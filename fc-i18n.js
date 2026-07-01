@@ -136,12 +136,6 @@
         de: "Lebenslauf öffnen",
         en: "Open CV",
       },
-      {
-        s: "#wga-inspiration-open",
-        attr: "aria-label",
-        de: "x INTERIOR öffnen",
-        en: "Open x INTERIOR",
-      },
     ],
     "joschaalstrainer.html": [
       {

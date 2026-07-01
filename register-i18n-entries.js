@@ -23,7 +23,7 @@ window.REGISTER_I18N = {
       { s: '.footer__links a[href*="datenschutz"]', de: "Datenschutz", en: "Privacy" },
       { s: '.footer__links a[href*="kontakt"]', de: "Kontakt", en: "Contact" },
       { s: '.footer__links a[href*="triff-joscha"]', de: "Joscha", en: "Joscha" },
-      { s: '.footer__links a[href*="wolfganggrope"]', de: "Kunst", en: "Art" },
+      { s: '.footer__links a[href*="biig.works/kunst"]', de: "Kunst", en: "Art" },
       { s: '.footer__links a[href*="kaufen"]', de: "Kaufen", en: "Shop" },
     ],
     logoAria: { de: "gogogo Startseite", en: "gogogo home" },
