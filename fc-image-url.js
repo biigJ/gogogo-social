@@ -135,14 +135,28 @@
   }
 
   function isExcludedPage() {
-    var body = document.body;
-    if (!body) return false;
-    if (body.classList.contains("biig-interior-page")) return true;
     if (document.documentElement.getAttribute("data-fc-no-image-optimize") === "true") return true;
     return false;
   }
 
+  function wireFallbackImages(root) {
+    (root || document).querySelectorAll("img[data-fc-fallback]").forEach(function (img) {
+      if (img.hasAttribute("data-fc-fallback-wired")) return;
+      img.setAttribute("data-fc-fallback-wired", "");
+      img.addEventListener(
+        "error",
+        function onFallback() {
+          img.removeEventListener("error", onFallback);
+          var fb = img.getAttribute("data-fc-fallback");
+          if (fb) img.src = fb;
+        },
+        { once: true }
+      );
+    });
+  }
+
   function autoInit() {
+    wireFallbackImages(document);
     if (isExcludedPage()) return;
     upgradePageImages(document);
   }
