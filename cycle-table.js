@@ -25,6 +25,37 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }
 
+  function syncSessionRemote(session) {
+    if (!window.fcCycleSupabase || !window.fcCycleSupabase.isConfigured() || !session) return;
+    window.fcCycleSupabase.upsertSession(session).catch(function (err) {
+      console.warn("[cycle-table] Supabase sync failed", err);
+    });
+  }
+
+  function syncUserRemote(user) {
+    if (!window.fcCycleSupabase || !window.fcCycleSupabase.isConfigured() || !user) return;
+    window.fcCycleSupabase.upsertUser(user).catch(function (err) {
+      console.warn("[cycle-table] user sync failed", err);
+    });
+  }
+
+  function hydrateFromRemote() {
+    if (!window.fcCycleSupabase || !window.fcCycleSupabase.isConfigured()) {
+      return Promise.resolve();
+    }
+    return window.fcCycleSupabase
+      .fetchAll()
+      .then(function (remote) {
+        if (!remote) return;
+        (remote.sessions || []).forEach(normalizeSession);
+        state.data = remote;
+        saveData(state.data);
+      })
+      .catch(function (err) {
+        console.warn("[cycle-table] Supabase load failed — using local cache", err);
+      });
+  }
+
   function loadUser() {
     try {
       var raw = localStorage.getItem(SESSION_KEY);
@@ -208,6 +239,7 @@
       user = { slug: slugName(name), name: name, pin: pin };
       state.data.users.push(user);
       saveData(state.data);
+      syncUserRemote(user);
     } else if (user.pin !== pin) {
       if (err) {
         err.textContent = t("PIN stimmt nicht.", "PIN does not match.");
@@ -268,6 +300,7 @@
       ud[field] = value;
     }
     saveData(state.data);
+    syncSessionRemote(session);
     renderTable();
   }
 
@@ -287,6 +320,7 @@
     if (existing) {
       existing.workoutName = workoutName;
       saveData(state.data);
+      syncSessionRemote(existing);
       state.selectedDate = date;
       updateDateLabel();
       render();
@@ -316,6 +350,7 @@
       participants: {},
     });
     saveData(state.data);
+    syncSessionRemote(state.data.sessions[state.data.sessions.length - 1]);
     if (els.sessionForm) els.sessionForm.reset();
     buildExerciseFields(countEl ? parseInt(countEl.value, 10) || 5 : 5);
     state.selectedDate = date;
@@ -772,6 +807,8 @@
     initEls();
     initDatePicker();
     bindStatic();
-    render();
+    hydrateFromRemote().then(function () {
+      render();
+    });
   });
 })();
