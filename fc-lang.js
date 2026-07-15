@@ -63,6 +63,7 @@
       s.src = "fc-i18n.js";
     }
     s.onload = boot;
+    s.onerror = boot;
     document.head.appendChild(s);
   }
 })();
