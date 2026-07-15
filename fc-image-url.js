@@ -26,10 +26,21 @@
     var p = normalizeAssetPath(src);
     if (p.indexOf("assets/berlin-arch-tour/") === 0) return 1200;
     if (p.indexOf("assets/wolfgang-grope/") === 0) return 1000;
-    if (p.indexOf("assets/interior/") === 0 || p.indexOf("assets/hochbau/") === 0) return 1400;
+    if (
+      p.indexOf("assets/interior/") === 0 ||
+      p.indexOf("assets/hochbau/") === 0 ||
+      p.indexOf("assets/interior-rocketscience/") === 0
+    ) {
+      return 1400;
+    }
     if (p.indexOf("assets/biigJ/") === 0) return 1200;
     if (p.indexOf("assets/gogogo/") === 0) return 1600;
     if (p.indexOf("assets-mockups/") === 0) return 1200;
+    return 1400;
+  }
+
+  function interiorFamilyWidth(width) {
+    if (width <= 820) return 800;
     return 1400;
   }
 
@@ -37,8 +48,16 @@
     if (!img) return widthForSrc(src);
     var explicit = Number(img.getAttribute("data-fc-width"));
     if (explicit > 0) return explicit;
+    var p = normalizeAssetPath(src);
     var w = Number(img.getAttribute("width"));
     if (w > 0) {
+      if (
+        p.indexOf("assets/interior/") === 0 ||
+        p.indexOf("assets/hochbau/") === 0 ||
+        p.indexOf("assets/interior-rocketscience/") === 0
+      ) {
+        return interiorFamilyWidth(w);
+      }
       if (w <= 820) return 800;
       if (w <= 1100) return 1000;
       if (w <= 1300) return 1200;
