@@ -12,7 +12,13 @@
   }
 
   function normalizeAssetPath(src) {
-    return splitQuery(src).path.replace(/^(\.\.\/)+/, "").replace(/^\//, "");
+    var path = splitQuery(src).path;
+    if (/^https?:\/\//i.test(path)) {
+      try {
+        path = new URL(path).pathname;
+      } catch (e) {}
+    }
+    return path.replace(/^(\.\.\/)+/, "").replace(/^\//, "");
   }
 
   function shouldOptimizeSrc(src) {
@@ -44,13 +50,22 @@
     return 1400;
   }
 
+  function snapWidthForSrc(src, width) {
+    var family = widthForSrc(src);
+    if (family === 1000 && width !== 1000) return 1000;
+    return width;
+  }
+
   function widthForImg(img, src) {
     if (!img) return widthForSrc(src);
     var explicit = Number(img.getAttribute("data-fc-width"));
-    if (explicit > 0) return explicit;
+    if (explicit > 0) return snapWidthForSrc(src, explicit);
     var p = normalizeAssetPath(src);
     var w = Number(img.getAttribute("width"));
     if (w > 0) {
+      if (p.indexOf("assets/wolfgang-grope/") === 0) {
+        return 1000;
+      }
       if (
         p.indexOf("assets/interior/") === 0 ||
         p.indexOf("assets/hochbau/") === 0 ||
@@ -82,7 +97,8 @@
     if (!img || !src) return src;
     opts = opts || {};
     var fallback = src;
-    var webp = optimizedUrl(src, width || widthForImg(img, src));
+    var resolvedWidth = snapWidthForSrc(src, width || widthForImg(img, src));
+    var webp = optimizedUrl(src, resolvedWidth);
     if (!webp || webp === src) {
       img.src = fallback;
       if (opts.srcset) img.removeAttribute("srcset");
@@ -96,6 +112,15 @@
     }
 
     function onError() {
+      if (!img.dataset.fcWidthFallback) {
+        var familyW = widthForSrc(src);
+        var familyWebp = optimizedUrl(src, familyW);
+        if (familyWebp && familyWebp !== webp && familyWebp !== src) {
+          img.dataset.fcWidthFallback = "1";
+          img.src = familyWebp;
+          return;
+        }
+      }
       useFallback();
     }
 
