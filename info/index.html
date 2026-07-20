@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0A0A0A" />
+  <title>gogogo</title>
+  <meta name="description" content="Ein kleiner Kreis für tägliche Bewegung. Auf Einladung." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Playfair+Display:wght@600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/gate.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body.has-test-nav {
+      padding-top: 0;
+    }
+
+    .door {
+      position: relative;
+      min-height: 100dvh;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: calc(56px + env(safe-area-inset-top)) 24px calc(56px + env(safe-area-inset-bottom));
+      opacity: 1;
+      transition: opacity 300ms ease;
+    }
+
+    .door.is-leaving {
+      opacity: 0;
+    }
+
+    .door__bg {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      background: var(--black);
+      pointer-events: none;
+    }
+
+    .door__bg video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .door__overlay {
+      position: absolute;
+      inset: 0;
+      background: var(--black);
+      opacity: 0.88;
+    }
+
+    .door__inner {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 480px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .door__label {
+      margin-bottom: 20px;
+    }
+
+    .door__brand {
+      font-family: "Playfair Display", serif;
+      font-weight: 600;
+      font-size: 44px;
+      line-height: 1.1;
+      color: var(--white);
+    }
+
+    .door__lede {
+      font-family: Inter, sans-serif;
+      font-weight: 300;
+      font-size: 17px;
+      line-height: 1.45;
+      color: var(--white);
+      max-width: 22em;
+      margin: 0 auto;
+    }
+
+    .door__form {
+      margin-top: 40px;
+    }
+
+    .door__error {
+      margin-top: 14px;
+      font-family: Inter, sans-serif;
+      font-weight: 300;
+      font-size: 13px;
+      color: var(--subtle);
+      min-height: 1.2em;
+    }
+
+    .door__panel[hidden] {
+      display: none;
+    }
+
+    .door__waitlist .field + .field {
+      margin-top: 16px;
+    }
+
+    .door__done {
+      margin-top: 24px;
+      font-family: Inter, sans-serif;
+      font-weight: 300;
+      font-size: 17px;
+      color: var(--white);
+      line-height: 1.45;
+    }
+
+    .door__footer {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2;
+      padding: 16px 20px calc(16px + env(safe-area-inset-bottom));
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body class="has-test-nav">
+  <header class="test-nav" aria-label="Hauptnavigation">
+    <a class="test-nav__logo" href="/info/">gogogo</a>
+    <nav class="test-nav__links">
+      <a href="/app/">App</a>
+      <a class="is-active" href="/info/" aria-current="page">Info</a>
+    </nav>
+  </header>
+  <main class="door" id="door">
+    <div class="door__bg" aria-hidden="true">
+      <video
+        id="door-video"
+        muted
+        loop
+        playsinline
+        preload="metadata"
+        poster="../assets/gogogo/hero-poster.png"
+      >
+        <source src="../assets/gogogo/hero.mp4" type="video/mp4" />
+      </video>
+      <div class="door__overlay"></div>
+    </div>
+
+    <div class="door__inner">
+      <p class="caps door__label">Nur auf Einladung</p>
+      <h1 class="door__brand">gogogo</h1>
+      <hr class="accent-line" />
+      <p class="door__lede">Ein kleiner Kreis für tägliche Bewegung.</p>
+
+      <div class="door__form">
+        <div class="door__panel" id="panel-code">
+          <label class="visually-hidden" for="gate-code">Dein Code</label>
+          <input
+            class="field"
+            id="gate-code"
+            type="text"
+            inputmode="text"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            placeholder="Dein Code"
+          />
+          <button class="btn-ghost" type="button" id="btn-enter">Eintreten</button>
+          <p class="door__error" id="gate-error" role="status" aria-live="polite"></p>
+          <button class="textlink" type="button" id="btn-waitlist-open">Keinen Code? Auf die Liste.</button>
+        </div>
+
+        <div class="door__panel door__waitlist" id="panel-waitlist" hidden>
+          <label class="visually-hidden" for="wl-name">Name</label>
+          <input class="field" id="wl-name" type="text" autocomplete="name" placeholder="Name" />
+          <label class="visually-hidden" for="wl-phone">Telefon</label>
+          <input class="field" id="wl-phone" type="tel" autocomplete="tel" placeholder="Telefon" />
+          <button class="btn-ghost" type="button" id="btn-waitlist-submit">Auf die Liste</button>
+          <p class="door__done" id="wl-done" hidden>Joscha meldet sich. Versprochen.</p>
+          <button class="textlink" type="button" id="btn-waitlist-back" style="margin-top: 24px;">Zurück zum Code</button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="gate-footer door__footer">
+      <a href="joscha.html">Triff Joscha</a><span class="gate-footer__sep">·</span>
+      <a href="https://www.fridaycircle.club" target="_blank" rel="noopener">FRIDAY CIRCLE</a><span class="gate-footer__sep">·</span>
+      <a href="https://www.fridaycircle.club/impressum/" target="_blank" rel="noopener">Impressum</a><span class="gate-footer__sep">·</span>
+      <a href="https://www.fridaycircle.club/datenschutz/" target="_blank" rel="noopener">Datenschutz</a>
+    </footer>
+  </main>
+
+  <style>
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  </style>
+
+  <script>
+    (function () {
+      var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
+      var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
+      var GATE_KEY = "gogogo_gate";
+
+      if (localStorage.getItem(GATE_KEY) === "open") {
+        window.location.replace("inside/");
+        return;
+      }
+
+      var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      var video = document.getElementById("door-video");
+      if (reduceMotion) {
+        video.removeAttribute("autoplay");
+        video.pause();
+        video.remove();
+      } else {
+        video.setAttribute("autoplay", "");
+        var playPromise = video.play();
+        if (playPromise && typeof playPromise.catch === "function") {
+          playPromise.catch(function () {
+            video.remove();
+          });
+        }
+        video.addEventListener("error", function () {
+          video.remove();
+        });
+      }
+
+      var door = document.getElementById("door");
+      var codeInput = document.getElementById("gate-code");
+      var errorEl = document.getElementById("gate-error");
+      var btnEnter = document.getElementById("btn-enter");
+      var panelCode = document.getElementById("panel-code");
+      var panelWaitlist = document.getElementById("panel-waitlist");
+      var wlDone = document.getElementById("wl-done");
+
+      function digitsOnly(value) {
+        return String(value || "").replace(/\D/g, "");
+      }
+
+      function phonesMatch(a, b) {
+        var da = digitsOnly(a);
+        var db = digitsOnly(b);
+        if (!da || !db) return false;
+        if (da === db) return true;
+        return da.endsWith(db) || db.endsWith(da);
+      }
+
+      async function isValidAccess(raw) {
+        var input = String(raw || "").trim();
+        if (!input) return false;
+
+        var code = input.toUpperCase().replace(/\s/g, "");
+        var inviteRes = await supabase
+          .from("invites")
+          .select("code")
+          .eq("code", code)
+          .maybeSingle();
+        if (inviteRes.data) return true;
+
+        var phoneDigits = digitsOnly(input);
+        if (phoneDigits.length < 6) return false;
+
+        var usersRes = await supabase.from("users").select("phone");
+        if (usersRes.error || !usersRes.data) return false;
+        return usersRes.data.some(function (row) {
+          return phonesMatch(row.phone, input);
+        });
+      }
+
+      function showError() {
+        errorEl.textContent = "Dieser Code ist nicht gültig.";
+        codeInput.classList.remove("shake", "is-error");
+        void codeInput.offsetWidth;
+        if (reduceMotion) {
+          codeInput.classList.add("is-error");
+        } else {
+          codeInput.classList.add("shake");
+        }
+      }
+
+      function clearError() {
+        errorEl.textContent = "";
+        codeInput.classList.remove("shake", "is-error");
+      }
+
+      async function enter() {
+        clearError();
+        var value = codeInput.value;
+        btnEnter.disabled = true;
+        try {
+          var ok = await isValidAccess(value);
+          if (!ok) {
+            showError();
+            return;
+          }
+          localStorage.setItem(GATE_KEY, "open");
+          door.classList.add("is-leaving");
+          window.setTimeout(function () {
+            window.location.href = "inside/";
+          }, reduceMotion ? 0 : 300);
+        } catch (err) {
+          showError();
+        } finally {
+          btnEnter.disabled = false;
+        }
+      }
+
+      btnEnter.addEventListener("click", enter);
+      codeInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          enter();
+        }
+      });
+      codeInput.addEventListener("input", clearError);
+
+      document.getElementById("btn-waitlist-open").addEventListener("click", function () {
+        panelCode.hidden = true;
+        panelWaitlist.hidden = false;
+        wlDone.hidden = true;
+        document.getElementById("wl-name").focus();
+      });
+
+      document.getElementById("btn-waitlist-back").addEventListener("click", function () {
+        panelWaitlist.hidden = true;
+        panelCode.hidden = false;
+        codeInput.focus();
+      });
+
+      document.getElementById("btn-waitlist-submit").addEventListener("click", async function () {
+        var name = (document.getElementById("wl-name").value || "").trim();
+        var phone = (document.getElementById("wl-phone").value || "").trim();
+        var btn = document.getElementById("btn-waitlist-submit");
+        if (!name || !phone) return;
+        btn.disabled = true;
+        var res = await supabase.from("waitlist").insert({ name: name, phone: phone });
+        btn.disabled = false;
+        if (res.error) return;
+        wlDone.hidden = false;
+      });
+    })();
+  </script>
+</body>
+</html>

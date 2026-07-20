@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0A0A0A" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="gogogo" />
+  <link rel="manifest" href="manifest.json" />
+  <title>gogogo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Playfair+Display:wght@600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="../assets/gate.css" />
+  <style>
+    :root {
+      --black: #0A0A0A;
+      --white: #F7F5F0;
+      --accent: #C8B89A;
+      --accent-d: #8B7355;
+      --mid: #1E1E1E;
+      --line: #2A2A2A;
+      --subtle: #8A8A85;
+      --done: #4A7C59;
+      --moved: #8B6914;
+      --none: #3A3A3A;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      min-height: 100%;
+      background: var(--black);
+      color: var(--white);
+      font-family: Inter, sans-serif;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+    body.has-test-nav .app {
+      padding-top: calc(24px + 48px + env(safe-area-inset-top));
+    }
+    body.has-test-nav #view-splash {
+      top: calc(48px + env(safe-area-inset-top));
+    }
+    button, input, textarea, select {
+      font: inherit;
+      color: inherit;
+      background: none;
+      border: none;
+      outline: none;
+    }
+    button { cursor: pointer; }
+    a { color: var(--accent); text-decoration: none; }
+
+    .app {
+      max-width: 390px;
+      margin: 0 auto;
+      min-height: 100dvh;
+      padding: 24px;
+      padding-bottom: calc(24px + env(safe-area-inset-bottom));
+      position: relative;
+    }
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .caps {
+      font-family: Inter, sans-serif;
+      font-weight: 500;
+      font-size: 0.65rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--subtle);
+    }
+    .serif { font-family: "Playfair Display", serif; font-weight: 600; }
+    .line { height: 1px; background: var(--line); width: 100%; }
+    .accent-line { height: 1px; background: var(--accent); width: 40px; margin: 16px auto 0; }
+
+    /* Splash */
+    #view-splash {
+      position: fixed; inset: 0; z-index: 100;
+      display: none; align-items: center; justify-content: center;
+      background: var(--black); flex-direction: column;
+    }
+    #view-splash.active { display: flex; }
+    #view-splash .brand { font-family: "Playfair Display", serif; font-size: 32px; }
+    #view-splash.fade-out { opacity: 0; transition: opacity 300ms ease; }
+
+    /* Gate */
+    .gate-label { margin-bottom: 16px; }
+    .gate-headline { font-size: 40px; line-height: 1.1; margin-bottom: 32px; }
+    .field {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      padding: 16px;
+      background: var(--mid);
+      margin-bottom: 12px;
+    }
+    .field::placeholder { color: var(--subtle); }
+    .btn {
+      display: block; width: 100%;
+      height: 56px;
+      border-radius: 2px;
+      background: var(--accent);
+      color: var(--black);
+      font-weight: 500;
+      text-align: center;
+      line-height: 56px;
+      transition: background 150ms;
+    }
+    .btn:hover, .btn:active { background: var(--accent-d); }
+    .btn:disabled { opacity: 0.4; pointer-events: none; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--line);
+      line-height: 54px;
+    }
+    .btn-done { background: var(--done); color: var(--white); }
+    .btn-moved { background: var(--moved); color: var(--white); }
+    .btn-none { background: var(--none); color: var(--white); }
+    .btn-accent-pt { background: var(--accent); color: var(--black); }
+    .textlink {
+      display: block; text-align: center; margin-top: 24px;
+      color: var(--subtle); font-size: 0.9rem;
+    }
+    .textlink span { color: var(--accent); border-bottom: 1px solid var(--accent); }
+
+    /* Onboarding progress */
+    .ob-progress {
+      height: 2px; background: var(--line); margin-bottom: 32px; overflow: hidden;
+    }
+    .ob-progress > i {
+      display: block; height: 100%; background: var(--accent);
+      width: 0; transition: width 200ms ease;
+    }
+    .ob-step { display: none; }
+    .ob-step.active { display: block; }
+    .ob-title { font-size: 28px; line-height: 1.15; margin-bottom: 24px; }
+    .tile-grid { display: grid; gap: 10px; margin-bottom: 24px; }
+    .tile {
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      padding: 16px;
+      text-align: left;
+      background: var(--mid);
+    }
+    .tile.selected { border-color: var(--accent); }
+    .tile strong { display: block; font-weight: 500; margin-bottom: 6px; }
+    .tile small { color: var(--subtle); font-size: 0.8rem; line-height: 1.35; font-weight: 300; }
+    .choice-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      color: var(--white);
+      background: var(--mid);
+    }
+    .chip.selected { border-color: var(--accent); color: var(--accent); }
+    .day-row { display: flex; gap: 6px; margin: 16px 0; }
+    .day-btn {
+      flex: 1; aspect-ratio: 1;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      font-size: 0.7rem;
+      color: var(--subtle);
+      background: var(--mid);
+    }
+    .day-btn.plan { border-color: var(--accent); color: var(--white); background: #2a261f; }
+    .hint { color: var(--subtle); font-size: 0.85rem; line-height: 1.45; margin: 12px 0 24px; font-weight: 300; }
+    .plan-preview { border: 1px solid var(--line); border-radius: 2px; padding: 14px; margin-bottom: 8px; }
+    .plan-preview .caps { margin-bottom: 6px; }
+    textarea.field { min-height: 100px; resize: vertical; line-height: 1.4; }
+    .char-count { text-align: right; color: var(--subtle); font-size: 0.75rem; margin-top: -4px; margin-bottom: 16px; }
+
+    /* Heute */
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .header .brand { font-family: "Playfair Display", serif; font-size: 20px; }
+    .header-actions { display: flex; align-items: center; gap: 12px; }
+    .icon-btn {
+      width: 32px; height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      color: var(--subtle);
+      font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cycle-wrap { display: flex; justify-content: center; margin-bottom: 28px; }
+    .cycle-svg { width: 180px; height: 180px; }
+    .cycle-center {
+      font-weight: 300; font-size: 1.1rem; fill: var(--white);
+    }
+    .cycle-sub { font-size: 0.55rem; fill: var(--subtle); letter-spacing: 0.08em; text-transform: uppercase; }
+    .date-label { text-align: center; margin-bottom: 20px; }
+    .today-headline { font-size: 32px; line-height: 1.15; margin-bottom: 8px; }
+    .today-desc { color: var(--subtle); font-weight: 300; margin-bottom: 20px; }
+    .own-why {
+      font-style: italic; color: var(--subtle); font-weight: 300;
+      font-size: 0.95rem; line-height: 1.4; margin-bottom: 28px;
+    }
+    .checkin-stack { display: grid; gap: 10px; margin-bottom: 20px; }
+    .checkin-stack .btn.pop {
+      animation: checkPop 200ms ease;
+    }
+    @keyframes checkPop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #view-splash.fade-out { transition: none; }
+      .checkin-stack .btn.pop { animation: none; }
+      .ob-progress > i { transition: none; }
+    }
+    .points-feedback {
+      text-align: center; color: var(--accent);
+      font-weight: 300; font-size: 1.2rem; margin-bottom: 8px;
+      min-height: 1.4em;
+    }
+    .confirm-line {
+      text-align: center; color: var(--subtle); font-weight: 300;
+      margin-bottom: 20px; min-height: 1.4em;
+    }
+    .optional-block { display: none; margin-bottom: 20px; }
+    .optional-block.show { display: block; }
+    .optional-block .caps { margin-bottom: 8px; }
+    .nods-line {
+      text-align: center; color: var(--accent); font-size: 0.85rem;
+      margin: 12px 0 20px; font-weight: 300;
+    }
+    .nav-link {
+      display: block; text-align: center; margin-top: 28px;
+      color: var(--accent); letter-spacing: 0.12em;
+      font-size: 0.65rem; font-weight: 500; text-transform: uppercase;
+    }
+
+    /* Gruppe */
+    .back-link {
+      display: inline-block; margin-bottom: 20px;
+      color: var(--subtle); font-size: 0.9rem;
+    }
+    .group-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .group-head h1 { font-size: 32px; }
+    .member-list { display: grid; gap: 0; }
+    .member-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+      cursor: pointer; text-align: left; width: 100%;
+    }
+    .avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: "Playfair Display", serif; font-size: 16px;
+      color: var(--black); flex-shrink: 0;
+    }
+    .member-meta { flex: 1; min-width: 0; }
+    .member-meta .name { font-weight: 500; }
+    .member-meta .role-tag { margin-top: 2px; }
+    .status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      border: 1px solid var(--line); flex-shrink: 0;
+    }
+    .status-dot.done { background: var(--done); border-color: var(--done); }
+    .status-dot.moved { background: var(--moved); border-color: var(--moved); }
+    .status-dot.none { background: var(--none); border-color: var(--none); }
+
+    /* Cards / overlays */
+    .overlay {
+      display: none; position: fixed; inset: 0; z-index: 80;
+      background: rgba(10,10,10,0.92);
+      align-items: flex-end; justify-content: center;
+      padding: 24px;
+    }
+    .overlay.active { display: flex; }
+    .sheet {
+      width: 100%; max-width: 390px;
+      background: var(--mid);
+      border: 1px solid var(--line);
+      border-radius: 2px;
+      padding: 24px;
+      max-height: 85dvh;
+      overflow-y: auto;
+    }
+    .sheet h2 { font-size: 28px; margin-bottom: 16px; }
+    .sheet p { color: var(--subtle); font-weight: 300; line-height: 1.45; margin-bottom: 12px; }
+    .nod-btn {
+      width: 88px; height: 88px; border-radius: 50%;
+      border: 1px solid var(--accent);
+      margin: 20px auto; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 4px;
+    }
+    .nod-btn.filled { background: var(--accent); color: var(--black); }
+    .nod-btn .caps { color: inherit; }
+    .photo-preview {
+      width: 100%; max-height: 200px; object-fit: cover;
+      border-radius: 2px; margin-top: 8px; display: none;
+    }
+    .photo-preview.show { display: block; }
+
+    /* Admin */
+    .admin-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    .admin-tab {
+      flex: 1; padding: 10px; border: 1px solid var(--line);
+      border-radius: 2px; font-size: 0.75rem; color: var(--subtle);
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .admin-tab.active { border-color: var(--accent); color: var(--accent); }
+    .admin-panel { display: none; }
+    .admin-panel.active { display: block; }
+    .admin-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line);
+      text-align: left; width: 100%;
+    }
+    .admin-row.hang { color: var(--moved); }
+    .code-big {
+      font-family: "Playfair Display", serif;
+      font-size: 40px; letter-spacing: 0.15em;
+      text-align: center; margin: 20px 0;
+    }
+
+    /* Toast */
+    #toast {
+      position: fixed; left: 50%; bottom: 28px;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--mid); border: 1px solid var(--line);
+      border-radius: 2px; padding: 12px 18px;
+      font-size: 0.85rem; color: var(--white);
+      opacity: 0; pointer-events: none; z-index: 200;
+      transition: opacity 200ms, transform 200ms;
+      max-width: calc(100% - 48px);
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #toast { transition: none; }
+    }
+
+    .hidden { display: none !important; }
+    .mt-16 { margin-top: 16px; }
+    .mt-24 { margin-top: 24px; }
+    .mb-8 { margin-bottom: 8px; }
+    .mb-16 { margin-bottom: 16px; }
+  </style>
+</head>
+<body class="has-test-nav">
+  <header class="test-nav" aria-label="Hauptnavigation">
+    <a class="test-nav__logo" href="/info/">gogogo</a>
+    <nav class="test-nav__links">
+      <a class="is-active" href="/app/" aria-current="page">App</a>
+      <a href="/info/">Info</a>
+    </nav>
+  </header>
+  <div id="view-splash" class="view active">
+    <div class="brand">gogogo</div>
+    <div class="accent-line"></div>
+  </div>
+
+  <div class="app">
+    <!-- GATE -->
+    <div id="view-gate" class="view">
+      <div class="caps gate-label">Nur auf Einladung</div>
+      <h1 class="serif gate-headline">gogogo ist ein kleiner Kreis.</h1>
+      <input id="invite-code" class="field" type="text" maxlength="6" placeholder="6 stelliger Code" autocomplete="off" autocapitalize="characters" />
+      <button class="btn" id="btn-enter">Eintreten</button>
+      <button class="textlink" id="btn-waitlist-open">Keinen Code? <span>Auf die Liste.</span></button>
+    </div>
+
+    <div id="view-waitlist" class="view">
+      <button class="back-link" id="btn-waitlist-back">← Zurück</button>
+      <h1 class="serif ob-title">Auf die Liste.</h1>
+      <input id="wl-name" class="field" type="text" placeholder="Vorname" />
+      <input id="wl-phone" class="field" type="tel" placeholder="Telefon" />
+      <button class="btn" id="btn-waitlist-submit">Eintragen</button>
+      <p class="hint" id="wl-done" style="display:none">Joscha meldet sich. Versprochen.</p>
+    </div>
+
+    <!-- ONBOARDING -->
+    <div id="view-onboarding" class="view">
+      <div class="ob-progress"><i id="ob-bar"></i></div>
+
+      <div id="ob-a" class="ob-step active">
+        <h1 class="serif ob-title">Wer bist du?</h1>
+        <input id="ob-name" class="field" type="text" placeholder="Vorname" />
+        <input id="ob-phone" class="field" type="tel" placeholder="Telefon" />
+        <input id="ob-email" class="field" type="email" placeholder="E Mail (optional)" />
+        <button class="btn" id="ob-a-next">Weiter</button>
+      </div>
+
+      <div id="ob-b" class="ob-step">
+        <h1 class="serif ob-title">Was soll besser werden?</h1>
+        <div class="tile-grid" id="goal-tiles"></div>
+        <button class="btn" id="ob-b-next" disabled>Weiter</button>
+      </div>
+
+      <div id="ob-c" class="ob-step">
+        <h1 class="serif ob-title">Was ist realistisch?</h1>
+        <p class="caps mb-8">Wie viele Trainingstage sind ehrlich machbar?</p>
+        <div class="choice-row" id="cap-days"></div>
+        <p class="caps mb-8">Wo bewegst du dich?</p>
+        <div class="choice-row" id="cap-place"></div>
+        <div id="plan-box" class="hidden">
+          <div class="plan-preview">
+            <div class="caps">Dein Plan</div>
+            <div id="plan-label"></div>
+          </div>
+          <p class="caps mb-8">Deine Tage (tippen zum Verschieben)</p>
+          <div class="day-row" id="day-row"></div>
+          <p class="hint">Dein Plan gilt jetzt 30 Tage. Verschieben innerhalb einer Woche geht. Neu verhandeln erst im nächsten Zyklus.</p>
+        </div>
+        <button class="btn" id="ob-c-next" disabled>Weiter</button>
+      </div>
+
+      <div id="ob-d" class="ob-step">
+        <h1 class="serif ob-title">Warum willst du das? Deine Worte.</h1>
+        <textarea id="ob-why" class="field" maxlength="200" placeholder="z.B. Ich will mit 60 noch vom Boden aufstehen können."></textarea>
+        <div class="char-count"><span id="why-count">0</span>/200</div>
+        <p class="caps mb-8">Was machst du gern? (optional)</p>
+        <div class="choice-row" id="interest-chips"></div>
+        <button class="btn mt-24" id="ob-d-finish">Los geht's.</button>
+      </div>
+    </div>
+
+    <div id="view-buddy-intro" class="view">
+      <h1 class="serif ob-title">Joscha ist dein erster Buddy.</h1>
+      <p class="hint">Er sieht deine Check-ins und meldet sich, wenn du hängst. Du kannst weitere Buddies einladen, sobald ihr euch kennt.</p>
+      <button class="btn" id="btn-buddy-ok">Verstanden.</button>
+    </div>
+
+    <!-- HEUTE -->
+    <div id="view-today" class="view">
+      <div class="header">
+        <div class="brand">gogogo</div>
+        <div class="header-actions">
+          <div class="caps" id="cycle-day-label">Tag 1 / 30</div>
+          <button class="icon-btn hidden" id="btn-admin" title="Admin" aria-label="Admin">◆</button>
+        </div>
+      </div>
+      <div class="cycle-wrap">
+        <svg class="cycle-svg" id="cycle-svg" viewBox="0 0 200 200" aria-hidden="true"></svg>
+      </div>
+      <div class="caps date-label" id="date-label"></div>
+      <h1 class="serif today-headline" id="today-headline"></h1>
+      <p class="today-desc" id="today-desc"></p>
+      <p class="own-why" id="own-why"></p>
+      <div class="nods-line hidden" id="nods-line"></div>
+      <div class="checkin-stack" id="checkin-stack"></div>
+      <div class="points-feedback" id="points-feedback"></div>
+      <div class="confirm-line" id="confirm-line"></div>
+      <div class="optional-block" id="optional-block">
+        <div class="caps">Notiz (optional)</div>
+        <input id="checkin-note" class="field" type="text" maxlength="140" placeholder="Ein Satz." />
+        <div class="caps">Foto (optional)</div>
+        <input id="checkin-photo" type="file" accept="image/*" capture="environment" class="field" style="padding:12px" />
+        <img id="photo-preview" class="photo-preview" alt="" />
+        <button class="btn btn-ghost mt-16" id="btn-save-extras">Speichern</button>
+      </div>
+      <button class="nav-link" id="btn-to-group">→ Deine Gruppe</button>
+    </div>
+
+    <!-- GRUPPE -->
+    <div id="view-group" class="view">
+      <button class="back-link" id="btn-group-back">← Heute</button>
+      <div class="group-head">
+        <h1 class="serif">Deine Gruppe.</h1>
+        <button class="icon-btn" id="btn-invite" aria-label="Einladen">+</button>
+      </div>
+      <div class="member-list" id="member-list"></div>
+    </div>
+
+    <!-- ADMIN -->
+    <div id="view-admin" class="view">
+      <button class="back-link" id="btn-admin-back">← Heute</button>
+      <h1 class="serif ob-title">Admin.</h1>
+      <div class="admin-tabs">
+        <button class="admin-tab active" data-tab="today">Heute</button>
+        <button class="admin-tab" data-tab="hang">Hängt</button>
+        <button class="admin-tab" data-tab="invite">Einladen</button>
+      </div>
+      <div id="admin-today" class="admin-panel active"></div>
+      <div id="admin-hang" class="admin-panel"></div>
+      <div id="admin-invite" class="admin-panel">
+        <p class="caps mb-8">Gruppe</p>
+        <select id="admin-group-select" class="field"></select>
+        <input id="admin-new-group" class="field" type="text" placeholder="Oder neue Gruppe anlegen" />
+        <button class="btn" id="btn-create-invite">Neuen Code erstellen</button>
+        <div id="invite-result" class="hidden">
+          <div class="code-big" id="new-invite-code"></div>
+          <button class="btn btn-ghost mb-8" id="btn-copy-invite">Kopieren</button>
+          <button class="btn" id="btn-share-invite">Teilen</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlays -->
+  <div class="overlay" id="overlay-week">
+    <div class="sheet">
+      <h2 class="serif">Deine Woche.</h2>
+      <p id="week-units"></p>
+      <p id="week-moved"></p>
+      <p id="week-points"></p>
+      <p class="own-why" id="week-why"></p>
+      <button class="btn mt-16" id="btn-week-ok">Weiter.</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay-cycle">
+    <div class="sheet">
+      <h2 class="serif">30 Tage.</h2>
+      <p id="cycle-points"></p>
+      <p id="cycle-units"></p>
+      <p>Zeit für ein Gespräch mit Joscha: Plan behalten oder anpassen?</p>
+      <button class="btn mt-16" id="btn-keep-plan">Plan behalten</button>
+      <button class="btn btn-ghost mt-16" id="btn-cycle-joscha">Joscha schreiben</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay-photo-hint">
+    <div class="sheet">
+      <h2 class="serif">Dein Foto.</h2>
+      <p>Dein Foto zeigt deinen Moment, nicht deine Performance. Es bleibt in deiner Gruppe und verschwindet nach 7 Tagen aus der Ansicht.</p>
+      <button class="btn mt-16" id="btn-photo-hint-ok">Verstanden.</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay-member">
+    <div class="sheet">
+      <button class="back-link" id="btn-member-close">← Schließen</button>
+      <h2 class="serif" id="member-name"></h2>
+      <p id="member-note" class="hint"></p>
+      <img id="member-photo" class="photo-preview" alt="" />
+      <button class="nod-btn" id="btn-nod"><span class="caps">Nicken</span></button>
+      <p class="caps" id="nod-status" style="text-align:center"></p>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay-invite-info">
+    <div class="sheet">
+      <h2 class="serif">Einladen.</h2>
+      <p>Neue Buddies kommen über Joscha dazu. Sag ihm, wen du dabei haben willst.</p>
+      <button class="btn mt-16" id="btn-invite-joscha">Joscha schreiben</button>
+      <button class="btn btn-ghost mt-16" id="btn-invite-close">Schließen</button>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+(function () {
+  // Push via Supabase Edge Functions + pg_cron in Phase 2.
+
+  const SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
+  const LS_USER = "gogogo_user";
+  const LS_QUEUE = "gogogo_checkin_queue";
+  const LS_WEEK_REPORT = "gogogo_week_report";
+  const LS_PHOTO_HINT = "gogogo_photo_hint_seen";
+  const JOSCHA_WA = "490000000000";
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const PLAN_MATRIX = {
+    kraft_2:    { units: ["kraft","kraft"],                    label: "2x Kraft pro Woche" },
+    kraft_3:    { units: ["kraft","kraft","lang"],             label: "2x Kraft, 1x lang & locker" },
+    kraft_4:    { units: ["kraft","kraft","lang","intensiv"],  label: "2x Kraft, 1x lang, 1x intensiv" },
+    ausdauer_2: { units: ["lang","intensiv"],                  label: "1x lang, 1x intensiv" },
+    ausdauer_3: { units: ["lang","intensiv","kraft"],          label: "1x lang, 1x intensiv, 1x Kraft" },
+    ausdauer_4: { units: ["lang","lang","intensiv","kraft"],   label: "2x lang, 1x intensiv, 1x Kraft" },
+    skills_2:   { units: ["skills","kraft"],                   label: "1x Skills, 1x Kraft" },
+    skills_3:   { units: ["skills","kraft","lang"],            label: "1x Skills, 1x Kraft, 1x lang" },
+    skills_4:   { units: ["skills","kraft","kraft","lang"],    label: "1x Skills, 2x Kraft, 1x lang" },
+    baseline_2: { units: ["lang","skills"],                    label: "1x lang, 1x Skills" },
+    baseline_3: { units: ["lang","skills","kraft"],            label: "1x lang, 1x Skills, 1x leichte Kraft" },
+    baseline_4: { units: ["lang","skills","kraft","lang"],     label: "2x lang, 1x Skills, 1x leichte Kraft" }
+  };
+
+  const UNIT_LABELS = {
+    kraft:    { name: "Kraft",           desc: "ca. 45 Min Ganzkörper" },
+    lang:     { name: "Lang & locker",   desc: "45-90 Min Gehen, Laufen, Rad" },
+    intensiv: { name: "Kurz & intensiv", desc: "20-30 Min HIIT, Sprints, Spiel" },
+    skills:   { name: "Skills",          desc: "Balance, Beweglichkeit, Koordination" }
+  };
+
+  const GOAL_TILES = [
+    { id: "kraft", title: "Kraft & Muskeln erhalten", why: "Ab 30 verliert der Körper ohne Reiz ca. 1% Muskel pro Jahr." },
+    { id: "ausdauer", title: "Ausdauer & Energie", why: "Jede zusätzliche Stufe aerober Kapazität senkt das Sterberisiko um ca. 11%." },
+    { id: "skills", title: "Beweglichkeit & Balance", why: "Balance und Beweglichkeit gehen ab 50 zuerst. Trainierbar in Minuten pro Tag." },
+    { id: "baseline", title: "Wieder regelmäßig bewegen", why: "Schon 10 bis 20 Minuten täglich halten deine Grundlinie." }
+  ];
+
+  const PLACE_OPTS = [
+    { id: "gym", label: "Gym" },
+    { id: "home", label: "Zuhause" },
+    { id: "outdoor", label: "Draußen" },
+    { id: "mixed", label: "Gemischt" }
+  ];
+
+  const INTERESTS = ["Laufen","Rad","Schwimmen","Wandern","Ballsport","Tanzen","Klettern","Kampfsport","Yoga"];
+  const DAY_KEYS = ["mon","tue","wed","thu","fri","sat","sun"];
+  const DAY_LABELS = ["M","D","M","D","F","S","S"];
+  const DEFAULT_DAYS = { 2: ["tue","sat"], 3: ["tue","thu","sat"], 4: ["tue","thu","sat","sun"] };
+  const AVATAR_COLORS = ["#C8B89A","#4A7C59","#8B6914"];
+
+  /*
+   * ROLE_DEFINITIONS — Vergaberegeln (Architektur Phase 2+):
+   * gym: automatisch bei Onboarding
+   * coach: manuell durch Admin
+   * motivator: 5+ Nicken gegeben in einem Zyklus
+   * rolemodel: höchste Wochenpunkte 3 Wochen in Folge (nur intern, nie öffentlich)
+   * drill: 4 Wochen Plan-Einheiten zu 100%
+   * streak: bewusst deaktiviert in V1 (keine Streaks)
+   */
+  const ROLE_DEFINITIONS = {
+    gym: { label: "Gym", active: true },
+    coach: { label: "Coach", active: true },
+    motivator: { label: "Motivator", active: false },
+    rolemodel: { label: "Rolemodel", active: false },
+    drill: { label: "Drill", active: false },
+    streak: { label: "Streak", active: false }
+  };
+  const ROLES_ENABLED = ["gym", "coach"];
+
+  const CONFIRM = {
+    done: "Steht. Deine Gruppe sieht das.",
+    moved: "Zählt. Bewegung ist Bewegung.",
+    none: "Morgen ist ein neuer Tag."
+  };
+
+  let user = null;
+  let inviteRow = null;
+  let ob = {
+    name: "", phone: "", email: "",
+    goal: null, capacity_days: null, capacity_place: null,
+    plan_id: null, plan_days: {}, own_why: "", interests: []
+  };
+  let pendingMember = null;
+  let todayCheckin = null;
+  let weekCheckins = [];
+  let cycleCheckins = [];
+  let openMakeupUnits = [];
+
+  function $(id) { return document.getElementById(id); }
+
+  function showToast(msg) {
+    const el = $("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(function () { el.classList.remove("show"); }, 2000);
+  }
+
+  function showView(id) {
+    document.querySelectorAll(".view").forEach(function (v) { v.classList.remove("active"); });
+    const el = document.getElementById(id);
+    if (el) el.classList.add("active");
+  }
+
+  function showOverlay(id, on) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle("active", !!on);
+  }
+
+  function getUser() {
+    try {
+      const raw = localStorage.getItem(LS_USER);
+      const data = raw ? JSON.parse(raw) : null;
+      if (!data || !data.id || !data.cycle_start || !data.plan_days) return null;
+      return data;
+    } catch (_) { return null; }
+  }
+
+  function clearSession() {
+    try {
+      localStorage.removeItem(LS_USER);
+      localStorage.removeItem(LS_QUEUE);
+    } catch (_) {}
+    user = null;
+  }
+
+  function setUser(data) {
+    user = data;
+    localStorage.setItem(LS_USER, JSON.stringify(data));
+  }
+
+  function berlinParts(d) {
+    const fmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Berlin",
+      year: "numeric", month: "2-digit", day: "2-digit",
+      weekday: "short"
+    });
+    const parts = {};
+    fmt.formatToParts(d || new Date()).forEach(function (p) {
+      if (p.type !== "literal") parts[p.type] = p.value;
+    });
+    return parts;
+  }
+
+  function berlinToday() {
+    const p = berlinParts();
+    return p.year + "-" + p.month + "-" + p.day;
+  }
+
+  function berlinDate(d) {
+    const p = berlinParts(d);
+    return p.year + "-" + p.month + "-" + p.day;
+  }
+
+  function weekdayKey(d) {
+    const map = { Mon: "mon", Tue: "tue", Wed: "wed", Thu: "thu", Fri: "fri", Sat: "sat", Sun: "sun" };
+    return map[berlinParts(d).weekday];
+  }
+
+  function parseISO(s) {
+    if (!s || typeof s !== "string") return new Date(NaN);
+    const a = s.split("-");
+    return new Date(Date.UTC(+a[0], +a[1] - 1, +a[2], 12));
+  }
+
+  function addDays(iso, n) {
+    const d = parseISO(iso);
+    d.setUTCDate(d.getUTCDate() + n);
+    return berlinDate(d);
+  }
+
+  function cycleDayNum(cycleStart) {
+    const start = parseISO(cycleStart);
+    const today = parseISO(berlinToday());
+    const diff = Math.floor((today - start) / 86400000) + 1;
+    return diff;
+  }
+
+  function mondayOfWeek() {
+    const key = weekdayKey(new Date());
+    const idx = DAY_KEYS.indexOf(key);
+    return addDays(berlinToday(), -idx);
+  }
+
+  function formatLongDate() {
+    const d = new Date();
+    const s = d.toLocaleDateString("de-DE", {
+      timeZone: "Europe/Berlin",
+      weekday: "long", day: "numeric", month: "long"
+    });
+    return s.toUpperCase();
+  }
+
+  function waLink(phone, text) {
+    const n = String(phone || JOSCHA_WA).replace(/\D/g, "");
+    return "https://wa.me/" + n + "?text=" + encodeURIComponent(text);
+  }
+
+  function getQueue() {
+    try { return JSON.parse(localStorage.getItem(LS_QUEUE) || "[]"); }
+    catch (_) { return []; }
+  }
+
+  function setQueue(q) {
+    localStorage.setItem(LS_QUEUE, JSON.stringify(q));
+  }
+
+  async function flushQueue() {
+    const q = getQueue();
+    if (!q.length) return;
+    const remaining = [];
+    for (let i = 0; i < q.length; i++) {
+      const item = q[i];
+      const { error } = await supabase.from("checkins").upsert(item, { onConflict: "user_id,date" });
+      if (error) remaining.push(item);
+    }
+    setQueue(remaining);
+  }
+
+  function calcPoints(isPlanDay, result, isMakeup) {
+    if (result === "none") return 0;
+    if (isMakeup) return 3;
+    if (isPlanDay) return result === "done" ? 3 : 2;
+    return 1;
+  }
+
+  function buildDefaultPlanDays(goal, days) {
+    const planId = goal + "_" + days;
+    const units = PLAN_MATRIX[planId].units.slice();
+    const keys = DEFAULT_DAYS[days].slice();
+    const planDays = {};
+    keys.forEach(function (k, i) { planDays[k] = units[i]; });
+    return { planId: planId, planDays: planDays };
+  }
+
+  function plannedUnitsThisWeek(planDays) {
+    const list = [];
+    DAY_KEYS.forEach(function (k) {
+      if (planDays && planDays[k]) list.push({ day: k, unit: planDays[k] });
+    });
+    return list;
+  }
+
+  function doneUnitsThisWeek(checkins, planDays) {
+    const done = [];
+    checkins.forEach(function (c) {
+      if (c.result !== "done") return;
+      const key = weekdayKey(parseISO(c.date));
+      if (planDays && planDays[key]) done.push(planDays[key]);
+      else if (c.note && c.note.indexOf("nachgeholt:") === 0) {
+        done.push(c.note.replace("nachgeholt:", "").trim());
+      }
+    });
+    return done;
+  }
+
+  function openUnits(planDays, checkins) {
+    const planned = plannedUnitsThisWeek(planDays).map(function (p) { return p.unit; });
+    const done = doneUnitsThisWeek(checkins, planDays);
+    const open = planned.slice();
+    done.forEach(function (u) {
+      const i = open.indexOf(u);
+      if (i >= 0) open.splice(i, 1);
+    });
+    return open;
+  }
+
+  /* ---------- Splash / boot ---------- */
+  async function boot() {
+    user = getUser();
+    setTimeout(async function () {
+      const splash = $("view-splash");
+      splash.classList.add("fade-out");
+      setTimeout(async function () {
+        splash.classList.remove("active", "fade-out");
+        try {
+          if (user) {
+            await flushQueue();
+            await enterApp();
+          } else {
+            showView("view-gate");
+          }
+        } catch (err) {
+          console.error(err);
+          clearSession();
+          showView("view-gate");
+          showToast("Session zurückgesetzt. Bitte neu eintreten.");
+        }
+      }, 300);
+    }, 1500);
+  }
+
+  async function refreshUserFromDb() {
+    if (!user || !user.id) return;
+    const { data, error } = await supabase.from("users").select("*").eq("id", user.id).single();
+    if (error || !data || !data.cycle_start) {
+      clearSession();
+      throw new Error("User nicht gefunden oder veraltet");
+    }
+    setUser(data);
+  }
+
+  async function enterApp() {
+    await refreshUserFromDb();
+    if (!user) {
+      showView("view-gate");
+      return;
+    }
+    await flushQueue();
+    const day = cycleDayNum(user.cycle_start);
+    $("btn-admin").classList.toggle("hidden", !user.is_admin);
+    showView("view-today");
+    await loadTodayData();
+    if (day > 30) {
+      await showCycleOverlay();
+      return;
+    }
+    await maybeShowWeekOverlay();
+  }
+
+  async function loadTodayData() {
+    const today = berlinToday();
+    const monday = mondayOfWeek();
+    const cycleStart = user.cycle_start;
+
+    const { data: week } = await supabase
+      .from("checkins")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("date", monday)
+      .lte("date", today);
+    weekCheckins = week || [];
+
+    const { data: cycle } = await supabase
+      .from("checkins")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("date", cycleStart)
+      .lte("date", today);
+    cycleCheckins = cycle || [];
+
+    todayCheckin = weekCheckins.find(function (c) { return c.date === today; }) || null;
+    openMakeupUnits = openUnits(user.plan_days || {}, weekCheckins);
+
+    renderToday();
+    await renderNodsReceived();
+  }
+
+  function weekPointsSum() {
+    return weekCheckins.reduce(function (s, c) { return s + (c.points || 0); }, 0);
+  }
+
+  function renderCycleRing() {
+    const svg = $("cycle-svg");
+    const cx = 100, cy = 100, r = 78, stroke = 4;
+    const segs = 30;
+    const gap = 2.5;
+    const sweep = (360 - segs * gap) / segs;
+    const pointsByDay = {};
+    cycleCheckins.forEach(function (c) {
+      const n = Math.floor((parseISO(c.date) - parseISO(user.cycle_start)) / 86400000) + 1;
+      if (n >= 1 && n <= 30) pointsByDay[n] = c.points || 0;
+    });
+    const dayNum = Math.min(Math.max(cycleDayNum(user.cycle_start), 1), 30);
+
+    let html = "";
+    for (let i = 1; i <= segs; i++) {
+      const startAngle = -90 + (i - 1) * (sweep + gap);
+      const color = colorForPoints(pointsByDay[i], i > dayNum);
+      html += polarArc(cx, cy, r, startAngle, startAngle + sweep, stroke, color);
+    }
+    html += '<text x="100" y="96" text-anchor="middle" class="cycle-center">' + weekPointsSum() + '</text>';
+    html += '<text x="100" y="114" text-anchor="middle" class="cycle-sub">Woche</text>';
+    svg.innerHTML = html;
+  }
+
+  function colorForPoints(pts, future) {
+    if (future || pts == null) return varLine();
+    if (pts >= 3) return "#4A7C59";
+    if (pts === 2) return "#8B6914";
+    if (pts === 1) return "#C8B89A";
+    return varLine();
+  }
+
+  function varLine() { return "#2A2A2A"; }
+
+  function polarArc(cx, cy, r, a0, a1, sw, color) {
+    const r0 = (a0 * Math.PI) / 180;
+    const r1 = (a1 * Math.PI) / 180;
+    const x0 = cx + r * Math.cos(r0);
+    const y0 = cy + r * Math.sin(r0);
+    const x1 = cx + r * Math.cos(r1);
+    const y1 = cy + r * Math.sin(r1);
+    const large = a1 - a0 > 180 ? 1 : 0;
+    return '<path d="M ' + x0 + ' ' + y0 + ' A ' + r + ' ' + r + ' 0 ' + large + ' 1 ' + x1 + ' ' + y1 +
+      '" fill="none" stroke="' + color + '" stroke-width="' + sw + '" stroke-linecap="butt"/>';
+  }
+
+  function renderToday() {
+    const day = Math.min(Math.max(cycleDayNum(user.cycle_start), 1), 30);
+    $("cycle-day-label").textContent = "Tag " + day + " / 30";
+    $("date-label").textContent = formatLongDate();
+    $("own-why").textContent = user.own_why ? '"' + user.own_why + '"' : "";
+
+    const key = weekdayKey(new Date());
+    const unit = user.plan_days && user.plan_days[key];
+    const isPlan = !!unit;
+
+    if (isPlan) {
+      const u = UNIT_LABELS[unit];
+      $("today-headline").textContent = "Heute: " + u.name + ".";
+      $("today-desc").textContent = u.desc;
+    } else {
+      $("today-headline").textContent = "Heute: frei bewegen.";
+      $("today-desc").textContent = "Ein Spaziergang zählt.";
+    }
+
+    renderCycleRing();
+    renderCheckinButtons(isPlan, unit);
+  }
+
+  function renderCheckinButtons(isPlan, unit) {
+    const stack = $("checkin-stack");
+    stack.innerHTML = "";
+    $("points-feedback").textContent = "";
+    $("confirm-line").textContent = "";
+    $("optional-block").classList.remove("show");
+
+    if (todayCheckin) {
+      showCheckedIn(todayCheckin);
+      return;
+    }
+
+    if (isPlan) {
+      addCheckBtn(stack, "Gemacht", "btn-done", function (btn) { doCheckin("done", false, null, btn); });
+      addCheckBtn(stack, "Anders bewegt", "btn-moved", function (btn) { doCheckin("moved", false, null, btn); });
+      addCheckBtn(stack, "Heute nicht", "btn-none", function (btn) { doCheckin("none", false, null, btn); });
+    } else {
+      addCheckBtn(stack, "Bewegt", "btn-accent-pt", function (btn) { doCheckin("moved", false, null, btn); });
+      addCheckBtn(stack, "Heute nicht", "btn-none", function (btn) { doCheckin("none", false, null, btn); });
+      openMakeupUnits.forEach(function (u) {
+        const label = UNIT_LABELS[u] ? UNIT_LABELS[u].name : u;
+        addCheckBtn(stack, "Ich habe " + label + " nachgeholt", "btn-done", function (btn) {
+          doCheckin("done", true, u, btn);
+        });
+      });
+    }
+  }
+
+  function addCheckBtn(stack, label, cls, fn) {
+    const b = document.createElement("button");
+    b.className = "btn " + cls;
+    b.textContent = label;
+    b.addEventListener("click", function () { fn(b); });
+    stack.appendChild(b);
+  }
+
+  function showCheckedIn(c) {
+    const stack = $("checkin-stack");
+    stack.innerHTML = "";
+    $("points-feedback").textContent = c.points > 0 ? "+" + c.points : "";
+    $("confirm-line").textContent = CONFIRM[c.result] || "";
+    $("optional-block").classList.add("show");
+    $("checkin-note").value = c.note && c.note.indexOf("nachgeholt:") !== 0 ? (c.note || "") : "";
+    if (c.photo_url) {
+      $("photo-preview").src = c.photo_url;
+      $("photo-preview").classList.add("show");
+    }
+  }
+
+  async function doCheckin(result, isMakeup, makeupUnit, btn) {
+    const key = weekdayKey(new Date());
+    const isPlan = !!(user.plan_days && user.plan_days[key]);
+    const points = calcPoints(isPlan, result, isMakeup);
+    const today = berlinToday();
+    let note = null;
+    if (isMakeup && makeupUnit) note = "nachgeholt:" + makeupUnit;
+
+    const payload = {
+      user_id: user.id,
+      date: today,
+      result: result,
+      note: note,
+      points: points
+    };
+
+    if (btn) btn.classList.add("pop");
+    $("points-feedback").textContent = points > 0 ? "+" + points : "";
+    $("confirm-line").textContent = CONFIRM[result];
+
+    try {
+      const { data, error } = await supabase
+        .from("checkins")
+        .upsert(payload, { onConflict: "user_id,date" })
+        .select()
+        .single();
+      if (error) throw error;
+      todayCheckin = data;
+    } catch (_) {
+      const q = getQueue();
+      q.push(payload);
+      setQueue(q);
+      todayCheckin = payload;
+      showToast("Offline gespeichert. Sync später.");
+    }
+
+    weekCheckins = weekCheckins.filter(function (c) { return c.date !== today; });
+    weekCheckins.push(todayCheckin);
+    cycleCheckins = cycleCheckins.filter(function (c) { return c.date !== today; });
+    cycleCheckins.push(todayCheckin);
+    openMakeupUnits = openUnits(user.plan_days || {}, weekCheckins);
+
+    setTimeout(function () {
+      showCheckedIn(todayCheckin);
+      renderCycleRing();
+    }, 220);
+  }
+
+  async function renderNodsReceived() {
+    const line = $("nods-line");
+    if (!todayCheckin || !todayCheckin.id) {
+      line.classList.add("hidden");
+      return;
+    }
+    const { data } = await supabase
+      .from("nods")
+      .select("id")
+      .eq("to_checkin", todayCheckin.id);
+    const n = (data || []).length;
+    if (n > 0) {
+      line.textContent = n === 1
+        ? "1 Mensch hat dir zugenickt"
+        : n + " Menschen haben dir zugenickt";
+      line.classList.remove("hidden");
+    } else {
+      line.classList.add("hidden");
+    }
+  }
+
+  /* ---------- Week / cycle overlays ---------- */
+  let pendingWeekReportFlag = null;
+
+  async function maybeShowWeekOverlay() {
+    const key = weekdayKey(new Date());
+    const thisMonday = mondayOfWeek();
+    const prevMonday = addDays(thisMonday, -7);
+    const last = localStorage.getItem(LS_WEEK_REPORT);
+
+    if (key === "sun") {
+      if (last === thisMonday) return;
+      fillWeekOverlayFromList(weekCheckins);
+      pendingWeekReportFlag = thisMonday;
+      showOverlay("overlay-week", true);
+      return;
+    }
+
+    // Erstes Öffnen nach Sonntag: vorherige Woche, falls noch nicht gezeigt
+    if (last === prevMonday || last === thisMonday) return;
+    if (last && last > prevMonday) return;
+    // Neue User ohne vorherige Woche: überspringen
+    if (!user.cycle_start || user.cycle_start > prevMonday) {
+      localStorage.setItem(LS_WEEK_REPORT, thisMonday);
+      return;
+    }
+
+    const { data } = await supabase
+      .from("checkins")
+      .select("*")
+      .eq("user_id", user.id)
+      .gte("date", prevMonday)
+      .lt("date", thisMonday);
+    fillWeekOverlayFromList(data || []);
+    pendingWeekReportFlag = prevMonday;
+    showOverlay("overlay-week", true);
+  }
+
+  function fillWeekOverlayFromList(list) {
+    const planned = plannedUnitsThisWeek(user.plan_days || {}).length;
+    const doneCount = list.filter(function (c) {
+      return c.result === "done";
+    }).length;
+    const movedDays = list.filter(function (c) {
+      return c.result === "done" || c.result === "moved";
+    }).length;
+    const pts = list.reduce(function (s, c) { return s + (c.points || 0); }, 0);
+    $("week-units").textContent = "Einheiten geschafft: " + Math.min(doneCount, planned) + " von " + planned;
+    $("week-moved").textContent = "Tage bewegt: " + movedDays + " von 7";
+    $("week-points").textContent = "Wochenpunkte: " + pts;
+    $("week-why").textContent = user.own_why ? '"' + user.own_why + '"' : "";
+  }
+
+  $("btn-week-ok").addEventListener("click", function () {
+    if (pendingWeekReportFlag) {
+      localStorage.setItem(LS_WEEK_REPORT, pendingWeekReportFlag);
+    }
+    showOverlay("overlay-week", false);
+  });
+
+  async function showCycleOverlay() {
+    const pts = cycleCheckins.reduce(function (s, c) { return s + (c.points || 0); }, 0);
+    const units = cycleCheckins.filter(function (c) { return c.result === "done"; }).length;
+    $("cycle-points").textContent = "Gesamtpunkte: " + pts;
+    $("cycle-units").textContent = "Einheiten gesamt: " + units;
+    showOverlay("overlay-cycle", true);
+  }
+
+  $("btn-keep-plan").addEventListener("click", async function () {
+    const today = berlinToday();
+    const { error } = await supabase.from("users").update({ cycle_start: today }).eq("id", user.id);
+    if (error) { showToast("Konnte Zyklus nicht starten."); return; }
+    user.cycle_start = today;
+    setUser(user);
+    showOverlay("overlay-cycle", false);
+    await loadTodayData();
+  });
+
+  $("btn-cycle-joscha").addEventListener("click", function () {
+    window.open(waLink(JOSCHA_WA, "Hi Joscha, mein 30 Tage Zyklus ist rum. Lass uns über meinen Plan sprechen."), "_blank");
+  });
+
+  /* ---------- Gate / waitlist ---------- */
+  $("btn-enter").addEventListener("click", async function () {
+    const code = ($("invite-code").value || "").trim().toUpperCase();
+    if (code.length !== 6) {
+      showToast("Dieser Code ist nicht gültig.");
+      return;
+    }
+    const { data, error } = await supabase
+      .from("invites")
+      .select("*")
+      .eq("code", code)
+      .is("used_by", null)
+      .maybeSingle();
+    if (error || !data) {
+      showToast("Dieser Code ist nicht gültig.");
+      return;
+    }
+    inviteRow = data;
+    startOnboarding();
+  });
+
+  $("btn-waitlist-open").addEventListener("click", function () {
+    showView("view-waitlist");
+  });
+  $("btn-waitlist-back").addEventListener("click", function () {
+    showView("view-gate");
+  });
+  $("btn-waitlist-submit").addEventListener("click", async function () {
+    const name = ($("wl-name").value || "").trim();
+    const phone = ($("wl-phone").value || "").trim();
+    if (!name || !phone) { showToast("Name und Telefon bitte ausfüllen."); return; }
+    const { error } = await supabase.from("waitlist").insert({ name: name, phone: phone });
+    if (error) { showToast("Konnte nicht speichern."); return; }
+    $("wl-done").style.display = "block";
+  });
+
+  /* ---------- Onboarding ---------- */
+  function startOnboarding() {
+    ob = {
+      name: "", phone: "", email: "",
+      goal: null, capacity_days: null, capacity_place: null,
+      plan_id: null, plan_days: {}, own_why: "", interests: []
+    };
+    showView("view-onboarding");
+    setObStep(0);
+    renderGoalTiles();
+    renderCapChoices();
+    renderInterestChips();
+  }
+
+  function setObStep(n) {
+    ["ob-a","ob-b","ob-c","ob-d"].forEach(function (id, i) {
+      $(id).classList.toggle("active", i === n);
+    });
+    $("ob-bar").style.width = ((n + 1) / 4 * 100) + "%";
+  }
+
+  function renderGoalTiles() {
+    const box = $("goal-tiles");
+    box.innerHTML = "";
+    GOAL_TILES.forEach(function (g) {
+      const b = document.createElement("button");
+      b.className = "tile";
+      b.innerHTML = "<strong>" + g.title + "</strong><small>" + g.why + "</small>";
+      b.addEventListener("click", function () {
+        ob.goal = g.id;
+        box.querySelectorAll(".tile").forEach(function (t) { t.classList.remove("selected"); });
+        b.classList.add("selected");
+        $("ob-b-next").disabled = false;
+        maybeBuildPlan();
+      });
+      box.appendChild(b);
+    });
+  }
+
+  function renderCapChoices() {
+    const days = $("cap-days");
+    days.innerHTML = "";
+    [2, 3, 4].forEach(function (n) {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.textContent = String(n);
+      b.addEventListener("click", function () {
+        ob.capacity_days = n;
+        days.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("selected"); });
+        b.classList.add("selected");
+        maybeBuildPlan();
+        updateObCNext();
+      });
+      days.appendChild(b);
+    });
+    const place = $("cap-place");
+    place.innerHTML = "";
+    PLACE_OPTS.forEach(function (p) {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.textContent = p.label;
+      b.addEventListener("click", function () {
+        ob.capacity_place = p.id;
+        place.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("selected"); });
+        b.classList.add("selected");
+        updateObCNext();
+      });
+      place.appendChild(b);
+    });
+  }
+
+  function updateObCNext() {
+    $("ob-c-next").disabled = !(ob.capacity_days && ob.capacity_place && ob.plan_id);
+  }
+
+  function maybeBuildPlan() {
+    if (!ob.goal || !ob.capacity_days) return;
+    const built = buildDefaultPlanDays(ob.goal, ob.capacity_days);
+    ob.plan_id = built.planId;
+    ob.plan_days = built.planDays;
+    $("plan-box").classList.remove("hidden");
+    $("plan-label").textContent = PLAN_MATRIX[ob.plan_id].label;
+    renderDayRow();
+    updateObCNext();
+  }
+
+  // Tap Plantage zum Auswählen, dann leeren Tag zum Ablegen
+  let selectedPlanDay = null;
+  function renderDayRow() {
+    const row = $("day-row");
+    row.innerHTML = "";
+    DAY_KEYS.forEach(function (k, i) {
+      const b = document.createElement("button");
+      b.className = "day-btn" + (ob.plan_days[k] ? " plan" : "");
+      if (selectedPlanDay === k) b.style.outline = "1px solid #C8B89A";
+      b.textContent = DAY_LABELS[i];
+      b.title = ob.plan_days[k] ? UNIT_LABELS[ob.plan_days[k]].name : "";
+      b.addEventListener("click", function () {
+        if (ob.plan_days[k]) {
+          selectedPlanDay = selectedPlanDay === k ? null : k;
+          renderDayRow();
+          return;
+        }
+        if (selectedPlanDay && ob.plan_days[selectedPlanDay]) {
+          const unit = ob.plan_days[selectedPlanDay];
+          delete ob.plan_days[selectedPlanDay];
+          ob.plan_days[k] = unit;
+          selectedPlanDay = null;
+          renderDayRow();
+        }
+      });
+      row.appendChild(b);
+    });
+  }
+
+  function renderInterestChips() {
+    const box = $("interest-chips");
+    box.innerHTML = "";
+    INTERESTS.forEach(function (name) {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.textContent = name;
+      b.addEventListener("click", function () {
+        const i = ob.interests.indexOf(name);
+        if (i >= 0) ob.interests.splice(i, 1);
+        else ob.interests.push(name);
+        b.classList.toggle("selected");
+      });
+      box.appendChild(b);
+    });
+  }
+
+  $("ob-a-next").addEventListener("click", function () {
+    ob.name = ($("ob-name").value || "").trim();
+    ob.phone = ($("ob-phone").value || "").trim();
+    ob.email = ($("ob-email").value || "").trim() || null;
+    if (!ob.name || !ob.phone) { showToast("Name und Telefon bitte ausfüllen."); return; }
+    setObStep(1);
+  });
+  $("ob-b-next").addEventListener("click", function () { setObStep(2); });
+  $("ob-c-next").addEventListener("click", function () { setObStep(3); });
+  $("ob-why").addEventListener("input", function () {
+    $("why-count").textContent = String(($("ob-why").value || "").length);
+  });
+
+  $("ob-d-finish").addEventListener("click", async function () {
+    ob.own_why = ($("ob-why").value || "").trim().slice(0, 200);
+    if (!ob.own_why) { showToast("Schreib kurz warum."); return; }
+    if (!inviteRow) { showToast("Einladung fehlt."); return; }
+
+    const row = {
+      name: ob.name,
+      phone: ob.phone,
+      email: ob.email,
+      goal: ob.goal,
+      capacity_days: ob.capacity_days,
+      capacity_place: ob.capacity_place,
+      own_why: ob.own_why,
+      interests: ob.interests,
+      group_id: inviteRow.group_id,
+      is_admin: false,
+      cycle_start: berlinToday(),
+      plan_id: ob.plan_id,
+      plan_days: ob.plan_days
+    };
+
+    const { data, error } = await supabase.from("users").insert(row).select().single();
+    if (error) {
+      if (error.code === "23505") {
+        showToast("Diese Telefonnummer gibt es schon.");
+      } else {
+        showToast("Konnte Profil nicht anlegen.");
+      }
+      return;
+    }
+
+    await supabase.from("invites").update({
+      used_by: data.id,
+      used_at: new Date().toISOString()
+    }).eq("code", inviteRow.code);
+
+    await supabase.from("roles").insert({ user_id: data.id, role: "gym" });
+
+    setUser(data);
+    showView("view-buddy-intro");
+  });
+
+  $("btn-buddy-ok").addEventListener("click", async function () {
+    await enterApp();
+  });
+
+  /* ---------- Extras: note / photo ---------- */
+  $("btn-save-extras").addEventListener("click", async function () {
+    if (!todayCheckin) return;
+    const noteRaw = ($("checkin-note").value || "").trim().slice(0, 140);
+    let note = noteRaw;
+    if (todayCheckin.note && todayCheckin.note.indexOf("nachgeholt:") === 0) {
+      note = todayCheckin.note + (noteRaw ? " | " + noteRaw : "");
+    }
+    const patch = { note: note || todayCheckin.note };
+    const file = $("checkin-photo").files[0];
+    if (file) {
+      if (!localStorage.getItem(LS_PHOTO_HINT)) {
+        showOverlay("overlay-photo-hint", true);
+        $("btn-photo-hint-ok").onclick = async function () {
+          localStorage.setItem(LS_PHOTO_HINT, "1");
+          showOverlay("overlay-photo-hint", false);
+          await uploadAndSave(file, patch);
+        };
+        return;
+      }
+      await uploadAndSave(file, patch);
+      return;
+    }
+    await saveCheckinPatch(patch);
+  });
+
+  $("btn-photo-hint-ok").addEventListener("click", function () {
+    localStorage.setItem(LS_PHOTO_HINT, "1");
+    showOverlay("overlay-photo-hint", false);
+  });
+
+  async function uploadAndSave(file, patch) {
+    try {
+      const blob = await resizeImage(file, 1200);
+      const path = user.id + "/" + berlinToday() + ".jpg";
+      const { error: upErr } = await supabase.storage
+        .from("checkin-photos")
+        .upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from("checkin-photos").getPublicUrl(path);
+      patch.photo_url = pub.publicUrl;
+      $("photo-preview").src = patch.photo_url;
+      $("photo-preview").classList.add("show");
+    } catch (_) {
+      showToast("Foto Upload fehlgeschlagen.");
+    }
+    await saveCheckinPatch(patch);
+  }
+
+  async function saveCheckinPatch(patch) {
+    if (!todayCheckin || !todayCheckin.id) {
+      Object.assign(todayCheckin, patch);
+      showToast("Gespeichert lokal.");
+      return;
+    }
+    const { data, error } = await supabase
+      .from("checkins")
+      .update(patch)
+      .eq("id", todayCheckin.id)
+      .select()
+      .single();
+    if (error) { showToast("Konnte nicht speichern."); return; }
+    todayCheckin = data;
+    showToast("Gespeichert.");
+  }
+
+  function resizeImage(file, maxEdge) {
+    return new Promise(function (resolve, reject) {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = function () {
+        let w = img.width, h = img.height;
+        if (w > maxEdge || h > maxEdge) {
+          if (w > h) { h = Math.round(h * maxEdge / w); w = maxEdge; }
+          else { w = Math.round(w * maxEdge / h); h = maxEdge; }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(function (blob) {
+          if (blob) resolve(blob);
+          else reject(new Error("blob"));
+        }, "image/jpeg", 0.85);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  /* ---------- Gruppe ---------- */
+  $("btn-to-group").addEventListener("click", async function () {
+    showView("view-group");
+    await loadGroup();
+  });
+  $("btn-group-back").addEventListener("click", function () {
+    showView("view-today");
+    renderNodsReceived();
+  });
+
+  async function loadGroup() {
+    const list = $("member-list");
+    list.innerHTML = "";
+    if (!user.group_id) {
+      list.innerHTML = "<p class='hint'>Noch keine Gruppe.</p>";
+      return;
+    }
+    const { data: members, error } = await supabase
+      .from("users")
+      .select("id,name,is_admin")
+      .eq("group_id", user.group_id)
+      .order("name");
+    if (error || !members) {
+      showToast("Gruppe nicht ladbar.");
+      return;
+    }
+    const today = berlinToday();
+    const ids = members.map(function (m) { return m.id; });
+    const { data: checks } = await supabase
+      .from("checkins")
+      .select("*")
+      .in("user_id", ids)
+      .eq("date", today);
+    const checkMap = {};
+    (checks || []).forEach(function (c) { checkMap[c.user_id] = c; });
+
+    const { data: roles } = await supabase
+      .from("roles")
+      .select("user_id,role")
+      .in("user_id", ids);
+    const roleMap = {};
+    (roles || []).forEach(function (r) {
+      if (!ROLES_ENABLED.includes(r.role)) return;
+      if (r.role === "gym") return;
+      if (!roleMap[r.user_id]) roleMap[r.user_id] = [];
+      roleMap[r.user_id].push(ROLE_DEFINITIONS[r.role].label.toUpperCase());
+    });
+
+    members.forEach(function (m, idx) {
+      const c = checkMap[m.id];
+      const row = document.createElement("button");
+      row.className = "member-row";
+      const color = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+      const roles = (roleMap[m.id] || []).join(" · ");
+      row.innerHTML =
+        '<div class="avatar" style="background:' + color + '">' + (m.name.charAt(0).toUpperCase()) + '</div>' +
+        '<div class="member-meta"><div class="name">' + escapeHtml(m.name) + '</div>' +
+        (roles ? '<div class="caps role-tag">' + roles + '</div>' : '') +
+        '</div>' +
+        '<div class="status-dot ' + (c ? c.result : '') + '"></div>';
+      row.addEventListener("click", function () {
+        if (!c) return;
+        openMemberCard(m, c);
+      });
+      list.appendChild(row);
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (ch) {
+      return ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" })[ch];
+    });
+  }
+
+  async function openMemberCard(m, c) {
+    pendingMember = { member: m, checkin: c };
+    $("member-name").textContent = m.name;
+    let note = c.note || "";
+    if (note.indexOf("nachgeholt:") === 0) {
+      const parts = note.split(" | ");
+      note = parts.length > 1 ? parts.slice(1).join(" | ") : "";
+    }
+    $("member-note").textContent = note || "Keine Notiz.";
+    const photo = $("member-photo");
+    const fresh = isWithinDays(c.date, 7) && c.photo_url;
+    if (fresh) {
+      photo.src = c.photo_url;
+      photo.classList.add("show");
+    } else {
+      photo.classList.remove("show");
+      photo.removeAttribute("src");
+    }
+
+    const nodBtn = $("btn-nod");
+    const nodStatus = $("nod-status");
+    nodBtn.classList.remove("filled");
+    nodStatus.textContent = "";
+    nodBtn.disabled = m.id === user.id;
+
+    if (c.id) {
+      const { data } = await supabase
+        .from("nods")
+        .select("id")
+        .eq("from_user", user.id)
+        .eq("to_checkin", c.id)
+        .maybeSingle();
+      if (data) {
+        nodBtn.classList.add("filled");
+        nodStatus.textContent = "Genickt.";
+        nodBtn.disabled = true;
+      }
+    }
+    showOverlay("overlay-member", true);
+  }
+
+  function isWithinDays(iso, n) {
+    const d = parseISO(iso);
+    const t = parseISO(berlinToday());
+    return (t - d) / 86400000 <= n;
+  }
+
+  $("btn-member-close").addEventListener("click", function () {
+    showOverlay("overlay-member", false);
+  });
+
+  $("btn-nod").addEventListener("click", async function () {
+    if (!pendingMember || !pendingMember.checkin.id) return;
+    if (pendingMember.member.id === user.id) return;
+    const { error } = await supabase.from("nods").insert({
+      from_user: user.id,
+      to_checkin: pendingMember.checkin.id
+    });
+    if (error) {
+      if (error.code === "23505") {
+        $("btn-nod").classList.add("filled");
+        $("nod-status").textContent = "Genickt.";
+      } else {
+        showToast("Nicken fehlgeschlagen.");
+      }
+      return;
+    }
+    $("btn-nod").classList.add("filled");
+    $("nod-status").textContent = "Genickt.";
+    $("btn-nod").disabled = true;
+  });
+
+  $("btn-invite").addEventListener("click", function () {
+    if (user.is_admin) {
+      showView("view-admin");
+      document.querySelectorAll(".admin-tab").forEach(function (t) {
+        t.classList.toggle("active", t.dataset.tab === "invite");
+      });
+      document.querySelectorAll(".admin-panel").forEach(function (p) {
+        p.classList.toggle("active", p.id === "admin-invite");
+      });
+      loadAdminInviteForm();
+      return;
+    }
+    showOverlay("overlay-invite-info", true);
+  });
+  $("btn-invite-close").addEventListener("click", function () {
+    showOverlay("overlay-invite-info", false);
+  });
+  $("btn-invite-joscha").addEventListener("click", function () {
+    window.open(waLink(JOSCHA_WA, "Hi Joscha, ich würde gern jemanden zu gogogo einladen."), "_blank");
+  });
+
+  /* ---------- Admin ---------- */
+  $("btn-admin").addEventListener("click", async function () {
+    showView("view-admin");
+    await loadAdmin();
+  });
+  $("btn-admin-back").addEventListener("click", function () {
+    showView("view-today");
+  });
+
+  document.querySelectorAll(".admin-tab").forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      document.querySelectorAll(".admin-tab").forEach(function (t) { t.classList.remove("active"); });
+      tab.classList.add("active");
+      document.querySelectorAll(".admin-panel").forEach(function (p) { p.classList.remove("active"); });
+      $("admin-" + tab.dataset.tab).classList.add("active");
+      if (tab.dataset.tab === "invite") loadAdminInviteForm();
+    });
+  });
+
+  async function loadAdmin() {
+    const { data: users } = await supabase
+      .from("users")
+      .select("id,name,group_id,cycle_start,groups(name)")
+      .order("name");
+    const today = berlinToday();
+    const ids = (users || []).map(function (u) { return u.id; });
+    const { data: checks } = await supabase
+      .from("checkins")
+      .select("user_id,result,date")
+      .in("user_id", ids)
+      .gte("date", addDays(today, -10));
+
+    const todayMap = {};
+    const lastMap = {};
+    (checks || []).forEach(function (c) {
+      if (c.date === today) todayMap[c.user_id] = c.result;
+      if (!lastMap[c.user_id] || c.date > lastMap[c.user_id]) lastMap[c.user_id] = c.date;
+    });
+
+    const sorted = (users || []).slice().sort(function (a, b) {
+      const ar = todayMap[a.id];
+      const br = todayMap[b.id];
+      const ao = ar == null ? -1 : (ar === "none" ? 0 : ar === "moved" ? 1 : 2);
+      const bo = br == null ? -1 : (br === "none" ? 0 : br === "moved" ? 1 : 2);
+      return ao - bo;
+    });
+
+    const todayBox = $("admin-today");
+    todayBox.innerHTML = "";
+    sorted.forEach(function (u) {
+      const st = todayMap[u.id];
+      const day = cycleDayNum(u.cycle_start);
+      const gname = u.groups && u.groups.name ? u.groups.name : "ohne Gruppe";
+      const row = document.createElement("div");
+      row.className = "admin-row";
+      row.innerHTML =
+        "<div><strong>" + escapeHtml(u.name) + "</strong><div class='caps'>" +
+        escapeHtml(gname) + " · Tag " + day + "</div></div>" +
+        '<div class="status-dot ' + (st || "") + '"></div>';
+      todayBox.appendChild(row);
+    });
+
+    const hangBox = $("admin-hang");
+    hangBox.innerHTML = "";
+    (users || []).forEach(function (u) {
+      if (todayMap[u.id]) return;
+      const last = lastMap[u.id];
+      let gap;
+      if (last) {
+        gap = Math.floor((parseISO(today) - parseISO(last)) / 86400000);
+      } else {
+        gap = cycleDayNum(u.cycle_start);
+      }
+      if (gap < 3) return;
+      const row = document.createElement("div");
+      row.className = "admin-row hang";
+      row.innerHTML =
+        "<div><strong>" + escapeHtml(u.name) + "</strong><div class='caps'>" + gap + " Tage ohne Check in</div></div>";
+      const btn = document.createElement("a");
+      btn.className = "btn btn-ghost";
+      btn.style.width = "auto";
+      btn.style.height = "40px";
+      btn.style.lineHeight = "40px";
+      btn.style.padding = "0 12px";
+      btn.textContent = "WhatsApp";
+      btn.href = "#";
+      btn.addEventListener("click", async function (e) {
+        e.preventDefault();
+        const { data } = await supabase.from("users").select("phone").eq("id", u.id).single();
+        window.open(waLink(data && data.phone, "Hey " + u.name + ", ich hab dich ein paar Tage nicht in gogogo gesehen. Alles gut bei dir?"), "_blank");
+      });
+      row.appendChild(btn);
+      hangBox.appendChild(row);
+    });
+
+    await loadAdminInviteForm();
+  }
+
+  async function loadAdminInviteForm() {
+    const { data: groups } = await supabase.from("groups").select("id,name").order("name");
+    const sel = $("admin-group-select");
+    sel.innerHTML = "";
+    (groups || []).forEach(function (g) {
+      const opt = document.createElement("option");
+      opt.value = g.id;
+      opt.textContent = g.name;
+      sel.appendChild(opt);
+    });
+  }
+
+  function randomCode() {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let s = "";
+    for (let i = 0; i < 6; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
+    return s;
+  }
+
+  $("btn-create-invite").addEventListener("click", async function () {
+    let groupId = $("admin-group-select").value;
+    const newName = ($("admin-new-group").value || "").trim();
+    if (newName) {
+      const { data: g, error } = await supabase.from("groups").insert({ name: newName }).select().single();
+      if (error) { showToast("Gruppe nicht anlegbar."); return; }
+      groupId = g.id;
+      $("admin-new-group").value = "";
+      await loadAdminInviteForm();
+      $("admin-group-select").value = groupId;
+    }
+    if (!groupId) { showToast("Gruppe wählen."); return; }
+    const code = randomCode();
+    const { error } = await supabase.from("invites").insert({
+      code: code,
+      created_by: user.id,
+      group_id: groupId
+    });
+    if (error) { showToast("Code nicht erstellbar."); return; }
+    $("invite-result").classList.remove("hidden");
+    $("new-invite-code").textContent = code;
+  });
+
+  $("btn-copy-invite").addEventListener("click", async function () {
+    const code = $("new-invite-code").textContent;
+    try {
+      await navigator.clipboard.writeText(code);
+      showToast("Kopiert.");
+    } catch (_) {
+      showToast(code);
+    }
+  });
+
+  $("btn-share-invite").addEventListener("click", async function () {
+    const code = $("new-invite-code").textContent;
+    const text = "Dein gogogo Code: " + code;
+    if (navigator.share) {
+      try { await navigator.share({ title: "gogogo", text: text }); }
+      catch (_) {}
+    } else {
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast("Kopiert.");
+      } catch (_) {
+        showToast(text);
+      }
+    }
+  });
+
+  boot();
+})();
+  </script>
+</body>
+</html>
