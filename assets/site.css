@@ -120,28 +120,60 @@ button {
   width: 40px;
   height: 40px;
   display: inline-flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   border-radius: 50%;
+  position: relative;
 }
 
-.icon-btn i,
-.icon-btn i::before {
+.icon-btn__burger {
+  position: relative;
+  width: 18px;
+  height: 12px;
   display: block;
-  width: 16px;
+}
+
+.icon-btn__burger i,
+.icon-btn__burger::before,
+.icon-btn__burger::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  width: 18px;
   height: 1.5px;
   background: var(--black);
   border-radius: 1px;
+  transition: transform 200ms ease, opacity 200ms ease, top 200ms ease;
 }
 
-.icon-btn i::before {
-  content: "";
-  width: 12px;
+.icon-btn__burger i {
+  top: 5px;
+  display: block;
 }
 
-.icon-bag {
+.icon-btn__burger::before {
+  top: 0;
+}
+
+.icon-btn__burger::after {
+  top: 10px;
+}
+
+.icon-btn.is-open .icon-btn__burger i {
+  opacity: 0;
+}
+
+.icon-btn.is-open .icon-btn__burger::before {
+  top: 5px;
+  transform: rotate(45deg);
+}
+
+.icon-btn.is-open .icon-btn__burger::after {
+  top: 5px;
+  transform: rotate(-45deg);
+}
+
+.icon-login {
   width: 40px;
   height: 40px;
   display: inline-flex;
@@ -150,42 +182,86 @@ button {
   border-radius: 50%;
 }
 
-.icon-bag svg {
-  width: 18px;
-  height: 18px;
+.icon-login svg {
+  width: 20px;
+  height: 20px;
   stroke: var(--black);
   fill: none;
   stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .menu-panel {
   position: fixed;
   inset: 0;
-  z-index: 60;
-  background: rgba(10, 10, 10, 0.35);
+  z-index: 55;
   display: none;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0;
+  background: rgba(10, 10, 10, 0.18);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 .menu-panel.is-open {
-  display: block;
+  display: flex;
 }
 
 .menu-panel__sheet {
-  width: min(100%, 320px);
-  height: 100%;
-  background: var(--white);
-  padding: 28px 24px;
+  width: min(100%, 430px);
+  min-height: 100%;
+  margin: 0 auto;
+  background: rgba(246, 246, 244, 0.92);
+  padding: calc(var(--header-h) + 36px) 28px 36px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  border-radius: 0 18px 18px 0;
+  border-radius: 0;
 }
 
-.menu-panel__sheet a,
-.menu-panel__sheet button {
-  text-align: left;
-  font-size: 1rem;
+.menu-panel__nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(28px, 6vh, 48px);
+  text-align: center;
+}
+
+.menu-panel__nav a {
+  font-size: clamp(1.55rem, 5.5vw, 2rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.menu-panel__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px 28px;
+  padding-top: 24px;
+}
+
+.menu-panel__foot a,
+.menu-panel__foot button {
+  font-family: var(--mono);
+  font-size: 0.68rem;
   font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #222;
+}
+
+body.menu-open {
+  overflow: hidden;
+}
+
+body.menu-open .site-top {
+  z-index: 70;
 }
 
 .hero {
@@ -312,6 +388,12 @@ button {
 .section {
   padding: 72px clamp(18px, 4vw, 48px) 56px;
   background: var(--white);
+}
+
+#vorteile,
+#joscha,
+#kontakt {
+  scroll-margin-top: 72px;
 }
 
 .section__inner {
@@ -449,49 +531,20 @@ button {
 }
 
 .site-footer__panel {
-  background: transparent;
-  border-radius: 0;
-  padding: 40px clamp(18px, 4vw, 48px) 48px;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 28px 40px;
-}
-
-@media (min-width: 720px) {
-  .site-footer__panel {
-    grid-template-columns: 1.4fr 1fr 1fr 1fr;
-    padding: 48px clamp(28px, 5vw, 64px) 56px;
-  }
-}
-
-.site-footer__brand {
-  font-size: 0.95rem;
-  font-weight: 600;
-  margin-bottom: 12px;
-}
-
-.site-footer__copy,
-.site-footer__meta,
-.site-footer__links a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 14px 28px;
+  padding: 28px 20px 36px;
   font-family: var(--mono);
   font-size: 0.72rem;
-  line-height: 1.55;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: #333;
 }
 
-.site-footer__heading {
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin-bottom: 12px;
-}
-
-.site-footer__links {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.site-footer__links a:hover {
+.site-footer__panel a:hover {
   text-decoration: underline;
 }
 
