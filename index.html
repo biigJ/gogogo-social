@@ -49,21 +49,21 @@
 
   <section class="hero" aria-label="Einstieg">
     <div class="hero__slider" id="hero-slider" aria-hidden="true">
-      <div class="hero__slide is-active">
-        <video muted loop playsinline autoplay preload="auto" poster="assets/gogogo/hero-poster.png">
+      <div class="hero__slide is-active" data-kind="video">
+        <video muted playsinline preload="auto" poster="assets/gogogo/hero-poster.png">
           <source src="assets/gogogo/hero.mp4" type="video/mp4" />
         </video>
       </div>
-      <div class="hero__slide">
-        <video muted loop playsinline preload="auto">
+      <div class="hero__slide" data-kind="video">
+        <video muted playsinline preload="auto">
           <source src="assets/gogogo/gogogo.mp4" type="video/mp4" />
         </video>
       </div>
-      <div class="hero__slide">
+      <div class="hero__slide" data-kind="image">
         <img src="assets/gogogo/factfulness-1600.webp" alt="" width="1600" height="900" decoding="async" />
       </div>
-      <div class="hero__slide">
-        <video muted loop playsinline preload="auto">
+      <div class="hero__slide" data-kind="video">
+        <video muted playsinline preload="auto">
           <source src="assets/gogogo/circle-clip.mp4" type="video/mp4" />
         </video>
       </div>
@@ -208,7 +208,15 @@
       var slides = Array.prototype.slice.call(document.querySelectorAll(".hero__slide"));
       var idx = 0;
       var FADE_MS = 1200;
-      var HOLD_MS = 5000;
+      var IMAGE_MS = 2000;
+      var timer = null;
+
+      function clearTimer() {
+        if (timer) {
+          window.clearTimeout(timer);
+          timer = null;
+        }
+      }
 
       function playSlide(slide) {
         var vid = slide.querySelector("video");
@@ -220,35 +228,75 @@
 
       function pauseSlide(slide) {
         var vid = slide.querySelector("video");
-        if (vid) vid.pause();
+        if (!vid) return;
+        vid.onended = null;
+        vid.pause();
+      }
+
+      function goNext() {
+        showSlide((idx + 1) % slides.length);
+      }
+
+      function armAdvance() {
+        clearTimer();
+        if (reduceMotion || slides.length < 2) return;
+
+        var slide = slides[idx];
+        var vid = slide.querySelector("video");
+        var done = false;
+
+        function finish() {
+          if (done) return;
+          done = true;
+          clearTimer();
+          if (vid) vid.onended = null;
+          goNext();
+        }
+
+        if (vid) {
+          vid.onended = finish;
+          function armFallback() {
+            if (done) return;
+            var dur = Number.isFinite(vid.duration) && vid.duration > 0
+              ? vid.duration * 1000
+              : 8000;
+            clearTimer();
+            timer = window.setTimeout(finish, Math.max(dur - 40, IMAGE_MS));
+          }
+          if (Number.isFinite(vid.duration) && vid.duration > 0) {
+            armFallback();
+          } else {
+            vid.addEventListener("loadedmetadata", armFallback, { once: true });
+            timer = window.setTimeout(finish, 10000);
+          }
+          return;
+        }
+
+        timer = window.setTimeout(finish, IMAGE_MS);
       }
 
       function showSlide(n) {
         if (n === idx || !slides[n]) return;
+        clearTimer();
         var prev = slides[idx];
         var next = slides[n];
+        pauseSlide(prev);
         prev.classList.remove("is-active");
         next.classList.add("is-active");
         playSlide(next);
         idx = n;
-        window.setTimeout(function () {
-          pauseSlide(prev);
-        }, reduceMotion ? 0 : FADE_MS);
+        armAdvance();
       }
 
-      if (slides[0]) playSlide(slides[0]);
+      if (slides[0]) {
+        playSlide(slides[0]);
+        if (!reduceMotion) armAdvance();
+      }
 
-      if (!reduceMotion && slides.length > 1) {
-        window.setInterval(function () {
-          showSlide((idx + 1) % slides.length);
-        }, HOLD_MS + FADE_MS);
-      } else if (reduceMotion) {
+      if (reduceMotion) {
         slides.forEach(function (slide) {
           var vid = slide.querySelector("video");
-          if (vid) {
-            vid.removeAttribute("autoplay");
-            vid.pause();
-          }
+          if (vid) vid.pause();
         });
       }
 
