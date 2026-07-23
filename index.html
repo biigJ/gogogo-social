@@ -207,45 +207,41 @@
       var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       var slides = Array.prototype.slice.call(document.querySelectorAll(".hero__slide"));
       var idx = 0;
-      var fading = false;
+      var FADE_MS = 1200;
+      var HOLD_MS = 5000;
 
       function playSlide(slide) {
         var vid = slide.querySelector("video");
         if (!vid || reduceMotion) return;
+        try { vid.currentTime = 0; } catch (e) {}
         var p = vid.play();
         if (p && p.catch) p.catch(function () {});
       }
 
-      function showSlide(n) {
-        if (fading || n === idx) return;
-        var next = slides[n];
-        var prev = slides[idx];
-        fading = true;
-        next.classList.add("is-active");
-        playSlide(next);
-        if (prev) {
-          prev.classList.add("is-leaving");
-          prev.classList.remove("is-active");
-        }
-        window.setTimeout(function () {
-          if (prev) {
-            prev.classList.remove("is-leaving");
-            var vid = prev.querySelector("video");
-            if (vid) vid.pause();
-          }
-          fading = false;
-          idx = n;
-        }, reduceMotion ? 0 : 1400);
+      function pauseSlide(slide) {
+        var vid = slide.querySelector("video");
+        if (vid) vid.pause();
       }
 
-      slides.forEach(function (slide, i) {
-        if (i === 0) playSlide(slide);
-      });
+      function showSlide(n) {
+        if (n === idx || !slides[n]) return;
+        var prev = slides[idx];
+        var next = slides[n];
+        prev.classList.remove("is-active");
+        next.classList.add("is-active");
+        playSlide(next);
+        idx = n;
+        window.setTimeout(function () {
+          pauseSlide(prev);
+        }, reduceMotion ? 0 : FADE_MS);
+      }
+
+      if (slides[0]) playSlide(slides[0]);
 
       if (!reduceMotion && slides.length > 1) {
         window.setInterval(function () {
           showSlide((idx + 1) % slides.length);
-        }, 6200);
+        }, HOLD_MS + FADE_MS);
       } else if (reduceMotion) {
         slides.forEach(function (slide) {
           var vid = slide.querySelector("video");
