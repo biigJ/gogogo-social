@@ -207,14 +207,22 @@
       var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       var slides = Array.prototype.slice.call(document.querySelectorAll(".hero__slide"));
       var idx = 0;
-      var FADE_MS = 1200;
+      var FADE_MS = 2000;
       var IMAGE_MS = 2000;
       var timer = null;
+      var fadeTimer = null;
 
       function clearTimer() {
         if (timer) {
           window.clearTimeout(timer);
           timer = null;
+        }
+      }
+
+      function clearFadeTimer() {
+        if (fadeTimer) {
+          window.clearTimeout(fadeTimer);
+          fadeTimer = null;
         }
       }
 
@@ -230,6 +238,7 @@
         var vid = slide.querySelector("video");
         if (!vid) return;
         vid.onended = null;
+        vid.ontimeupdate = null;
         vid.pause();
       }
 
@@ -249,24 +258,37 @@
           if (done) return;
           done = true;
           clearTimer();
-          if (vid) vid.onended = null;
+          if (vid) {
+            vid.onended = null;
+            vid.ontimeupdate = null;
+          }
           goNext();
         }
 
         if (vid) {
-          vid.onended = finish;
-          function armFallback() {
+          function armOverlap() {
             if (done) return;
-            var dur = Number.isFinite(vid.duration) && vid.duration > 0
+            var durMs = Number.isFinite(vid.duration) && vid.duration > 0
               ? vid.duration * 1000
               : 8000;
+            // Start next clip 2s before this one ends (overlapping crossfade)
+            var leadMs = Math.max(0, durMs - FADE_MS);
             clearTimer();
-            timer = window.setTimeout(finish, Math.max(dur - 40, IMAGE_MS));
+            timer = window.setTimeout(finish, leadMs);
+
+            vid.ontimeupdate = function () {
+              if (done || !Number.isFinite(vid.duration)) return;
+              if (vid.currentTime >= vid.duration - FADE_MS / 1000) {
+                vid.ontimeupdate = null;
+                finish();
+              }
+            };
           }
+
           if (Number.isFinite(vid.duration) && vid.duration > 0) {
-            armFallback();
+            armOverlap();
           } else {
-            vid.addEventListener("loadedmetadata", armFallback, { once: true });
+            vid.addEventListener("loadedmetadata", armOverlap, { once: true });
             timer = window.setTimeout(finish, 10000);
           }
           return;
@@ -278,14 +300,19 @@
       function showSlide(n) {
         if (n === idx || !slides[n]) return;
         clearTimer();
+        clearFadeTimer();
         var prev = slides[idx];
         var next = slides[n];
-        pauseSlide(prev);
+        // Keep previous media playing during the 2s overlap blend
         prev.classList.remove("is-active");
         next.classList.add("is-active");
         playSlide(next);
         idx = n;
         armAdvance();
+        fadeTimer = window.setTimeout(function () {
+          pauseSlide(prev);
+          fadeTimer = null;
+        }, reduceMotion ? 0 : FADE_MS);
       }
 
       if (slides[0]) {
