@@ -12,6 +12,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preload" as="image" href="assets/gogogo/hero-poster-1600.webp" />
+  <link rel="preload" as="video" href="assets/gogogo/hero.mp4" type="video/mp4" />
+  <link rel="preload" as="video" href="assets/gogogo/gogogo.mp4" type="video/mp4" />
+  <link rel="preload" as="video" href="assets/gogogo/circle-clip.mp4" type="video/mp4" />
   <link rel="stylesheet" href="assets/site.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/auth.js" defer></script>
@@ -50,22 +54,23 @@
   <section class="hero" aria-label="Einstieg">
     <div class="hero__slider" id="hero-slider" aria-hidden="true">
       <div class="hero__slide is-active" data-kind="video">
-        <video muted playsinline preload="auto" poster="assets/gogogo/hero-poster.png">
-          <source src="assets/gogogo/hero.mp4" type="video/mp4" />
-        </video>
+        <video
+          class="hero__video"
+          src="assets/gogogo/hero.mp4"
+          muted
+          playsinline
+          preload="auto"
+          poster="assets/gogogo/hero-poster-1600.webp"
+        ></video>
       </div>
       <div class="hero__slide" data-kind="video">
-        <video muted playsinline preload="auto">
-          <source src="assets/gogogo/gogogo.mp4" type="video/mp4" />
-        </video>
+        <video class="hero__video" src="assets/gogogo/gogogo.mp4" muted playsinline preload="auto"></video>
       </div>
       <div class="hero__slide" data-kind="image">
-        <img src="assets/gogogo/factfulness-1600.webp" alt="" width="1600" height="900" decoding="async" />
+        <img src="assets/gogogo/factfulness-1600.webp" alt="" width="1600" height="900" decoding="async" fetchpriority="low" />
       </div>
       <div class="hero__slide" data-kind="video">
-        <video muted playsinline preload="auto">
-          <source src="assets/gogogo/circle-clip.mp4" type="video/mp4" />
-        </video>
+        <video class="hero__video" src="assets/gogogo/circle-clip.mp4" muted playsinline preload="auto"></video>
       </div>
     </div>
     <div class="hero__veil"></div>
@@ -206,11 +211,13 @@
     (function () {
       var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       var slides = Array.prototype.slice.call(document.querySelectorAll(".hero__slide"));
+      var videos = Array.prototype.slice.call(document.querySelectorAll(".hero__video"));
       var idx = 0;
       var FADE_MS = 2000;
       var IMAGE_MS = 2000;
       var timer = null;
       var fadeTimer = null;
+      var started = false;
 
       function clearTimer() {
         if (timer) {
@@ -226,12 +233,42 @@
         }
       }
 
+      function whenCanPlay(vid) {
+        return new Promise(function (resolve) {
+          if (!vid) return resolve();
+          if (vid.readyState >= 3) return resolve();
+          var done = false;
+          function ok() {
+            if (done) return;
+            done = true;
+            vid.removeEventListener("canplay", ok);
+            vid.removeEventListener("loadeddata", ok);
+            resolve();
+          }
+          vid.addEventListener("canplay", ok);
+          vid.addEventListener("loadeddata", ok);
+          if (vid.networkState === 0) {
+            try { vid.load(); } catch (e) {}
+          }
+          window.setTimeout(ok, 12000);
+        });
+      }
+
+      function warmSlide(slide) {
+        var vid = slide && slide.querySelector("video");
+        if (!vid) return Promise.resolve();
+        try { vid.preload = "auto"; } catch (e) {}
+        return whenCanPlay(vid);
+      }
+
       function playSlide(slide) {
         var vid = slide.querySelector("video");
-        if (!vid || reduceMotion) return;
-        try { vid.currentTime = 0; } catch (e) {}
-        var p = vid.play();
-        if (p && p.catch) p.catch(function () {});
+        if (!vid || reduceMotion) return Promise.resolve();
+        return whenCanPlay(vid).then(function () {
+          try { if (vid.currentTime > 0.05) vid.currentTime = 0; } catch (e) {}
+          var p = vid.play();
+          if (p && p.catch) return p.catch(function () {});
+        });
       }
 
       function pauseSlide(slide) {
@@ -254,6 +291,9 @@
         var vid = slide.querySelector("video");
         var done = false;
 
+        // Prefetch the following slide so the overlap blend can start on time
+        warmSlide(slides[(idx + 1) % slides.length]);
+
         function finish() {
           if (done) return;
           done = true;
@@ -262,22 +302,16 @@
             vid.onended = null;
             vid.ontimeupdate = null;
           }
-          goNext();
+          var next = slides[(idx + 1) % slides.length];
+          warmSlide(next).then(goNext);
         }
 
         if (vid) {
-          function armOverlap() {
+          function watchProgress() {
             if (done) return;
-            var durMs = Number.isFinite(vid.duration) && vid.duration > 0
-              ? vid.duration * 1000
-              : 8000;
-            // Start next clip 2s before this one ends (overlapping crossfade)
-            var leadMs = Math.max(0, durMs - FADE_MS);
-            clearTimer();
-            timer = window.setTimeout(finish, leadMs);
-
             vid.ontimeupdate = function () {
-              if (done || !Number.isFinite(vid.duration)) return;
+              if (done || !Number.isFinite(vid.duration) || vid.duration <= 0) return;
+              // Drive fade from real playback position — not wall-clock
               if (vid.currentTime >= vid.duration - FADE_MS / 1000) {
                 vid.ontimeupdate = null;
                 finish();
@@ -285,11 +319,10 @@
             };
           }
 
-          if (Number.isFinite(vid.duration) && vid.duration > 0) {
-            armOverlap();
+          if (!vid.paused && !vid.ended) {
+            watchProgress();
           } else {
-            vid.addEventListener("loadedmetadata", armOverlap, { once: true });
-            timer = window.setTimeout(finish, 10000);
+            vid.addEventListener("playing", watchProgress, { once: true });
           }
           return;
         }
@@ -303,29 +336,43 @@
         clearFadeTimer();
         var prev = slides[idx];
         var next = slides[n];
-        // Keep previous media playing during the 2s overlap blend
         prev.classList.remove("is-active");
         next.classList.add("is-active");
-        playSlide(next);
         idx = n;
-        armAdvance();
+        playSlide(next).then(function () {
+          if (idx === n) armAdvance();
+        });
         fadeTimer = window.setTimeout(function () {
           pauseSlide(prev);
           fadeTimer = null;
         }, reduceMotion ? 0 : FADE_MS);
       }
 
-      if (slides[0]) {
-        playSlide(slides[0]);
-        if (!reduceMotion) armAdvance();
-      }
-
-      if (reduceMotion) {
-        slides.forEach(function (slide) {
-          var vid = slide.querySelector("video");
-          if (vid) vid.pause();
+      function startSlider() {
+        if (started) return;
+        started = true;
+        if (reduceMotion) {
+          videos.forEach(function (vid) { vid.pause(); });
+          return;
+        }
+        playSlide(slides[0]).then(function () {
+          armAdvance();
         });
       }
+
+      // Kick off network fetch for every clip immediately, then start when first is ready
+      videos.forEach(function (vid) {
+        try { vid.preload = "auto"; vid.load(); } catch (e) {}
+      });
+
+      if (slides[0]) {
+        var first = slides[0].querySelector("video");
+        whenCanPlay(first).then(startSlider);
+        // Still warm the rest in parallel
+        slides.slice(1).forEach(warmSlide);
+      }
+
+      if (reduceMotion) startSlider();
 
       var menu = document.getElementById("menu-panel");
       var btnMenu = document.getElementById("btn-menu");
