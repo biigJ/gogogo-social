@@ -153,11 +153,12 @@
     }
     if (
       text.indexOf("rate limit") !== -1 ||
+      text.indexOf("email rate limit exceeded") !== -1 ||
       text.indexOf("over_email_send_rate_limit") !== -1 ||
       code === "over_email_send_rate_limit" ||
       status === 429
     ) {
-      return "Zu viele Emails in kurzer Zeit. Bitte 1–2 Minuten warten, Spam prüfen — oder in Supabase den User manuell bestätigen.";
+      return "Zu viele Auth-Emails. Bitte 30–60 Minuten warten — nicht erneut klicken. Danach einmal „Passwort zurücksetzen“.";
     }
     if (
       text.indexOf("invalid login credentials") !== -1 ||
