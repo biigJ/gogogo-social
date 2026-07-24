@@ -9,6 +9,12 @@
 --   Redirect URLs:   https://gogogo.social/**
 --                    https://gogogo.social/members/**
 --                    http://localhost:*   (nur optional für lokales Testen)
+--
+-- Wenn „Bestätigung erneut senden“ keine Mail bringt:
+--   1) Authentication → Users → Deinen User öffnen → ggf. schon „Confirmed“?
+--      Dann einfach einloggen (keine neue Mail nötig).
+--   2) Sonst dort „Confirm email“ / User manuell bestätigen.
+--   3) Auth → Rate limits / Custom SMTP prüfen (Built-in Mail ist limitiert).
 
 create table if not exists member_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
