@@ -1,7 +1,14 @@
 -- gogogo.social Mitglieder (Website Auth)
 -- Im Supabase SQL Editor ausführen (gleiche Instanz wie die App).
+--
 -- Authentication → Providers: Email aktivieren.
 -- "Confirm email" einschalten für die Bestätigungsmail.
+--
+-- Authentication → URL Configuration (WICHTIG — sonst geht der Mail-Link nach localhost):
+--   Site URL:        https://gogogo.social
+--   Redirect URLs:   https://gogogo.social/**
+--                    https://gogogo.social/members/**
+--                    http://localhost:*   (nur optional für lokales Testen)
 
 create table if not exists member_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
