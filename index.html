@@ -185,6 +185,10 @@
         <input class="field" id="login-email" type="email" autocomplete="email" placeholder="Emailadresse" required />
         <input class="field" id="login-password" type="password" autocomplete="current-password" placeholder="Passwort" required />
         <button class="btn-black" type="submit">Einloggen</button>
+        <div class="auth-helpers">
+          <button class="auth-helper" type="button" id="btn-reset-pw">Passwort zurücksetzen</button>
+          <button class="auth-helper" type="button" id="btn-resend-confirm">Bestätigung erneut senden</button>
+        </div>
       </form>
 
       <p class="form-msg" id="auth-msg" role="status" aria-live="polite"></p>
@@ -466,7 +470,7 @@
           );
           showTab("login");
         } catch (err) {
-          setMsg((err && err.message) || "Registrierung fehlgeschlagen.", "is-error");
+          setMsg(GogogoAuth.authErrorMessage(err), "is-error");
         }
       });
 
@@ -481,7 +485,37 @@
           var goApp = /[?&]next=app/.test(location.search);
           window.location.href = goApp ? GogogoAuth.APP_URL : "/members/";
         } catch (err) {
-          setMsg((err && err.message) || "Login fehlgeschlagen. Email bestätigt?", "is-error");
+          setMsg(GogogoAuth.authErrorMessage(err), "is-error");
+        }
+      });
+
+      document.getElementById("btn-reset-pw").addEventListener("click", async function () {
+        var email = document.getElementById("login-email").value.trim();
+        if (!email) {
+          setMsg("Bitte zuerst Deine Emailadresse eintragen.", "is-error");
+          return;
+        }
+        setMsg("Sende Reset-Link …");
+        try {
+          await GogogoAuth.resetPassword(email);
+          setMsg("Falls ein Konto existiert, ist der Link zum Passwort-Zurücksetzen unterwegs (auch Spam prüfen).", "is-ok");
+        } catch (err) {
+          setMsg(GogogoAuth.authErrorMessage(err), "is-error");
+        }
+      });
+
+      document.getElementById("btn-resend-confirm").addEventListener("click", async function () {
+        var email = document.getElementById("login-email").value.trim();
+        if (!email) {
+          setMsg("Bitte zuerst Deine Emailadresse eintragen.", "is-error");
+          return;
+        }
+        setMsg("Sende Bestätigung …");
+        try {
+          await GogogoAuth.resendConfirmation(email);
+          setMsg("Bestätigungsemail erneut gesendet. Bitte Inbox und Spam prüfen.", "is-ok");
+        } catch (err) {
+          setMsg(GogogoAuth.authErrorMessage(err), "is-error");
         }
       });
 

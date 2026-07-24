@@ -89,6 +89,53 @@
     return res.data;
   }
 
+  async function resetPassword(email) {
+    var origin = window.location.origin;
+    var res = await getClient().auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: origin + "/?auth=1",
+    });
+    if (res.error) throw res.error;
+    return true;
+  }
+
+  async function resendConfirmation(email) {
+    var origin = window.location.origin;
+    var res = await getClient().auth.resend({
+      type: "signup",
+      email: email.trim(),
+      options: { emailRedirectTo: origin + "/members/" },
+    });
+    if (res.error) throw res.error;
+    return true;
+  }
+
+  function authErrorMessage(err) {
+    var raw = (err && (err.message || err.error_description || err.msg)) || "";
+    var code = (err && (err.code || err.error)) || "";
+    var text = String(raw).toLowerCase();
+
+    if (
+      text.indexOf("email not confirmed") !== -1 ||
+      code === "email_not_confirmed"
+    ) {
+      return "Email noch nicht bestätigt. Bitte den Link in Deiner Inbox (oder Spam) anklicken — oder Bestätigung erneut senden.";
+    }
+    if (
+      text.indexOf("invalid login credentials") !== -1 ||
+      text.indexOf("invalid_credentials") !== -1 ||
+      code === "invalid_credentials"
+    ) {
+      return "Email oder Passwort stimmen nicht. Neu über „Mitglied“ registriert und Email bestätigt? Sonst Passwort zurücksetzen.";
+    }
+    if (text.indexOf("user already registered") !== -1) {
+      return "Diese Email ist schon registriert. Bitte einloggen oder Passwort zurücksetzen.";
+    }
+    if (text.indexOf("password") !== -1 && text.indexOf("least") !== -1) {
+      return "Passwort zu kurz (mindestens 6–8 Zeichen).";
+    }
+    return raw || "Etwas ist schiefgelaufen. Bitte noch einmal versuchen.";
+  }
+
   async function signOut() {
     await getClient().auth.signOut();
   }
@@ -115,6 +162,9 @@
     signUp: signUp,
     signIn: signIn,
     signOut: signOut,
+    resetPassword: resetPassword,
+    resendConfirmation: resendConfirmation,
+    authErrorMessage: authErrorMessage,
     waLink: waLink,
     openWhatsAppAfterSignup: openWhatsAppAfterSignup,
   };
