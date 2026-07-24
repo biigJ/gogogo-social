@@ -191,6 +191,13 @@
         </div>
       </form>
 
+      <form id="form-new-password" class="hidden">
+        <p class="auth-note">Wähle ein neues Passwort (mindestens 8 Zeichen).</p>
+        <input class="field" id="new-password" type="password" autocomplete="new-password" placeholder="Neues Passwort" minlength="8" required />
+        <input class="field" id="new-password-2" type="password" autocomplete="new-password" placeholder="Passwort wiederholen" minlength="8" required />
+        <button class="btn-black" type="submit">Passwort speichern</button>
+      </form>
+
       <p class="form-msg" id="auth-msg" role="status" aria-live="polite"></p>
       <button class="btn-ghost" type="button" id="btn-auth-close">Schließen</button>
     </div>
@@ -389,6 +396,7 @@
       var modal = document.getElementById("auth-modal");
       var formReg = document.getElementById("form-register");
       var formLogin = document.getElementById("form-login");
+      var formNewPw = document.getElementById("form-new-password");
       var msg = document.getElementById("auth-msg");
       var title = document.getElementById("auth-title");
 
@@ -402,10 +410,12 @@
         document.querySelectorAll(".modal__tab").forEach(function (el) {
           el.classList.toggle("is-active", el.getAttribute("data-auth-tab") === tab);
         });
-        var isReg = tab === "register";
-        formReg.classList.toggle("hidden", !isReg);
-        formLogin.classList.toggle("hidden", isReg);
-        title.textContent = isReg ? "Mitglied werden" : "Login";
+        formReg.classList.toggle("hidden", tab !== "register");
+        formLogin.classList.toggle("hidden", tab !== "login");
+        formNewPw.classList.toggle("hidden", tab !== "new-password");
+        if (tab === "register") title.textContent = "Mitglied werden";
+        else if (tab === "new-password") title.textContent = "Neues Passwort";
+        else title.textContent = "Login";
         setMsg("");
       }
 
@@ -489,6 +499,30 @@
         }
       });
 
+      formNewPw.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var a = document.getElementById("new-password").value;
+        var b = document.getElementById("new-password-2").value;
+        if (a !== b) {
+          setMsg("Die Passwörter stimmen nicht überein.", "is-error");
+          return;
+        }
+        if (a.length < 8) {
+          setMsg("Mindestens 8 Zeichen.", "is-error");
+          return;
+        }
+        setMsg("Speichere Passwort …");
+        try {
+          await GogogoAuth.updatePassword(a);
+          setMsg("Passwort gespeichert. Du bist angemeldet.", "is-ok");
+          window.setTimeout(function () {
+            window.location.href = "/members/";
+          }, 700);
+        } catch (err) {
+          setMsg(GogogoAuth.authErrorMessage(err), "is-error");
+        }
+      });
+
       document.getElementById("btn-reset-pw").addEventListener("click", async function () {
         var email = document.getElementById("login-email").value.trim();
         if (!email) {
@@ -498,7 +532,7 @@
         setMsg("Sende Reset-Link …");
         try {
           await GogogoAuth.resetPassword(email);
-          setMsg("Falls ein Konto existiert, ist der Link zum Passwort-Zurücksetzen unterwegs (auch Spam prüfen).", "is-ok");
+          setMsg("Reset-Link ist unterwegs. Inbox und Spam prüfen, dann Link öffnen und neues Passwort setzen.", "is-ok");
         } catch (err) {
           setMsg(GogogoAuth.authErrorMessage(err), "is-error");
         }
@@ -514,7 +548,7 @@
         try {
           await GogogoAuth.resendConfirmation(email);
           setMsg(
-            "Anfrage gesendet. Wenn die Email schon bestätigt war, kommt keine neue Mail — dann einfach einloggen. Sonst Inbox + Spam prüfen (kann 1–2 Min. dauern).",
+            "Anfrage gesendet. Wenn die Email schon bestätigt war, kommt keine neue Mail — dann Passwort zurücksetzen. Sonst Inbox + Spam prüfen.",
             "is-ok"
           );
         } catch (err) {
@@ -522,7 +556,21 @@
         }
       });
 
-      if (/[?&]auth=1/.test(location.search)) openAuth("login");
+      (async function bootAuthUi() {
+        var type = GogogoAuth.getAuthCallbackType();
+        var wantsAuth = /[?&]auth=/.test(location.search);
+        if (type === "recovery" || /[?&]auth=reset/.test(location.search)) {
+          openAuth("new-password");
+          setMsg("Setze jetzt Dein neues Passwort.", "is-ok");
+          return;
+        }
+        if (type === "signup") {
+          openAuth("login");
+          setMsg("Email bestätigt. Bitte einloggen — oder Passwort zurücksetzen, falls es nicht klappt.", "is-ok");
+          return;
+        }
+        if (wantsAuth) openAuth("login");
+      })();
     })();
   </script>
 </body>

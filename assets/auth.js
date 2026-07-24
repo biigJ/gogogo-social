@@ -103,10 +103,23 @@
 
   async function resetPassword(email) {
     var res = await getClient().auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: SITE_URL + "/?auth=1",
+      redirectTo: SITE_URL + "/?auth=reset",
     });
     if (res.error) throw res.error;
     return true;
+  }
+
+  async function updatePassword(password) {
+    var res = await getClient().auth.updateUser({ password: password });
+    if (res.error) throw res.error;
+    return res.data;
+  }
+
+  function getAuthCallbackType() {
+    var hash = String(window.location.hash || "").replace(/^#/, "");
+    var search = String(window.location.search || "").replace(/^\?/, "");
+    var params = new URLSearchParams(hash + (hash && search ? "&" : "") + search);
+    return params.get("type") || "";
   }
 
   async function resendConfirmation(email) {
@@ -151,7 +164,7 @@
       text.indexOf("invalid_credentials") !== -1 ||
       code === "invalid_credentials"
     ) {
-      return "Email oder Passwort stimmen nicht. Neu über „Mitglied“ registriert und Email bestätigt? Sonst Passwort zurücksetzen.";
+      return "Passwort stimmt nicht (Konto existiert und ist bestätigt). Autofill prüfen oder „Passwort zurücksetzen“ nutzen.";
     }
     if (
       text.indexOf("user already registered") !== -1 ||
@@ -193,6 +206,8 @@
     signIn: signIn,
     signOut: signOut,
     resetPassword: resetPassword,
+    updatePassword: updatePassword,
+    getAuthCallbackType: getAuthCallbackType,
     resendConfirmation: resendConfirmation,
     authErrorMessage: authErrorMessage,
     waLink: waLink,
