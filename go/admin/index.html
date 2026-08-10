@@ -61,6 +61,32 @@
     }
     .field::placeholder { color: var(--placeholder); }
     .field:focus { outline: none; border-color: var(--ink); }
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      margin-bottom: 12px;
+      align-items: stretch;
+    }
+    .field-row .field { margin-bottom: 0; }
+    .btn-gen {
+      padding: 0 14px;
+      background: var(--paper);
+      color: var(--btn-ink);
+      font-weight: 700;
+      font-size: 0.78rem;
+      letter-spacing: -0.02em;
+      border-radius: var(--radius);
+      white-space: nowrap;
+    }
+    .btn-gen:hover { opacity: 0.92; }
+    .hint {
+      margin: -4px 0 12px;
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      opacity: 0.85;
+    }
     .btn {
       display: inline-flex; align-items: center; justify-content: center;
       width: 100%; height: 56px; background: var(--paper); color: var(--btn-ink);
@@ -111,10 +137,41 @@
       <form id="gen-form" novalidate>
         <label class="visually-hidden" for="gen-name">Vorname</label>
         <input class="field" id="gen-name" type="text" autocomplete="off" placeholder="Vorname" required />
+
         <label class="visually-hidden" for="gen-serial">Seriennummer</label>
-        <input class="field" id="gen-serial" type="text" autocomplete="off" placeholder="Seriennummer" required />
+        <div class="field-row">
+          <input
+            class="field"
+            id="gen-serial"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]{8}"
+            maxlength="8"
+            autocomplete="off"
+            placeholder="Seriennummer (8 Stellen)"
+            required
+          />
+          <button class="btn-gen" type="button" id="btn-serial" aria-label="8-stellige Seriennummer erzeugen">8 Stellen</button>
+        </div>
+        <p class="hint">Seriennummer: genau 8 Ziffern</p>
+
         <label class="visually-hidden" for="gen-code">Einladung</label>
-        <input class="field" id="gen-code" type="text" autocomplete="off" placeholder="Einladung" required />
+        <div class="field-row">
+          <input
+            class="field"
+            id="gen-code"
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]{4}"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="Code (4 Stellen)"
+            required
+          />
+          <button class="btn-gen" type="button" id="btn-code" aria-label="4-stelligen Code erzeugen">4 Stellen</button>
+        </div>
+        <p class="hint">Einladungs-Code: genau 4 Ziffern</p>
+
         <button class="btn" id="gen-submit" type="submit">generieren</button>
         <p class="msg" id="gen-msg" role="status"></p>
       </form>
@@ -161,6 +218,7 @@
       function showGen() {
         panelLogin.hidden = true;
         panelGen.hidden = false;
+        fillDefaults();
       }
       function showLogin() {
         panelGen.hidden = true;
@@ -168,9 +226,38 @@
         try { sessionStorage.removeItem(AUTH_KEY); } catch (e) {}
       }
 
+      function randomDigits(n) {
+        var out = "";
+        var buf = new Uint32Array(n);
+        if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(buf);
+        else for (var i = 0; i < n; i++) buf[i] = Math.floor(Math.random() * 0xffffffff);
+        for (var j = 0; j < n; j++) out += String(buf[j] % 10);
+        return out;
+      }
+
+      function fillSerial() {
+        document.getElementById("gen-serial").value = randomDigits(8);
+      }
+      function fillCode() {
+        document.getElementById("gen-code").value = randomDigits(4);
+      }
+      function fillDefaults() {
+        if (!document.getElementById("gen-serial").value) fillSerial();
+        if (!document.getElementById("gen-code").value) fillCode();
+      }
+
       try {
         if (sessionStorage.getItem(AUTH_KEY) === "1") showGen();
       } catch (e) {}
+
+      document.getElementById("btn-serial").addEventListener("click", fillSerial);
+      document.getElementById("btn-code").addEventListener("click", fillCode);
+
+      ["gen-serial", "gen-code"].forEach(function (id) {
+        document.getElementById(id).addEventListener("input", function () {
+          this.value = this.value.replace(/\D/g, "").slice(0, id === "gen-serial" ? 8 : 4);
+        });
+      });
 
       document.getElementById("login-form").addEventListener("submit", function (e) {
         e.preventDefault();
@@ -222,6 +309,16 @@
           msg.classList.add("is-error");
           return;
         }
+        if (!/^\d{8}$/.test(serial)) {
+          msg.textContent = "Seriennummer braucht genau 8 Ziffern.";
+          msg.classList.add("is-error");
+          return;
+        }
+        if (!/^\d{4}$/.test(code)) {
+          msg.textContent = "Code braucht genau 4 Ziffern.";
+          msg.classList.add("is-error");
+          return;
+        }
         btn.disabled = true;
         msg.textContent = "Speichere …";
         try {
@@ -239,6 +336,9 @@
             });
           }
           msg.textContent = "Code gespeichert.";
+          /* nächste Runde: neue Nummern vorschlagen */
+          fillSerial();
+          fillCode();
         } catch (err) {
           msg.textContent = "Fehler: " + (err && err.message ? err.message : err);
           msg.classList.add("is-error");
