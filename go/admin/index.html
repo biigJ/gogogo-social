@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#C7413B" />
+  <title>gogogo lead code generator</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <style>
+    :root {
+      --red: #C7413B;
+      --paper: #F7F5F0;
+      --ink: rgba(52, 34, 32, 0.9);
+      --ink-on-red: rgba(247, 245, 240, 0.9);
+      --btn-ink: rgba(170, 58, 52, 0.9);
+      --placeholder: rgba(110, 88, 84, 0.9);
+      --display: "Space Grotesk", system-ui, sans-serif;
+      --max: 420px;
+      --pad: 24px;
+      --radius: 2px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--display);
+      background: var(--red);
+      color: var(--ink-on-red);
+      min-height: 100svh;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; border: 0; background: none; }
+    .wrap {
+      width: min(100%, var(--max));
+      margin: 0 auto;
+      padding: calc(28px + env(safe-area-inset-top)) var(--pad) calc(40px + env(safe-area-inset-bottom));
+    }
+    .cycle-wrap { width: 240px; height: 240px; margin: 0 auto 28px; }
+    .cycle { width: 240px; height: 240px; display: block; }
+    .cycle.is-spinning { animation: spin 120s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .cycle.is-spinning { animation: none; } }
+    h1 {
+      font-weight: 700;
+      font-size: clamp(28px, 8vw, 36px);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      text-align: center;
+      margin-bottom: 28px;
+      color: var(--ink-on-red);
+    }
+    .field {
+      display: block; width: 100%; margin-bottom: 12px; padding: 14px;
+      background: var(--paper); color: var(--ink);
+      border: 1px solid transparent; border-radius: var(--radius);
+      font-size: 16px; font-weight: 500; letter-spacing: -0.02em;
+    }
+    .field::placeholder { color: var(--placeholder); }
+    .field:focus { outline: none; border-color: var(--ink); }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 100%; height: 56px; background: var(--paper); color: var(--btn-ink);
+      font-weight: 700; font-size: 1rem; letter-spacing: -0.03em;
+      border-radius: var(--radius);
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .msg { min-height: 1.2em; margin-top: 12px; font-size: 0.85rem; font-weight: 500; }
+    .msg.is-error { text-decoration: underline; }
+    .panel[hidden] { display: none !important; }
+    .qr-box {
+      margin-top: 28px; padding: 20px; background: var(--paper);
+      border-radius: var(--radius); text-align: center; color: var(--ink);
+    }
+    .qr-box canvas, .qr-box img { margin: 0 auto 14px; display: block; max-width: 100%; }
+    .qr-box a { color: var(--btn-ink); word-break: break-all; font-size: 0.85rem; font-weight: 600; }
+    .qr-meta { margin-top: 10px; font-size: 0.9rem; font-weight: 600; letter-spacing: -0.02em; }
+    .logout {
+      display: block; margin: 24px auto 0; text-align: center;
+      font-size: 0.8rem; font-weight: 500; text-decoration: underline; color: var(--ink-on-red);
+    }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0); border: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="cycle-wrap">
+      <svg class="cycle is-spinning" id="cycle" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
+    </div>
+
+    <div class="panel" id="panel-login">
+      <h1>gogogo lead code generator</h1>
+      <form id="login-form" novalidate>
+        <label class="visually-hidden" for="login-name">Vorname</label>
+        <input class="field" id="login-name" type="text" autocomplete="username" placeholder="Vorname" required />
+        <label class="visually-hidden" for="login-code">Code</label>
+        <input class="field" id="login-code" type="password" autocomplete="current-password" placeholder="Code" required />
+        <button class="btn" type="submit">Los geht's</button>
+        <p class="msg" id="login-msg" role="status"></p>
+      </form>
+    </div>
+
+    <div class="panel" id="panel-gen" hidden>
+      <h1>gogogo lead code generator</h1>
+      <form id="gen-form" novalidate>
+        <label class="visually-hidden" for="gen-name">Vorname</label>
+        <input class="field" id="gen-name" type="text" autocomplete="off" placeholder="Vorname" required />
+        <label class="visually-hidden" for="gen-serial">Seriennummer</label>
+        <input class="field" id="gen-serial" type="text" autocomplete="off" placeholder="Seriennummer" required />
+        <label class="visually-hidden" for="gen-code">Einladung</label>
+        <input class="field" id="gen-code" type="text" autocomplete="off" placeholder="Einladung" required />
+        <button class="btn" id="gen-submit" type="submit">generieren</button>
+        <p class="msg" id="gen-msg" role="status"></p>
+      </form>
+      <div class="qr-box" id="qr-box" hidden>
+        <canvas id="qr-canvas" width="220" height="220"></canvas>
+        <a id="qr-link" href="#" target="_blank" rel="noopener"></a>
+        <p class="qr-meta" id="qr-meta"></p>
+      </div>
+      <button class="logout" type="button" id="logout">Abmelden</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
+      var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
+      var ADMIN_NAME = "biigJ";
+      var ADMIN_CODE = "121276030993";
+      var AUTH_KEY = "gogogo_go_admin";
+      var GO_BASE = "https://www.gogogo.social/go";
+
+      function drawCycle(svg) {
+        var ns = "http://www.w3.org/2000/svg";
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+        var cx = 120, cy = 120, inner = 78, outer = 112, count = 30;
+        for (var s = 0; s < count; s++) {
+          var a = ((s / count) * Math.PI * 2) - Math.PI / 2;
+          var line = document.createElementNS(ns, "line");
+          line.setAttribute("x1", (cx + Math.cos(a) * inner).toFixed(2));
+          line.setAttribute("y1", (cy + Math.sin(a) * inner).toFixed(2));
+          line.setAttribute("x2", (cx + Math.cos(a) * outer).toFixed(2));
+          line.setAttribute("y2", (cy + Math.sin(a) * outer).toFixed(2));
+          line.setAttribute("stroke", "#F7F5F0");
+          line.setAttribute("stroke-width", "3");
+          line.setAttribute("stroke-linecap", "round");
+          svg.appendChild(line);
+        }
+      }
+      drawCycle(document.getElementById("cycle"));
+
+      var panelLogin = document.getElementById("panel-login");
+      var panelGen = document.getElementById("panel-gen");
+
+      function showGen() {
+        panelLogin.hidden = true;
+        panelGen.hidden = false;
+      }
+      function showLogin() {
+        panelGen.hidden = true;
+        panelLogin.hidden = false;
+        try { sessionStorage.removeItem(AUTH_KEY); } catch (e) {}
+      }
+
+      try {
+        if (sessionStorage.getItem(AUTH_KEY) === "1") showGen();
+      } catch (e) {}
+
+      document.getElementById("login-form").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var name = document.getElementById("login-name").value.trim();
+        var code = document.getElementById("login-code").value.trim();
+        var msg = document.getElementById("login-msg");
+        if (name === ADMIN_NAME && code === ADMIN_CODE) {
+          try { sessionStorage.setItem(AUTH_KEY, "1"); } catch (err) {}
+          msg.textContent = "";
+          showGen();
+        } else {
+          msg.textContent = "Vorname oder Code falsch.";
+          msg.classList.add("is-error");
+        }
+      });
+
+      document.getElementById("logout").addEventListener("click", showLogin);
+
+      async function insertCode(payload) {
+        var res = await fetch(SUPABASE_URL + "/rest/v1/go_invite_codes", {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY,
+            "Content-Type": "application/json",
+            Prefer: "return=representation"
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          var t = "";
+          try { t = await res.text(); } catch (e) {}
+          throw new Error(t || ("HTTP " + res.status));
+        }
+        return res.json();
+      }
+
+      document.getElementById("gen-form").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var name = document.getElementById("gen-name").value.trim();
+        var serial = document.getElementById("gen-serial").value.trim();
+        var code = document.getElementById("gen-code").value.trim();
+        var msg = document.getElementById("gen-msg");
+        var btn = document.getElementById("gen-submit");
+        var qrBox = document.getElementById("qr-box");
+        msg.classList.remove("is-error");
+        if (!name || !serial || !code) {
+          msg.textContent = "Bitte alle Felder ausfüllen.";
+          msg.classList.add("is-error");
+          return;
+        }
+        btn.disabled = true;
+        msg.textContent = "Speichere …";
+        try {
+          await insertCode({ first_name: name, serial_number: serial, code: code });
+          var url = GO_BASE + "?c=" + encodeURIComponent(code);
+          document.getElementById("qr-link").href = url;
+          document.getElementById("qr-link").textContent = url;
+          document.getElementById("qr-meta").textContent = name + " · " + serial + " · " + code;
+          qrBox.hidden = false;
+          if (window.QRCode && QRCode.toCanvas) {
+            await QRCode.toCanvas(document.getElementById("qr-canvas"), url, {
+              width: 220,
+              margin: 1,
+              color: { dark: "#0A0A0A", light: "#F7F5F0" }
+            });
+          }
+          msg.textContent = "Code gespeichert.";
+        } catch (err) {
+          msg.textContent = "Fehler: " + (err && err.message ? err.message : err);
+          msg.classList.add("is-error");
+        }
+        btn.disabled = false;
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#C7413B" />
+  <title>gogogo · Account</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script src="/assets/go-dither.js" defer></script>
+  <style>
+    :root {
+      --red: #C7413B;
+      --paper: #F7F5F0;
+      --ink: rgba(52, 34, 32, 0.9);
+      --ink-on-red: rgba(247, 245, 240, 0.9);
+      --btn-ink: rgba(170, 58, 52, 0.9);
+      --chrome-bg: #ececeb;
+      --chrome-width: min(100% - 32px, 390px);
+      --chrome-radius: 22px;
+      --header-h: 52px;
+      --display: "Space Grotesk", system-ui, sans-serif;
+      --max: 420px;
+      --pad: 24px;
+      --radius: 2px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--display);
+      background: var(--red);
+      color: var(--ink-on-red);
+      min-height: 100svh;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.35;
+    }
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; border: 0; background: none; }
+    a { color: inherit; text-decoration: none; }
+    img { display: block; max-width: 100%; }
+
+    .site-top {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 50;
+      display: flex; justify-content: center;
+      padding: 14px 16px 0; pointer-events: none;
+    }
+    .site-header {
+      pointer-events: auto;
+      width: var(--chrome-width);
+      display: grid; grid-template-columns: 44px 1fr 44px;
+      align-items: center; height: var(--header-h);
+      padding: 0 8px; background: var(--chrome-bg);
+      border-radius: var(--chrome-radius); color: var(--ink);
+    }
+    .site-header__brand { justify-self: center; font-weight: 600; font-size: 0.92rem; }
+    .icon-btn {
+      width: 40px; height: 40px; display: inline-flex;
+      align-items: center; justify-content: center;
+    }
+    .icon-btn__burger {
+      position: relative; width: 18px; height: 12px; display: block;
+    }
+    .icon-btn__burger i,
+    .icon-btn__burger::before,
+    .icon-btn__burger::after {
+      content: ""; position: absolute; left: 0; width: 18px; height: 1.5px;
+      background: var(--ink); border-radius: 1px;
+      transition: transform 200ms ease, opacity 200ms ease, top 200ms ease;
+    }
+    .icon-btn__burger i { top: 5px; display: block; }
+    .icon-btn__burger::before { top: 0; }
+    .icon-btn__burger::after { top: 10px; }
+    .icon-btn.is-open .icon-btn__burger i { opacity: 0; }
+    .icon-btn.is-open .icon-btn__burger::before { top: 5px; transform: rotate(45deg); }
+    .icon-btn.is-open .icon-btn__burger::after { top: 5px; transform: rotate(-45deg); }
+
+    .menu-panel {
+      position: fixed; inset: 0; z-index: 55; display: none;
+      align-items: flex-start; justify-content: center;
+      padding: calc(14px + var(--header-h) + 10px) 16px 24px;
+      background: rgba(10, 10, 10, 0.18);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    }
+    .menu-panel.is-open { display: flex; }
+    .menu-panel__sheet {
+      width: var(--chrome-width); background: rgba(246, 246, 244, 0.96);
+      padding: 28px 22px 26px; border-radius: var(--chrome-radius); color: var(--ink);
+    }
+    .menu-panel__nav {
+      display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center;
+    }
+    .menu-panel__nav a, .menu-panel__nav button {
+      font-size: clamp(1.05rem, 4vw, 1.3rem);
+      font-weight: 700; letter-spacing: -0.02em;
+    }
+    body.menu-open { overflow: hidden; }
+    body.menu-open .site-top { z-index: 70; }
+
+    .wrap {
+      width: min(100%, var(--max));
+      margin: 0 auto;
+      padding: calc(14px + var(--header-h) + 24px + env(safe-area-inset-top)) var(--pad) calc(40px + env(safe-area-inset-bottom));
+    }
+
+    .hero { text-align: center; margin-bottom: 28px; }
+    .cycle-wrap {
+      position: relative; width: 240px; height: 240px; margin: 0 auto 20px;
+    }
+    .cycle { width: 240px; height: 240px; display: block; }
+    .cycle.is-spinning { animation: spin 120s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .cycle.is-spinning { animation: none; } }
+    .cycle-portrait {
+      position: absolute; inset: 50%;
+      width: 132px; height: 132px; margin: -66px 0 0 -66px;
+      border-radius: 50%; overflow: hidden; background: rgba(10, 10, 10, 0.18);
+      border: 0;
+    }
+    .cycle-portrait img { width: 100%; height: 100%; object-fit: cover; }
+    .cycle-add {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 48px; font-weight: 500; color: var(--ink-on-red); line-height: 1;
+    }
+    .cycle-add[hidden] { display: none; }
+    .hero__hello {
+      font-weight: 700; font-size: clamp(1.4rem, 6vw, 1.9rem);
+      letter-spacing: -0.03em; line-height: 1.1;
+    }
+
+    .tile {
+      background: var(--paper); color: var(--ink);
+      border-radius: var(--radius); padding: 18px 16px; margin-bottom: 16px;
+    }
+    .tile h2 {
+      font-weight: 700; font-size: clamp(1.2rem, 5vw, 1.5rem);
+      letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 12px;
+    }
+    .tile p { font-weight: 500; font-size: 0.95rem; letter-spacing: -0.02em; line-height: 1.35; }
+    .tile .btn, .panel .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 100%; height: 48px; margin-top: 14px;
+      background: var(--red); color: var(--ink-on-red);
+      font-weight: 700; letter-spacing: -0.03em; border-radius: var(--radius);
+    }
+    .tile .btn--ghost {
+      background: transparent; color: var(--btn-ink); border: 1px solid var(--btn-ink);
+    }
+
+    .week {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-top: 8px;
+    }
+    .week__day {
+      aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(199, 65, 59, 0.08); border-radius: 2px;
+      font-size: 0.65rem; font-weight: 700; letter-spacing: -0.02em;
+    }
+    .week__day.is-today { background: var(--red); color: var(--ink-on-red); }
+    .week__n { font-size: 0.95rem; margin-top: 2px; }
+
+    .chat {
+      display: flex; flex-direction: column; gap: 10px; min-height: 180px;
+      max-height: 280px; overflow: auto; margin-bottom: 12px;
+    }
+    .chat__bubble {
+      align-self: flex-start; max-width: 85%;
+      background: rgba(199, 65, 59, 0.1); padding: 10px 12px; border-radius: 2px;
+      font-size: 0.9rem; font-weight: 500;
+    }
+    .chat__bubble--me { align-self: flex-end; background: rgba(199, 65, 59, 0.22); }
+    .chat__row { display: flex; gap: 8px; }
+    .chat__row input {
+      flex: 1; padding: 12px; border: 1px solid rgba(52, 34, 32, 0.2);
+      border-radius: var(--radius); background: #fff; color: var(--ink); font-size: 16px;
+    }
+    .chat__row button {
+      padding: 0 16px; background: var(--red); color: var(--ink-on-red);
+      font-weight: 700; border-radius: var(--radius);
+    }
+
+    .panel { display: none; margin-top: 8px; }
+    .panel.is-active { display: block; }
+    .panel .tile { margin-bottom: 14px; }
+    .fact details { margin-top: 10px; }
+    .fact summary {
+      cursor: pointer; list-style: none; font-size: 0.75rem; font-weight: 700;
+      letter-spacing: -0.02em; color: var(--btn-ink);
+    }
+    .fact summary::-webkit-details-marker { display: none; }
+    .fact__bg { margin-top: 10px; font-size: 0.85rem; opacity: 0.9; }
+    .video-media { width: 100%; aspect-ratio: 16/9; background: #111; margin-bottom: 12px; overflow: hidden; }
+    .video-media iframe, .video-media video { width: 100%; height: 100%; border: 0; }
+
+    .zirkel-frame {
+      width: 100%; min-height: 70vh; border: 0; border-radius: var(--radius);
+      background: var(--paper);
+    }
+
+    .modal {
+      position: fixed; inset: 0; z-index: 80; display: none;
+      align-items: center; justify-content: center; padding: 18px;
+      background: rgba(10, 10, 10, 0.55);
+    }
+    .modal.is-open { display: flex; }
+    .modal__panel {
+      width: min(100%, 390px); background: var(--paper); color: var(--ink);
+      border-radius: var(--radius); padding: 18px 16px 16px;
+    }
+    .modal__panel h2 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 12px; }
+    .crop {
+      width: 100%; aspect-ratio: 1; overflow: hidden; background: #ddd;
+      position: relative; touch-action: none; margin-bottom: 12px;
+    }
+    .crop img {
+      position: absolute; left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      max-width: none; user-select: none; pointer-events: none;
+    }
+    .modal__actions { display: flex; gap: 8px; }
+    .modal__actions .btn { flex: 1; margin-top: 0; height: 48px; }
+    .modal__actions .btn--ghost { background: transparent; color: var(--btn-ink); border: 1px solid var(--btn-ink); }
+
+    .foot {
+      text-align: center; margin-top: 28px; font-size: 12px; font-weight: 500;
+      color: var(--ink-on-red);
+    }
+    .foot a:hover { text-decoration: underline; }
+    .gate {
+      text-align: center; padding: 80px 24px;
+    }
+    .gate a {
+      display: inline-flex; margin-top: 16px; padding: 14px 22px;
+      background: var(--paper); color: var(--btn-ink); font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div id="app-gate" class="gate" hidden>
+    <p class="hero__hello">Kein Account gefunden.</p>
+    <p style="margin-top:12px;font-weight:500">Melde Dich zuerst über die Buddy-Challenge an.</p>
+    <a href="/go/">Zu /go</a>
+  </div>
+
+  <div id="app" hidden>
+    <div class="site-top">
+      <header class="site-header">
+        <div class="site-header__left">
+          <button class="icon-btn" id="btn-menu" type="button" aria-label="Menü" aria-expanded="false">
+            <span class="icon-btn__burger"><i></i></span>
+          </button>
+        </div>
+        <div class="site-header__brand">gogogo</div>
+        <div class="site-header__right" aria-hidden="true"></div>
+      </header>
+    </div>
+
+    <div class="menu-panel" id="menu-panel" hidden>
+      <div class="menu-panel__sheet" role="dialog" aria-label="Menü">
+        <nav class="menu-panel__nav">
+          <button type="button" data-goto="home">Home</button>
+          <button type="button" data-goto="calendar">Kalender</button>
+          <button type="button" data-goto="chat">Chat</button>
+          <button type="button" data-goto="zirkel">Zirkeltraining</button>
+          <button type="button" data-goto="factfulness">Factfulness</button>
+          <button type="button" data-goto="videos">Videos</button>
+        </nav>
+      </div>
+    </div>
+
+    <div class="wrap">
+      <section class="hero">
+        <div class="cycle-wrap">
+          <svg class="cycle is-spinning" id="cycle" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
+          <button class="cycle-portrait" id="photo-btn" type="button" aria-label="Foto hochladen">
+            <img id="photo-img" alt="" hidden />
+            <span class="cycle-add" id="photo-plus">+</span>
+          </button>
+        </div>
+        <p class="hero__hello" id="hello">Hallo.</p>
+      </section>
+
+      <div class="panel is-active" id="panel-home" data-panel="home">
+        <article class="tile">
+          <h2>Dein Account</h2>
+          <p id="home-meta">Buddy-Challenge · Foto oben hinzufügen.</p>
+        </article>
+        <article class="tile">
+          <h2>Trainingsplan-Generator</h2>
+          <p>Folgt im nächsten Schritt.</p>
+        </article>
+        <article class="tile">
+          <h2>Schnellzugriff</h2>
+          <button class="btn" type="button" data-goto="calendar">Kalender</button>
+          <button class="btn btn--ghost" type="button" data-goto="chat">Chat mit Buddys &amp; Coach</button>
+          <button class="btn btn--ghost" type="button" data-goto="zirkel">Zirkeltraining</button>
+        </article>
+      </div>
+
+      <div class="panel" id="panel-calendar" data-panel="calendar">
+        <article class="tile">
+          <h2>Woche</h2>
+          <p id="week-label"></p>
+          <div class="week" id="week"></div>
+        </article>
+      </div>
+
+      <div class="panel" id="panel-chat" data-panel="chat">
+        <article class="tile">
+          <h2>Chat</h2>
+          <div class="chat" id="chat-log">
+            <div class="chat__bubble">Joscha: Willkommen in der Buddy-Challenge. Schreib hier an Buddys &amp; Coach.</div>
+          </div>
+          <div class="chat__row">
+            <input id="chat-input" type="text" placeholder="Nachricht …" autocomplete="off" />
+            <button type="button" id="chat-send">Senden</button>
+          </div>
+        </article>
+      </div>
+
+      <div class="panel" id="panel-zirkel" data-panel="zirkel">
+        <article class="tile">
+          <h2>Zirkeltraining</h2>
+          <p>Mobile Stationen &amp; Werte — ohne Desktop-Drumherum.</p>
+          <a class="btn" href="/cycle-table-mobile.html" target="_blank" rel="noopener">Stationen öffnen</a>
+          <a class="btn btn--ghost" href="/account/fitness-friday.html">FitnessFriday App</a>
+        </article>
+        <iframe class="zirkel-frame" title="Zirkeltraining mobil" src="/cycle-table-mobile.html" loading="lazy"></iframe>
+      </div>
+
+      <div class="panel" id="panel-factfulness" data-panel="factfulness">
+        <article class="tile">
+          <h2>Factfulness</h2>
+          <p>Basics zu Bewegung — im gogogo Layout.</p>
+        </article>
+        <article class="tile fact"><h2>Du bist ein Hybridathlet</h2><p>Dein Körper ist für Kraft, Herz-Lunge und Skills gebaut. Spezialisierung ist die Ausnahme.</p></article>
+        <article class="tile fact"><h2>Im Rhythmus der Woche</h2><p>1× lang locker, 1× intensiv kurz, 2× Kraft. Der Rest: Spaziergänge, Mobility, Schlaf.</p></article>
+        <article class="tile fact"><h2>Tägliche Bewegung</h2><p>10–20 Minuten am Tag halten die Baseline — körperlich und mental.</p></article>
+        <article class="tile fact"><h2>Big Six Plus</h2><p>Kniebeuge, Klimmzug, Kreuzheben, Drücken, Ziehen, Schulterdrücken — plus einbeinig, Rotation, Plyo.</p></article>
+        <article class="tile fact"><h2>Kniebeuge</h2><p>Trainiert die ganze Kette. Start: Spanish Squats.</p></article>
+        <article class="tile fact"><h2>Klimmzugstange</h2><p>Schon passives Hängen hilft. Griffkraft ist ein starker Longevity-Marker.</p></article>
+        <article class="tile fact"><h2>Nahrung &amp; Erholung</h2><p>Prinzipien statt Dogma: Protein, Abstand, Schlaf.</p></article>
+        <article class="tile fact"><h2>Nervensystem &amp; Organismus</h2><p>Variation statt Dauerreiz. Der Stoffwechsel ist ein Regelkreis.</p></article>
+        <article class="tile fact"><h2>Dein Alter ist egal</h2><p>Der Grundumsatz bleibt lange stabil — Bewegung und Muskelmasse entscheiden.</p></article>
+        <article class="tile fact"><h2>Cortisol, Insulin, Fett</h2><p>Schlaf, Stress und Zucker steuern Speichern oft stärker als Kalorienzählen.</p></article>
+        <article class="tile fact"><h2>Frauen trainieren (nicht) anders</h2><p>Dieselben Grundübungen. Bulky ist unwahrscheinlich. Zyklus kann Timing feinjustieren.</p></article>
+        <article class="tile fact"><h2>Muskelmasse regelt mehr</h2><p>Mehr Muskel → höherer Umsatz, bessere Insulinlage.</p></article>
+      </div>
+
+      <div class="panel" id="panel-videos" data-panel="videos">
+        <article class="tile">
+          <h2>Videos</h2>
+          <p>Aus dem Gym — im Account-Layout.</p>
+        </article>
+        <article class="tile">
+          <h2>Upper Body Basics</h2>
+          <div class="video-media" id="yt-upper" data-youtube-id="l6IP5qdZ4sk">
+            <img src="/assets/gogogo/gogogo-upperbody-Video-Poster.png" alt="" width="1600" height="900" loading="lazy" />
+          </div>
+          <p>Klimmzüge, Pendlay Row, Bench, Military Press, Reverse Fly, Core-Rotation.</p>
+          <button class="btn" type="button" id="play-upper">Video abspielen</button>
+        </article>
+        <article class="tile">
+          <h2>Mobility</h2>
+          <div class="video-media">
+            <img src="/assets/gogogo/factfulness-1600.webp" alt="" width="1600" height="900" loading="lazy" />
+          </div>
+          <p>Mobility-Clip folgt.</p>
+        </article>
+      </div>
+
+      <footer class="foot">
+        <a href="/impressum/">Impressum</a> ·
+        <a href="/datenschutz/">Datenschutz</a> ·
+        <a href="/kontakt/">Kontakt</a>
+      </footer>
+    </div>
+  </div>
+
+  <div class="modal" id="photo-modal" hidden>
+    <div class="modal__panel">
+      <h2>Gesicht ins Quadrat</h2>
+      <p style="font-size:0.9rem;font-weight:500;margin-bottom:12px">Verschiebe das Bild, bis Dein Gesicht mittig sitzt. Danach wird es gerastert und gespeichert.</p>
+      <div class="crop" id="crop">
+        <img id="crop-img" alt="" />
+      </div>
+      <input type="file" id="photo-file" accept="image/*" hidden />
+      <div class="modal__actions">
+        <button class="btn btn--ghost" type="button" id="photo-pick">Foto wählen</button>
+        <button class="btn" type="button" id="photo-save" disabled>Speichern</button>
+      </div>
+      <button class="btn btn--ghost" type="button" id="photo-close" style="width:100%;margin-top:8px">Schließen</button>
+      <p id="photo-msg" style="margin-top:10px;font-size:0.8rem;font-weight:500;min-height:1.2em"></p>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
+      var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
+      var ACCOUNT_KEY = "gogogo_go_account";
+
+      var account = null;
+      try { account = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch (e) {}
+
+      if (!account || !account.name) {
+        document.getElementById("app-gate").hidden = false;
+        return;
+      }
+      document.getElementById("app").hidden = false;
+      document.getElementById("hello").textContent = "Hallo, " + account.name + ".";
+      document.getElementById("home-meta").textContent =
+        (account.invite_code ? "Code " + account.invite_code + " · " : "") +
+        (account.serial_number ? "Seriennr. " + account.serial_number : "Buddy-Challenge");
+
+      if (account.photo_url) {
+        var img = document.getElementById("photo-img");
+        img.src = account.photo_url;
+        img.hidden = false;
+        document.getElementById("photo-plus").hidden = true;
+      }
+
+      function drawCycle(svg) {
+        var ns = "http://www.w3.org/2000/svg";
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+        var cx = 120, cy = 120, inner = 78, outer = 112, count = 30;
+        for (var s = 0; s < count; s++) {
+          var a = ((s / count) * Math.PI * 2) - Math.PI / 2;
+          var line = document.createElementNS(ns, "line");
+          line.setAttribute("x1", (cx + Math.cos(a) * inner).toFixed(2));
+          line.setAttribute("y1", (cy + Math.sin(a) * inner).toFixed(2));
+          line.setAttribute("x2", (cx + Math.cos(a) * outer).toFixed(2));
+          line.setAttribute("y2", (cy + Math.sin(a) * outer).toFixed(2));
+          line.setAttribute("stroke", "#F7F5F0");
+          line.setAttribute("stroke-width", "3");
+          line.setAttribute("stroke-linecap", "round");
+          svg.appendChild(line);
+        }
+      }
+      drawCycle(document.getElementById("cycle"));
+
+      /* Menu */
+      var menuBtn = document.getElementById("btn-menu");
+      var menuPanel = document.getElementById("menu-panel");
+      function setMenu(open) {
+        menuBtn.classList.toggle("is-open", open);
+        menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        menuPanel.classList.toggle("is-open", open);
+        menuPanel.hidden = !open;
+        document.body.classList.toggle("menu-open", open);
+      }
+      menuBtn.addEventListener("click", function () {
+        setMenu(!menuPanel.classList.contains("is-open"));
+      });
+      menuPanel.addEventListener("click", function (e) {
+        if (e.target === menuPanel) setMenu(false);
+      });
+
+      function gotoPanel(id) {
+        document.querySelectorAll(".panel").forEach(function (p) {
+          p.classList.toggle("is-active", p.getAttribute("data-panel") === id);
+        });
+        setMenu(false);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      document.querySelectorAll("[data-goto]").forEach(function (el) {
+        el.addEventListener("click", function () {
+          gotoPanel(el.getAttribute("data-goto"));
+        });
+      });
+
+      /* Week calendar */
+      (function buildWeek() {
+        var names = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+        var now = new Date();
+        var day = (now.getDay() + 6) % 7;
+        var monday = new Date(now);
+        monday.setDate(now.getDate() - day);
+        document.getElementById("week-label").textContent =
+          "KW · ab " + monday.toLocaleDateString("de-DE");
+        var root = document.getElementById("week");
+        for (var i = 0; i < 7; i++) {
+          var d = new Date(monday);
+          d.setDate(monday.getDate() + i);
+          var el = document.createElement("div");
+          el.className = "week__day" + (i === day ? " is-today" : "");
+          el.innerHTML = "<span>" + names[i] + "</span><span class='week__n'>" + d.getDate() + "</span>";
+          root.appendChild(el);
+        }
+      })();
+
+      /* Chat local stub */
+      var chatLog = document.getElementById("chat-log");
+      document.getElementById("chat-send").addEventListener("click", function () {
+        var input = document.getElementById("chat-input");
+        var t = input.value.trim();
+        if (!t) return;
+        var b = document.createElement("div");
+        b.className = "chat__bubble chat__bubble--me";
+        b.textContent = account.name + ": " + t;
+        chatLog.appendChild(b);
+        input.value = "";
+        chatLog.scrollTop = chatLog.scrollHeight;
+      });
+
+      /* Videos */
+      document.getElementById("play-upper").addEventListener("click", function () {
+        var box = document.getElementById("yt-upper");
+        var id = box.getAttribute("data-youtube-id");
+        box.innerHTML = '<iframe src="https://www.youtube.com/embed/' + id + '?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen title="Upper Body Basics"></iframe>';
+      });
+
+      /* Photo crop + dither + upload */
+      var modal = document.getElementById("photo-modal");
+      var crop = document.getElementById("crop");
+      var cropImg = document.getElementById("crop-img");
+      var fileInput = document.getElementById("photo-file");
+      var saveBtn = document.getElementById("photo-save");
+      var photoMsg = document.getElementById("photo-msg");
+      var offset = { x: 0, y: 0 };
+      var baseScale = 1;
+      var dragging = false;
+      var last = { x: 0, y: 0 };
+
+      function openModal() {
+        modal.hidden = false;
+        modal.classList.add("is-open");
+      }
+      function closeModal() {
+        modal.classList.remove("is-open");
+        modal.hidden = true;
+      }
+
+      document.getElementById("photo-btn").addEventListener("click", openModal);
+      document.getElementById("photo-close").addEventListener("click", closeModal);
+      document.getElementById("photo-pick").addEventListener("click", function () { fileInput.click(); });
+
+      fileInput.addEventListener("change", function () {
+        var file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+        var url = URL.createObjectURL(file);
+        cropImg.onload = function () {
+          var box = crop.getBoundingClientRect();
+          baseScale = Math.max(box.width / cropImg.naturalWidth, box.height / cropImg.naturalHeight) * 1.15;
+          offset = { x: 0, y: 0 };
+          applyCropTransform();
+          saveBtn.disabled = false;
+          photoMsg.textContent = "";
+        };
+        cropImg.src = url;
+      });
+
+      function applyCropTransform() {
+        cropImg.style.width = (cropImg.naturalWidth * baseScale) + "px";
+        cropImg.style.height = (cropImg.naturalHeight * baseScale) + "px";
+        cropImg.style.transform = "translate(calc(-50% + " + offset.x + "px), calc(-50% + " + offset.y + "px))";
+      }
+
+      function onDown(e) {
+        dragging = true;
+        var p = e.touches ? e.touches[0] : e;
+        last = { x: p.clientX, y: p.clientY };
+      }
+      function onMove(e) {
+        if (!dragging) return;
+        e.preventDefault();
+        var p = e.touches ? e.touches[0] : e;
+        offset.x += p.clientX - last.x;
+        offset.y += p.clientY - last.y;
+        last = { x: p.clientX, y: p.clientY };
+        applyCropTransform();
+      }
+      function onUp() { dragging = false; }
+      crop.addEventListener("mousedown", onDown);
+      crop.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      crop.addEventListener("touchstart", onDown, { passive: true });
+      crop.addEventListener("touchmove", onMove, { passive: false });
+      crop.addEventListener("touchend", onUp);
+
+      function renderCroppedCanvas() {
+        var box = crop.getBoundingClientRect();
+        var size = Math.floor(box.width);
+        var canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        var ctx = canvas.getContext("2d");
+        var w = cropImg.naturalWidth * baseScale;
+        var h = cropImg.naturalHeight * baseScale;
+        var dx = size / 2 + offset.x - w / 2;
+        var dy = size / 2 + offset.y - h / 2;
+        ctx.fillStyle = "#F7F5F0";
+        ctx.fillRect(0, 0, size, size);
+        ctx.drawImage(cropImg, dx, dy, w, h);
+        return canvas;
+      }
+
+      document.getElementById("photo-save").addEventListener("click", async function () {
+        if (!window.GogogoDither) {
+          photoMsg.textContent = "Dither-Tool noch nicht geladen.";
+          return;
+        }
+        saveBtn.disabled = true;
+        photoMsg.textContent = "Rastern & hochladen …";
+        try {
+          var cropped = renderCroppedCanvas();
+          var dithered = GogogoDither.ditherSquare(cropped, 3);
+          var blob = await GogogoDither.blobFromCanvas(dithered);
+          var path = (account.id || ("local-" + Date.now())) + "-" + Date.now() + ".png";
+          var up = await fetch(SUPABASE_URL + "/storage/v1/object/go-avatars/" + path, {
+            method: "POST",
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: "Bearer " + SUPABASE_KEY,
+              "Content-Type": "image/png",
+              "x-upsert": "true"
+            },
+            body: blob
+          });
+          var publicUrl = SUPABASE_URL + "/storage/v1/object/public/go-avatars/" + path;
+          if (!up.ok) {
+            /* Fallback: local data URL if storage bucket missing */
+            publicUrl = dithered.toDataURL("image/png");
+            photoMsg.textContent = "Lokal gespeichert (Storage-Bucket go-avatars ggf. anlegen).";
+          } else {
+            photoMsg.textContent = "Gespeichert.";
+            if (account.id && String(account.id).indexOf("local-") !== 0) {
+              await fetch(SUPABASE_URL + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(account.id), {
+                method: "PATCH",
+                headers: {
+                  apikey: SUPABASE_KEY,
+                  Authorization: "Bearer " + SUPABASE_KEY,
+                  "Content-Type": "application/json",
+                  Prefer: "return=minimal"
+                },
+                body: JSON.stringify({ photo_url: publicUrl, updated_at: new Date().toISOString() })
+              });
+            }
+          }
+          account.photo_url = publicUrl;
+          localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
+          var av = document.getElementById("photo-img");
+          av.src = publicUrl;
+          av.hidden = false;
+          document.getElementById("photo-plus").hidden = true;
+          setTimeout(closeModal, 600);
+        } catch (err) {
+          photoMsg.textContent = "Fehler: " + (err && err.message ? err.message : err);
+        }
+        saveBtn.disabled = false;
+      });
+    })();
+  </script>
+</body>
+</html>

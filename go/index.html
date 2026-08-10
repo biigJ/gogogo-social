@@ -588,28 +588,14 @@
         } catch (e) {}
       }
 
-      function showSuccess(name) {
-        successTitle.textContent = "Stark, " + name + ".";
-        waBtn.href = waLink(name);
-        flowMain.classList.add("is-hidden");
-        flowSuccess.classList.add("is-visible");
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-
-      async function insertLead(payload) {
-        if (window.supabase && window.supabase.createClient) {
-          var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-          var res = await sb.from("go_leads").insert(payload);
-          if (res.error) throw res.error;
-          return;
-        }
-        var res = await fetch(SUPABASE_URL + "/rest/v1/go_leads", {
+      async function restInsert(table, payload, prefer) {
+        var res = await fetch(SUPABASE_URL + "/rest/v1/" + table, {
           method: "POST",
           headers: {
-            "apikey": SUPABASE_KEY,
-            "Authorization": "Bearer " + SUPABASE_KEY,
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY,
             "Content-Type": "application/json",
-            "Prefer": "return=minimal"
+            Prefer: prefer || "return=representation"
           },
           body: JSON.stringify(payload)
         });
@@ -618,6 +604,24 @@
           try { body = await res.text(); } catch (e) {}
           throw new Error(body || ("HTTP " + res.status));
         }
+        if ((prefer || "").indexOf("representation") >= 0) {
+          try { return await res.json(); } catch (e) { return null; }
+        }
+        return null;
+      }
+
+      async function lookupInvite(code) {
+        if (!code) return null;
+        var url = SUPABASE_URL + "/rest/v1/go_invite_codes?code=eq." + encodeURIComponent(code) + "&select=*&limit=1";
+        var res = await fetch(url, {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY
+          }
+        });
+        if (!res.ok) return null;
+        var rows = await res.json();
+        return rows && rows[0] ? rows[0] : null;
       }
 
       form.addEventListener("submit", async function (e) {
@@ -642,16 +646,59 @@
         msg.textContent = "";
         msg.classList.remove("is-error");
         submitBtn.disabled = true;
+        msg.textContent = "Einen Moment …";
+
+        var inviteRow = null;
+        try {
+          inviteRow = await lookupInvite(invite);
+        } catch (err) {}
 
         try {
-          await insertLead(payload);
+          await restInsert("go_leads", payload, "return=minimal");
         } catch (err) {
           queueLead(Object.assign({ queued_at: new Date().toISOString(), error: String(err && err.message || err) }, payload));
         }
 
-        try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
-        showSuccess(name);
+        var account = null;
+        try {
+          var rows = await restInsert("go_accounts", {
+            name: name,
+            phone: phone,
+            invite_code: invite,
+            serial_number: inviteRow ? inviteRow.serial_number : null
+          }, "return=representation");
+          account = rows && rows[0] ? rows[0] : null;
+        } catch (err) {
+          account = {
+            id: "local-" + Date.now(),
+            name: name,
+            phone: phone,
+            invite_code: invite,
+            serial_number: inviteRow ? inviteRow.serial_number : null,
+            photo_url: null
+          };
+        }
+
+        /* Parallel: WhatsApp-Agent-Job — Account wartet nicht darauf */
+        try {
+          await restInsert("go_wa_jobs", {
+            account_id: account && account.id && String(account.id).indexOf("local-") !== 0 ? account.id : null,
+            name: name,
+            phone: phone,
+            invite_code: invite,
+            status: "pending"
+          }, "return=minimal");
+        } catch (err) {}
+
+        try {
+          localStorage.setItem("gogogo_go_account", JSON.stringify(account));
+          sessionStorage.removeItem(SESSION_KEY);
+        } catch (e) {}
+
+        window.location.href = "/account/";
       });
+
+      /* Success-UI bleibt als Fallback ungenutzt — Redirect ist der Hauptpfad */
 
       noWa.addEventListener("click", function () {
         noWaNote.textContent = "Alles klar. Du hörst von Joscha.";
