@@ -40,7 +40,15 @@
       padding: calc(28px + env(safe-area-inset-top)) var(--pad) calc(40px + env(safe-area-inset-bottom));
     }
     .cycle-wrap { width: 240px; height: 240px; margin: 0 auto 28px; }
-    .cycle { width: 240px; height: 240px; display: block; }
+    .cycle-wrap.is-back {
+      cursor: pointer;
+      border-radius: 50%;
+    }
+    .cycle-wrap.is-back:focus-visible {
+      outline: 2px solid var(--ink-on-red);
+      outline-offset: 4px;
+    }
+    .cycle { width: 240px; height: 240px; display: block; pointer-events: none; }
     .cycle.is-spinning { animation: spin 120s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .cycle.is-spinning { animation: none; } }
@@ -52,6 +60,22 @@
       text-align: center;
       margin-bottom: 28px;
       color: var(--ink-on-red);
+    }
+    .result-name {
+      font-weight: 700;
+      font-size: clamp(1.5rem, 6vw, 2rem);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .result-meta {
+      text-align: center;
+      font-weight: 600;
+      font-size: 1rem;
+      letter-spacing: -0.02em;
+      margin-bottom: 24px;
+      opacity: 0.95;
     }
     .field {
       display: block; width: 100%; margin-bottom: 12px; padding: 14px;
@@ -98,12 +122,11 @@
     .msg.is-error { text-decoration: underline; }
     .panel[hidden] { display: none !important; }
     .qr-box {
-      margin-top: 28px; padding: 20px; background: var(--paper);
+      padding: 20px; background: var(--paper);
       border-radius: var(--radius); text-align: center; color: var(--ink);
     }
     .qr-box canvas, .qr-box img { margin: 0 auto 14px; display: block; max-width: 100%; }
     .qr-box a { color: var(--btn-ink); word-break: break-all; font-size: 0.85rem; font-weight: 600; }
-    .qr-meta { margin-top: 10px; font-size: 0.9rem; font-weight: 600; letter-spacing: -0.02em; }
     .logout {
       display: block; margin: 24px auto 0; text-align: center;
       font-size: 0.8rem; font-weight: 500; text-decoration: underline; color: var(--ink-on-red);
@@ -116,9 +139,15 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="cycle-wrap">
+    <button
+      class="cycle-wrap"
+      id="cycle-btn"
+      type="button"
+      aria-label="Zurück zum Formular"
+      disabled
+    >
       <svg class="cycle is-spinning" id="cycle" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
-    </div>
+    </button>
 
     <div class="panel" id="panel-login">
       <h1>gogogo lead code generator</h1>
@@ -173,12 +202,16 @@
         <button class="btn" id="gen-submit" type="submit">generieren</button>
         <p class="msg" id="gen-msg" role="status"></p>
       </form>
-      <div class="qr-box" id="qr-box" hidden>
+      <button class="logout" type="button" id="logout">Abmelden</button>
+    </div>
+
+    <div class="panel" id="panel-result" hidden>
+      <p class="result-name" id="result-name"></p>
+      <p class="result-meta" id="result-meta"></p>
+      <div class="qr-box" id="qr-box">
         <canvas id="qr-canvas" width="220" height="220"></canvas>
         <a id="qr-link" href="#" target="_blank" rel="noopener"></a>
-        <p class="qr-meta" id="qr-meta"></p>
       </div>
-      <button class="logout" type="button" id="logout">Abmelden</button>
     </div>
   </div>
 
@@ -212,16 +245,38 @@
 
       var panelLogin = document.getElementById("panel-login");
       var panelGen = document.getElementById("panel-gen");
+      var panelResult = document.getElementById("panel-result");
+      var cycleBtn = document.getElementById("cycle-btn");
+
+      function setCycleBack(on) {
+        cycleBtn.classList.toggle("is-back", on);
+        cycleBtn.disabled = !on;
+        cycleBtn.setAttribute("aria-disabled", on ? "false" : "true");
+      }
 
       function showGen() {
         panelLogin.hidden = true;
+        panelResult.hidden = true;
         panelGen.hidden = false;
+        setCycleBack(false);
         fillDefaults();
       }
       function showLogin() {
         panelGen.hidden = true;
+        panelResult.hidden = true;
         panelLogin.hidden = false;
+        setCycleBack(false);
         try { sessionStorage.removeItem(AUTH_KEY); } catch (e) {}
+      }
+      function showResult(name, serial, code, url) {
+        panelLogin.hidden = true;
+        panelGen.hidden = true;
+        panelResult.hidden = false;
+        document.getElementById("result-name").textContent = name;
+        document.getElementById("result-meta").textContent = serial + " · " + code;
+        document.getElementById("qr-link").href = url;
+        document.getElementById("qr-link").textContent = url;
+        setCycleBack(true);
       }
 
       function randomDigits(n) {
@@ -250,6 +305,17 @@
 
       document.getElementById("btn-serial").addEventListener("click", fillSerial);
       document.getElementById("btn-code").addEventListener("click", fillCode);
+
+      cycleBtn.addEventListener("click", function () {
+        if (cycleBtn.disabled) return;
+        document.getElementById("gen-name").value = "";
+        document.getElementById("gen-msg").textContent = "";
+        document.getElementById("gen-msg").classList.remove("is-error");
+        fillSerial();
+        fillCode();
+        showGen();
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      });
 
       ["gen-serial", "gen-code"].forEach(function (id) {
         document.getElementById(id).addEventListener("input", function () {
@@ -300,7 +366,6 @@
         var code = document.getElementById("gen-code").value.trim();
         var msg = document.getElementById("gen-msg");
         var btn = document.getElementById("gen-submit");
-        var qrBox = document.getElementById("qr-box");
         msg.classList.remove("is-error");
         if (!name || !serial || !code) {
           msg.textContent = "Bitte alle Felder ausfüllen.";
@@ -322,10 +387,6 @@
         try {
           await insertCode({ first_name: name, serial_number: serial, code: code });
           var url = GO_BASE + "?c=" + encodeURIComponent(code);
-          document.getElementById("qr-link").href = url;
-          document.getElementById("qr-link").textContent = url;
-          document.getElementById("qr-meta").textContent = name + " · " + serial + " · " + code;
-          qrBox.hidden = false;
           if (window.QRCode && QRCode.toCanvas) {
             await QRCode.toCanvas(document.getElementById("qr-canvas"), url, {
               width: 220,
@@ -333,10 +394,8 @@
               color: { dark: "#0A0A0A", light: "#F7F5F0" }
             });
           }
-          msg.textContent = "Code gespeichert.";
-          /* nächste Runde: neue Nummern vorschlagen */
-          fillSerial();
-          fillCode();
+          showResult(name, serial, code, url);
+          window.scrollTo({ top: 0, behavior: "smooth" });
         } catch (err) {
           msg.textContent = "Fehler: " + (err && err.message ? err.message : err);
           msg.classList.add("is-error");
