@@ -341,19 +341,38 @@
       document.getElementById("logout").addEventListener("click", showLogin);
 
       async function insertCode(payload) {
-        var res = await fetch(SUPABASE_URL + "/rest/v1/go_invite_codes", {
-          method: "POST",
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: "Bearer " + SUPABASE_KEY,
-            "Content-Type": "application/json",
-            Prefer: "return=representation"
-          },
-          body: JSON.stringify(payload)
-        });
+        var res;
+        try {
+          res = await fetch(SUPABASE_URL + "/rest/v1/go_invite_codes", {
+            method: "POST",
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: "Bearer " + SUPABASE_KEY,
+              "Content-Type": "application/json",
+              Prefer: "return=representation"
+            },
+            body: JSON.stringify(payload)
+          });
+        } catch (netErr) {
+          var offline = Object.assign({ queued_at: new Date().toISOString(), offline: true }, payload);
+          try {
+            var q = JSON.parse(localStorage.getItem("gogogo_invite_queue") || "[]");
+            q.push(offline);
+            localStorage.setItem("gogogo_invite_queue", JSON.stringify(q));
+          } catch (e) {}
+          var e2 = new Error(
+            "Supabase nicht erreichbar. Code lokal geparkt — QR trotzdem nutzbar. " +
+            "Bitte Projekt-URL prüfen (aktuell: " + SUPABASE_URL.replace("https://", "") + ")."
+          );
+          e2.offline = true;
+          throw e2;
+        }
         if (!res.ok) {
           var t = "";
           try { t = await res.text(); } catch (e) {}
+          if (res.status === 404 || /PGRST205|does not exist|relation/i.test(t)) {
+            throw new Error("Tabelle go_invite_codes fehlt — go-account.sql in Supabase ausführen.");
+          }
           throw new Error(t || ("HTTP " + res.status));
         }
         return res.json();
@@ -384,9 +403,23 @@
         }
         btn.disabled = true;
         msg.textContent = "Speichere …";
+        var url = GO_BASE + "?c=" + encodeURIComponent(code);
+        var savedOk = false;
+        var warn = "";
         try {
           await insertCode({ first_name: name, serial_number: serial, code: code });
-          var url = GO_BASE + "?c=" + encodeURIComponent(code);
+          savedOk = true;
+        } catch (err) {
+          if (err && err.offline) {
+            warn = String(err.message || err);
+          } else {
+            msg.textContent = "Fehler: " + (err && err.message ? err.message : err);
+            msg.classList.add("is-error");
+            btn.disabled = false;
+            return;
+          }
+        }
+        try {
           if (window.QRCode && QRCode.toCanvas) {
             await QRCode.toCanvas(document.getElementById("qr-canvas"), url, {
               width: 220,
@@ -395,6 +428,14 @@
             });
           }
           showResult(name, serial, code, url);
+          if (warn) {
+            var note = document.createElement("p");
+            note.className = "msg is-error";
+            note.style.marginTop = "14px";
+            note.style.textAlign = "center";
+            note.textContent = warn;
+            document.getElementById("panel-result").appendChild(note);
+          }
           window.scrollTo({ top: 0, behavior: "smooth" });
         } catch (err) {
           msg.textContent = "Fehler: " + (err && err.message ? err.message : err);
