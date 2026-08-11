@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     :root {
       --red: #C7413B;
@@ -125,7 +125,14 @@
       padding: 20px; background: var(--paper);
       border-radius: var(--radius); text-align: center; color: var(--ink);
     }
-    .qr-box canvas, .qr-box img { margin: 0 auto 14px; display: block; max-width: 100%; }
+    .qr-box #qr-mount {
+      width: 220px; height: 220px; margin: 0 auto 14px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .qr-box #qr-mount img,
+    .qr-box #qr-mount canvas {
+      display: block; width: 220px; height: 220px;
+    }
     .qr-box a { color: var(--btn-ink); word-break: break-all; font-size: 0.85rem; font-weight: 600; }
     .logout {
       display: block; margin: 24px auto 0; text-align: center;
@@ -209,7 +216,7 @@
       <p class="result-name" id="result-name"></p>
       <p class="result-meta" id="result-meta"></p>
       <div class="qr-box" id="qr-box">
-        <canvas id="qr-canvas" width="220" height="220"></canvas>
+        <div id="qr-mount" aria-hidden="true"></div>
         <a id="qr-link" href="#" target="_blank" rel="noopener"></a>
       </div>
     </div>
@@ -277,6 +284,28 @@
         document.getElementById("qr-link").href = url;
         document.getElementById("qr-link").textContent = url;
         setCycleBack(true);
+        renderQr(url);
+      }
+
+      function renderQr(url) {
+        var mount = document.getElementById("qr-mount");
+        mount.innerHTML = "";
+        if (typeof QRCode !== "function") {
+          mount.textContent = "QR-Library fehlt — Link unten nutzen.";
+          mount.style.color = "var(--btn-ink)";
+          mount.style.fontSize = "0.85rem";
+          mount.style.fontWeight = "600";
+          return;
+        }
+        /* qrcodejs: zeichnet in ein leeres Element */
+        new QRCode(mount, {
+          text: url,
+          width: 220,
+          height: 220,
+          colorDark: "#0A0A0A",
+          colorLight: "#F7F5F0",
+          correctLevel: QRCode.CorrectLevel.M
+        });
       }
 
       function randomDigits(n) {
@@ -419,28 +448,16 @@
             return;
           }
         }
-        try {
-          if (window.QRCode && QRCode.toCanvas) {
-            await QRCode.toCanvas(document.getElementById("qr-canvas"), url, {
-              width: 220,
-              margin: 1,
-              color: { dark: "#0A0A0A", light: "#F7F5F0" }
-            });
-          }
-          showResult(name, serial, code, url);
-          if (warn) {
-            var note = document.createElement("p");
-            note.className = "msg is-error";
-            note.style.marginTop = "14px";
-            note.style.textAlign = "center";
-            note.textContent = warn;
-            document.getElementById("panel-result").appendChild(note);
-          }
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        } catch (err) {
-          msg.textContent = "Fehler: " + (err && err.message ? err.message : err);
-          msg.classList.add("is-error");
+        showResult(name, serial, code, url);
+        if (warn) {
+          var note = document.createElement("p");
+          note.className = "msg is-error";
+          note.style.marginTop = "14px";
+          note.style.textAlign = "center";
+          note.textContent = warn;
+          document.getElementById("panel-result").appendChild(note);
         }
+        window.scrollTo({ top: 0, behavior: "smooth" });
         btn.disabled = false;
       });
     })();
