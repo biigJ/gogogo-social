@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0a0a" />
+  <title>gogogo.social</title>
+  <meta name="description" content="Ein kleiner Kreis für tägliche Bewegung. Auf Anmeldung." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preload" as="image" href="assets/gogogo/hero-poster-1600.webp" />
+  <link rel="preload" as="video" href="assets/gogogo/hero.mp4" type="video/mp4" />
+  <link rel="preload" as="video" href="assets/gogogo/gogogo.mp4" type="video/mp4" />
+  <link rel="preload" as="video" href="assets/gogogo/circle-clip.mp4" type="video/mp4" />
+  <link rel="stylesheet" href="assets/site.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/auth.js" defer></script>
+</head>
+<body>
+  <div class="site-top">
+    <header class="site-header" aria-label="Hauptnavigation">
+      <div class="site-header__left">
+        <button class="icon-btn" type="button" id="btn-menu" aria-label="Menü öffnen" aria-expanded="false" aria-controls="menu-panel">
+          <span class="icon-btn__burger" aria-hidden="true"><i></i></span>
+        </button>
+      </div>
+      <a class="site-header__brand" href="/">gogogo.social</a>
+      <div class="site-header__right">
+        <button class="icon-login" type="button" data-open-auth="login" aria-label="Login">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="8" r="3.25" />
+            <path d="M5.5 19.25c1.6-3.1 3.9-4.5 6.5-4.5s4.9 1.4 6.5 4.5" />
+          </svg>
+        </button>
+      </div>
+    </header>
+  </div>
+
+  <div class="menu-panel" id="menu-panel" hidden>
+    <div class="menu-panel__sheet" role="dialog" aria-label="Menü">
+      <nav class="menu-panel__nav" aria-label="Seiten">
+        <a href="#vorteile" data-menu-link>ZERO PT / GYM</a>
+        <a href="#joscha" data-menu-link>Joscha</a>
+        <a href="/kontakt/" data-menu-link>Kontakt</a>
+      </nav>
+      <div class="menu-panel__foot">
+        <button type="button" data-open-auth="login">Anmelden</button>
+        <button type="button" data-open-auth="register">Mitglied</button>
+        <button type="button" id="btn-app-gate">App</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="hero hero--dither" aria-label="Einstieg">
+    <div class="hero__slider" id="hero-slider" aria-hidden="true">
+      <div class="hero__slide is-active" data-kind="video">
+        <video
+          class="hero__video"
+          src="assets/gogogo/hero.mp4"
+          muted
+          playsinline
+          preload="auto"
+          poster="assets/gogogo/hero-poster-1600.webp"
+        ></video>
+      </div>
+      <div class="hero__slide" data-kind="video">
+        <video class="hero__video" src="assets/gogogo/gogogo.mp4" muted playsinline preload="auto"></video>
+      </div>
+      <div class="hero__slide" data-kind="image">
+        <img src="assets/gogogo/factfulness-1600.webp" alt="" width="1600" height="900" decoding="async" fetchpriority="low" />
+      </div>
+      <div class="hero__slide" data-kind="video">
+        <video class="hero__video" src="assets/gogogo/circle-clip.mp4" muted playsinline preload="auto"></video>
+      </div>
+    </div>
+    <canvas class="hero__dither" id="hero-dither" aria-hidden="true"></canvas>
+    <div class="hero__veil"></div>
+    <div class="hero__card-wrap">
+      <div class="hero__card">
+        <p class="hero__eyebrow">gogogo.social</p>
+        <h1 class="hero__title">Verankere Deinen täglichen Bewegungsdrang in einer Routine mit echten Menschen.</h1>
+        <p class="hero__sub">Hier findest Du Accountability mit Gym Buddys, Coaches, simplen Trainingsplänen und einem wöchentlichen Zirkeltraining, das es in sich hat.</p>
+        <button class="btn-black" type="button" data-open-auth="register">Entdecken</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="vorteile" aria-labelledby="benefits-title">
+    <div class="section__inner">
+      <h2 class="section__title" id="benefits-title">gogogo — Vorteile für Dich</h2>
+      <div class="benefits">
+        <article class="benefit">
+          <div class="benefit__media">
+            <img src="assets/gogogo/tandem-1600.webp" alt="" width="800" height="800" loading="lazy" decoding="async" />
+          </div>
+          <h3 class="benefit__title">I am your Gym Buddy</h3>
+          <p class="benefit__meta">GEMEINSAM DRANBLEIBEN</p>
+        </article>
+        <article class="benefit">
+          <div class="benefit__media">
+            <img src="assets/gogogo/factfulness-1600.webp" alt="" width="800" height="800" loading="lazy" decoding="async" />
+          </div>
+          <h3 class="benefit__title">Einfach ein Trainingsplan</h3>
+          <p class="benefit__meta">PASSEND ZU DEINEM ALLTAG</p>
+        </article>
+        <article class="benefit">
+          <div class="benefit__media">
+            <img src="assets/gogogo/triff-joscha-wir-machen-poster-1600.webp" alt="" width="800" height="800" loading="lazy" decoding="async" />
+          </div>
+          <h3 class="benefit__title">Den richtigen Trainer Buddy finden</h3>
+          <p class="benefit__meta">ECHTER BLICK, WENIG LÄRM</p>
+        </article>
+        <article class="benefit">
+          <div class="benefit__media">
+            <img src="assets/gogogo/fridaycycletraining-1600.webp" alt="" width="800" height="800" loading="lazy" decoding="async" />
+          </div>
+          <h3 class="benefit__title">freitags Zirkeltraining</h3>
+          <p class="benefit__meta">FRIDAY TRAINING IN BERLIN</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section section--about" id="joscha" aria-labelledby="about-title">
+    <div class="about">
+      <img
+        class="about__photo"
+        src="assets/biigJ/BJG-im-Fenster-Ausschnitt-1600.webp"
+        alt="Joscha"
+        width="1438"
+        height="1600"
+        loading="lazy"
+        decoding="async"
+      />
+      <div class="about__text">
+        <h2 class="about__title" id="about-title">Vom Reißbrett ins Gym</h2>
+        <p>
+          Zwanzig Jahre habe ich Räume für andere entworfen und meinen eigenen Alltag dabei vernachlässigt. Fitness Apps, Influencer Videos, Personal Training, Mitgliedschaften. Irgendwann war es zu viel von allem und zu wenig Bewegung.
+        </p>
+        <p>
+          Dann wurde ich Trainer. Seitdem sehe ich jeden Tag, wie viel Zufriedenheit in einem gesunden Maß an Bewegung steckt. Das Naheliegende ist uns oft doch fern.
+        </p>
+        <p>
+          Du und ich sind nicht im Einzelkampf. Es braucht wohlgesonnene Menschen, echtes Interesse und einen ehrlichen Blick auf das, was für Dich wirklich möglich ist.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <nav class="site-footer__panel" aria-label="Footer">
+      <a href="/impressum/">Impressum</a>
+      <a href="/datenschutz/">Datenschutz</a>
+      <a href="/kontakt/">Kontakt</a>
+      <span>Berlin 2026</span>
+    </nav>
+  </footer>
+
+  <div class="modal" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" hidden>
+    <div class="modal__panel">
+      <div class="modal__tabs">
+        <button class="modal__tab is-active" type="button" data-auth-tab="register">Mitglied</button>
+        <button class="modal__tab" type="button" data-auth-tab="login">Login</button>
+      </div>
+      <h2 id="auth-title" class="section__title" style="margin-bottom:16px;font-size:1.35rem">Mitglied werden</h2>
+
+      <form id="form-register">
+        <input class="field" id="reg-first" type="text" autocomplete="given-name" placeholder="Vorname" required />
+        <input class="field" id="reg-last" type="text" autocomplete="family-name" placeholder="Name" required />
+        <input class="field" id="reg-email" type="email" autocomplete="email" placeholder="Emailadresse" required />
+        <input class="field" id="reg-phone" type="tel" autocomplete="tel" placeholder="Telefonnummer" required />
+        <input class="field" id="reg-password" type="password" autocomplete="new-password" placeholder="Passwort (min. 8 Zeichen)" minlength="8" required />
+        <input class="field" id="reg-contact" type="text" placeholder="Kontaktwunsch (Anruf, WhatsApp, Email …)" />
+        <label class="check">
+          <input type="checkbox" id="reg-privacy" required />
+          <span>Ich akzeptiere die <a href="/datenschutz/" target="_blank" rel="noopener">Datenschutzhinweise</a> und willige in die Speicherung meiner Angaben ein. Ich erhalte eine Bestätigungsemail.</span>
+        </label>
+        <button class="btn-black" type="submit">Registrieren</button>
+      </form>
+
+      <form id="form-login" class="hidden">
+        <input class="field" id="login-email" type="email" autocomplete="email" placeholder="Emailadresse" required />
+        <input class="field" id="login-password" type="password" autocomplete="current-password" placeholder="Passwort" required />
+        <button class="btn-black" type="submit">Einloggen</button>
+        <div class="auth-helpers">
+          <button class="auth-helper" type="button" id="btn-reset-pw">Passwort zurücksetzen</button>
+          <button class="auth-helper" type="button" id="btn-resend-confirm">Bestätigung erneut senden</button>
+        </div>
+      </form>
+
+      <form id="form-new-password" class="hidden">
+        <p class="auth-note">Wähle ein neues Passwort (mindestens 8 Zeichen).</p>
+        <input class="field" id="new-password" type="password" autocomplete="new-password" placeholder="Neues Passwort" minlength="8" required />
+        <input class="field" id="new-password-2" type="password" autocomplete="new-password" placeholder="Passwort wiederholen" minlength="8" required />
+        <button class="btn-black" type="submit">Passwort speichern</button>
+      </form>
+
+      <p class="form-msg" id="auth-msg" role="status" aria-live="polite"></p>
+      <button class="btn-ghost" type="button" id="btn-auth-close">Schließen</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var slides = Array.prototype.slice.call(document.querySelectorAll(".hero__slide"));
+      var videos = Array.prototype.slice.call(document.querySelectorAll(".hero__video"));
+      var idx = 0;
+      var FADE_MS = 2000;
+      var IMAGE_MS = 2000;
+      var timer = null;
+      var fadeTimer = null;
+      var started = false;
+
+      /* Rot/Weiß Bayer-Dither über dem Hero (wie gogogo-dither-tool) */
+      (function initHeroDither() {
+        var canvas = document.getElementById("hero-dither");
+        if (!canvas || !canvas.getContext) return;
+        var ctx = canvas.getContext("2d", { alpha: false });
+        var tmp = document.createElement("canvas");
+        var tctx = tmp.getContext("2d", { willReadFrequently: true });
+        var FG = [0xC7, 0x41, 0x3B];
+        var BG = [0xF7, 0xF5, 0xF0];
+        var BAYER = [
+          [0.03125, 0.53125, 0.15625, 0.65625],
+          [0.78125, 0.28125, 0.90625, 0.40625],
+          [0.21875, 0.71875, 0.09375, 0.59375],
+          [0.96875, 0.46875, 0.84375, 0.34375]
+        ];
+        var running = false;
+        var raf = 0;
+
+        function mediaOf(slide) {
+          return slide.querySelector("video") || slide.querySelector("img");
+        }
+
+        function frame() {
+          raf = 0;
+          var slide = slides[idx];
+          var media = slide && mediaOf(slide);
+          var cw = canvas.clientWidth || window.innerWidth;
+          var ch = canvas.clientHeight || window.innerHeight;
+          if (!media || cw < 2 || ch < 2) {
+            if (running) raf = requestAnimationFrame(frame);
+            return;
+          }
+          if (media.tagName === "VIDEO" && media.readyState < 2) {
+            if (running) raf = requestAnimationFrame(frame);
+            return;
+          }
+
+          var scale = cw < 480 ? 3 : cw < 900 ? 2 : 2;
+          var maxW = Math.min(640, Math.floor(cw / scale));
+          var w = maxW;
+          var h = Math.max(1, Math.round(maxW * (ch / cw)));
+
+          if (tmp.width !== w || tmp.height !== h) {
+            tmp.width = w;
+            tmp.height = h;
+          }
+          if (canvas.width !== w * scale || canvas.height !== h * scale) {
+            canvas.width = w * scale;
+            canvas.height = h * scale;
+          }
+
+          tctx.fillStyle = "#F7F5F0";
+          tctx.fillRect(0, 0, w, h);
+          try {
+            /* object-fit: cover */
+            var mw = media.videoWidth || media.naturalWidth || w;
+            var mh = media.videoHeight || media.naturalHeight || h;
+            if (!mw || !mh) {
+              if (running) raf = requestAnimationFrame(frame);
+              return;
+            }
+            var cover = Math.max(w / mw, h / mh);
+            var dw = mw * cover;
+            var dh = mh * cover;
+            tctx.drawImage(media, (w - dw) / 2, (h - dh) / 2, dw, dh);
+          } catch (e) {
+            if (running) raf = requestAnimationFrame(frame);
+            return;
+          }
+
+          var data = tctx.getImageData(0, 0, w, h);
+          var px = data.data;
+          var out = ctx.createImageData(canvas.width, canvas.height);
+          var od = out.data;
+
+          for (var y = 0; y < h; y++) {
+            for (var x = 0; x < w; x++) {
+              var i = (y * w + x) * 4;
+              var g = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+              g = (g - 128) * 1.15 + 128;
+              if (g < 0) g = 0;
+              else if (g > 255) g = 255;
+              var on = (g / 255) < BAYER[y % 4][x % 4];
+              var r = on ? FG[0] : BG[0];
+              var g2 = on ? FG[1] : BG[1];
+              var b = on ? FG[2] : BG[2];
+              for (var sy = 0; sy < scale; sy++) {
+                for (var sx = 0; sx < scale; sx++) {
+                  var oi = ((y * scale + sy) * canvas.width + (x * scale + sx)) * 4;
+                  od[oi] = r;
+                  od[oi + 1] = g2;
+                  od[oi + 2] = b;
+                  od[oi + 3] = 255;
+                }
+              }
+            }
+          }
+          ctx.putImageData(out, 0, 0);
+          if (running) raf = requestAnimationFrame(frame);
+        }
+
+        function start() {
+          if (running) return;
+          running = true;
+          raf = requestAnimationFrame(frame);
+        }
+
+        function stop() {
+          running = false;
+          if (raf) cancelAnimationFrame(raf);
+          raf = 0;
+        }
+
+        window.GogogoHeroDither = { start: start, stop: stop, refresh: frame };
+        if (!reduceMotion) start();
+        else {
+          window.setTimeout(function () {
+            frame();
+          }, 400);
+        }
+        window.addEventListener("resize", function () {
+          if (!running) frame();
+        });
+      })();
+
+      function clearTimer() {
+        if (timer) {
+          window.clearTimeout(timer);
+          timer = null;
+        }
+      }
+
+      function clearFadeTimer() {
+        if (fadeTimer) {
+          window.clearTimeout(fadeTimer);
+          fadeTimer = null;
+        }
+      }
+
+      function whenCanPlay(vid) {
+        return new Promise(function (resolve) {
+          if (!vid) return resolve();
+          if (vid.readyState >= 3) return resolve();
+          var done = false;
+          function ok() {
+            if (done) return;
+            done = true;
+            vid.removeEventListener("canplay", ok);
+            vid.removeEventListener("loadeddata", ok);
+            resolve();
+          }
+          vid.addEventListener("canplay", ok);
+          vid.addEventListener("loadeddata", ok);
+          if (vid.networkState === 0) {
+            try { vid.load(); } catch (e) {}
+          }
+          window.setTimeout(ok, 12000);
+        });
+      }
+
+      function warmSlide(slide) {
+        var vid = slide && slide.querySelector("video");
+        if (!vid) return Promise.resolve();
+        try { vid.preload = "auto"; } catch (e) {}
+        return whenCanPlay(vid);
+      }
+
+      function playSlide(slide) {
+        var vid = slide.querySelector("video");
+        if (!vid || reduceMotion) return Promise.resolve();
+        return whenCanPlay(vid).then(function () {
+          try { if (vid.currentTime > 0.05) vid.currentTime = 0; } catch (e) {}
+          var p = vid.play();
+          if (p && p.catch) return p.catch(function () {});
+        });
+      }
+
+      function pauseSlide(slide) {
+        var vid = slide.querySelector("video");
+        if (!vid) return;
+        vid.onended = null;
+        vid.ontimeupdate = null;
+        vid.pause();
+      }
+
+      function goNext() {
+        showSlide((idx + 1) % slides.length);
+      }
+
+      function armAdvance() {
+        clearTimer();
+        if (reduceMotion || slides.length < 2) return;
+
+        var slide = slides[idx];
+        var vid = slide.querySelector("video");
+        var done = false;
+
+        // Prefetch the following slide so the overlap blend can start on time
+        warmSlide(slides[(idx + 1) % slides.length]);
+
+        function finish() {
+          if (done) return;
+          done = true;
+          clearTimer();
+          if (vid) {
+            vid.onended = null;
+            vid.ontimeupdate = null;
+          }
+          var next = slides[(idx + 1) % slides.length];
+          warmSlide(next).then(goNext);
+        }
+
+        if (vid) {
+          function watchProgress() {
+            if (done) return;
+            vid.ontimeupdate = function () {
+              if (done || !Number.isFinite(vid.duration) || vid.duration <= 0) return;
+              // Drive fade from real playback position — not wall-clock
+              if (vid.currentTime >= vid.duration - FADE_MS / 1000) {
+                vid.ontimeupdate = null;
+                finish();
+              }
+            };
+          }
+
+          if (!vid.paused && !vid.ended) {
+            watchProgress();
+          } else {
+            vid.addEventListener("playing", watchProgress, { once: true });
+          }
+          return;
+        }
+
+        timer = window.setTimeout(finish, IMAGE_MS);
+      }
+
+      function showSlide(n) {
+        if (n === idx || !slides[n]) return;
+        clearTimer();
+        clearFadeTimer();
+        var prev = slides[idx];
+        var next = slides[n];
+        prev.classList.remove("is-active");
+        next.classList.add("is-active");
+        idx = n;
+        playSlide(next).then(function () {
+          if (idx === n) armAdvance();
+        });
+        fadeTimer = window.setTimeout(function () {
+          pauseSlide(prev);
+          fadeTimer = null;
+        }, reduceMotion ? 0 : FADE_MS);
+      }
+
+      function startSlider() {
+        if (started) return;
+        started = true;
+        if (reduceMotion) {
+          videos.forEach(function (vid) { vid.pause(); });
+          return;
+        }
+        playSlide(slides[0]).then(function () {
+          armAdvance();
+        });
+      }
+
+      // Kick off network fetch for every clip immediately, then start when first is ready
+      videos.forEach(function (vid) {
+        try { vid.preload = "auto"; vid.load(); } catch (e) {}
+      });
+
+      if (slides[0]) {
+        var first = slides[0].querySelector("video");
+        whenCanPlay(first).then(startSlider);
+        // Still warm the rest in parallel
+        slides.slice(1).forEach(warmSlide);
+      }
+
+      if (reduceMotion) startSlider();
+
+      var menu = document.getElementById("menu-panel");
+      var btnMenu = document.getElementById("btn-menu");
+      function openMenu(open) {
+        menu.hidden = !open;
+        menu.classList.toggle("is-open", open);
+        document.body.classList.toggle("menu-open", open);
+        btnMenu.classList.toggle("is-open", open);
+        btnMenu.setAttribute("aria-expanded", open ? "true" : "false");
+        btnMenu.setAttribute("aria-label", open ? "Menü schließen" : "Menü öffnen");
+      }
+      btnMenu.addEventListener("click", function () {
+        openMenu(!menu.classList.contains("is-open"));
+      });
+      document.querySelectorAll("[data-menu-link]").forEach(function (el) {
+        el.addEventListener("click", function () { openMenu(false); });
+      });
+      menu.addEventListener("click", function (e) {
+        if (e.target === menu) openMenu(false);
+      });
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && menu.classList.contains("is-open")) openMenu(false);
+      });
+
+      var modal = document.getElementById("auth-modal");
+      var formReg = document.getElementById("form-register");
+      var formLogin = document.getElementById("form-login");
+      var formNewPw = document.getElementById("form-new-password");
+      var msg = document.getElementById("auth-msg");
+      var title = document.getElementById("auth-title");
+
+      function setMsg(text, kind) {
+        msg.textContent = text || "";
+        msg.classList.remove("is-error", "is-ok");
+        if (kind) msg.classList.add(kind);
+      }
+
+      function showTab(tab) {
+        document.querySelectorAll(".modal__tab").forEach(function (el) {
+          el.classList.toggle("is-active", el.getAttribute("data-auth-tab") === tab);
+        });
+        formReg.classList.toggle("hidden", tab !== "register");
+        formLogin.classList.toggle("hidden", tab !== "login");
+        formNewPw.classList.toggle("hidden", tab !== "new-password");
+        if (tab === "register") title.textContent = "Mitglied werden";
+        else if (tab === "new-password") title.textContent = "Neues Passwort";
+        else title.textContent = "Login";
+        setMsg("");
+      }
+
+      function openAuth(tab) {
+        openMenu(false);
+        modal.hidden = false;
+        modal.classList.add("is-open");
+        showTab(tab || "register");
+      }
+
+      function closeAuth() {
+        modal.classList.remove("is-open");
+        modal.hidden = true;
+      }
+
+      document.querySelectorAll("[data-open-auth]").forEach(function (el) {
+        el.addEventListener("click", function () {
+          openAuth(el.getAttribute("data-open-auth"));
+        });
+      });
+      document.querySelectorAll("[data-auth-tab]").forEach(function (el) {
+        el.addEventListener("click", function () {
+          showTab(el.getAttribute("data-auth-tab"));
+        });
+      });
+      document.getElementById("btn-auth-close").addEventListener("click", closeAuth);
+      modal.addEventListener("click", function (e) {
+        if (e.target === modal) closeAuth();
+      });
+
+      document.getElementById("btn-app-gate").addEventListener("click", async function () {
+        openMenu(false);
+        try {
+          var session = await GogogoAuth.getSession();
+          if (session) {
+            window.location.href = GogogoAuth.APP_URL;
+          } else {
+            openAuth("login");
+            setMsg("Bitte zuerst anmelden, um die App zu öffnen.", "is-error");
+          }
+        } catch (err) {
+          openAuth("login");
+        }
+      });
+
+      formReg.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        setMsg("Wird gespeichert …");
+        try {
+          await GogogoAuth.signUp({
+            firstName: document.getElementById("reg-first").value,
+            lastName: document.getElementById("reg-last").value,
+            email: document.getElementById("reg-email").value,
+            phone: document.getElementById("reg-phone").value,
+            password: document.getElementById("reg-password").value,
+            contactPref: document.getElementById("reg-contact").value,
+          });
+          setMsg("Schau in Deine Emails und bestätige die Anmeldung. Danach kannst Du Dich einloggen.", "is-ok");
+          GogogoAuth.openWhatsAppAfterSignup(
+            document.getElementById("reg-first").value,
+            document.getElementById("reg-contact").value
+          );
+          showTab("login");
+        } catch (err) {
+          setMsg(GogogoAuth.authErrorMessage(err), "is-error");
+        }
+      });
+
+      formLogin.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        setMsg("Einen Moment …");
+        try {
+          await GogogoAuth.signIn(
+            document.getElementById("login-email").value,
+            document.getElementById("login-password").value
+          );
+          var goApp = /[?&]next=app/.test(location.search);
+          window.location.href = goApp ? GogogoAuth.APP_URL : "/members/";
+        } catch (err) {
+          setMsg(GogogoAuth.authErrorMessage(err), "is-error");
+        }
+      });
+
+      formNewPw.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var a = document.getElementById("new-password").value;
+        var b = document.getElementById("new-password-2").value;
+        if (a !== b) {
+          setMsg("Die Passwörter stimmen nicht überein.", "is-error");
+          return;
+        }
+        if (a.length < 8) {
+          setMsg("Mindestens 8 Zeichen.", "is-error");
+          return;
+        }
+        setMsg("Speichere Passwort …");
+        try {
+          await GogogoAuth.updatePassword(a);
+          setMsg("Passwort gespeichert. Du bist angemeldet.", "is-ok");
+          window.setTimeout(function () {
+            window.location.href = "/members/";
+          }, 700);
+        } catch (err) {
+          setMsg(GogogoAuth.authErrorMessage(err), "is-error");
+        }
+      });
+
+      document.getElementById("btn-reset-pw").addEventListener("click", async function () {
+        var email = document.getElementById("login-email").value.trim();
+        if (!email) {
+          setMsg("Bitte zuerst Deine Emailadresse eintragen.", "is-error");
+          return;
+        }
+        setMsg("Sende Reset-Link …");
+        try {
+          await GogogoAuth.resetPassword(email);
+          setMsg("Reset-Link ist unterwegs. Inbox und Spam prüfen, dann Link öffnen und neues Passwort setzen.", "is-ok");
+        } catch (err) {
+          setMsg(GogogoAuth.authErrorMessage(err), "is-error");
+        }
+      });
+
+      document.getElementById("btn-resend-confirm").addEventListener("click", async function () {
+        var email = document.getElementById("login-email").value.trim();
+        if (!email) {
+          setMsg("Bitte zuerst Deine Emailadresse eintragen.", "is-error");
+          return;
+        }
+        setMsg("Sende Bestätigung …");
+        try {
+          await GogogoAuth.resendConfirmation(email);
+          setMsg(
+            "Anfrage gesendet. Wenn die Email schon bestätigt war, kommt keine neue Mail — dann Passwort zurücksetzen. Sonst Inbox + Spam prüfen.",
+            "is-ok"
+          );
+        } catch (err) {
+          setMsg(GogogoAuth.authErrorMessage(err), "is-error");
+        }
+      });
+
+      (async function bootAuthUi() {
+        var type = GogogoAuth.getAuthCallbackType();
+        var wantsAuth = /[?&]auth=/.test(location.search);
+        if (type === "recovery" || /[?&]auth=reset/.test(location.search)) {
+          openAuth("new-password");
+          setMsg("Setze jetzt Dein neues Passwort.", "is-ok");
+          return;
+        }
+        if (type === "signup") {
+          openAuth("login");
+          setMsg("Email bestätigt. Bitte einloggen — oder Passwort zurücksetzen, falls es nicht klappt.", "is-ok");
+          return;
+        }
+        if (wantsAuth) openAuth("login");
+      })();
+    })();
+  </script>
+</body>
+</html>
