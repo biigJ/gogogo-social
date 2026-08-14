@@ -961,6 +961,16 @@
       var homeHero = document.getElementById("home-hero");
       var trainingFrame = document.getElementById("training-frame");
       var trainingLoaded = false;
+      var accountVideoControllers = [];
+
+      function pauseAccountVideos() {
+        accountVideoControllers.forEach(function (c) {
+          try { c.pause(); } catch (e) {}
+        });
+        document.querySelectorAll(".video-block__media video").forEach(function (vid) {
+          try { vid.pause(); } catch (e2) {}
+        });
+      }
 
       function gotoPanel(id) {
         document.querySelectorAll(".panel").forEach(function (p) {
@@ -973,6 +983,7 @@
           else btn.removeAttribute("aria-current");
         });
         homeHero.hidden = id !== "home";
+        if (id !== "book") pauseAccountVideos();
         if (id === "training" && !trainingLoaded) {
           trainingFrame.src = "/account/fitness-friday.html?embed=1";
           trainingLoaded = true;
@@ -1201,6 +1212,16 @@
             );
           } catch (err2) {}
         }
+
+        function pauseVideo() {
+          if (isFs()) exitFs();
+          if (player && typeof player.pauseVideo === "function") {
+            try { player.pauseVideo(); } catch (e) {}
+          } else {
+            ytCommand("pauseVideo");
+          }
+        }
+        accountVideoControllers.push({ pause: pauseVideo });
 
         function loadYtApi() {
           if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
