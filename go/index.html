@@ -225,6 +225,25 @@
 
     .form-msg.is-error { text-decoration: underline; }
 
+    .form-switch {
+      display: block;
+      width: 100%;
+      margin-top: 16px;
+      text-align: center;
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 0.85rem;
+      letter-spacing: -0.02em;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      color: var(--ink-on-red);
+    }
+
+    .form-block form[hidden],
+    .form-switch[hidden] {
+      display: none !important;
+    }
+
     .help-intro {
       display: block;
       width: 100%;
@@ -462,6 +481,35 @@
           <button class="btn" id="go-submit" type="submit" disabled>Los geht's</button>
           <p class="form-msg" id="go-msg" role="status" aria-live="polite"></p>
         </form>
+
+        <button class="form-switch" type="button" id="btn-buddy-login">Ich bin bereits gogogo-Buddy</button>
+
+        <form id="go-login" novalidate hidden>
+          <label class="visually-hidden" for="login-name">Vorname</label>
+          <input
+            class="field"
+            id="login-name"
+            type="text"
+            autocomplete="given-name"
+            autocapitalize="words"
+            placeholder="Vorname"
+            required
+          />
+          <label class="visually-hidden" for="login-invite">Einladung</label>
+          <input
+            class="field"
+            id="login-invite"
+            type="text"
+            inputmode="numeric"
+            maxlength="4"
+            autocomplete="off"
+            placeholder="Einladung"
+            required
+          />
+          <button class="btn" id="login-submit" type="submit" disabled>Einloggen</button>
+          <p class="form-msg" id="login-msg" role="status" aria-live="polite"></p>
+          <button class="form-switch" type="button" id="btn-buddy-signup">Neu hier? Account anlegen</button>
+        </form>
       </section>
 
       <p class="help-intro">Was Dir helfen kann:</p>
@@ -546,8 +594,16 @@
       var waBtn = document.getElementById("wa-btn");
       var noWa = document.getElementById("no-wa");
       var noWaNote = document.getElementById("no-wa-note");
+      var loginForm = document.getElementById("go-login");
+      var loginName = document.getElementById("login-name");
+      var loginInvite = document.getElementById("login-invite");
+      var loginSubmit = document.getElementById("login-submit");
+      var loginMsg = document.getElementById("login-msg");
+      var btnBuddyLogin = document.getElementById("btn-buddy-login");
+      var btnBuddySignup = document.getElementById("btn-buddy-signup");
 
       if (hasCodeParam) inviteInput.value = inviteFromQr;
+      if (hasCodeParam) loginInvite.value = inviteFromQr;
 
       function drawCycle(svg, fillAll) {
         var ns = "http://www.w3.org/2000/svg";
@@ -806,6 +862,67 @@
 
       noWa.addEventListener("click", function () {
         noWaNote.textContent = "Alles klar. Du hörst von Joscha.";
+      });
+
+      function showBuddyLogin() {
+        form.hidden = true;
+        btnBuddyLogin.hidden = true;
+        loginForm.hidden = false;
+        if (!loginName.value && nameInput.value) loginName.value = nameInput.value.trim();
+        if (!loginInvite.value && inviteInput.value) loginInvite.value = inviteInput.value.trim();
+        updateLoginSubmit();
+        loginName.focus();
+      }
+
+      function showBuddySignup() {
+        loginForm.hidden = true;
+        form.hidden = false;
+        btnBuddyLogin.hidden = false;
+        nameInput.focus();
+      }
+
+      function updateLoginSubmit() {
+        loginSubmit.disabled = !(loginName.value.trim() && loginInvite.value.trim());
+      }
+
+      btnBuddyLogin.addEventListener("click", showBuddyLogin);
+      btnBuddySignup.addEventListener("click", showBuddySignup);
+      [loginName, loginInvite].forEach(function (el) {
+        el.addEventListener("input", updateLoginSubmit);
+        el.addEventListener("change", updateLoginSubmit);
+      });
+      loginInvite.addEventListener("input", function () {
+        this.value = this.value.replace(/\D/g, "").slice(0, 4);
+        updateLoginSubmit();
+      });
+
+      loginForm.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var name = loginName.value.trim();
+        var invite = loginInvite.value.trim();
+        if (!name || !invite) {
+          loginMsg.textContent = "Bitte Vorname und Einladungscode ausfüllen.";
+          loginMsg.classList.add("is-error");
+          return;
+        }
+        loginMsg.textContent = "Einen Moment …";
+        loginMsg.classList.remove("is-error");
+        loginSubmit.disabled = true;
+        var account = null;
+        try {
+          account = await lookupAccount(name, invite);
+        } catch (err) {}
+        if (!account) {
+          loginMsg.textContent = "Kein Account zu diesem Namen und Code. Bitte zuerst anmelden.";
+          loginMsg.classList.add("is-error");
+          loginSubmit.disabled = false;
+          return;
+        }
+        try {
+          localStorage.setItem("gogogo_go_account", JSON.stringify(account));
+          sessionStorage.removeItem(SESSION_KEY);
+        } catch (err) {}
+        window.location.href = "/account/";
       });
 
       restoreDraft();
