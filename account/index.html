@@ -194,12 +194,18 @@
       overflow: hidden;
       background: #0a0a0a;
     }
-    .video-block__yt iframe {
+    .video-block__yt-scaler {
       position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
+      top: 0;
+      left: 0;
+      will-change: width, height, left;
+    }
+    .video-block__yt-scaler iframe {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
       border: 0;
+      pointer-events: none;
     }
     .video-block__fs {
       position: absolute;
@@ -221,16 +227,17 @@
       left: 0;
       right: 0;
       bottom: 0;
-      z-index: 3;
-      padding: 28px 14px 14px;
-      background: linear-gradient(180deg, transparent, rgba(10, 10, 10, 0.72) 45%);
+      z-index: 5;
+      padding: 28px 14px max(14px, env(safe-area-inset-bottom));
+      background: linear-gradient(180deg, transparent, rgba(10, 10, 10, 0.78) 42%);
       box-sizing: border-box;
+      touch-action: none;
     }
     .video-block__seek {
       -webkit-appearance: none;
       appearance: none;
       width: 100%;
-      height: 28px;
+      height: 32px;
       margin: 0;
       background: transparent;
       cursor: pointer;
@@ -244,9 +251,9 @@
     .video-block__seek::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 16px;
-      height: 16px;
-      margin-top: -6px;
+      width: 18px;
+      height: 18px;
+      margin-top: -7px;
       border-radius: 50%;
       background: #F7F5F0;
       border: 0;
@@ -258,8 +265,8 @@
       background: rgba(247, 245, 240, 0.35);
     }
     .video-block__seek::-moz-range-thumb {
-      width: 16px;
-      height: 16px;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
       background: #F7F5F0;
       border: 0;
@@ -1117,8 +1124,11 @@
       document.querySelectorAll(".video-block__media[data-youtube-id]").forEach(function (wrap) {
         var loaded = false;
         var player = null;
+        var iframe = null;
         var scrubbing = false;
         var tickTimer = null;
+        var scaler = null;
+        var shell = null;
 
         function requestFs(el) {
           if (el.requestFullscreen) return el.requestFullscreen();
@@ -1155,6 +1165,7 @@
             wrap.classList.add("is-fs");
             document.body.classList.add("video-fs-open");
           }
+          requestAnimationFrame(layoutScaler);
         }
 
         function formatTime(sec) {
@@ -1164,20 +1175,61 @@
           return m + ":" + (s < 10 ? "0" : "") + s;
         }
 
+        function layoutScaler() {
+          if (!shell || !scaler) return;
+          var h = shell.clientHeight;
+          var w = shell.clientWidth;
+          if (!h || !w) return;
+          var sw = h * (16 / 9);
+          scaler.style.width = sw + "px";
+          scaler.style.height = h + "px";
+          scaler.style.left = (w - sw) / 2 + "px";
+          scaler.style.top = "0px";
+        }
+
+        function ytCommand(func, args) {
+          if (player && typeof player[func] === "function") {
+            try {
+              return player[func].apply(player, args || []);
+            } catch (err) {}
+          }
+          if (!iframe || !iframe.contentWindow) return;
+          try {
+            iframe.contentWindow.postMessage(
+              JSON.stringify({ event: "command", func: func, args: args || [] }),
+              "*"
+            );
+          } catch (err2) {}
+        }
+
         function loadYtApi() {
           if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
-          return new Promise(function (resolve) {
+          return new Promise(function (resolve, reject) {
+            var done = false;
+            function finish() {
+              if (done) return;
+              if (!(window.YT && window.YT.Player)) return;
+              done = true;
+              resolve(window.YT);
+            }
             var prev = window.onYouTubeIframeAPIReady;
             window.onYouTubeIframeAPIReady = function () {
               if (typeof prev === "function") prev();
-              resolve(window.YT);
+              finish();
             };
             if (!document.getElementById("yt-iframe-api")) {
               var s = document.createElement("script");
               s.id = "yt-iframe-api";
               s.src = "https://www.youtube.com/iframe_api";
+              s.onerror = function () { reject(new Error("yt-api")); };
               document.head.appendChild(s);
             }
+            var n = 0;
+            var poll = setInterval(function () {
+              finish();
+              if (done || ++n > 80) clearInterval(poll);
+              if (!done && n > 80) reject(new Error("yt-timeout"));
+            }, 50);
           });
         }
 
@@ -1185,11 +1237,25 @@
           if (loaded) return;
           loaded = true;
           var id = wrap.getAttribute("data-youtube-id");
-          var shell = document.createElement("div");
+          shell = document.createElement("div");
           shell.className = "video-block__yt";
-          var mount = document.createElement("div");
-          mount.id = "yt-" + id + "-" + Math.random().toString(36).slice(2, 8);
-          shell.appendChild(mount);
+          scaler = document.createElement("div");
+          scaler.className = "video-block__yt-scaler";
+          iframe = document.createElement("iframe");
+          iframe.id = "yt-" + id + "-" + Math.random().toString(36).slice(2, 8);
+          iframe.title = "Upper Body Basics";
+          iframe.src =
+            "https://www.youtube.com/embed/" +
+            encodeURIComponent(id) +
+            "?autoplay=1&rel=0&playsinline=1&modestbranding=1&controls=0&fs=0&disablekb=1&iv_load_policy=3&enablejsapi=1&origin=" +
+            encodeURIComponent(window.location.origin);
+          iframe.setAttribute(
+            "allow",
+            "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          );
+          iframe.setAttribute("allowfullscreen", "false");
+          scaler.appendChild(iframe);
+          shell.appendChild(scaler);
 
           var transport = document.createElement("div");
           transport.className = "video-block__transport";
@@ -1218,14 +1284,23 @@
           wrap.appendChild(fsBtn);
           wrap.style.cursor = "default";
           wrap.removeEventListener("click", loadYoutube);
+          layoutScaler();
+          if (window.ResizeObserver) {
+            new ResizeObserver(layoutScaler).observe(wrap);
+          } else {
+            window.addEventListener("resize", layoutScaler);
+          }
+          document.addEventListener("fullscreenchange", layoutScaler);
+          document.addEventListener("webkitfullscreenchange", layoutScaler);
 
           function syncTime() {
             if (!player || typeof player.getCurrentTime !== "function") return;
             var dur = player.getDuration() || 0;
             var cur = player.getCurrentTime() || 0;
+            if (!(dur > 0)) return;
             durEl.textContent = formatTime(dur);
             curEl.textContent = formatTime(cur);
-            if (!scrubbing && dur > 0) seek.value = String(Math.round((cur / dur) * 1000));
+            if (!scrubbing) seek.value = String(Math.round((cur / dur) * 1000));
           }
 
           function startTick() {
@@ -1233,50 +1308,72 @@
             tickTimer = setInterval(syncTime, 250);
           }
 
-          seek.addEventListener("pointerdown", function () { scrubbing = true; });
-          seek.addEventListener("pointerup", function () { scrubbing = false; syncTime(); });
-          seek.addEventListener("pointercancel", function () { scrubbing = false; });
-          seek.addEventListener("change", function () {
-            if (!player || typeof player.seekTo !== "function") return;
-            var dur = player.getDuration() || 0;
-            if (dur <= 0) return;
-            player.seekTo((Number(seek.value) / 1000) * dur, true);
+          function seekFromBar() {
+            var dur = player && typeof player.getDuration === "function" ? player.getDuration() : 0;
+            var ratio = Number(seek.value) / 1000;
+            if (dur > 0 && player && typeof player.seekTo === "function") {
+              player.seekTo(ratio * dur, true);
+            } else {
+              /* duration unknown yet — still try via postMessage with seconds guess later */
+              if (dur > 0) ytCommand("seekTo", [ratio * dur, true]);
+            }
+            if (dur > 0) curEl.textContent = formatTime(ratio * dur);
+          }
+
+          transport.addEventListener("click", function (e) { e.stopPropagation(); });
+          seek.addEventListener("pointerdown", function (e) {
+            e.stopPropagation();
+            scrubbing = true;
+          });
+          seek.addEventListener("pointerup", function () {
+            seekFromBar();
             scrubbing = false;
           });
+          seek.addEventListener("pointercancel", function () { scrubbing = false; });
           seek.addEventListener("input", function () {
-            var dur = player && player.getDuration ? player.getDuration() : 0;
-            if (dur > 0) curEl.textContent = formatTime((Number(seek.value) / 1000) * dur);
+            scrubbing = true;
+            seekFromBar();
+          });
+          seek.addEventListener("change", function () {
+            seekFromBar();
+            scrubbing = false;
           });
 
-          loadYtApi().then(function (YT) {
-            player = new YT.Player(mount.id, {
-              videoId: id,
-              width: "100%",
-              height: "100%",
-              playerVars: {
-                autoplay: 1,
-                rel: 0,
-                playsinline: 1,
-                modestbranding: 1,
-                controls: 0,
-                fs: 0,
-                iv_load_policy: 3,
-                origin: window.location.origin
-              },
-              events: {
-                onReady: function (e) {
-                  player = e.target;
-                  try { player.playVideo(); } catch (err) {}
-                  syncTime();
-                  startTick();
-                },
-                onStateChange: function () { syncTime(); }
-              }
+          loadYtApi()
+            .then(function (YT) {
+              player = new YT.Player(iframe.id, {
+                events: {
+                  onReady: function (e) {
+                    player = e.target;
+                    var f = player.getIframe && player.getIframe();
+                    if (f) {
+                      iframe = f;
+                      f.style.pointerEvents = "none";
+                      f.style.width = "100%";
+                      f.style.height = "100%";
+                    }
+                    layoutScaler();
+                    try { player.playVideo(); } catch (err) {}
+                    try { player.unMute(); } catch (err2) {}
+                    syncTime();
+                    startTick();
+                  },
+                  onStateChange: function () {
+                    syncTime();
+                    layoutScaler();
+                  }
+                }
+              });
+            })
+            .catch(function () {
+              /* API blocked — keep cover iframe playing; scrub unavailable */
             });
-          });
 
           shell.addEventListener("click", function () {
-            if (!player || typeof player.getPlayerState !== "function") return;
+            if (!player || typeof player.getPlayerState !== "function") {
+              ytCommand("playVideo");
+              return;
+            }
             var state = player.getPlayerState();
             if (state === 1) player.pauseVideo();
             else player.playVideo();
