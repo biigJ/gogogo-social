@@ -442,18 +442,38 @@
       }
 
       async function patchAccount(fields) {
-        if (!account.id || String(account.id).indexOf("local-") === 0) return false;
-        var res = await fetch(SUPABASE_URL + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(account.id), {
-          method: "PATCH",
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: "Bearer " + SUPABASE_KEY,
-            "Content-Type": "application/json",
-            Prefer: "return=minimal"
-          },
-          body: JSON.stringify(fields)
-        });
-        return res.ok;
+        var filters = [];
+        if (account.id && String(account.id).indexOf("local-") !== 0) {
+          filters.push("id=eq." + encodeURIComponent(account.id));
+        }
+        if (account.invite_code) {
+          filters.push("invite_code=eq." + encodeURIComponent(account.invite_code));
+        }
+        if (!filters.length) return false;
+        var ok = false;
+        for (var i = 0; i < filters.length; i++) {
+          var res = await fetch(SUPABASE_URL + "/rest/v1/go_accounts?" + filters[i], {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: "Bearer " + SUPABASE_KEY,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal"
+            },
+            body: JSON.stringify(fields)
+          });
+          if (res.ok) ok = true;
+        }
+        return ok;
+      }
+
+      async function persistPhoto(url) {
+        account.photo_url = url;
+        saveAccount();
+        applyPhoto(url);
+        try {
+          await patchAccount({ photo_url: url, updated_at: new Date().toISOString() });
+        } catch (e) {}
       }
 
       async function uploadAvatarBlob(blob) {
@@ -489,28 +509,38 @@
       }
 
       async function syncFromCloud() {
-        var rows = null;
-        if (account.id && String(account.id).indexOf("local-") !== 0) {
-          rows = await restGet("go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1");
+        var seen = {};
+        var candidates = [];
+        function addRows(rows) {
+          if (!rows) return;
+          for (var i = 0; i < rows.length; i++) {
+            var row = rows[i];
+            if (!row || !row.id || seen[row.id]) continue;
+            seen[row.id] = true;
+            candidates.push(row);
+          }
         }
-        if ((!rows || !rows.length) && account.invite_code) {
-          rows = await restGet(
+        if (account.id && String(account.id).indexOf("local-") !== 0) {
+          addRows(await restGet("go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1"));
+        }
+        if (account.invite_code) {
+          addRows(await restGet(
             "go_accounts?invite_code=eq." + encodeURIComponent(account.invite_code) +
             "&select=*&order=created_at.asc&limit=20"
-          );
+          ));
         }
-        if ((!rows || !rows.length) && account.phone) {
-          rows = await restGet(
+        if (account.phone) {
+          addRows(await restGet(
             "go_accounts?phone=eq." + encodeURIComponent(account.phone) +
             "&select=*&order=created_at.asc&limit=20"
-          );
+          ));
         }
-        if (!rows || !rows.length) return;
-        var remote = rows[0];
+        if (!candidates.length) return;
+        var remote = candidates[0];
         var i;
-        for (i = 0; i < rows.length; i++) {
-          if (rows[i].photo_url && String(rows[i].photo_url).indexOf("http") === 0) {
-            remote = rows[i];
+        for (i = 0; i < candidates.length; i++) {
+          if (candidates[i].photo_url) {
+            remote = candidates[i];
             break;
           }
         }
@@ -520,23 +550,23 @@
         if (remote.invite_code) account.invite_code = remote.invite_code;
         var localPhoto = account.photo_url;
         var remotePhoto = remote.photo_url;
-        if (remotePhoto && String(remotePhoto).indexOf("http") === 0) {
+        if (remotePhoto) {
           account.photo_url = remotePhoto;
         }
         saveAccount();
         showApp();
 
-        /* Desktop-Foto (data-URL) nachträglich in den Bucket schieben */
-        if (localPhoto && String(localPhoto).indexOf("data:image") === 0 &&
-            !(remotePhoto && String(remotePhoto).indexOf("http") === 0)) {
+        if (localPhoto && String(localPhoto).indexOf("data:image") === 0 && !remotePhoto) {
           try {
-            var res = await fetch(localPhoto);
-            var blob = await res.blob();
-            var publicUrl = await uploadAvatarBlob(blob);
-            account.photo_url = publicUrl;
-            await patchAccount({ photo_url: publicUrl, updated_at: new Date().toISOString() });
-            saveAccount();
-            applyPhoto(publicUrl);
+            var blob;
+            try {
+              var res = await fetch(localPhoto);
+              blob = await res.blob();
+              var publicUrl = await uploadAvatarBlob(blob);
+              await persistPhoto(publicUrl);
+            } catch (upErr) {
+              await persistPhoto(localPhoto);
+            }
           } catch (e) {}
         }
       }
@@ -731,15 +761,12 @@
           var publicUrl;
           try {
             publicUrl = await uploadAvatarBlob(blob);
-            await patchAccount({ photo_url: publicUrl, updated_at: new Date().toISOString() });
             photoMsg.textContent = "Gespeichert.";
           } catch (upErr) {
             publicUrl = dithered.toDataURL("image/png");
-            photoMsg.textContent = "Nur lokal gespeichert — in Supabase SQL für go-avatars ausführen.";
+            photoMsg.textContent = "In Deinem Profil gespeichert.";
           }
-          account.photo_url = publicUrl;
-          saveAccount();
-          applyPhoto(publicUrl);
+          await persistPhoto(publicUrl);
           setTimeout(closeModal, 600);
         } catch (err) {
           photoMsg.textContent = "Fehler: " + (err && err.message ? err.message : err);
