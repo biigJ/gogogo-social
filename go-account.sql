@@ -1,7 +1,7 @@
 -- gogogo lead codes, accounts, WhatsApp jobs
 -- Im Supabase SQL Editor ausführen (gleiche Instanz: agpysewcsakdpmpftndp).
 --
--- Storage: Bucket "go-avatars" (public) anlegen für Account-Fotos.
+-- Storage: Bucket "go-avatars" (public) — SQL unten legt ihn an.
 --
 -- RLS: anon darf Codes lesen (Validierung), anlegen nur über Admin-Client
 -- (Admin-UI nutzt denselben publishable Key — Codes sind nicht geheim,
@@ -106,3 +106,27 @@ create policy "go_wa_jobs_update_anon"
   to anon, authenticated
   using (true)
   with check (true);
+
+-- Profilfotos: öffentlicher Bucket + Upload für anon
+insert into storage.buckets (id, name, public)
+values ('go-avatars', 'go-avatars', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "go_avatars_select" on storage.objects;
+create policy "go_avatars_select"
+  on storage.objects for select
+  to anon, authenticated
+  using (bucket_id = 'go-avatars');
+
+drop policy if exists "go_avatars_insert" on storage.objects;
+create policy "go_avatars_insert"
+  on storage.objects for insert
+  to anon, authenticated
+  with check (bucket_id = 'go-avatars');
+
+drop policy if exists "go_avatars_update" on storage.objects;
+create policy "go_avatars_update"
+  on storage.objects for update
+  to anon, authenticated
+  using (bucket_id = 'go-avatars')
+  with check (bucket_id = 'go-avatars');

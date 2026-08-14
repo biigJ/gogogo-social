@@ -407,18 +407,140 @@
         document.getElementById("app-gate").hidden = false;
         return;
       }
-      document.getElementById("app").hidden = false;
-      document.getElementById("hello").textContent = "Hallo, " + account.name + ".";
-      document.getElementById("home-meta").textContent =
-        (account.invite_code ? "Code " + account.invite_code + " · " : "") +
-        (account.serial_number ? "Seriennr. " + account.serial_number : "Buddy-Challenge");
 
-      if (account.photo_url) {
+      function saveAccount() {
+        try { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account)); } catch (e) {}
+      }
+
+      function applyPhoto(url) {
+        if (!url) return;
         var img = document.getElementById("photo-img");
-        img.src = account.photo_url;
+        img.src = url;
         img.hidden = false;
         document.getElementById("photo-plus").hidden = true;
       }
+
+      function showApp() {
+        document.getElementById("app").hidden = false;
+        document.getElementById("hello").textContent = "Hallo, " + account.name + ".";
+        document.getElementById("home-meta").textContent =
+          (account.invite_code ? "Code " + account.invite_code + " · " : "") +
+          (account.serial_number ? "Seriennr. " + account.serial_number : "Buddy-Challenge");
+        if (account.photo_url) applyPhoto(account.photo_url);
+      }
+      showApp();
+
+      async function restGet(path) {
+        var res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY
+          }
+        });
+        if (!res.ok) return null;
+        try { return await res.json(); } catch (e) { return null; }
+      }
+
+      async function patchAccount(fields) {
+        if (!account.id || String(account.id).indexOf("local-") === 0) return false;
+        var res = await fetch(SUPABASE_URL + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(account.id), {
+          method: "PATCH",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal"
+          },
+          body: JSON.stringify(fields)
+        });
+        return res.ok;
+      }
+
+      async function uploadAvatarBlob(blob) {
+        var path = (account.id || account.invite_code || ("local-" + Date.now())) + ".png";
+        var up = await fetch(SUPABASE_URL + "/storage/v1/object/go-avatars/" + path, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY,
+            "Content-Type": "image/png",
+            "x-upsert": "true"
+          },
+          body: blob
+        });
+        if (!up.ok) {
+          up = await fetch(SUPABASE_URL + "/storage/v1/object/go-avatars/" + path, {
+            method: "PUT",
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: "Bearer " + SUPABASE_KEY,
+              "Content-Type": "image/png",
+              "x-upsert": "true"
+            },
+            body: blob
+          });
+        }
+        if (!up.ok) {
+          var t = "";
+          try { t = await up.text(); } catch (e) {}
+          throw new Error(t || ("HTTP " + up.status));
+        }
+        return SUPABASE_URL + "/storage/v1/object/public/go-avatars/" + path + "?v=" + Date.now();
+      }
+
+      async function syncFromCloud() {
+        var rows = null;
+        if (account.id && String(account.id).indexOf("local-") !== 0) {
+          rows = await restGet("go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1");
+        }
+        if ((!rows || !rows.length) && account.invite_code) {
+          rows = await restGet(
+            "go_accounts?invite_code=eq." + encodeURIComponent(account.invite_code) +
+            "&select=*&order=created_at.asc&limit=20"
+          );
+        }
+        if ((!rows || !rows.length) && account.phone) {
+          rows = await restGet(
+            "go_accounts?phone=eq." + encodeURIComponent(account.phone) +
+            "&select=*&order=created_at.asc&limit=20"
+          );
+        }
+        if (!rows || !rows.length) return;
+        var remote = rows[0];
+        var i;
+        for (i = 0; i < rows.length; i++) {
+          if (rows[i].photo_url && String(rows[i].photo_url).indexOf("http") === 0) {
+            remote = rows[i];
+            break;
+          }
+        }
+        account.id = remote.id || account.id;
+        if (remote.name) account.name = remote.name;
+        if (remote.serial_number) account.serial_number = remote.serial_number;
+        if (remote.invite_code) account.invite_code = remote.invite_code;
+        var localPhoto = account.photo_url;
+        var remotePhoto = remote.photo_url;
+        if (remotePhoto && String(remotePhoto).indexOf("http") === 0) {
+          account.photo_url = remotePhoto;
+        }
+        saveAccount();
+        showApp();
+
+        /* Desktop-Foto (data-URL) nachträglich in den Bucket schieben */
+        if (localPhoto && String(localPhoto).indexOf("data:image") === 0 &&
+            !(remotePhoto && String(remotePhoto).indexOf("http") === 0)) {
+          try {
+            var res = await fetch(localPhoto);
+            var blob = await res.blob();
+            var publicUrl = await uploadAvatarBlob(blob);
+            account.photo_url = publicUrl;
+            await patchAccount({ photo_url: publicUrl, updated_at: new Date().toISOString() });
+            saveAccount();
+            applyPhoto(publicUrl);
+          } catch (e) {}
+        }
+      }
+      syncFromCloud().catch(function () {});
 
       function drawCycle(svg) {
         var ns = "http://www.w3.org/2000/svg";
@@ -606,43 +728,18 @@
           var cropped = renderCroppedCanvas();
           var dithered = GogogoDither.ditherSquare(cropped, 3);
           var blob = await GogogoDither.blobFromCanvas(dithered);
-          var path = (account.id || ("local-" + Date.now())) + "-" + Date.now() + ".png";
-          var up = await fetch(SUPABASE_URL + "/storage/v1/object/go-avatars/" + path, {
-            method: "POST",
-            headers: {
-              apikey: SUPABASE_KEY,
-              Authorization: "Bearer " + SUPABASE_KEY,
-              "Content-Type": "image/png",
-              "x-upsert": "true"
-            },
-            body: blob
-          });
-          var publicUrl = SUPABASE_URL + "/storage/v1/object/public/go-avatars/" + path;
-          if (!up.ok) {
-            /* Fallback: local data URL if storage bucket missing */
-            publicUrl = dithered.toDataURL("image/png");
-            photoMsg.textContent = "Lokal gespeichert (Storage-Bucket go-avatars ggf. anlegen).";
-          } else {
+          var publicUrl;
+          try {
+            publicUrl = await uploadAvatarBlob(blob);
+            await patchAccount({ photo_url: publicUrl, updated_at: new Date().toISOString() });
             photoMsg.textContent = "Gespeichert.";
-            if (account.id && String(account.id).indexOf("local-") !== 0) {
-              await fetch(SUPABASE_URL + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(account.id), {
-                method: "PATCH",
-                headers: {
-                  apikey: SUPABASE_KEY,
-                  Authorization: "Bearer " + SUPABASE_KEY,
-                  "Content-Type": "application/json",
-                  Prefer: "return=minimal"
-                },
-                body: JSON.stringify({ photo_url: publicUrl, updated_at: new Date().toISOString() })
-              });
-            }
+          } catch (upErr) {
+            publicUrl = dithered.toDataURL("image/png");
+            photoMsg.textContent = "Nur lokal gespeichert — in Supabase SQL für go-avatars ausführen.";
           }
           account.photo_url = publicUrl;
-          localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
-          var av = document.getElementById("photo-img");
-          av.src = publicUrl;
-          av.hidden = false;
-          document.getElementById("photo-plus").hidden = true;
+          saveAccount();
+          applyPhoto(publicUrl);
           setTimeout(closeModal, 600);
         } catch (err) {
           photoMsg.textContent = "Fehler: " + (err && err.message ? err.message : err);
