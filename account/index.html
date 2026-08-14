@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#C7413B" />
   <title>gogogo · Account</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -10,8 +10,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <script src="/assets/go-dither.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <script src="/assets/go-qr.js"></script>
   <style>
     :root {
       --red: #C7413B;
@@ -29,7 +27,7 @@
       --radius: 2px;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; touch-action: manipulation; }
     body {
       font-family: var(--display);
       background: var(--red);
@@ -37,6 +35,8 @@
       min-height: 100svh;
       -webkit-font-smoothing: antialiased;
       line-height: 1.35;
+      overscroll-behavior-x: none;
+      touch-action: manipulation;
     }
     button, input { font: inherit; color: inherit; }
     button { cursor: pointer; border: 0; background: none; }
@@ -44,69 +44,43 @@
     img { display: block; max-width: 100%; }
 
     .site-top {
-      position: absolute; top: 0; left: 0; right: 0; z-index: 50;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
       display: flex; justify-content: center;
-      padding: 14px 16px 0; pointer-events: none;
+      padding: calc(10px + env(safe-area-inset-top)) 16px 0;
+      pointer-events: none;
+      background: linear-gradient(180deg, rgba(199,65,59,0.98) 55%, rgba(199,65,59,0));
     }
     .site-header {
       pointer-events: auto;
       width: var(--chrome-width);
-      display: grid; grid-template-columns: 44px 1fr 44px;
-      align-items: center; height: var(--header-h);
-      padding: 0 8px; background: var(--chrome-bg);
-      border-radius: var(--chrome-radius); color: var(--ink);
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      align-items: center;
+      height: var(--header-h);
+      padding: 0 6px;
+      background: var(--chrome-bg);
+      border-radius: var(--chrome-radius);
+      color: var(--ink);
     }
-    .site-header__brand { justify-self: center; font-weight: 600; font-size: 0.92rem; }
-    .icon-btn {
-      width: 40px; height: 40px; display: inline-flex;
-      align-items: center; justify-content: center;
+    .nav-btn {
+      height: 44px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink);
+      opacity: 0.55;
     }
-    .icon-btn__burger {
-      position: relative; width: 18px; height: 12px; display: block;
-    }
-    .icon-btn__burger i,
-    .icon-btn__burger::before,
-    .icon-btn__burger::after {
-      content: ""; position: absolute; left: 0; width: 18px; height: 1.5px;
-      background: var(--ink); border-radius: 1px;
-      transition: transform 200ms ease, opacity 200ms ease, top 200ms ease;
-    }
-    .icon-btn__burger i { top: 5px; display: block; }
-    .icon-btn__burger::before { top: 0; }
-    .icon-btn__burger::after { top: 10px; }
-    .icon-btn.is-open .icon-btn__burger i { opacity: 0; }
-    .icon-btn.is-open .icon-btn__burger::before { top: 5px; transform: rotate(45deg); }
-    .icon-btn.is-open .icon-btn__burger::after { top: 5px; transform: rotate(-45deg); }
-
-    .menu-panel {
-      position: fixed; inset: 0; z-index: 55; display: none;
-      align-items: flex-start; justify-content: center;
-      padding: calc(14px + var(--header-h) + 10px) 16px 24px;
-      background: rgba(10, 10, 10, 0.18);
-      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-    }
-    .menu-panel.is-open { display: flex; }
-    .menu-panel__sheet {
-      width: var(--chrome-width); background: rgba(246, 246, 244, 0.96);
-      padding: 28px 22px 26px; border-radius: var(--chrome-radius); color: var(--ink);
-    }
-    .menu-panel__nav {
-      display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center;
-    }
-    .menu-panel__nav a, .menu-panel__nav button {
-      font-size: clamp(1.05rem, 4vw, 1.3rem);
-      font-weight: 700; letter-spacing: -0.02em;
-    }
-    body.menu-open { overflow: hidden; }
-    body.menu-open .site-top { z-index: 70; }
+    .nav-btn.is-active { opacity: 1; }
+    .nav-btn svg { width: 22px; height: 22px; display: block; }
 
     .wrap {
       width: min(100%, var(--max));
       margin: 0 auto;
-      padding: calc(14px + var(--header-h) + 24px + env(safe-area-inset-top)) var(--pad) calc(40px + env(safe-area-inset-bottom));
+      padding: calc(10px + env(safe-area-inset-top) + var(--header-h) + 18px) var(--pad) calc(40px + env(safe-area-inset-bottom));
     }
 
-    .hero { text-align: center; margin-bottom: 28px; }
+    .hero { text-align: center; margin-bottom: 22px; }
+    .hero[hidden] { display: none !important; }
     .cycle-wrap {
       position: relative; width: 240px; height: 240px; margin: 0 auto 20px;
     }
@@ -135,11 +109,12 @@
       background: var(--paper); color: var(--ink);
       border-radius: var(--radius); padding: 18px 16px; margin-bottom: 16px;
     }
-    .tile h2 {
-      font-weight: 700; font-size: clamp(1.2rem, 5vw, 1.5rem);
+    .tile h2, .fact__title {
+      font-weight: 700; font-size: clamp(1.15rem, 5vw, 1.45rem);
       letter-spacing: -0.03em; line-height: 1.1; margin-bottom: 12px;
     }
-    .tile p { font-weight: 500; font-size: 0.95rem; letter-spacing: -0.02em; line-height: 1.35; }
+    .tile p, .fact__body { font-weight: 500; font-size: 0.95rem; letter-spacing: -0.02em; line-height: 1.35; }
+    .fact__body p + p { margin-top: 10px; }
     .tile .btn, .panel .btn {
       display: inline-flex; align-items: center; justify-content: center;
       width: 100%; height: 48px; margin-top: 14px;
@@ -161,60 +136,30 @@
     .week__day.is-today { background: var(--red); color: var(--ink-on-red); }
     .week__n { font-size: 0.95rem; margin-top: 2px; }
 
-    .chat {
-      display: flex; flex-direction: column; gap: 10px; min-height: 180px;
-      max-height: 280px; overflow: auto; margin-bottom: 12px;
-    }
-    .chat__bubble {
-      align-self: flex-start; max-width: 85%;
-      background: rgba(199, 65, 59, 0.1); padding: 10px 12px; border-radius: 2px;
-      font-size: 0.9rem; font-weight: 500;
-    }
-    .chat__bubble--me { align-self: flex-end; background: rgba(199, 65, 59, 0.22); }
-    .chat__row { display: flex; gap: 8px; }
-    .chat__row input {
-      flex: 1; padding: 12px; border: 1px solid rgba(52, 34, 32, 0.2);
-      border-radius: var(--radius); background: #fff; color: var(--ink); font-size: 16px;
-    }
-    .chat__row button {
-      padding: 0 16px; background: var(--red); color: var(--ink-on-red);
-      font-weight: 700; border-radius: var(--radius);
-    }
-
     .panel { display: none; margin-top: 8px; }
     .panel.is-active { display: block; }
     .panel .tile { margin-bottom: 14px; }
-    .qr-box {
-      padding: 0 0 20px;
-      background: transparent;
-      text-align: center;
-      color: var(--ink-on-red);
-    }
-    .qr-box #qr-mount {
-      width: 220px; height: 220px; margin: 0 auto 14px;
-      display: flex; align-items: center; justify-content: center;
-      background: transparent;
-    }
-    .qr-box #qr-mount img,
-    .qr-box #qr-mount canvas,
-    .qr-box #qr-mount table {
-      display: block; width: 220px; height: 220px;
-      background: transparent !important;
-    }
-    .qr-box a { color: var(--ink-on-red); word-break: break-all; font-size: 0.85rem; font-weight: 600; }
     .fact details { margin-top: 10px; }
     .fact summary {
       cursor: pointer; list-style: none; font-size: 0.75rem; font-weight: 700;
       letter-spacing: -0.02em; color: var(--btn-ink);
     }
     .fact summary::-webkit-details-marker { display: none; }
-    .fact__bg { margin-top: 10px; font-size: 0.85rem; opacity: 0.9; }
-    .video-media { width: 100%; aspect-ratio: 16/9; background: #111; margin-bottom: 12px; overflow: hidden; }
-    .video-media iframe, .video-media video { width: 100%; height: 100%; border: 0; }
+    .fact__bg { margin-top: 10px; font-size: 0.85rem; opacity: 0.95; }
+    .fact__bg h4 { font-size: 0.9rem; margin: 12px 0 8px; letter-spacing: -0.02em; }
+    .fact__bg p + p { margin-top: 8px; }
+    .fact__bg ul { padding-left: 1.1em; margin-top: 8px; }
+    .fact__bg a { color: var(--btn-ink); text-decoration: underline; text-underline-offset: 2px; }
 
-    .zirkel-frame {
-      width: 100%; min-height: 70vh; border: 0; border-radius: var(--radius);
-      background: var(--paper);
+    .video-block__media { width: 100%; aspect-ratio: 16/9; background: #111; margin-bottom: 12px; overflow: hidden; }
+    .video-block__media iframe, .video-block__media video { width: 100%; height: 100%; border: 0; display: block; }
+
+    .training-frame {
+      width: 100%;
+      min-height: calc(100svh - var(--header-h) - 40px);
+      border: 0;
+      border-radius: var(--radius);
+      background: #0A0A0A;
     }
 
     .modal {
@@ -264,33 +209,27 @@
 
   <div id="app" hidden>
     <div class="site-top">
-      <header class="site-header">
-        <div class="site-header__left">
-          <button class="icon-btn" id="btn-menu" type="button" aria-label="Menü" aria-expanded="false">
-            <span class="icon-btn__burger"><i></i></span>
-          </button>
-        </div>
-        <div class="site-header__brand">gogogo</div>
-        <div class="site-header__right" aria-hidden="true"></div>
-      </header>
-    </div>
-
-    <div class="menu-panel" id="menu-panel" hidden>
-      <div class="menu-panel__sheet" role="dialog" aria-label="Menü">
-        <nav class="menu-panel__nav">
-          <button type="button" data-goto="home">Home</button>
-          <button type="button" data-goto="calendar">Kalender</button>
-          <button type="button" data-goto="chat">Chat</button>
-          <button type="button" data-goto="zirkel">Zirkeltraining</button>
-          <button type="button" data-goto="factfulness">Factfulness</button>
-          <button type="button" data-goto="videos">Videos</button>
-          <button type="button" id="btn-new-account">Neuen Account anlegen</button>
-        </nav>
-      </div>
+      <nav class="site-header" aria-label="Account">
+        <button class="nav-btn is-active" type="button" data-goto="home" aria-label="Home" aria-current="page">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3.4 3.2 10.6V21h6.3v-5.8h4.9V21h6.4V10.6L12 3.4Z"/></svg>
+        </button>
+        <button class="nav-btn" type="button" data-goto="book" aria-label="Buch">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.2 3.5h9.2c1.3 0 2.3 1 2.3 2.3v12.9c0 .7-.6 1.3-1.3 1.3H6.5c-.9 0-1.6-.7-1.6-1.6V5.1c0-.9.7-1.6 1.6-1.6h-.3Zm1.1 2.2v12.1h9.2V5.8c0-.1-.1-.2-.2-.2H7.3Zm2.2 2.1h5.2v1.5H9.5V7.9Zm0 3.2h5.2v1.5H9.5v-1.5Zm0 3.2h3.6v1.5H9.5v-1.5Z"/></svg>
+        </button>
+        <button class="nav-btn" type="button" data-goto="community" aria-label="Community">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8.2 11.2a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2Zm7.6 0a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2ZM3.4 19.2c0-2.7 2.4-4.6 4.8-4.6h.4c1 .4 2.1.6 3.2.6s2.2-.2 3.2-.6h.4c2.4 0 4.8 1.9 4.8 4.6v1.3H3.4v-1.3Z"/></svg>
+        </button>
+        <button class="nav-btn" type="button" data-goto="chat" aria-label="Chat">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4.2 4.2h15.6c1 0 1.8.8 1.8 1.8v9.2c0 1-.8 1.8-1.8 1.8H9.1L4.2 21V6c0-1 .8-1.8 1.8-1.8h-1.8Zm1.8 1.8v10.2l2.4-1.8h11.4V6H6Z"/></svg>
+        </button>
+        <button class="nav-btn" type="button" data-goto="training" aria-label="Training">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.2 9.2h2.2v5.6H3.2V9.2Zm15.4 0h2.2v5.6h-2.2V9.2ZM6.8 10.4h2.1v3.2H6.8v-3.2Zm8.3 0h2.1v3.2h-2.1v-3.2ZM9.8 11.1h4.4v1.8H9.8v-1.8Z"/></svg>
+        </button>
+      </nav>
     </div>
 
     <div class="wrap">
-      <section class="hero">
+      <section class="hero" id="home-hero">
         <div class="cycle-wrap">
           <svg class="cycle is-spinning" id="cycle" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
           <button class="cycle-portrait" id="photo-btn" type="button" aria-label="Foto hochladen">
@@ -302,96 +241,311 @@
       </section>
 
       <div class="panel is-active" id="panel-home" data-panel="home">
-        <div class="qr-box">
-          <div id="qr-mount" aria-hidden="true"></div>
-          <a id="qr-link" href="https://www.gogogo.social/go" target="_blank" rel="noopener">https://www.gogogo.social/go</a>
-        </div>
-        <article class="tile">
-          <h2>Dein Account</h2>
-          <p id="home-meta">Buddy-Challenge · Foto oben hinzufügen.</p>
-        </article>
-        <article class="tile">
-          <h2>Trainingsplan-Generator</h2>
-          <p>Folgt im nächsten Schritt.</p>
-        </article>
-        <article class="tile">
-          <h2>Schnellzugriff</h2>
-          <button class="btn" type="button" data-goto="calendar">Kalender</button>
-          <button class="btn btn--ghost" type="button" data-goto="chat">Chat mit Buddys &amp; Coach</button>
-          <button class="btn btn--ghost" type="button" data-goto="zirkel">Zirkeltraining</button>
-        </article>
-      </div>
-
-      <div class="panel" id="panel-calendar" data-panel="calendar">
         <article class="tile">
           <h2>Woche</h2>
           <p id="week-label"></p>
           <div class="week" id="week"></div>
+        </article>
+        <article class="tile">
+          <h2>Trainingsplan an Woche anpassen</h2>
+          <p>Passe Deine Woche an Deinen Alltag an — folgt im nächsten Schritt.</p>
+          <button class="btn" type="button" id="btn-adapt-plan">Anpassen</button>
+        </article>
+      </div>
+
+      <div class="panel" id="panel-book" data-panel="book">
+        <article class="tile">
+          <h2>Factfulness</h2>
+          <p>Basics zu Bewegung — mit Hintergründen und Quellen.</p>
+        </article>
+<article class="tile fact">
+        <h3 class="fact__title">Du bist ein Hybridathlet</h3>
+        <div class="fact__body">
+          <p>Dein Körper ist nicht für eine Disziplin gebaut, sondern für drei: Kraft, Herz-Lunge und Skills (Balance, Koordination, Beweglichkeit). Hybrid ist der Normalzustand, Spezialisierung die Ausnahme. Wer nur eine Säule trainiert (typisch: nur Cardio oder nur Gym), baut Stärke an einer Stelle und lässt zwei Lücken offen.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>Kraft hält Muskel und Knochen und wirkt gegen Sarkopenie (ab 30 etwa 1 % Muskelverlust pro Jahr, wenn nicht gegengesteuert). Krafttraining allein senkt die Gesamtsterblichkeit um etwa 10 bis 17 % (Momma et al., BJSM 2022).</p>
+            <p>Herz-Lunge baut Mitochondrien und erhöht die VO2max. Jede zusätzliche MET (Maß für aerobe Kapazität) senkt das Sterberisiko um etwa 11 % (Kodama et al., JAMA 2009).</p>
+            <p>Skills gehen ab 50 zuerst. Wer mit 70 noch ohne Hilfe vom Boden aufsteht, lebt nachweislich länger (Araújo, Sitting-Rising-Test — siehe Kachel 05).</p>
+            <p>Die Kombination wirkt stärker als jede Säule allein. Saeidifard et al., BJSM 2019, rund 416.000 Erwachsene: Kraft und Cardio gemeinsam senken die Gesamtsterblichkeit deutlich stärker als jedes Training für sich.</p>
+            <ul>
+              <li><a href="https://bjsm.bmj.com/content/53/10/640" target="_blank" rel="noopener">Saeidifard et al., Br J Sports Med 2019 — Resistance + Aerobic Training &amp; Mortality</a></li>
+              <li><a href="https://bjsm.bmj.com/content/56/13/755" target="_blank" rel="noopener">Momma et al., Br J Sports Med 2022 — Muscle-strengthening &amp; Mortality</a></li>
+              <li><a href="https://jamanetwork.com/journals/jama/fullarticle/183849" target="_blank" rel="noopener">Kodama et al., JAMA 2009 — CRF &amp; Mortality</a></li>
+            </ul>
+          </div>
+        </details>
+      </article>
+<article class="tile fact">
+        <h3 class="fact__title">Im Rhythmus der Woche</h3>
+        <div class="fact__body">
+          <p>Pro Woche: 1× lang und locker (45 bis 90 Min Wandern, Laufen oder Radfahren), 1× intensiv und kurz (20 bis 30 Min HIIT, HYROX, Fußball, Sprints), 2× Kraft (je rund 45 Min Ganzkörper). Der Rest sind Spaziergänge, Mobility, Schlaf. Genauso hat Dein Körper vor 10.000 Jahren überlebt.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>80/20 ist seit zwei Jahrzehnten Konsens: rund 80 % der Bewegung in niedriger Intensität (Zone 2: Wandern, lockerer Dauerlauf, ruhiges Radfahren), 20 % hoch (HIIT, Intervalle, Spiel). Zone 2 baut Mitochondrien und Fettoxidation auf, also den Stoffwechselmotor, der über Tagesenergie und Lebenserwartung mitentscheidet. Iñigo San Millán (Coach von Tadej Pogačar, University of Colorado) hat diese Logik aus dem Profisport in den Longevity-Kontext übersetzt.</p>
+            <p>Krafttraining liefert, was Zone 2 nicht kann: Knochendichte, Muskelmasse, hormonelle Balance.</p>
+            <ul>
+              <li><a href="https://www.frontiersin.org/journals/physiology/articles/10.3389/fphys.2014.00033/full" target="_blank" rel="noopener">Stöggl &amp; Sperlich, Frontiers in Physiology 2014 — polarisiertes Training</a></li>
+              <li><a href="https://theproof.com/the-science-of-zone-2-cardiovascular-exercise-part-1-inigo-san-millan-phd/" target="_blank" rel="noopener">San Millán Interview, The Proof Podcast</a></li>
+            </ul>
+          </div>
+        </details>
+      </article>
+<article class="tile fact">
+        <h3 class="fact__title">Tägliche Bewegung</h3>
+        <div class="fact__body">
+          <p>Schon 10 bis 20 Minuten am Tag halten Deine Baseline. Körperliche Reize: ein kurzer Spaziergang, Mobility, Treppen. Mentale Pausen: Atmen, Lesen, ein Gespräch ohne Bildschirm. Beides kostet keine Stunde.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>Singh et al., BMJ 2024, über 14.000 Teilnehmende: strukturierte Bewegung wirkt bei leichten bis mittelschweren depressiven Symptomen ähnlich gut wie Antidepressiva oder Verhaltenstherapie. Spazierengehen, Joggen, Yoga und Krafttraining zeigten alle signifikante Effekte. Mechanistisch: BDNF, Endorphine, Dopaminregulation, bessere Schlafqualität.</p>
+            <p>Mentale Pausen (Atmen, Lesen, Gespräche ohne Bildschirm) wirken nur, wenn sie ungeteilt sind. Das Nervensystem braucht den Wechsel zwischen Anspannung und echter Ruhe. Multitasking ist weder das eine noch das andere.</p>
+            <ul>
+              <li><a href="https://www.bmj.com/content/384/bmj-2023-075847" target="_blank" rel="noopener">Singh et al., BMJ 2024 — Exercise for Depression</a></li>
+              <li>Kandola et al., Neuroscience &amp; Biobehavioral Reviews 2019</li>
+            </ul>
+          </div>
+        </details>
+      </article>
+<article class="tile fact">
+        <h3 class="fact__title">Big Six Plus</h3>
+        <div class="fact__body">
+          <p>Die sechs Grundübungen reichen als Basis: Kniebeuge, Klimmzug, Kreuzheben, Drücken (Bank oder Liegestütz), Ziehen (Rudern), Schulterdrücken. Dazu kommen einbeinige und einarmige Varianten (Bulgarian Split Squat, Single-Leg Deadlift, Single-Arm Press), Rotation (Wood-Chops, Russian Twists, Med Ball Throws) und Plyometrie (Box Jumps, Broad Jumps, Klatschliegestütze). Variation entsteht über Gewicht, Tempo, Wiederholungen, nicht über Geräte.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>Mehrgelenkige Verbundübungen aktivieren mehrere Muskelgruppen gleichzeitig und liefern den größten Trainingsreiz pro Minute. Sinnvolle Periodisierung läuft in vier Phasen: Kraftausdauer (viele Wdh., kurze Pausen, Technik festigen), Hypertrophie (8 bis 12 Wdh., 60 bis 90 Sek. Pause, Muskel wächst), Maximalkraft (3 bis 5 Wdh., 3 bis 5 Minuten Pause; häufigster Fehler: Pause zu kurz, dann ist es keine Maximalkraft mehr), Kombinationsphasen. Meta-Analysen von Schoenfeld zeigen: nicht das Timing macht den Unterschied, sondern Volumen × Erholung × Konsistenz.</p>
+            <p>Was die Big Six nicht voll abdecken, und warum das Plus dazugehört:</p>
+            <p><strong>Körperspannung.</strong> Der Rumpf überträgt Kraft zwischen Beinen und Armen. Ohne stabilen Core läuft die Kraft ins Leere. Dead Bug, Pallof Press und langsam ausgeführte Verbundübungen (3 Sekunden absenken) trainieren das direkt.</p>
+            <p><strong>Rotation.</strong> Im Alltag bewegen wir uns rotierend: Schwung beim Gehen, Greifen, Werfen, Aufstehen aus dem Bett. Wood-Chops, Russian Twists und Med Ball Throws schließen die Lücke, die reine Verbundübungen lassen.</p>
+            <p><strong>Plyometrie.</strong> Schnellkraft (Power) sinkt ab dem mittleren Erwachsenenalter schneller als Maximalkraft (Reid &amp; Fielding, Exerc Sport Sci Rev 2012). Box Jumps, Broad Jumps und Klatschliegestütze halten das Nervensystem reaktiv.</p>
+            <p><strong>Beweglichkeit.</strong> Range of Motion entscheidet, wie sauber jede Übung ausgeführt wird. Hip 90/90, Cat-Cow und Wall Slides gehören ins Aufwärmen, nicht ans Ende.</p>
+            <ul>
+              <li><a href="https://link.springer.com/article/10.1007/s40279-017-0722-0" target="_blank" rel="noopener">Schoenfeld et al., Sports Medicine 2017 — Trainingsvolumen &amp; Hypertrophie</a></li>
+              <li><a href="https://pubmed.ncbi.nlm.nih.gov/22499408/" target="_blank" rel="noopener">Reid &amp; Fielding, Exerc Sport Sci Rev 2012 — Power vs. Strength Decline mit Alter</a></li>
+              <li>ACSM Position Stand on Resistance Training</li>
+            </ul>
+          </div>
+        </details>
+      </article>
+<article class="tile fact">
+        <h3 class="fact__title">Kniebeuge</h3>
+        <div class="fact__body">
+          <p>Die Kniebeuge trainiert das ganze System gleichzeitig: Glutes, Hüfte, Knie, Rumpf, Haltung. Jede aufrechte Bewegung im Alltag läuft über diese Kette — Aufstehen, Treppensteigen, etwas vom Boden heben, ein Kind hochnehmen. Starke Glutes halten Dein Becken in Position, die Wirbelsäule aufrecht, den Rücken schmerzfrei. Wir starten mit Spanish Squats. Die Übung zeigt sofort, wo Glutes und Hüfte aktiv sind und wo nicht.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>Die Kniebeuge adressiert die gluteale Kette. Starke Glutes ziehen das Becken in eine neutrale Position, der untere Rücken muss nicht mehr kompensieren, die Schultern hängen entspannt. Haltungsschmerzen verschwinden bei vielen Klienten allein dadurch.</p>
+            <p>Die Hüftbeweglichkeit, die in der tiefen Hocke trainiert wird, ist dieselbe, die Du beim Schuhe Binden, beim Heben aus dem Knie und beim Sitzen in natürlicher Hocke (statt nach vorne gerundet) brauchst. Wer in die volle Hocke kommt, hat die mechanischen Grundlagen für fast alle Alltagsbewegungen sauber abgedeckt.</p>
+            <p>Wie funktional diese Kette ist, zeigt der Sitting-Rising-Test (Araújo et al., European Journal of Preventive Cardiology, Update 2025): über 4.000 Personen, 12 Jahre Beobachtung. Wer ohne Hilfe von Händen oder Knien vom Boden aufstehen kann, hat in der Regel intakte Kraft, Beweglichkeit, Balance und Körperzusammensetzung. Score 0 bis 4 von 10 ging mit einem 6-fach erhöhten kardiovaskulären Sterberisiko gegenüber Score 10 einher.</p>
+            <p>Spanish Squat (Widerstandsband um einen Pfeiler) ist der ideale Einstieg, weil Knieausrichtung und Glutes-Aktivierung gleichzeitig geübt werden.</p>
+            <ul>
+              <li><a href="https://pubmed.ncbi.nlm.nih.gov/40569873/" target="_blank" rel="noopener">Araújo et al., Eur J Prev Cardiol 2025 — Sitting-Rising Test</a></li>
+              <li><a href="https://www.bluezones.com/" target="_blank" rel="noopener">Buettner, Blue Zones — Living to 100</a></li>
+            </ul>
+          </div>
+        </details>
+      </article>
+<article class="tile fact">
+        <h3 class="fact__title">Klimmzugstange</h3>
+        <div class="fact__body">
+          <p>Klimmzug ist die zweitwichtigste Übung. Schon passives Hängen an der Stange dekomprimiert Wirbelsäule und Schultern. Griffkraft ist einer der stärksten messbaren Lebenserwartungs-Marker.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>Sun et al., Scientific Reports 2024, Meta-Analyse von 42 Studien mit über 3 Millionen Teilnehmenden: pro 5 kg geringere Griffkraft steigt das Sterberisiko um 16 %. Die Korrelation ist nicht kausal, Griffkraft baut keine Lebenserwartung auf. Aber sie ist ein präziser Proxy für Gesamtmuskelmasse, neuromuskuläre Integrität und biologisches Alter.</p>
+            <p>Der Klimmzug ist der mechanisch sauberste Weg, die hintere Kette (Latissimus, Trapezius, Rhomboiden, Bizeps) zu adressieren und Schulterstabilität in Dekompression zu trainieren. Wer keinen schafft: passives Hängen 30 bis 60 Sekunden ist schon Reiz.</p>
+            <ul>
+              <li><a href="https://www.nature.com/articles/s41598-024-80487-y" target="_blank" rel="noopener">Sun et al., Scientific Reports 2024 — Grip Strength &amp; Mortality</a></li>
+              <li><a href="https://onlinelibrary.wiley.com/doi/full/10.1002/jcsm.13619" target="_blank" rel="noopener">Andersen et al., J Cachexia Sarcopenia Muscle 2024 — 28 Länder</a></li>
+            </ul>
+          </div>
+        </details>
+      </article>
+<article class="tile fact">
+        <h3 class="fact__title">Nahrung &amp; Erholung</h3>
+        <div class="fact__body">
+          <p>Es gibt nicht die richtige Ernährung. Es gibt Prinzipien, die für die meisten funktionieren, und Deinen Alltag, der entscheidet, wie sie zu Dir passen. Mein Vorschlag: proteinreiches Frühstück, eine warme Hauptmahlzeit, 4 bis 5 Stunden Mahlzeitenabstand, gerne Quark mit Protein am Abend.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>Drei Punkte, die belastbar sind:</p>
+            <p>Gesamtprotein schlägt Protein-Timing. Das anabole Fenster hält neuen Meta-Analysen nicht stand. Was zählt: rund 1,6 g/kg Körpergewicht Protein pro Tag für Trainierende, auf 3 bis 4 Mahlzeiten verteilt (Schoenfeld &amp; Aragon, J Int Soc Sports Nutr).</p>
+            <p>Time-Restricted Eating wirkt moderat. Mehrere 2024er Meta-Analysen zeigen: ein 8- bis 10-Stunden-Essensfenster führt zu kleinem, aber konsistentem Gewichtsverlust, besserer Insulinsensitivität, niedrigerem HbA1c (Chang et al., iScience 2024).</p>
+            <p>Zirkadianer Rhythmus ist real, aber nicht heilig. Was Du konsistent durchhältst, schlägt das, was optimal aber unrealistisch ist.</p>
+            <ul>
+              <li><a href="https://link.springer.com/article/10.1186/1550-2783-10-53" target="_blank" rel="noopener">Schoenfeld &amp; Aragon — Protein-Timing-Meta</a></li>
+              <li><a href="https://www.cell.com/iscience/fulltext/S2589-0042(24)00221-9" target="_blank" rel="noopener">Chang et al., iScience 2024 — Time-Restricted Eating</a></li>
+              <li><a href="https://link.springer.com/article/10.1007/s11154-023-09853-x" target="_blank" rel="noopener">Pavlou et al., Rev Endocr Metab Disord 2023</a></li>
+            </ul>
+          </div>
+        </details>
+      </article>
+<article class="tile fact">
+        <h3 class="fact__title">Nervensystem &amp; Organismus</h3>
+        <div class="fact__body">
+          <p>Vier Krafttage pro Woche und nichts passiert mehr? Dann fehlt der andere Reiz. Dein Nervensystem will Variation. Dein Stoffwechsel ist ein Regelkreis, kein Excel-Sheet. Er passt seinen Output an Deinen Input an.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>A) Nervensystem braucht Variation. Wer monatelang den gleichen Reiz fährt, wird bewegungseffizienter: der Körper braucht weniger Energie für dieselbe Arbeit. Was sich wie Stagnation anfühlt, ist Effizienzgewinn. Lösung: Reizwechsel. HIIT einbauen, wenn nur Kraft gemacht wurde. Tempo wechseln. Neue Bewegungsmuster.</p>
+            <p>B) Organismus passt Energieverbrauch an. Herman Pontzer (Duke) hat mit doppelt-markiertem Wasser bei den Hadza-Jägern und -Sammlern in Tansania gemessen: jemand, der acht Stunden täglich auf Jagd geht, verbrennt kaum mehr Kalorien als ein Bürojob-Mensch. Der Körper regelt seinen Verbrauch von oben. Was bei Bewegung mehr fließt, drosselt er bei Reparatur, Immunsystem und Reproduktion. Kalorienzählen ist ein guter Ansatz, aber kein vollständiges Modell.</p>
+            <ul>
+              <li><a href="https://www.cell.com/current-biology/fulltext/S0960-9822(12)00387-3" target="_blank" rel="noopener">Pontzer et al., Current Biology 2012 — Hadza Energy Expenditure</a></li>
+              <li>Pontzer, <em>Burn</em> (Penguin 2021)</li>
+            </ul>
+          </div>
+        </details>
+      </article>
+<article class="tile fact">
+        <h3 class="fact__title">Dein Alter ist egal</h3>
+        <div class="fact__body">
+          <p>Die größte Lüge über das Älterwerden: mein Stoffwechsel wird langsamer. Stimmt nicht. Was wirklich passiert: Menschen bewegen sich weniger. Dein Stoffwechsel reagiert auf Deine Aktivität, nicht auf Dein Geburtsjahr.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>Pontzer et al., Science 2021: 6.421 Teilnehmende aus 29 Ländern, gemessen mit doppelt-markiertem Wasser (Goldstandard). Der Grundumsatz bleibt zwischen 20 und 60 stabil. Erst ab ca. 60 sinkt er um rund 0,7 % pro Jahr, deutlich weniger als die meisten Diätbücher behaupten.</p>
+            <p>Was sich verändert: die Bewegungsmenge und die Muskelmasse. Sarkopenie setzt ab dem 30. Lebensjahr ein, etwa 1 % Muskelverlust pro Jahr, wenn nicht gegengesteuert wird. Beides trainierbar.</p>
+            <p>VO2max ist einer der stärksten Mortalitätsprädiktoren: jede zusätzliche MET (Maß für aerobe Kapazität) senkt das Sterberisiko um etwa 11 % (Kodama et al., JAMA 2009).</p>
+            <ul>
+              <li><a href="https://www.science.org/doi/10.1126/science.abe5017" target="_blank" rel="noopener">Pontzer et al., Science 2021 — Daily Energy Expenditure</a></li>
+              <li><a href="https://jamanetwork.com/journals/jama/fullarticle/183849" target="_blank" rel="noopener">Kodama et al., JAMA 2009 — CRF &amp; Mortality</a></li>
+            </ul>
+          </div>
+        </details>
+      </article>
+<article class="tile fact">
+        <h3 class="fact__title">Cortisol, Insulin, Fett</h3>
+        <div class="fact__body">
+          <p>Du machst alles richtig und nimmst trotzdem nicht ab. Schau nicht zuerst auf die Kalorien. Schau auf Deinen Schlaf, Deinen Stress und Deinen Zuckerkonsum. Dein Körper speichert Wasser und Fett nicht aus Bösartigkeit. Er reagiert auf ein Hormonsignal. Das Signal heißt Cortisol und Insulin, und du schickst es täglich mehrmals ab.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>Stufe 1: Zucker und Insulin. Isst Du Zucker oder schnelle Kohlenhydrate, steigt der Blutzucker. Die Bauchspeicheldrüse schüttet Insulin aus, ein Speicherhormon — es weist die Zellen an, Energie aufzunehmen. Passiert das zu oft und zu hoch, wird Fettabbau biologisch blockiert. Insulin und Fettabbau laufen nicht gleichzeitig.</p>
+            <p>Stufe 2: Cortisol und Wasser. Chronischer Stress hält Cortisol dauerhaft erhöht. Cortisol aktiviert Aldosteron, das die Nieren anweist, mehr Natrium und damit mehr Wasser einzulagern. Folge: aufgedunsenes Gesicht (puffy face), geschwollene Augen am Morgen, Völlegefühl ohne klare Ursache, schwankende Waage ohne Veränderung der Fettmasse. Das morgendlich aufgedunsene Gesicht ist kein zusätzliches Fett, sondern Wasser als Entzündungsreaktion.</p>
+            <p>Stufe 3: Der Teufelskreis. Schlafmangel erhöht Cortisol. Erhöhtes Cortisol treibt Heißhunger auf Zucker. Zucker erhöht Insulin. Insulin blockiert Fettabbau. Covassin et al., JAMA 2022 (Mayo Clinic): 14 Tage Schlafrestriktion auf 4 Stunden pro Nacht führten zu +9 % Bauchfett und +11 % viszeralem Fett, bei gleicher Kalorienaufnahme.</p>
+            <ul>
+              <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9187217/" target="_blank" rel="noopener">Covassin et al., JAMA 2022 — Sleep Restriction &amp; Visceral Fat</a></li>
+              <li><a href="https://doi.org/10.1073/pnas.2434785100" target="_blank" rel="noopener">Dallman et al., PNAS 2003 — Chronic Stress &amp; Comfort Food</a></li>
+              <li>Clinical Obesity Review 2024 — HPA-Axis</li>
+            </ul>
+          </div>
+        </details>
+      </article>
+<article class="tile fact">
+        <h3 class="fact__title">Frauen trainieren (nicht) anders</h3>
+        <div class="fact__body">
+          <p>Wir sind biologisch unterschiedlich. Das heißt nicht, dass wir anders trainieren müssen. Die sechs Grundübungen funktionieren bei jedem Menschen. Die Angst, durch Krafttraining bulky zu werden, ist unbegründet. Wer den Zyklus berücksichtigen will, kann seine Trainingsspitzen klug darauf legen.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>Bulky werden ist unwahrscheinlich. Männer produzieren etwa 15- bis 20-mal mehr Testosteron als Frauen. Was auf Bildern weiblicher Bodybuilderinnen zu sehen ist, entsteht durch jahrelanges spezialisiertes Training, anhaltenden Kalorienüberschuss und oft pharmakologische Unterstützung. Mit zwei bis drei Krafteinheiten pro Woche ist bulky physiologisch praktisch ausgeschlossen.</p>
+            <p>Was tatsächlich passiert: mehr Muskeltonus, klarere Definition, stabilere Gelenke. Knochendichte und Stoffwechsel profitieren spürbar. Ab der Perimenopause ist Krafttraining der zentrale Hebel gegen Sarkopenie und Osteoporose.</p>
+            <p>Die Hypertrophie-Antwort ist gleich, nur das absolute Ausmaß unterscheidet sich. Refalo et al., PeerJ 2025: die relativen Zuwächse sind bei Frauen und Männern praktisch identisch.</p>
+            <p>Der Zyklus beeinflusst die Tagesform. In der späten Follikelphase zeigen Studien Spitzenwerte für Maximalkraft und Power (McNulty et al., Frontiers in Sports and Active Living 2025). In der späten Lutealphase sinkt die Leistung bei vielen Frauen messbar. Wer plant: Maximalkraft-Blöcke in die Follikelphase, Mobility und lockere Einheiten in die späte Lutealphase.</p>
+            <ul>
+              <li><a href="https://peerj.com/articles/19042/" target="_blank" rel="noopener">Refalo et al., PeerJ 2025 — Sex Differences in Hypertrophy</a></li>
+              <li><a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11897035/" target="_blank" rel="noopener">McNulty et al., Front Sports Active Living 2025 — Menstrual Cycle &amp; Performance</a></li>
+              <li><a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC10818650/" target="_blank" rel="noopener">Carmichael et al., Sports 2024 — Cycle &amp; Maximal Strength</a></li>
+            </ul>
+          </div>
+        </details>
+      </article>
+<article class="tile fact">
+        <h3 class="fact__title">Muskelmasse regelt mehr</h3>
+        <div class="fact__body">
+          <p>Wer abnehmen will und nur die Kalorien zählt, denkt zu kurz. Muskelmasse ist das aktivste Gewebe im Körper. Mehr Muskeln bedeuten höheren Grundumsatz, bessere Insulinsensitivität und eine günstigere Hormonlage. Gilt für Männer und Frauen.</p>
+        </div>
+        <details>
+          <summary>Hintergrund →</summary>
+          <div class="fact__bg">
+            <h4>Wissenschaftlicher Hintergrund</h4>
+            <p>Muskelmasse erhöht den Grundumsatz direkt. Ein Kilogramm Muskelmasse verbraucht in Ruhe etwa 13 kcal pro Tag mehr als ein Kilogramm Fett. 5 kg Muskelaufbau machen über ein Jahr ca. 23.000 kcal Unterschied, also rund 3 kg Fett allein durch den höheren Ruheumsatz.</p>
+            <p>Testosteron und Wachstumshormon (GH) als natürliche Hebel. Krafttraining mit schweren Verbundübungen (Kniebeuge, Kreuzheben, Klimmzug) stimuliert die körpereigene Ausschüttung. GH mobilisiert Fettsäuren aus den Depots und fördert gleichzeitig den Muskelaufbau. Deshalb führt schweres Krafttraining bei gleicher Kalorienzufuhr zu einer günstigeren Körperzusammensetzung als leichtes Cardio.</p>
+            <p>GH wird vor allem in den ersten Stunden des Schlafs ausgeschüttet (Van Cauter et al., Sleep 2000). Schlechter Schlaf reduziert den natürlichen GH-Puls. Alkohol am Abend blockiert die GH-Ausschüttung fast vollständig.</p>
+            <p>Mehr Muskelmasse bedeutet mehr Glykogenspeicher. Der Körper puffert Kohlenhydrate besser, der Blutzucker schwankt weniger, Insulin bleibt niedriger. Niedrigeres Insulin bedeutet: das Fettspeicher-Signal wird seltener gesendet.</p>
+            <p>Praktisch: Krafttraining priorisieren, ausreichend Protein (1,6 g/kg), schlafen. Der Rest reguliert sich.</p>
+            <ul>
+              <li><a href="https://pubmed.ncbi.nlm.nih.gov/10746585/" target="_blank" rel="noopener">Van Cauter et al., Sleep 2000 — GH &amp; Schlaf</a></li>
+              <li><a href="https://pubmed.ncbi.nlm.nih.gov/15870604/" target="_blank" rel="noopener">Kraemer &amp; Ratamess, Med Sci Sports Exerc 2005 — Hormonelle Antwort auf RT</a></li>
+              <li><a href="https://journals.lww.com/nsca-jscr/fulltext/2010/10000/the_mechanisms_of_muscle_hypertrophy_and_their.40.aspx" target="_blank" rel="noopener">Schoenfeld, J Strength Cond Res 2010 — Hypertrophie-Mechanismen</a></li>
+            </ul>
+          </div>
+        </details>
+      </article>
+        <article class="tile">
+          <h2>Videos</h2>
+          <p>Aus dem Gym.</p>
+        </article>
+<article class="tile video-block">
+        <div class="video-block__media" data-youtube-id="l6IP5qdZ4sk">
+          <video
+            controls
+            playsinline
+            preload="none"
+            poster="/assets/gogogo/gogogo-upperbody-Video-Poster.png"
+            aria-label="Upper Body Basics abspielen"
+          ></video>
+        </div>
+        <h3 class="fact__title">Upper Body Basics</h3>
+        <p class="fact__body">An einem Feierabend für interne Verwendung aufgenommen und auf englisch mit einem cringe Sound vertont. Bis es professionelles Material gibt - hier eine kleine Kostprobe des eigenen Oberkörpertrainings im Juli 2025 mit leichten Gewichten.<br /><br /><strong>Basics für fortgeschrittenes Krafttraining</strong>, das ich grundsätzlich empfehle: Klimmzüge, Pendlay Row, Bench Press, Military Press, Reverse Fly, Core-Rotation mit der Langhantel.<br /><br /><strong>Wenn Du noch kein Krafttraining in Deinen Alltag integriert hast</strong> oder lange Pause gemacht hast: es gibt für jede dieser Übungen auch equivalente Vereinfachung. Oder wenn Du einfach nur mit <strong>Körpergewicht</strong> trainieren willst, können wir Dir auch Übungen dafür zeigen. Krafttraining ist keine Raketentechnik, super easy und ab 2 Stunden in der Woche erledigt. Starte einfach mit Liegestützen auf den Knien, freie Kniebeugen und Klimmzügen mit Füßen auf den Boden. Einen mini Plan zur Steigerung und tägliche Erinnerung für mehr Bewegung bekommst Du von uns wenn Du möchtest.</p>
+      </article>
+<article class="tile video-block">
+        <div class="video-block__media">
+          <video
+            controls
+            playsinline
+            preload="none"
+            poster="/assets/gogogo/gogogo-mobility-Video-Poster.png"
+          ></video>
+        </div>
+        <h3 class="fact__title">Mobility</h3>
+        <p class="fact__body">Teil 1 des Bewegtbildmaterials vom Juli 2025 für interne Zwecke. Weil es eines meiner Steckenpferde ist, stell ich es online, bis es professionelles Material gibt.<br /><br />Mobilität bedeutet nicht einfach Beweglichkeit sondern den eigenen Körper plus mehr Gewicht über den weitest möglichen Bewegungsradius bewegen zu können. Das kannst Du mit einer dreiminütigen Routine vorm Training aber auch an anderen Tagen verbessern. Was aber auch zur Wahrheit gehört: Beweglichkeit Deines Körpers steigerst Du mit einem abwechslungsreichen Alltag und Training.<br /><br />Wir bauen an Deiner individuellen Wochenstruktur - passend und nehmen Dir die Überforderung durch Information-Overkill.</p>
+      </article>
+      </div>
+
+      <div class="panel" id="panel-community" data-panel="community">
+        <article class="tile">
+          <h2>Community</h2>
+          <p>Match mit Trainingsbuddys und lade Deine Freunde ein. Real Life Events to be announced.</p>
+          <button class="btn" type="button" data-goto="chat">Zum Chat</button>
         </article>
       </div>
 
       <div class="panel" id="panel-chat" data-panel="chat">
         <article class="tile">
           <h2>Chat</h2>
-          <div class="chat" id="chat-log">
-            <div class="chat__bubble">Joscha: Willkommen in der Buddy-Challenge. Schreib hier an Buddys &amp; Coach.</div>
-          </div>
-          <div class="chat__row">
-            <input id="chat-input" type="text" placeholder="Nachricht …" autocomplete="off" />
-            <button type="button" id="chat-send">Senden</button>
-          </div>
+          <p>Schreib Joscha und den Buddys direkt auf WhatsApp.</p>
+          <a class="btn" id="wa-chat" href="https://wa.me/491747015500" target="_blank" rel="noopener">WhatsApp öffnen</a>
         </article>
       </div>
 
-      <div class="panel" id="panel-zirkel" data-panel="zirkel">
-        <article class="tile">
-          <h2>Zirkeltraining</h2>
-          <p>Mobile Stationen &amp; Werte — ohne Desktop-Drumherum.</p>
-          <a class="btn" href="/cycle-table-mobile.html" target="_blank" rel="noopener">Stationen öffnen</a>
-          <a class="btn btn--ghost" href="/account/fitness-friday.html">FitnessFriday App</a>
-        </article>
-        <iframe class="zirkel-frame" title="Zirkeltraining mobil" src="/cycle-table-mobile.html" loading="lazy"></iframe>
-      </div>
-
-      <div class="panel" id="panel-factfulness" data-panel="factfulness">
-        <article class="tile">
-          <h2>Factfulness</h2>
-          <p>Basics zu Bewegung — im gogogo Layout.</p>
-        </article>
-        <article class="tile fact"><h2>Du bist ein Hybridathlet</h2><p>Dein Körper ist für Kraft, Herz-Lunge und Skills gebaut. Spezialisierung ist die Ausnahme.</p></article>
-        <article class="tile fact"><h2>Im Rhythmus der Woche</h2><p>1× lang locker, 1× intensiv kurz, 2× Kraft. Der Rest: Spaziergänge, Mobility, Schlaf.</p></article>
-        <article class="tile fact"><h2>Tägliche Bewegung</h2><p>10–20 Minuten am Tag halten die Baseline — körperlich und mental.</p></article>
-        <article class="tile fact"><h2>Big Six Plus</h2><p>Kniebeuge, Klimmzug, Kreuzheben, Drücken, Ziehen, Schulterdrücken — plus einbeinig, Rotation, Plyo.</p></article>
-        <article class="tile fact"><h2>Kniebeuge</h2><p>Trainiert die ganze Kette. Start: Spanish Squats.</p></article>
-        <article class="tile fact"><h2>Klimmzugstange</h2><p>Schon passives Hängen hilft. Griffkraft ist ein starker Longevity-Marker.</p></article>
-        <article class="tile fact"><h2>Nahrung &amp; Erholung</h2><p>Prinzipien statt Dogma: Protein, Abstand, Schlaf.</p></article>
-        <article class="tile fact"><h2>Nervensystem &amp; Organismus</h2><p>Variation statt Dauerreiz. Der Stoffwechsel ist ein Regelkreis.</p></article>
-        <article class="tile fact"><h2>Dein Alter ist egal</h2><p>Der Grundumsatz bleibt lange stabil — Bewegung und Muskelmasse entscheiden.</p></article>
-        <article class="tile fact"><h2>Cortisol, Insulin, Fett</h2><p>Schlaf, Stress und Zucker steuern Speichern oft stärker als Kalorienzählen.</p></article>
-        <article class="tile fact"><h2>Frauen trainieren (nicht) anders</h2><p>Dieselben Grundübungen. Bulky ist unwahrscheinlich. Zyklus kann Timing feinjustieren.</p></article>
-        <article class="tile fact"><h2>Muskelmasse regelt mehr</h2><p>Mehr Muskel → höherer Umsatz, bessere Insulinlage.</p></article>
-      </div>
-
-      <div class="panel" id="panel-videos" data-panel="videos">
-        <article class="tile">
-          <h2>Videos</h2>
-          <p>Aus dem Gym — im Account-Layout.</p>
-        </article>
-        <article class="tile">
-          <h2>Upper Body Basics</h2>
-          <div class="video-media" id="yt-upper" data-youtube-id="l6IP5qdZ4sk">
-            <img src="/assets/gogogo/gogogo-upperbody-Video-Poster.png" alt="" width="1600" height="900" loading="lazy" />
-          </div>
-          <p>Klimmzüge, Pendlay Row, Bench, Military Press, Reverse Fly, Core-Rotation.</p>
-          <button class="btn" type="button" id="play-upper">Video abspielen</button>
-        </article>
-        <article class="tile">
-          <h2>Mobility</h2>
-          <div class="video-media">
-            <img src="/assets/gogogo/factfulness-1600.webp" alt="" width="1600" height="900" loading="lazy" />
-          </div>
-          <p>Mobility-Clip folgt.</p>
-        </article>
+      <div class="panel" id="panel-training" data-panel="training">
+        <iframe class="training-frame" id="training-frame" title="Friday Circle" src="about:blank" loading="lazy"></iframe>
       </div>
 
       <footer class="foot">
@@ -421,9 +575,14 @@
 
   <script>
     (function () {
+      document.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
+      document.addEventListener("gesturechange", function (e) { e.preventDefault(); }, { passive: false });
+      document.addEventListener("gestureend", function (e) { e.preventDefault(); }, { passive: false });
+
       var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
       var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
       var ACCOUNT_KEY = "gogogo_go_account";
+      var WHATSAPP_NUMBER = "+491747015500";
 
       var account = null;
       try { account = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch (e) {}
@@ -448,22 +607,16 @@
       function showApp() {
         document.getElementById("app").hidden = false;
         document.getElementById("hello").textContent = "Hallo, " + account.name + ".";
-        document.getElementById("home-meta").textContent =
-          (account.invite_code ? "Code " + account.invite_code + " · " : "") +
-          (account.serial_number ? "Seriennr. " + account.serial_number : "Buddy-Challenge");
         if (account.photo_url) applyPhoto(account.photo_url);
+        var wa = document.getElementById("wa-chat");
+        var n = String(WHATSAPP_NUMBER).replace(/\D/g, "");
+        wa.href = "https://wa.me/" + n + "?text=" + encodeURIComponent("Hi Joscha, ich bin " + account.name + ".");
       }
       showApp();
-      if (typeof renderGoQr === "function") {
-        renderGoQr(document.getElementById("qr-mount"), window.GOGOGO_LANDING || "https://www.gogogo.social/go");
-      }
 
       async function restGet(path) {
         var res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: "Bearer " + SUPABASE_KEY
-          }
+          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
         });
         if (!res.ok) return null;
         try { return await res.json(); } catch (e) { return null; }
@@ -488,9 +641,7 @@
         account.photo_url = url;
         saveAccount();
         applyPhoto(url);
-        try {
-          await patchAccount({ photo_url: url, updated_at: new Date().toISOString() });
-        } catch (e) {}
+        try { await patchAccount({ photo_url: url, updated_at: new Date().toISOString() }); } catch (e) {}
       }
 
       async function uploadAvatarBlob(blob) {
@@ -558,17 +709,11 @@
         var remote = candidates[0];
         var i;
         for (i = 0; i < candidates.length; i++) {
-          if (account.id && candidates[i].id === account.id) {
-            remote = candidates[i];
-            break;
-          }
+          if (account.id && candidates[i].id === account.id) { remote = candidates[i]; break; }
         }
         if (!remote.photo_url) {
           for (i = 0; i < candidates.length; i++) {
-            if (candidates[i].photo_url) {
-              remote = candidates[i];
-              break;
-            }
+            if (candidates[i].photo_url) { remote = candidates[i]; break; }
           }
         }
         account.id = remote.id || account.id;
@@ -576,12 +721,9 @@
         if (remote.invite_code) account.invite_code = remote.invite_code;
         var localPhoto = account.photo_url;
         var remotePhoto = remote.photo_url;
-        if (remotePhoto) {
-          account.photo_url = remotePhoto;
-        }
+        if (remotePhoto) account.photo_url = remotePhoto;
         saveAccount();
         showApp();
-
         if (localPhoto && String(localPhoto).indexOf("data:image") === 0 && !remotePhoto) {
           try {
             try {
@@ -616,42 +758,38 @@
       }
       drawCycle(document.getElementById("cycle"));
 
-      /* Menu */
-      var menuBtn = document.getElementById("btn-menu");
-      var menuPanel = document.getElementById("menu-panel");
-      function setMenu(open) {
-        menuBtn.classList.toggle("is-open", open);
-        menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
-        menuPanel.classList.toggle("is-open", open);
-        menuPanel.hidden = !open;
-        document.body.classList.toggle("menu-open", open);
-      }
-      menuBtn.addEventListener("click", function () {
-        setMenu(!menuPanel.classList.contains("is-open"));
-      });
-      menuPanel.addEventListener("click", function (e) {
-        if (e.target === menuPanel) setMenu(false);
-      });
+      var homeHero = document.getElementById("home-hero");
+      var trainingFrame = document.getElementById("training-frame");
+      var trainingLoaded = false;
 
       function gotoPanel(id) {
         document.querySelectorAll(".panel").forEach(function (p) {
           p.classList.toggle("is-active", p.getAttribute("data-panel") === id);
         });
-        setMenu(false);
+        document.querySelectorAll(".nav-btn").forEach(function (btn) {
+          var on = btn.getAttribute("data-goto") === id;
+          btn.classList.toggle("is-active", on);
+          if (on) btn.setAttribute("aria-current", "page");
+          else btn.removeAttribute("aria-current");
+        });
+        homeHero.hidden = id !== "home";
+        if (id === "training" && !trainingLoaded) {
+          trainingFrame.src = "/account/fitness-friday.html?embed=1";
+          trainingLoaded = true;
+        }
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
+
       document.querySelectorAll("[data-goto]").forEach(function (el) {
         el.addEventListener("click", function () {
           gotoPanel(el.getAttribute("data-goto"));
         });
       });
 
-      document.getElementById("btn-new-account").addEventListener("click", function () {
-        try { localStorage.removeItem(ACCOUNT_KEY); } catch (e) {}
-        window.location.href = "/go/";
+      document.getElementById("btn-adapt-plan").addEventListener("click", function () {
+        alert("Trainingsplan an Woche anpassen folgt im nächsten Schritt.");
       });
 
-      /* Week calendar */
       (function buildWeek() {
         var names = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
         var now = new Date();
@@ -670,27 +808,6 @@
           root.appendChild(el);
         }
       })();
-
-      /* Chat local stub */
-      var chatLog = document.getElementById("chat-log");
-      document.getElementById("chat-send").addEventListener("click", function () {
-        var input = document.getElementById("chat-input");
-        var t = input.value.trim();
-        if (!t) return;
-        var b = document.createElement("div");
-        b.className = "chat__bubble chat__bubble--me";
-        b.textContent = account.name + ": " + t;
-        chatLog.appendChild(b);
-        input.value = "";
-        chatLog.scrollTop = chatLog.scrollHeight;
-      });
-
-      /* Videos */
-      document.getElementById("play-upper").addEventListener("click", function () {
-        var box = document.getElementById("yt-upper");
-        var id = box.getAttribute("data-youtube-id");
-        box.innerHTML = '<iframe src="https://www.youtube.com/embed/' + id + '?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen title="Upper Body Basics"></iframe>';
-      });
 
       /* Photo crop + dither + upload */
       var modal = document.getElementById("photo-modal");
