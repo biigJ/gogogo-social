@@ -1,6 +1,6 @@
 (function (global) {
   var LANDING = "https://www.gogogo.social/go";
-  var DARK = "#0A0A0A";
+  var DARK = "#F7F5F0";
   var PAGE = "#C7413B";
 
   function renderGoQr(mount, url) {
