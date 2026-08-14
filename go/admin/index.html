@@ -213,6 +213,12 @@
     .list {
       display: flex; flex-direction: column; gap: 10px;
     }
+    .list-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: stretch;
+    }
     .list-item {
       width: 100%; text-align: left;
       background: var(--paper); color: var(--ink);
@@ -224,11 +230,32 @@
     .list-item span {
       display: block; margin-top: 4px; font-size: 0.85rem; font-weight: 500; opacity: 0.8;
     }
+    .list-row.is-paused .list-item { opacity: 0.55; }
+    .list-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 88px;
+    }
+    .list-action {
+      flex: 1;
+      min-height: 36px;
+      background: var(--paper);
+      color: var(--btn-ink);
+      font-weight: 700;
+      font-size: 0.72rem;
+      letter-spacing: -0.02em;
+      border-radius: var(--radius);
+      padding: 0 8px;
+    }
+    .list-action:hover { opacity: 0.92; }
+    .list-action:disabled { opacity: 0.45; cursor: wait; }
+    .list-action.is-on {
+      background: var(--ink);
+      color: var(--paper);
+    }
     .empty {
       text-align: center; font-weight: 500; opacity: 0.9;
-    }
-    .logout {
-      display: none;
     }
     .visually-hidden {
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -437,6 +464,151 @@
         updateAuthBtn();
       }
 
+      function apiHeaders(extra) {
+        var h = {
+          apikey: SUPABASE_KEY,
+          Authorization: "Bearer " + SUPABASE_KEY
+        };
+        Object.keys(extra || {}).forEach(function (k) { h[k] = extra[k]; });
+        return h;
+      }
+
+      function actionError(text) {
+        if (/42703|paused does not exist|PGRST202|function.*(pause_go_invite|delete_go_invite)/i.test(text || "")) {
+          return "In Supabase SQL Editor go-invite-admin.sql ausführen.";
+        }
+        return text || "Aktion fehlgeschlagen.";
+      }
+
+      async function callRpc(name, args) {
+        return fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
+          method: "POST",
+          headers: apiHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(args)
+        });
+      }
+
+      async function pauseInvite(id, paused) {
+        var res = await callRpc("pause_go_invite", { p_id: id, p_paused: paused });
+        if (res.status === 404) {
+          res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_invite_codes?id=eq." + encodeURIComponent(id),
+            {
+              method: "PATCH",
+              headers: apiHeaders({
+                "Content-Type": "application/json",
+                Prefer: "return=minimal"
+              }),
+              body: JSON.stringify({ paused: paused })
+            }
+          );
+        }
+        if (!res.ok) {
+          var t = "";
+          try { t = await res.text(); } catch (e) {}
+          throw new Error(actionError(t));
+        }
+      }
+
+      async function deleteInvite(id) {
+        var res = await callRpc("delete_go_invite", { p_id: id });
+        if (res.status === 404) {
+          res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_invite_codes?id=eq." + encodeURIComponent(id),
+            { method: "DELETE", headers: apiHeaders() }
+          );
+        }
+        if (!res.ok) {
+          var t = "";
+          try { t = await res.text(); } catch (e) {}
+          throw new Error(actionError(t));
+        }
+      }
+
+      function renderListRow(list, row) {
+        var wrap = document.createElement("div");
+        wrap.className = "list-row" + (row.paused ? " is-paused" : "");
+
+        var openBtn = document.createElement("button");
+        openBtn.type = "button";
+        openBtn.className = "list-item";
+        var title = document.createElement("strong");
+        title.textContent = row.first_name || "";
+        var meta = document.createElement("span");
+        meta.textContent = (row.serial_number || "") + " · " + (row.code || "") +
+          (row.paused ? " · pausiert" : "");
+        openBtn.appendChild(title);
+        openBtn.appendChild(meta);
+        openBtn.addEventListener("click", function () {
+          var url = GO_BASE + "?c=" + encodeURIComponent(row.code);
+          showResult(row.first_name, row.serial_number, row.code, url);
+        });
+
+        var actions = document.createElement("div");
+        actions.className = "list-actions";
+
+        var pauseBtn = document.createElement("button");
+        pauseBtn.type = "button";
+        pauseBtn.className = "list-action" + (row.paused ? " is-on" : "");
+        pauseBtn.textContent = row.paused ? "Weiter" : "Pause";
+        pauseBtn.setAttribute("aria-pressed", row.paused ? "true" : "false");
+
+        var delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "list-action";
+        delBtn.textContent = "Löschen";
+
+        function setBusy(on) {
+          pauseBtn.disabled = on;
+          delBtn.disabled = on;
+        }
+
+        pauseBtn.addEventListener("click", async function (e) {
+          e.stopPropagation();
+          setBusy(true);
+          try {
+            await pauseInvite(row.id, !row.paused);
+            row.paused = !row.paused;
+            wrap.classList.toggle("is-paused", row.paused);
+            pauseBtn.classList.toggle("is-on", row.paused);
+            pauseBtn.textContent = row.paused ? "Weiter" : "Pause";
+            pauseBtn.setAttribute("aria-pressed", row.paused ? "true" : "false");
+            meta.textContent = (row.serial_number || "") + " · " + (row.code || "") +
+              (row.paused ? " · pausiert" : "");
+            document.getElementById("list-msg").textContent = "";
+            document.getElementById("list-msg").classList.remove("is-error");
+          } catch (err) {
+            document.getElementById("list-msg").textContent = err && err.message ? err.message : "Pause fehlgeschlagen.";
+            document.getElementById("list-msg").classList.add("is-error");
+          }
+          setBusy(false);
+        });
+
+        delBtn.addEventListener("click", async function (e) {
+          e.stopPropagation();
+          if (!window.confirm("Eintrag für " + (row.first_name || "diesen Code") + " löschen?")) return;
+          setBusy(true);
+          try {
+            await deleteInvite(row.id);
+            if (lastQr && lastQr.code === row.code) lastQr = null;
+            wrap.remove();
+            var remaining = list.querySelectorAll(".list-row").length;
+            document.getElementById("list-msg").classList.remove("is-error");
+            document.getElementById("list-msg").textContent = remaining ? "" : "Noch keine Codes.";
+          } catch (err) {
+            document.getElementById("list-msg").textContent = err && err.message ? err.message : "Löschen fehlgeschlagen.";
+            document.getElementById("list-msg").classList.add("is-error");
+            setBusy(false);
+          }
+        });
+
+        actions.appendChild(pauseBtn);
+        actions.appendChild(delBtn);
+        wrap.appendChild(openBtn);
+        wrap.appendChild(actions);
+        list.appendChild(wrap);
+      }
+
       async function showList() {
         hideAllPanels();
         panelList.hidden = false;
@@ -449,28 +621,12 @@
         try {
           var res = await fetch(
             SUPABASE_URL + "/rest/v1/go_invite_codes?select=*&order=created_at.desc",
-            {
-              headers: {
-                apikey: SUPABASE_KEY,
-                Authorization: "Bearer " + SUPABASE_KEY
-              }
-            }
+            { headers: apiHeaders() }
           );
           if (!res.ok) throw new Error("HTTP " + res.status);
           var rows = await res.json();
           listMsg.textContent = rows.length ? "" : "Noch keine Codes.";
-          rows.forEach(function (row) {
-            var btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "list-item";
-            btn.innerHTML = "<strong>" + (row.first_name || "") + "</strong><span>" +
-              (row.serial_number || "") + " · " + (row.code || "") + "</span>";
-            btn.addEventListener("click", function () {
-              var url = GO_BASE + "?c=" + encodeURIComponent(row.code);
-              showResult(row.first_name, row.serial_number, row.code, url);
-            });
-            list.appendChild(btn);
-          });
+          rows.forEach(function (row) { renderListRow(list, row); });
         } catch (err) {
           listMsg.textContent = "Liste nicht geladen.";
           listMsg.classList.add("is-error");
@@ -485,17 +641,18 @@
         }
         try {
           var res = await fetch(
-            SUPABASE_URL + "/rest/v1/go_invite_codes?select=*&order=created_at.desc&limit=1",
-            {
-              headers: {
-                apikey: SUPABASE_KEY,
-                Authorization: "Bearer " + SUPABASE_KEY
-              }
-            }
+            SUPABASE_URL + "/rest/v1/go_invite_codes?select=*&order=created_at.desc&limit=20",
+            { headers: apiHeaders() }
           );
           var rows = res.ok ? await res.json() : [];
-          if (rows && rows[0]) {
-            var row = rows[0];
+          var row = null;
+          if (rows && rows.length) {
+            for (var i = 0; i < rows.length; i++) {
+              if (!rows[i].paused) { row = rows[i]; break; }
+            }
+            if (!row) row = rows[0];
+          }
+          if (row) {
             showResult(row.first_name, row.serial_number, row.code, GO_BASE + "?c=" + encodeURIComponent(row.code));
             return;
           }
