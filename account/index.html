@@ -10,6 +10,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <script src="/assets/go-dither.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="/assets/go-qr.js"></script>
   <style>
     :root {
       --red: #C7413B;
@@ -182,6 +184,24 @@
     .panel { display: none; margin-top: 8px; }
     .panel.is-active { display: block; }
     .panel .tile { margin-bottom: 14px; }
+    .qr-box {
+      padding: 0 0 20px;
+      background: transparent;
+      text-align: center;
+      color: var(--ink-on-red);
+    }
+    .qr-box #qr-mount {
+      width: 220px; height: 220px; margin: 0 auto 14px;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent;
+    }
+    .qr-box #qr-mount img,
+    .qr-box #qr-mount canvas,
+    .qr-box #qr-mount table {
+      display: block; width: 220px; height: 220px;
+      background: transparent !important;
+    }
+    .qr-box a { color: var(--ink-on-red); word-break: break-all; font-size: 0.85rem; font-weight: 600; }
     .fact details { margin-top: 10px; }
     .fact summary {
       cursor: pointer; list-style: none; font-size: 0.75rem; font-weight: 700;
@@ -282,6 +302,10 @@
       </section>
 
       <div class="panel is-active" id="panel-home" data-panel="home">
+        <div class="qr-box">
+          <div id="qr-mount" aria-hidden="true"></div>
+          <a id="qr-link" href="https://www.gogogo.social/go" target="_blank" rel="noopener">https://www.gogogo.social/go</a>
+        </div>
         <article class="tile">
           <h2>Dein Account</h2>
           <p id="home-meta">Buddy-Challenge · Foto oben hinzufügen.</p>
@@ -430,6 +454,9 @@
         if (account.photo_url) applyPhoto(account.photo_url);
       }
       showApp();
+      if (typeof renderGoQr === "function") {
+        renderGoQr(document.getElementById("qr-mount"), window.GOGOGO_LANDING || "https://www.gogogo.social/go");
+      }
 
       async function restGet(path) {
         var res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
