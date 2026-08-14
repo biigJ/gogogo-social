@@ -216,6 +216,65 @@
       justify-content: center;
     }
     .video-block__fs svg { width: 18px; height: 18px; display: block; }
+    .video-block__transport {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 3;
+      padding: 28px 14px 14px;
+      background: linear-gradient(180deg, transparent, rgba(10, 10, 10, 0.72) 45%);
+      box-sizing: border-box;
+    }
+    .video-block__seek {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 28px;
+      margin: 0;
+      background: transparent;
+      cursor: pointer;
+    }
+    .video-block__seek:focus { outline: none; }
+    .video-block__seek::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(247, 245, 240, 0.35);
+    }
+    .video-block__seek::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      margin-top: -6px;
+      border-radius: 50%;
+      background: #F7F5F0;
+      border: 0;
+      box-shadow: 0 0 0 2px rgba(199, 65, 59, 0.9);
+    }
+    .video-block__seek::-moz-range-track {
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(247, 245, 240, 0.35);
+    }
+    .video-block__seek::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #F7F5F0;
+      border: 0;
+      box-shadow: 0 0 0 2px rgba(199, 65, 59, 0.9);
+    }
+    .video-block__time {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 2px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: rgba(247, 245, 240, 0.85);
+      font-variant-numeric: tabular-nums;
+    }
     .video-block__media.is-fs,
     .video-block__media:fullscreen,
     .video-block__media:-webkit-full-screen {
@@ -1057,6 +1116,9 @@
 
       document.querySelectorAll(".video-block__media[data-youtube-id]").forEach(function (wrap) {
         var loaded = false;
+        var player = null;
+        var scrubbing = false;
+        var tickTimer = null;
 
         function requestFs(el) {
           if (el.requestFullscreen) return el.requestFullscreen();
@@ -1095,23 +1157,48 @@
           }
         }
 
+        function formatTime(sec) {
+          sec = Math.max(0, Math.floor(sec || 0));
+          var m = Math.floor(sec / 60);
+          var s = sec % 60;
+          return m + ":" + (s < 10 ? "0" : "") + s;
+        }
+
+        function loadYtApi() {
+          if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+          return new Promise(function (resolve) {
+            var prev = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = function () {
+              if (typeof prev === "function") prev();
+              resolve(window.YT);
+            };
+            if (!document.getElementById("yt-iframe-api")) {
+              var s = document.createElement("script");
+              s.id = "yt-iframe-api";
+              s.src = "https://www.youtube.com/iframe_api";
+              document.head.appendChild(s);
+            }
+          });
+        }
+
         function loadYoutube() {
           if (loaded) return;
           loaded = true;
           var id = wrap.getAttribute("data-youtube-id");
           var shell = document.createElement("div");
           shell.className = "video-block__yt";
-          var iframe = document.createElement("iframe");
-          iframe.title = "Upper Body Basics";
-          iframe.src =
-            "https://www.youtube-nocookie.com/embed/" +
-            encodeURIComponent(id) +
-            "?autoplay=1&rel=0&playsinline=1&modestbranding=1&controls=1&fs=0";
-          iframe.setAttribute(
-            "allow",
-            "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          );
-          shell.appendChild(iframe);
+          var mount = document.createElement("div");
+          mount.id = "yt-" + id + "-" + Math.random().toString(36).slice(2, 8);
+          shell.appendChild(mount);
+
+          var transport = document.createElement("div");
+          transport.className = "video-block__transport";
+          transport.innerHTML =
+            '<input class="video-block__seek" type="range" min="0" max="1000" value="0" step="1" aria-label="Vorspulen" />' +
+            '<div class="video-block__time"><span data-cur>0:00</span><span data-dur>0:00</span></div>';
+          var seek = transport.querySelector(".video-block__seek");
+          var curEl = transport.querySelector("[data-cur]");
+          var durEl = transport.querySelector("[data-dur]");
 
           var fsBtn = document.createElement("button");
           fsBtn.type = "button";
@@ -1127,9 +1214,73 @@
 
           wrap.innerHTML = "";
           wrap.appendChild(shell);
+          wrap.appendChild(transport);
           wrap.appendChild(fsBtn);
           wrap.style.cursor = "default";
           wrap.removeEventListener("click", loadYoutube);
+
+          function syncTime() {
+            if (!player || typeof player.getCurrentTime !== "function") return;
+            var dur = player.getDuration() || 0;
+            var cur = player.getCurrentTime() || 0;
+            durEl.textContent = formatTime(dur);
+            curEl.textContent = formatTime(cur);
+            if (!scrubbing && dur > 0) seek.value = String(Math.round((cur / dur) * 1000));
+          }
+
+          function startTick() {
+            if (tickTimer) clearInterval(tickTimer);
+            tickTimer = setInterval(syncTime, 250);
+          }
+
+          seek.addEventListener("pointerdown", function () { scrubbing = true; });
+          seek.addEventListener("pointerup", function () { scrubbing = false; syncTime(); });
+          seek.addEventListener("pointercancel", function () { scrubbing = false; });
+          seek.addEventListener("change", function () {
+            if (!player || typeof player.seekTo !== "function") return;
+            var dur = player.getDuration() || 0;
+            if (dur <= 0) return;
+            player.seekTo((Number(seek.value) / 1000) * dur, true);
+            scrubbing = false;
+          });
+          seek.addEventListener("input", function () {
+            var dur = player && player.getDuration ? player.getDuration() : 0;
+            if (dur > 0) curEl.textContent = formatTime((Number(seek.value) / 1000) * dur);
+          });
+
+          loadYtApi().then(function (YT) {
+            player = new YT.Player(mount.id, {
+              videoId: id,
+              width: "100%",
+              height: "100%",
+              playerVars: {
+                autoplay: 1,
+                rel: 0,
+                playsinline: 1,
+                modestbranding: 1,
+                controls: 0,
+                fs: 0,
+                iv_load_policy: 3,
+                origin: window.location.origin
+              },
+              events: {
+                onReady: function (e) {
+                  player = e.target;
+                  try { player.playVideo(); } catch (err) {}
+                  syncTime();
+                  startTick();
+                },
+                onStateChange: function () { syncTime(); }
+              }
+            });
+          });
+
+          shell.addEventListener("click", function () {
+            if (!player || typeof player.getPlayerState !== "function") return;
+            var state = player.getPlayerState();
+            if (state === 1) player.pauseVideo();
+            else player.playVideo();
+          });
         }
 
         wrap.addEventListener("click", loadYoutube);
