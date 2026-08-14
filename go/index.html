@@ -151,7 +151,7 @@
       font-weight: 500;
       letter-spacing: -0.02em;
       line-height: 1.35;
-      margin: 14px 0 18px;
+      margin: 10px 0;
       color: var(--ink-on-red);
     }
 
@@ -164,6 +164,26 @@
     }
 
     .check a { text-decoration: underline; }
+
+    .check input:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .notice {
+      margin: 14px 0 8px;
+      padding: 12px 14px;
+      border: 1px solid rgba(247, 245, 240, 0.4);
+      border-radius: var(--radius);
+      font-family: var(--display);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.4;
+      color: var(--ink-on-red);
+    }
+
+    .check + .btn { margin-top: 10px; }
 
     .btn {
       display: inline-flex;
@@ -415,9 +435,27 @@
             required
           />
 
+          <div class="notice" id="legal-notice">
+            <p>
+              <strong>Beta-Version.</strong> /go und der Account sind in der Erprobung.
+              Es gibt noch keine Zwei-Schritte-Verifizierung über Telefonnummer und IP-Adresse.
+              Der Admin kann theoretisch in Accounts gehen und deren Funktionen nutzen.
+            </p>
+            <p>
+              Bitte lies zuerst die
+              <a id="legal-link" href="/datenschutz/#beta" target="_blank" rel="noopener">Datenschutzhinweise</a>
+              vollständig. Danach kannst Du die Kästchen setzen.
+            </p>
+          </div>
+
           <label class="check">
-            <input type="checkbox" id="go-privacy" required />
-            <span>Ich akzeptiere die <a href="/datenschutz/">Datenschutzhinweise</a>.</span>
+            <input type="checkbox" id="go-privacy" required disabled />
+            <span>Ich habe die Datenschutzhinweise gelesen und akzeptiere sie.</span>
+          </label>
+
+          <label class="check">
+            <input type="checkbox" id="go-beta" required disabled />
+            <span>Ich habe den Beta-Hinweis gelesen und akzeptiere, dass der Admin aktuell theoretisch auf Accounts zugreifen kann.</span>
           </label>
 
           <button class="btn" id="go-submit" type="submit" disabled>Los geht's</button>
@@ -498,6 +536,8 @@
       var phoneInput = document.getElementById("go-phone");
       var inviteInput = document.getElementById("go-invite");
       var privacy = document.getElementById("go-privacy");
+      var beta = document.getElementById("go-beta");
+      var legalRead = false;
       var submitBtn = document.getElementById("go-submit");
       var msg = document.getElementById("go-msg");
       var flowMain = document.getElementById("flow-main");
@@ -547,8 +587,7 @@
           sessionStorage.setItem(SESSION_KEY, JSON.stringify({
             name: nameInput.value,
             phone: phoneInput.value,
-            invite: inviteInput.value,
-            privacy: privacy.checked
+            invite: inviteInput.value
           }));
         } catch (e) {}
       }
@@ -561,20 +600,32 @@
           if (d.name) nameInput.value = d.name;
           if (d.phone) phoneInput.value = d.phone;
           if (d.invite && !hasCodeParam) inviteInput.value = d.invite;
-          if (d.privacy) privacy.checked = true;
         } catch (e) {}
       }
+
+      function markLegalRead() {
+        legalRead = true;
+        privacy.disabled = false;
+        beta.disabled = false;
+        updateSubmit();
+      }
+
+      document.querySelectorAll('a[href*="/datenschutz"]').forEach(function (a) {
+        a.addEventListener("click", markLegalRead);
+      });
 
       function updateSubmit() {
         submitBtn.disabled = !(
           nameInput.value.trim() &&
           phoneInput.value.trim() &&
           inviteInput.value.trim() &&
-          privacy.checked
+          legalRead &&
+          privacy.checked &&
+          beta.checked
         );
       }
 
-      [nameInput, phoneInput, inviteInput, privacy].forEach(function (el) {
+      [nameInput, phoneInput, inviteInput, privacy, beta].forEach(function (el) {
         el.addEventListener("input", function () { updateSubmit(); saveDraft(); });
         el.addEventListener("change", function () { updateSubmit(); saveDraft(); });
       });
@@ -663,8 +714,8 @@
         var name = nameInput.value.trim();
         var phone = phoneInput.value.trim();
         var invite = inviteInput.value.trim() || (hasCodeParam ? inviteFromQr : "") || "";
-        if (!name || !phone || !invite || !privacy.checked) {
-          msg.textContent = "Bitte Vorname, Handynummer, Einladungscode und Datenschutz ausfüllen.";
+        if (!name || !phone || !invite || !legalRead || !privacy.checked || !beta.checked) {
+          msg.textContent = "Bitte Vorname, Handynummer, Einladungscode ausfüllen und die Datenschutz- sowie Beta-Hinweise lesen und abhaken.";
           msg.classList.add("is-error");
           return;
         }

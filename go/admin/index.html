@@ -98,7 +98,8 @@
     .menu-panel__nav {
       display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center;
     }
-    .menu-panel__nav button {
+    .menu-panel__nav button,
+    .menu-panel__nav a {
       font-size: clamp(1.05rem, 4vw, 1.3rem);
       font-weight: 700; letter-spacing: -0.02em;
     }
@@ -138,14 +139,21 @@
       margin-bottom: 28px;
       color: var(--ink-on-red);
     }
-    .result-name {
+    .admin-name {
+      display: block;
+      width: 100%;
+      margin: -4px 0 24px;
       font-weight: 700;
       font-size: clamp(1.5rem, 6vw, 2rem);
       letter-spacing: -0.03em;
       line-height: 1.1;
       text-align: center;
-      margin-bottom: 8px;
+      color: var(--ink-on-red);
+      text-decoration: underline;
+      text-underline-offset: 5px;
     }
+    .admin-name[hidden] { display: none; }
+    .admin-name:disabled { opacity: 0.55; cursor: wait; }
     .result-meta {
       text-align: center;
       font-weight: 600;
@@ -290,6 +298,7 @@
         <button type="button" data-view="gen">Generator</button>
         <button type="button" data-view="list">Liste</button>
         <button type="button" data-view="qr">QR anzeigen</button>
+        <a href="/go/">gogogo.social</a>
       </nav>
     </div>
   </div>
@@ -304,6 +313,7 @@
     >
       <svg class="cycle is-spinning" id="cycle" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
     </button>
+    <button class="admin-name" id="admin-name" type="button" hidden></button>
 
     <div class="panel" id="panel-login">
       <h1>gogogo lead code generator</h1>
@@ -367,7 +377,6 @@
     </div>
 
     <div class="panel" id="panel-result" hidden>
-      <p class="result-name" id="result-name"></p>
       <p class="result-meta" id="result-meta"></p>
       <div class="qr-box" id="qr-box">
         <div id="qr-mount" aria-hidden="true"></div>
@@ -383,7 +392,9 @@
       var ADMIN_NAME = "biigJ";
       var ADMIN_CODE = "121276030993";
       var AUTH_KEY = "gogogo_go_admin";
+      var ACCOUNT_KEY = "gogogo_go_account";
       var GO_BASE = "https://www.gogogo.social/go";
+      var adminNameBtn = document.getElementById("admin-name");
 
       function drawCycle(svg) {
         var ns = "http://www.w3.org/2000/svg";
@@ -443,10 +454,107 @@
         cycleBtn.setAttribute("aria-disabled", on ? "false" : "true");
       }
 
+      function setActorName(name) {
+        if (!isAuthed() || !name) {
+          adminNameBtn.hidden = true;
+          adminNameBtn.textContent = "";
+          return;
+        }
+        adminNameBtn.hidden = false;
+        adminNameBtn.textContent = name;
+      }
+
+      function namesMatch(a, b) {
+        return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+      }
+
+      async function enterUserAccount(name, serial, code) {
+        if (!name) return;
+        adminNameBtn.disabled = true;
+        var account = null;
+        try {
+          var accRes = await fetch(
+            SUPABASE_URL + "/rest/v1/go_accounts?name=ilike." + encodeURIComponent(name) +
+            "&select=*&order=created_at.desc&limit=20",
+            { headers: apiHeaders() }
+          );
+          var accounts = accRes.ok ? await accRes.json() : [];
+          var matches = (accounts || []).filter(function (row) {
+            return namesMatch(row.name, name);
+          });
+          if (code) {
+            for (var i = 0; i < matches.length; i++) {
+              if (String(matches[i].invite_code || "") === String(code)) {
+                account = matches[i];
+                break;
+              }
+            }
+          }
+          if (!account) {
+            for (var p = 0; p < matches.length; p++) {
+              if (matches[p].photo_url) { account = matches[p]; break; }
+            }
+          }
+          if (!account && matches.length) account = matches[0];
+        } catch (e) {}
+
+        if (!account) {
+          var invite = { serial_number: serial || null, code: code || null };
+          try {
+            var invRes = await fetch(
+              SUPABASE_URL + "/rest/v1/go_invite_codes?first_name=ilike." + encodeURIComponent(name) +
+              "&select=*&order=created_at.desc&limit=5",
+              { headers: apiHeaders() }
+            );
+            var invites = invRes.ok ? await invRes.json() : [];
+            for (var n = 0; n < (invites || []).length; n++) {
+              if (namesMatch(invites[n].first_name, name)) {
+                invite = invites[n];
+                break;
+              }
+            }
+          } catch (e) {}
+          try {
+            var created = await fetch(SUPABASE_URL + "/rest/v1/go_accounts", {
+              method: "POST",
+              headers: apiHeaders({
+                "Content-Type": "application/json",
+                Prefer: "return=representation"
+              }),
+              body: JSON.stringify({
+                name: name,
+                phone: "admin",
+                invite_code: invite.code || code || null,
+                serial_number: invite.serial_number || serial || null
+              })
+            });
+            if (created.ok) {
+              var rows = await created.json();
+              account = rows && rows[0] ? rows[0] : null;
+            }
+          } catch (e) {}
+        }
+
+        if (!account) {
+          account = {
+            id: "local-" + Date.now(),
+            name: name,
+            phone: "admin",
+            invite_code: code || null,
+            serial_number: serial || null,
+            photo_url: null
+          };
+        }
+
+        try { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account)); } catch (e) {}
+        window.location.href = "/account/";
+      }
+
       function showGen() {
         hideAllPanels();
         panelGen.hidden = false;
         setCycleBack(false);
+        setActorName(ADMIN_NAME);
         fillDefaults();
         updateAuthBtn();
       }
@@ -454,6 +562,7 @@
         hideAllPanels();
         panelLogin.hidden = false;
         setCycleBack(false);
+        setActorName("");
         try { sessionStorage.removeItem(AUTH_KEY); } catch (e) {}
         updateAuthBtn();
       }
@@ -462,15 +571,13 @@
         hideAllPanels();
         lastQr = { name: name, serial: serial, code: code, url: url };
         panelResult.hidden = false;
-        var nameEl = document.getElementById("result-name");
         var metaEl = document.getElementById("result-meta");
-        nameEl.hidden = !name;
-        nameEl.textContent = name || "";
         metaEl.hidden = !(serial || code);
         metaEl.textContent = serial || code ? (serial + " · " + code) : "";
         document.getElementById("qr-link").href = url;
         document.getElementById("qr-link").textContent = url;
         setCycleBack(true);
+        setActorName(name || ADMIN_NAME);
         renderQr(url);
         updateAuthBtn();
       }
@@ -641,6 +748,7 @@
           listMsg.textContent = "Liste nicht geladen.";
           listMsg.classList.add("is-error");
         }
+        setActorName(ADMIN_NAME);
         updateAuthBtn();
       }
 
@@ -676,6 +784,13 @@
       authBtn.addEventListener("click", function () {
         setMenu(false);
         showLogin();
+      });
+      adminNameBtn.addEventListener("click", function () {
+        if (!isAuthed() || adminNameBtn.hidden) return;
+        var name = adminNameBtn.textContent.trim();
+        var serial = lastQr && namesMatch(lastQr.name, name) ? lastQr.serial : "";
+        var code = lastQr && namesMatch(lastQr.name, name) ? lastQr.code : "";
+        enterUserAccount(name, serial, code);
       });
 
       function renderQr(url) {
