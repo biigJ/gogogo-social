@@ -166,8 +166,11 @@
     .fact__bg ul { padding-left: 1.1em; margin-top: 8px; }
     .fact__bg a { color: var(--btn-ink); text-decoration: underline; text-underline-offset: 2px; }
 
-    .video-block__media { width: 100%; aspect-ratio: 16/9; background: #111; margin-bottom: 12px; overflow: hidden; }
+    .video-block__media { width: 100%; aspect-ratio: 16/9; background: #111; margin-bottom: 12px; overflow: hidden; position: relative; cursor: pointer; }
     .video-block__media iframe, .video-block__media video { width: 100%; height: 100%; border: 0; display: block; }
+    .video-block__media video { object-fit: cover; }
+    .video-block__media img { width: 100%; height: 100%; object-fit: cover; }
+    .video-block__media[data-pending] { cursor: default; }
 
     .training-frame {
       width: 100%;
@@ -561,16 +564,18 @@
         <p class="fact__body">An einem Feierabend für interne Verwendung aufgenommen und auf englisch mit einem cringe Sound vertont. Bis es professionelles Material gibt - hier eine kleine Kostprobe des eigenen Oberkörpertrainings im Juli 2025 mit leichten Gewichten.<br /><br /><strong>Basics für fortgeschrittenes Krafttraining</strong>, das ich grundsätzlich empfehle: Klimmzüge, Pendlay Row, Bench Press, Military Press, Reverse Fly, Core-Rotation mit der Langhantel.<br /><br /><strong>Wenn Du noch kein Krafttraining in Deinen Alltag integriert hast</strong> oder lange Pause gemacht hast: es gibt für jede dieser Übungen auch equivalente Vereinfachung. Oder wenn Du einfach nur mit <strong>Körpergewicht</strong> trainieren willst, können wir Dir auch Übungen dafür zeigen. Krafttraining ist keine Raketentechnik, super easy und ab 2 Stunden in der Woche erledigt. Starte einfach mit Liegestützen auf den Knien, freie Kniebeugen und Klimmzügen mit Füßen auf den Boden. Einen mini Plan zur Steigerung und tägliche Erinnerung für mehr Bewegung bekommst Du von uns wenn Du möchtest.</p>
       </article>
 <article class="tile video-block">
-        <div class="video-block__media">
-          <video
-            controls
-            playsinline
-            preload="none"
-            poster="/assets/gogogo/gogogo-mobility-Video-Poster.png"
-          ></video>
+        <div class="video-block__media" data-pending="1">
+          <img
+            src="/assets/gogogo/gogogo-mobility-Video-Poster.png"
+            alt="Mobility"
+            width="1600"
+            height="900"
+            loading="lazy"
+            decoding="async"
+          />
         </div>
         <h3 class="fact__title">Mobility</h3>
-        <p class="fact__body">Teil 1 des Bewegtbildmaterials vom Juli 2025 für interne Zwecke. Weil es eines meiner Steckenpferde ist, stell ich es online, bis es professionelles Material gibt.<br /><br />Mobilität bedeutet nicht einfach Beweglichkeit sondern den eigenen Körper plus mehr Gewicht über den weitest möglichen Bewegungsradius bewegen zu können. Das kannst Du mit einer dreiminütigen Routine vorm Training aber auch an anderen Tagen verbessern. Was aber auch zur Wahrheit gehört: Beweglichkeit Deines Körpers steigerst Du mit einem abwechslungsreichen Alltag und Training.<br /><br />Wir bauen an Deiner individuellen Wochenstruktur - passend und nehmen Dir die Überforderung durch Information-Overkill.</p>
+        <p class="fact__body">Teil 1 des Bewegtbildmaterials vom Juli 2025 für interne Zwecke. Weil es eines meiner Steckenpferde ist, stell ich es online, bis es professionelles Material gibt.<br /><br />Mobilität bedeutet nicht einfach Beweglichkeit sondern den eigenen Körper plus mehr Gewicht über den weitest möglichen Bewegungsradius bewegen zu können. Das kannst Du mit einer dreiminütigen Routine vorm Training aber auch an anderen Tagen verbessern. Was aber auch zur Wahrheit gehört: Beweglichkeit Deines Körpers steigerst Du mit einem abwechslungsreichen Alltag und Training.<br /><br />Wir bauen an Deiner individuellen Wochenstruktur - passend und nehmen Dir die Überforderung durch Information-Overkill.<br /><br /><strong>Video-Clip folgt.</strong></p>
       </article>
         <article class="tile about-card">
           <img
@@ -986,6 +991,36 @@
           photoMsg.textContent = "Fehler: " + (err && err.message ? err.message : err);
         }
         saveBtn.disabled = false;
+      });
+
+      document.querySelectorAll(".video-block__media[data-youtube-id]").forEach(function (wrap) {
+        var loaded = false;
+        function loadYoutube() {
+          if (loaded) return;
+          loaded = true;
+          var id = wrap.getAttribute("data-youtube-id");
+          var iframe = document.createElement("iframe");
+          iframe.title = "Video";
+          iframe.src =
+            "https://www.youtube-nocookie.com/embed/" +
+            encodeURIComponent(id) +
+            "?autoplay=1&rel=0&playsinline=1";
+          iframe.setAttribute(
+            "allow",
+            "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          );
+          iframe.allowFullscreen = true;
+          wrap.innerHTML = "";
+          wrap.appendChild(iframe);
+        }
+        wrap.addEventListener("click", loadYoutube);
+        var vid = wrap.querySelector("video");
+        if (vid) {
+          vid.addEventListener("play", function () {
+            try { vid.pause(); } catch (e) {}
+            loadYoutube();
+          });
+        }
       });
     })();
   </script>
