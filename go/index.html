@@ -407,9 +407,12 @@
             id="go-invite"
             name="invite"
             type="text"
+            inputmode="numeric"
+            maxlength="4"
             autocomplete="off"
             enterkeyhint="done"
             placeholder="Einladung"
+            required
           />
 
           <label class="check">
@@ -563,7 +566,12 @@
       }
 
       function updateSubmit() {
-        submitBtn.disabled = !(nameInput.value.trim() && phoneInput.value.trim() && privacy.checked);
+        submitBtn.disabled = !(
+          nameInput.value.trim() &&
+          phoneInput.value.trim() &&
+          inviteInput.value.trim() &&
+          privacy.checked
+        );
       }
 
       [nameInput, phoneInput, inviteInput, privacy].forEach(function (el) {
@@ -621,61 +629,45 @@
         try { return await res.json(); } catch (e) { return null; }
       }
 
+      function namesMatch(a, b) {
+        return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+      }
+
       async function lookupInvite(code) {
         if (!code) return null;
         var rows = await restGet("go_invite_codes?code=eq." + encodeURIComponent(code) + "&select=*&limit=1");
         return rows && rows[0] ? rows[0] : null;
       }
 
-      async function lookupAccount(name, phone, invite) {
-        var nameLc = (name || "").trim().toLowerCase();
-        function pick(rows) {
-          if (!rows || !rows.length || !nameLc) return null;
-          var matches = [];
-          var i;
-          for (i = 0; i < rows.length; i++) {
-            if (String(rows[i].name || "").trim().toLowerCase() === nameLc) matches.push(rows[i]);
-          }
-          if (!matches.length) return null;
-          for (i = 0; i < matches.length; i++) {
-            if (matches[i].photo_url) return matches[i];
-          }
-          return matches[0];
+      async function lookupAccount(name, invite) {
+        if (!invite || !name) return null;
+        var rows = await restGet(
+          "go_accounts?invite_code=eq." + encodeURIComponent(invite) +
+          "&select=*&order=created_at.asc&limit=50"
+        );
+        if (!rows || !rows.length) return null;
+        var matches = [];
+        var i;
+        for (i = 0; i < rows.length; i++) {
+          if (namesMatch(rows[i].name, name)) matches.push(rows[i]);
         }
-        var found = null;
-        if (invite) {
-          found = pick(await restGet(
-            "go_accounts?invite_code=eq." + encodeURIComponent(invite) +
-            "&select=*&order=created_at.asc&limit=50"
-          ));
+        if (!matches.length) return null;
+        for (i = 0; i < matches.length; i++) {
+          if (matches[i].photo_url) return matches[i];
         }
-        if (!found && phone && nameLc) {
-          found = pick(await restGet(
-            "go_accounts?phone=eq." + encodeURIComponent(phone) +
-            "&select=*&order=created_at.asc&limit=50"
-          ));
-        }
-        return found;
+        return matches[0];
       }
 
       form.addEventListener("submit", async function (e) {
         e.preventDefault();
         var name = nameInput.value.trim();
         var phone = phoneInput.value.trim();
-        if (!name || !phone || !privacy.checked) {
-          msg.textContent = "Bitte Vorname, Handynummer und Datenschutz ausfüllen.";
+        var invite = inviteInput.value.trim() || (hasCodeParam ? inviteFromQr : "") || "";
+        if (!name || !phone || !invite || !privacy.checked) {
+          msg.textContent = "Bitte Vorname, Handynummer, Einladungscode und Datenschutz ausfüllen.";
           msg.classList.add("is-error");
           return;
         }
-
-        var invite = inviteInput.value.trim() || (hasCodeParam ? inviteFromQr : null) || null;
-        var payload = {
-          name: name,
-          phone: phone,
-          choice: "call",
-          invite_code: invite,
-          source: source
-        };
 
         msg.textContent = "";
         msg.classList.remove("is-error");
@@ -687,6 +679,27 @@
           inviteRow = await lookupInvite(invite);
         } catch (err) {}
 
+        if (!inviteRow) {
+          msg.textContent = "Dieser Code ist unbekannt. Account nur mit Einladung aus dem Generator.";
+          msg.classList.add("is-error");
+          submitBtn.disabled = false;
+          return;
+        }
+        if (!namesMatch(inviteRow.first_name, name)) {
+          msg.textContent = "Dieser Code ist einem anderen Namen zugeordnet.";
+          msg.classList.add("is-error");
+          submitBtn.disabled = false;
+          return;
+        }
+
+        var payload = {
+          name: name,
+          phone: phone,
+          choice: "call",
+          invite_code: invite,
+          source: source
+        };
+
         try {
           await restInsert("go_leads", payload, "return=minimal");
         } catch (err) {
@@ -694,11 +707,13 @@
         }
 
         var account = null;
+        var createdNew = false;
         try {
           account = await lookupAccount(name, phone, invite);
         } catch (err) {}
 
         if (!account) {
+          createdNew = true;
           try {
             var rows = await restInsert("go_accounts", {
               name: name,
@@ -718,21 +733,21 @@
             };
           }
         } else {
-          account.name = name;
           account.phone = phone;
           if (inviteRow && inviteRow.serial_number) account.serial_number = inviteRow.serial_number;
         }
 
-        /* Parallel: WhatsApp-Agent-Job — Account wartet nicht darauf */
-        try {
-          await restInsert("go_wa_jobs", {
-            account_id: account && account.id && String(account.id).indexOf("local-") !== 0 ? account.id : null,
-            name: name,
-            phone: phone,
-            invite_code: invite,
-            status: "pending"
-          }, "return=minimal");
-        } catch (err) {}
+        if (createdNew) {
+          try {
+            await restInsert("go_wa_jobs", {
+              account_id: account && account.id && String(account.id).indexOf("local-") !== 0 ? account.id : null,
+              name: name,
+              phone: phone,
+              invite_code: invite,
+              status: "pending"
+            }, "return=minimal");
+          } catch (err) {}
+        }
 
         try {
           localStorage.setItem("gogogo_go_account", JSON.stringify(account));
