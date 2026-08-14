@@ -628,36 +628,34 @@
       }
 
       async function lookupAccount(name, phone, invite) {
-        var rows = null;
-        if (invite) {
-          rows = await restGet(
-            "go_accounts?invite_code=eq." + encodeURIComponent(invite) +
-            "&select=*&order=created_at.asc&limit=20"
-          );
-        }
-        if ((!rows || !rows.length) && phone) {
-          rows = await restGet(
-            "go_accounts?phone=eq." + encodeURIComponent(phone) +
-            "&select=*&order=created_at.asc&limit=20"
-          );
-        }
-        if (!rows || !rows.length) return null;
-        var i;
-        var withPhoto = null;
-        var nameLc = (name || "").toLowerCase();
-        for (i = 0; i < rows.length; i++) {
-          if (rows[i].photo_url && String(rows[i].photo_url).indexOf("http") === 0) {
-            withPhoto = rows[i];
-            break;
-          }
-        }
-        if (withPhoto) return withPhoto;
-        if (nameLc) {
+        var nameLc = (name || "").trim().toLowerCase();
+        function pick(rows) {
+          if (!rows || !rows.length || !nameLc) return null;
+          var matches = [];
+          var i;
           for (i = 0; i < rows.length; i++) {
-            if (String(rows[i].name || "").toLowerCase() === nameLc) return rows[i];
+            if (String(rows[i].name || "").trim().toLowerCase() === nameLc) matches.push(rows[i]);
           }
+          if (!matches.length) return null;
+          for (i = 0; i < matches.length; i++) {
+            if (matches[i].photo_url) return matches[i];
+          }
+          return matches[0];
         }
-        return rows[0];
+        var found = null;
+        if (invite) {
+          found = pick(await restGet(
+            "go_accounts?invite_code=eq." + encodeURIComponent(invite) +
+            "&select=*&order=created_at.asc&limit=50"
+          ));
+        }
+        if (!found && phone && nameLc) {
+          found = pick(await restGet(
+            "go_accounts?phone=eq." + encodeURIComponent(phone) +
+            "&select=*&order=created_at.asc&limit=50"
+          ));
+        }
+        return found;
       }
 
       form.addEventListener("submit", async function (e) {
