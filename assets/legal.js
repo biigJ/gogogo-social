@@ -1,12 +1,10 @@
 (function () {
   var el = document.getElementById("legal-back");
   if (!el) return;
-  el.addEventListener("click", function (e) {
-    try {
-      if (document.referrer && new URL(document.referrer).origin === location.origin) {
-        e.preventDefault();
-        history.back();
-      }
-    } catch (err) {}
-  });
+  var loggedIn = false;
+  try {
+    var account = JSON.parse(localStorage.getItem("gogogo_go_account") || "null");
+    loggedIn = !!(account && account.name);
+  } catch (e) {}
+  el.setAttribute("href", loggedIn ? "/account/" : "/go/");
 })();
