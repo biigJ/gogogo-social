@@ -23,6 +23,10 @@
       --max: 420px;
       --pad: 24px;
       --radius: 2px;
+      --chrome-bg: #ececeb;
+      --chrome-width: min(100% - 32px, 390px);
+      --chrome-radius: 22px;
+      --header-h: 52px;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -34,10 +38,76 @@
     }
     button, input { font: inherit; color: inherit; }
     button { cursor: pointer; border: 0; background: none; }
+    a { color: inherit; text-decoration: none; }
+
+    .site-top {
+      position: absolute; top: 0; left: 0; right: 0; z-index: 50;
+      display: flex; justify-content: center;
+      padding: 14px 16px 0; pointer-events: none;
+    }
+    .site-header {
+      pointer-events: auto;
+      width: var(--chrome-width);
+      display: grid; grid-template-columns: 44px 1fr auto;
+      align-items: center; height: var(--header-h);
+      padding: 0 8px; background: var(--chrome-bg);
+      border-radius: var(--chrome-radius); color: var(--ink);
+    }
+    .site-header__brand { justify-self: center; font-weight: 600; font-size: 0.92rem; }
+    .site-header__left, .site-header__right {
+      display: flex; align-items: center; justify-content: center;
+    }
+    .icon-btn {
+      width: 40px; height: 40px; display: inline-flex;
+      align-items: center; justify-content: center;
+    }
+    .icon-btn__burger {
+      position: relative; width: 18px; height: 12px; display: block;
+    }
+    .icon-btn__burger i,
+    .icon-btn__burger::before,
+    .icon-btn__burger::after {
+      content: ""; position: absolute; left: 0; width: 18px; height: 1.5px;
+      background: var(--ink); border-radius: 1px;
+      transition: transform 200ms ease, opacity 200ms ease, top 200ms ease;
+    }
+    .icon-btn__burger i { top: 5px; display: block; }
+    .icon-btn__burger::before { top: 0; }
+    .icon-btn__burger::after { top: 10px; }
+    .icon-btn.is-open .icon-btn__burger i { opacity: 0; }
+    .icon-btn.is-open .icon-btn__burger::before { top: 5px; transform: rotate(45deg); }
+    .icon-btn.is-open .icon-btn__burger::after { top: 5px; transform: rotate(-45deg); }
+    .auth-btn {
+      padding: 0 10px; height: 40px;
+      font-weight: 700; font-size: 0.78rem; letter-spacing: -0.02em;
+      color: var(--ink);
+    }
+    .menu-panel {
+      position: fixed; inset: 0; z-index: 55; display: none;
+      align-items: flex-start; justify-content: center;
+      padding: calc(14px + var(--header-h) + 10px) 16px 24px;
+      background: rgba(10, 10, 10, 0.18);
+      backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    }
+    .menu-panel.is-open { display: flex; }
+    .menu-panel__sheet {
+      width: var(--chrome-width); background: rgba(246, 246, 244, 0.96);
+      padding: 28px 22px 26px; border-radius: var(--chrome-radius); color: var(--ink);
+    }
+    .menu-panel__nav {
+      display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center;
+    }
+    .menu-panel__nav button {
+      font-size: clamp(1.05rem, 4vw, 1.3rem);
+      font-weight: 700; letter-spacing: -0.02em;
+    }
+    body.menu-open { overflow: hidden; }
+    body.menu-open .site-top { z-index: 70; }
+
     .wrap {
       width: min(100%, var(--max));
       margin: 0 auto;
-      padding: calc(28px + env(safe-area-inset-top)) var(--pad) calc(40px + env(safe-area-inset-bottom));
+      padding: calc(14px + var(--header-h) + 24px + env(safe-area-inset-top)) var(--pad) calc(40px + env(safe-area-inset-bottom));
     }
     .cycle-wrap {
       display: block;
@@ -140,9 +210,25 @@
       display: block; width: 220px; height: 220px;
     }
     .qr-box a { color: var(--btn-ink); word-break: break-all; font-size: 0.85rem; font-weight: 600; }
+    .list {
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .list-item {
+      width: 100%; text-align: left;
+      background: var(--paper); color: var(--ink);
+      border-radius: var(--radius); padding: 14px 16px;
+    }
+    .list-item strong {
+      display: block; font-size: 1.05rem; letter-spacing: -0.03em;
+    }
+    .list-item span {
+      display: block; margin-top: 4px; font-size: 0.85rem; font-weight: 500; opacity: 0.8;
+    }
+    .empty {
+      text-align: center; font-weight: 500; opacity: 0.9;
+    }
     .logout {
-      display: block; margin: 24px auto 0; text-align: center;
-      font-size: 0.8rem; font-weight: 500; text-decoration: underline; color: var(--ink-on-red);
+      display: none;
     }
     .visually-hidden {
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -151,6 +237,30 @@
   </style>
 </head>
 <body>
+  <div class="site-top">
+    <header class="site-header">
+      <div class="site-header__left">
+        <button class="icon-btn" id="btn-menu" type="button" aria-label="Menü" aria-expanded="false">
+          <span class="icon-btn__burger"><i></i></span>
+        </button>
+      </div>
+      <div class="site-header__brand">gogogo</div>
+      <div class="site-header__right">
+        <button class="auth-btn" type="button" id="btn-auth">Login</button>
+      </div>
+    </header>
+  </div>
+
+  <div class="menu-panel" id="menu-panel" hidden>
+    <div class="menu-panel__sheet" role="dialog" aria-label="Menü">
+      <nav class="menu-panel__nav">
+        <button type="button" data-view="gen">Generator</button>
+        <button type="button" data-view="list">Liste</button>
+        <button type="button" data-view="qr">QR anzeigen</button>
+      </nav>
+    </div>
+  </div>
+
   <div class="wrap">
     <button
       class="cycle-wrap"
@@ -215,7 +325,12 @@
         <button class="btn" id="gen-submit" type="submit">generieren</button>
         <p class="msg" id="gen-msg" role="status"></p>
       </form>
-      <button class="logout" type="button" id="logout">Abmelden</button>
+    </div>
+
+    <div class="panel" id="panel-list" hidden>
+      <h1>Liste</h1>
+      <p class="msg" id="list-msg" role="status"></p>
+      <div class="list" id="code-list"></div>
     </div>
 
     <div class="panel" id="panel-result" hidden>
@@ -259,7 +374,35 @@
       var panelLogin = document.getElementById("panel-login");
       var panelGen = document.getElementById("panel-gen");
       var panelResult = document.getElementById("panel-result");
+      var panelList = document.getElementById("panel-list");
       var cycleBtn = document.getElementById("cycle-btn");
+      var authBtn = document.getElementById("btn-auth");
+      var menuBtn = document.getElementById("btn-menu");
+      var menuPanel = document.getElementById("menu-panel");
+      var lastQr = null;
+
+      function isAuthed() {
+        try { return sessionStorage.getItem(AUTH_KEY) === "1"; } catch (e) { return false; }
+      }
+
+      function updateAuthBtn() {
+        authBtn.textContent = isAuthed() ? "Logout" : "Login";
+      }
+
+      function setMenu(open) {
+        menuBtn.classList.toggle("is-open", open);
+        menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        menuPanel.classList.toggle("is-open", open);
+        menuPanel.hidden = !open;
+        document.body.classList.toggle("menu-open", open);
+      }
+
+      function hideAllPanels() {
+        panelLogin.hidden = true;
+        panelGen.hidden = true;
+        panelResult.hidden = true;
+        panelList.hidden = true;
+      }
 
       function setCycleBack(on) {
         cycleBtn.classList.toggle("is-back", on);
@@ -268,22 +411,22 @@
       }
 
       function showGen() {
-        panelLogin.hidden = true;
-        panelResult.hidden = true;
+        hideAllPanels();
         panelGen.hidden = false;
         setCycleBack(false);
         fillDefaults();
+        updateAuthBtn();
       }
       function showLogin() {
-        panelGen.hidden = true;
-        panelResult.hidden = true;
+        hideAllPanels();
         panelLogin.hidden = false;
         setCycleBack(false);
         try { sessionStorage.removeItem(AUTH_KEY); } catch (e) {}
+        updateAuthBtn();
       }
       function showResult(name, serial, code, url) {
-        panelLogin.hidden = true;
-        panelGen.hidden = true;
+        hideAllPanels();
+        lastQr = { name: name, serial: serial, code: code, url: url };
         panelResult.hidden = false;
         document.getElementById("result-name").textContent = name;
         document.getElementById("result-meta").textContent = serial + " · " + code;
@@ -291,7 +434,108 @@
         document.getElementById("qr-link").textContent = url;
         setCycleBack(true);
         renderQr(url);
+        updateAuthBtn();
       }
+
+      async function showList() {
+        hideAllPanels();
+        panelList.hidden = false;
+        setCycleBack(true);
+        var list = document.getElementById("code-list");
+        var listMsg = document.getElementById("list-msg");
+        list.innerHTML = "";
+        listMsg.textContent = "Lade …";
+        listMsg.classList.remove("is-error");
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_invite_codes?select=*&order=created_at.desc",
+            {
+              headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY
+              }
+            }
+          );
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          var rows = await res.json();
+          listMsg.textContent = rows.length ? "" : "Noch keine Codes.";
+          rows.forEach(function (row) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "list-item";
+            btn.innerHTML = "<strong>" + (row.first_name || "") + "</strong><span>" +
+              (row.serial_number || "") + " · " + (row.code || "") + "</span>";
+            btn.addEventListener("click", function () {
+              var url = GO_BASE + "?c=" + encodeURIComponent(row.code);
+              showResult(row.first_name, row.serial_number, row.code, url);
+            });
+            list.appendChild(btn);
+          });
+        } catch (err) {
+          listMsg.textContent = "Liste nicht geladen.";
+          listMsg.classList.add("is-error");
+        }
+        updateAuthBtn();
+      }
+
+      async function showQrMenu() {
+        if (lastQr) {
+          showResult(lastQr.name, lastQr.serial, lastQr.code, lastQr.url);
+          return;
+        }
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_invite_codes?select=*&order=created_at.desc&limit=1",
+            {
+              headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY
+              }
+            }
+          );
+          var rows = res.ok ? await res.json() : [];
+          if (rows && rows[0]) {
+            var row = rows[0];
+            showResult(row.first_name, row.serial_number, row.code, GO_BASE + "?c=" + encodeURIComponent(row.code));
+            return;
+          }
+        } catch (e) {}
+        hideAllPanels();
+        panelList.hidden = false;
+        document.getElementById("list-msg").textContent = "Noch kein QR — zuerst generieren.";
+        document.getElementById("code-list").innerHTML = "";
+        setCycleBack(true);
+      }
+
+      function requireAuth(fn) {
+        if (!isAuthed()) {
+          showLogin();
+          return;
+        }
+        fn();
+      }
+
+      menuBtn.addEventListener("click", function () {
+        setMenu(!menuPanel.classList.contains("is-open"));
+      });
+      menuPanel.addEventListener("click", function (e) {
+        if (e.target === menuPanel) setMenu(false);
+      });
+      document.querySelectorAll("[data-view]").forEach(function (el) {
+        el.addEventListener("click", function () {
+          var view = el.getAttribute("data-view");
+          setMenu(false);
+          requireAuth(function () {
+            if (view === "list") showList();
+            else if (view === "qr") showQrMenu();
+            else showGen();
+          });
+        });
+      });
+      authBtn.addEventListener("click", function () {
+        setMenu(false);
+        showLogin();
+      });
 
       function renderQr(url) {
         var mount = document.getElementById("qr-mount");
@@ -335,8 +579,10 @@
       }
 
       try {
-        if (sessionStorage.getItem(AUTH_KEY) === "1") showGen();
-      } catch (e) {}
+        if (isAuthed()) showGen();
+        else showLogin();
+      } catch (e) { showLogin(); }
+      updateAuthBtn();
 
       document.getElementById("btn-serial").addEventListener("click", fillSerial);
       document.getElementById("btn-code").addEventListener("click", fillCode);
@@ -367,13 +613,12 @@
           try { sessionStorage.setItem(AUTH_KEY, "1"); } catch (err) {}
           msg.textContent = "";
           showGen();
+          updateAuthBtn();
         } else {
           msg.textContent = "Vorname oder Code falsch.";
           msg.classList.add("is-error");
         }
       });
-
-      document.getElementById("logout").addEventListener("click", showLogin);
 
       async function insertCode(payload) {
         var res;
