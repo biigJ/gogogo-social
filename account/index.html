@@ -1995,7 +1995,10 @@
         function markFor(key) {
           var e = entryFor(key);
           if (!e) return "";
-          return e.score == null ? "✕" : "✓";
+          if (e.score == null) return "✕";
+          var n = Number(e.score);
+          if (!(n >= 1 && n <= 10)) n = 5;
+          return String(n);
         }
         function updateScoreFill() {
           var val = parseInt(scoreInput.value, 10);
@@ -2107,7 +2110,10 @@
             markBtn.className = "home-cal__mark";
             if (mark) {
               markBtn.textContent = mark;
-              markBtn.setAttribute("aria-label", mark === "✓" ? "Bewertung bearbeiten" : "Eintrag bearbeiten");
+              markBtn.setAttribute(
+                "aria-label",
+                mark === "✕" ? "Eintrag bearbeiten" : "Bewertung " + mark + " bearbeiten"
+              );
               markBtn.addEventListener("click", function (ev) {
                 ev.stopPropagation();
                 selectDay(key, true);
