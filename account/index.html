@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#C7413B" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="/account/manifest.webmanifest" />
   <title>gogogo · Account</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
@@ -656,6 +659,31 @@
     .about-card p:last-child {
       padding-bottom: 18px;
     }
+
+    /* Soft Portrait-Lock: Browser erlauben oft kein hartes Lock. */
+    .orient-lock {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: var(--red);
+      color: var(--ink-on-red);
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.03em;
+      line-height: 1.25;
+    }
+    @media screen and (orientation: landscape) and (max-height: 520px) {
+      .orient-lock { display: flex; }
+      html, body {
+        overflow: hidden;
+        touch-action: none;
+      }
+    }
     .about-card__title {
       font-weight: 700;
       font-size: clamp(1.2rem, 5vw, 1.5rem);
@@ -687,6 +715,9 @@
   </style>
 </head>
 <body>
+  <div class="orient-lock" id="orient-lock" role="dialog" aria-live="polite" aria-label="Bitte Hochformat">
+    Bitte drehe Dein Handy<br />ins Hochformat.
+  </div>
   <div id="app-gate" class="gate" hidden>
     <p class="hero__hello">Kein Account gefunden.</p>
     <p style="margin-top:12px;font-weight:500">Melde Dich zuerst über die Buddy-Challenge an.</p>
@@ -1103,6 +1134,25 @@
       document.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
       document.addEventListener("gesturechange", function (e) { e.preventDefault(); }, { passive: false });
       document.addEventListener("gestureend", function (e) { e.preventDefault(); }, { passive: false });
+
+      /* Portrait-Lock: nur in PWA/Fullscreen zuverlässig; sonst Soft-Lock per CSS. */
+      function tryLockPortrait() {
+        try {
+          var orient = screen.orientation || screen.mozOrientation || screen.msOrientation;
+          if (orient && typeof orient.lock === "function") {
+            orient.lock("portrait").catch(function () {});
+          } else if (typeof screen.lockOrientation === "function") {
+            screen.lockOrientation("portrait");
+          } else if (typeof screen.mozLockOrientation === "function") {
+            screen.mozLockOrientation("portrait");
+          }
+        } catch (e) {}
+      }
+      tryLockPortrait();
+      window.addEventListener("orientationchange", tryLockPortrait);
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) tryLockPortrait();
+      });
 
       var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
       var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
