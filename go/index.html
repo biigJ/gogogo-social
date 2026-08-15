@@ -485,6 +485,11 @@
             <span>Ich habe den Beta-Hinweis gelesen und akzeptiere, dass der Admin aktuell theoretisch auf Accounts zugreifen kann.</span>
           </label>
 
+          <label class="check">
+            <input type="checkbox" id="go-whatsapp" required />
+            <span>Ich bin einverstanden, dass meine Telefonnummer direkt an WhatsApp weitergeleitet wird und der Admin mich über WhatsApp kontaktieren darf. Ich werde einer WhatsApp-Gruppe hinzugefügt, um täglich zur Bewegung erinnert zu werden.</span>
+          </label>
+
           <button class="btn" id="go-submit" type="submit" disabled>Los geht's</button>
           <p class="form-msg" id="go-msg" role="status" aria-live="polite"></p>
         </form>
@@ -591,6 +596,7 @@
       var inviteInput = document.getElementById("go-invite");
       var privacy = document.getElementById("go-privacy");
       var beta = document.getElementById("go-beta");
+      var whatsappConsent = document.getElementById("go-whatsapp");
       var submitBtn = document.getElementById("go-submit");
       var msg = document.getElementById("go-msg");
       var flowMain = document.getElementById("flow-main");
@@ -670,11 +676,12 @@
           phoneInput.value.trim() &&
           inviteInput.value.trim() &&
           privacy.checked &&
-          beta.checked
+          beta.checked &&
+          whatsappConsent.checked
         );
       }
 
-      [nameInput, phoneInput, inviteInput, privacy, beta].forEach(function (el) {
+      [nameInput, phoneInput, inviteInput, privacy, beta, whatsappConsent].forEach(function (el) {
         el.addEventListener("input", function () { updateSubmit(); saveDraft(); });
         el.addEventListener("change", function () { updateSubmit(); saveDraft(); });
       });
@@ -763,8 +770,8 @@
         var name = nameInput.value.trim();
         var phone = phoneInput.value.trim();
         var invite = inviteInput.value.trim() || (hasCodeParam ? inviteFromQr : "") || "";
-        if (!name || !phone || !invite || !privacy.checked || !beta.checked) {
-          msg.textContent = "Bitte Vorname, Handynummer, Einladungscode ausfüllen und die Datenschutz- sowie Beta-Hinweise abhaken.";
+        if (!name || !phone || !invite || !privacy.checked || !beta.checked || !whatsappConsent.checked) {
+          msg.textContent = "Bitte Vorname, Handynummer, Einladungscode ausfüllen und alle Hinweise abhaken.";
           msg.classList.add("is-error");
           return;
         }
