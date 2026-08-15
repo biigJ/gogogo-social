@@ -115,6 +115,16 @@
       border-radius: var(--chrome-radius);
       color: var(--ink);
       box-shadow: 0 8px 24px rgba(52, 34, 32, 0.18);
+      transform: scale(1);
+      transform-origin: center bottom;
+      transition: transform 180ms ease;
+      will-change: transform;
+    }
+    .site-header.is-compact {
+      transform: scale(0.9);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .site-header { transition: none; }
     }
     .nav-btn {
       height: 44px;
@@ -1582,7 +1592,44 @@
         var scrollEl = document.querySelector(".wrap__scroll");
         if (scrollEl) scrollEl.scrollTop = 0;
         window.scrollTo({ top: 0, behavior: "smooth" });
+        setNavCompact(false);
       }
+
+      (function bindNavScrollShrink() {
+        var nav = document.querySelector(".site-header");
+        if (!nav) return;
+        var lastY = window.scrollY || 0;
+        var compact = false;
+        var ticking = false;
+
+        window.setNavCompact = function (on) {
+          compact = !!on;
+          nav.classList.toggle("is-compact", compact);
+          if (!compact) lastY = window.scrollY || 0;
+        };
+
+        function onScroll() {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(function () {
+            ticking = false;
+            var y = window.scrollY || 0;
+            var dy = y - lastY;
+            if (y <= 8) {
+              if (compact) setNavCompact(false);
+            } else if (dy > 4) {
+              /* runter scrollen → Menü 10 % kleiner */
+              if (!compact) setNavCompact(true);
+            } else if (dy < -4) {
+              /* hoch scrollen → wieder normal */
+              if (compact) setNavCompact(false);
+            }
+            lastY = y;
+          });
+        }
+
+        window.addEventListener("scroll", onScroll, { passive: true });
+      })();
 
       document.querySelectorAll("[data-goto]").forEach(function (el) {
         el.addEventListener("click", function () {
