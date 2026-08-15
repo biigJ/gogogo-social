@@ -497,7 +497,10 @@
     .profile-portrait__plus[hidden] { display: none; }
     .profile-meta {
       display: grid;
-      gap: 6px;
+      grid-template-columns: max-content max-content;
+      column-gap: calc(10px * 0.65);
+      row-gap: calc(6px * 0.65);
+      align-items: baseline;
       color: var(--ink-on-red);
       font-size: 0.85rem;
       font-weight: 500;
@@ -506,15 +509,15 @@
       padding-top: 4px;
     }
     .profile-meta__row {
-      display: flex;
-      align-items: baseline;
-      gap: 10px;
+      display: contents;
     }
     .profile-meta__label { opacity: 0.85; }
     .profile-meta__value {
       font-weight: 700;
       letter-spacing: -0.02em;
       white-space: nowrap;
+      text-align: left;
+      justify-self: start;
     }
     .community-head {
       position: relative;
@@ -1464,8 +1467,8 @@
               <span class="profile-meta__value" id="profile-streak">0 Tage</span>
             </div>
             <div class="profile-meta__row">
-              <span class="profile-meta__label">Punkte · 28 Tage</span>
-              <span class="profile-meta__value" id="profile-points28">0</span>
+              <span class="profile-meta__label">Wert</span>
+              <span class="profile-meta__value" id="profile-wert">0</span>
             </div>
           </div>
         </div>
@@ -2019,19 +2022,27 @@
         return streak;
       }
 
-      function computePointsLast28() {
-        var total = 0;
+      function computeWertLast28() {
+        var sum = 0;
+        var count = 0;
         var today = new Date();
         today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        for (var i = 0; i < CYCLE_RAYS; i++) {
+        var maxDays = Math.min(CYCLE_RAYS, 28);
+        for (var i = 0; i < maxDays; i++) {
           var d = new Date(today);
           d.setDate(today.getDate() - i);
           var entry = dayEntries[formatDateKey(d)];
           if (!entry || entry.score == null) continue;
           var n = Number(entry.score);
-          if (n >= 1 && n <= 10) total += n;
+          if (!(n >= 1 && n <= 10)) continue;
+          sum += n;
+          count += 1;
+          if (count >= 28) break;
         }
-        return total;
+        if (!count) return 0;
+        var rated = Math.min(count, 28);
+        var avg = sum / rated;
+        return Math.round(avg * 10) / 10;
       }
 
       function fillProfilePanel() {
@@ -2040,7 +2051,7 @@
         var buddiesEl = document.getElementById("profile-buddies");
         var coachEl = document.getElementById("profile-coach");
         var streakEl = document.getElementById("profile-streak");
-        var pointsEl = document.getElementById("profile-points28");
+        var wertEl = document.getElementById("profile-wert");
         var planRoot = document.getElementById("profile-plan-days");
         if (nameEl) nameEl.textContent = firstNameOf(account);
         if (bioEl) bioEl.textContent = PROFILE_BIO;
@@ -2052,7 +2063,10 @@
         }
         var streak = computeWorkoutStreak();
         if (streakEl) streakEl.textContent = streak === 1 ? "1 Tag" : streak + " Tage";
-        if (pointsEl) pointsEl.textContent = String(computePointsLast28());
+        if (wertEl) {
+          var wert = computeWertLast28();
+          wertEl.textContent = String(wert).replace(".", ",");
+        }
         if (planRoot && !planRoot.dataset.ready) {
           planRoot.innerHTML = "";
           for (var i = 0; i < PROFILE_PLAN.length; i++) {
