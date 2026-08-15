@@ -1,7 +1,9 @@
 -- Community: Buddy-Links + Feed-Posts (Foto / 144-Zeichen-Text / Antwort)
 -- Im Supabase SQL Editor ausführen (gleiche Instanz: agpysewcsakdpmpftndp).
 --
--- Storage: bestehende Bucket "go-avatars" (public) für Community-Fotos unter community/.
+-- Storage: Community-Fotos nutzen den bestehenden Bucket "checkin-photos" (public),
+-- Pfad community/<account-id>-<ts>.jpg — analog zur Check-in-App.
+-- Optional: Bucket "go-avatars" aus go-account.sql anlegen (Profilfotos).
 
 create table if not exists go_buddies (
   id uuid primary key default gen_random_uuid(),

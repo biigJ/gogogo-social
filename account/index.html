@@ -1678,7 +1678,7 @@
           <button class="btn" type="button" id="share-text-send">Posten</button>
         </div>
       </div>
-      <input type="file" id="share-camera-file" accept="image/*" capture="environment" hidden />
+      <input type="file" id="share-camera-file" accept="image/jpeg,image/png,image/*" capture="environment" hidden />
       <button class="btn btn--ghost" type="button" id="share-close" style="width:100%;margin-top:12px">Später</button>
     </div>
   </div>
@@ -2184,28 +2184,157 @@
         return row;
       }
 
-      async function uploadCommunityBlob(blob) {
-        var path = "community/" + (account.id || "local") + "-" + Date.now() + ".jpg";
-        var up = await fetch(SUPABASE_URL + "/storage/v1/object/go-avatars/" + path, {
-          method: "POST",
-          headers: restHeaders({
-            "Content-Type": blob.type || "image/jpeg",
-            "x-upsert": "true"
-          }),
-          body: blob
+      function canvasToJpegBlob(canvas, quality) {
+        return new Promise(function (resolve) {
+          canvas.toBlob(
+            function (blob) {
+              if (!blob) {
+                resolve(null);
+                return;
+              }
+              if (blob.type === "image/jpeg") {
+                resolve(blob);
+                return;
+              }
+              resolve(new Blob([blob], { type: "image/jpeg" }));
+            },
+            "image/jpeg",
+            quality == null ? 0.82 : quality
+          );
         });
-        if (!up.ok) {
-          up = await fetch(SUPABASE_URL + "/storage/v1/object/go-avatars/" + path, {
-            method: "PUT",
+      }
+
+      function drawScaledToCanvas(source, sw, sh) {
+        var maxSide = 1280;
+        var scale = Math.min(1, maxSide / Math.max(sw, sh, 1));
+        var canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(sw * scale));
+        canvas.height = Math.max(1, Math.round(sh * scale));
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+        return canvas;
+      }
+
+      async function fileToJpegBlob(file) {
+        if (!file) return null;
+        if (typeof createImageBitmap === "function") {
+          try {
+            var bitmap = await createImageBitmap(file);
+            var canvasB = drawScaledToCanvas(bitmap, bitmap.width, bitmap.height);
+            if (typeof bitmap.close === "function") bitmap.close();
+            var fromBitmap = await canvasToJpegBlob(canvasB, 0.82);
+            if (fromBitmap) return fromBitmap;
+          } catch (_bmErr) {
+            /* Image-Pfad */
+          }
+        }
+        return new Promise(function (resolve) {
+          var url = URL.createObjectURL(file);
+          var img = new Image();
+          img.onload = function () {
+            try {
+              var canvas = drawScaledToCanvas(
+                img,
+                img.naturalWidth || img.width || 1,
+                img.naturalHeight || img.height || 1
+              );
+              canvasToJpegBlob(canvas, 0.82).then(function (blob) {
+                try { URL.revokeObjectURL(url); } catch (e0) {}
+                resolve(blob || file);
+              });
+            } catch (e) {
+              try { URL.revokeObjectURL(url); } catch (e1) {}
+              resolve(file);
+            }
+          };
+          img.onerror = function () {
+            try { URL.revokeObjectURL(url); } catch (e2) {}
+            resolve(file);
+          };
+          img.src = url;
+        });
+      }
+
+      async function blobToDataUrl(blob) {
+        return new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () { resolve(String(reader.result || "")); };
+          reader.onerror = function () { reject(new Error("read")); };
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      /* checkin-photos existiert bereits; go-avatars oft noch nicht angelegt */
+      var COMMUNITY_PHOTO_BUCKET = "checkin-photos";
+
+      async function uploadCommunityBlob(blob) {
+        var jpeg = blob;
+        var type = (blob && blob.type) || "";
+        if (!type || type.indexOf("jpeg") < 0 && type.indexOf("jpg") < 0) {
+          jpeg = await fileToJpegBlob(blob);
+        } else if (blob.size > 900000) {
+          jpeg = await fileToJpegBlob(blob);
+        }
+        if (!jpeg) return null;
+        if (!jpeg.type || jpeg.type.indexOf("jpeg") < 0) {
+          jpeg = new Blob([jpeg], { type: "image/jpeg" });
+        }
+        var path =
+          "community/" +
+          String(account && account.id ? account.id : "local").replace(/[^a-zA-Z0-9_-]/g, "") +
+          "-" +
+          Date.now() +
+          ".jpg";
+        var up = await fetch(
+          SUPABASE_URL + "/storage/v1/object/" + COMMUNITY_PHOTO_BUCKET + "/" + path,
+          {
+            method: "POST",
             headers: restHeaders({
-              "Content-Type": blob.type || "image/jpeg",
+              "Content-Type": "image/jpeg",
               "x-upsert": "true"
             }),
-            body: blob
-          });
+            body: jpeg
+          }
+        );
+        if (!up.ok) {
+          up = await fetch(
+            SUPABASE_URL + "/storage/v1/object/" + COMMUNITY_PHOTO_BUCKET + "/" + path,
+            {
+              method: "PUT",
+              headers: restHeaders({
+                "Content-Type": "image/jpeg",
+                "x-upsert": "true"
+              }),
+              body: jpeg
+            }
+          );
         }
-        if (!up.ok) return null;
-        return SUPABASE_URL + "/storage/v1/object/public/go-avatars/" + path + "?v=" + Date.now();
+        if (up.ok) {
+          return (
+            SUPABASE_URL +
+            "/storage/v1/object/public/" +
+            COMMUNITY_PHOTO_BUCKET +
+            "/" +
+            path +
+            "?v=" +
+            Date.now()
+          );
+        }
+        var errText = "";
+        try { errText = await up.text(); } catch (e) {}
+        console.warn("community upload failed", up.status, errText);
+        /* Fallback wie Profilfotos: kompakte data-URL */
+        try {
+          if (jpeg.size > 350000) {
+            jpeg = await fileToJpegBlob(jpeg);
+          }
+          if (!jpeg) return null;
+          var dataUrl = await blobToDataUrl(jpeg);
+          if (dataUrl && dataUrl.indexOf("data:image") === 0) return dataUrl;
+        } catch (fbErr) {
+          console.warn("community data-url fallback failed", fbErr);
+        }
+        return null;
       }
 
       function fillCommunityPanel() {
@@ -3044,28 +3173,43 @@
             }
             shareCamera.classList.add("has-preview");
             if (msg) msg.textContent = "Lädt Foto…";
-            uploadCommunityBlob(file).then(function (url) {
-              if (!url) {
+            fileToJpegBlob(file)
+              .then(function (jpeg) {
+                return uploadCommunityBlob(jpeg || file);
+              })
+              .then(function (url) {
+                if (!url) {
+                  if (msg) msg.textContent = "Foto-Upload fehlgeschlagen.";
+                  /* Vorschau bleibt — localUrl nicht freigeben */
+                  return null;
+                }
+                if (sharePreview) sharePreview.src = url;
+                try { URL.revokeObjectURL(localUrl); } catch (e0) {}
+                localUrl = null;
+                return createCommunityPost({
+                  author_id: account.id,
+                  kind: "photo",
+                  body: null,
+                  photo_url: url,
+                  reply_to_id: null
+                }).then(function (row) {
+                  return { url: url, row: row };
+                });
+              })
+              .then(function (result) {
+                if (!result || !result.url) return;
+                if (result.row) {
+                  if (msg) msg.textContent = "Foto im Feed.";
+                  setTimeout(function () { closeShareModal(); }, 900);
+                } else {
+                  if (msg) msg.textContent = "Upload ok — Feed speichern fehlgeschlagen (SQL?).";
+                }
+              })
+              .catch(function (err) {
+                console.warn("share photo failed", err);
                 if (msg) msg.textContent = "Foto-Upload fehlgeschlagen.";
-                shareCamera.classList.remove("has-preview");
-                return null;
-              }
-              if (sharePreview) sharePreview.src = url;
-              return createCommunityPost({
-                author_id: account.id,
-                kind: "photo",
-                body: null,
-                photo_url: url,
-                reply_to_id: null
               });
-            }).then(function (row) {
-              if (row) {
-                if (msg) msg.textContent = "Foto im Feed.";
-                setTimeout(function () { closeShareModal(); }, 700);
-              }
-            }).finally(function () {
-              try { URL.revokeObjectURL(localUrl); } catch (e) {}
-            });
+            shareFile.value = "";
           });
         }
 
