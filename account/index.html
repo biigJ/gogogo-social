@@ -516,6 +516,36 @@
       letter-spacing: -0.02em;
       white-space: nowrap;
     }
+    .community-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 14px;
+      width: 100%;
+    }
+    .community-head .profile-name {
+      margin: 0;
+      flex: 1;
+      min-width: 0;
+      text-align: left;
+    }
+    .community-back {
+      flex: 0 0 auto;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(247, 245, 240, 0.16);
+      color: var(--ink-on-red);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .community-back svg {
+      width: 14px;
+      height: 14px;
+      display: block;
+    }
     .community-firstname {
       color: var(--ink-on-red);
       font-size: 0.7rem;
@@ -598,8 +628,8 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      min-height: 36vh;
-      max-height: 52vh;
+      min-height: 28vh;
+      max-height: none;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       padding-bottom: 8px;
@@ -651,6 +681,54 @@
       margin-top: 8px;
       padding-top: 10px;
       border-top: 1px solid rgba(247, 245, 240, 0.35);
+    }
+    body.is-community .site-chrome:not(.site-chrome--top) {
+      display: none;
+    }
+    body.is-community .wrap__scroll {
+      padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 18px);
+    }
+    body.is-community .community-composer {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+      z-index: 55;
+      width: min(100% - 32px, var(--max, 390px));
+      box-sizing: border-box;
+      margin: 0;
+      padding: 8px 10px;
+      border-top: 0;
+      background: var(--chrome-bg);
+      border-radius: 999px;
+      box-shadow: 0 8px 24px rgba(52, 34, 32, 0.18);
+      color: var(--ink);
+      pointer-events: auto;
+    }
+    body.is-community .community-composer__pick {
+      background: rgba(52, 34, 32, 0.1);
+      color: var(--ink);
+    }
+    body.is-community .community-composer__pick.is-on {
+      background: rgba(52, 34, 32, 0.2);
+    }
+    body.is-community .community-composer input {
+      border-color: rgba(52, 34, 32, 0.22);
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.55);
+    }
+    body.is-community .community-composer input::placeholder {
+      color: rgba(52, 34, 32, 0.45);
+    }
+    body.is-community .community-composer button[type="submit"] {
+      background: #c7413b;
+      color: #f7f5f0;
+    }
+    body.is-community .community-add-msg {
+      margin-bottom: 8px;
+    }
+    .community-circle.is-serial-entry {
+      overflow: visible;
     }
     .community-composer__pick {
       width: 36px;
@@ -1588,16 +1666,21 @@
       </div>
 
       <div class="panel" id="panel-community" data-panel="community">
-        <h1 class="profile-name">Meine Buddies</h1>
+        <div class="community-head">
+          <button class="community-back" type="button" id="community-back" aria-label="Zurück">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15.4 4.6 7.2 12l8.2 7.4z"/></svg>
+          </button>
+          <h1 class="profile-name">Meine Buddies</h1>
+        </div>
         <div class="community-slots" id="community-slots" aria-label="Buddy-Plätze"></div>
         <hr class="community-rule" />
         <div class="community-feed" id="community-feed" aria-live="polite"></div>
+        <p class="community-add-msg" id="community-add-msg" aria-live="polite" style="margin-top:8px"></p>
         <form class="community-composer" id="community-composer">
           <button class="community-composer__pick" id="community-reply-pick" type="button" aria-label="Buddy zum Antworten wählen">@</button>
           <input id="community-reply-text" type="text" maxlength="144" placeholder="Antwort an Buddy…" aria-label="Antwort" />
           <button type="submit">Senden</button>
         </form>
-        <p class="community-add-msg" id="community-add-msg" aria-live="polite" style="margin-top:8px"></p>
       </div>
 
       <div class="panel" id="panel-chat" data-panel="chat">
@@ -1920,71 +2003,85 @@
         var root = document.getElementById("community-slots");
         if (!root) return;
         root.innerHTML = "";
+        serialEntryActive = false;
         var items = getBuddies().slice(0, MAX_BUDDIES);
         for (var i = 0; i < MAX_BUDDIES; i++) {
-          var buddy = items[i] || null;
-          var slot = document.createElement("div");
-          slot.className = "community-slot";
-          slot.dataset.slot = String(i);
+          (function (slotIndex) {
+            var buddy = items[slotIndex] || null;
+            var slot = document.createElement("div");
+            slot.className = "community-slot";
+            slot.dataset.slot = String(slotIndex);
 
-          var circle = document.createElement("button");
-          circle.type = "button";
-          circle.className = "community-circle";
-          circle.dataset.slot = String(i);
+            var circle = document.createElement("button");
+            circle.type = "button";
+            circle.className = "community-circle";
+            circle.dataset.slot = String(slotIndex);
 
-          var label = document.createElement("p");
-          label.className = "community-firstname";
+            var label = document.createElement("p");
+            label.className = "community-firstname";
 
-          if (buddy) {
-            if (buddy.photo_url) {
-              var img = document.createElement("img");
-              img.src = buddy.photo_url;
-              img.alt = "";
-              circle.appendChild(img);
-            }
-            label.textContent = firstNameOf(buddy);
-            circle.setAttribute("aria-label", firstNameOf(buddy));
-            circle.addEventListener("click", function (b) {
-              return function () {
+            if (buddy) {
+              if (buddy.photo_url) {
+                var img = document.createElement("img");
+                img.src = buddy.photo_url;
+                img.alt = "";
+                circle.appendChild(img);
+              }
+              label.textContent = firstNameOf(buddy);
+              circle.setAttribute("aria-label", firstNameOf(buddy));
+              circle.addEventListener("click", function () {
                 if (!pickingReplyBuddy) return;
-                replyTargetId = b.id || null;
+                replyTargetId = buddy.id || null;
                 pickingReplyBuddy = false;
                 var pick = document.getElementById("community-reply-pick");
                 if (pick) pick.classList.remove("is-on");
                 var input = document.getElementById("community-reply-text");
                 if (input) {
-                  input.placeholder = "Antwort an " + firstNameOf(b) + "…";
+                  input.placeholder = "Antwort an " + firstNameOf(buddy) + "…";
                   input.focus();
                 }
                 var msg = document.getElementById("community-add-msg");
-                if (msg) msg.textContent = "Antwort an " + firstNameOf(b);
-              };
-            }(buddy));
-          } else if (i === items.length) {
-            var plus = document.createElement("span");
-            plus.className = "community-circle__plus";
-            plus.textContent = "+";
-            circle.appendChild(plus);
-            circle.setAttribute("aria-label", "Buddy hinzufügen");
-            circle.addEventListener("click", function () {
-              beginSerialEntry(circle, label);
-            });
-            label.textContent = " ";
-          } else {
-            circle.setAttribute("aria-label", "Leerer Buddy-Platz");
-            circle.disabled = true;
-            label.textContent = " ";
-          }
+                if (msg) msg.textContent = "Antwort an " + firstNameOf(buddy);
+              });
+            } else if (slotIndex === items.length) {
+              var plus = document.createElement("span");
+              plus.className = "community-circle__plus";
+              plus.textContent = "+";
+              circle.appendChild(plus);
+              circle.setAttribute("aria-label", "Buddy hinzufügen");
+              circle.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                beginSerialEntry(circle, label);
+              });
+              label.textContent = " ";
+            } else {
+              circle.setAttribute("aria-label", "Leerer Buddy-Platz");
+              circle.disabled = true;
+              label.textContent = " ";
+            }
 
-          slot.appendChild(circle);
-          slot.appendChild(label);
-          root.appendChild(slot);
+            slot.appendChild(circle);
+            slot.appendChild(label);
+            root.appendChild(slot);
+          })(i);
         }
+      }
+
+      var serialEntryActive = false;
+
+      function cancelSerialEntry() {
+        if (!serialEntryActive) return;
+        serialEntryActive = false;
+        renderBuddySlots();
       }
 
       function beginSerialEntry(circle, label) {
         if (getBuddies().length >= MAX_BUDDIES) return;
+        serialEntryActive = true;
         circle.innerHTML = "";
+        circle.classList.add("is-serial-entry");
+        circle.dataset.serialEntry = "1";
         var input = document.createElement("input");
         input.className = "community-circle__serial";
         input.type = "text";
@@ -1995,17 +2092,39 @@
         input.setAttribute("aria-label", "8-stellige Profilnummer");
         circle.appendChild(input);
         input.focus();
+        input.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+        });
+        input.addEventListener("pointerdown", function (ev) {
+          ev.stopPropagation();
+        });
         input.addEventListener("input", function () {
           input.value = String(input.value || "").replace(/\D/g, "").slice(0, 8);
           if (input.value.length === 8) submitSerial(input.value, circle, label);
         });
         input.addEventListener("keydown", function (ev) {
+          if (ev.key === "Escape") {
+            ev.preventDefault();
+            cancelSerialEntry();
+            return;
+          }
           if (ev.key === "Enter") {
             ev.preventDefault();
             if (input.value.length === 8) submitSerial(input.value, circle, label);
           }
         });
       }
+
+      document.addEventListener("pointerdown", function (ev) {
+        if (!serialEntryActive) return;
+        var t = ev.target;
+        if (t && t.closest) {
+          if (t.closest(".community-circle__serial")) return;
+          if (t.closest('.community-circle[data-serial-entry="1"]')) return;
+        }
+        cancelSerialEntry();
+      }, true);
+
 
       async function submitSerial(serial, circle, label) {
         var msg = document.getElementById("community-add-msg");
@@ -2718,7 +2837,9 @@
           p.classList.toggle("is-active", p.getAttribute("data-panel") === id);
         });
         var onProfile = id === "profile";
+        var onCommunity = id === "community";
         document.body.classList.toggle("is-profile", onProfile);
+        document.body.classList.toggle("is-community", onCommunity);
         document.querySelectorAll(".nav-btn").forEach(function (btn) {
           if (onProfile) {
             btn.classList.remove("is-active");
@@ -2738,7 +2859,7 @@
           trainingLoaded = true;
         }
         if (onProfile) fillProfilePanel();
-        if (id === "community") {
+        if (onCommunity) {
           fillCommunityPanel();
           setFeedSeenNow();
           updateCommunityNavDot();
@@ -3156,6 +3277,12 @@
         var replyPick = document.getElementById("community-reply-pick");
         var replyText = document.getElementById("community-reply-text");
         var msg = document.getElementById("community-add-msg");
+        var communityBack = document.getElementById("community-back");
+        if (communityBack) {
+          communityBack.addEventListener("click", function () {
+            gotoPanel("home");
+          });
+        }
 
         if (shareClose) shareClose.addEventListener("click", closeShareModal);
         if (shareText) {
