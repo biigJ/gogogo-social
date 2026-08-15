@@ -34,17 +34,31 @@
       --radius: 2px;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; touch-action: manipulation; }
+    html {
+      scroll-behavior: smooth;
+      touch-action: manipulation;
+      height: 100%;
+    }
     body {
       font-family: var(--display);
       background: var(--red);
       color: var(--ink-on-red);
-      min-height: 100svh;
+      min-height: 100%;
+      height: 100%;
+      height: 100dvh;
       -webkit-font-smoothing: antialiased;
       line-height: 1.35;
       overscroll-behavior-x: none;
       touch-action: manipulation;
+      overflow: hidden;
     }
+    #app {
+      height: 100%;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+    #app[hidden] { display: none !important; }
     button, input { font: inherit; color: inherit; }
     button { cursor: pointer; border: 0; background: none; }
     a { color: inherit; text-decoration: none; }
@@ -87,7 +101,21 @@
     .wrap {
       width: min(100%, var(--max));
       margin: 0 auto;
-      padding: calc(10px + env(safe-area-inset-top) + var(--header-h) + 18px) var(--pad) calc(40px + env(safe-area-inset-bottom));
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      padding: calc(10px + env(safe-area-inset-top) + var(--header-h) + 12px) var(--pad) 0;
+    }
+    .wrap__scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding-bottom: 8px;
     }
 
     .hero { text-align: center; margin-bottom: 22px; }
@@ -606,10 +634,22 @@
 
     .training-frame {
       width: 100%;
-      min-height: calc(100svh - var(--header-h) - 40px);
+      height: 100%;
+      min-height: 0;
       border: 0;
       border-radius: var(--radius);
       background: var(--red);
+    }
+    #panel-training.is-active {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      height: 100%;
+    }
+    body.is-training .wrap__scroll {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
     }
     body.is-training .foot,
     body.is-training .foot a { color: rgba(247, 245, 240, 0.75); }
@@ -703,7 +743,12 @@
     .about-card p:last-child { margin-bottom: 0; }
 
     .foot {
-      text-align: center; margin-top: 28px; font-size: 12px; font-weight: 500;
+      flex-shrink: 0;
+      text-align: center;
+      margin: 0;
+      padding: 10px 0 max(12px, env(safe-area-inset-bottom));
+      font-size: 12px;
+      font-weight: 500;
       color: var(--ink-on-red);
     }
     .foot a:hover { text-decoration: underline; }
@@ -750,6 +795,7 @@
     </div>
 
     <div class="wrap">
+      <div class="wrap__scroll">
       <section class="hero" id="home-hero">
         <div class="cycle-wrap">
           <svg class="cycle is-spinning" id="cycle" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
@@ -1104,6 +1150,7 @@
 
       <div class="panel" id="panel-training" data-panel="training">
         <iframe class="training-frame" id="training-frame" title="Friday Circle" src="about:blank" loading="lazy"></iframe>
+      </div>
       </div>
 
       <footer class="foot">
@@ -1493,7 +1540,9 @@
           trainingFrame.src = "/account/fitness-friday.html?embed=1";
           trainingLoaded = true;
         }
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        var scrollEl = document.querySelector(".wrap__scroll");
+        if (scrollEl) scrollEl.scrollTop = 0;
+        else window.scrollTo({ top: 0, behavior: "smooth" });
       }
 
       document.querySelectorAll("[data-goto]").forEach(function (el) {
