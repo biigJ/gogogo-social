@@ -140,6 +140,146 @@
     .week__day.is-today { background: var(--red); color: var(--ink-on-red); }
     .week__n { font-size: 0.95rem; margin-top: 2px; }
 
+    .home-cal {
+      color: var(--ink-on-red);
+      margin-bottom: 18px;
+    }
+    .home-cal__head {
+      display: grid;
+      grid-template-columns: 40px 1fr 40px;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .home-cal__label {
+      text-align: center;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+    }
+    .home-cal__nav {
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink-on-red);
+    }
+    .home-cal__nav::before {
+      content: "";
+      width: 0;
+      height: 0;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+    }
+    .home-cal__nav--prev::before {
+      border-right: 12px solid currentColor;
+    }
+    .home-cal__nav--next::before {
+      border-left: 12px solid currentColor;
+    }
+    .home-cal__days {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+    .home-cal__day {
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      color: inherit;
+      border: 1px solid transparent;
+      border-radius: 2px;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      padding: 0;
+    }
+    .home-cal__day .home-cal__n {
+      font-size: 0.95rem;
+      margin-top: 2px;
+      font-weight: 700;
+    }
+    .home-cal__day.has-workout {
+      border-color: rgba(247, 245, 240, 0.85);
+    }
+    .home-cal__day.is-friday {
+      border-radius: 50%;
+      border-color: rgba(247, 245, 240, 0.85);
+    }
+    .home-cal__day.is-selected {
+      background: rgba(247, 245, 240, 0.16);
+    }
+    .home-cal__day.is-today .home-cal__n {
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .home-cal__tools {
+      display: flex;
+      justify-content: center;
+      margin-top: 14px;
+    }
+    .home-cal__pen {
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink-on-red);
+    }
+    .home-cal__pen svg { width: 22px; height: 22px; display: block; }
+    .home-cal__pen[aria-expanded="true"] { opacity: 1; }
+    .home-note {
+      display: none;
+      margin-top: 8px;
+      text-align: left;
+      color: var(--ink-on-red);
+      font-weight: 500;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+      line-height: 1.4;
+    }
+    .home-note.is-open { display: block; }
+    .home-note__hi {
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .home-workout {
+      color: var(--ink-on-red);
+      text-align: left;
+    }
+    .home-workout__title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 8px;
+    }
+    .home-workout__body {
+      font-weight: 500;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+      line-height: 1.4;
+    }
+    .home-workout__body p + p { margin-top: 8px; }
+    .home-workout__empty {
+      font-weight: 500;
+      opacity: 0.85;
+    }
+    .home-workout__cta {
+      display: inline-flex;
+      margin-top: 14px;
+      padding: 12px 16px;
+      background: var(--paper);
+      color: var(--btn-ink);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      border-radius: var(--radius);
+    }
+
     .panel { display: none; margin-top: 8px; }
     .panel.is-active { display: block; }
     .panel .tile { margin-bottom: 14px; }
@@ -430,19 +570,30 @@
             <span class="cycle-add" id="photo-plus">+</span>
           </button>
         </div>
-        <p class="hero__hello" id="hello">Hallo.</p>
       </section>
 
       <div class="panel is-active" id="panel-home" data-panel="home">
-        <article class="tile">
-          <h2 id="week-label"></h2>
-          <div class="week" id="week"></div>
-        </article>
-        <article class="tile">
-          <h2>Trainingsplan an Woche anpassen</h2>
-          <p>Passe Deine Woche an Deinen Alltag an — folgt im nächsten Schritt.</p>
-          <button class="btn" type="button" id="btn-adapt-plan">Anpassen</button>
-        </article>
+        <div class="home-cal">
+          <div class="home-cal__head">
+            <button class="home-cal__nav home-cal__nav--prev" type="button" id="week-prev" aria-label="Vorherige Woche"></button>
+            <h2 class="home-cal__label" id="week-label"></h2>
+            <button class="home-cal__nav home-cal__nav--next" type="button" id="week-next" aria-label="Nächste Woche"></button>
+          </div>
+          <div class="home-cal__days" id="week" role="listbox" aria-label="Wochentage"></div>
+          <div class="home-cal__tools">
+            <button class="home-cal__pen" type="button" id="home-note-toggle" aria-label="Notiz öffnen" aria-expanded="false" aria-controls="home-note">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none">
+                <path d="M4.5 19.5 5.2 15.8 16.4 4.6a1.7 1.7 0 0 1 2.4 0l.6.6a1.7 1.7 0 0 1 0 2.4L8.2 18.8l-3.7.7Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+                <path d="M14.6 6.4 17.6 9.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+          <div class="home-note" id="home-note" hidden>
+            <p class="home-note__hi" id="home-note-hi"></p>
+            <div class="home-note__body" id="home-note-body"></div>
+          </div>
+        </div>
+        <div class="home-workout" id="home-workout"></div>
       </div>
 
       <div class="panel" id="panel-book" data-panel="book">
@@ -813,7 +964,6 @@
 
       function showApp() {
         document.getElementById("app").hidden = false;
-        document.getElementById("hello").textContent = "Hallo, " + account.name + ".";
         if (account.photo_url) applyPhoto(account.photo_url);
         var n = String(WHATSAPP_NUMBER).replace(/\D/g, "");
         var waHref = "https://wa.me/" + n + "?text=" + encodeURIComponent("Hi Joscha, ich bin " + account.name + ".");
@@ -1021,29 +1171,170 @@
         });
       });
 
-      document.getElementById("btn-adapt-plan").addEventListener("click", function () {
-        alert("Trainingsplan an Woche anpassen folgt im nächsten Schritt.");
-      });
-
-      (function buildWeek() {
+      (function buildHomeCalendar() {
         var names = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-        var now = new Date();
-        var day = (now.getDay() + 6) % 7;
-        var monday = new Date(now);
-        monday.setDate(now.getDate() - day);
-        document.getElementById("week-label").textContent = now.toLocaleDateString("de-DE", {
-          month: "long",
-          year: "numeric"
-        });
+        /* Admin-Text unter dem Stift — später aus Admin/DB. */
+        var HOME_NOTE =
+          "Hier steht bald Dein persönlicher Text von Joscha. Bis dahin: bleib in Bewegung, halte die Fixpunkte und melde Dich, wenn etwas hakt.";
+        /* Wochen-Template: Index 0 = Montag. Freitag immer HIIT. */
+        var WEEKDAY_WORKOUTS = {
+          0: {
+            title: "Kraft · Ganzkörper",
+            body: "Rund 45 Minuten Kraft. Fokus auf die Big Six und saubere Technik."
+          },
+          1: null,
+          2: {
+            title: "Kraft · Ganzkörper",
+            body: "Zweite Krafteinheit der Woche. Gleicher Rahmen, kleine Steigerung wo es sitzt."
+          },
+          3: {
+            title: "Zone 2 · lang & locker",
+            body: "45 bis 90 Minuten Wandern, Laufen oder Radfahren — Gesprächstempo."
+          },
+          4: {
+            title: "HIIT · Friday Circle",
+            body: "Intensives Intervalltraining. Freitags steht hier immer Dein HIIT aus dem Training-Menü.",
+            training: true
+          },
+          5: null,
+          6: null
+        };
+
         var root = document.getElementById("week");
-        for (var i = 0; i < 7; i++) {
-          var d = new Date(monday);
-          d.setDate(monday.getDate() + i);
-          var el = document.createElement("div");
-          el.className = "week__day" + (i === day ? " is-today" : "");
-          el.innerHTML = "<span>" + names[i] + "</span><span class='week__n'>" + d.getDate() + "</span>";
-          root.appendChild(el);
+        var labelEl = document.getElementById("week-label");
+        var workoutEl = document.getElementById("home-workout");
+        var noteEl = document.getElementById("home-note");
+        var noteHi = document.getElementById("home-note-hi");
+        var noteBody = document.getElementById("home-note-body");
+        var noteToggle = document.getElementById("home-note-toggle");
+        var weekOffset = 0;
+        var selectedKey = null;
+
+        function startOfDay(d) {
+          return new Date(d.getFullYear(), d.getMonth(), d.getDate());
         }
+        function mondayOf(d) {
+          var x = startOfDay(d);
+          var day = (x.getDay() + 6) % 7;
+          x.setDate(x.getDate() - day);
+          return x;
+        }
+        function dateKey(d) {
+          return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+        }
+        function firstName() {
+          return String((account && account.name) || "").trim().split(/\s+/)[0] || "Du";
+        }
+        function workoutFor(d) {
+          var wd = (d.getDay() + 6) % 7;
+          if (wd === 4) {
+            return WEEKDAY_WORKOUTS[4];
+          }
+          return WEEKDAY_WORKOUTS[wd] || null;
+        }
+        function monthLabelForWeek(monday) {
+          var mid = new Date(monday);
+          mid.setDate(monday.getDate() + 3);
+          return mid.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+        }
+
+        function renderWorkout(d) {
+          var w = workoutFor(d);
+          if (!w) {
+            workoutEl.innerHTML =
+              '<p class="home-workout__empty">Kein Workout an diesem Tag.</p>';
+            return;
+          }
+          var html =
+            '<h3 class="home-workout__title"></h3><div class="home-workout__body"><p></p></div>';
+          workoutEl.innerHTML = html;
+          workoutEl.querySelector(".home-workout__title").textContent = w.title;
+          workoutEl.querySelector(".home-workout__body p").textContent = w.body;
+          if (w.training) {
+            var cta = document.createElement("button");
+            cta.type = "button";
+            cta.className = "home-workout__cta";
+            cta.textContent = "Zum Training";
+            cta.addEventListener("click", function () {
+              gotoPanel("training");
+            });
+            workoutEl.appendChild(cta);
+          }
+        }
+
+        function renderWeek() {
+          var today = startOfDay(new Date());
+          var base = mondayOf(today);
+          base.setDate(base.getDate() + weekOffset * 7);
+          labelEl.textContent = monthLabelForWeek(base);
+          root.innerHTML = "";
+
+          var days = [];
+          for (var i = 0; i < 7; i++) {
+            var d = new Date(base);
+            d.setDate(base.getDate() + i);
+            days.push(d);
+          }
+
+          if (!selectedKey) {
+            var inWeek = days.some(function (d) { return dateKey(d) === dateKey(today); });
+            selectedKey = inWeek ? dateKey(today) : dateKey(days[0]);
+          } else {
+            var still = days.some(function (d) { return dateKey(d) === selectedKey; });
+            if (!still) selectedKey = dateKey(days[0]);
+          }
+
+          days.forEach(function (d, i) {
+            var key = dateKey(d);
+            var w = workoutFor(d);
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "home-cal__day";
+            btn.setAttribute("role", "option");
+            btn.setAttribute("aria-label", names[i] + " " + d.getDate());
+            if (w) btn.classList.add("has-workout");
+            if (i === 4) btn.classList.add("is-friday");
+            if (key === dateKey(today)) btn.classList.add("is-today");
+            if (key === selectedKey) {
+              btn.classList.add("is-selected");
+              btn.setAttribute("aria-selected", "true");
+            } else {
+              btn.setAttribute("aria-selected", "false");
+            }
+            btn.innerHTML =
+              "<span>" + names[i] + "</span><span class='home-cal__n'>" + d.getDate() + "</span>";
+            btn.addEventListener("click", function () {
+              selectedKey = key;
+              renderWeek();
+            });
+            root.appendChild(btn);
+          });
+
+          var selected = days.find(function (d) { return dateKey(d) === selectedKey; }) || days[0];
+          renderWorkout(selected);
+        }
+
+        document.getElementById("week-prev").addEventListener("click", function () {
+          weekOffset -= 1;
+          selectedKey = null;
+          renderWeek();
+        });
+        document.getElementById("week-next").addEventListener("click", function () {
+          weekOffset += 1;
+          selectedKey = null;
+          renderWeek();
+        });
+
+        noteHi.textContent = "Hallo " + firstName() + ",";
+        noteBody.textContent = HOME_NOTE;
+        noteToggle.addEventListener("click", function () {
+          var open = noteEl.classList.toggle("is-open");
+          noteEl.hidden = !open;
+          noteToggle.setAttribute("aria-expanded", open ? "true" : "false");
+          noteToggle.setAttribute("aria-label", open ? "Notiz schließen" : "Notiz öffnen");
+        });
+
+        renderWeek();
       })();
 
       /* Photo crop + dither + upload */
