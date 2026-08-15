@@ -2008,12 +2008,41 @@
       var PROFILE_WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
       var COACH_DAY_KEYS = ["day_mo", "day_di", "day_mi", "day_do", "day_fr", "day_sa", "day_so"];
       var coachPlan = null;
+      var coachDayHistory = [];
       var onCoachPlanLoaded = null;
 
       function coachDayText(wd) {
         if (!coachPlan) return "";
         var key = COACH_DAY_KEYS[wd];
         return key && coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
+      }
+
+      /* Text für einen konkreten Kalendertag: letzter History-Stand mit effective_from <= Datum. */
+      function coachDayTextForDate(d) {
+        var wd = (d.getDay() + 6) % 7;
+        var key = COACH_DAY_KEYS[wd];
+        if (!key) return "";
+        var dateStr = formatDateKey(d);
+        var best = null;
+        var bestFrom = "";
+        for (var i = 0; i < coachDayHistory.length; i++) {
+          var h = coachDayHistory[i];
+          if (!h || h.day_key !== key) continue;
+          var from = String(h.effective_from || "").slice(0, 10);
+          if (!from || from > dateStr) continue;
+          if (
+            !best ||
+            from > bestFrom ||
+            (from === bestFrom && String(h.created_at || "") > String(best.created_at || ""))
+          ) {
+            best = h;
+            bestFrom = from;
+          }
+        }
+        if (best) {
+          return best.body != null ? String(best.body).trim() : "";
+        }
+        return coachDayText(wd);
       }
 
       function splitPlanLines(text) {
@@ -2092,6 +2121,7 @@
       async function loadCoachPlan() {
         if (!hasCloudAccount()) {
           coachPlan = null;
+          coachDayHistory = [];
           renderProfilePlan();
           if (typeof onCoachPlanLoaded === "function") onCoachPlanLoaded();
           return;
@@ -2121,6 +2151,7 @@
           }
         } catch (e0) {}
         coachPlan = null;
+        coachDayHistory = [];
         if (ids.length) {
           try {
             var inList = "(" + ids.join(",") + ")";
@@ -2130,6 +2161,14 @@
             );
             if (rows && rows[0]) coachPlan = rows[0];
           } catch (e1) {}
+          try {
+            var hist = await restGet(
+              "go_coach_plan_day_history?account_id=in." + inList +
+              "&select=account_id,day_key,body,effective_from,created_at" +
+              "&order=effective_from.asc,created_at.asc&limit=500"
+            );
+            if (hist && hist.length) coachDayHistory = hist;
+          } catch (e2) {}
         }
         renderProfilePlan();
         if (typeof onCoachPlanLoaded === "function") onCoachPlanLoaded();
@@ -3412,9 +3451,9 @@
         }
         function workoutFor(d) {
           var wd = (d.getDay() + 6) % 7;
-          /* Sobald ein Admin-Plan geladen ist: nur noch dessen Wochentage (kein Default-Template). */
-          if (coachPlan) {
-            var fromCoach = coachDayText(wd);
+          /* Admin-Plan geladen (aktuell oder Historie): Kästen nur daraus. */
+          if (coachPlan || (coachDayHistory && coachDayHistory.length)) {
+            var fromCoach = coachDayTextForDate(d);
             if (fromCoach) {
               var parts = splitPlanLines(fromCoach);
               var rest = /ruhe|erholung|kein\s*workout/i.test(fromCoach);
@@ -3683,7 +3722,7 @@
           try { renderWeek(); } catch (e) {}
         };
         /* Plan kann schon vor diesem Callback fertig geladen sein (Race mit showApp). */
-        if (coachPlan) {
+        if (coachPlan || (coachDayHistory && coachDayHistory.length)) {
           onCoachPlanLoaded();
         } else {
           loadCoachPlan().catch(function () {});

@@ -306,6 +306,13 @@
       border-color: var(--ink);
     }
     .admin-plan__save { margin-top: 6px; }
+    .admin-plan__hint {
+      margin: 10px 0 0;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      letter-spacing: -0.02em;
+      color: rgba(247, 245, 240, 0.72);
+    }
     h1 {
       font-weight: 700;
       font-size: clamp(28px, 8vw, 36px);
@@ -628,6 +635,7 @@
           <textarea id="plan-so" rows="2" maxlength="400" placeholder="Sonntag…"></textarea>
         </div>
         <button class="btn admin-plan__save" type="button" id="plan-save">Plan speichern</button>
+        <p class="admin-plan__hint">Wochentage überschreiben archiviert den alten Text dauerhaft: vergangene Kalendertage behalten den alten Eintrag. Das lässt sich nicht rückgängig machen.</p>
         <p class="msg" id="plan-msg" role="status"></p>
       </section>
     </div>
@@ -978,6 +986,88 @@
           if (rows && rows[0]) fillPlanForm(rows[0]);
         } catch (e) {}
       }
+
+      var DAY_PLAN_KEYS = ["day_mo", "day_di", "day_mi", "day_do", "day_fr", "day_sa", "day_so"];
+
+      function berlinTodayISO() {
+        try {
+          return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+        } catch (e) {
+          var d = new Date();
+          return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+        }
+      }
+
+      function normPlanText(v) {
+        var s = v == null ? "" : String(v).trim();
+        return s || null;
+      }
+
+      async function fetchPlanRow(accountId) {
+        var res = await fetch(
+          SUPABASE_URL + "/rest/v1/go_coach_plans?account_id=eq." + encodeURIComponent(accountId) +
+          "&select=*&limit=1",
+          { headers: apiHeaders() }
+        );
+        if (!res.ok) return null;
+        var rows = await res.json();
+        return rows && rows[0] ? rows[0] : null;
+      }
+
+      async function dayHistoryExists(accountId, dayKey) {
+        var res = await fetch(
+          SUPABASE_URL + "/rest/v1/go_coach_plan_day_history?account_id=eq." + encodeURIComponent(accountId) +
+          "&day_key=eq." + encodeURIComponent(dayKey) +
+          "&select=id&limit=1",
+          { headers: apiHeaders() }
+        );
+        if (!res.ok) return false;
+        var rows = await res.json();
+        return !!(rows && rows.length);
+      }
+
+      async function insertDayHistory(rows) {
+        if (!rows || !rows.length) return true;
+        var res = await fetch(SUPABASE_URL + "/rest/v1/go_coach_plan_day_history", {
+          method: "POST",
+          headers: apiHeaders({
+            "Content-Type": "application/json",
+            Prefer: "return=minimal"
+          }),
+          body: JSON.stringify(rows)
+        });
+        return res.ok;
+      }
+
+      /* Bei Überschreiben: alten Stand archivieren (immutable), neuer gilt ab heute. */
+      async function archiveChangedDays(accountId, previous, payload) {
+        var today = berlinTodayISO();
+        var inserts = [];
+        for (var i = 0; i < DAY_PLAN_KEYS.length; i++) {
+          var key = DAY_PLAN_KEYS[i];
+          var oldVal = previous ? normPlanText(previous[key]) : null;
+          var newVal = normPlanText(payload[key]);
+          if (oldVal === newVal) continue;
+          var hasHist = await dayHistoryExists(accountId, key);
+          if (!hasHist && oldVal != null) {
+            inserts.push({
+              account_id: accountId,
+              day_key: key,
+              body: oldVal,
+              effective_from: "2000-01-01"
+            });
+          }
+          inserts.push({
+            account_id: accountId,
+            day_key: key,
+            body: newVal,
+            effective_from: today
+          });
+        }
+        if (!inserts.length) return true;
+        return await insertDayHistory(inserts);
+      }
+
       async function saveCoachPlan() {
         var planMsg = document.getElementById("plan-msg");
         if (!activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) {
@@ -997,6 +1087,11 @@
           planMsg.textContent = "Speichere …";
         }
         try {
+          var previous = await fetchPlanRow(activeAccount.id);
+          var archived = await archiveChangedDays(activeAccount.id, previous, payload);
+          if (!archived) {
+            throw new Error("History insert failed");
+          }
           var res = await fetch(SUPABASE_URL + "/rest/v1/go_coach_plans?on_conflict=account_id", {
             method: "POST",
             headers: apiHeaders({
@@ -1013,7 +1108,7 @@
           if (planMsg) planMsg.textContent = "Gespeichert.";
         } catch (err) {
           if (planMsg) {
-            planMsg.textContent = "Speichern fehlgeschlagen (go-coach-plans.sql?).";
+            planMsg.textContent = "Speichern fehlgeschlagen (go-coach-plans.sql / go-coach-plan-history.sql?).";
             planMsg.classList.add("is-error");
           }
         }
