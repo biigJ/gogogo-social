@@ -121,9 +121,12 @@
       left: 0;
       right: 0;
       bottom: auto;
-      /* Von Display-Oberkante durch Safe-Area, kurzer Soft-Auslauf darunter */
-      height: calc(env(safe-area-inset-top, 0px) + 28px);
-      min-height: calc(env(safe-area-inset-top, 0px) + 28px);
+      z-index: 60;
+      /* Nur die Notch-/Statusleisten-Zone — kein Auslauf unter den Notch */
+      height: constant(safe-area-inset-top);
+      height: env(safe-area-inset-top, 0px);
+      min-height: constant(safe-area-inset-top);
+      min-height: env(safe-area-inset-top, 0px);
       padding: 0;
       display: block;
       opacity: 1;
@@ -134,31 +137,14 @@
       background: transparent;
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
-      /* Maske ab y=0 voll — kein Loch unter der Statusleiste */
-      -webkit-mask-image: linear-gradient(
-        to bottom,
-        #000 0%,
-        #000 68%,
-        transparent 100%
-      );
-      mask-image: linear-gradient(
-        to bottom,
-        #000 0%,
-        #000 68%,
-        transparent 100%
-      );
+      -webkit-mask-image: none;
+      mask-image: none;
     }
     body.has-scroll-overflow .site-chrome.site-chrome--top::before {
-      /* Oben stärkerer Frost-Fill: iOS blur't in der Safe-Area nicht → sonst rote Lücke */
-      background: linear-gradient(
-        to bottom,
-        rgba(255, 255, 255, 0.36) 0%,
-        rgba(255, 255, 255, 0.2) 38%,
-        rgba(255, 255, 255, 0.08) 72%,
-        rgba(255, 255, 255, 0) 100%
-      );
-      -webkit-backdrop-filter: blur(22px) saturate(1.15);
-      backdrop-filter: blur(22px) saturate(1.15);
+      /* Frost nur hinter dem Notch, ab Display-Oberkante; kein Rot, kein Band darunter */
+      background: rgba(255, 255, 255, 0.28);
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
     }
     .site-chrome--top::after {
       display: none;
