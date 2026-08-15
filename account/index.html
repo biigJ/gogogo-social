@@ -522,6 +522,7 @@
       gap: 10px;
       margin: 0 0 14px;
       width: 100%;
+      flex: 0 0 auto;
     }
     .community-head .profile-name {
       margin: 0;
@@ -552,25 +553,64 @@
       font-weight: 500;
       letter-spacing: -0.02em;
       line-height: 1.2;
-      margin: 6px 0 0;
+      margin: 0;
       text-align: center;
       max-width: 100%;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+      min-height: 1.2em;
+    }
+    .community-slot__meta {
+      height: 2.85em;
+      margin-top: 6px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 2px;
+      box-sizing: border-box;
+    }
+    .community-fails {
+      display: flex;
+      gap: 5px;
+      justify-content: center;
+      align-items: center;
+      min-height: 1em;
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0.04em;
+      color: var(--ink-on-red);
+    }
+    .community-fails span {
+      opacity: 0.92;
     }
     .community-rule {
       border: 0;
       border-top: 1px solid rgba(247, 245, 240, 0.85);
-      margin: 0 0 14px;
+      margin: 10px 0 10px;
       width: 100%;
+      flex: 0 0 auto;
     }
     .community-slots {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 8px;
-      margin: 0 0 16px;
+      margin: 0;
       align-items: start;
+      flex: 0 0 auto;
+    }
+    .community-top {
+      flex: 0 0 auto;
+    }
+    .community-shell {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      width: 100%;
     }
     .community-slot {
       display: flex;
@@ -628,11 +668,47 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      min-height: 28vh;
-      max-height: none;
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
-      padding-bottom: 8px;
+      padding: 2px 0 10px;
+      overscroll-behavior: contain;
+    }
+    body.is-community {
+      overflow: hidden;
+      height: 100dvh;
+    }
+    body.is-community #app,
+    body.is-community .wrap {
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    body.is-community .wrap__scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 12px);
+    }
+    body.is-community #panel-community.is-active {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+      margin-top: 4px;
+    }
+    body.is-community .community-add-msg {
+      flex: 0 0 auto;
+      min-height: 1.2em;
+      margin: 0 0 6px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--ink-on-red);
     }
     .community-post {
       max-width: 82%;
@@ -685,9 +761,6 @@
     body.is-community .site-chrome:not(.site-chrome--top) {
       display: none;
     }
-    body.is-community .wrap__scroll {
-      padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 18px);
-    }
     body.is-community .community-composer {
       position: fixed;
       left: 50%;
@@ -723,9 +796,6 @@
     body.is-community .community-composer button[type="submit"] {
       background: #c7413b;
       color: #f7f5f0;
-    }
-    body.is-community .community-add-msg {
-      margin-bottom: 8px;
     }
     .community-circle.is-serial-entry {
       overflow: visible;
@@ -1666,21 +1736,25 @@
       </div>
 
       <div class="panel" id="panel-community" data-panel="community">
-        <div class="community-head">
-          <button class="community-back" type="button" id="community-back" aria-label="Zurück">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15.4 4.6 7.2 12l8.2 7.4z"/></svg>
-          </button>
-          <h1 class="profile-name">Meine Buddies</h1>
+        <div class="community-shell">
+          <div class="community-head">
+            <button class="community-back" type="button" id="community-back" aria-label="Zurück">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15.4 4.6 7.2 12l8.2 7.4z"/></svg>
+            </button>
+            <h1 class="profile-name">Meine Buddies</h1>
+          </div>
+          <div class="community-top">
+            <div class="community-slots" id="community-slots" aria-label="Buddy-Plätze"></div>
+            <hr class="community-rule" />
+            <p class="community-add-msg" id="community-add-msg" aria-live="polite"></p>
+          </div>
+          <div class="community-feed" id="community-feed" aria-live="polite"></div>
+          <form class="community-composer" id="community-composer">
+            <button class="community-composer__pick" id="community-reply-pick" type="button" aria-label="Buddy zum Antworten wählen">@</button>
+            <input id="community-reply-text" type="text" maxlength="144" placeholder="Antwort an Buddy…" aria-label="Antwort" />
+            <button type="submit">Senden</button>
+          </form>
         </div>
-        <div class="community-slots" id="community-slots" aria-label="Buddy-Plätze"></div>
-        <hr class="community-rule" />
-        <div class="community-feed" id="community-feed" aria-live="polite"></div>
-        <p class="community-add-msg" id="community-add-msg" aria-live="polite" style="margin-top:8px"></p>
-        <form class="community-composer" id="community-composer">
-          <button class="community-composer__pick" id="community-reply-pick" type="button" aria-label="Buddy zum Antworten wählen">@</button>
-          <input id="community-reply-text" type="text" maxlength="144" placeholder="Antwort an Buddy…" aria-label="Antwort" />
-          <button type="submit">Senden</button>
-        </form>
       </div>
 
       <div class="panel" id="panel-chat" data-panel="chat">
@@ -1806,6 +1880,8 @@
       var ACCOUNT_KEY = "gogogo_go_account";
       var DAY_ENTRIES_KEY = "gogogo_go_day_entries";
       var BUDDIES_KEY = "gogogo_go_buddies";
+      var BUDDY_SEARCH_FAILS_KEY = "gogogo_go_buddy_search_fails";
+      var BUDDY_SEARCH_LOCK_KEY = "gogogo_go_buddy_search_lock_until";
       var WHATSAPP_NUMBER = "+491747015500";
       var CYCLE_RAYS = 28;
       var RAY_GRAY = "rgba(247, 245, 240, 0.28)";
@@ -1999,12 +2075,65 @@
         }
       }
 
+      function getBuddySearchFails() {
+        try {
+          var n = parseInt(localStorage.getItem(BUDDY_SEARCH_FAILS_KEY) || "0", 10);
+          return isNaN(n) ? 0 : Math.max(0, Math.min(3, n));
+        } catch (e) {
+          return 0;
+        }
+      }
+      function setBuddySearchFails(n) {
+        try { localStorage.setItem(BUDDY_SEARCH_FAILS_KEY, String(Math.max(0, Math.min(3, n)))); } catch (e) {}
+      }
+      function getBuddySearchLockUntil() {
+        try {
+          var n = parseInt(localStorage.getItem(BUDDY_SEARCH_LOCK_KEY) || "0", 10);
+          return isNaN(n) ? 0 : n;
+        } catch (e2) {
+          return 0;
+        }
+      }
+      function isBuddySearchLocked() {
+        var until = getBuddySearchLockUntil();
+        if (!until) return false;
+        if (Date.now() >= until) {
+          try { localStorage.removeItem(BUDDY_SEARCH_LOCK_KEY); } catch (e3) {}
+          setBuddySearchFails(0);
+          return false;
+        }
+        return true;
+      }
+      function lockBuddySearch() {
+        var until = Date.now() + 60 * 60 * 1000;
+        try { localStorage.setItem(BUDDY_SEARCH_LOCK_KEY, String(until)); } catch (e4) {}
+        setBuddySearchFails(3);
+      }
+      function registerBuddySearchFail() {
+        var n = getBuddySearchFails() + 1;
+        if (n >= 3) {
+          lockBuddySearch();
+          return 3;
+        }
+        setBuddySearchFails(n);
+        return n;
+      }
+      function clearBuddySearchFails() {
+        if (isBuddySearchLocked()) return;
+        setBuddySearchFails(0);
+      }
+      function buddySearchLockMessage() {
+        return "Du hast zu viele Fehleingaben gehabt und deine Suche wird für 60 Minuten gesperrt.";
+      }
+
       function renderBuddySlots() {
         var root = document.getElementById("community-slots");
         if (!root) return;
         root.innerHTML = "";
         serialEntryActive = false;
         var items = getBuddies().slice(0, MAX_BUDDIES);
+        var fails = getBuddySearchFails();
+        var locked = isBuddySearchLocked();
         for (var i = 0; i < MAX_BUDDIES; i++) {
           (function (slotIndex) {
             var buddy = items[slotIndex] || null;
@@ -2017,8 +2146,13 @@
             circle.className = "community-circle";
             circle.dataset.slot = String(slotIndex);
 
+            var meta = document.createElement("div");
+            meta.className = "community-slot__meta";
             var label = document.createElement("p");
             label.className = "community-firstname";
+            var failsEl = document.createElement("div");
+            failsEl.className = "community-fails";
+            failsEl.setAttribute("aria-hidden", "true");
 
             if (buddy) {
               if (buddy.photo_url) {
@@ -2048,21 +2182,35 @@
               plus.className = "community-circle__plus";
               plus.textContent = "+";
               circle.appendChild(plus);
-              circle.setAttribute("aria-label", "Buddy hinzufügen");
+              circle.setAttribute("aria-label", locked ? "Buddy-Suche gesperrt" : "Buddy hinzufügen");
+              if (fails > 0) {
+                for (var fx = 0; fx < fails; fx++) {
+                  var x = document.createElement("span");
+                  x.textContent = "X";
+                  failsEl.appendChild(x);
+                }
+              }
               circle.addEventListener("click", function (ev) {
                 ev.preventDefault();
                 ev.stopPropagation();
+                var msg = document.getElementById("community-add-msg");
+                if (isBuddySearchLocked()) {
+                  if (msg) msg.textContent = buddySearchLockMessage();
+                  return;
+                }
                 beginSerialEntry(circle, label);
               });
-              label.textContent = " ";
+              label.textContent = "\u00a0";
             } else {
               circle.setAttribute("aria-label", "Leerer Buddy-Platz");
               circle.disabled = true;
-              label.textContent = " ";
+              label.textContent = "\u00a0";
             }
 
+            meta.appendChild(label);
+            meta.appendChild(failsEl);
             slot.appendChild(circle);
-            slot.appendChild(label);
+            slot.appendChild(meta);
             root.appendChild(slot);
           })(i);
         }
@@ -2078,6 +2226,11 @@
 
       function beginSerialEntry(circle, label) {
         if (getBuddies().length >= MAX_BUDDIES) return;
+        if (isBuddySearchLocked()) {
+          var lockMsg = document.getElementById("community-add-msg");
+          if (lockMsg) lockMsg.textContent = buddySearchLockMessage();
+          return;
+        }
         serialEntryActive = true;
         circle.innerHTML = "";
         circle.classList.add("is-serial-entry");
@@ -2128,6 +2281,11 @@
 
       async function submitSerial(serial, circle, label) {
         var msg = document.getElementById("community-add-msg");
+        if (isBuddySearchLocked()) {
+          if (msg) msg.textContent = buddySearchLockMessage();
+          renderBuddySlots();
+          return;
+        }
         if (account.serial_number && String(account.serial_number) === serial) {
           if (msg) msg.textContent = "Das ist Deine eigene Nummer.";
           renderBuddySlots();
@@ -2142,10 +2300,16 @@
         try {
           var remote = await lookupAccountBySerial(serial);
           if (!remote || !remote.name) {
-            if (msg) msg.textContent = "Keine Person mit dieser Nummer gefunden.";
+            var failCount = registerBuddySearchFail();
             renderBuddySlots();
+            if (failCount >= 3 || isBuddySearchLocked()) {
+              if (msg) msg.textContent = buddySearchLockMessage();
+            } else {
+              if (msg) msg.textContent = "Keine Person mit dieser Nummer gefunden.";
+            }
             return;
           }
+          clearBuddySearchFails();
           var buddy = {
             id: remote.id || null,
             name: remote.name,
@@ -2160,8 +2324,13 @@
           if (msg) msg.textContent = firstNameOf(buddy) + " ist dabei.";
           await refreshCommunityFeed();
         } catch (e) {
-          if (msg) msg.textContent = "Lookup fehlgeschlagen.";
+          var failCount2 = registerBuddySearchFail();
           renderBuddySlots();
+          if (failCount2 >= 3 || isBuddySearchLocked()) {
+            if (msg) msg.textContent = buddySearchLockMessage();
+          } else {
+            if (msg) msg.textContent = "Lookup fehlgeschlagen.";
+          }
         }
       }
 
@@ -2221,7 +2390,7 @@
         feed.innerHTML = "";
         var names = authorNameMap();
         var posts = communityPosts.slice().sort(function (a, b) {
-          return String(a.created_at || "").localeCompare(String(b.created_at || ""));
+          return String(b.created_at || "").localeCompare(String(a.created_at || ""));
         });
         for (var i = 0; i < posts.length; i++) {
           var post = posts[i];
@@ -2251,7 +2420,7 @@
           }
           feed.appendChild(el);
         }
-        feed.scrollTop = feed.scrollHeight;
+        feed.scrollTop = 0;
       }
 
       function getFeedSeenAt() {
@@ -2468,6 +2637,10 @@
 
       function fillCommunityPanel() {
         renderBuddySlots();
+        if (isBuddySearchLocked()) {
+          var lockEl = document.getElementById("community-add-msg");
+          if (lockEl) lockEl.textContent = buddySearchLockMessage();
+        }
         refreshCommunityFeed();
         if (document.body.classList.contains("is-community") || 
             document.querySelector('.panel.is-active[data-panel="community"]')) {
