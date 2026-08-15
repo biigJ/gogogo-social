@@ -7,6 +7,8 @@
   <meta name="theme-color" content="#C7413B" />
   <title>gogogo lead code generator</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
@@ -426,7 +428,21 @@
       var lastQr = null;
 
       function isAuthed() {
-        try { return sessionStorage.getItem(AUTH_KEY) === "1"; } catch (e) { return false; }
+        try {
+          return localStorage.getItem(AUTH_KEY) === "1" || sessionStorage.getItem(AUTH_KEY) === "1";
+        } catch (e) { return false; }
+      }
+
+      function setAuthed(on) {
+        try {
+          if (on) {
+            localStorage.setItem(AUTH_KEY, "1");
+            sessionStorage.setItem(AUTH_KEY, "1");
+          } else {
+            localStorage.removeItem(AUTH_KEY);
+            sessionStorage.removeItem(AUTH_KEY);
+          }
+        } catch (e) {}
       }
 
       function updateAuthBtn() {
@@ -563,7 +579,7 @@
         panelLogin.hidden = false;
         setCycleBack(false);
         setActorName("");
-        try { sessionStorage.removeItem(AUTH_KEY); } catch (e) {}
+        setAuthed(false);
         updateAuthBtn();
       }
       function showResult(name, serial, code) {
@@ -855,7 +871,7 @@
         var code = document.getElementById("login-code").value.trim();
         var msg = document.getElementById("login-msg");
         if (name === ADMIN_NAME && code === ADMIN_CODE) {
-          try { sessionStorage.setItem(AUTH_KEY, "1"); } catch (err) {}
+          setAuthed(true);
           msg.textContent = "";
           showGen();
           updateAuthBtn();
