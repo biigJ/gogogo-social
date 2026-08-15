@@ -1114,9 +1114,13 @@
         }
       }
       var coachAccount = null;
+      var COACH_PHOTO_URL = "/assets/go/coach-joscha.png";
 
       async function resolveCoachAccount() {
-        if (coachAccount && coachAccount.id) return coachAccount;
+        if (coachAccount && coachAccount.id) {
+          coachAccount.photo_url = COACH_PHOTO_URL;
+          return coachAccount;
+        }
         var names = ["Joscha", ADMIN_NAME];
         for (var i = 0; i < names.length; i++) {
           try {
@@ -1129,6 +1133,7 @@
             for (var j = 0; j < (rows || []).length; j++) {
               if (namesMatch(rows[j].name, names[i])) {
                 coachAccount = rows[j];
+                coachAccount.photo_url = COACH_PHOTO_URL;
                 return coachAccount;
               }
             }
@@ -1145,12 +1150,14 @@
               name: "Joscha",
               phone: "coach",
               invite_code: null,
-              serial_number: null
+              serial_number: null,
+              photo_url: COACH_PHOTO_URL
             })
           });
           if (created.ok) {
             var out = await created.json();
             coachAccount = out && out[0] ? out[0] : null;
+            if (coachAccount) coachAccount.photo_url = COACH_PHOTO_URL;
           }
         } catch (e2) {}
         return coachAccount;
