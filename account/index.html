@@ -631,9 +631,17 @@
     }
     .community-post__photo {
       display: block;
-      width: min(100%, 220px);
+      width: min(42vw, 132px);
+      max-height: 176px;
+      object-fit: cover;
       border-radius: var(--radius);
       margin-top: 4px;
+    }
+    .community-post.is-mine .community-post__photo {
+      margin-left: auto;
+    }
+    .community-post.is-buddy .community-post__photo {
+      margin-right: auto;
     }
     .community-composer {
       display: grid;
@@ -1678,10 +1686,12 @@
           <button class="btn" type="button" id="share-text-send">Posten</button>
         </div>
       </div>
-      <input type="file" id="share-camera-file" accept="image/jpeg,image/png,image/*" capture="environment" hidden />
-      <button class="btn btn--ghost" type="button" id="share-close" style="width:100%;margin-top:12px">Später</button>
+      <p id="share-msg" style="margin-top:10px;font-size:0.8rem;font-weight:500;min-height:1.2em"></p>
+      <button class="btn btn--ghost" type="button" id="share-close" style="width:100%;margin-top:8px">Fertig</button>
     </div>
   </div>
+  <!-- außerhalb des Modals: iOS schließt sonst oft das Overlay beim Kamera-Aufruf -->
+  <input type="file" id="share-camera-file" accept="image/jpeg,image/png,image/*" capture="environment" hidden />
 
   <script>
     (function () {
@@ -2356,13 +2366,27 @@
         return rows[0];
       }
 
+      var shareCameraArmed = false;
+      var shareSessionActive = false;
+
+      function ensureShareModalVisible() {
+        var modal = document.getElementById("share-modal");
+        if (!modal) return;
+        modal.hidden = false;
+        modal.classList.add("is-open");
+      }
+
       function openShareModal() {
         var modal = document.getElementById("share-modal");
         if (!modal) return;
+        shareSessionActive = true;
+        shareCameraArmed = false;
         document.getElementById("share-choice").hidden = false;
         document.getElementById("share-text-wrap").hidden = true;
         document.getElementById("share-text-input").value = "";
         document.getElementById("share-text-count").textContent = "0";
+        var shareMsg = document.getElementById("share-msg");
+        if (shareMsg) shareMsg.textContent = "";
         var cam = document.getElementById("share-camera");
         var preview = document.getElementById("share-camera-preview");
         if (cam) cam.classList.remove("has-preview");
@@ -2372,15 +2396,26 @@
         }
         var file = document.getElementById("share-camera-file");
         if (file) file.value = "";
-        modal.hidden = false;
-        modal.classList.add("is-open");
+        ensureShareModalVisible();
       }
       function closeShareModal() {
         var modal = document.getElementById("share-modal");
         if (!modal) return;
+        shareSessionActive = false;
+        shareCameraArmed = false;
         modal.classList.remove("is-open");
         modal.hidden = true;
       }
+
+      function restoreShareModalAfterCamera() {
+        if (!shareSessionActive && !shareCameraArmed) return;
+        ensureShareModalVisible();
+      }
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) restoreShareModalAfterCamera();
+      });
+      window.addEventListener("pageshow", restoreShareModalAfterCamera);
+      window.addEventListener("focus", restoreShareModalAfterCamera);
 
       function showApp() {
         document.getElementById("app").hidden = false;
@@ -3127,6 +3162,8 @@
           shareText.addEventListener("click", function () {
             shareChoice.hidden = true;
             shareTextWrap.hidden = false;
+            var shareMsg = document.getElementById("share-msg");
+            if (shareMsg) shareMsg.textContent = "";
             shareTextInput.focus();
           });
         }
@@ -3145,15 +3182,24 @@
           shareTextSend.addEventListener("click", function () {
             var body = String(shareTextInput.value || "").trim().slice(0, 144);
             if (!body) return;
+            var shareMsg = document.getElementById("share-msg");
             createCommunityPost({
               author_id: account.id,
               kind: "text",
               body: body,
               photo_url: null,
               reply_to_id: null
-            }).then(function () {
-              closeShareModal();
-              if (msg) msg.textContent = "Text im Feed.";
+            }).then(function (row) {
+              if (row) {
+                if (shareMsg) shareMsg.textContent = "Text im Feed.";
+                if (msg) msg.textContent = "Text im Feed.";
+                shareTextInput.value = "";
+                shareTextCount.textContent = "0";
+                shareChoice.hidden = false;
+                shareTextWrap.hidden = true;
+              } else if (shareMsg) {
+                shareMsg.textContent = "Text speichern fehlgeschlagen.";
+              }
             });
           });
         }
@@ -3161,10 +3207,23 @@
           var sharePreview = document.getElementById("share-camera-preview");
           shareCamera.addEventListener("click", function () {
             if (shareCamera.classList.contains("has-preview")) return;
+            shareSessionActive = true;
+            shareCameraArmed = true;
+            ensureShareModalVisible();
             shareFile.click();
+            /* Abbruch der Kamera: nach kurzer Pause Modal wiederherstellen */
+            setTimeout(function () {
+              if (shareCameraArmed) {
+                shareCameraArmed = false;
+                ensureShareModalVisible();
+              }
+            }, 1200);
           });
           shareFile.addEventListener("change", function () {
             var file = shareFile.files && shareFile.files[0];
+            shareCameraArmed = false;
+            shareSessionActive = true;
+            ensureShareModalVisible();
             if (!file) return;
             var localUrl = URL.createObjectURL(file);
             if (sharePreview) {
@@ -3172,15 +3231,21 @@
               sharePreview.alt = "Aufnahme";
             }
             shareCamera.classList.add("has-preview");
+            shareChoice.hidden = false;
+            shareTextWrap.hidden = true;
+            var shareMsg = document.getElementById("share-msg");
+            if (shareMsg) shareMsg.textContent = "Lädt Foto…";
             if (msg) msg.textContent = "Lädt Foto…";
             fileToJpegBlob(file)
               .then(function (jpeg) {
+                ensureShareModalVisible();
                 return uploadCommunityBlob(jpeg || file);
               })
               .then(function (url) {
+                ensureShareModalVisible();
                 if (!url) {
+                  if (shareMsg) shareMsg.textContent = "Foto-Upload fehlgeschlagen.";
                   if (msg) msg.textContent = "Foto-Upload fehlgeschlagen.";
-                  /* Vorschau bleibt — localUrl nicht freigeben */
                   return null;
                 }
                 if (sharePreview) sharePreview.src = url;
@@ -3197,16 +3262,20 @@
                 });
               })
               .then(function (result) {
+                ensureShareModalVisible();
                 if (!result || !result.url) return;
                 if (result.row) {
+                  if (shareMsg) shareMsg.textContent = "Foto im Feed — Text geht noch, oder Fertig.";
                   if (msg) msg.textContent = "Foto im Feed.";
-                  setTimeout(function () { closeShareModal(); }, 900);
                 } else {
+                  if (shareMsg) shareMsg.textContent = "Upload ok — Feed speichern fehlgeschlagen (SQL?).";
                   if (msg) msg.textContent = "Upload ok — Feed speichern fehlgeschlagen (SQL?).";
                 }
               })
               .catch(function (err) {
                 console.warn("share photo failed", err);
+                ensureShareModalVisible();
+                if (shareMsg) shareMsg.textContent = "Foto-Upload fehlgeschlagen.";
                 if (msg) msg.textContent = "Foto-Upload fehlgeschlagen.";
               });
             shareFile.value = "";
