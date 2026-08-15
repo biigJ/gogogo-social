@@ -29,7 +29,8 @@
       --chrome-width: min(100% - 32px, 390px);
       --chrome-radius: 22px;
       --header-h: 52px;
-      --chrome-stack: calc(var(--header-h) + 36px + env(safe-area-inset-bottom));
+      --chrome-fade: 56px;
+      --chrome-stack: calc(var(--chrome-fade) + var(--header-h) + 44px + env(safe-area-inset-bottom, 0px));
       --display: "Space Grotesk", system-ui, sans-serif;
       --max: 420px;
       --pad: 24px;
@@ -75,22 +76,30 @@
       display: flex;
       flex-direction: column;
       align-items: stretch;
-      padding: 36px var(--pad) 0;
+      padding: var(--chrome-fade) var(--pad) 0;
       pointer-events: none;
-      background: linear-gradient(
-        180deg,
-        rgba(199, 65, 59, 0) 0%,
-        rgba(199, 65, 59, 0.72) 34%,
-        rgba(199, 65, 59, 0.96) 58%,
-        var(--red) 78%
-      );
+      /* Oben weich ausfaden, darunter deckend — verhindert Geistertext unter dem Menü. */
+      background:
+        linear-gradient(
+          180deg,
+          rgba(199, 65, 59, 0) 0%,
+          rgba(199, 65, 59, 0.55) 42%,
+          var(--red) 78%
+        );
+      transform: translateZ(0);
+      isolation: isolate;
+    }
+    .site-chrome__bar {
+      background: var(--red);
+      pointer-events: none;
     }
     .site-bottom {
       flex-shrink: 0;
       display: flex;
       justify-content: center;
-      padding: 0;
+      padding: 0 0 6px;
       pointer-events: none;
+      background: var(--red);
     }
     .site-header {
       pointer-events: auto;
@@ -139,10 +148,10 @@
       overscroll-behavior: contain;
       box-sizing: border-box;
       padding: 0 var(--pad);
-      /* Inhalt startet unter der Notch, scrollt aber bis hinter die Kamera. */
-      padding-top: env(safe-area-inset-top);
-      /* Unten genug Platz, damit Text über dem Menü lesbar ist und dahinter durchläuft. */
-      padding-bottom: calc(var(--chrome-stack) + 24px);
+      /* Genug Abstand unter Dynamic Island; beim Scrollen wandert Inhalt dahinter. */
+      padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
+      /* Letzte Karte kann über dem Menü stehen, läuft beim Weiterscrollen darunter. */
+      padding-bottom: calc(var(--chrome-stack) + 32px);
     }
 
     .hero { text-align: center; margin-bottom: 22px; }
@@ -774,10 +783,11 @@
       pointer-events: auto;
       text-align: center;
       margin: 0;
-      padding: 8px 0 max(10px, env(safe-area-inset-bottom));
+      padding: 6px 0 max(18px, calc(env(safe-area-inset-bottom, 0px) + 8px));
       font-size: 12px;
       font-weight: 500;
       color: var(--ink-on-red);
+      background: var(--red);
     }
     .foot a:hover { text-decoration: underline; }
     .gate {
