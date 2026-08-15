@@ -673,6 +673,7 @@
       var menuPanel = document.getElementById("menu-panel");
       var lastQr = null;
       var activeAccount = null;
+      var activeAccountIds = [];
       var cyclePortrait = document.getElementById("cycle-portrait");
       var cyclePortraitImg = document.getElementById("cycle-portrait-img");
       var PLAN_FIELDS = [
@@ -846,6 +847,7 @@
         hideAllPanels();
         panelGen.hidden = false;
         activeAccount = null;
+        activeAccountIds = [];
         setCycleVisible(true);
         setCyclePhoto(null);
         setCycleBack(false);
@@ -857,6 +859,7 @@
         hideAllPanels();
         panelLogin.hidden = false;
         activeAccount = null;
+        activeAccountIds = [];
         setCycleVisible(true);
         setCyclePhoto(null);
         setCycleBack(false);
@@ -864,46 +867,84 @@
         setAuthed(false);
         updateAuthBtn();
       }
-      async function resolveAccount(name, serial, code) {
-        var account = null;
+      async function resolveRelatedAccounts(name, serial, code) {
+        var seen = {};
+        var list = [];
+        function addRows(rows, requireName) {
+          if (!rows) return;
+          for (var i = 0; i < rows.length; i++) {
+            var row = rows[i];
+            if (!row || !row.id || seen[row.id]) continue;
+            if (requireName && name && !namesMatch(row.name, name)) continue;
+            seen[row.id] = true;
+            list.push(row);
+          }
+        }
         try {
           if (serial) {
             var bySerial = await fetch(
               SUPABASE_URL + "/rest/v1/go_accounts?serial_number=eq." + encodeURIComponent(serial) +
-              "&select=*&limit=1",
+              "&select=*&order=created_at.desc&limit=50",
               { headers: apiHeaders() }
             );
-            var serialRows = bySerial.ok ? await bySerial.json() : [];
-            if (serialRows && serialRows[0]) account = serialRows[0];
+            addRows(bySerial.ok ? await bySerial.json() : [], false);
           }
-          if (!account && name) {
+          if (name) {
             var accRes = await fetch(
               SUPABASE_URL + "/rest/v1/go_accounts?name=ilike." + encodeURIComponent(name) +
-              "&select=*&order=created_at.desc&limit=20",
+              "&select=*&order=created_at.desc&limit=50",
               { headers: apiHeaders() }
             );
-            var accounts = accRes.ok ? await accRes.json() : [];
-            var matches = (accounts || []).filter(function (row) {
-              return namesMatch(row.name, name);
-            });
-            if (code) {
-              for (var i = 0; i < matches.length; i++) {
-                if (String(matches[i].invite_code || "") === String(code)) {
-                  account = matches[i];
-                  break;
-                }
-              }
-            }
-            if (!account) {
-              for (var p = 0; p < matches.length; p++) {
-                if (matches[p].photo_url) { account = matches[p]; break; }
-              }
-            }
-            if (!account && matches.length) account = matches[0];
+            addRows(accRes.ok ? await accRes.json() : [], true);
+          }
+          if (code) {
+            var byCode = await fetch(
+              SUPABASE_URL + "/rest/v1/go_accounts?invite_code=eq." + encodeURIComponent(code) +
+              "&select=*&order=created_at.desc&limit=50",
+              { headers: apiHeaders() }
+            );
+            addRows(byCode.ok ? await byCode.json() : [], name ? true : false);
           }
         } catch (e) {}
-        return account;
+        return list;
       }
+
+      async function pickPrimaryAccount(accounts) {
+        if (!accounts || !accounts.length) return null;
+        var best = accounts[0];
+        var bestCount = -1;
+        for (var i = 0; i < accounts.length; i++) {
+          var acc = accounts[i];
+          var count = 0;
+          try {
+            var res = await fetch(
+              SUPABASE_URL + "/rest/v1/go_community_posts?author_id=eq." + encodeURIComponent(acc.id) +
+              "&select=id&limit=50",
+              { headers: apiHeaders() }
+            );
+            var rows = res.ok ? await res.json() : [];
+            count = rows ? rows.length : 0;
+          } catch (e) {}
+          if (count > bestCount) {
+            bestCount = count;
+            best = acc;
+          } else if (count === bestCount && acc.photo_url && !best.photo_url) {
+            best = acc;
+          }
+        }
+        return best;
+      }
+
+      async function resolveAccount(name, serial, code) {
+        var related = await resolveRelatedAccounts(name, serial, code);
+        activeAccountIds = related.map(function (a) { return a.id; }).filter(Boolean);
+        if (!related.length) {
+          activeAccountIds = [];
+          return null;
+        }
+        return await pickPrimaryAccount(related);
+      }
+
       function clearPlanForm() {
         PLAN_FIELDS.forEach(function (pair) {
           var el = document.getElementById(pair[0]);
@@ -1024,24 +1065,30 @@
         var feed = document.getElementById("admin-feed");
         if (!feed) return;
         feed.innerHTML = "";
-        if (!account || !account.id || String(account.id).indexOf("local-") === 0) {
+        var ids = (activeAccountIds && activeAccountIds.length)
+          ? activeAccountIds.slice()
+          : (account && account.id && String(account.id).indexOf("local-") !== 0 ? [account.id] : []);
+        if (!ids.length) {
           feed.innerHTML = '<p class="empty">Noch kein Community-Verlauf.</p>';
           return;
         }
         try {
           var coach = await resolveCoachAccount();
+          var inList = "(" + ids.join(",") + ")";
           var q =
-            "go_community_posts?or=(author_id.eq." + encodeURIComponent(account.id) +
-            ",reply_to_id.eq." + encodeURIComponent(account.id) +
-            ")&select=*&order=created_at.desc&limit=120";
+            "go_community_posts?or=(author_id.in." + inList +
+            ",reply_to_id.in." + inList +
+            ")&select=*&order=created_at.desc&limit=200";
           var res = await fetch(SUPABASE_URL + "/rest/v1/" + q, { headers: apiHeaders() });
           var rows = res.ok ? await res.json() : [];
           if (!rows || !rows.length) {
             feed.innerHTML = '<p class="empty">Noch kein Community-Verlauf.</p>';
             return;
           }
-          var userFirst = String(account.name || "").trim().split(/\s+/)[0] || "Nutzer";
+          var userFirst = String((account && account.name) || "").trim().split(/\s+/)[0] || "Nutzer";
           var coachId = coach && coach.id ? coach.id : null;
+          var idSet = {};
+          ids.forEach(function (id) { idSet[id] = true; });
           rows.forEach(function (post) {
             if (!post) return;
             var mine = !!(coachId && post.author_id === coachId);
@@ -1297,6 +1344,7 @@
         hideAllPanels();
         panelList.hidden = false;
         activeAccount = null;
+        activeAccountIds = [];
         setCycleVisible(false);
         setCyclePhoto(null);
         setCycleBack(false);
