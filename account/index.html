@@ -3412,20 +3412,29 @@
         }
         function workoutFor(d) {
           var wd = (d.getDay() + 6) % 7;
-          var fromCoach = coachDayText(wd);
-          if (fromCoach) {
-            var parts = splitPlanLines(fromCoach);
-            var rest = /ruhe|erholung|kein\s*workout/i.test(fromCoach);
-            var training =
-              wd === 4 &&
-              !parts.line2 &&
-              /zum\s*training|friday\s*circle|\bhiit\b/i.test(fromCoach);
+          /* Sobald ein Admin-Plan geladen ist: nur noch dessen Wochentage (kein Default-Template). */
+          if (coachPlan) {
+            var fromCoach = coachDayText(wd);
+            if (fromCoach) {
+              var parts = splitPlanLines(fromCoach);
+              var rest = /ruhe|erholung|kein\s*workout/i.test(fromCoach);
+              var training =
+                wd === 4 &&
+                !parts.line2 &&
+                /zum\s*training|friday\s*circle|\bhiit\b/i.test(fromCoach);
+              return {
+                title: parts.title || fromCoach,
+                line1: parts.line1,
+                line2: parts.line2 || (training ? "Zum Training" : ""),
+                rest: rest,
+                training: training
+              };
+            }
             return {
-              title: parts.title || fromCoach,
-              line1: parts.line1,
-              line2: parts.line2 || (training ? "Zum Training" : ""),
-              rest: rest,
-              training: training
+              title: "Noch offen.",
+              line1: "",
+              line2: "",
+              rest: true
             };
           }
           return WEEKDAY_WORKOUTS[wd] || WEEKDAY_WORKOUTS[1];
@@ -3458,11 +3467,13 @@
 
         function renderWorkout(d) {
           var w = workoutFor(d);
-          titleEl.textContent = w.title;
-          line1El.textContent = w.line1;
+          titleEl.textContent = w.title || "";
+          line1El.textContent = w.line1 || "";
+          line1El.hidden = !w.line1;
           line2El.textContent = "";
           while (line2El.firstChild) line2El.removeChild(line2El.firstChild);
           if (w.training) {
+            line2El.hidden = false;
             var cta = document.createElement("button");
             cta.type = "button";
             cta.className = "home-workout__cta";
@@ -3472,7 +3483,8 @@
             });
             line2El.appendChild(cta);
           } else {
-            line2El.textContent = w.line2;
+            line2El.textContent = w.line2 || "";
+            line2El.hidden = !w.line2;
           }
           syncCheckControls(dateKey(d));
         }
@@ -3670,6 +3682,12 @@
         onCoachPlanLoaded = function () {
           try { renderWeek(); } catch (e) {}
         };
+        /* Plan kann schon vor diesem Callback fertig geladen sein (Race mit showApp). */
+        if (coachPlan) {
+          onCoachPlanLoaded();
+        } else {
+          loadCoachPlan().catch(function () {});
+        }
       })();
 
       /* Photo crop + dither + upload */
