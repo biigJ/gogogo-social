@@ -86,7 +86,6 @@
       padding: var(--chrome-fade) var(--pad) 0;
       pointer-events: none;
       background: transparent;
-      isolation: isolate;
     }
     .site-chrome::before {
       content: "";
@@ -94,9 +93,9 @@
       inset: 0;
       z-index: 0;
       pointer-events: none;
-      background: rgba(199, 65, 59, 0.18);
-      -webkit-backdrop-filter: blur(22px) saturate(1.2);
-      backdrop-filter: blur(22px) saturate(1.2);
+      background: rgba(199, 65, 59, 0.12);
+      -webkit-backdrop-filter: blur(22px) saturate(1.15);
+      backdrop-filter: blur(22px) saturate(1.15);
       -webkit-mask-image: linear-gradient(
         180deg,
         rgba(0, 0, 0, 0) 0%,
@@ -115,24 +114,43 @@
     .site-chrome--top {
       top: 0;
       bottom: auto;
-      height: calc(env(safe-area-inset-top, 0px) + var(--chrome-fade));
+      height: calc(env(safe-area-inset-top, 0px) + 72px);
       padding: 0;
       display: block;
+      /* isolation bricht auf iOS oft den Blur → harter roter Rand */
+      isolation: auto;
     }
     .site-chrome--top::before {
+      background: transparent;
+      -webkit-backdrop-filter: blur(28px) saturate(1.1);
+      backdrop-filter: blur(28px) saturate(1.1);
       -webkit-mask-image: linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0) 0%,
-        rgba(0, 0, 0, 0.45) 38%,
-        rgba(0, 0, 0, 0.9) 72%,
-        #000 100%
+        to bottom,
+        #000 0%,
+        rgba(0, 0, 0, 0.85) 42%,
+        rgba(0, 0, 0, 0.35) 72%,
+        transparent 100%
       );
       mask-image: linear-gradient(
-        0deg,
-        rgba(0, 0, 0, 0) 0%,
-        rgba(0, 0, 0, 0.45) 38%,
-        rgba(0, 0, 0, 0.9) 72%,
-        #000 100%
+        to bottom,
+        #000 0%,
+        rgba(0, 0, 0, 0.85) 42%,
+        rgba(0, 0, 0, 0.35) 72%,
+        transparent 100%
+      );
+    }
+    /* Sanfter Notfall-Verlauf, falls backdrop-filter schwach wirkt */
+    .site-chrome--top::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        to bottom,
+        rgba(199, 65, 59, 0.35) 0%,
+        rgba(199, 65, 59, 0.12) 45%,
+        rgba(199, 65, 59, 0) 100%
       );
     }
     .site-bottom {
