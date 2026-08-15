@@ -397,14 +397,14 @@
   <div id="app" hidden>
     <div class="site-top">
       <nav class="site-header" aria-label="Account">
-        <button class="nav-btn is-active" type="button" data-goto="home" aria-label="Home" aria-current="page">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 3.4 3.2 10.6V21h6.3v-5.8h4.9V21h6.4V10.6L12 3.4Z"/></svg>
-        </button>
         <button class="nav-btn" type="button" data-goto="book" aria-label="Buch">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.2 3.5h9.2c1.3 0 2.3 1 2.3 2.3v12.9c0 .7-.6 1.3-1.3 1.3H6.5c-.9 0-1.6-.7-1.6-1.6V5.1c0-.9.7-1.6 1.6-1.6h-.3Zm1.1 2.2v12.1h9.2V5.8c0-.1-.1-.2-.2-.2H7.3Zm2.2 2.1h5.2v1.5H9.5V7.9Zm0 3.2h5.2v1.5H9.5v-1.5Zm0 3.2h3.6v1.5H9.5v-1.5Z"/></svg>
         </button>
         <button class="nav-btn" type="button" data-goto="community" aria-label="Community">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8.2 11.2a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2Zm7.6 0a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2ZM3.4 19.2c0-2.7 2.4-4.6 4.8-4.6h.4c1 .4 2.1.6 3.2.6s2.2-.2 3.2-.6h.4c2.4 0 4.8 1.9 4.8 4.6v1.3H3.4v-1.3Z"/></svg>
+        </button>
+        <button class="nav-btn is-active" type="button" data-goto="home" aria-label="Home" aria-current="page">
+          <svg id="nav-cycle" viewBox="0 0 24 24" aria-hidden="true" fill="none"></svg>
         </button>
         <button class="nav-btn" type="button" data-goto="chat" aria-label="Chat">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4.2 4.2h15.6c1 0 1.8.8 1.8 1.8v9.2c0 1-.8 1.8-1.8 1.8H9.1L4.2 21V6c0-1 .8-1.8 1.8-1.8h-1.8Zm1.8 1.8v10.2l2.4-1.8h11.4V6H6Z"/></svg>
@@ -942,10 +942,17 @@
       }
       syncFromCloud().catch(function () {});
 
-      function drawCycle(svg) {
+      function drawCycle(svg, opts) {
+        opts = opts || {};
         var ns = "http://www.w3.org/2000/svg";
         while (svg.firstChild) svg.removeChild(svg.firstChild);
-        var cx = 120, cy = 120, inner = 78, outer = 112, count = 30;
+        var cx = opts.cx != null ? opts.cx : 120;
+        var cy = opts.cy != null ? opts.cy : 120;
+        var inner = opts.inner != null ? opts.inner : 78;
+        var outer = opts.outer != null ? opts.outer : 112;
+        var count = opts.count != null ? opts.count : 30;
+        var stroke = opts.stroke || "#F7F5F0";
+        var sw = opts.strokeWidth || "3";
         for (var s = 0; s < count; s++) {
           var a = ((s / count) * Math.PI * 2) - Math.PI / 2;
           var line = document.createElementNS(ns, "line");
@@ -953,13 +960,22 @@
           line.setAttribute("y1", (cy + Math.sin(a) * inner).toFixed(2));
           line.setAttribute("x2", (cx + Math.cos(a) * outer).toFixed(2));
           line.setAttribute("y2", (cy + Math.sin(a) * outer).toFixed(2));
-          line.setAttribute("stroke", "#F7F5F0");
-          line.setAttribute("stroke-width", "3");
+          line.setAttribute("stroke", stroke);
+          line.setAttribute("stroke-width", sw);
           line.setAttribute("stroke-linecap", "round");
           svg.appendChild(line);
         }
       }
       drawCycle(document.getElementById("cycle"));
+      drawCycle(document.getElementById("nav-cycle"), {
+        cx: 12,
+        cy: 12,
+        inner: 5.2,
+        outer: 10.6,
+        count: 20,
+        stroke: "currentColor",
+        strokeWidth: "1.55"
+      });
 
       var homeHero = document.getElementById("home-hero");
       var trainingFrame = document.getElementById("training-frame");
