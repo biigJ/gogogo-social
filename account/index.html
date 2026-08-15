@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#C7413B" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="gogogo" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/account/manifest.webmanifest" />
   <title>gogogo · Account</title>
@@ -28,6 +29,7 @@
       --chrome-width: min(100% - 32px, 390px);
       --chrome-radius: 22px;
       --header-h: 52px;
+      --chrome-stack: calc(var(--header-h) + 36px + env(safe-area-inset-bottom));
       --display: "Space Grotesk", system-ui, sans-serif;
       --max: 420px;
       --pad: 24px;
@@ -64,11 +66,30 @@
     a { color: inherit; text-decoration: none; }
     img { display: block; max-width: 100%; }
 
+    .site-chrome {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      padding: 36px var(--pad) 0;
+      pointer-events: none;
+      background: linear-gradient(
+        180deg,
+        rgba(199, 65, 59, 0) 0%,
+        rgba(199, 65, 59, 0.72) 34%,
+        rgba(199, 65, 59, 0.96) 58%,
+        var(--red) 78%
+      );
+    }
     .site-bottom {
       flex-shrink: 0;
       display: flex;
       justify-content: center;
-      padding: 8px 0 0;
+      padding: 0;
       pointer-events: none;
     }
     .site-header {
@@ -99,23 +120,29 @@
     }
 
     .wrap {
+      position: relative;
       width: min(100%, var(--max));
       margin: 0 auto;
       flex: 1;
       min-height: 0;
-      display: flex;
-      flex-direction: column;
+      height: 100%;
       box-sizing: border-box;
-      padding: calc(12px + env(safe-area-inset-top)) var(--pad) 0;
+      padding: 0;
     }
     .wrap__scroll {
-      flex: 1;
-      min-height: 0;
+      position: absolute;
+      inset: 0;
+      z-index: 1;
       overflow-x: hidden;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
-      padding-bottom: 8px;
+      box-sizing: border-box;
+      padding: 0 var(--pad);
+      /* Inhalt startet unter der Notch, scrollt aber bis hinter die Kamera. */
+      padding-top: env(safe-area-inset-top);
+      /* Unten genug Platz, damit Text über dem Menü lesbar ist und dahinter durchläuft. */
+      padding-bottom: calc(var(--chrome-stack) + 24px);
     }
 
     .hero { text-align: center; margin-bottom: 22px; }
@@ -744,6 +771,7 @@
 
     .foot {
       flex-shrink: 0;
+      pointer-events: auto;
       text-align: center;
       margin: 0;
       padding: 8px 0 max(10px, env(safe-area-inset-bottom));
@@ -1131,33 +1159,35 @@
       </div>
       </div>
 
-      <div class="site-bottom">
-        <nav class="site-header" aria-label="Account">
-          <button class="nav-btn" type="button" data-goto="book" aria-label="Buch">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.2 3.5h9.2c1.3 0 2.3 1 2.3 2.3v12.9c0 .7-.6 1.3-1.3 1.3H6.5c-.9 0-1.6-.7-1.6-1.6V5.1c0-.9.7-1.6 1.6-1.6h-.3Zm1.1 2.2v12.1h9.2V5.8c0-.1-.1-.2-.2-.2H7.3Zm2.2 2.1h5.2v1.5H9.5V7.9Zm0 3.2h5.2v1.5H9.5v-1.5Zm0 3.2h3.6v1.5H9.5v-1.5Z"/></svg>
-          </button>
-          <button class="nav-btn" type="button" data-goto="community" aria-label="Community">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8.2 11.2a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2Zm7.6 0a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2ZM3.4 19.2c0-2.7 2.4-4.6 4.8-4.6h.4c1 .4 2.1.6 3.2.6s2.2-.2 3.2-.6h.4c2.4 0 4.8 1.9 4.8 4.6v1.3H3.4v-1.3Z"/></svg>
-          </button>
-          <button class="nav-btn is-active" type="button" data-goto="home" aria-label="Home" aria-current="page">
-            <svg id="nav-cycle" viewBox="0 0 24 24" aria-hidden="true" fill="none"></svg>
-          </button>
-          <button class="nav-btn" type="button" data-goto="chat" aria-label="Chat">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4.2 4.2h15.6c1 0 1.8.8 1.8 1.8v9.2c0 1-.8 1.8-1.8 1.8H9.1L4.2 21V6c0-1 .8-1.8 1.8-1.8h-1.8Zm1.8 1.8v10.2l2.4-1.8h11.4V6H6Z"/></svg>
-          </button>
-          <button class="nav-btn" type="button" data-goto="training" aria-label="Training">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none">
-              <circle cx="12" cy="12" r="7.25" stroke="currentColor" stroke-width="1.75" />
-            </svg>
-          </button>
-        </nav>
-      </div>
+      <div class="site-chrome">
+        <div class="site-bottom">
+          <nav class="site-header" aria-label="Account">
+            <button class="nav-btn" type="button" data-goto="book" aria-label="Buch">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6.2 3.5h9.2c1.3 0 2.3 1 2.3 2.3v12.9c0 .7-.6 1.3-1.3 1.3H6.5c-.9 0-1.6-.7-1.6-1.6V5.1c0-.9.7-1.6 1.6-1.6h-.3Zm1.1 2.2v12.1h9.2V5.8c0-.1-.1-.2-.2-.2H7.3Zm2.2 2.1h5.2v1.5H9.5V7.9Zm0 3.2h5.2v1.5H9.5v-1.5Zm0 3.2h3.6v1.5H9.5v-1.5Z"/></svg>
+            </button>
+            <button class="nav-btn" type="button" data-goto="community" aria-label="Community">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8.2 11.2a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2Zm7.6 0a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2ZM3.4 19.2c0-2.7 2.4-4.6 4.8-4.6h.4c1 .4 2.1.6 3.2.6s2.2-.2 3.2-.6h.4c2.4 0 4.8 1.9 4.8 4.6v1.3H3.4v-1.3Z"/></svg>
+            </button>
+            <button class="nav-btn is-active" type="button" data-goto="home" aria-label="Home" aria-current="page">
+              <svg id="nav-cycle" viewBox="0 0 24 24" aria-hidden="true" fill="none"></svg>
+            </button>
+            <button class="nav-btn" type="button" data-goto="chat" aria-label="Chat">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4.2 4.2h15.6c1 0 1.8.8 1.8 1.8v9.2c0 1-.8 1.8-1.8 1.8H9.1L4.2 21V6c0-1 .8-1.8 1.8-1.8h-1.8Zm1.8 1.8v10.2l2.4-1.8h11.4V6H6Z"/></svg>
+            </button>
+            <button class="nav-btn" type="button" data-goto="training" aria-label="Training">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none">
+                <circle cx="12" cy="12" r="7.25" stroke="currentColor" stroke-width="1.75" />
+              </svg>
+            </button>
+          </nav>
+        </div>
 
-      <footer class="foot">
-        <a href="/impressum/">Impressum</a> ·
-        <a href="/datenschutz/">Datenschutz</a> ·
-        <a href="/kontakt/">Kontakt</a>
-      </footer>
+        <footer class="foot">
+          <a href="/impressum/">Impressum</a> ·
+          <a href="/datenschutz/">Datenschutz</a> ·
+          <a href="/kontakt/">Kontakt</a>
+        </footer>
+      </div>
     </div>
   </div>
 
