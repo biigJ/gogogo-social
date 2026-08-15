@@ -187,6 +187,7 @@
       gap: 6px;
     }
     .home-cal__day {
+      position: relative;
       aspect-ratio: 1;
       display: flex;
       flex-direction: column;
@@ -254,6 +255,11 @@
       color: var(--ink-on-red);
       text-align: left;
     }
+    .home-workout__box {
+      border: 1px solid rgba(247, 245, 240, 0.55);
+      border-radius: var(--radius);
+      padding: 14px 14px 16px;
+    }
     .home-workout__title {
       font-size: 1.15rem;
       font-weight: 700;
@@ -280,6 +286,100 @@
       font-weight: 700;
       letter-spacing: -0.03em;
       border-radius: var(--radius);
+    }
+    .home-check {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .home-check__slider {
+      display: grid;
+      grid-template-rows: auto auto;
+      gap: 4px;
+      min-width: 0;
+    }
+    .home-check__range {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 28px;
+      background: transparent;
+      margin: 0;
+    }
+    .home-check__range:focus { outline: none; }
+    .home-check__range::-webkit-slider-runnable-track {
+      height: 2px;
+      background: rgba(247, 245, 240, 0.45);
+      border-radius: 1px;
+    }
+    .home-check__range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      margin-top: -7px;
+      border-radius: 50%;
+      background: var(--paper);
+      border: 0;
+    }
+    .home-check__range::-moz-range-track {
+      height: 2px;
+      background: rgba(247, 245, 240, 0.45);
+      border-radius: 1px;
+      border: 0;
+    }
+    .home-check__range::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--paper);
+      border: 0;
+    }
+    .home-check__scale {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.62rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      opacity: 0.7;
+      padding: 0 1px;
+      user-select: none;
+    }
+    .home-check__btn {
+      width: 40px;
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(247, 245, 240, 0.55);
+      border-radius: var(--radius);
+      color: var(--ink-on-red);
+      font-size: 1.15rem;
+      font-weight: 700;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .home-check__btn.is-active {
+      background: rgba(247, 245, 240, 0.18);
+    }
+    .home-check__btn:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+    .home-cal__mark {
+      position: absolute;
+      top: 1px;
+      right: 2px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      line-height: 1;
+      pointer-events: none;
+    }
+    .home-cal__day.is-friday .home-cal__mark {
+      top: 3px;
+      right: 6px;
     }
 
     .panel { display: none; margin-top: 8px; }
@@ -595,7 +695,19 @@
             <div class="home-note__body" id="home-note-body"></div>
           </div>
         </div>
-        <div class="home-workout" id="home-workout"></div>
+        <div class="home-workout" id="home-workout">
+          <div class="home-workout__box" id="home-workout-box"></div>
+          <div class="home-check" id="home-check">
+            <div class="home-check__slider">
+              <input class="home-check__range" id="home-score" type="range" min="1" max="10" step="1" value="5" aria-label="Bewertung 1 bis 10" />
+              <div class="home-check__scale" aria-hidden="true">
+                <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+              </div>
+            </div>
+            <button class="home-check__btn" type="button" id="home-check-ok" aria-label="Tag bestätigen">✓</button>
+            <button class="home-check__btn" type="button" id="home-check-no" aria-label="Tag ohne Eintrag">✕</button>
+          </div>
+        </div>
       </div>
 
       <div class="panel" id="panel-book" data-panel="book">
@@ -942,10 +1054,16 @@
       var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
       var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
       var ACCOUNT_KEY = "gogogo_go_account";
+      var DAY_ENTRIES_KEY = "gogogo_go_day_entries";
       var WHATSAPP_NUMBER = "+491747015500";
+      var CYCLE_RAYS = 30;
+      var RAY_GRAY = "rgba(247, 245, 240, 0.28)";
+      var RAY_LIT = "#F7F5F0";
 
       var account = null;
       try { account = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch (e) {}
+      var dayEntries = {};
+      try { dayEntries = JSON.parse(localStorage.getItem(DAY_ENTRIES_KEY) || "{}") || {}; } catch (e2) { dayEntries = {}; }
 
       if (!account || !account.name) {
         document.getElementById("app-gate").hidden = false;
@@ -979,6 +1097,104 @@
         });
         if (!res.ok) return null;
         try { return await res.json(); } catch (e) { return null; }
+      }
+
+      async function restUpsertDayEntry(row) {
+        var res = await fetch(SUPABASE_URL + "/rest/v1/go_day_entries?on_conflict=account_id,date", {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY,
+            "Content-Type": "application/json",
+            Prefer: "resolution=merge-duplicates,return=minimal"
+          },
+          body: JSON.stringify(row)
+        });
+        return res.ok;
+      }
+
+      function saveDayEntriesLocal() {
+        try { localStorage.setItem(DAY_ENTRIES_KEY, JSON.stringify(dayEntries)); } catch (e) {}
+      }
+
+      function setDayEntryLocal(date, score) {
+        dayEntries[date] = { score: score };
+        saveDayEntriesLocal();
+      }
+
+      function clearDayEntryLocal(date) {
+        delete dayEntries[date];
+        saveDayEntriesLocal();
+      }
+
+      function hasCloudAccount() {
+        return !!(account && account.id && String(account.id).indexOf("local-") !== 0);
+      }
+
+      function parseDateKey(key) {
+        var p = String(key || "").split("-");
+        if (p.length !== 3) return null;
+        var y = parseInt(p[0], 10);
+        var m = parseInt(p[1], 10);
+        var d = parseInt(p[2], 10);
+        if (!y || !m || !d) return null;
+        return new Date(y, m - 1, d);
+      }
+
+      function cycleStartDate() {
+        var raw = (account && (account.created_at || account.cycle_start)) || null;
+        if (raw) {
+          var d = new Date(raw);
+          if (!isNaN(d.getTime())) {
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+          }
+        }
+        var now = new Date();
+        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      }
+
+      function cycleWindowStart() {
+        var start = cycleStartDate();
+        var startMs = startOfDayMs(start);
+        var today = new Date();
+        var daysSince = Math.floor((startOfDayMs(today) - startMs) / 86400000);
+        var cycleOffset = Math.floor(Math.max(0, daysSince) / CYCLE_RAYS) * CYCLE_RAYS;
+        return new Date(startMs + cycleOffset * 86400000);
+      }
+
+      function cycleDayIndex(dateOrKey) {
+        var d = typeof dateOrKey === "string" ? parseDateKey(dateOrKey) : dateOrKey;
+        if (!d) return -1;
+        var windowStart = cycleWindowStart();
+        var idx = Math.floor((startOfDayMs(d) - startOfDayMs(windowStart)) / 86400000);
+        if (idx < 0 || idx >= CYCLE_RAYS) return -1;
+        return idx;
+      }
+
+      function startOfDayMs(d) {
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      }
+
+      function filledRaysFromEntries() {
+        var filled = {};
+        var keys = Object.keys(dayEntries);
+        for (var i = 0; i < keys.length; i++) {
+          var key = keys[i];
+          var entry = dayEntries[key];
+          if (!entry || entry.score == null) continue;
+          var idx = cycleDayIndex(key);
+          if (idx >= 0) filled[idx] = true;
+        }
+        return filled;
+      }
+
+      function refreshCycleRays() {
+        drawCycle(document.getElementById("cycle"), {
+          filled: filledRaysFromEntries(),
+          gray: RAY_GRAY,
+          lit: RAY_LIT,
+          count: CYCLE_RAYS
+        });
       }
 
       async function patchAccount(fields) {
@@ -1035,6 +1251,8 @@
         return SUPABASE_URL + "/storage/v1/object/public/go-avatars/" + path + "?v=" + Date.now();
       }
 
+      var dayEntriesReady = null;
+
       async function syncFromCloud() {
         var nameLc = String(account.name || "").trim().toLowerCase();
         var seen = {};
@@ -1064,7 +1282,10 @@
             "&select=*&order=created_at.asc&limit=50"
           ));
         }
-        if (!candidates.length) return;
+        if (!candidates.length) {
+          if (typeof dayEntriesReady === "function") dayEntriesReady();
+          return;
+        }
         var remote = candidates[0];
         var i;
         for (i = 0; i < candidates.length; i++) {
@@ -1078,11 +1299,13 @@
         account.id = remote.id || account.id;
         if (remote.serial_number) account.serial_number = remote.serial_number;
         if (remote.invite_code) account.invite_code = remote.invite_code;
+        if (remote.created_at) account.created_at = remote.created_at;
         var localPhoto = account.photo_url;
         var remotePhoto = remote.photo_url;
         if (remotePhoto) account.photo_url = remotePhoto;
         saveAccount();
         showApp();
+        if (typeof dayEntriesReady === "function") dayEntriesReady();
         if (localPhoto && String(localPhoto).indexOf("data:image") === 0 && !remotePhoto) {
           try {
             try {
@@ -1096,7 +1319,9 @@
           } catch (e) {}
         }
       }
-      syncFromCloud().catch(function () {});
+      syncFromCloud().catch(function () {
+        if (typeof dayEntriesReady === "function") dayEntriesReady();
+      });
 
       function drawCycle(svg, opts) {
         opts = opts || {};
@@ -1106,9 +1331,12 @@
         var cy = opts.cy != null ? opts.cy : 120;
         var inner = opts.inner != null ? opts.inner : 78;
         var outer = opts.outer != null ? opts.outer : 112;
-        var count = opts.count != null ? opts.count : 30;
-        var stroke = opts.stroke || "#F7F5F0";
+        var count = opts.count != null ? opts.count : CYCLE_RAYS;
+        var gray = opts.gray || (opts.stroke ? null : RAY_GRAY);
+        var lit = opts.lit || RAY_LIT;
+        var stroke = opts.stroke || null;
         var sw = opts.strokeWidth || "3";
+        var filled = opts.filled || {};
         for (var s = 0; s < count; s++) {
           var a = ((s / count) * Math.PI * 2) - Math.PI / 2;
           var line = document.createElementNS(ns, "line");
@@ -1116,13 +1344,14 @@
           line.setAttribute("y1", (cy + Math.sin(a) * inner).toFixed(2));
           line.setAttribute("x2", (cx + Math.cos(a) * outer).toFixed(2));
           line.setAttribute("y2", (cy + Math.sin(a) * outer).toFixed(2));
-          line.setAttribute("stroke", stroke);
+          var color = stroke || (filled[s] ? lit : gray);
+          line.setAttribute("stroke", color);
           line.setAttribute("stroke-width", sw);
           line.setAttribute("stroke-linecap", "round");
           svg.appendChild(line);
         }
       }
-      drawCycle(document.getElementById("cycle"));
+      refreshCycleRays();
       drawCycle(document.getElementById("nav-cycle"), {
         cx: 12,
         cy: 12,
@@ -1204,13 +1433,17 @@
 
         var root = document.getElementById("week");
         var labelEl = document.getElementById("week-label");
-        var workoutEl = document.getElementById("home-workout");
+        var workoutBox = document.getElementById("home-workout-box");
+        var scoreInput = document.getElementById("home-score");
+        var checkOk = document.getElementById("home-check-ok");
+        var checkNo = document.getElementById("home-check-no");
         var noteEl = document.getElementById("home-note");
         var noteHi = document.getElementById("home-note-hi");
         var noteBody = document.getElementById("home-note-body");
         var noteToggle = document.getElementById("home-note-toggle");
         var weekOffset = 0;
         var selectedKey = null;
+        var saving = false;
 
         function startOfDay(d) {
           return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -1239,29 +1472,57 @@
           mid.setDate(monday.getDate() + 3);
           return mid.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
         }
+        function entryFor(key) {
+          return dayEntries[key] || null;
+        }
+        function markFor(key) {
+          var e = entryFor(key);
+          if (!e) return "";
+          return e.score == null ? "✕" : "✓";
+        }
 
         function renderWorkout(d) {
           var w = workoutFor(d);
+          workoutBox.innerHTML = "";
           if (!w) {
-            workoutEl.innerHTML =
-              '<p class="home-workout__empty">Kein Workout an diesem Tag.</p>';
-            return;
+            var empty = document.createElement("p");
+            empty.className = "home-workout__empty";
+            empty.textContent = "Kein Workout an diesem Tag.";
+            workoutBox.appendChild(empty);
+          } else {
+            var title = document.createElement("h3");
+            title.className = "home-workout__title";
+            title.textContent = w.title;
+            var body = document.createElement("div");
+            body.className = "home-workout__body";
+            var p = document.createElement("p");
+            p.textContent = w.body;
+            body.appendChild(p);
+            workoutBox.appendChild(title);
+            workoutBox.appendChild(body);
+            if (w.training) {
+              var cta = document.createElement("button");
+              cta.type = "button";
+              cta.className = "home-workout__cta";
+              cta.textContent = "Zum Training";
+              cta.addEventListener("click", function () {
+                gotoPanel("training");
+              });
+              workoutBox.appendChild(cta);
+            }
           }
-          var html =
-            '<h3 class="home-workout__title"></h3><div class="home-workout__body"><p></p></div>';
-          workoutEl.innerHTML = html;
-          workoutEl.querySelector(".home-workout__title").textContent = w.title;
-          workoutEl.querySelector(".home-workout__body p").textContent = w.body;
-          if (w.training) {
-            var cta = document.createElement("button");
-            cta.type = "button";
-            cta.className = "home-workout__cta";
-            cta.textContent = "Zum Training";
-            cta.addEventListener("click", function () {
-              gotoPanel("training");
-            });
-            workoutEl.appendChild(cta);
+          syncCheckControls(dateKey(d));
+        }
+
+        function syncCheckControls(key) {
+          var e = entryFor(key);
+          if (e && e.score != null) {
+            scoreInput.value = String(e.score);
+          } else if (!e) {
+            scoreInput.value = "5";
           }
+          checkOk.classList.toggle("is-active", !!(e && e.score != null));
+          checkNo.classList.toggle("is-active", !!(e && e.score == null));
         }
 
         function renderWeek() {
@@ -1289,11 +1550,12 @@
           days.forEach(function (d, i) {
             var key = dateKey(d);
             var w = workoutFor(d);
+            var mark = markFor(key);
             var btn = document.createElement("button");
             btn.type = "button";
             btn.className = "home-cal__day";
             btn.setAttribute("role", "option");
-            btn.setAttribute("aria-label", names[i] + " " + d.getDate());
+            btn.setAttribute("aria-label", names[i] + " " + d.getDate() + (mark ? (" " + mark) : ""));
             if (w) btn.classList.add("has-workout");
             if (i === 4) btn.classList.add("is-friday");
             if (key === dateKey(today)) btn.classList.add("is-today");
@@ -1304,7 +1566,8 @@
               btn.setAttribute("aria-selected", "false");
             }
             btn.innerHTML =
-              "<span>" + names[i] + "</span><span class='home-cal__n'>" + d.getDate() + "</span>";
+              "<span>" + names[i] + "</span><span class='home-cal__n'>" + d.getDate() + "</span>" +
+              (mark ? ("<span class='home-cal__mark' aria-hidden='true'>" + mark + "</span>") : "");
             btn.addEventListener("click", function () {
               selectedKey = key;
               renderWeek();
@@ -1315,6 +1578,70 @@
           var selected = days.find(function (d) { return dateKey(d) === selectedKey; }) || days[0];
           renderWorkout(selected);
         }
+
+        async function persistEntry(key, score) {
+          if (saving) return;
+          saving = true;
+          checkOk.disabled = true;
+          checkNo.disabled = true;
+          try {
+            setDayEntryLocal(key, score);
+            refreshCycleRays();
+            renderWeek();
+            if (hasCloudAccount()) {
+              var ok = await restUpsertDayEntry({
+                account_id: account.id,
+                date: key,
+                score: score,
+                updated_at: new Date().toISOString()
+              });
+              if (!ok) {
+                /* lokal behalten; Cloud ggf. später nachziehen */
+              }
+            }
+          } finally {
+            saving = false;
+            checkOk.disabled = false;
+            checkNo.disabled = false;
+          }
+        }
+
+        async function loadEntriesFromCloud() {
+          if (!hasCloudAccount()) {
+            refreshCycleRays();
+            renderWeek();
+            return;
+          }
+          var rows = await restGet(
+            "go_day_entries?account_id=eq." + encodeURIComponent(account.id) +
+            "&select=date,score&order=date.asc&limit=400"
+          );
+          if (rows && rows.length) {
+            for (var i = 0; i < rows.length; i++) {
+              var row = rows[i];
+              if (!row || !row.date) continue;
+              dayEntries[row.date] = { score: row.score == null ? null : Number(row.score) };
+            }
+            saveDayEntriesLocal();
+          }
+          refreshCycleRays();
+          renderWeek();
+        }
+
+        dayEntriesReady = function () {
+          loadEntriesFromCloud().catch(function () {});
+        };
+
+        checkOk.addEventListener("click", function () {
+          if (!selectedKey) return;
+          var val = parseInt(scoreInput.value, 10);
+          if (!(val >= 1 && val <= 10)) val = 5;
+          persistEntry(selectedKey, val);
+        });
+        checkNo.addEventListener("click", function () {
+          if (!selectedKey) return;
+          persistEntry(selectedKey, null);
+        });
 
         document.getElementById("week-prev").addEventListener("click", function () {
           weekOffset -= 1;
@@ -1337,6 +1664,8 @@
         });
 
         renderWeek();
+        refreshCycleRays();
+        loadEntriesFromCloud().catch(function () {});
       })();
 
       /* Photo crop + dither + upload */
