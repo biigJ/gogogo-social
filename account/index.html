@@ -119,28 +119,41 @@
     .site-chrome--top {
       top: 0;
       bottom: auto;
-      /* Strikt Notch-/Statusleiste: von ganz oben bis Ende Safe-Area, kein tiefer Auslauf */
-      height: env(safe-area-inset-top, 0px);
-      min-height: env(safe-area-inset-top, 0px);
+      /* Safe-Area + kurzer Auslauf: iOS wendet backdrop-filter in der Statusleiste sonst oft nicht an */
+      height: calc(env(safe-area-inset-top, 0px) + 36px);
+      min-height: calc(env(safe-area-inset-top, 0px) + 36px);
       padding: 0;
       display: block;
-      opacity: 0;
-      transition: opacity 180ms ease;
+      /* opacity am Parent killt backdrop-filter auf WebKit — nur ::before steuern */
+      opacity: 1;
       isolation: auto;
       pointer-events: none;
     }
-    body.has-scroll-overflow .site-chrome--top {
-      opacity: 1;
-    }
     .site-chrome.site-chrome--top::before {
-      /* Reiner Blur hinter dem Notch — kein Farbton, kein Rot-Verlauf */
-      opacity: 1;
-      background: none;
-      background-color: transparent;
-      -webkit-backdrop-filter: blur(28px);
-      backdrop-filter: blur(28px);
-      -webkit-mask-image: none;
-      mask-image: none;
+      /* Reiner Blur ohne Rot: winzige neutrale Fläche aktiviert WebKit-Backdrop */
+      /* Kein opacity hier — das bricht backdrop-filter auf iOS */
+      background: transparent;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      -webkit-mask-image: linear-gradient(
+        to bottom,
+        #000 0%,
+        #000 42%,
+        rgba(0, 0, 0, 0.55) 72%,
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to bottom,
+        #000 0%,
+        #000 42%,
+        rgba(0, 0, 0, 0.55) 72%,
+        transparent 100%
+      );
+    }
+    body.has-scroll-overflow .site-chrome.site-chrome--top::before {
+      background: rgba(255, 255, 255, 0.06);
+      -webkit-backdrop-filter: blur(22px) saturate(1.15);
+      backdrop-filter: blur(22px) saturate(1.15);
     }
     .site-chrome--top::after {
       display: none;
