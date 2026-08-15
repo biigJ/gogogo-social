@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#C7413B" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="gogogo" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/account/manifest.webmanifest" />
   <title>gogogo · Account</title>
@@ -14,6 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script src="/assets/go-account-session.js"></script>
   <script src="/assets/go-dither.js" defer></script>
   <style>
     :root {
@@ -1164,7 +1166,12 @@
       var RAY_LIT = "#F7F5F0";
 
       var account = null;
-      try { account = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch (e) {}
+      if (window.GoAccountSession) {
+        account = GoAccountSession.load();
+        GoAccountSession.persist();
+      } else {
+        try { account = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch (e) {}
+      }
       var dayEntries = {};
       try { dayEntries = JSON.parse(localStorage.getItem(DAY_ENTRIES_KEY) || "{}") || {}; } catch (e2) { dayEntries = {}; }
 
@@ -1174,7 +1181,10 @@
       }
 
       function saveAccount() {
-        try { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account)); } catch (e) {}
+        if (window.GoAccountSession) GoAccountSession.save(account);
+        else {
+          try { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account)); } catch (e) {}
+        }
       }
 
       function applyPhoto(url) {
