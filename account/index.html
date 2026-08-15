@@ -512,6 +512,89 @@
       font-weight: 700;
       letter-spacing: -0.02em;
     }
+    .community-firstname {
+      color: var(--ink-on-red);
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.3;
+      margin: 0;
+    }
+    .community-rule {
+      border: 0;
+      border-top: 1px solid rgba(247, 245, 240, 0.85);
+      margin: 0 0 18px;
+      width: 100%;
+    }
+    .community-add-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+    .community-add {
+      cursor: pointer;
+    }
+    .community-add-side {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+      padding-top: 8px;
+    }
+    .community-add-form {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+    .community-add-form[hidden] { display: none !important; }
+    .community-add-form input {
+      width: 100%;
+      min-width: 0;
+      height: 40px;
+      padding: 0 12px;
+      border: 1px solid rgba(247, 245, 240, 0.85);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--ink-on-red);
+      font-weight: 500;
+      letter-spacing: 0.08em;
+    }
+    .community-add-form input::placeholder {
+      color: rgba(247, 245, 240, 0.55);
+      letter-spacing: -0.02em;
+    }
+    .community-add-form button {
+      height: 40px;
+      padding: 0 14px;
+      background: var(--paper);
+      color: var(--btn-ink);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      border-radius: var(--radius);
+    }
+    .community-add-msg {
+      margin: 0;
+      color: var(--ink-on-red);
+      font-size: 0.85rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      min-height: 1.2em;
+      opacity: 0.9;
+    }
+    .community-buddy-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 8px;
+    }
+    .community-buddy-list li {
+      color: var(--ink-on-red);
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
     .profile-stats {
       display: grid;
       gap: 8px;
@@ -1372,11 +1455,28 @@
       </div>
 
       <div class="panel" id="panel-community" data-panel="community">
-        <article class="tile">
-          <h2>Community</h2>
-          <p>Match mit Trainingsbuddys und lade Deine Freunde ein. Real Life Events to be announced.</p>
-          <button class="btn" type="button" data-goto="chat">Zum Chat</button>
-        </article>
+        <h1 class="profile-name">Meine Buddies</h1>
+        <div class="profile-top">
+          <div class="profile-portrait" id="community-photo" aria-hidden="true">
+            <img id="community-photo-img" alt="" hidden />
+            <span class="profile-portrait__plus" id="community-photo-plus">+</span>
+          </div>
+          <p class="community-firstname" id="community-firstname"></p>
+        </div>
+        <hr class="community-rule" />
+        <div class="community-add-row">
+          <button class="profile-portrait community-add" id="community-add-btn" type="button" aria-label="Buddy hinzufügen">
+            <span class="profile-portrait__plus">+</span>
+          </button>
+          <div class="community-add-side">
+            <form class="community-add-form" id="community-add-form" hidden>
+              <input id="community-serial" type="text" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="off" placeholder="8-stellige Nummer" aria-label="8-stellige Profilnummer" />
+              <button type="submit">OK</button>
+            </form>
+            <p class="community-add-msg" id="community-add-msg" aria-live="polite"></p>
+            <ul class="community-buddy-list" id="community-buddy-list"></ul>
+          </div>
+        </div>
       </div>
 
       <div class="panel" id="panel-chat" data-panel="chat">
@@ -1470,6 +1570,7 @@
       var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
       var ACCOUNT_KEY = "gogogo_go_account";
       var DAY_ENTRIES_KEY = "gogogo_go_day_entries";
+      var BUDDIES_KEY = "gogogo_go_buddies";
       var WHATSAPP_NUMBER = "+491747015500";
       var CYCLE_RAYS = 28;
       var RAY_GRAY = "rgba(247, 245, 240, 0.28)";
@@ -1484,6 +1585,11 @@
       }
       var dayEntries = {};
       try { dayEntries = JSON.parse(localStorage.getItem(DAY_ENTRIES_KEY) || "{}") || {}; } catch (e2) { dayEntries = {}; }
+      var buddyList = [];
+      try {
+        var rawBuddies = JSON.parse(localStorage.getItem(BUDDIES_KEY) || "[]");
+        buddyList = Array.isArray(rawBuddies) ? rawBuddies : [];
+      } catch (e3) { buddyList = []; }
 
       if (!account || !account.name) {
         document.getElementById("app-gate").hidden = false;
@@ -1495,6 +1601,18 @@
         else {
           try { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account)); } catch (e) {}
         }
+      }
+
+      function getBuddies() {
+        return buddyList;
+      }
+
+      function saveBuddies() {
+        try { localStorage.setItem(BUDDIES_KEY, JSON.stringify(buddyList)); } catch (e) {}
+      }
+
+      function firstNameOf(accountObj) {
+        return String((accountObj && accountObj.name) || "").trim().split(/\s+/)[0] || "Du";
       }
 
       function applyPhoto(url) {
@@ -1510,10 +1628,13 @@
           profileImg.hidden = false;
         }
         if (profilePlus) profilePlus.hidden = true;
-      }
-
-      function firstNameOf(accountObj) {
-        return String((accountObj && accountObj.name) || "").trim().split(/\s+/)[0] || "Du";
+        var communityImg = document.getElementById("community-photo-img");
+        var communityPlus = document.getElementById("community-photo-plus");
+        if (communityImg) {
+          communityImg.src = url;
+          communityImg.hidden = false;
+        }
+        if (communityPlus) communityPlus.hidden = true;
       }
 
       var PROFILE_BIO =
@@ -1579,8 +1700,7 @@
         var planRoot = document.getElementById("profile-plan-days");
         if (nameEl) nameEl.textContent = firstNameOf(account);
         if (bioEl) bioEl.textContent = PROFILE_BIO;
-        var buddies = account && account.buddies_count != null ? Number(account.buddies_count) : 0;
-        if (buddiesEl) buddiesEl.textContent = String(isFinite(buddies) ? buddies : 0);
+        if (buddiesEl) buddiesEl.textContent = String(getBuddies().length);
         var hasCoach = !!(account && (account.has_coach || account.coach));
         if (coachEl) {
           coachEl.textContent = hasCoach ? "✓" : "✕";
@@ -1615,10 +1735,41 @@
         }
       }
 
+      function renderBuddyList() {
+        var list = document.getElementById("community-buddy-list");
+        if (!list) return;
+        list.innerHTML = "";
+        var items = getBuddies();
+        for (var i = 0; i < items.length; i++) {
+          var buddy = items[i];
+          if (!buddy || !buddy.name) continue;
+          var li = document.createElement("li");
+          li.textContent = buddy.name;
+          list.appendChild(li);
+        }
+      }
+
+      function fillCommunityPanel() {
+        var nameEl = document.getElementById("community-firstname");
+        if (nameEl) nameEl.textContent = firstNameOf(account);
+        if (account.photo_url) applyPhoto(account.photo_url);
+        renderBuddyList();
+      }
+
+      async function lookupAccountBySerial(serial) {
+        var rows = await restGet(
+          "go_accounts?serial_number=eq." + encodeURIComponent(serial) +
+          "&select=id,name,serial_number,photo_url&limit=1"
+        );
+        if (!rows || !rows.length) return null;
+        return rows[0];
+      }
+
       function showApp() {
         document.getElementById("app").hidden = false;
         if (account.photo_url) applyPhoto(account.photo_url);
         fillProfilePanel();
+        fillCommunityPanel();
         var n = String(WHATSAPP_NUMBER).replace(/\D/g, "");
         var waHref = "https://wa.me/" + n + "?text=" + encodeURIComponent("Hi Joscha, ich bin " + account.name + ".");
         document.getElementById("wa-chat").href = waHref;
@@ -1930,6 +2081,7 @@
           trainingLoaded = true;
         }
         if (onProfile) fillProfilePanel();
+        if (id === "community") fillCommunityPanel();
         var scrollEl = document.querySelector(".wrap__scroll");
         if (scrollEl) scrollEl.scrollTop = 0;
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2326,6 +2478,63 @@
       document.getElementById("profile-photo-btn").addEventListener("click", openModal);
       document.getElementById("photo-close").addEventListener("click", closeModal);
       document.getElementById("photo-pick").addEventListener("click", function () { fileInput.click(); });
+
+      (function bindCommunityBuddies() {
+        var addBtn = document.getElementById("community-add-btn");
+        var form = document.getElementById("community-add-form");
+        var serialInput = document.getElementById("community-serial");
+        var msg = document.getElementById("community-add-msg");
+        if (!addBtn || !form || !serialInput) return;
+
+        addBtn.addEventListener("click", function () {
+          form.hidden = false;
+          msg.textContent = "";
+          serialInput.value = "";
+          serialInput.focus();
+        });
+
+        serialInput.addEventListener("input", function () {
+          serialInput.value = String(serialInput.value || "").replace(/\D/g, "").slice(0, 8);
+        });
+
+        form.addEventListener("submit", function (ev) {
+          ev.preventDefault();
+          var serial = String(serialInput.value || "").replace(/\D/g, "");
+          if (serial.length !== 8) {
+            msg.textContent = "Bitte 8 Ziffern eingeben.";
+            return;
+          }
+          if (account.serial_number && String(account.serial_number) === serial) {
+            msg.textContent = "Das ist Deine eigene Nummer.";
+            return;
+          }
+          if (buddyList.some(function (b) { return b && String(b.serial_number) === serial; })) {
+            msg.textContent = "Buddy ist schon hinzugefügt.";
+            return;
+          }
+          msg.textContent = "Suche…";
+          lookupAccountBySerial(serial).then(function (remote) {
+            if (!remote || !remote.name) {
+              msg.textContent = "Keine Person mit dieser Nummer gefunden.";
+              return;
+            }
+            buddyList.push({
+              id: remote.id || null,
+              name: remote.name,
+              serial_number: remote.serial_number || serial,
+              photo_url: remote.photo_url || null
+            });
+            saveBuddies();
+            renderBuddyList();
+            fillProfilePanel();
+            form.hidden = true;
+            serialInput.value = "";
+            msg.textContent = remote.name + " ist dabei.";
+          }).catch(function () {
+            msg.textContent = "Lookup fehlgeschlagen. Bitte erneut versuchen.";
+          });
+        });
+      })();
 
       fileInput.addEventListener("change", function () {
         var file = fileInput.files && fileInput.files[0];
