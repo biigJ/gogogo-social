@@ -512,6 +512,28 @@
       font-weight: 700;
       letter-spacing: -0.02em;
     }
+    .profile-stats {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 18px;
+      color: var(--ink-on-red);
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.35;
+    }
+    .profile-stats__row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .profile-stats__label { opacity: 0.9; }
+    .profile-stats__value {
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
     .profile-bio {
       color: var(--ink-on-red);
       font-weight: 500;
@@ -1042,6 +1064,16 @@
             </div>
           </div>
         </div>
+        <div class="profile-stats" aria-label="Analyse">
+          <div class="profile-stats__row">
+            <span class="profile-stats__label">Streak</span>
+            <span class="profile-stats__value" id="profile-streak">0 Tage</span>
+          </div>
+          <div class="profile-stats__row">
+            <span class="profile-stats__label">Punkte · 28 Tage</span>
+            <span class="profile-stats__value" id="profile-points28">0</span>
+          </div>
+        </div>
         <p class="profile-bio" id="profile-bio"></p>
         <section class="profile-plan" aria-label="Trainingsplan">
           <h2 class="profile-plan__title">Dein Trainingsplan</h2>
@@ -1497,11 +1529,53 @@
         { title: "Ruhetag", line1: "Kein Workout an diesem Tag.", line2: "Erholung zählt mit." }
       ];
 
+      function formatDateKey(d) {
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      }
+
+      function computeWorkoutStreak() {
+        var today = new Date();
+        today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        var streak = 0;
+        var cursor = new Date(today);
+        /* Wenn heute noch kein erledigtes Workout: bei gestern starten. */
+        var todayKey = formatDateKey(cursor);
+        var todayEntry = dayEntries[todayKey];
+        if (!(todayEntry && todayEntry.score != null)) {
+          cursor.setDate(cursor.getDate() - 1);
+        }
+        for (var i = 0; i < 400; i++) {
+          var key = formatDateKey(cursor);
+          var entry = dayEntries[key];
+          if (!entry || entry.score == null) break;
+          streak += 1;
+          cursor.setDate(cursor.getDate() - 1);
+        }
+        return streak;
+      }
+
+      function computePointsLast28() {
+        var total = 0;
+        var today = new Date();
+        today = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        for (var i = 0; i < CYCLE_RAYS; i++) {
+          var d = new Date(today);
+          d.setDate(today.getDate() - i);
+          var entry = dayEntries[formatDateKey(d)];
+          if (!entry || entry.score == null) continue;
+          var n = Number(entry.score);
+          if (n >= 1 && n <= 10) total += n;
+        }
+        return total;
+      }
+
       function fillProfilePanel() {
         var nameEl = document.getElementById("profile-name");
         var bioEl = document.getElementById("profile-bio");
         var buddiesEl = document.getElementById("profile-buddies");
         var coachEl = document.getElementById("profile-coach");
+        var streakEl = document.getElementById("profile-streak");
+        var pointsEl = document.getElementById("profile-points28");
         var planRoot = document.getElementById("profile-plan-days");
         if (nameEl) nameEl.textContent = firstNameOf(account);
         if (bioEl) bioEl.textContent = PROFILE_BIO;
@@ -1512,6 +1586,9 @@
           coachEl.textContent = hasCoach ? "✓" : "✕";
           coachEl.setAttribute("aria-label", hasCoach ? "Coach verbunden" : "Kein Coach");
         }
+        var streak = computeWorkoutStreak();
+        if (streakEl) streakEl.textContent = streak === 1 ? "1 Tag" : streak + " Tage";
+        if (pointsEl) pointsEl.textContent = String(computePointsLast28());
         if (planRoot && !planRoot.dataset.ready) {
           planRoot.innerHTML = "";
           for (var i = 0; i < PROFILE_PLAN.length; i++) {
@@ -2143,6 +2220,7 @@
             editingOpen = false;
             refreshCycleRays();
             renderWeek();
+            fillProfilePanel();
             if (hasCloudAccount()) {
               await restUpsertDayEntry({
                 account_id: account.id,
@@ -2179,6 +2257,7 @@
           if (selectedKey) editingOpen = !entryFor(selectedKey);
           refreshCycleRays();
           renderWeek();
+          fillProfilePanel();
         }
 
         dayEntriesReady = function () {
