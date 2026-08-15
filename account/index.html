@@ -83,7 +83,7 @@
       height: 100dvh;
       overflow: hidden;
     }
-    button, input { font: inherit; color: inherit; }
+    button, input, textarea { font: inherit; color: inherit; }
     button { cursor: pointer; border: 0; background: none; }
     a { color: inherit; text-decoration: none; }
     img { display: block; max-width: 100%; }
@@ -693,7 +693,7 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px) + 12px);
+      padding-bottom: calc(var(--community-composer-h, 58px) + 14px);
     }
     body.is-community #panel-community.is-active {
       display: flex;
@@ -753,7 +753,7 @@
       display: grid;
       grid-template-columns: auto 1fr auto;
       gap: 8px;
-      align-items: center;
+      align-items: flex-end;
       margin-top: 8px;
       padding-top: 10px;
       border-top: 1px solid rgba(247, 245, 240, 0.35);
@@ -763,39 +763,84 @@
     }
     body.is-community .community-composer {
       position: fixed;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+      left: 0;
+      right: 0;
+      bottom: 0;
       z-index: 55;
-      width: min(100% - 32px, var(--max, 390px));
+      width: 100%;
+      max-width: none;
+      transform: none;
       box-sizing: border-box;
       margin: 0;
-      padding: 8px 10px;
+      padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
       border-top: 0;
-      background: var(--chrome-bg);
-      border-radius: 999px;
-      box-shadow: 0 8px 24px rgba(52, 34, 32, 0.18);
-      color: var(--ink);
+      background: var(--red);
+      border-radius: 0;
+      box-shadow: 0 -6px 20px rgba(52, 34, 32, 0.12);
+      color: var(--ink-on-red);
       pointer-events: auto;
+      align-items: flex-end;
     }
     body.is-community .community-composer__pick {
-      background: rgba(52, 34, 32, 0.1);
-      color: var(--ink);
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--paper);
+      font-size: 1.45rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 0;
     }
     body.is-community .community-composer__pick.is-on {
-      background: rgba(52, 34, 32, 0.2);
+      background: rgba(247, 245, 240, 0.22);
+      color: var(--paper);
     }
-    body.is-community .community-composer input {
-      border-color: rgba(52, 34, 32, 0.22);
+    .community-composer__field {
+      width: 100%;
+      min-width: 0;
+      min-height: 40px;
+      max-height: calc(1.35em * 3 + 20px);
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 22px;
+      background: var(--paper);
       color: var(--ink);
-      background: rgba(255, 255, 255, 0.55);
+      font-size: 0.95rem;
+      font-weight: 500;
+      line-height: 1.35;
+      letter-spacing: -0.01em;
+      resize: none;
+      overflow-y: auto;
+      display: block;
+      field-sizing: content;
     }
-    body.is-community .community-composer input::placeholder {
+    .community-composer__field::placeholder {
       color: rgba(52, 34, 32, 0.45);
     }
-    body.is-community .community-composer button[type="submit"] {
-      background: #c7413b;
-      color: #f7f5f0;
+    .community-composer__field:focus {
+      outline: none;
+    }
+    .community-composer__send {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      padding: 0;
+      background: var(--paper);
+      color: var(--red);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      align-self: flex-end;
+    }
+    .community-composer__send svg {
+      width: 20px;
+      height: 20px;
+      display: block;
+    }
+    .community-composer__send:disabled {
+      opacity: 0.45;
     }
     .community-circle.is-serial-entry {
       overflow: visible;
@@ -809,30 +854,12 @@
       font-size: 1.1rem;
       font-weight: 700;
       line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
     .community-composer__pick.is-on {
       background: rgba(247, 245, 240, 0.35);
-    }
-    .community-composer input {
-      width: 100%;
-      min-width: 0;
-      height: 40px;
-      padding: 0 12px;
-      border: 1px solid rgba(247, 245, 240, 0.55);
-      border-radius: var(--radius);
-      background: transparent;
-      color: var(--ink-on-red);
-      font-size: 0.85rem;
-      font-weight: 500;
-    }
-    .community-composer button[type="submit"] {
-      height: 40px;
-      padding: 0 12px;
-      background: var(--paper);
-      color: var(--btn-ink);
-      font-weight: 700;
-      font-size: 0.8rem;
-      border-radius: var(--radius);
     }
     .nav-btn__dot {
       position: absolute;
@@ -1751,8 +1778,18 @@
           <div class="community-feed" id="community-feed" aria-live="polite"></div>
           <form class="community-composer" id="community-composer">
             <button class="community-composer__pick" id="community-reply-pick" type="button" aria-label="Buddy zum Antworten wählen">@</button>
-            <input id="community-reply-text" type="text" maxlength="144" placeholder="Antwort an Buddy…" aria-label="Antwort" />
-            <button type="submit">Senden</button>
+            <textarea
+              class="community-composer__field"
+              id="community-reply-text"
+              maxlength="144"
+              rows="1"
+              placeholder="Nachricht…"
+              aria-label="Nachricht"
+              enterkeyhint="enter"
+            ></textarea>
+            <button class="community-composer__send" id="community-reply-send" type="submit" aria-label="Senden">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.4 20.6 21 12 3.4 3.4l.1 6.7L14.2 12 3.5 13.9z"/></svg>
+            </button>
           </form>
         </div>
       </div>
@@ -3036,6 +3073,10 @@
           fillCommunityPanel();
           setFeedSeenNow();
           updateCommunityNavDot();
+          requestAnimationFrame(function () {
+            var ev = new Event("resize");
+            window.dispatchEvent(ev);
+          });
         }
         var scrollEl = document.querySelector(".wrap__scroll");
         if (scrollEl) scrollEl.scrollTop = 0;
@@ -3449,8 +3490,73 @@
         var composer = document.getElementById("community-composer");
         var replyPick = document.getElementById("community-reply-pick");
         var replyText = document.getElementById("community-reply-text");
+        var replySend = document.getElementById("community-reply-send");
         var msg = document.getElementById("community-add-msg");
         var communityBack = document.getElementById("community-back");
+
+        function syncCommunityComposerChrome() {
+          if (!composer) return;
+          var kb = 0;
+          if (window.visualViewport) {
+            kb = Math.max(
+              0,
+              window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop
+            );
+          }
+          var safe = 0;
+          try {
+            var probe = getComputedStyle(document.documentElement).getPropertyValue("env(safe-area-inset-bottom)");
+          } catch (e0) {}
+          if (kb > 8) {
+            composer.style.bottom = kb + "px";
+            composer.style.paddingBottom = "8px";
+          } else {
+            composer.style.bottom = "0px";
+            composer.style.paddingBottom = "";
+          }
+          var h = Math.ceil(composer.getBoundingClientRect().height || 58);
+          document.documentElement.style.setProperty("--community-composer-h", h + "px");
+        }
+
+        function resizeReplyField() {
+          if (!replyText) return;
+          replyText.style.height = "auto";
+          var styles = window.getComputedStyle(replyText);
+          var line = parseFloat(styles.lineHeight);
+          if (!line || isNaN(line)) line = 1.35 * (parseFloat(styles.fontSize) || 15);
+          var pad =
+            (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
+          var max = line * 3 + pad;
+          var next = Math.min(Math.max(replyText.scrollHeight, line + pad), max);
+          replyText.style.height = next + "px";
+          syncCommunityComposerChrome();
+        }
+
+        if (replyText) {
+          replyText.addEventListener("input", function () {
+            var v = String(replyText.value || "");
+            if (v.length > 144) replyText.value = v.slice(0, 144);
+            resizeReplyField();
+            if (replySend) replySend.disabled = !String(replyText.value || "").trim();
+          });
+          replyText.addEventListener("focus", function () {
+            setTimeout(syncCommunityComposerChrome, 50);
+            setTimeout(syncCommunityComposerChrome, 320);
+          });
+          replyText.addEventListener("blur", function () {
+            setTimeout(syncCommunityComposerChrome, 50);
+            setTimeout(syncCommunityComposerChrome, 320);
+          });
+          if (replySend) replySend.disabled = true;
+          resizeReplyField();
+        }
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener("resize", syncCommunityComposerChrome);
+          window.visualViewport.addEventListener("scroll", syncCommunityComposerChrome);
+        }
+        window.addEventListener("resize", syncCommunityComposerChrome);
+        syncCommunityComposerChrome();
+
         if (communityBack) {
           communityBack.addEventListener("click", function () {
             gotoPanel("home");
@@ -3602,7 +3708,7 @@
               }, 2200);
             } else {
               replyTargetId = null;
-              if (replyText) replyText.placeholder = "Antwort an Buddy…";
+              if (replyText) replyText.placeholder = "Nachricht…";
             }
           });
         }
@@ -3624,12 +3730,17 @@
               reply_to_id: replyTargetId
             }).then(function (row) {
               if (!row) return;
-              if (replyText) replyText.value = "";
+              if (replyText) {
+                replyText.value = "";
+                resizeReplyField();
+              }
+              if (replySend) replySend.disabled = true;
               replyTargetId = null;
               pickingReplyBuddy = false;
               if (replyPick) replyPick.classList.remove("is-on");
-              if (replyText) replyText.placeholder = "Antwort an Buddy…";
+              if (replyText) replyText.placeholder = "Nachricht…";
               if (msg) msg.textContent = "Antwort gesendet.";
+              syncCommunityComposerChrome();
             });
           });
         }
