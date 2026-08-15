@@ -560,6 +560,18 @@
       border-right: 12px solid currentColor;
       margin-right: 2px;
     }
+    .community-role {
+      color: var(--ink-on-red);
+      font-size: 0.58rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      line-height: 1.1;
+      text-transform: none;
+      text-align: center;
+      margin: 0 0 4px;
+      min-height: 0.7em;
+      opacity: 0.85;
+    }
     .community-firstname {
       color: var(--ink-on-red);
       font-size: 0.7rem;
@@ -2056,7 +2068,7 @@
         if (nameEl) nameEl.textContent = firstNameOf(account);
         if (bioEl) bioEl.textContent = PROFILE_BIO;
         if (buddiesEl) buddiesEl.textContent = String(getBuddies().length);
-        var hasCoach = !!(account && (account.has_coach || account.coach));
+        var hasCoach = true;
         if (coachEl) {
           coachEl.textContent = hasCoach ? "✓" : "✕";
           coachEl.setAttribute("aria-label", hasCoach ? "Coach verbunden" : "Kein Coach");
@@ -2094,7 +2106,14 @@
       }
 
       var FEED_SEEN_KEY = "gogogo_go_feed_seen_at";
-      var MAX_BUDDIES = 4;
+      var MAX_BUDDIES = 3;
+      var COMMUNITY_SLOTS = 4;
+      var COACH_SLOT = {
+        id: "coach",
+        name: "Joscha",
+        photo_url: null,
+        isCoach: true
+      };
       var communityPosts = [];
       var replyTargetId = null;
       var pickingReplyBuddy = false;
@@ -2187,12 +2206,17 @@
         var items = getBuddies().slice(0, MAX_BUDDIES);
         var fails = getBuddySearchFails();
         var locked = isBuddySearchLocked();
-        for (var i = 0; i < MAX_BUDDIES; i++) {
+        for (var i = 0; i < COMMUNITY_SLOTS; i++) {
           (function (slotIndex) {
-            var buddy = items[slotIndex] || null;
+            var isCoachSlot = slotIndex === COMMUNITY_SLOTS - 1;
+            var buddy = isCoachSlot ? COACH_SLOT : (items[slotIndex] || null);
             var slot = document.createElement("div");
-            slot.className = "community-slot";
+            slot.className = "community-slot" + (isCoachSlot ? " is-coach" : "");
             slot.dataset.slot = String(slotIndex);
+
+            var role = document.createElement("p");
+            role.className = "community-role";
+            role.textContent = isCoachSlot ? "Coach" : "\u00a0";
 
             var circle = document.createElement("button");
             circle.type = "button";
@@ -2207,7 +2231,25 @@
             failsEl.className = "community-fails";
             failsEl.setAttribute("aria-hidden", "true");
 
-            if (buddy) {
+            if (isCoachSlot) {
+              if (COACH_SLOT.photo_url) {
+                var cimg = document.createElement("img");
+                cimg.src = COACH_SLOT.photo_url;
+                cimg.alt = "";
+                circle.appendChild(cimg);
+              }
+              label.textContent = firstNameOf(COACH_SLOT);
+              circle.setAttribute("aria-label", "Coach");
+              circle.addEventListener("click", function () {
+                if (!pickingReplyBuddy) return;
+                replyTargetId = null;
+                pickingReplyBuddy = false;
+                var pick = document.getElementById("community-reply-pick");
+                if (pick) pick.classList.remove("is-on");
+                var msg = document.getElementById("community-add-msg");
+                if (msg) msg.textContent = "Coach ist fest — Buddy oben antippen.";
+              });
+            } else if (buddy) {
               if (buddy.photo_url) {
                 var img = document.createElement("img");
                 img.src = buddy.photo_url;
@@ -2262,6 +2304,7 @@
 
             meta.appendChild(label);
             meta.appendChild(failsEl);
+            slot.appendChild(role);
             slot.appendChild(circle);
             slot.appendChild(meta);
             root.appendChild(slot);

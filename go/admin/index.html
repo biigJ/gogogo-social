@@ -120,11 +120,13 @@
     }
     .cycle-wrap {
       display: block;
+      position: relative;
       width: 240px;
       height: 240px;
       margin: 0 auto 28px;
       padding: 0;
     }
+    .cycle-wrap[hidden] { display: none !important; }
     .cycle-wrap.is-back {
       cursor: pointer;
       border-radius: 50%;
@@ -137,6 +139,113 @@
     .cycle.is-spinning { animation: spin 120s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .cycle.is-spinning { animation: none; } }
+    .cycle-portrait {
+      position: absolute;
+      inset: 50%;
+      width: 132px;
+      height: 132px;
+      margin: -66px 0 0 -66px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: rgba(10, 10, 10, 0.18);
+      pointer-events: none;
+      display: none;
+    }
+    .cycle-wrap.has-photo .cycle-portrait { display: block; }
+    .cycle-portrait img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .admin-rule {
+      border: 0;
+      border-top: 1px solid rgba(247, 245, 240, 0.85);
+      margin: 22px 0 16px;
+      width: 100%;
+    }
+    .admin-feed {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 42vh;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 4px;
+    }
+    .admin-post {
+      max-width: 86%;
+      font-size: 0.8rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.35;
+      color: var(--ink-on-red);
+      align-self: flex-start;
+      text-align: left;
+    }
+    .admin-post.is-mine {
+      align-self: flex-end;
+      text-align: right;
+    }
+    .admin-post__who {
+      font-size: 0.68rem;
+      opacity: 0.75;
+      margin-bottom: 2px;
+    }
+    .admin-post__body { margin: 0; word-break: break-word; }
+    .admin-post__photo {
+      display: block;
+      width: min(42vw, 132px);
+      max-height: 176px;
+      object-fit: cover;
+      border-radius: var(--radius);
+      margin-top: 4px;
+    }
+    .admin-post.is-mine .admin-post__photo { margin-left: auto; }
+    .admin-plan {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .admin-plan__title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin: 0 0 4px;
+      color: var(--ink-on-red);
+    }
+    .admin-plan__block label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      opacity: 0.85;
+      margin-bottom: 6px;
+    }
+    .admin-plan__block textarea,
+    .admin-plan__block input {
+      width: 100%;
+      min-height: 44px;
+      padding: 12px 14px;
+      background: var(--paper);
+      color: var(--ink);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      font-size: 0.9rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      resize: vertical;
+    }
+    .admin-plan__block textarea {
+      min-height: 72px;
+      line-height: 1.35;
+    }
+    .admin-plan__block textarea:focus,
+    .admin-plan__block input:focus {
+      outline: none;
+      border-color: var(--ink);
+    }
+    .admin-plan__save { margin-top: 6px; }
     h1 {
       font-weight: 700;
       font-size: clamp(28px, 8vw, 36px);
@@ -231,6 +340,7 @@
       background: transparent !important;
     }
     .qr-box a { color: var(--ink-on-red); word-break: break-all; font-size: 0.85rem; font-weight: 600; }
+    .qr-box a[hidden] { display: none !important; }
     .list {
       display: flex; flex-direction: column; gap: 10px;
     }
@@ -315,10 +425,13 @@
       class="cycle-wrap"
       id="cycle-btn"
       type="button"
-      aria-label="Zurück zum Formular"
+      aria-label="Zurück zum Generator"
       disabled
     >
       <svg class="cycle is-spinning" id="cycle" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
+      <span class="cycle-portrait" id="cycle-portrait" aria-hidden="true">
+        <img id="cycle-portrait-img" alt="" />
+      </span>
     </button>
     <button class="admin-name" id="admin-name" type="button" hidden></button>
 
@@ -387,8 +500,60 @@
       <p class="result-meta" id="result-meta"></p>
       <div class="qr-box" id="qr-box">
         <div id="qr-mount" aria-hidden="true"></div>
-        <a id="qr-link" href="#" target="_blank" rel="noopener"></a>
+        <a id="qr-link" href="#" target="_blank" rel="noopener" hidden></a>
       </div>
+      <hr class="admin-rule" />
+      <div class="admin-feed" id="admin-feed" aria-live="polite"></div>
+      <hr class="admin-rule" />
+      <section class="admin-plan" id="admin-plan" aria-label="Trainingsplan">
+        <h2 class="admin-plan__title">Trainingsplan</h2>
+        <div class="admin-plan__block">
+          <label for="plan-blurb">Kurzer Satz zum Nutzer</label>
+          <textarea id="plan-blurb" rows="2" maxlength="280" placeholder="Kurzbeschreibung…"></textarea>
+        </div>
+        <div class="admin-plan__block">
+          <label for="plan-life">Lebenssituation</label>
+          <textarea id="plan-life" rows="3" maxlength="600" placeholder="Beschreibung der Lebenssituation…"></textarea>
+        </div>
+        <div class="admin-plan__block">
+          <label for="plan-goal">Ziel</label>
+          <textarea id="plan-goal" rows="2" maxlength="400" placeholder="Ziel des Nutzers…"></textarea>
+        </div>
+        <div class="admin-plan__block">
+          <label for="plan-phase">Aktuelle Phase &amp; Schritte</label>
+          <textarea id="plan-phase" rows="3" maxlength="600" placeholder="Phase und zu erledigende Schritte…"></textarea>
+        </div>
+        <div class="admin-plan__block">
+          <label for="plan-mo">Montag</label>
+          <textarea id="plan-mo" rows="2" maxlength="400" placeholder="Montag…"></textarea>
+        </div>
+        <div class="admin-plan__block">
+          <label for="plan-di">Dienstag</label>
+          <textarea id="plan-di" rows="2" maxlength="400" placeholder="Dienstag…"></textarea>
+        </div>
+        <div class="admin-plan__block">
+          <label for="plan-mi">Mittwoch</label>
+          <textarea id="plan-mi" rows="2" maxlength="400" placeholder="Mittwoch…"></textarea>
+        </div>
+        <div class="admin-plan__block">
+          <label for="plan-do">Donnerstag</label>
+          <textarea id="plan-do" rows="2" maxlength="400" placeholder="Donnerstag…"></textarea>
+        </div>
+        <div class="admin-plan__block">
+          <label for="plan-fr">Freitag</label>
+          <textarea id="plan-fr" rows="2" maxlength="400" placeholder="Freitag…"></textarea>
+        </div>
+        <div class="admin-plan__block">
+          <label for="plan-sa">Samstag</label>
+          <textarea id="plan-sa" rows="2" maxlength="400" placeholder="Samstag…"></textarea>
+        </div>
+        <div class="admin-plan__block">
+          <label for="plan-so">Sonntag</label>
+          <textarea id="plan-so" rows="2" maxlength="400" placeholder="Sonntag…"></textarea>
+        </div>
+        <button class="btn admin-plan__save" type="button" id="plan-save">Plan speichern</button>
+        <p class="msg" id="plan-msg" role="status"></p>
+      </section>
     </div>
   </div>
 
@@ -431,6 +596,23 @@
       var menuBtn = document.getElementById("btn-menu");
       var menuPanel = document.getElementById("menu-panel");
       var lastQr = null;
+      var activeAccount = null;
+      var cyclePortrait = document.getElementById("cycle-portrait");
+      var cyclePortraitImg = document.getElementById("cycle-portrait-img");
+      var PLAN_FIELDS = [
+        ["plan-blurb", "blurb"],
+        ["plan-life", "life_situation"],
+        ["plan-goal", "goal"],
+        ["plan-phase", "phase_steps"],
+        ["plan-mo", "day_mo"],
+        ["plan-di", "day_di"],
+        ["plan-mi", "day_mi"],
+        ["plan-do", "day_do"],
+        ["plan-fr", "day_fr"],
+        ["plan-sa", "day_sa"],
+        ["plan-so", "day_so"]
+      ];
+
 
       function isAuthed() {
         try {
@@ -469,10 +651,23 @@
         panelList.hidden = true;
       }
 
+      function setCycleVisible(on) {
+        cycleBtn.hidden = !on;
+      }
       function setCycleBack(on) {
         cycleBtn.classList.toggle("is-back", on);
         cycleBtn.disabled = !on;
         cycleBtn.setAttribute("aria-disabled", on ? "false" : "true");
+      }
+      function setCyclePhoto(url) {
+        if (!cyclePortrait || !cyclePortraitImg) return;
+        if (url) {
+          cyclePortraitImg.src = url;
+          cycleBtn.classList.add("has-photo");
+        } else {
+          cyclePortraitImg.removeAttribute("src");
+          cycleBtn.classList.remove("has-photo");
+        }
       }
 
       function setActorName(name) {
@@ -574,20 +769,186 @@
       function showGen() {
         hideAllPanels();
         panelGen.hidden = false;
+        activeAccount = null;
+        setCycleVisible(true);
+        setCyclePhoto(null);
         setCycleBack(false);
-        setActorName(ADMIN_NAME);
+        setActorName("");
         fillDefaults();
         updateAuthBtn();
       }
       function showLogin() {
         hideAllPanels();
         panelLogin.hidden = false;
+        activeAccount = null;
+        setCycleVisible(true);
+        setCyclePhoto(null);
         setCycleBack(false);
         setActorName("");
         setAuthed(false);
         updateAuthBtn();
       }
-      function showResult(name, serial, code) {
+      async function resolveAccount(name, serial, code) {
+        var account = null;
+        try {
+          if (serial) {
+            var bySerial = await fetch(
+              SUPABASE_URL + "/rest/v1/go_accounts?serial_number=eq." + encodeURIComponent(serial) +
+              "&select=*&limit=1",
+              { headers: apiHeaders() }
+            );
+            var serialRows = bySerial.ok ? await bySerial.json() : [];
+            if (serialRows && serialRows[0]) account = serialRows[0];
+          }
+          if (!account && name) {
+            var accRes = await fetch(
+              SUPABASE_URL + "/rest/v1/go_accounts?name=ilike." + encodeURIComponent(name) +
+              "&select=*&order=created_at.desc&limit=20",
+              { headers: apiHeaders() }
+            );
+            var accounts = accRes.ok ? await accRes.json() : [];
+            var matches = (accounts || []).filter(function (row) {
+              return namesMatch(row.name, name);
+            });
+            if (code) {
+              for (var i = 0; i < matches.length; i++) {
+                if (String(matches[i].invite_code || "") === String(code)) {
+                  account = matches[i];
+                  break;
+                }
+              }
+            }
+            if (!account) {
+              for (var p = 0; p < matches.length; p++) {
+                if (matches[p].photo_url) { account = matches[p]; break; }
+              }
+            }
+            if (!account && matches.length) account = matches[0];
+          }
+        } catch (e) {}
+        return account;
+      }
+      function clearPlanForm() {
+        PLAN_FIELDS.forEach(function (pair) {
+          var el = document.getElementById(pair[0]);
+          if (el) el.value = "";
+        });
+        var planMsg = document.getElementById("plan-msg");
+        if (planMsg) {
+          planMsg.textContent = "";
+          planMsg.classList.remove("is-error");
+        }
+      }
+      function fillPlanForm(row) {
+        clearPlanForm();
+        if (!row) return;
+        PLAN_FIELDS.forEach(function (pair) {
+          var el = document.getElementById(pair[0]);
+          if (el) el.value = row[pair[1]] != null ? String(row[pair[1]]) : "";
+        });
+      }
+      async function loadCoachPlan(accountId) {
+        clearPlanForm();
+        if (!accountId || String(accountId).indexOf("local-") === 0) return;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_coach_plans?account_id=eq." + encodeURIComponent(accountId) +
+            "&select=*&limit=1",
+            { headers: apiHeaders() }
+          );
+          if (!res.ok) return;
+          var rows = await res.json();
+          if (rows && rows[0]) fillPlanForm(rows[0]);
+        } catch (e) {}
+      }
+      async function saveCoachPlan() {
+        var planMsg = document.getElementById("plan-msg");
+        if (!activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) {
+          if (planMsg) {
+            planMsg.textContent = "Kein Account — Plan nicht speicherbar (SQL/Account?).";
+            planMsg.classList.add("is-error");
+          }
+          return;
+        }
+        var payload = { account_id: activeAccount.id, updated_at: new Date().toISOString() };
+        PLAN_FIELDS.forEach(function (pair) {
+          var el = document.getElementById(pair[0]);
+          payload[pair[1]] = el ? String(el.value || "").trim() || null : null;
+        });
+        if (planMsg) {
+          planMsg.classList.remove("is-error");
+          planMsg.textContent = "Speichere …";
+        }
+        try {
+          var res = await fetch(SUPABASE_URL + "/rest/v1/go_coach_plans?on_conflict=account_id", {
+            method: "POST",
+            headers: apiHeaders({
+              "Content-Type": "application/json",
+              Prefer: "resolution=merge-duplicates,return=minimal"
+            }),
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) {
+            var t = "";
+            try { t = await res.text(); } catch (e0) {}
+            throw new Error(t || ("HTTP " + res.status));
+          }
+          if (planMsg) planMsg.textContent = "Gespeichert.";
+        } catch (err) {
+          if (planMsg) {
+            planMsg.textContent = "Speichern fehlgeschlagen (go-coach-plans.sql?).";
+            planMsg.classList.add("is-error");
+          }
+        }
+      }
+      async function renderMirroredFeed(account) {
+        var feed = document.getElementById("admin-feed");
+        if (!feed) return;
+        feed.innerHTML = "";
+        if (!account || !account.id || String(account.id).indexOf("local-") === 0) {
+          feed.innerHTML = '<p class="empty">Noch kein Community-Verlauf.</p>';
+          return;
+        }
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_community_posts?author_id=eq." + encodeURIComponent(account.id) +
+            "&select=*&order=created_at.desc&limit=100",
+            { headers: apiHeaders() }
+          );
+          var rows = res.ok ? await res.json() : [];
+          if (!rows || !rows.length) {
+            feed.innerHTML = '<p class="empty">Noch kein Community-Verlauf.</p>';
+            return;
+          }
+          var first = String(account.name || "").trim().split(/\s+/)[0] || "Nutzer";
+          rows.forEach(function (post) {
+            if (!post) return;
+            var el = document.createElement("article");
+            el.className = "admin-post";
+            var who = document.createElement("div");
+            who.className = "admin-post__who";
+            who.textContent = first;
+            el.appendChild(who);
+            if (post.photo_url) {
+              var img = document.createElement("img");
+              img.className = "admin-post__photo";
+              img.src = post.photo_url;
+              img.alt = "";
+              el.appendChild(img);
+            }
+            if (post.body) {
+              var body = document.createElement("p");
+              body.className = "admin-post__body";
+              body.textContent = post.body;
+              el.appendChild(body);
+            }
+            feed.appendChild(el);
+          });
+        } catch (e) {
+          feed.innerHTML = '<p class="empty">Feed nicht geladen.</p>';
+        }
+      }
+      async function showResult(name, serial, code) {
         var url = GO_BASE;
         hideAllPanels();
         lastQr = { name: name, serial: serial, code: code, url: url };
@@ -595,12 +956,22 @@
         var metaEl = document.getElementById("result-meta");
         metaEl.hidden = !(serial || code);
         metaEl.textContent = serial || code ? (serial + " · " + code) : "";
-        document.getElementById("qr-link").href = url;
-        document.getElementById("qr-link").textContent = url;
+        var link = document.getElementById("qr-link");
+        if (link) {
+          link.href = url;
+          link.textContent = url;
+          link.hidden = true;
+        }
+        setCycleVisible(true);
         setCycleBack(true);
-        setActorName(name || ADMIN_NAME);
+        setActorName(name || "");
+        setCyclePhoto(null);
         renderQr(url);
         updateAuthBtn();
+        activeAccount = await resolveAccount(name, serial, code);
+        if (activeAccount && activeAccount.photo_url) setCyclePhoto(activeAccount.photo_url);
+        await renderMirroredFeed(activeAccount);
+        await loadCoachPlan(activeAccount && activeAccount.id);
       }
 
       function apiHeaders(extra) {
@@ -750,7 +1121,11 @@
       async function showList() {
         hideAllPanels();
         panelList.hidden = false;
-        setCycleBack(true);
+        activeAccount = null;
+        setCycleVisible(false);
+        setCyclePhoto(null);
+        setCycleBack(false);
+        setActorName("");
         var list = document.getElementById("code-list");
         var listMsg = document.getElementById("list-msg");
         list.innerHTML = "";
@@ -769,7 +1144,6 @@
           listMsg.textContent = "Liste nicht geladen.";
           listMsg.classList.add("is-error");
         }
-        setActorName(ADMIN_NAME);
         updateAuthBtn();
       }
 
@@ -863,6 +1237,9 @@
         showGen();
         window.scrollTo({ top: 0, behavior: "smooth" });
       });
+
+      var planSave = document.getElementById("plan-save");
+      if (planSave) planSave.addEventListener("click", function () { saveCoachPlan(); });
 
       ["gen-serial", "gen-code"].forEach(function (id) {
         document.getElementById(id).addEventListener("input", function () {
