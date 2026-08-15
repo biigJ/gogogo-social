@@ -55,10 +55,24 @@
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
     }
+    /* Neutraler Streifen hinter dem Notch: sonst färbt Seiten-Rot jeden Blur rosa. */
+    body.has-scroll-overflow::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 0;
+      height: constant(safe-area-inset-top);
+      height: env(safe-area-inset-top, 0px);
+      background: var(--chrome-bg);
+      pointer-events: none;
+    }
     #app {
       min-height: 100dvh;
       display: block;
       position: relative;
+      z-index: 1;
     }
     #app[hidden] { display: none !important; }
     body.is-training {
@@ -122,7 +136,7 @@
       right: 0;
       bottom: auto;
       z-index: 60;
-      /* Nur die Notch-/Statusleisten-Zone — kein Auslauf unter den Notch */
+      /* Nur hinter dem Notch, ab Display-Oberkante */
       height: constant(safe-area-inset-top);
       height: env(safe-area-inset-top, 0px);
       min-height: constant(safe-area-inset-top);
@@ -141,10 +155,10 @@
       mask-image: none;
     }
     body.has-scroll-overflow .site-chrome.site-chrome--top::before {
-      /* Frost nur hinter dem Notch, ab Display-Oberkante; kein Rot, kein Band darunter */
-      background: rgba(255, 255, 255, 0.28);
-      -webkit-backdrop-filter: blur(20px);
-      backdrop-filter: blur(20px);
+      /* Farbloser Blur — Untergrund ist bereits neutral (body::before), kein Rot-Tint */
+      background: rgba(255, 255, 255, 0.04);
+      -webkit-backdrop-filter: blur(20px) saturate(1.2);
+      backdrop-filter: blur(20px) saturate(1.2);
     }
     .site-chrome--top::after {
       display: none;
