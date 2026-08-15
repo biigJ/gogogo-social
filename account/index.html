@@ -2292,11 +2292,14 @@
         return n;
       }
       function clearBuddySearchFails() {
-        if (isBuddySearchLocked()) return;
+        try { localStorage.removeItem(BUDDY_SEARCH_LOCK_KEY); } catch (e5) {}
         setBuddySearchFails(0);
       }
       function buddySearchLockMessage() {
         return "Du hast zu viele Fehleingaben gehabt und deine Suche wird für 60 Minuten gesperrt.";
+      }
+      function normalizeBuddySerial(raw) {
+        return String(raw || "").replace(/\D/g, "").slice(0, 8);
       }
 
       function renderBuddySlots() {
@@ -2414,15 +2417,17 @@
       }
 
       var serialEntryActive = false;
+      var serialSubmitBusy = false;
 
       function cancelSerialEntry() {
-        if (!serialEntryActive) return;
+        if (!serialEntryActive || serialSubmitBusy) return;
         serialEntryActive = false;
         renderBuddySlots();
       }
 
       function beginSerialEntry(circle, label) {
         if (getBuddies().length >= MAX_BUDDIES) return;
+        if (serialSubmitBusy) return;
         if (isBuddySearchLocked()) {
           var lockMsg = document.getElementById("community-add-msg");
           if (lockMsg) lockMsg.textContent = buddySearchLockMessage();
@@ -2449,7 +2454,7 @@
           ev.stopPropagation();
         });
         input.addEventListener("input", function () {
-          input.value = String(input.value || "").replace(/\D/g, "").slice(0, 8);
+          input.value = normalizeBuddySerial(input.value);
           if (input.value.length === 8) submitSerial(input.value, circle, label);
         });
         input.addEventListener("keydown", function (ev) {
@@ -2466,7 +2471,7 @@
       }
 
       document.addEventListener("pointerdown", function (ev) {
-        if (!serialEntryActive) return;
+        if (!serialEntryActive || serialSubmitBusy) return;
         var t = ev.target;
         if (t && t.closest) {
           if (t.closest(".community-circle__serial")) return;
@@ -2478,26 +2483,43 @@
 
       async function submitSerial(serial, circle, label) {
         var msg = document.getElementById("community-add-msg");
+        var code = normalizeBuddySerial(serial);
+        if (serialSubmitBusy) return;
+        if (code.length !== 8) return;
         if (isBuddySearchLocked()) {
           if (msg) msg.textContent = buddySearchLockMessage();
           renderBuddySlots();
           return;
         }
-        if (account.serial_number && String(account.serial_number) === serial) {
+        if (account.serial_number && normalizeBuddySerial(account.serial_number) === code) {
           if (msg) msg.textContent = "Das ist Deine eigene Nummer.";
           renderBuddySlots();
           return;
         }
-        if (buddyList.some(function (b) { return b && String(b.serial_number) === serial; })) {
+        if (buddyList.some(function (b) {
+          return b && normalizeBuddySerial(b.serial_number) === code;
+        })) {
           if (msg) msg.textContent = "Buddy ist schon hinzugefügt.";
           renderBuddySlots();
           return;
         }
+        serialSubmitBusy = true;
         if (msg) msg.textContent = "Suche…";
         try {
-          var remote = await lookupAccountBySerial(serial);
+          var found = await lookupAccountBySerial(code);
+          if (found && found.pendingName) {
+            serialSubmitBusy = false;
+            renderBuddySlots();
+            if (msg) {
+              msg.textContent = firstNameOf({ name: found.pendingName }) +
+                " ist noch nicht in der App angemeldet.";
+            }
+            return;
+          }
+          var remote = found && found.account ? found.account : null;
           if (!remote || !remote.name) {
             var failCount = registerBuddySearchFail();
+            serialSubmitBusy = false;
             renderBuddySlots();
             if (failCount >= 3 || isBuddySearchLocked()) {
               if (msg) msg.textContent = buddySearchLockMessage();
@@ -2510,18 +2532,20 @@
           var buddy = {
             id: remote.id || null,
             name: remote.name,
-            serial_number: remote.serial_number || serial,
+            serial_number: remote.serial_number || code,
             photo_url: remote.photo_url || null
           };
           buddyList.push(buddy);
           saveBuddies();
           await syncBuddyLinkCloud(buddy);
           fillProfilePanel();
+          serialSubmitBusy = false;
           renderBuddySlots();
           if (msg) msg.textContent = firstNameOf(buddy) + " ist dabei.";
           await refreshCommunityFeed();
         } catch (e) {
           var failCount2 = registerBuddySearchFail();
+          serialSubmitBusy = false;
           renderBuddySlots();
           if (failCount2 >= 3 || isBuddySearchLocked()) {
             if (msg) msg.textContent = buddySearchLockMessage();
@@ -2847,12 +2871,34 @@
       }
 
       async function lookupAccountBySerial(serial) {
+        var code = normalizeBuddySerial(serial);
+        if (code.length !== 8) return { account: null, pendingName: null };
         var rows = await restGet(
-          "go_accounts?serial_number=eq." + encodeURIComponent(serial) +
+          "go_accounts?serial_number=eq." + encodeURIComponent(code) +
           "&select=id,name,serial_number,photo_url&limit=1"
         );
-        if (!rows || !rows.length) return null;
-        return rows[0];
+        if (rows && rows[0] && rows[0].name) {
+          return { account: rows[0], pendingName: null };
+        }
+        var invites = await restGet(
+          "go_invite_codes?serial_number=eq." + encodeURIComponent(code) +
+          "&select=first_name,serial_number,code,paused&limit=1"
+        );
+        var invite = invites && invites[0] ? invites[0] : null;
+        if (invite && invite.code && !invite.paused) {
+          var byInvite = await restGet(
+            "go_accounts?invite_code=eq." + encodeURIComponent(String(invite.code)) +
+            "&select=id,name,serial_number,photo_url&limit=1"
+          );
+          if (byInvite && byInvite[0] && byInvite[0].name) {
+            return { account: byInvite[0], pendingName: null };
+          }
+          return {
+            account: null,
+            pendingName: invite.first_name ? String(invite.first_name) : null
+          };
+        }
+        return { account: null, pendingName: null };
       }
 
       var shareCameraArmed = false;
