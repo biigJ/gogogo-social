@@ -44,7 +44,7 @@
       min-height: 100svh;
       -webkit-font-smoothing: antialiased;
     }
-    button, input { font: inherit; color: inherit; }
+    button, input, textarea { font: inherit; color: inherit; }
     button { cursor: pointer; border: 0; background: none; }
     a { color: inherit; text-decoration: none; }
 
@@ -164,15 +164,75 @@
       margin: 22px 0 16px;
       width: 100%;
     }
+    .admin-chat {
+      display: flex;
+      flex-direction: column;
+      height: 52vh;
+      min-height: 280px;
+      max-height: 520px;
+      margin: 0;
+    }
     .admin-feed {
       display: flex;
       flex-direction: column;
       gap: 10px;
-      max-height: 42vh;
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
-      padding-bottom: 4px;
+      padding: 2px 0 10px;
+      overscroll-behavior: contain;
     }
+    .admin-composer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: flex-end;
+      flex: 0 0 auto;
+      margin: 0;
+      padding: 8px 0 0;
+      border-top: 1px solid rgba(247, 245, 240, 0.35);
+    }
+    .admin-composer__field {
+      width: 100%;
+      min-width: 0;
+      min-height: 40px;
+      max-height: calc(1.35em * 3 + 20px);
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 22px;
+      background: var(--paper);
+      color: var(--ink);
+      font-size: 0.95rem;
+      font-weight: 500;
+      line-height: 1.35;
+      letter-spacing: -0.01em;
+      resize: none;
+      overflow-y: auto;
+      display: block;
+    }
+    .admin-composer__field::placeholder {
+      color: rgba(52, 34, 32, 0.45);
+    }
+    .admin-composer__field:focus { outline: none; }
+    .admin-composer__send {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      padding: 0;
+      background: var(--paper);
+      color: var(--red);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .admin-composer__send svg {
+      width: 20px;
+      height: 20px;
+      display: block;
+    }
+    .admin-composer__send:disabled { opacity: 0.45; }
     .admin-post {
       max-width: 86%;
       font-size: 0.8rem;
@@ -503,7 +563,23 @@
         <a id="qr-link" href="#" target="_blank" rel="noopener" hidden></a>
       </div>
       <hr class="admin-rule" />
-      <div class="admin-feed" id="admin-feed" aria-live="polite"></div>
+      <div class="admin-chat" id="admin-chat">
+        <div class="admin-feed" id="admin-feed" aria-live="polite"></div>
+        <form class="admin-composer" id="admin-composer">
+          <textarea
+            class="admin-composer__field"
+            id="admin-reply-text"
+            maxlength="144"
+            rows="1"
+            placeholder="Nachricht an Nutzer…"
+            aria-label="Nachricht an Nutzer"
+            enterkeyhint="enter"
+          ></textarea>
+          <button class="admin-composer__send" id="admin-reply-send" type="submit" aria-label="Senden" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.4 20.6 21 12 3.4 3.4l.1 6.7L14.2 12 3.5 13.9z"/></svg>
+          </button>
+        </form>
+      </div>
       <hr class="admin-rule" />
       <section class="admin-plan" id="admin-plan" aria-label="Trainingsplan">
         <h2 class="admin-plan__title">Trainingsplan</h2>
@@ -901,6 +977,49 @@
           }
         }
       }
+      var coachAccount = null;
+
+      async function resolveCoachAccount() {
+        if (coachAccount && coachAccount.id) return coachAccount;
+        var names = ["Joscha", ADMIN_NAME];
+        for (var i = 0; i < names.length; i++) {
+          try {
+            var res = await fetch(
+              SUPABASE_URL + "/rest/v1/go_accounts?name=ilike." + encodeURIComponent(names[i]) +
+              "&select=*&order=created_at.asc&limit=5",
+              { headers: apiHeaders() }
+            );
+            var rows = res.ok ? await res.json() : [];
+            for (var j = 0; j < (rows || []).length; j++) {
+              if (namesMatch(rows[j].name, names[i])) {
+                coachAccount = rows[j];
+                return coachAccount;
+              }
+            }
+          } catch (e) {}
+        }
+        try {
+          var created = await fetch(SUPABASE_URL + "/rest/v1/go_accounts", {
+            method: "POST",
+            headers: apiHeaders({
+              "Content-Type": "application/json",
+              Prefer: "return=representation"
+            }),
+            body: JSON.stringify({
+              name: "Joscha",
+              phone: "coach",
+              invite_code: null,
+              serial_number: null
+            })
+          });
+          if (created.ok) {
+            var out = await created.json();
+            coachAccount = out && out[0] ? out[0] : null;
+          }
+        } catch (e2) {}
+        return coachAccount;
+      }
+
       async function renderMirroredFeed(account) {
         var feed = document.getElementById("admin-feed");
         if (!feed) return;
@@ -910,24 +1029,27 @@
           return;
         }
         try {
-          var res = await fetch(
-            SUPABASE_URL + "/rest/v1/go_community_posts?author_id=eq." + encodeURIComponent(account.id) +
-            "&select=*&order=created_at.desc&limit=100",
-            { headers: apiHeaders() }
-          );
+          var coach = await resolveCoachAccount();
+          var q =
+            "go_community_posts?or=(author_id.eq." + encodeURIComponent(account.id) +
+            ",reply_to_id.eq." + encodeURIComponent(account.id) +
+            ")&select=*&order=created_at.desc&limit=120";
+          var res = await fetch(SUPABASE_URL + "/rest/v1/" + q, { headers: apiHeaders() });
           var rows = res.ok ? await res.json() : [];
           if (!rows || !rows.length) {
             feed.innerHTML = '<p class="empty">Noch kein Community-Verlauf.</p>';
             return;
           }
-          var first = String(account.name || "").trim().split(/\s+/)[0] || "Nutzer";
+          var userFirst = String(account.name || "").trim().split(/\s+/)[0] || "Nutzer";
+          var coachId = coach && coach.id ? coach.id : null;
           rows.forEach(function (post) {
             if (!post) return;
+            var mine = !!(coachId && post.author_id === coachId);
             var el = document.createElement("article");
-            el.className = "admin-post";
+            el.className = "admin-post" + (mine ? " is-mine" : "");
             var who = document.createElement("div");
             who.className = "admin-post__who";
-            who.textContent = first;
+            who.textContent = mine ? "Du" : userFirst;
             el.appendChild(who);
             if (post.photo_url) {
               var img = document.createElement("img");
@@ -944,10 +1066,63 @@
             }
             feed.appendChild(el);
           });
+          feed.scrollTop = 0;
         } catch (e) {
           feed.innerHTML = '<p class="empty">Feed nicht geladen.</p>';
         }
       }
+
+      function resizeAdminReplyField() {
+        var replyText = document.getElementById("admin-reply-text");
+        if (!replyText) return;
+        replyText.style.height = "auto";
+        var styles = window.getComputedStyle(replyText);
+        var line = parseFloat(styles.lineHeight);
+        if (!line || isNaN(line)) line = 1.35 * (parseFloat(styles.fontSize) || 15);
+        var pad = (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
+        var max = line * 3 + pad;
+        var next = Math.min(Math.max(replyText.scrollHeight, line + pad), max);
+        replyText.style.height = next + "px";
+      }
+
+      async function sendAdminReply() {
+        var replyText = document.getElementById("admin-reply-text");
+        var replySend = document.getElementById("admin-reply-send");
+        var body = String((replyText && replyText.value) || "").trim().slice(0, 144);
+        if (!body) return;
+        if (!activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) {
+          return;
+        }
+        var coach = await resolveCoachAccount();
+        if (!coach || !coach.id) return;
+        if (replySend) replySend.disabled = true;
+        try {
+          var res = await fetch(SUPABASE_URL + "/rest/v1/go_community_posts", {
+            method: "POST",
+            headers: apiHeaders({
+              "Content-Type": "application/json",
+              Prefer: "return=representation"
+            }),
+            body: JSON.stringify({
+              author_id: coach.id,
+              kind: "reply",
+              body: body,
+              photo_url: null,
+              reply_to_id: activeAccount.id
+            })
+          });
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          if (replyText) {
+            replyText.value = "";
+            resizeAdminReplyField();
+          }
+          await renderMirroredFeed(activeAccount);
+        } catch (e) {
+          if (replySend) replySend.disabled = !String((replyText && replyText.value) || "").trim();
+        }
+        if (replySend) replySend.disabled = !String((replyText && replyText.value) || "").trim();
+      }
+
       async function showResult(name, serial, code) {
         var url = GO_BASE;
         hideAllPanels();
@@ -1240,6 +1415,27 @@
 
       var planSave = document.getElementById("plan-save");
       if (planSave) planSave.addEventListener("click", function () { saveCoachPlan(); });
+
+      (function bindAdminComposer() {
+        var composer = document.getElementById("admin-composer");
+        var replyText = document.getElementById("admin-reply-text");
+        var replySend = document.getElementById("admin-reply-send");
+        if (replyText) {
+          replyText.addEventListener("input", function () {
+            var v = String(replyText.value || "");
+            if (v.length > 144) replyText.value = v.slice(0, 144);
+            resizeAdminReplyField();
+            if (replySend) replySend.disabled = !String(replyText.value || "").trim();
+          });
+          resizeAdminReplyField();
+        }
+        if (composer) {
+          composer.addEventListener("submit", function (ev) {
+            ev.preventDefault();
+            sendAdminReply();
+          });
+        }
+      })();
 
       ["gen-serial", "gen-code"].forEach(function (id) {
         document.getElementById(id).addEventListener("input", function () {
