@@ -118,40 +118,45 @@
     }
     .site-chrome--top {
       top: 0;
+      left: 0;
+      right: 0;
       bottom: auto;
-      /* Safe-Area + kurzer Auslauf: iOS wendet backdrop-filter in der Statusleiste sonst oft nicht an */
-      height: calc(env(safe-area-inset-top, 0px) + 36px);
-      min-height: calc(env(safe-area-inset-top, 0px) + 36px);
+      /* Von Display-Oberkante durch Safe-Area, kurzer Soft-Auslauf darunter */
+      height: calc(env(safe-area-inset-top, 0px) + 28px);
+      min-height: calc(env(safe-area-inset-top, 0px) + 28px);
       padding: 0;
       display: block;
-      /* opacity am Parent killt backdrop-filter auf WebKit — nur ::before steuern */
       opacity: 1;
       isolation: auto;
       pointer-events: none;
     }
     .site-chrome.site-chrome--top::before {
-      /* Reiner Blur ohne Rot: winzige neutrale Fläche aktiviert WebKit-Backdrop */
-      /* Kein opacity hier — das bricht backdrop-filter auf iOS */
       background: transparent;
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
+      /* Maske ab y=0 voll — kein Loch unter der Statusleiste */
       -webkit-mask-image: linear-gradient(
         to bottom,
         #000 0%,
-        #000 42%,
-        rgba(0, 0, 0, 0.55) 72%,
+        #000 68%,
         transparent 100%
       );
       mask-image: linear-gradient(
         to bottom,
         #000 0%,
-        #000 42%,
-        rgba(0, 0, 0, 0.55) 72%,
+        #000 68%,
         transparent 100%
       );
     }
     body.has-scroll-overflow .site-chrome.site-chrome--top::before {
-      background: rgba(255, 255, 255, 0.06);
+      /* Oben stärkerer Frost-Fill: iOS blur't in der Safe-Area nicht → sonst rote Lücke */
+      background: linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.36) 0%,
+        rgba(255, 255, 255, 0.2) 38%,
+        rgba(255, 255, 255, 0.08) 72%,
+        rgba(255, 255, 255, 0) 100%
+      );
       -webkit-backdrop-filter: blur(22px) saturate(1.15);
       backdrop-filter: blur(22px) saturate(1.15);
     }
