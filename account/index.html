@@ -1194,25 +1194,12 @@
         return new Date(y, m - 1, d);
       }
 
-      function cycleStartDate() {
-        var raw = (account && (account.created_at || account.cycle_start)) || null;
-        if (raw) {
-          var d = new Date(raw);
-          if (!isNaN(d.getTime())) {
-            return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-          }
-        }
-        var now = new Date();
-        return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      }
-
+      /* Rädchen: rollierende letzten 30 Tage (heute inklusive), rückwirkend. */
       function cycleWindowStart() {
-        var start = cycleStartDate();
-        var startMs = startOfDayMs(start);
         var today = new Date();
-        var daysSince = Math.floor((startOfDayMs(today) - startMs) / 86400000);
-        var cycleOffset = Math.floor(Math.max(0, daysSince) / CYCLE_RAYS) * CYCLE_RAYS;
-        return new Date(startMs + cycleOffset * 86400000);
+        var start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        start.setDate(start.getDate() - (CYCLE_RAYS - 1));
+        return start;
       }
 
       function cycleDayIndex(dateOrKey) {
