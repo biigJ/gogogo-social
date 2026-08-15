@@ -707,10 +707,30 @@
       border-radius: var(--radius);
       font-weight: 700;
       letter-spacing: -0.02em;
+      overflow: hidden;
+      position: relative;
+      padding: 0;
     }
     .share-modal__btn svg {
       width: 28px;
       height: 28px;
+      display: block;
+    }
+    .share-modal__btn.has-preview {
+      padding: 0;
+    }
+    .share-modal__btn.has-preview svg,
+    .share-modal__btn.has-preview > span {
+      display: none;
+    }
+    .share-modal__preview {
+      display: none;
+      width: 100%;
+      height: 100%;
+      min-height: 96px;
+      object-fit: cover;
+    }
+    .share-modal__btn.has-preview .share-modal__preview {
       display: block;
     }
     .share-text-field {
@@ -1643,6 +1663,7 @@
         <button class="share-modal__btn" type="button" id="share-camera" aria-label="Foto aufnehmen">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 4h6l1.2 2H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3.8L9 4Zm3 4.5A4.5 4.5 0 1 0 16.5 13 4.5 4.5 0 0 0 12 8.5Zm0 2A2.5 2.5 0 1 1 9.5 13 2.5 2.5 0 0 1 12 10.5Z"/></svg>
           <span>Kamera</span>
+          <img class="share-modal__preview" id="share-camera-preview" alt="" />
         </button>
         <button class="share-modal__btn" type="button" id="share-text" aria-label="Text schreiben">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 4h16v2H4V4Zm0 4h16v2H4V8Zm0 4h10v2H4v-2Zm0 4h16v2H4v-2Z"/></svg>
@@ -2213,6 +2234,15 @@
         document.getElementById("share-text-wrap").hidden = true;
         document.getElementById("share-text-input").value = "";
         document.getElementById("share-text-count").textContent = "0";
+        var cam = document.getElementById("share-camera");
+        var preview = document.getElementById("share-camera-preview");
+        if (cam) cam.classList.remove("has-preview");
+        if (preview) {
+          preview.removeAttribute("src");
+          preview.alt = "";
+        }
+        var file = document.getElementById("share-camera-file");
+        if (file) file.value = "";
         modal.hidden = false;
         modal.classList.add("is-open");
       }
@@ -2999,15 +3029,28 @@
           });
         }
         if (shareCamera && shareFile) {
-          shareCamera.addEventListener("click", function () { shareFile.click(); });
+          var sharePreview = document.getElementById("share-camera-preview");
+          shareCamera.addEventListener("click", function () {
+            if (shareCamera.classList.contains("has-preview")) return;
+            shareFile.click();
+          });
           shareFile.addEventListener("change", function () {
             var file = shareFile.files && shareFile.files[0];
             if (!file) return;
+            var localUrl = URL.createObjectURL(file);
+            if (sharePreview) {
+              sharePreview.src = localUrl;
+              sharePreview.alt = "Aufnahme";
+            }
+            shareCamera.classList.add("has-preview");
+            if (msg) msg.textContent = "Lädt Foto…";
             uploadCommunityBlob(file).then(function (url) {
               if (!url) {
                 if (msg) msg.textContent = "Foto-Upload fehlgeschlagen.";
-                return;
+                shareCamera.classList.remove("has-preview");
+                return null;
               }
+              if (sharePreview) sharePreview.src = url;
               return createCommunityPost({
                 author_id: account.id,
                 kind: "photo",
@@ -3017,9 +3060,11 @@
               });
             }).then(function (row) {
               if (row) {
-                closeShareModal();
                 if (msg) msg.textContent = "Foto im Feed.";
+                setTimeout(function () { closeShareModal(); }, 700);
               }
+            }).finally(function () {
+              try { URL.revokeObjectURL(localUrl); } catch (e) {}
             });
           });
         }
