@@ -986,12 +986,6 @@
       margin: 0;
     }
     .profile-plan__day p + p { margin-top: 2px; }
-    body.is-profile .nav-btn {
-      opacity: 0.55;
-    }
-    body.is-profile .nav-btn.is-active {
-      opacity: 0.55;
-    }
     .home-check {
       display: grid;
       grid-template-columns: 1fr auto auto;
@@ -2764,9 +2758,12 @@
         }).catch(function () {
           fillCommunityPanel();
         });
-        var n = String(WHATSAPP_NUMBER).replace(/\D/g, "");
-        var waHref = "https://wa.me/" + n + "?text=" + encodeURIComponent("Hi Joscha, ich bin " + account.name + ".");
-        document.getElementById("wa-chat").href = waHref;
+        var waEl = document.getElementById("wa-chat");
+        if (waEl) {
+          var n = String(WHATSAPP_NUMBER).replace(/\D/g, "");
+          var waHref = "https://wa.me/" + n + "?text=" + encodeURIComponent("Hi Joscha, ich bin " + account.name + ".");
+          waEl.href = waHref;
+        }
       }
       showApp();
 
@@ -3059,11 +3056,6 @@
         document.body.classList.toggle("is-profile", onProfile);
         document.body.classList.toggle("is-community", onCommunity);
         document.querySelectorAll(".nav-btn").forEach(function (btn) {
-          if (onProfile) {
-            btn.classList.remove("is-active");
-            btn.removeAttribute("aria-current");
-            return;
-          }
           var on = btn.getAttribute("data-goto") === id;
           btn.classList.toggle("is-active", on);
           if (on) btn.setAttribute("aria-current", "page");
