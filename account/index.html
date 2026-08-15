@@ -40,59 +40,65 @@
     html {
       scroll-behavior: smooth;
       touch-action: manipulation;
-      height: 100%;
     }
     body {
       font-family: var(--display);
       background: var(--red);
       color: var(--ink-on-red);
-      min-height: 100%;
-      height: 100%;
-      height: 100dvh;
+      min-height: 100dvh;
       -webkit-font-smoothing: antialiased;
       line-height: 1.35;
       overscroll-behavior-x: none;
       touch-action: manipulation;
-      overflow: hidden;
+      /* Dokument scrollt — auf iOS zuverlässiger als nested overflow. */
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     }
     #app {
-      height: 100%;
-      height: 100dvh;
-      display: flex;
-      flex-direction: column;
+      min-height: 100dvh;
+      display: block;
+      position: relative;
     }
     #app[hidden] { display: none !important; }
+    body.is-training {
+      overflow: hidden;
+      height: 100dvh;
+    }
+    body.is-training #app {
+      height: 100dvh;
+      overflow: hidden;
+    }
     button, input { font: inherit; color: inherit; }
     button { cursor: pointer; border: 0; background: none; }
     a { color: inherit; text-decoration: none; }
     img { display: block; max-width: 100%; }
 
     .site-chrome {
-      position: absolute;
+      position: fixed;
       left: 0;
       right: 0;
       bottom: 0;
-      z-index: 40;
+      z-index: 50;
       display: flex;
       flex-direction: column;
       align-items: stretch;
       padding: var(--chrome-fade) var(--pad) 0;
       pointer-events: none;
-      /* Oben weich ausfaden, darunter deckend — verhindert Geistertext unter dem Menü. */
       background:
         linear-gradient(
           180deg,
           rgba(199, 65, 59, 0) 0%,
-          rgba(199, 65, 59, 0.55) 42%,
-          var(--red) 78%
+          rgba(199, 65, 59, 0.7) 40%,
+          var(--red) 72%
         );
-      transform: translateZ(0);
-      isolation: isolate;
     }
     .site-bottom {
       flex-shrink: 0;
       display: flex;
       justify-content: center;
+      width: min(100%, var(--max));
+      margin: 0 auto;
       padding: 0 0 6px;
       pointer-events: none;
       background: var(--red);
@@ -125,29 +131,27 @@
     }
 
     .wrap {
-      position: relative;
       width: min(100%, var(--max));
       margin: 0 auto;
-      flex: 1;
-      min-height: 0;
-      height: 100%;
       box-sizing: border-box;
       padding: 0;
     }
     .wrap__scroll {
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-      overflow-x: hidden;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior: contain;
       box-sizing: border-box;
       padding: 0 var(--pad);
-      /* Genug Abstand unter Dynamic Island; beim Scrollen wandert Inhalt dahinter. */
       padding-top: calc(env(safe-area-inset-top, 0px) + 16px);
-      /* Letzte Karte kann über dem Menü stehen, läuft beim Weiterscrollen darunter. */
       padding-bottom: calc(var(--chrome-stack) + 32px);
+    }
+    body.is-training .wrap,
+    body.is-training .wrap__scroll {
+      height: 100%;
+      min-height: 0;
+    }
+    body.is-training .wrap__scroll {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding-bottom: calc(var(--chrome-stack));
     }
 
     .hero { text-align: center; margin-bottom: 22px; }
@@ -676,12 +680,8 @@
       display: flex;
       flex-direction: column;
       min-height: 0;
-      height: 100%;
-    }
-    body.is-training .wrap__scroll {
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+      flex: 1;
+      height: auto;
     }
     body.is-training .foot,
     body.is-training .foot a { color: rgba(247, 245, 240, 0.75); }
@@ -777,8 +777,9 @@
     .foot {
       flex-shrink: 0;
       pointer-events: auto;
+      width: min(100%, var(--max));
+      margin: 0 auto;
       text-align: center;
-      margin: 0;
       padding: 6px 0 max(18px, calc(env(safe-area-inset-bottom, 0px) + 8px));
       font-size: 12px;
       font-weight: 500;
@@ -1578,7 +1579,7 @@
         }
         var scrollEl = document.querySelector(".wrap__scroll");
         if (scrollEl) scrollEl.scrollTop = 0;
-        else window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
 
       document.querySelectorAll("[data-goto]").forEach(function (el) {
