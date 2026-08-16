@@ -1208,6 +1208,7 @@
       }
 
       var DAY_PLAN_KEYS = ["day_mo", "day_di", "day_mi", "day_do", "day_fr", "day_sa", "day_so"];
+      var coachHistoryAvailable = null;
 
       function berlinTodayISO() {
         try {
@@ -1234,7 +1235,33 @@
         return rows && rows[0] ? rows[0] : null;
       }
 
+      async function probeCoachHistoryTable() {
+        if (coachHistoryAvailable != null) return coachHistoryAvailable;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_coach_plan_day_history?select=id&limit=1",
+            { headers: apiHeaders() }
+          );
+          if (res.ok) {
+            coachHistoryAvailable = true;
+            return true;
+          }
+          var t = "";
+          try { t = await res.text(); } catch (e0) {}
+          if (res.status === 404 || /PGRST205|go_coach_plan_day_history|schema cache/i.test(t)) {
+            coachHistoryAvailable = false;
+            return false;
+          }
+          coachHistoryAvailable = false;
+          return false;
+        } catch (e) {
+          coachHistoryAvailable = false;
+          return false;
+        }
+      }
+
       async function dayHistoryExists(accountId, dayKey) {
+        if (!(await probeCoachHistoryTable())) return false;
         var res = await fetch(
           SUPABASE_URL + "/rest/v1/go_coach_plan_day_history?account_id=eq." + encodeURIComponent(accountId) +
           "&day_key=eq." + encodeURIComponent(dayKey) +
@@ -1247,7 +1274,8 @@
       }
 
       async function insertDayHistory(rows) {
-        if (!rows || !rows.length) return true;
+        if (!rows || !rows.length) return { ok: true, missing: false };
+        if (!(await probeCoachHistoryTable())) return { ok: true, missing: true };
         var res = await fetch(SUPABASE_URL + "/rest/v1/go_coach_plan_day_history", {
           method: "POST",
           headers: apiHeaders({
@@ -1256,11 +1284,21 @@
           }),
           body: JSON.stringify(rows)
         });
-        return res.ok;
+        if (res.ok) return { ok: true, missing: false };
+        var t = "";
+        try { t = await res.text(); } catch (e0) {}
+        if (res.status === 404 || /PGRST205|go_coach_plan_day_history|schema cache/i.test(t)) {
+          coachHistoryAvailable = false;
+          return { ok: true, missing: true };
+        }
+        return { ok: false, missing: false, detail: t || ("HTTP " + res.status) };
       }
 
       /* Bei Überschreiben: alten Stand archivieren (immutable), neuer gilt ab heute. */
       async function archiveChangedDays(accountId, previous, payload) {
+        if (!(await probeCoachHistoryTable())) {
+          return { ok: true, missing: true };
+        }
         var today = berlinTodayISO();
         var inserts = [];
         for (var i = 0; i < DAY_PLAN_KEYS.length; i++) {
@@ -1284,7 +1322,7 @@
             effective_from: today
           });
         }
-        if (!inserts.length) return true;
+        if (!inserts.length) return { ok: true, missing: false };
         return await insertDayHistory(inserts);
       }
 
@@ -1309,8 +1347,8 @@
         try {
           var previous = await fetchPlanRow(activeAccount.id);
           var archived = await archiveChangedDays(activeAccount.id, previous, payload);
-          if (!archived) {
-            throw new Error("History insert failed");
+          if (!archived.ok) {
+            throw new Error(archived.detail || "History insert failed");
           }
           var res = await fetch(SUPABASE_URL + "/rest/v1/go_coach_plans?on_conflict=account_id", {
             method: "POST",
@@ -1325,10 +1363,23 @@
             try { t = await res.text(); } catch (e0) {}
             throw new Error(t || ("HTTP " + res.status));
           }
-          if (planMsg) planMsg.textContent = "Gespeichert.";
+          if (planMsg) {
+            if (archived.missing) {
+              planMsg.textContent = "Gespeichert. Hinweis: Tages-Archiv fehlt — go-coach-plan-history.sql in Supabase ausführen.";
+            } else {
+              planMsg.textContent = "Gespeichert.";
+            }
+          }
         } catch (err) {
           if (planMsg) {
-            planMsg.textContent = "Speichern fehlgeschlagen (go-coach-plans.sql / go-coach-plan-history.sql?).";
+            var detail = err && err.message ? String(err.message) : "";
+            if (/PGRST205|go_coach_plan_day_history/i.test(detail)) {
+              planMsg.textContent = "Speichern fehlgeschlagen: Tabelle go_coach_plan_day_history fehlt (go-coach-plan-history.sql).";
+            } else if (/go_coach_plans/i.test(detail)) {
+              planMsg.textContent = "Speichern fehlgeschlagen: go_coach_plans prüfen (go-coach-plans.sql).";
+            } else {
+              planMsg.textContent = "Speichern fehlgeschlagen" + (detail ? (": " + detail.slice(0, 160)) : ".");
+            }
             planMsg.classList.add("is-error");
           }
         }
