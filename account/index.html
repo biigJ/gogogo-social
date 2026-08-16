@@ -3717,6 +3717,20 @@
         });
       });
 
+      (function applyGotoQuery() {
+        try {
+          var params = new URLSearchParams(window.location.search || "");
+          var goto = String(params.get("goto") || "").trim().toLowerCase();
+          if (!goto) return;
+          var allowed = { home: 1, profile: 1, community: 1, book: 1, training: 1, chat: 1 };
+          if (!allowed[goto]) return;
+          gotoPanel(goto);
+          if (window.history && typeof history.replaceState === "function") {
+            history.replaceState({}, "", window.location.pathname + (window.location.hash || ""));
+          }
+        } catch (e) {}
+      })();
+
       (function buildHomeCalendar() {
         var names = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
         /* Wochen-Template: Index 0 = Montag. Freitag immer HIIT. Immer Headline + 2 Sublines. */
