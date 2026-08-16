@@ -1258,6 +1258,13 @@
       border-radius: var(--radius);
       box-sizing: border-box;
     }
+    .profile-challenge__left {
+      display: inline-flex;
+      align-items: baseline;
+      gap: 10px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
     .profile-challenge__label {
       font-weight: 700;
       font-size: 1rem;
@@ -1265,6 +1272,17 @@
       line-height: 1.1;
       color: var(--red);
     }
+    .profile-challenge__stake {
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--red);
+      white-space: nowrap;
+    }
+    .profile-challenge__stake[hidden] { display: none !important; }
+    .profile-challenge__euro[hidden] { display: none !important; }
+    .profile-challenge__days[hidden] { display: none !important; }
     .profile-challenge__squares {
       display: inline-flex;
       align-items: center;
@@ -1864,12 +1882,15 @@
           ></button>
         </div>
         <div class="profile-challenge" id="profile-challenge" aria-label="Challenge">
-          <span class="profile-challenge__label">Challenge</span>
+          <div class="profile-challenge__left">
+            <span class="profile-challenge__label">Challenge</span>
+            <span class="profile-challenge__stake" id="profile-challenge-stake" hidden></span>
+          </div>
           <div class="profile-challenge__squares">
-            <div class="profile-challenge__euro" id="profile-challenge-euro" aria-hidden="true">€</div>
-            <div class="profile-challenge__wheel" id="profile-challenge-wheel" aria-label="Verbleibende Tage">
+            <div class="profile-challenge__euro" id="profile-challenge-euro" hidden aria-hidden="true">€</div>
+            <div class="profile-challenge__wheel" id="profile-challenge-wheel" aria-label="Challenge">
               <svg id="profile-challenge-rays" viewBox="0 0 40 40" aria-hidden="true"></svg>
-              <span class="profile-challenge__days" id="profile-challenge-days">28</span>
+              <span class="profile-challenge__days" id="profile-challenge-days" hidden>28</span>
             </div>
           </div>
         </div>
@@ -2263,7 +2284,7 @@
   <div class="modal" id="photo-modal" hidden>
     <div class="modal__panel">
       <h2>Gesicht ins Quadrat</h2>
-      <p style="font-size:0.9rem;font-weight:500;margin-bottom:12px">Verschiebe das Bild, bis Dein Gesicht mittig sitzt. Danach wird es gerastert und gespeichert.</p>
+      <p style="font-size:0.9rem;font-weight:500;margin-bottom:12px">Verschiebe das Bild, bis Dein Gesicht mittig sitzt. Mit zwei Fingern zoomen. Danach wird es gerastert und gespeichert.</p>
       <div class="crop" id="crop">
         <img id="crop-img" alt="" />
       </div>
@@ -2403,26 +2424,65 @@
         return lines.join("\n").trim();
       }
 
-      function ensurePlaceholderPortrait() {
-        if (PLACEHOLDER_PORTRAIT_URL) return PLACEHOLDER_PORTRAIT_URL;
+      function drawGymnastSilhouette(ctx, size) {
+        var s = size / 264;
+        ctx.save();
+        ctx.translate(size / 2, size / 2);
+        ctx.scale(s, s);
+        ctx.strokeStyle = "#C7413B";
+        ctx.fillStyle = "#C7413B";
+        ctx.lineWidth = 10;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        /* Kopf */
+        ctx.beginPath();
+        ctx.arc(0, -70, 22, 0, Math.PI * 2);
+        ctx.fill();
+        /* Rumpf */
+        ctx.beginPath();
+        ctx.moveTo(0, -46);
+        ctx.lineTo(0, 18);
+        ctx.stroke();
+        /* Arme hoch (Gymnastik) */
+        ctx.beginPath();
+        ctx.moveTo(0, -28);
+        ctx.lineTo(-58, -78);
+        ctx.moveTo(0, -28);
+        ctx.lineTo(58, -78);
+        ctx.stroke();
+        /* Beine in Schrittstellung */
+        ctx.beginPath();
+        ctx.moveTo(0, 18);
+        ctx.lineTo(-42, 88);
+        ctx.moveTo(0, 18);
+        ctx.lineTo(48, 78);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function ensurePlaceholderPortrait(force) {
+        if (!force && PLACEHOLDER_PORTRAIT_URL) return PLACEHOLDER_PORTRAIT_URL;
         try {
-          var size = 264;
+          var size = 512;
           var canvas = document.createElement("canvas");
           canvas.width = size;
           canvas.height = size;
           var ctx = canvas.getContext("2d");
           ctx.fillStyle = "#F7F5F0";
           ctx.fillRect(0, 0, size, size);
-          ctx.fillStyle = "#C7413B";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.font = "160px Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif";
-          ctx.fillText("🤸", size / 2, size / 2 + 8);
+          drawGymnastSilhouette(ctx, size);
           if (window.GogogoDither && GogogoDither.ditherSquare) {
             var dithered = GogogoDither.ditherSquare(canvas, 1);
             PLACEHOLDER_PORTRAIT_URL = dithered.toDataURL("image/png");
           } else {
             PLACEHOLDER_PORTRAIT_URL = canvas.toDataURL("image/png");
+            /* Dither-Script nachladen → nochmal rastern */
+            setTimeout(function () {
+              if (!(window.GogogoDither && GogogoDither.ditherSquare)) return;
+              if (account && account.photo_url) return;
+              PLACEHOLDER_PORTRAIT_URL = null;
+              applyHomePlaceholder();
+            }, 400);
           }
         } catch (e) {
           PLACEHOLDER_PORTRAIT_URL = "";
@@ -2480,25 +2540,50 @@
         if (profilePlus) profilePlus.hidden = true;
       }
 
-      function challengeRemainingDays(startedAt, active) {
-        if (!active) return CHALLENGE_DAYS;
-        if (!startedAt) return CHALLENGE_DAYS;
+      function challengeElapsedDays(startedAt) {
+        if (!startedAt) return 0;
         var start = new Date(startedAt);
-        if (isNaN(start.getTime())) return CHALLENGE_DAYS;
+        if (isNaN(start.getTime())) return 0;
         var now = new Date();
         var startDay = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
         var nowDay = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
         var elapsed = Math.floor((nowDay - startDay) / 86400000);
-        if (elapsed < 0) elapsed = 0;
-        return Math.max(0, CHALLENGE_DAYS - elapsed);
+        return elapsed < 0 ? 0 : elapsed;
       }
 
-      function renderMiniChallengeWheel(svg, remaining) {
+      function challengeRemainingDays(startedAt, active) {
+        if (!active) return CHALLENGE_DAYS;
+        return Math.max(0, CHALLENGE_DAYS - challengeElapsedDays(startedAt));
+      }
+
+      /* (Einsatz − 2) / (vergangene + noch übrige Tage bis 28) */
+      function challengeDailyStake(amount, startedAt, active) {
+        var stake = Number(amount);
+        if (!active || !(stake >= 30)) return null;
+        var elapsed = challengeElapsedDays(startedAt);
+        var remaining = Math.max(0, CHALLENGE_DAYS - elapsed);
+        var divisor = Math.max(1, Math.min(elapsed, CHALLENGE_DAYS) + remaining);
+        return (stake - 2) / divisor;
+      }
+
+      function formatChallengeStake(value) {
+        if (value == null || isNaN(value)) return "";
+        var rounded = Math.round(value * 100) / 100;
+        return rounded.toLocaleString("de-DE", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        }) + "\u00a0€";
+      }
+
+      function renderMiniChallengeWheel(svg, remaining, allRed) {
         if (!svg) return;
         var filled = {};
-        var rem = Math.max(0, Math.min(CHALLENGE_DAYS, Number(remaining) || 0));
-        for (var i = 0; i < rem; i++) filled[i] = true;
-        /* Größerer Innenkreis, damit die Tageszahl freistehend darin sitzt */
+        if (allRed) {
+          for (var a = 0; a < CHALLENGE_DAYS; a++) filled[a] = true;
+        } else {
+          var rem = Math.max(0, Math.min(CHALLENGE_DAYS, Number(remaining) || 0));
+          for (var i = 0; i < rem; i++) filled[i] = true;
+        }
         drawCycle(svg, {
           cx: 20,
           cy: 20,
@@ -2515,12 +2600,38 @@
       function renderProfileChallenge() {
         var euro = document.getElementById("profile-challenge-euro");
         var daysEl = document.getElementById("profile-challenge-days");
+        var stakeEl = document.getElementById("profile-challenge-stake");
         var svg = document.getElementById("profile-challenge-rays");
         var active = !!(account && account.challenge_active);
         var rem = challengeRemainingDays(account && account.challenge_started_at, active);
-        if (euro) euro.classList.toggle("is-active", active);
-        if (daysEl) daysEl.textContent = String(active ? rem : CHALLENGE_DAYS);
-        renderMiniChallengeWheel(svg, active ? rem : 0);
+        if (euro) {
+          euro.hidden = true;
+          euro.setAttribute("aria-hidden", "true");
+        }
+        if (daysEl) {
+          if (active) {
+            daysEl.hidden = false;
+            daysEl.textContent = String(rem);
+          } else {
+            daysEl.hidden = true;
+            daysEl.textContent = "";
+          }
+        }
+        if (stakeEl) {
+          var daily = challengeDailyStake(
+            account && account.challenge_amount,
+            account && account.challenge_started_at,
+            active
+          );
+          if (daily != null) {
+            stakeEl.hidden = false;
+            stakeEl.textContent = formatChallengeStake(daily);
+          } else {
+            stakeEl.hidden = true;
+            stakeEl.textContent = "";
+          }
+        }
+        renderMiniChallengeWheel(svg, rem, !active);
       }
 
       var DEFAULT_MANTRAS = [
@@ -4595,6 +4706,10 @@
         if (Object.prototype.hasOwnProperty.call(remote, "challenge_started_at")) {
           account.challenge_started_at = remote.challenge_started_at || null;
         }
+        if (Object.prototype.hasOwnProperty.call(remote, "challenge_amount")) {
+          var amt = remote.challenge_amount == null ? null : Number(remote.challenge_amount);
+          account.challenge_amount = amt != null && !isNaN(amt) ? amt : null;
+        }
         var localPhoto = account.photo_url;
         var remotePhoto = remote.photo_url;
         if (remotePhoto) account.photo_url = remotePhoto;
@@ -4869,38 +4984,24 @@
         }
         function workoutFor(d) {
           var wd = (d.getDay() + 6) % 7;
-          /* Admin-Plan geladen (aktuell oder Historie): Kästen nur daraus. */
-          if (coachPlan || (coachDayHistory && coachDayHistory.length)) {
-            if (isAccountPaused()) {
-              return { title: "", line1: "", line2: "", rest: true };
-            }
-            var fromCoach = coachDayTextForDate(d);
-            if (fromCoach) {
-              var parts = splitPlanLines(fromCoach);
-              var rest = /ruhe|erholung|kein\s*workout/i.test(fromCoach);
-              var training =
-                wd === 4 &&
-                !parts.line2 &&
-                /zum\s*training|friday\s*circle|\bhiit\b/i.test(fromCoach);
-              return {
-                title: parts.title || fromCoach,
-                line1: parts.line1,
-                line2: parts.line2 || (training ? "Zum Training" : ""),
-                rest: rest,
-                training: training
-              };
-            }
-            return {
-              title: "Noch offen.",
-              line1: "",
-              line2: "",
-              rest: true
-            };
-          }
           if (isAccountPaused()) {
             return { title: "", line1: "", line2: "", rest: true };
           }
-          return WEEKDAY_WORKOUTS[wd] || WEEKDAY_WORKOUTS[1];
+          var fromCoach = coachDayTextForDate(d);
+          var planText = fromCoach || DEFAULT_DAY_PLAN;
+          var parts = splitPlanLines(planText);
+          var rest = /ruhe|erholung|kein\s*workout/i.test(planText);
+          var training =
+            wd === 4 &&
+            !parts.line2 &&
+            /zum\s*training|friday\s*circle|\bhiit\b/i.test(planText);
+          return {
+            title: parts.title || planText,
+            line1: parts.line1,
+            line2: parts.line2 || (training ? "Zum Training" : ""),
+            rest: rest,
+            training: training
+          };
         }
         function monthLabelForWeek(monday) {
           var mid = new Date(monday);
@@ -5219,8 +5320,22 @@
       var photoMsg = document.getElementById("photo-msg");
       var offset = { x: 0, y: 0 };
       var baseScale = 1;
+      var userScale = 1;
       var dragging = false;
+      var pinching = false;
       var last = { x: 0, y: 0 };
+      var pinchStartDist = 0;
+      var pinchStartUserScale = 1;
+
+      function cropEffectiveScale() {
+        return baseScale * userScale;
+      }
+
+      function touchDistance(t0, t1) {
+        var dx = t0.clientX - t1.clientX;
+        var dy = t0.clientY - t1.clientY;
+        return Math.sqrt(dx * dx + dy * dy) || 1;
+      }
 
       function openModal() {
         modal.hidden = false;
@@ -5505,27 +5620,53 @@
         cropImg.onload = function () {
           var box = crop.getBoundingClientRect();
           baseScale = Math.max(box.width / cropImg.naturalWidth, box.height / cropImg.naturalHeight) * 1.15;
+          userScale = 1;
           offset = { x: 0, y: 0 };
           applyCropTransform();
           saveBtn.disabled = false;
-          photoMsg.textContent = "";
+          photoMsg.textContent = "Zwei Finger zum Zoomen · Verschieben mit einem Finger";
         };
         cropImg.src = url;
       });
 
       function applyCropTransform() {
-        cropImg.style.width = (cropImg.naturalWidth * baseScale) + "px";
-        cropImg.style.height = (cropImg.naturalHeight * baseScale) + "px";
+        var sc = cropEffectiveScale();
+        cropImg.style.width = (cropImg.naturalWidth * sc) + "px";
+        cropImg.style.height = (cropImg.naturalHeight * sc) + "px";
         cropImg.style.transform = "translate(calc(-50% + " + offset.x + "px), calc(-50% + " + offset.y + "px))";
       }
 
       function onDown(e) {
+        if (e.touches && e.touches.length >= 2) {
+          pinching = true;
+          dragging = false;
+          pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
+          pinchStartUserScale = userScale;
+          return;
+        }
+        pinching = false;
         dragging = true;
         var p = e.touches ? e.touches[0] : e;
         last = { x: p.clientX, y: p.clientY };
       }
       function onMove(e) {
-        if (!dragging) return;
+        if (e.touches && e.touches.length >= 2) {
+          e.preventDefault();
+          pinching = true;
+          dragging = false;
+          var dist = touchDistance(e.touches[0], e.touches[1]);
+          if (!pinchStartDist) {
+            pinchStartDist = dist;
+            pinchStartUserScale = userScale;
+          }
+          var next = pinchStartUserScale * (dist / pinchStartDist);
+          if (next < 0.55) next = 0.55;
+          if (next > 4.5) next = 4.5;
+          userScale = next;
+          applyCropTransform();
+          return;
+        }
+        if (!dragging || pinching) return;
         e.preventDefault();
         var p = e.touches ? e.touches[0] : e;
         offset.x += p.clientX - last.x;
@@ -5533,13 +5674,27 @@
         last = { x: p.clientX, y: p.clientY };
         applyCropTransform();
       }
-      function onUp() { dragging = false; }
+      function onUp(e) {
+        if (e && e.touches && e.touches.length >= 1) {
+          if (e.touches.length === 1) {
+            pinching = false;
+            pinchStartDist = 0;
+            dragging = true;
+            last = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          }
+          return;
+        }
+        dragging = false;
+        pinching = false;
+        pinchStartDist = 0;
+      }
       crop.addEventListener("mousedown", onDown);
       crop.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
-      crop.addEventListener("touchstart", onDown, { passive: true });
+      crop.addEventListener("touchstart", onDown, { passive: false });
       crop.addEventListener("touchmove", onMove, { passive: false });
       crop.addEventListener("touchend", onUp);
+      crop.addEventListener("touchcancel", onUp);
 
       function renderCroppedCanvas() {
         var box = crop.getBoundingClientRect();
@@ -5548,8 +5703,9 @@
         canvas.width = size;
         canvas.height = size;
         var ctx = canvas.getContext("2d");
-        var w = cropImg.naturalWidth * baseScale;
-        var h = cropImg.naturalHeight * baseScale;
+        var sc = cropEffectiveScale();
+        var w = cropImg.naturalWidth * sc;
+        var h = cropImg.naturalHeight * sc;
         var dx = size / 2 + offset.x - w / 2;
         var dy = size / 2 + offset.y - h / 2;
         ctx.fillStyle = "#F7F5F0";
