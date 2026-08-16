@@ -396,7 +396,7 @@
     .admin-open-profile {
       display: block;
       width: 100%;
-      margin: 0 0 18px;
+      margin: 28px 0 0;
     }
     .admin-open-profile[hidden] { display: none; }
     .result-meta {
@@ -471,6 +471,41 @@
     }
     .qr-box a { color: var(--ink-on-red); word-break: break-all; font-size: 0.85rem; font-weight: 600; }
     .qr-box a[hidden] { display: none !important; }
+    body.is-qr-only {
+      overflow: hidden;
+      height: 100svh;
+      max-height: 100svh;
+    }
+    body.is-qr-only .wrap {
+      box-sizing: border-box;
+      height: 100svh;
+      max-height: 100svh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    body.is-qr-only .cycle-wrap {
+      flex: 0 0 auto;
+      margin-bottom: 0;
+    }
+    body.is-qr-only #panel-result {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: stretch;
+      overflow: hidden;
+    }
+    body.is-qr-only .qr-box {
+      flex: 0 0 auto;
+      width: 100%;
+    }
+    body.is-qr-only .result-meta,
+    body.is-qr-only .admin-open-profile,
+    body.is-qr-only #admin-result-extras {
+      display: none !important;
+    }
     .list {
       display: flex; flex-direction: column; gap: 10px;
     }
@@ -635,9 +670,6 @@
     </div>
 
     <div class="panel" id="panel-result" hidden>
-      <button class="btn admin-open-profile" id="admin-open-profile" type="button" hidden>
-        Profil öffnen
-      </button>
       <p class="result-meta" id="result-meta"></p>
       <div class="qr-box" id="qr-box">
         <div id="qr-mount" aria-hidden="true"></div>
@@ -721,6 +753,9 @@
           <p class="msg" id="plan-msg" role="status"></p>
         </section>
       </div>
+      <button class="btn admin-open-profile" id="admin-open-profile" type="button" hidden>
+        Profil öffnen
+      </button>
     </div>
   </div>
 
@@ -824,6 +859,15 @@
         panelResult.hidden = true;
         panelList.hidden = true;
         if (panelMantras) panelMantras.hidden = true;
+        setQrOnlyMode(false);
+      }
+
+      function setQrOnlyMode(on) {
+        document.body.classList.toggle("is-qr-only", !!on);
+        if (on) {
+          window.scrollTo(0, 0);
+          if (document.documentElement) document.documentElement.scrollTop = 0;
+        }
       }
 
       function setCycleVisible(on) {
@@ -1782,6 +1826,7 @@
         activeAccountIds = [];
         panelResult.hidden = false;
         setResultExtrasVisible(false);
+        setQrOnlyMode(true);
         var metaEl = document.getElementById("result-meta");
         if (metaEl) {
           metaEl.hidden = true;
@@ -1794,7 +1839,7 @@
           link.textContent = url;
           link.hidden = false;
         }
-        setCycleVisible(false);
+        setCycleVisible(true);
         setCycleBack(false);
         setActorName("");
         setCyclePhoto(null);
