@@ -1,5 +1,6 @@
--- Trainer-Rolle und gewählter Trainer pro Account
--- Im Supabase SQL Editor ausführen.
+-- Trainer-Rolle, gewählter Trainer, und Coach-Account (Joscha)
+-- Einmal im Supabase SQL Editor ausführen.
+-- Ohne den Coach-Account (phone = 'coach') erscheint „Trainer gerade nicht erreichbar.“
 
 alter table go_accounts
   add column if not exists is_trainer boolean not null default false;
@@ -14,7 +15,19 @@ create index if not exists go_accounts_is_trainer_idx
 create index if not exists go_accounts_trainer_id_idx
   on go_accounts (trainer_id);
 
--- Bestehenden Joscha-/Coach-Account als Trainer markieren (falls vorhanden)
+-- Coach-Account anlegen, falls noch keiner existiert
+insert into go_accounts (name, phone, photo_url)
+select
+  'Joscha',
+  'coach',
+  'https://www.gogogo.social/assets/go/gogogo-dithering/coach-joscha.jpg?v=dither'
+where not exists (
+  select 1 from go_accounts
+  where lower(coalesce(phone, '')) = 'coach'
+     or lower(coalesce(name, '')) = 'joscha'
+);
+
+-- Joscha-/Coach-Account als Trainer markieren
 update go_accounts
 set is_trainer = true
 where (
