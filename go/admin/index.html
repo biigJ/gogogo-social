@@ -19,6 +19,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="/assets/go-qr.js"></script>
+  <script src="/assets/go-account-session.js"></script>
   <style>
     :root {
       --red: #C7413B;
@@ -343,6 +344,12 @@
     }
     .admin-name[hidden] { display: none; }
     .admin-name:disabled { opacity: 0.55; cursor: wait; }
+    .admin-open-profile {
+      display: block;
+      width: 100%;
+      margin: 0 0 18px;
+    }
+    .admin-open-profile[hidden] { display: none; }
     .result-meta {
       text-align: center;
       font-weight: 600;
@@ -570,6 +577,9 @@
     </div>
 
     <div class="panel" id="panel-result" hidden>
+      <button class="btn admin-open-profile" id="admin-open-profile" type="button" hidden>
+        Profil öffnen
+      </button>
       <p class="result-meta" id="result-meta"></p>
       <div class="qr-box" id="qr-box">
         <div id="qr-mount" aria-hidden="true"></div>
@@ -664,6 +674,11 @@
       var ACCOUNT_KEY = "gogogo_go_account";
       var GO_BASE = "https://www.gogogo.social/go";
       var adminNameBtn = document.getElementById("admin-name");
+      var adminOpenProfileBtn = document.getElementById("admin-open-profile");
+      var DAY_ENTRIES_KEY = "gogogo_go_day_entries";
+      var BUDDIES_KEY = "gogogo_go_buddies";
+      var BUDDY_SEARCH_FAILS_KEY = "gogogo_go_buddy_search_fails";
+      var BUDDY_SEARCH_LOCK_KEY = "gogogo_go_buddy_search_lock_until";
 
       function drawCycle(svg) {
         var ns = "http://www.w3.org/2000/svg";
@@ -772,62 +787,112 @@
         if (!isAuthed() || !name) {
           adminNameBtn.hidden = true;
           adminNameBtn.textContent = "";
+          adminNameBtn.removeAttribute("aria-label");
+          if (adminOpenProfileBtn) adminOpenProfileBtn.hidden = true;
           return;
         }
         adminNameBtn.hidden = false;
+        adminNameBtn.disabled = false;
         adminNameBtn.textContent = name;
+        adminNameBtn.setAttribute("aria-label", "Profil von " + name + " öffnen");
+        if (adminOpenProfileBtn) {
+          adminOpenProfileBtn.hidden = false;
+          adminOpenProfileBtn.disabled = false;
+          adminOpenProfileBtn.textContent = "Profil von " + name + " öffnen";
+        }
       }
 
       function namesMatch(a, b) {
         return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
       }
 
-      async function enterUserAccount(name, serial, code) {
-        if (!name) return;
-        adminNameBtn.disabled = true;
-        var account = null;
+      function quoteFilterValue(value) {
+        return '"' + String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+      }
+
+      function clearLocalUserCaches() {
         try {
-          var accRes = await fetch(
-            SUPABASE_URL + "/rest/v1/go_accounts?name=ilike." + encodeURIComponent(name) +
-            "&select=*&order=created_at.desc&limit=20",
-            { headers: apiHeaders() }
-          );
-          var accounts = accRes.ok ? await accRes.json() : [];
-          var matches = (accounts || []).filter(function (row) {
-            return namesMatch(row.name, name);
-          });
-          if (code) {
-            for (var i = 0; i < matches.length; i++) {
-              if (String(matches[i].invite_code || "") === String(code)) {
-                account = matches[i];
-                break;
+          localStorage.removeItem(DAY_ENTRIES_KEY);
+          localStorage.removeItem(BUDDIES_KEY);
+          localStorage.removeItem(BUDDY_SEARCH_FAILS_KEY);
+          localStorage.removeItem(BUDDY_SEARCH_LOCK_KEY);
+        } catch (e) {}
+      }
+
+      function persistImpersonatedAccount(account) {
+        if (!account || !account.name) return false;
+        try {
+          if (window.GoAccountSession) GoAccountSession.save(account);
+          else localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account));
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      async function enterUserAccount(name, serial, code, accountHint) {
+        if (!name && !(accountHint && accountHint.name)) return;
+        var displayName = (accountHint && accountHint.name) || name;
+        adminNameBtn.disabled = true;
+        if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = true;
+        var account = null;
+
+        if (accountHint && accountHint.id && accountHint.name) {
+          account = accountHint;
+        } else if (activeAccount && activeAccount.id && namesMatch(activeAccount.name, displayName)) {
+          account = activeAccount;
+        }
+
+        if (!account) {
+          try {
+            account = await resolveAccount(displayName, serial, code);
+          } catch (e) {}
+        }
+
+        if (!account) {
+          try {
+            var accRes = await fetch(
+              SUPABASE_URL + "/rest/v1/go_accounts?name=ilike." + encodeURIComponent(quoteFilterValue(displayName)) +
+              "&select=*&order=created_at.desc&limit=20",
+              { headers: apiHeaders() }
+            );
+            var accounts = accRes.ok ? await accRes.json() : [];
+            var matches = (accounts || []).filter(function (row) {
+              return namesMatch(row.name, displayName);
+            });
+            if (code) {
+              for (var i = 0; i < matches.length; i++) {
+                if (String(matches[i].invite_code || "") === String(code)) {
+                  account = matches[i];
+                  break;
+                }
               }
             }
-          }
-          if (!account) {
-            for (var p = 0; p < matches.length; p++) {
-              if (matches[p].photo_url) { account = matches[p]; break; }
+            if (!account) {
+              for (var p = 0; p < matches.length; p++) {
+                if (matches[p].photo_url) { account = matches[p]; break; }
+              }
             }
-          }
-          if (!account && matches.length) account = matches[0];
-        } catch (e) {}
+            if (!account && matches.length) account = matches[0];
+          } catch (e2) {}
+        }
 
         if (!account) {
           var invite = { serial_number: serial || null, code: code || null };
           try {
             var invRes = await fetch(
-              SUPABASE_URL + "/rest/v1/go_invite_codes?first_name=ilike." + encodeURIComponent(name) +
+              SUPABASE_URL + "/rest/v1/go_invite_codes?first_name=ilike." + encodeURIComponent(quoteFilterValue(displayName)) +
               "&select=*&order=created_at.desc&limit=5",
               { headers: apiHeaders() }
             );
             var invites = invRes.ok ? await invRes.json() : [];
             for (var n = 0; n < (invites || []).length; n++) {
-              if (namesMatch(invites[n].first_name, name)) {
+              if (namesMatch(invites[n].first_name, displayName)) {
                 invite = invites[n];
                 break;
               }
             }
-          } catch (e) {}
+          } catch (e3) {}
           try {
             var created = await fetch(SUPABASE_URL + "/rest/v1/go_accounts", {
               method: "POST",
@@ -836,7 +901,7 @@
                 Prefer: "return=representation"
               }),
               body: JSON.stringify({
-                name: name,
+                name: displayName,
                 phone: "admin",
                 invite_code: invite.code || code || null,
                 serial_number: invite.serial_number || serial || null
@@ -846,13 +911,13 @@
               var rows = await created.json();
               account = rows && rows[0] ? rows[0] : null;
             }
-          } catch (e) {}
+          } catch (e4) {}
         }
 
         if (!account) {
           account = {
             id: "local-" + Date.now(),
-            name: name,
+            name: displayName,
             phone: "admin",
             invite_code: code || null,
             serial_number: serial || null,
@@ -860,8 +925,28 @@
           };
         }
 
-        try { localStorage.setItem(ACCOUNT_KEY, JSON.stringify(account)); } catch (e) {}
-        window.location.href = "/account/";
+        clearLocalUserCaches();
+        if (!persistImpersonatedAccount(account)) {
+          adminNameBtn.disabled = false;
+          if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = false;
+          window.alert("Account konnte lokal nicht gespeichert werden.");
+          return;
+        }
+        window.location.href = "/account/?goto=profile";
+      }
+
+      function openCurrentUserProfile() {
+        if (!isAuthed()) return;
+        var name =
+          (activeAccount && activeAccount.name) ||
+          (lastQr && lastQr.name) ||
+          (adminNameBtn && adminNameBtn.textContent) ||
+          "";
+        name = String(name || "").trim();
+        if (!name) return;
+        var serial = lastQr && namesMatch(lastQr.name, name) ? lastQr.serial : (activeAccount && activeAccount.serial_number) || "";
+        var code = lastQr && namesMatch(lastQr.name, name) ? lastQr.code : (activeAccount && activeAccount.invite_code) || "";
+        enterUserAccount(name, serial, code, activeAccount);
       }
 
       function showGen() {
@@ -1454,12 +1539,23 @@
           (row.paused ? " · pausiert" : "");
         openBtn.appendChild(title);
         openBtn.appendChild(meta);
+        openBtn.setAttribute("aria-label", "Profil von " + (row.first_name || "Nutzer") + " öffnen");
         openBtn.addEventListener("click", function () {
-          showResult(row.first_name, row.serial_number, row.code);
+          enterUserAccount(row.first_name, row.serial_number, row.code);
         });
 
         var actions = document.createElement("div");
         actions.className = "list-actions";
+
+        var adminBtn = document.createElement("button");
+        adminBtn.type = "button";
+        adminBtn.className = "list-action";
+        adminBtn.textContent = "Admin";
+        adminBtn.setAttribute("aria-label", "Admin-Ansicht für " + (row.first_name || "Nutzer"));
+        adminBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          showResult(row.first_name, row.serial_number, row.code);
+        });
 
         var pauseBtn = document.createElement("button");
         pauseBtn.type = "button";
@@ -1473,6 +1569,8 @@
         delBtn.textContent = "Löschen";
 
         function setBusy(on) {
+          openBtn.disabled = on;
+          adminBtn.disabled = on;
           pauseBtn.disabled = on;
           delBtn.disabled = on;
         }
@@ -1516,6 +1614,7 @@
           }
         });
 
+        actions.appendChild(adminBtn);
         actions.appendChild(pauseBtn);
         actions.appendChild(delBtn);
         wrap.appendChild(openBtn);
@@ -1587,12 +1686,13 @@
         showLogin();
       });
       adminNameBtn.addEventListener("click", function () {
-        if (!isAuthed() || adminNameBtn.hidden) return;
-        var name = adminNameBtn.textContent.trim();
-        var serial = lastQr && namesMatch(lastQr.name, name) ? lastQr.serial : "";
-        var code = lastQr && namesMatch(lastQr.name, name) ? lastQr.code : "";
-        enterUserAccount(name, serial, code);
+        openCurrentUserProfile();
       });
+      if (adminOpenProfileBtn) {
+        adminOpenProfileBtn.addEventListener("click", function () {
+          openCurrentUserProfile();
+        });
+      }
 
       function renderQr(url) {
         var mount = document.getElementById("qr-mount");
