@@ -2136,10 +2136,14 @@
             if (seenIds.indexOf(id) < 0) seenIds.push(id);
           });
         } catch (eSeen) {}
-        markAdminInviteSeen({ serial_number: serial, code: code }, seenIds);
+        var peakBefore = 0;
+        try {
+          peakBefore = peakLatestForIds(seenIds, await loadLatestPostMsByAuthor());
+        } catch (ePeak) {}
+        markAdminInviteSeen({ serial_number: serial, code: code }, seenIds, peakBefore);
         refreshTrainerUi();
         await renderMirroredFeed(activeAccount);
-        markAdminInviteSeen({ serial_number: serial, code: code }, seenIds);
+        markAdminInviteSeen({ serial_number: serial, code: code }, seenIds, peakBefore);
         await loadCoachPlan(activeAccount && activeAccount.id);
       }
 
@@ -2548,26 +2552,43 @@
         try { localStorage.setItem(ADMIN_FEED_SEEN_KEY, JSON.stringify(map)); } catch (e) {}
       }
 
-      /* Gelesen-Markierung pro Nutzer: Invite-Code + Seriennummer + alle Account-IDs */
-      function markAdminInviteSeen(row, accountIds) {
-        var map = getAdminFeedSeenMap();
-        var now = new Date().toISOString();
-        var changed = false;
-        if (row && row.code) {
-          map["invite:" + String(row.code)] = now;
-          changed = true;
-        }
-        if (row && row.serial_number) {
-          map["serial:" + String(row.serial_number)] = now;
-          changed = true;
-        }
-        var list = Array.isArray(accountIds) ? accountIds : [accountIds];
-        list.forEach(function (id) {
+      /* Session-Fallback: Punkt bleibt weg auch wenn localStorage blockiert/neu geladen wird in derselben Sitzung. */
+      var adminSeenSessionMs = {};
+
+      function adminSeenKeysForInvite(row, accountIds) {
+        var keys = [];
+        if (row && row.code) keys.push("invite:" + String(row.code));
+        if (row && row.serial_number) keys.push("serial:" + String(row.serial_number));
+        (Array.isArray(accountIds) ? accountIds : [accountIds]).forEach(function (id) {
           if (!id || String(id).indexOf("local-") === 0) return;
-          map[String(id)] = now;
-          changed = true;
+          keys.push(String(id));
         });
-        if (changed) saveAdminFeedSeenMap(map);
+        return keys;
+      }
+
+      function peakLatestForIds(ids, latestByAuthor) {
+        var peak = 0;
+        (ids || []).forEach(function (id) {
+          var n = latestByAuthor && latestByAuthor[String(id)];
+          if (n && n > peak) peak = n;
+        });
+        return peak;
+      }
+
+      /* Gelesen-Markierung: Invite + Serial + Account-IDs, Zeitstempel ≥ letzte bekannte Nachricht. */
+      function markAdminInviteSeen(row, accountIds, atLeastMs) {
+        var map = getAdminFeedSeenMap();
+        var ms = Date.now();
+        var floor = Number(atLeastMs) || 0;
+        if (floor > 0) ms = Math.max(ms, floor + 1);
+        var now = new Date(ms).toISOString();
+        var keys = adminSeenKeysForInvite(row, accountIds);
+        if (!keys.length) return;
+        keys.forEach(function (key) {
+          map[key] = now;
+          adminSeenSessionMs[key] = ms;
+        });
+        saveAdminFeedSeenMap(map);
       }
 
       function markAdminFeedSeen(accountIds) {
@@ -2577,10 +2598,8 @@
       function inviteSeenMs(row, accountIds) {
         var map = getAdminFeedSeenMap();
         var ms = 0;
-        if (row && row.code) ms = Math.max(ms, postTimeMs(map["invite:" + String(row.code)]));
-        if (row && row.serial_number) ms = Math.max(ms, postTimeMs(map["serial:" + String(row.serial_number)]));
-        (accountIds || []).forEach(function (id) {
-          ms = Math.max(ms, postTimeMs(map[String(id)]));
+        adminSeenKeysForInvite(row, accountIds).forEach(function (key) {
+          ms = Math.max(ms, postTimeMs(map[key]), Number(adminSeenSessionMs[key]) || 0);
         });
         return ms;
       }
@@ -2665,10 +2684,11 @@
         return !seenMs || latestMs > seenMs;
       }
 
-      function renderListRow(list, row, hasUnread, linkedAccountIds) {
+      function renderListRow(list, row, hasUnread, linkedAccountIds, latestByAuthor) {
         var wrap = document.createElement("div");
         wrap.className = "list-row" + (row.paused ? " is-paused" : "");
         var linkedIds = Array.isArray(linkedAccountIds) ? linkedAccountIds.slice() : [];
+        var latestMap = latestByAuthor || {};
 
         var main = document.createElement("div");
         main.className = "list-main";
@@ -2782,7 +2802,8 @@
         adminBtn.addEventListener("click", function (e) {
           e.stopPropagation();
           /* Admin geöffnet = Nachrichten gelesen — Punkt sofort weg. */
-          markAdminInviteSeen(row, linkedIds);
+          var peak = peakLatestForIds(linkedIds, latestMap);
+          markAdminInviteSeen(row, linkedIds, peak);
           msgDot.classList.remove("is-on");
           msgDot.removeAttribute("title");
           showResult(row.first_name, row.serial_number, row.code);
@@ -2880,7 +2901,7 @@
           var latestByAuthor = await loadLatestPostMsByAuthor();
           rows.forEach(function (row) {
             var linked = accountIdsForInvite(row, accountIndex);
-            renderListRow(list, row, inviteHasUnread(row, accountIndex, latestByAuthor), linked);
+            renderListRow(list, row, inviteHasUnread(row, accountIndex, latestByAuthor), linked, latestByAuthor);
           });
         } catch (err) {
           listMsg.textContent = "Liste nicht geladen.";
