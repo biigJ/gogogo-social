@@ -1126,6 +1126,7 @@
       var lastQr = null;
       var activeAccount = null;
       var activeAccountIds = [];
+      var pendingAdminInvite = null;
       var cyclePortrait = document.getElementById("cycle-portrait");
       var cyclePortraitImg = document.getElementById("cycle-portrait-img");
       var PLAN_FIELDS = [
@@ -1980,60 +1981,85 @@
         if (!feed) return;
         feed.innerHTML = "";
         var ids = (activeAccountIds && activeAccountIds.length)
-          ? activeAccountIds.slice()
-          : (account && account.id && String(account.id).indexOf("local-") !== 0 ? [account.id] : []);
+          ? activeAccountIds.slice().map(String)
+          : (account && account.id && String(account.id).indexOf("local-") !== 0 ? [String(account.id)] : []);
         if (!ids.length) {
           feed.innerHTML = '<p class="empty">Noch kein Community-Verlauf.</p>';
           return;
         }
         try {
           var coach = await resolveCoachAccount();
-          var coachId = coach && coach.id ? coach.id : null;
+          var coachId = coach && coach.id ? String(coach.id) : null;
           var buddyIds = await loadUserBuddyIds(ids[0]);
-          var allIds = ids.slice();
-          buddyIds.forEach(function (id) {
-            if (id && allIds.indexOf(id) < 0) allIds.push(id);
+          /* Wie Account-Community: Coach NICHT in author_id — sonst sieht jeder Admin
+             alle Trainer-Nachrichten. Trainer nur via reply_to an diesen Nutzer. */
+          var authorIds = [];
+          var seenAuth = {};
+          ids.concat(buddyIds || []).forEach(function (id) {
+            if (!id || seenAuth[id] || (coachId && String(id) === coachId)) return;
+            seenAuth[id] = true;
+            authorIds.push(String(id));
           });
-          if (coachId && allIds.indexOf(coachId) < 0) allIds.push(coachId);
-          var inList = "(" + allIds.join(",") + ")";
-          var primary = ids[0];
+          var userIn = "(" + ids.join(",") + ")";
+          var orParts = ["reply_to_id.in." + userIn];
+          if (authorIds.length) orParts.unshift("author_id.in.(" + authorIds.join(",") + ")");
           var q =
-            "go_community_posts?or=(author_id.in." + inList +
-            ",reply_to_id.in." + "(" + ids.join(",") + ")" +
+            "go_community_posts?or=(" + orParts.join(",") +
             ")&select=*&order=created_at.desc&limit=200";
           var res = await fetch(SUPABASE_URL + "/rest/v1/" + q, { headers: apiHeaders() });
           var rows = res.ok ? await res.json() : [];
-          if (!rows || !rows.length) {
+          rows = (rows || []).filter(function (p) {
+            if (!p) return false;
+            if (coachId && String(p.author_id) === coachId) {
+              return ids.indexOf(String(p.reply_to_id || "")) >= 0;
+            }
+            return true;
+          });
+          if (!rows.length) {
             feed.innerHTML = '<p class="empty">Noch kein Community-Verlauf.</p>';
             return;
           }
+          var nameIds = authorIds.slice();
+          if (coachId) nameIds.push(coachId);
+          ids.forEach(function (id) {
+            if (nameIds.indexOf(id) < 0) nameIds.push(id);
+          });
+          rows.forEach(function (p) {
+            if (p && p.author_id && nameIds.indexOf(String(p.author_id)) < 0) {
+              nameIds.push(String(p.author_id));
+            }
+            if (p && p.reply_to_id && nameIds.indexOf(String(p.reply_to_id)) < 0) {
+              nameIds.push(String(p.reply_to_id));
+            }
+          });
           var nameById = {};
-          if (account && account.id) nameById[account.id] = account.name;
+          if (account && account.id) nameById[String(account.id)] = account.name;
           if (coachId) nameById[coachId] = (coach && coach.name) || "Trainer";
           try {
             var peopleRes = await fetch(
-              SUPABASE_URL + "/rest/v1/go_accounts?id=in." + inList + "&select=id,name&limit=30",
+              SUPABASE_URL + "/rest/v1/go_accounts?id=in.(" + nameIds.join(",") + ")&select=id,name&limit=40",
               { headers: apiHeaders() }
             );
             var people = peopleRes.ok ? await peopleRes.json() : [];
             (people || []).forEach(function (p) {
-              if (p && p.id && p.name) nameById[p.id] = p.name;
+              if (p && p.id && p.name) nameById[String(p.id)] = p.name;
             });
           } catch (eNames) {}
+          var primary = ids[0];
           function firstName(id) {
-            var n = nameById[id] || "";
+            var n = nameById[String(id)] || "";
             return String(n).trim().split(/\s+/)[0] || "Nutzer";
           }
           rows.forEach(function (post) {
             if (!post) return;
-            var mine = !!(coachId && post.author_id === coachId);
+            var mine = !!(coachId && String(post.author_id) === coachId);
             var el = document.createElement("article");
             el.className = "admin-post" + (mine ? " is-mine" : "");
             var who = document.createElement("div");
             who.className = "admin-post__who";
             who.textContent = mine ? "Du (Trainer)" : firstName(post.author_id);
             if (post.reply_to_id) {
-              who.textContent += " → " + (post.reply_to_id === primary ? firstName(primary) : firstName(post.reply_to_id));
+              who.textContent += " → " + (String(post.reply_to_id) === String(primary) ? firstName(primary) : firstName(post.reply_to_id));
             }
             el.appendChild(who);
             if (post.photo_url) {
@@ -2117,10 +2143,17 @@
         if (extras) extras.hidden = !on;
       }
 
-      async function showResult(name, serial, code) {
+      async function showResult(name, serial, code, inviteRow) {
         var url = GO_BASE;
         hideAllPanels();
-        lastQr = { name: name, serial: serial, code: code, url: url };
+        if (inviteRow && inviteRow.id) pendingAdminInvite = inviteRow;
+        lastQr = {
+          name: name,
+          serial: serial,
+          code: code,
+          url: url,
+          inviteId: (inviteRow && inviteRow.id) || (pendingAdminInvite && pendingAdminInvite.id) || null
+        };
         panelResult.hidden = false;
         setResultExtrasVisible(true);
         var metaEl = document.getElementById("result-meta");
@@ -2147,28 +2180,45 @@
       }
 
       async function acknowledgeCurrentUserMessages() {
-        var serial = lastQr && lastQr.serial ? lastQr.serial : (activeAccount && activeAccount.serial_number) || "";
-        var code = lastQr && lastQr.code ? lastQr.code : (activeAccount && activeAccount.invite_code) || "";
+        var invite = pendingAdminInvite || {
+          id: lastQr && lastQr.inviteId,
+          serial_number: lastQr && lastQr.serial,
+          code: lastQr && lastQr.code
+        };
+        var serial = (invite && invite.serial_number) || (lastQr && lastQr.serial) || "";
+        var code = (invite && invite.code) || (lastQr && lastQr.code) || "";
+        if (invite && !invite.serial_number && serial) invite.serial_number = serial;
+        if (invite && !invite.code && code) invite.code = code;
         var ids = (activeAccountIds && activeAccountIds.length)
-          ? activeAccountIds.slice()
+          ? activeAccountIds.slice().map(String)
           : (activeAccount && activeAccount.id ? [String(activeAccount.id)] : []);
         try {
           var idx = await loadAccountIndex();
           accountIdsForInvite({ serial_number: serial, code: code }, idx).forEach(function (id) {
-            if (ids.indexOf(id) < 0) ids.push(id);
+            if (ids.indexOf(String(id)) < 0) ids.push(String(id));
           });
         } catch (e0) {}
         var peak = 0;
         try {
           peak = peakLatestForIds(ids, await loadLatestPostMsByAuthor());
         } catch (e1) {}
-        markAdminInviteSeen({ serial_number: serial, code: code }, ids, peak);
+        /* Immer mindestens „jetzt“, damit OK den Punkt zuverlässig löscht. */
+        markAdminInviteSeen(invite, ids, Math.max(peak, Date.now()));
       }
 
       async function confirmUserAdminOk() {
-        await acknowledgeCurrentUserMessages();
-        await showList();
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        var okBtn = document.getElementById("admin-user-ok");
+        if (okBtn) okBtn.disabled = true;
+        try {
+          await acknowledgeCurrentUserMessages();
+        } catch (eAck) {}
+        try {
+          await showList();
+        } finally {
+          if (okBtn) okBtn.disabled = false;
+          pendingAdminInvite = null;
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
       }
 
       function refreshTrainerUi() {
@@ -2581,6 +2631,7 @@
 
       function adminSeenKeysForInvite(row, accountIds) {
         var keys = [];
+        if (row && row.id) keys.push("inviteid:" + String(row.id));
         if (row && row.code) keys.push("invite:" + String(row.code));
         if (row && row.serial_number) keys.push("serial:" + String(row.serial_number));
         (Array.isArray(accountIds) ? accountIds : [accountIds]).forEach(function (id) {
@@ -2599,7 +2650,7 @@
         return peak;
       }
 
-      /* Gelesen-Markierung: Invite + Serial + Account-IDs, Zeitstempel ≥ letzte bekannte Nachricht. */
+      /* Gelesen-Markierung: Invite-ID + Code + Serial + Account-IDs. */
       function markAdminInviteSeen(row, accountIds, atLeastMs) {
         var map = getAdminFeedSeenMap();
         var ms = Date.now();
@@ -2607,6 +2658,12 @@
         if (floor > 0) ms = Math.max(ms, floor + 1);
         var now = new Date(ms).toISOString();
         var keys = adminSeenKeysForInvite(row, accountIds);
+        if (!keys.length) {
+          /* Fallback: wenigstens Code/Serial aus lastQr speichern */
+          if (lastQr && lastQr.inviteId) keys.push("inviteid:" + String(lastQr.inviteId));
+          if (lastQr && lastQr.code) keys.push("invite:" + String(lastQr.code));
+          if (lastQr && lastQr.serial) keys.push("serial:" + String(lastQr.serial));
+        }
         if (!keys.length) return;
         keys.forEach(function (key) {
           map[key] = now;
@@ -2826,7 +2883,8 @@
         adminBtn.addEventListener("click", function (e) {
           e.stopPropagation();
           /* Punkt bleibt, bis OK in der Nutzer-Ansicht gedrückt wird. */
-          showResult(row.first_name, row.serial_number, row.code);
+          pendingAdminInvite = row;
+          showResult(row.first_name, row.serial_number, row.code, row);
         });
 
         var pauseBtn = document.createElement("button");
