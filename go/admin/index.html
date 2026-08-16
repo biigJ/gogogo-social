@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="theme-color" content="#C7413B" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -43,6 +43,7 @@
       overflow-x: hidden;
       width: 100%;
       max-width: 100%;
+      touch-action: manipulation;
     }
     body {
       font-family: var(--display);
@@ -56,6 +57,7 @@
       overflow-y: auto;
       overscroll-behavior-x: none;
       -webkit-overflow-scrolling: touch;
+      touch-action: manipulation;
     }
     /* Neutral hinter dem Notch — kein roter Rand unter der Statusleiste */
     body::before {
@@ -233,7 +235,8 @@
       border-radius: 22px;
       background: var(--paper);
       color: var(--ink);
-      font-size: 0.95rem;
+      /* ≥16px: kein iOS-Zoom beim Fokus, Breite bleibt stabil */
+      font-size: 16px;
       font-weight: 500;
       line-height: 1.35;
       letter-spacing: -0.01em;
@@ -313,7 +316,7 @@
       margin-bottom: 6px;
     }
     .admin-plan__block textarea,
-    .admin-plan__block input {
+    .admin-plan__block input:not([type="checkbox"]) {
       width: 100%;
       min-height: 44px;
       padding: 12px 14px;
@@ -321,7 +324,8 @@
       color: var(--ink);
       border: 1px solid transparent;
       border-radius: var(--radius);
-      font-size: 0.9rem;
+      /* ≥16px: kein iOS-Zoom beim Fokus, Breite bleibt stabil */
+      font-size: 16px;
       font-weight: 500;
       letter-spacing: -0.02em;
       resize: vertical;
@@ -343,7 +347,7 @@
     .admin-plan__zirkel {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       margin: 0;
       font-size: 0.72rem;
       font-weight: 600;
@@ -353,17 +357,41 @@
       user-select: none;
       white-space: nowrap;
     }
-    .admin-plan__zirkel input {
-      width: 16px;
-      height: 16px;
-      min-height: 0;
+    /* Eckige weiße Felder + roter Haken — wie übrige Paper-Inputs */
+    .admin-plan__zirkel input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      min-height: 18px;
       margin: 0;
       padding: 0;
-      accent-color: var(--paper);
       flex: 0 0 auto;
+      background: var(--paper);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: inline-grid;
+      place-items: center;
+      color: var(--red);
+    }
+    .admin-plan__zirkel input[type="checkbox"]:checked::after {
+      content: "";
+      width: 10px;
+      height: 5px;
+      margin-top: -2px;
+      border-left: 2px solid var(--red);
+      border-bottom: 2px solid var(--red);
+      transform: rotate(-45deg);
+      box-sizing: border-box;
+    }
+    .admin-plan__zirkel input[type="checkbox"]:focus-visible {
+      outline: 2px solid var(--paper);
+      outline-offset: 2px;
     }
     .admin-plan__block textarea:focus,
-    .admin-plan__block input:focus {
+    .admin-plan__block input:not([type="checkbox"]):focus {
       outline: none;
       border-color: var(--ink);
     }
