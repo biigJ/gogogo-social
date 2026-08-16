@@ -465,12 +465,12 @@
       margin-bottom: 4px;
       min-height: 0;
       padding-right: 0;
-      font-size: 0.92rem;
+      font-size: 1.2rem;
       line-height: 1.15;
     }
     .home-workout__box.is-zirkel .home-workout__line {
       min-height: 0;
-      font-size: 0.82rem;
+      font-size: 1.07rem;
       font-weight: 600;
       line-height: 1.2;
     }
@@ -1086,7 +1086,6 @@
       height: 8px;
       border-radius: 50%;
       background: var(--red);
-      box-shadow: 0 0 0 1.5px var(--chrome-bg);
       display: none;
       pointer-events: none;
       z-index: 2;
@@ -4227,8 +4226,8 @@
         }
         var coachId = null;
         try { coachId = await ensureCoachAccount(); } catch (e0) {}
+        /* Coach nicht in author_id — Trainer-Nachrichten nur via reply_to_id an diesen Nutzer. */
         var ids = [account.id].concat(getBuddies().map(function (b) { return b && b.id; }).filter(Boolean));
-        if (coachId) ids.push(coachId);
         var seenIds = {};
         var unique = [];
         for (var u = 0; u < ids.length; u++) {
@@ -4237,7 +4236,7 @@
           unique.push(ids[u]);
         }
         ids = unique;
-        if (!ids.length) {
+        if (!ids.length && !account.id) {
           communityPosts = [];
           renderCommunityFeed();
           updateCommunityNavDot();
@@ -4249,13 +4248,19 @@
           ",reply_to_id.eq." + encodeURIComponent(account.id) +
           ")&select=*&order=created_at.asc&limit=200"
         );
-        communityPosts = Array.isArray(rows) ? rows : [];
+        communityPosts = (Array.isArray(rows) ? rows : []).filter(function (p) {
+          if (!p) return false;
+          /* Fremde Trainer-Antworten an andere Nutzer ausblenden */
+          if (coachId && p.author_id === coachId && p.reply_to_id !== account.id) return false;
+          return true;
+        });
         var missing = {};
         for (var i = 0; i < communityPosts.length; i++) {
           var p = communityPosts[i];
           if (!p || !p.author_id || seenIds[p.author_id]) continue;
           missing[p.author_id] = true;
         }
+        if (coachId) missing[coachId] = true;
         var missingIds = Object.keys(missing);
         if (missingIds.length) {
           try {
@@ -5080,7 +5085,7 @@
           if (isZirkelWeekday(wd)) {
             return {
               title: "Zirkeltraining",
-              line1: "Jetzt starten",
+              line1: "jetzt starten",
               line2: "",
               rest: false,
               training: true,
@@ -5270,8 +5275,16 @@
         function buildCheckinFeedBody(key, score) {
           var weekday = weekdayNameForKey(key);
           var d = parseDateKey(key) || new Date();
-          var planText = coachDayTextForDate(d) || coachDayText((d.getDay() + 6) % 7) || DEFAULT_DAY_PLAN;
-          var firstLine = splitPlanLines(planText).title || String(planText || "").split(/\n/)[0] || "Training";
+          var rawCoach = coachDayTextForDate(d) || coachDayText((d.getDay() + 6) % 7) || "";
+          rawCoach = String(rawCoach).trim();
+          var planText = rawCoach || DEFAULT_DAY_PLAN;
+          var isPlaceholder =
+            !rawCoach ||
+            planText === DEFAULT_DAY_PLAN ||
+            /Spaziergang am Morgen/i.test(planText);
+          var firstLine = isPlaceholder
+            ? "allgemeine Bewegung"
+            : (splitPlanLines(planText).title || String(planText || "").split(/\n/)[0] || "Training");
           firstLine = String(firstLine).trim();
           var rating = "Rating " + String(score) + "/10";
           var body = weekday + "\n" + firstLine + "\n" + rating;
