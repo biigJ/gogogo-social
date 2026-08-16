@@ -542,6 +542,16 @@
     .list-item span {
       display: block; margin-top: 4px; font-size: 0.85rem; font-weight: 500; opacity: 0.8;
     }
+    .list-item .list-item__stake {
+      display: none;
+      margin-top: 4px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--red);
+      opacity: 1;
+    }
+    .list-item .list-item__stake.is-on { display: block; }
     .list-row.is-paused .list-item { opacity: 0.55; }
     .list-main {
       display: grid;
@@ -620,6 +630,90 @@
     .visually-hidden {
       position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
       overflow: hidden; clip: rect(0,0,0,0); border: 0;
+    }
+
+    .challenge-modal {
+      position: fixed; inset: 0; z-index: 80;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+      background: rgba(10, 10, 10, 0.28);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .challenge-modal.is-open { display: flex; }
+    .challenge-modal__sheet {
+      width: min(100%, 340px);
+      background: var(--red);
+      color: var(--ink-on-red);
+      border-radius: var(--chrome-radius);
+      padding: 28px 22px 22px;
+      text-align: center;
+      box-shadow: 0 18px 48px rgba(10, 10, 10, 0.28);
+    }
+    .challenge-modal__title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.25;
+      margin-bottom: 22px;
+    }
+    .challenge-modal__actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .challenge-modal__btn {
+      min-height: 48px;
+      border-radius: var(--radius);
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+      background: var(--paper);
+      color: var(--btn-ink);
+    }
+    .challenge-modal__btn.is-ghost {
+      background: transparent;
+      color: var(--ink-on-red);
+      border: 1.5px solid rgba(247, 245, 240, 0.55);
+    }
+    .challenge-modal__btn:disabled { opacity: 0.45; cursor: wait; }
+    .challenge-amount-dial {
+      position: relative;
+      width: 220px;
+      height: 220px;
+      margin: 0 auto;
+      touch-action: none;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .challenge-amount-dial:active { cursor: grabbing; }
+    .challenge-amount-dial svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+    }
+    .challenge-amount-dial__value {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      font-size: 1.85rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: var(--paper);
+    }
+    .challenge-amount-dial__hint {
+      margin-top: 14px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      opacity: 0.8;
     }
   </style>
 </head>
@@ -724,6 +818,31 @@
       <h1>Alle Nutzer</h1>
       <p class="msg" id="list-msg" role="status"></p>
       <div class="list" id="code-list"></div>
+    </div>
+
+    <div class="challenge-modal" id="challenge-abort-modal" hidden aria-hidden="true">
+      <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="challenge-abort-title">
+        <p class="challenge-modal__title" id="challenge-abort-title">Challenge abbrechen?</p>
+        <div class="challenge-modal__actions">
+          <button type="button" class="challenge-modal__btn is-ghost" id="challenge-abort-no">Nein</button>
+          <button type="button" class="challenge-modal__btn" id="challenge-abort-yes">Ja</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="challenge-modal" id="challenge-amount-modal" hidden aria-hidden="true">
+      <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="challenge-amount-title">
+        <p class="challenge-modal__title" id="challenge-amount-title">Challenge-Einsatz</p>
+        <div class="challenge-amount-dial" id="challenge-amount-dial" aria-label="Einsatz drehen">
+          <svg id="challenge-amount-rays" viewBox="0 0 220 220" aria-hidden="true"></svg>
+          <div class="challenge-amount-dial__value" id="challenge-amount-value">30&nbsp;€</div>
+        </div>
+        <p class="challenge-amount-dial__hint">Drehen · 30–999&nbsp;€</p>
+        <div class="challenge-modal__actions">
+          <button type="button" class="challenge-modal__btn is-ghost" id="challenge-amount-cancel">Abbrechen</button>
+          <button type="button" class="challenge-modal__btn" id="challenge-amount-ok">Starten</button>
+        </div>
+      </div>
     </div>
 
     <div class="panel" id="panel-mantras" hidden>
@@ -1899,19 +2018,168 @@
         } catch (e1) {}
       }
 
-      function promptChallengeAmount(row) {
-        var current = row.challenge_amount != null ? String(row.challenge_amount) : "100";
-        var raw = window.prompt(
-          "Challenge-Einsatz in Euro (30–999) für " + (row.first_name || "Nutzer") + ":",
-          current
-        );
-        if (raw == null) return null;
-        var n = parseInt(String(raw).replace(/[^0-9]/g, ""), 10);
-        if (!(n >= 30 && n <= 999)) {
-          window.alert("Bitte eine ganze Zahl zwischen 30 und 999 eingeben.");
-          return null;
+      function openChallengeModal(el) {
+        if (!el) return;
+        el.hidden = false;
+        el.setAttribute("aria-hidden", "false");
+        el.classList.add("is-open");
+      }
+
+      function closeChallengeModal(el) {
+        if (!el) return;
+        el.classList.remove("is-open");
+        el.hidden = true;
+        el.setAttribute("aria-hidden", "true");
+      }
+
+      function confirmChallengeAbort() {
+        return new Promise(function (resolve) {
+          var modal = document.getElementById("challenge-abort-modal");
+          var yes = document.getElementById("challenge-abort-yes");
+          var no = document.getElementById("challenge-abort-no");
+          if (!modal || !yes || !no) {
+            resolve(window.confirm("Challenge abbrechen?"));
+            return;
+          }
+          function finish(ok) {
+            yes.removeEventListener("click", onYes);
+            no.removeEventListener("click", onNo);
+            modal.removeEventListener("click", onBackdrop);
+            closeChallengeModal(modal);
+            resolve(!!ok);
+          }
+          function onYes(e) { e.stopPropagation(); finish(true); }
+          function onNo(e) { e.stopPropagation(); finish(false); }
+          function onBackdrop(e) {
+            if (e.target === modal) finish(false);
+          }
+          openChallengeModal(modal);
+          yes.addEventListener("click", onYes);
+          no.addEventListener("click", onNo);
+          modal.addEventListener("click", onBackdrop);
+        });
+      }
+
+      function drawAmountDialRays(svg, amount) {
+        if (!svg) return;
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+        var ns = "http://www.w3.org/2000/svg";
+        var cx = 110, cy = 110, inner = 58, outer = 98;
+        var rays = 36;
+        var t = (Math.max(30, Math.min(999, Number(amount) || 30)) - 30) / (999 - 30);
+        var lit = Math.max(1, Math.round(t * rays));
+        var rot = t * Math.PI * 2;
+        for (var s = 0; s < rays; s++) {
+          var a = ((s / rays) * Math.PI * 2) - Math.PI / 2 + rot;
+          var line = document.createElementNS(ns, "line");
+          line.setAttribute("x1", (cx + Math.cos(a) * inner).toFixed(2));
+          line.setAttribute("y1", (cy + Math.sin(a) * inner).toFixed(2));
+          line.setAttribute("x2", (cx + Math.cos(a) * outer).toFixed(2));
+          line.setAttribute("y2", (cy + Math.sin(a) * outer).toFixed(2));
+          line.setAttribute("stroke", s < lit ? "#F7F5F0" : "rgba(247,245,240,0.28)");
+          line.setAttribute("stroke-width", "3.2");
+          line.setAttribute("stroke-linecap", "round");
+          svg.appendChild(line);
         }
-        return n;
+      }
+
+      function pickChallengeAmount(row) {
+        return new Promise(function (resolve) {
+          var modal = document.getElementById("challenge-amount-modal");
+          var dial = document.getElementById("challenge-amount-dial");
+          var valueEl = document.getElementById("challenge-amount-value");
+          var rays = document.getElementById("challenge-amount-rays");
+          var ok = document.getElementById("challenge-amount-ok");
+          var cancel = document.getElementById("challenge-amount-cancel");
+          var title = document.getElementById("challenge-amount-title");
+          if (!modal || !dial || !valueEl || !ok || !cancel) {
+            resolve(null);
+            return;
+          }
+          var amount = 30;
+          var lastAngle = null;
+          var dragging = false;
+
+          if (title) {
+            title.textContent = "Challenge für " + (row.first_name || "Nutzer");
+          }
+
+          function render() {
+            valueEl.textContent = String(amount) + "\u00a0€";
+            drawAmountDialRays(rays, amount);
+          }
+
+          function angleFromEvent(ev) {
+            var rect = dial.getBoundingClientRect();
+            var cx = rect.left + rect.width / 2;
+            var cy = rect.top + rect.height / 2;
+            var pt = ev.touches && ev.touches[0] ? ev.touches[0] : ev;
+            return Math.atan2(pt.clientY - cy, pt.clientX - cx);
+          }
+
+          function onPointerDown(ev) {
+            ev.preventDefault();
+            dragging = true;
+            lastAngle = angleFromEvent(ev);
+          }
+
+          function onPointerMove(ev) {
+            if (!dragging) return;
+            ev.preventDefault();
+            var angle = angleFromEvent(ev);
+            var delta = angle - lastAngle;
+            while (delta > Math.PI) delta -= Math.PI * 2;
+            while (delta < -Math.PI) delta += Math.PI * 2;
+            lastAngle = angle;
+            /* ~90 € pro Umdrehung → feines Drehen über den Bereich */
+            var next = amount + (delta / (Math.PI * 2)) * 90;
+            amount = Math.max(30, Math.min(999, Math.round(next)));
+            render();
+          }
+
+          function onPointerUp() {
+            dragging = false;
+            lastAngle = null;
+          }
+
+          function finish(value) {
+            dial.removeEventListener("mousedown", onPointerDown);
+            dial.removeEventListener("touchstart", onPointerDown);
+            window.removeEventListener("mousemove", onPointerMove);
+            window.removeEventListener("touchmove", onPointerMove);
+            window.removeEventListener("mouseup", onPointerUp);
+            window.removeEventListener("touchend", onPointerUp);
+            ok.removeEventListener("click", onOk);
+            cancel.removeEventListener("click", onCancel);
+            modal.removeEventListener("click", onBackdrop);
+            closeChallengeModal(modal);
+            resolve(value);
+          }
+
+          function onOk(e) {
+            e.stopPropagation();
+            finish(amount);
+          }
+          function onCancel(e) {
+            e.stopPropagation();
+            finish(null);
+          }
+          function onBackdrop(e) {
+            if (e.target === modal) finish(null);
+          }
+
+          render();
+          openChallengeModal(modal);
+          dial.addEventListener("mousedown", onPointerDown);
+          dial.addEventListener("touchstart", onPointerDown, { passive: false });
+          window.addEventListener("mousemove", onPointerMove, { passive: false });
+          window.addEventListener("touchmove", onPointerMove, { passive: false });
+          window.addEventListener("mouseup", onPointerUp);
+          window.addEventListener("touchend", onPointerUp);
+          ok.addEventListener("click", onOk);
+          cancel.addEventListener("click", onCancel);
+          modal.addEventListener("click", onBackdrop);
+        });
       }
 
       function renderListRow(list, row) {
@@ -1926,10 +2194,13 @@
         openBtn.className = "list-item";
         var title = document.createElement("strong");
         title.textContent = row.first_name || "";
+        var stakeLine = document.createElement("span");
+        stakeLine.className = "list-item__stake";
         var meta = document.createElement("span");
         meta.textContent = (row.serial_number || "") + " · " + (row.code || "") +
           (row.paused ? " · pausiert" : "");
         openBtn.appendChild(title);
+        openBtn.appendChild(stakeLine);
         openBtn.appendChild(meta);
         openBtn.setAttribute("aria-label", "Profil von " + (row.first_name || "Nutzer") + " öffnen");
         openBtn.addEventListener("click", function () {
@@ -1960,6 +2231,13 @@
           var rem = challengeRemainingDays(row.challenge_started_at, active);
           daysEl.textContent = String(active ? rem : CHALLENGE_DAYS);
           drawAdminChallengeWheel(wheelSvg, active ? rem : 0);
+          if (row.challenge_active && row.challenge_amount != null) {
+            stakeLine.textContent = String(row.challenge_amount) + "\u00a0€";
+            stakeLine.classList.add("is-on");
+          } else {
+            stakeLine.textContent = "";
+            stakeLine.classList.remove("is-on");
+          }
         }
         wheel.appendChild(wheelSvg);
         wheel.appendChild(daysEl);
@@ -1970,9 +2248,14 @@
           euroBtn.disabled = true;
           try {
             if (row.challenge_active) {
+              var abort = await confirmChallengeAbort();
+              if (!abort) {
+                euroBtn.disabled = false;
+                return;
+              }
               await patchInviteChallenge(row, false, null);
             } else {
-              var amount = promptChallengeAmount(row);
+              var amount = await pickChallengeAmount(row);
               if (amount == null) {
                 euroBtn.disabled = false;
                 return;
@@ -1980,9 +2263,7 @@
               await patchInviteChallenge(row, true, amount);
             }
             refreshChallengeUi();
-            document.getElementById("list-msg").textContent = row.challenge_active
-              ? ("Challenge aktiv · " + row.challenge_amount + " €")
-              : "";
+            document.getElementById("list-msg").textContent = "";
             document.getElementById("list-msg").classList.remove("is-error");
           } catch (err) {
             document.getElementById("list-msg").textContent =
