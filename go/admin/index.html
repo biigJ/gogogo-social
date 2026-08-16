@@ -326,9 +326,41 @@
       letter-spacing: -0.02em;
       resize: vertical;
     }
-    .admin-plan__block textarea {
-      min-height: 72px;
-      line-height: 1.35;
+    .admin-plan__block textarea:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .admin-plan__dayhead {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .admin-plan__dayhead label[for] {
+      margin-bottom: 0;
+    }
+    .admin-plan__zirkel {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      opacity: 0.95;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .admin-plan__zirkel input {
+      width: 16px;
+      height: 16px;
+      min-height: 0;
+      margin: 0;
+      padding: 0;
+      accent-color: var(--paper);
+      flex: 0 0 auto;
     }
     .admin-plan__block textarea:focus,
     .admin-plan__block input:focus {
@@ -903,32 +935,74 @@
             <label for="plan-phase">Aktuelle Phase &amp; Schritte</label>
             <textarea id="plan-phase" rows="3" maxlength="600" placeholder="Phase und zu erledigende Schritte…"></textarea>
           </div>
-          <div class="admin-plan__block">
-            <label for="plan-mo">Montag</label>
+          <div class="admin-plan__block" data-plan-day="0">
+            <div class="admin-plan__dayhead">
+              <label for="plan-mo">Montag</label>
+              <label class="admin-plan__zirkel">
+                <input type="checkbox" class="plan-zirkel-check" data-wd="0" aria-label="Zirkeltraining Montag" />
+                Zirkeltraining
+              </label>
+            </div>
             <textarea id="plan-mo" rows="2" maxlength="400" placeholder="Montag…"></textarea>
           </div>
-          <div class="admin-plan__block">
-            <label for="plan-di">Dienstag</label>
+          <div class="admin-plan__block" data-plan-day="1">
+            <div class="admin-plan__dayhead">
+              <label for="plan-di">Dienstag</label>
+              <label class="admin-plan__zirkel">
+                <input type="checkbox" class="plan-zirkel-check" data-wd="1" aria-label="Zirkeltraining Dienstag" />
+                Zirkeltraining
+              </label>
+            </div>
             <textarea id="plan-di" rows="2" maxlength="400" placeholder="Dienstag…"></textarea>
           </div>
-          <div class="admin-plan__block">
-            <label for="plan-mi">Mittwoch</label>
+          <div class="admin-plan__block" data-plan-day="2">
+            <div class="admin-plan__dayhead">
+              <label for="plan-mi">Mittwoch</label>
+              <label class="admin-plan__zirkel">
+                <input type="checkbox" class="plan-zirkel-check" data-wd="2" aria-label="Zirkeltraining Mittwoch" />
+                Zirkeltraining
+              </label>
+            </div>
             <textarea id="plan-mi" rows="2" maxlength="400" placeholder="Mittwoch…"></textarea>
           </div>
-          <div class="admin-plan__block">
-            <label for="plan-do">Donnerstag</label>
+          <div class="admin-plan__block" data-plan-day="3">
+            <div class="admin-plan__dayhead">
+              <label for="plan-do">Donnerstag</label>
+              <label class="admin-plan__zirkel">
+                <input type="checkbox" class="plan-zirkel-check" data-wd="3" aria-label="Zirkeltraining Donnerstag" />
+                Zirkeltraining
+              </label>
+            </div>
             <textarea id="plan-do" rows="2" maxlength="400" placeholder="Donnerstag…"></textarea>
           </div>
-          <div class="admin-plan__block">
-            <label for="plan-fr">Freitag</label>
+          <div class="admin-plan__block" data-plan-day="4">
+            <div class="admin-plan__dayhead">
+              <label for="plan-fr">Freitag</label>
+              <label class="admin-plan__zirkel">
+                <input type="checkbox" class="plan-zirkel-check" data-wd="4" aria-label="Zirkeltraining Freitag" checked />
+                Zirkeltraining
+              </label>
+            </div>
             <textarea id="plan-fr" rows="2" maxlength="400" placeholder="Freitag…"></textarea>
           </div>
-          <div class="admin-plan__block">
-            <label for="plan-sa">Samstag</label>
+          <div class="admin-plan__block" data-plan-day="5">
+            <div class="admin-plan__dayhead">
+              <label for="plan-sa">Samstag</label>
+              <label class="admin-plan__zirkel">
+                <input type="checkbox" class="plan-zirkel-check" data-wd="5" aria-label="Zirkeltraining Samstag" />
+                Zirkeltraining
+              </label>
+            </div>
             <textarea id="plan-sa" rows="2" maxlength="400" placeholder="Samstag…"></textarea>
           </div>
-          <div class="admin-plan__block">
-            <label for="plan-so">Sonntag</label>
+          <div class="admin-plan__block" data-plan-day="6">
+            <div class="admin-plan__dayhead">
+              <label for="plan-so">Sonntag</label>
+              <label class="admin-plan__zirkel">
+                <input type="checkbox" class="plan-zirkel-check" data-wd="6" aria-label="Zirkeltraining Sonntag" />
+                Zirkeltraining
+              </label>
+            </div>
             <textarea id="plan-so" rows="2" maxlength="400" placeholder="Sonntag…"></textarea>
           </div>
           <button class="btn admin-plan__save" type="button" id="plan-save">Plan speichern</button>
@@ -1004,9 +1078,55 @@
         ["plan-sa", "day_sa"],
         ["plan-so", "day_so"]
       ];
+      var PLAN_DAY_FIELD_IDS = ["plan-mo", "plan-di", "plan-mi", "plan-do", "plan-fr", "plan-sa", "plan-so"];
+      var DEFAULT_ZIRKEL_WD = 4;
 
+      function getZirkelChecks() {
+        return Array.prototype.slice.call(document.querySelectorAll(".plan-zirkel-check"));
+      }
 
-      function isAuthed() {
+      function getSelectedZirkelWeekday() {
+        var checks = getZirkelChecks();
+        for (var i = 0; i < checks.length; i++) {
+          if (checks[i].checked) {
+            var n = parseInt(checks[i].getAttribute("data-wd"), 10);
+            if (n >= 0 && n <= 6) return n;
+          }
+        }
+        return DEFAULT_ZIRKEL_WD;
+      }
+
+      function applyZirkelDayUi(wd) {
+        var selected = wd >= 0 && wd <= 6 ? wd : DEFAULT_ZIRKEL_WD;
+        getZirkelChecks().forEach(function (box) {
+          var n = parseInt(box.getAttribute("data-wd"), 10);
+          box.checked = n === selected;
+        });
+        PLAN_DAY_FIELD_IDS.forEach(function (id, idx) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          var isZirkel = idx === selected;
+          el.disabled = isZirkel;
+          if (isZirkel) {
+            el.value = "";
+            el.placeholder = "Zirkeltraining";
+          } else if (el.placeholder === "Zirkeltraining") {
+            var labels = ["Montag…", "Dienstag…", "Mittwoch…", "Donnerstag…", "Freitag…", "Samstag…", "Sonntag…"];
+            el.placeholder = labels[idx] || "";
+          }
+        });
+      }
+
+      function bindZirkelDayChecks() {
+        getZirkelChecks().forEach(function (box) {
+          box.addEventListener("change", function () {
+            var n = parseInt(box.getAttribute("data-wd"), 10);
+            if (!(n >= 0 && n <= 6)) n = DEFAULT_ZIRKEL_WD;
+            applyZirkelDayUi(n);
+          });
+        });
+        applyZirkelDayUi(DEFAULT_ZIRKEL_WD);
+      }      function isAuthed() {
         try {
           return localStorage.getItem(AUTH_KEY) === "1" || sessionStorage.getItem(AUTH_KEY) === "1";
         } catch (e) { return false; }
@@ -1344,8 +1464,12 @@
       function clearPlanForm() {
         PLAN_FIELDS.forEach(function (pair) {
           var el = document.getElementById(pair[0]);
-          if (el) el.value = "";
+          if (el) {
+            el.value = "";
+            el.disabled = false;
+          }
         });
+        applyZirkelDayUi(DEFAULT_ZIRKEL_WD);
         var planMsg = document.getElementById("plan-msg");
         if (planMsg) {
           planMsg.textContent = "";
@@ -1359,6 +1483,9 @@
           var el = document.getElementById(pair[0]);
           if (el) el.value = row[pair[1]] != null ? String(row[pair[1]]) : "";
         });
+        var zw = row.zirkel_weekday != null ? Number(row.zirkel_weekday) : DEFAULT_ZIRKEL_WD;
+        if (!(zw >= 0 && zw <= 6)) zw = DEFAULT_ZIRKEL_WD;
+        applyZirkelDayUi(zw);
       }
       async function loadCoachPlan(accountId) {
         clearPlanForm();
@@ -1508,6 +1635,10 @@
           var el = document.getElementById(pair[0]);
           payload[pair[1]] = el ? String(el.value || "").trim() || null : null;
         });
+        var zirkelWd = getSelectedZirkelWeekday();
+        payload.zirkel_weekday = zirkelWd;
+        var zirkelKey = DAY_PLAN_KEYS[zirkelWd];
+        if (zirkelKey) payload[zirkelKey] = null;
         if (planMsg) {
           planMsg.classList.remove("is-error");
           planMsg.textContent = "Speichere …";
@@ -1548,6 +1679,8 @@
             var detail = err && err.message ? String(err.message) : "";
             if (/PGRST205|go_coach_plan_day_history/i.test(detail)) {
               planMsg.textContent = "Speichern fehlgeschlagen: Tabelle go_coach_plan_day_history fehlt oder Schema-Cache — Supabase neu laden.";
+            } else if (/zirkel_weekday/i.test(detail)) {
+              planMsg.textContent = "Speichern fehlgeschlagen: Spalte zirkel_weekday fehlt — go-coach-plans-zirkel.sql in Supabase ausführen.";
             } else if (/go_coach_plans/i.test(detail)) {
               planMsg.textContent = "Speichern fehlgeschlagen: go_coach_plans prüfen (go-coach-plans.sql).";
             } else {
@@ -2679,6 +2812,7 @@
 
       var planSave = document.getElementById("plan-save");
       if (planSave) planSave.addEventListener("click", function () { saveCoachPlan(); });
+      bindZirkelDayChecks();
 
       var mantraSave = document.getElementById("mantra-save");
       if (mantraSave) mantraSave.addEventListener("click", function () { saveMantras(); });

@@ -384,7 +384,7 @@
     .home-cal__day.has-workout {
       background: rgba(247, 245, 240, 0.16);
     }
-    .home-cal__day.is-friday {
+    .home-cal__day.is-zirkel {
       border-radius: 50%;
     }
     .home-cal__day.is-selected {
@@ -440,6 +440,13 @@
       padding: calc(14px * 1.35);
       min-height: calc(7.6rem * 1.35);
       box-sizing: border-box;
+    }
+    .home-workout__box.is-zirkel {
+      cursor: pointer;
+    }
+    .home-workout__box.is-zirkel:focus-visible {
+      outline: 2px solid rgba(247, 245, 240, 0.85);
+      outline-offset: 2px;
     }
     .home-workout__title {
       font-size: 1.15rem;
@@ -2665,6 +2672,18 @@
       var COACH_DAY_KEYS = ["day_mo", "day_di", "day_mi", "day_do", "day_fr", "day_sa", "day_so"];
       var coachPlan = null;
       var coachDayHistory = [];
+      var DEFAULT_ZIRKEL_WD = 4;
+
+      function zirkelWeekday() {
+        if (!coachPlan) return DEFAULT_ZIRKEL_WD;
+        var n = Number(coachPlan.zirkel_weekday);
+        if (n >= 0 && n <= 6) return n;
+        return DEFAULT_ZIRKEL_WD;
+      }
+
+      function isZirkelWeekday(wd) {
+        return Number(wd) === zirkelWeekday();
+      }
       var onCoachPlanLoaded = null;
 
       function formatMantraDisplay(row) {
@@ -2926,6 +2945,7 @@
 
       function coachDayText(wd) {
         if (isAccountPaused()) return "";
+        if (isZirkelWeekday(wd)) return "Zirkeltraining";
         if (!coachPlan) return "";
         var key = COACH_DAY_KEYS[wd];
         return key && coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
@@ -2943,6 +2963,7 @@
       function coachDayTextForDate(d) {
         if (isAccountPaused()) return "";
         var wd = (d.getDay() + 6) % 7;
+        if (isZirkelWeekday(wd)) return "Zirkeltraining";
         var key = COACH_DAY_KEYS[wd];
         if (!key) return "";
         var dateStr = formatDateKey(d);
@@ -4965,6 +4986,7 @@
         var titleEl = document.getElementById("home-workout-title");
         var line1El = document.getElementById("home-workout-line1");
         var line2El = document.getElementById("home-workout-line2");
+        var workoutBox = document.getElementById("home-workout-box");
         var weekOffset = 0;
         var selectedKey = null;
         var editingOpen = false;
@@ -4985,22 +5007,29 @@
         function workoutFor(d) {
           var wd = (d.getDay() + 6) % 7;
           if (isAccountPaused()) {
-            return { title: "", line1: "", line2: "", rest: true };
+            return { title: "", line1: "", line2: "", rest: true, training: false, zirkel: false };
+          }
+          if (isZirkelWeekday(wd)) {
+            return {
+              title: "Zirkeltraining",
+              line1: "",
+              line2: "",
+              rest: false,
+              training: true,
+              zirkel: true
+            };
           }
           var fromCoach = coachDayTextForDate(d);
           var planText = fromCoach || DEFAULT_DAY_PLAN;
           var parts = splitPlanLines(planText);
           var rest = /ruhe|erholung|kein\s*workout/i.test(planText);
-          var training =
-            wd === 4 &&
-            !parts.line2 &&
-            /zum\s*training|friday\s*circle|\bhiit\b/i.test(planText);
           return {
             title: parts.title || planText,
             line1: parts.line1,
-            line2: parts.line2 || (training ? "Zum Training" : ""),
+            line2: parts.line2,
             rest: rest,
-            training: training
+            training: false,
+            zirkel: false
           };
         }
         function monthLabelForWeek(monday) {
@@ -5036,19 +5065,18 @@
           line1El.hidden = !w.line1;
           line2El.textContent = "";
           while (line2El.firstChild) line2El.removeChild(line2El.firstChild);
-          if (w.training) {
-            line2El.hidden = false;
-            var cta = document.createElement("button");
-            cta.type = "button";
-            cta.className = "home-workout__cta";
-            cta.textContent = w.line2;
-            cta.addEventListener("click", function () {
-              gotoPanel("training");
-            });
-            line2El.appendChild(cta);
-          } else {
-            line2El.textContent = w.line2 || "";
-            line2El.hidden = !w.line2;
+          line2El.hidden = true;
+          if (workoutBox) {
+            workoutBox.classList.toggle("is-zirkel", !!w.zirkel);
+            if (w.zirkel) {
+              workoutBox.setAttribute("role", "button");
+              workoutBox.setAttribute("tabindex", "0");
+              workoutBox.setAttribute("aria-label", "Zirkeltraining öffnen");
+            } else {
+              workoutBox.removeAttribute("role");
+              workoutBox.removeAttribute("tabindex");
+              workoutBox.removeAttribute("aria-label");
+            }
           }
           syncCheckControls(dateKey(d));
         }
@@ -5119,7 +5147,7 @@
             btn.setAttribute("aria-label", names[i] + " " + d.getDate());
             if (isAccountPaused()) btn.disabled = true;
             if (w && !w.rest) btn.classList.add("has-workout");
-            if (i === 4) btn.classList.add("is-friday");
+            if (isZirkelWeekday(i)) btn.classList.add("is-zirkel");
             if (key === dateKey(today)) btn.classList.add("is-today");
             if (key === selectedKey) {
               btn.classList.add("is-selected");
@@ -5288,6 +5316,20 @@
           editingOpen = false;
           renderWeek();
         });
+        if (workoutBox) {
+          workoutBox.addEventListener("click", function () {
+            if (isAccountPaused()) return;
+            if (!workoutBox.classList.contains("is-zirkel")) return;
+            gotoPanel("training");
+          });
+          workoutBox.addEventListener("keydown", function (ev) {
+            if (!workoutBox.classList.contains("is-zirkel")) return;
+            if (ev.key === "Enter" || ev.key === " ") {
+              ev.preventDefault();
+              gotoPanel("training");
+            }
+          });
+        }
 
         updateScoreFill();
         renderWeek();

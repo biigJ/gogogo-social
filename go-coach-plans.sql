@@ -14,6 +14,7 @@ create table if not exists go_coach_plans (
   day_fr text,
   day_sa text,
   day_so text,
+  zirkel_weekday smallint not null default 4 check (zirkel_weekday >= 0 and zirkel_weekday <= 6),
   updated_at timestamptz not null default now()
 );
 
