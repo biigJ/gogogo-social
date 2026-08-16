@@ -610,6 +610,34 @@
       border-right: 12px solid currentColor;
       margin-right: 2px;
     }
+    .community-wa {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 1;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(247, 245, 240, 0.16);
+      color: var(--ink-on-red);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      text-decoration: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .community-wa[hidden] { display: none !important; }
+    .community-wa svg {
+      width: 20px;
+      height: 20px;
+      display: block;
+    }
+    .community-wa:focus-visible {
+      outline: 2px solid var(--ink-on-red);
+      outline-offset: 2px;
+    }
     .community-role {
       color: var(--ink-on-red);
       font-size: 0.7rem;
@@ -1984,6 +2012,22 @@
           <div class="community-head">
             <button class="community-back" type="button" id="community-back" aria-label="Zurück"></button>
             <h1 class="profile-name">Meine Buddies</h1>
+            <a
+              class="community-wa"
+              id="community-wa"
+              href="#"
+              target="_blank"
+              rel="noopener"
+              aria-label="WhatsApp-Gruppe öffnen"
+              hidden
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M12.04 2c-5.46 0-9.91 4.43-9.91 9.9 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 1.8c2.16 0 4.19.84 5.72 2.37a8.07 8.07 0 0 1 2.38 5.73c0 4.47-3.64 8.1-8.1 8.1-1.42 0-2.8-.37-4.01-1.07l-.29-.17-3.12.82.83-3.04-.19-.31a8.08 8.08 0 0 1-1.24-4.33c0-4.47 3.64-8.1 8.12-8.1zm4.66 10.35c-.2-.1-1.18-.58-1.36-.65-.18-.07-.32-.1-.45.1-.13.2-.51.65-.63.78-.12.13-.23.15-.43.05-.2-.1-.84-.31-1.6-.99-.59-.52-.99-1.17-1.1-1.37-.12-.2-.01-.3.09-.4.09-.09.2-.23.3-.35.1-.12.13-.2.2-.33.07-.13.03-.25-.02-.35-.05-.1-.45-1.08-.62-1.48-.16-.39-.33-.33-.45-.34h-.38c-.13 0-.35.05-.53.25-.18.2-.7.68-.7 1.66s.72 1.92.82 2.05c.1.13 1.41 2.15 3.42 3.02.48.21.85.33 1.14.42.48.15.92.13 1.26.08.39-.06 1.18-.48 1.35-.95.17-.47.17-.87.12-.95-.05-.08-.18-.13-.38-.23z"
+                />
+              </svg>
+            </a>
           </div>
           <div class="community-top">
             <div class="community-slots" id="community-slots" aria-label="Buddy-Plätze"></div>
@@ -2135,6 +2179,8 @@
       var BUDDY_SEARCH_FAILS_KEY = "gogogo_go_buddy_search_fails";
       var BUDDY_SEARCH_LOCK_KEY = "gogogo_go_buddy_search_lock_until";
       var WHATSAPP_NUMBER = "+491747015500";
+      // Permanenter Einladungslink der gogogo Buddy WhatsApp-Gruppe (Gruppeninfo → Link)
+      var WHATSAPP_GROUP_URL = "";
       var CYCLE_RAYS = 28;
       var RAY_GRAY = "rgba(247, 245, 240, 0.28)";
       var RAY_LIT = "#F7F5F0";
@@ -3814,6 +3860,20 @@
           var waHref = "https://wa.me/" + n + "?text=" + encodeURIComponent("Hi Joscha, ich bin " + account.name + ".");
           waEl.href = waHref;
         }
+        syncCommunityWhatsApp();
+      }
+
+      function syncCommunityWhatsApp() {
+        var waGroup = document.getElementById("community-wa");
+        if (!waGroup) return;
+        var url = String(WHATSAPP_GROUP_URL || "").trim();
+        if (!url) {
+          waGroup.hidden = true;
+          waGroup.removeAttribute("href");
+          return;
+        }
+        waGroup.href = url;
+        waGroup.hidden = false;
       }
       showApp();
 
