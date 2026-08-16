@@ -405,6 +405,22 @@
       opacity: 0;
       pointer-events: none;
     }
+    body.is-account-paused .home-cal,
+    body.is-account-paused .home-check {
+      pointer-events: none;
+      opacity: 0.45;
+      user-select: none;
+    }
+    body.is-account-paused .community-composer {
+      display: none !important;
+    }
+    body.is-account-paused.is-community .wrap__scroll {
+      padding-bottom: 14px;
+    }
+    body.is-account-paused .community-wa {
+      pointer-events: none;
+      opacity: 0.35;
+    }
     .home-workout {
       color: var(--ink-on-red);
       text-align: left;
@@ -2193,6 +2209,8 @@
       } else {
         try { account = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch (e) {}
       }
+      var accountPaused = false;
+      var onAccountPausedChange = null;
       var dayEntries = {};
       try { dayEntries = JSON.parse(localStorage.getItem(DAY_ENTRIES_KEY) || "{}") || {}; } catch (e2) { dayEntries = {}; }
       var buddyList = [];
@@ -2454,7 +2472,77 @@
         renderProfileMantra();
       }
 
+      function isAccountPaused() {
+        return !!accountPaused;
+      }
+
+      function applyAccountPausedUi() {
+        document.body.classList.toggle("is-account-paused", isAccountPaused());
+        var composer = document.getElementById("community-composer");
+        if (composer) {
+          composer.setAttribute("aria-disabled", isAccountPaused() ? "true" : "false");
+          if (isAccountPaused()) {
+            var replyText = document.getElementById("community-reply-text");
+            var replySend = document.getElementById("community-reply-send");
+            var replyPick = document.getElementById("community-reply-pick");
+            if (replyText) {
+              replyText.value = "";
+              replyText.blur();
+              replyText.disabled = true;
+            }
+            if (replySend) replySend.disabled = true;
+            if (replyPick) replyPick.disabled = true;
+          } else {
+            var replyTextOn = document.getElementById("community-reply-text");
+            var replyPickOn = document.getElementById("community-reply-pick");
+            if (replyTextOn) replyTextOn.disabled = false;
+            if (replyPickOn) replyPickOn.disabled = false;
+          }
+        }
+        if (isAccountPaused()) {
+          try { closeShareModal(); } catch (e) {}
+        }
+        try { renderProfilePlan(); } catch (e2) {}
+        if (typeof onAccountPausedChange === "function") {
+          try { onAccountPausedChange(); } catch (e3) {}
+        }
+      }
+
+      async function refreshAccountPausedStatus() {
+        var was = accountPaused;
+        accountPaused = false;
+        if (!account) {
+          applyAccountPausedUi();
+          return accountPaused;
+        }
+        try {
+          var rows = null;
+          if (account.invite_code) {
+            rows = await restGet(
+              "go_invite_codes?code=eq." + encodeURIComponent(String(account.invite_code)) +
+              "&select=paused&limit=1"
+            );
+          }
+          if ((!rows || !rows[0]) && account.serial_number) {
+            var serial = String(account.serial_number || "").replace(/\D/g, "").slice(0, 8);
+            if (serial.length === 8) {
+              rows = await restGet(
+                "go_invite_codes?serial_number=eq." + encodeURIComponent(serial) +
+                "&select=paused&limit=1"
+              );
+            }
+          }
+          if (rows && rows[0]) accountPaused = !!rows[0].paused;
+        } catch (e) {}
+        applyAccountPausedUi();
+        if (was !== accountPaused) {
+          try { fillProfilePanel(); } catch (e2) {}
+        }
+        return accountPaused;
+      }
+
       function coachDayText(wd) {
+        if (isAccountPaused()) return "";
         if (!coachPlan) return "";
         var key = COACH_DAY_KEYS[wd];
         return key && coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
@@ -2462,6 +2550,7 @@
 
       /* Text für einen konkreten Kalendertag: letzter History-Stand mit effective_from <= Datum. */
       function coachDayTextForDate(d) {
+        if (isAccountPaused()) return "";
         var wd = (d.getDay() + 6) % 7;
         var key = COACH_DAY_KEYS[wd];
         if (!key) return "";
@@ -2527,6 +2616,7 @@
         appendPlanText(planRoot, coachPlan && coachPlan.life_situation);
         appendPlanText(planRoot, coachPlan && coachPlan.goal);
         appendPlanText(planRoot, coachPlan && coachPlan.phase_steps);
+        if (isAccountPaused()) return;
         for (var i = 0; i < PROFILE_WEEKDAYS.length; i++) {
           var dayVal = coachDayText(i);
           if (!dayVal) continue;
@@ -3579,6 +3669,7 @@
       }
 
       async function createCommunityPost(payload) {
+        if (isAccountPaused()) return null;
         if (!hasCloudAccount()) return null;
         var row = await restInsert("go_community_posts", payload);
         if (row) {
@@ -3799,6 +3890,7 @@
       }
 
       function openShareModal() {
+        if (isAccountPaused()) return;
         var modal = document.getElementById("share-modal");
         if (!modal) return;
         shareSessionActive = true;
@@ -3834,7 +3926,10 @@
         ensureShareModalVisible();
       }
       document.addEventListener("visibilitychange", function () {
-        if (!document.hidden) restoreShareModalAfterCamera();
+        if (!document.hidden) {
+          restoreShareModalAfterCamera();
+          refreshAccountPausedStatus().catch(function () {});
+        }
       });
       window.addEventListener("pageshow", restoreShareModalAfterCamera);
       window.addEventListener("focus", restoreShareModalAfterCamera);
@@ -3843,6 +3938,7 @@
         document.getElementById("app").hidden = false;
         if (account.photo_url) applyPhoto(account.photo_url);
         fillProfilePanel();
+        refreshAccountPausedStatus().catch(function () {});
         loadMantrasFromCloud().catch(function () {});
         loadCoachPlan().catch(function () {});
         loadTrainerFromCloud().then(function () {
@@ -4348,6 +4444,9 @@
           var wd = (d.getDay() + 6) % 7;
           /* Admin-Plan geladen (aktuell oder Historie): Kästen nur daraus. */
           if (coachPlan || (coachDayHistory && coachDayHistory.length)) {
+            if (isAccountPaused()) {
+              return { title: "", line1: "", line2: "", rest: true };
+            }
             var fromCoach = coachDayTextForDate(d);
             if (fromCoach) {
               var parts = splitPlanLines(fromCoach);
@@ -4370,6 +4469,9 @@
               line2: "",
               rest: true
             };
+          }
+          if (isAccountPaused()) {
+            return { title: "", line1: "", line2: "", rest: true };
           }
           return WEEKDAY_WORKOUTS[wd] || WEEKDAY_WORKOUTS[1];
         }
@@ -4438,6 +4540,7 @@
         }
 
         function selectDay(key, openEditor) {
+          if (isAccountPaused()) return;
           selectedKey = key;
           if (openEditor) editingOpen = true;
           else editingOpen = !entryFor(key);
@@ -4470,6 +4573,10 @@
             }
           }
 
+          if (isAccountPaused()) {
+            editingOpen = false;
+          }
+
           days.forEach(function (d, i) {
             var key = dateKey(d);
             var w = workoutFor(d);
@@ -4482,6 +4589,7 @@
             btn.className = "home-cal__day";
             btn.setAttribute("role", "option");
             btn.setAttribute("aria-label", names[i] + " " + d.getDate());
+            if (isAccountPaused()) btn.disabled = true;
             if (w && !w.rest) btn.classList.add("has-workout");
             if (i === 4) btn.classList.add("is-friday");
             if (key === dateKey(today)) btn.classList.add("is-today");
@@ -4506,10 +4614,14 @@
                 "aria-label",
                 mark === "✕" ? "Eintrag bearbeiten" : "Bewertung " + mark + " bearbeiten"
               );
-              markBtn.addEventListener("click", function (ev) {
-                ev.stopPropagation();
-                selectDay(key, true);
-              });
+              if (isAccountPaused()) {
+                markBtn.disabled = true;
+              } else {
+                markBtn.addEventListener("click", function (ev) {
+                  ev.stopPropagation();
+                  selectDay(key, true);
+                });
+              }
             } else {
               markBtn.textContent = "";
               markBtn.disabled = true;
@@ -4526,6 +4638,7 @@
         }
 
         async function persistEntry(key, score) {
+          if (isAccountPaused()) return;
           if (saving) return;
           saving = true;
           checkOk.disabled = true;
@@ -4585,23 +4698,27 @@
         scoreInput.addEventListener("change", updateScoreFill);
 
         checkOk.addEventListener("click", function () {
+          if (isAccountPaused()) return;
           if (!selectedKey) return;
           var val = parseInt(scoreInput.value, 10);
           if (!(val >= 1 && val <= 10)) val = 5;
           persistEntry(selectedKey, val);
         });
         checkNo.addEventListener("click", function () {
+          if (isAccountPaused()) return;
           if (!selectedKey) return;
           persistEntry(selectedKey, null);
         });
 
         document.getElementById("week-prev").addEventListener("click", function () {
+          if (isAccountPaused()) return;
           weekOffset -= 1;
           selectedKey = null;
           editingOpen = false;
           renderWeek();
         });
         document.getElementById("week-next").addEventListener("click", function () {
+          if (isAccountPaused()) return;
           weekOffset += 1;
           selectedKey = null;
           editingOpen = false;
@@ -4615,6 +4732,12 @@
 
         onCoachPlanLoaded = function () {
           try { renderWeek(); } catch (e) {}
+        };
+        onAccountPausedChange = function () {
+          try {
+            editingOpen = false;
+            renderWeek();
+          } catch (e) {}
         };
         /* Plan kann schon vor diesem Callback fertig geladen sein (Race mit showApp). */
         if (coachPlan || (coachDayHistory && coachDayHistory.length)) {
@@ -4863,6 +4986,7 @@
 
         if (replyPick) {
           replyPick.addEventListener("click", function () {
+            if (isAccountPaused()) return;
             pickingReplyBuddy = !pickingReplyBuddy;
             replyPick.classList.toggle("is-on", pickingReplyBuddy);
             if (pickingReplyBuddy) {
@@ -4881,6 +5005,7 @@
         if (composer) {
           composer.addEventListener("submit", function (ev) {
             ev.preventDefault();
+            if (isAccountPaused()) return;
             var body = String((replyText && replyText.value) || "").trim().slice(0, 144);
             if (!body) return;
             if (!replyTargetId) {
