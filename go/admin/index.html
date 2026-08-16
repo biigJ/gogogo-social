@@ -396,6 +396,17 @@
       border-color: var(--ink);
     }
     .admin-plan__save { margin-top: 6px; }
+    .admin-user-ok {
+      margin: 14px 0 4px;
+    }
+    .admin-user-ok__hint {
+      margin: 8px 0 0;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      letter-spacing: -0.02em;
+      color: rgba(247, 245, 240, 0.72);
+      text-align: center;
+    }
     .admin-plan__hint {
       margin: 10px 0 0;
       font-size: 0.78rem;
@@ -955,6 +966,10 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3.4 20.6 21 12 3.4 3.4l.1 6.7L14.2 12 3.5 13.9z"/></svg>
             </button>
           </form>
+        </div>
+        <div class="admin-user-ok">
+          <button class="btn" type="button" id="admin-user-ok">OK</button>
+          <p class="admin-user-ok__hint">OK markiert Nachrichten als gelesen und öffnet die Übersicht.</p>
         </div>
         <hr class="admin-rule" />
         <section class="admin-role" id="admin-role" aria-label="Funktion">
@@ -2123,28 +2138,37 @@
         setCyclePhoto(null);
         renderQr(url);
         updateAuthBtn();
-        /* Sofort per Invite/Serial als gelesen markieren (auch wenn Account-Resolve hakt). */
-        markAdminInviteSeen({ serial_number: serial, code: code }, []);
+        /* Gelesen erst mit OK — kein automatisches Löschen beim Öffnen. */
         activeAccount = await resolveAccount(name, serial, code);
         if (activeAccount && activeAccount.photo_url) setCyclePhoto(activeAccount.photo_url);
-        var seenIds = (activeAccountIds && activeAccountIds.length)
+        refreshTrainerUi();
+        await renderMirroredFeed(activeAccount);
+        await loadCoachPlan(activeAccount && activeAccount.id);
+      }
+
+      async function acknowledgeCurrentUserMessages() {
+        var serial = lastQr && lastQr.serial ? lastQr.serial : (activeAccount && activeAccount.serial_number) || "";
+        var code = lastQr && lastQr.code ? lastQr.code : (activeAccount && activeAccount.invite_code) || "";
+        var ids = (activeAccountIds && activeAccountIds.length)
           ? activeAccountIds.slice()
-          : (activeAccount && activeAccount.id ? [activeAccount.id] : []);
+          : (activeAccount && activeAccount.id ? [String(activeAccount.id)] : []);
         try {
           var idx = await loadAccountIndex();
           accountIdsForInvite({ serial_number: serial, code: code }, idx).forEach(function (id) {
-            if (seenIds.indexOf(id) < 0) seenIds.push(id);
+            if (ids.indexOf(id) < 0) ids.push(id);
           });
-        } catch (eSeen) {}
-        var peakBefore = 0;
+        } catch (e0) {}
+        var peak = 0;
         try {
-          peakBefore = peakLatestForIds(seenIds, await loadLatestPostMsByAuthor());
-        } catch (ePeak) {}
-        markAdminInviteSeen({ serial_number: serial, code: code }, seenIds, peakBefore);
-        refreshTrainerUi();
-        await renderMirroredFeed(activeAccount);
-        markAdminInviteSeen({ serial_number: serial, code: code }, seenIds, peakBefore);
-        await loadCoachPlan(activeAccount && activeAccount.id);
+          peak = peakLatestForIds(ids, await loadLatestPostMsByAuthor());
+        } catch (e1) {}
+        markAdminInviteSeen({ serial_number: serial, code: code }, ids, peak);
+      }
+
+      async function confirmUserAdminOk() {
+        await acknowledgeCurrentUserMessages();
+        await showList();
+        window.scrollTo({ top: 0, behavior: "smooth" });
       }
 
       function refreshTrainerUi() {
@@ -2801,11 +2825,7 @@
         adminBtn.setAttribute("aria-label", "Admin-Ansicht für " + (row.first_name || "Nutzer"));
         adminBtn.addEventListener("click", function (e) {
           e.stopPropagation();
-          /* Admin geöffnet = Nachrichten gelesen — Punkt sofort weg. */
-          var peak = peakLatestForIds(linkedIds, latestMap);
-          markAdminInviteSeen(row, linkedIds, peak);
-          msgDot.classList.remove("is-on");
-          msgDot.removeAttribute("title");
+          /* Punkt bleibt, bis OK in der Nutzer-Ansicht gedrückt wird. */
           showResult(row.first_name, row.serial_number, row.code);
         });
 
@@ -3202,6 +3222,13 @@
       var planSave = document.getElementById("plan-save");
       if (planSave) planSave.addEventListener("click", function () { saveCoachPlan(); });
       bindZirkelDayChecks();
+
+      var adminUserOk = document.getElementById("admin-user-ok");
+      if (adminUserOk) {
+        adminUserOk.addEventListener("click", function () {
+          confirmUserAdminOk();
+        });
+      }
 
       var mantraSave = document.getElementById("mantra-save");
       if (mantraSave) mantraSave.addEventListener("click", function () { saveMantras(); });
