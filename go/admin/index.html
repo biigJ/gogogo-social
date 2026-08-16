@@ -543,6 +543,54 @@
       display: block; margin-top: 4px; font-size: 0.85rem; font-weight: 500; opacity: 0.8;
     }
     .list-row.is-paused .list-item { opacity: 0.55; }
+    .list-main {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      align-items: stretch;
+      min-width: 0;
+    }
+    .list-challenge-euro,
+    .list-challenge-wheel {
+      width: 52px;
+      min-height: 52px;
+      align-self: stretch;
+      border-radius: var(--radius);
+      border: 1.5px solid rgba(247, 245, 240, 0.55);
+      background: rgba(10, 10, 10, 0.16);
+      color: var(--ink-on-red);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 0;
+      font-weight: 700;
+      font-size: 1.15rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .list-challenge-euro.is-active {
+      background: var(--paper);
+      color: var(--red);
+      border-color: var(--paper);
+    }
+    .list-challenge-wheel {
+      cursor: default;
+      pointer-events: none;
+    }
+    .list-challenge-wheel svg {
+      position: absolute;
+      inset: 5px;
+      width: calc(100% - 10px);
+      height: calc(100% - 10px);
+    }
+    .list-challenge-days {
+      position: relative;
+      z-index: 1;
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
     .list-actions {
       display: flex;
       flex-direction: column;
@@ -1764,9 +1812,95 @@
         }
       }
 
+      var CHALLENGE_DAYS = 28;
+
+      function challengeRemainingDays(startedAt, active) {
+        if (!active) return CHALLENGE_DAYS;
+        if (!startedAt) return CHALLENGE_DAYS;
+        var start = new Date(startedAt);
+        if (isNaN(start.getTime())) return CHALLENGE_DAYS;
+        var now = new Date();
+        var startDay = Date.UTC(start.getFullYear(), start.getMonth(), start.getDate());
+        var nowDay = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+        var elapsed = Math.floor((nowDay - startDay) / 86400000);
+        if (elapsed < 0) elapsed = 0;
+        return Math.max(0, CHALLENGE_DAYS - elapsed);
+      }
+
+      function drawAdminChallengeWheel(svg, remaining) {
+        if (!svg) return;
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+        var ns = "http://www.w3.org/2000/svg";
+        var cx = 20, cy = 20, inner = 7, outer = 17.5;
+        var rem = Math.max(0, Math.min(CHALLENGE_DAYS, Number(remaining) || 0));
+        for (var s = 0; s < CHALLENGE_DAYS; s++) {
+          var a = ((s / CHALLENGE_DAYS) * Math.PI * 2) - Math.PI / 2;
+          var line = document.createElementNS(ns, "line");
+          line.setAttribute("x1", (cx + Math.cos(a) * inner).toFixed(2));
+          line.setAttribute("y1", (cy + Math.sin(a) * inner).toFixed(2));
+          line.setAttribute("x2", (cx + Math.cos(a) * outer).toFixed(2));
+          line.setAttribute("y2", (cy + Math.sin(a) * outer).toFixed(2));
+          line.setAttribute("stroke", s < rem ? "#C7413B" : "rgba(247,245,240,0.28)");
+          line.setAttribute("stroke-width", "1.35");
+          line.setAttribute("stroke-linecap", "round");
+          svg.appendChild(line);
+        }
+      }
+
+      async function patchInviteChallenge(row, active) {
+        var payload = {
+          challenge_active: !!active,
+          challenge_started_at: active ? new Date().toISOString() : null
+        };
+        var res = await fetch(
+          SUPABASE_URL + "/rest/v1/go_invite_codes?id=eq." + encodeURIComponent(row.id),
+          {
+            method: "PATCH",
+            headers: apiHeaders({
+              "Content-Type": "application/json",
+              Prefer: "return=minimal"
+            }),
+            body: JSON.stringify(payload)
+          }
+        );
+        if (!res.ok) {
+          var t = "";
+          try { t = await res.text(); } catch (e0) {}
+          throw new Error(t || ("HTTP " + res.status));
+        }
+        row.challenge_active = !!active;
+        row.challenge_started_at = payload.challenge_started_at;
+        /* Spiegel auf go_accounts */
+        try {
+          var filters = [];
+          if (row.serial_number) {
+            filters.push("serial_number.eq." + encodeURIComponent(row.serial_number));
+          }
+          if (row.code) {
+            filters.push("invite_code.eq." + encodeURIComponent(row.code));
+          }
+          if (filters.length) {
+            await fetch(
+              SUPABASE_URL + "/rest/v1/go_accounts?or=(" + filters.join(",") + ")",
+              {
+                method: "PATCH",
+                headers: apiHeaders({
+                  "Content-Type": "application/json",
+                  Prefer: "return=minimal"
+                }),
+                body: JSON.stringify(payload)
+              }
+            );
+          }
+        } catch (e1) {}
+      }
+
       function renderListRow(list, row) {
         var wrap = document.createElement("div");
         wrap.className = "list-row" + (row.paused ? " is-paused" : "");
+
+        var main = document.createElement("div");
+        main.className = "list-main";
 
         var openBtn = document.createElement("button");
         openBtn.type = "button";
@@ -1782,6 +1916,54 @@
         openBtn.addEventListener("click", function () {
           enterUserAccount(row.first_name, row.serial_number, row.code);
         });
+
+        var euroBtn = document.createElement("button");
+        euroBtn.type = "button";
+        euroBtn.className = "list-challenge-euro" + (row.challenge_active ? " is-active" : "");
+        euroBtn.textContent = "€";
+        euroBtn.setAttribute("aria-label", "Challenge für " + (row.first_name || "Nutzer"));
+        euroBtn.setAttribute("aria-pressed", row.challenge_active ? "true" : "false");
+
+        var wheel = document.createElement("div");
+        wheel.className = "list-challenge-wheel";
+        wheel.setAttribute("aria-label", "Verbleibende Challenge-Tage");
+        var wheelSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        wheelSvg.setAttribute("viewBox", "0 0 40 40");
+        var daysEl = document.createElement("span");
+        daysEl.className = "list-challenge-days";
+        function refreshChallengeUi() {
+          var active = !!row.challenge_active;
+          euroBtn.classList.toggle("is-active", active);
+          euroBtn.setAttribute("aria-pressed", active ? "true" : "false");
+          var rem = challengeRemainingDays(row.challenge_started_at, active);
+          daysEl.textContent = String(active ? rem : CHALLENGE_DAYS);
+          drawAdminChallengeWheel(wheelSvg, active ? rem : 0);
+        }
+        wheel.appendChild(wheelSvg);
+        wheel.appendChild(daysEl);
+        refreshChallengeUi();
+
+        euroBtn.addEventListener("click", async function (e) {
+          e.stopPropagation();
+          euroBtn.disabled = true;
+          try {
+            await patchInviteChallenge(row, !row.challenge_active);
+            refreshChallengeUi();
+            document.getElementById("list-msg").textContent = "";
+            document.getElementById("list-msg").classList.remove("is-error");
+          } catch (err) {
+            document.getElementById("list-msg").textContent =
+              (err && err.message && /challenge_/i.test(err.message))
+                ? "Challenge-Spalten fehlen — go-challenge.sql in Supabase ausführen."
+                : (err && err.message ? err.message.slice(0, 120) : "Challenge speichern fehlgeschlagen.");
+            document.getElementById("list-msg").classList.add("is-error");
+          }
+          euroBtn.disabled = false;
+        });
+
+        main.appendChild(openBtn);
+        main.appendChild(euroBtn);
+        main.appendChild(wheel);
 
         var actions = document.createElement("div");
         actions.className = "list-actions";
@@ -1809,6 +1991,7 @@
 
         function setBusy(on) {
           openBtn.disabled = on;
+          euroBtn.disabled = on;
           adminBtn.disabled = on;
           pauseBtn.disabled = on;
           delBtn.disabled = on;
@@ -1856,7 +2039,7 @@
         actions.appendChild(adminBtn);
         actions.appendChild(pauseBtn);
         actions.appendChild(delBtn);
-        wrap.appendChild(openBtn);
+        wrap.appendChild(main);
         wrap.appendChild(actions);
         list.appendChild(wrap);
       }
