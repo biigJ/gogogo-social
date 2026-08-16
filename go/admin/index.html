@@ -620,18 +620,23 @@
       letter-spacing: -0.03em;
       line-height: 1.15;
     }
-    .list-item__msg-dot {
+    .list-item span {
+      display: block; margin-top: 4px; font-size: 0.85rem; font-weight: 500; opacity: 0.8;
+    }
+    /* Nach .list-item span: sonst bleibt der Punkt durch display:block immer sichtbar. */
+    .list-item .list-item__msg-dot {
       width: 8px;
       height: 8px;
       border-radius: 50%;
       background: var(--red);
       flex: 0 0 auto;
       display: none;
+      margin-top: 0;
+      font-size: 0;
+      line-height: 0;
+      opacity: 1;
     }
-    .list-item__msg-dot.is-on { display: inline-block; }
-    .list-item span {
-      display: block; margin-top: 4px; font-size: 0.85rem; font-weight: 500; opacity: 0.8;
-    }
+    .list-item .list-item__msg-dot.is-on { display: inline-block; }
     .list-item .list-item__stake {
       display: none;
       margin-top: 4px;
@@ -1088,6 +1093,8 @@
       var ACCOUNT_KEY = "gogogo_go_account";
       var ADMIN_FEED_SEEN_KEY = "gogogo_admin_feed_seen";
       var ADMIN_OK_ACK_KEY = "gogogo_admin_ok_ack_v1";
+      /* Wie Nutzer-Community: ISO-Zeitstempel „gelesen bis“ pro Invite (OK). */
+      var ADMIN_INVITE_SEEN_AT_KEY = "gogogo_admin_invite_seen_at_v2";
       var GO_BASE = (typeof location !== "undefined" && location.origin ? location.origin : "https://www.gogogo.social") + "/go";
       var adminNameBtn = document.getElementById("admin-name");
       var adminOpenProfileBtn = document.getElementById("admin-open-profile");
@@ -2191,24 +2198,20 @@
       }
 
       async function acknowledgeCurrentUserMessages() {
-        var inviteId =
-          (pendingAdminInvite && pendingAdminInvite.id) ||
-          (lastQr && lastQr.inviteId) ||
-          null;
-        var serial =
-          (pendingAdminInvite && pendingAdminInvite.serial_number) ||
-          (lastQr && lastQr.serial) ||
-          "";
-        var code =
-          (pendingAdminInvite && pendingAdminInvite.code) ||
-          (lastQr && lastQr.code) ||
-          "";
+        var row = pendingAdminInvite || {
+          id: lastQr && lastQr.inviteId,
+          code: lastQr && lastQr.code,
+          serial_number: lastQr && lastQr.serial
+        };
+        /* Account-Muster: einen „gesehen bis jetzt“-Zeitstempel setzen. */
+        setInviteSeenAtNow(row);
+        /* Peak der bekannten Posts mit absichern (Clock-/Fetch-Lag). */
         var ids = (activeAccountIds && activeAccountIds.length)
           ? activeAccountIds.slice().map(String)
           : (activeAccount && activeAccount.id ? [String(activeAccount.id)] : []);
         try {
           var idx = await loadAccountIndex();
-          accountIdsForInvite({ serial_number: serial, code: code }, idx).forEach(function (id) {
+          accountIdsForInvite(row, idx).forEach(function (id) {
             if (ids.indexOf(String(id)) < 0) ids.push(String(id));
           });
         } catch (e0) {}
@@ -2216,19 +2219,7 @@
         try {
           peak = peakLatestForIds(ids, await loadLatestPostMsByAuthor());
         } catch (e1) {}
-        var ackMs = Math.max(Date.now(), peak) + 1000;
-        /* Primär: Invite-ID — das steuert den roten Punkt in Alle Nutzer. */
-        setInviteOkAck(inviteId, ackMs);
-        /* Zusätzlich Legacy-Keys (Code/Serial/Account), falls ID fehlt. */
-        markAdminInviteSeen(
-          {
-            id: inviteId,
-            serial_number: serial,
-            code: code
-          },
-          ids,
-          ackMs
-        );
+        if (peak) setInviteSeenAtNow(row, peak + 1000);
       }
 
       async function confirmUserAdminOk() {
@@ -2643,6 +2634,61 @@
         });
       }
 
+      function inviteSeenStorageKeys(row) {
+        var keys = [];
+        if (!row) return keys;
+        if (row.id) keys.push("id:" + String(row.id));
+        if (row.code) keys.push("code:" + String(row.code));
+        if (row.serial_number) keys.push("serial:" + String(row.serial_number));
+        return keys;
+      }
+
+      function readInviteSeenAtMap() {
+        var out = {};
+        function merge(raw) {
+          var m = {};
+          try { m = raw ? JSON.parse(raw) : {}; } catch (e) { m = {}; }
+          Object.keys(m || {}).forEach(function (k) {
+            var prev = postTimeMs(out[k]) || Number(out[k]) || 0;
+            var next = postTimeMs(m[k]) || Number(m[k]) || 0;
+            if (next >= prev) out[k] = m[k];
+          });
+        }
+        try { merge(localStorage.getItem(ADMIN_INVITE_SEEN_AT_KEY)); } catch (e0) {}
+        try { merge(sessionStorage.getItem(ADMIN_INVITE_SEEN_AT_KEY)); } catch (e1) {}
+        return out;
+      }
+
+      function writeInviteSeenAtMap(map) {
+        var json = JSON.stringify(map || {});
+        try { localStorage.setItem(ADMIN_INVITE_SEEN_AT_KEY, json); } catch (e0) {}
+        try { sessionStorage.setItem(ADMIN_INVITE_SEEN_AT_KEY, json); } catch (e1) {}
+      }
+
+      /* Wie setFeedSeenNow im Account: „gelesen bis“ = jetzt (oder peakMs). */
+      function setInviteSeenAtNow(row, peakMs) {
+        var keys = inviteSeenStorageKeys(row);
+        if (!keys.length) return false;
+        var ms = Date.now();
+        var peak = Number(peakMs) || 0;
+        if (peak > ms) ms = peak;
+        var stamp = new Date(ms).toISOString();
+        var map = readInviteSeenAtMap();
+        keys.forEach(function (k) { map[k] = stamp; });
+        writeInviteSeenAtMap(map);
+        return true;
+      }
+
+      function getInviteSeenAtMs(row) {
+        var map = readInviteSeenAtMap();
+        var ms = 0;
+        inviteSeenStorageKeys(row).forEach(function (k) {
+          var v = map[k];
+          ms = Math.max(ms, postTimeMs(v) || Number(v) || 0);
+        });
+        return ms;
+      }
+
       function getAdminOkAckMap() {
         var map = {};
         try {
@@ -2694,7 +2740,6 @@
         try { localStorage.setItem(ADMIN_FEED_SEEN_KEY, JSON.stringify(map)); } catch (e) {}
       }
 
-      /* Session-Fallback: Punkt bleibt weg auch wenn localStorage blockiert/neu geladen wird in derselben Sitzung. */
       var adminSeenSessionMs = {};
 
       function adminSeenKeysForInvite(row, accountIds) {
@@ -2718,7 +2763,6 @@
         return peak;
       }
 
-      /* Legacy-Gelesen-Markierung (weiterhin mitschreiben). */
       function markAdminInviteSeen(row, accountIds, atLeastMs) {
         var map = getAdminFeedSeenMap();
         var ms = Date.now();
@@ -2823,15 +2867,17 @@
         if (!row) return false;
         var ids = accountIdsForInvite(row, index);
         var latestMs = peakLatestForIds(ids, latestByAuthor || {});
-        /* Keine Nutzer-Posts → kein Punkt. */
         if (!latestMs) return false;
-        /* OK-Ack für diese Invite-ID: Punkt weg, bis neuere Nachricht kommt. */
+        /* Primär: gleicher Mechanismus wie Nutzer-Community (gesehen-bis-Zeitstempel). */
+        var seenMs = getInviteSeenAtMs(row);
+        if (seenMs && latestMs <= seenMs) return false;
+        /* Fallback: ältere Ack-Keys */
         if (row.id) {
           var ack = inviteOkAckMs(row.id);
           if (ack && ack >= latestMs) return false;
         }
-        var seenMs = inviteSeenMs(row, ids);
-        if (seenMs && seenMs >= latestMs) return false;
+        var legacyMs = inviteSeenMs(row, ids);
+        if (legacyMs && legacyMs >= latestMs) return false;
         return true;
       }
 
