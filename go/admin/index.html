@@ -313,6 +313,12 @@
       letter-spacing: -0.02em;
       color: rgba(247, 245, 240, 0.72);
     }
+    .admin-role__status {
+      margin: 0 0 10px;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+      color: rgba(247, 245, 240, 0.9);
+    }
     h1 {
       font-weight: 700;
       font-size: clamp(28px, 8vw, 36px);
@@ -587,6 +593,13 @@
           </button>
         </form>
       </div>
+      <hr class="admin-rule" />
+      <section class="admin-role" id="admin-role" aria-label="Funktion">
+        <h2 class="admin-plan__title">Funktion</h2>
+        <p class="admin-role__status" id="trainer-status">Funktion: Buddy</p>
+        <button class="btn admin-plan__save" type="button" id="trainer-toggle">Als Trainer markieren</button>
+        <p class="msg" id="trainer-msg" role="status"></p>
+      </section>
       <hr class="admin-rule" />
       <section class="admin-plan" id="admin-plan" aria-label="Trainingsplan">
         <h2 class="admin-plan__title">Trainingsplan</h2>
@@ -1294,8 +1307,76 @@
         updateAuthBtn();
         activeAccount = await resolveAccount(name, serial, code);
         if (activeAccount && activeAccount.photo_url) setCyclePhoto(activeAccount.photo_url);
+        refreshTrainerUi();
         await renderMirroredFeed(activeAccount);
         await loadCoachPlan(activeAccount && activeAccount.id);
+      }
+
+      function refreshTrainerUi() {
+        var status = document.getElementById("trainer-status");
+        var btn = document.getElementById("trainer-toggle");
+        var msg = document.getElementById("trainer-msg");
+        if (msg) {
+          msg.textContent = "";
+          msg.classList.remove("is-error");
+        }
+        var isTrainer = !!(activeAccount && activeAccount.is_trainer);
+        if (status) status.textContent = "Funktion: " + (isTrainer ? "Trainer" : "Buddy");
+        if (btn) {
+          btn.disabled = !activeAccount || !activeAccount.id;
+          btn.textContent = isTrainer ? "Trainer-Status entfernen" : "Als Trainer markieren";
+        }
+      }
+
+      async function setTrainerRole(on) {
+        var msg = document.getElementById("trainer-msg");
+        if (!activeAccount || !activeAccount.id) {
+          if (msg) {
+            msg.textContent = "Kein Account — Trainer-Status nicht speicherbar.";
+            msg.classList.add("is-error");
+          }
+          return;
+        }
+        if (msg) {
+          msg.classList.remove("is-error");
+          msg.textContent = "Speichere …";
+        }
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(activeAccount.id),
+            {
+              method: "PATCH",
+              headers: apiHeaders({
+                "Content-Type": "application/json",
+                Prefer: "return=representation"
+              }),
+              body: JSON.stringify({
+                is_trainer: !!on,
+                updated_at: new Date().toISOString()
+              })
+            }
+          );
+          if (!res.ok) {
+            if (msg) {
+              msg.textContent = "Speichern fehlgeschlagen (go-trainer.sql ausführen?).";
+              msg.classList.add("is-error");
+            }
+            return;
+          }
+          var rows = await res.json();
+          if (rows && rows[0]) {
+            activeAccount.is_trainer = !!rows[0].is_trainer;
+          } else {
+            activeAccount.is_trainer = !!on;
+          }
+          refreshTrainerUi();
+          if (msg) msg.textContent = activeAccount.is_trainer ? "Als Trainer markiert." : "Trainer-Status entfernt.";
+        } catch (e) {
+          if (msg) {
+            msg.textContent = "Speichern fehlgeschlagen.";
+            msg.classList.add("is-error");
+          }
+        }
       }
 
       function apiHeaders(extra) {
@@ -1565,6 +1646,15 @@
 
       var planSave = document.getElementById("plan-save");
       if (planSave) planSave.addEventListener("click", function () { saveCoachPlan(); });
+
+      var trainerToggle = document.getElementById("trainer-toggle");
+      if (trainerToggle) {
+        trainerToggle.addEventListener("click", function () {
+          var next = !(activeAccount && activeAccount.is_trainer);
+          setTrainerRole(next);
+        });
+      }
+      refreshTrainerUi();
 
       (function bindAdminComposer() {
         var composer = document.getElementById("admin-composer");
