@@ -2548,13 +2548,25 @@
         return key && coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
       }
 
-      /* Text für einen konkreten Kalendertag: letzter History-Stand mit effective_from <= Datum. */
+      function berlinTodayKey() {
+        try {
+          return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+        } catch (e) {
+          return formatDateKey(new Date());
+        }
+      }
+
+      /* Text für einen Kalendertag: Vergangenheit aus History, ab heute aktueller Plan. */
       function coachDayTextForDate(d) {
         if (isAccountPaused()) return "";
         var wd = (d.getDay() + 6) % 7;
         var key = COACH_DAY_KEYS[wd];
         if (!key) return "";
         var dateStr = formatDateKey(d);
+        /* Ab heute: go_coach_plans — Admin-Änderungen sofort, auch wenn History nachhängt. */
+        if (dateStr >= berlinTodayKey()) {
+          return coachDayText(wd);
+        }
         var best = null;
         var bestFrom = "";
         for (var i = 0; i < coachDayHistory.length; i++) {
