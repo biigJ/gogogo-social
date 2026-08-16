@@ -1127,7 +1127,11 @@
         ["plan-so", "day_so"]
       ];
       var PLAN_DAY_FIELD_IDS = ["plan-mo", "plan-di", "plan-mi", "plan-do", "plan-fr", "plan-sa", "plan-so"];
+      var ZIRKEL_DAY_NAMES = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
       var DEFAULT_ZIRKEL_WD = 4;
+      var zirkelUiWeekday = DEFAULT_ZIRKEL_WD;
+      var zirkelTextStash = {};
+      var zirkelConfirmBusy = false;
 
       function getZirkelChecks() {
         return Array.prototype.slice.call(document.querySelectorAll(".plan-zirkel-check"));
@@ -1141,11 +1145,21 @@
             if (n >= 0 && n <= 6) return n;
           }
         }
-        return DEFAULT_ZIRKEL_WD;
+        return zirkelUiWeekday >= 0 && zirkelUiWeekday <= 6 ? zirkelUiWeekday : DEFAULT_ZIRKEL_WD;
       }
 
-      function applyZirkelDayUi(wd) {
+      function resetZirkelTextStash() {
+        zirkelTextStash = {};
+        PLAN_DAY_FIELD_IDS.forEach(function (id, idx) {
+          var el = document.getElementById(id);
+          zirkelTextStash[idx] = el ? String(el.value || "") : "";
+        });
+      }
+
+      /* clearZirkelText: Freitext der Zirkel-Tagesbox leeren (nach Ja). */
+      function applyZirkelDayUi(wd, opts) {
         var selected = wd >= 0 && wd <= 6 ? wd : DEFAULT_ZIRKEL_WD;
+        var clearZirkelText = !opts || opts.clearZirkelText !== false;
         getZirkelChecks().forEach(function (box) {
           var n = parseInt(box.getAttribute("data-wd"), 10);
           box.checked = n === selected;
@@ -1156,25 +1170,63 @@
           var isZirkel = idx === selected;
           el.disabled = isZirkel;
           if (isZirkel) {
-            el.value = "";
+            if (clearZirkelText) el.value = "";
             el.placeholder = "Zirkeltraining";
           } else if (el.placeholder === "Zirkeltraining") {
             var labels = ["Montag…", "Dienstag…", "Mittwoch…", "Donnerstag…", "Freitag…", "Samstag…", "Sonntag…"];
             el.placeholder = labels[idx] || "";
           }
         });
+        zirkelUiWeekday = selected;
       }
 
       function bindZirkelDayChecks() {
         getZirkelChecks().forEach(function (box) {
-          box.addEventListener("change", function () {
+          box.addEventListener("change", async function () {
             var n = parseInt(box.getAttribute("data-wd"), 10);
             if (!(n >= 0 && n <= 6)) n = DEFAULT_ZIRKEL_WD;
-            applyZirkelDayUi(n);
+            var prev = zirkelUiWeekday >= 0 && zirkelUiWeekday <= 6 ? zirkelUiWeekday : DEFAULT_ZIRKEL_WD;
+
+            /* Nur Abhaken rückgängig — immer genau ein Tag. */
+            if (!box.checked) {
+              applyZirkelDayUi(prev, { clearZirkelText: false });
+              return;
+            }
+            if (n === prev || zirkelConfirmBusy) {
+              applyZirkelDayUi(prev, { clearZirkelText: false });
+              return;
+            }
+
+            /* Visuell zurück, bis Ja/Nein. */
+            applyZirkelDayUi(prev, { clearZirkelText: false });
+            zirkelConfirmBusy = true;
+            var ok = false;
+            try {
+              ok = await confirmJaNein(
+                "Zirkeltraining auf " + (ZIRKEL_DAY_NAMES[n] || "diesen Tag") + " setzen?"
+              );
+            } finally {
+              zirkelConfirmBusy = false;
+            }
+            if (!ok) {
+              applyZirkelDayUi(prev, { clearZirkelText: false });
+              return;
+            }
+
+            var newEl = document.getElementById(PLAN_DAY_FIELD_IDS[n]);
+            if (newEl) zirkelTextStash[n] = String(newEl.value || "");
+            applyZirkelDayUi(n, { clearZirkelText: true });
+            var prevEl = document.getElementById(PLAN_DAY_FIELD_IDS[prev]);
+            if (prevEl && Object.prototype.hasOwnProperty.call(zirkelTextStash, prev)) {
+              prevEl.value = zirkelTextStash[prev];
+            }
           });
         });
-        applyZirkelDayUi(DEFAULT_ZIRKEL_WD);
-      }      function isAuthed() {
+        applyZirkelDayUi(DEFAULT_ZIRKEL_WD, { clearZirkelText: true });
+        resetZirkelTextStash();
+      }
+
+      function isAuthed() {
         try {
           return localStorage.getItem(AUTH_KEY) === "1" || sessionStorage.getItem(AUTH_KEY) === "1";
         } catch (e) { return false; }
@@ -1517,7 +1569,8 @@
             el.disabled = false;
           }
         });
-        applyZirkelDayUi(DEFAULT_ZIRKEL_WD);
+        applyZirkelDayUi(DEFAULT_ZIRKEL_WD, { clearZirkelText: true });
+        resetZirkelTextStash();
         var planMsg = document.getElementById("plan-msg");
         if (planMsg) {
           planMsg.textContent = "";
@@ -1533,7 +1586,8 @@
         });
         var zw = row.zirkel_weekday != null ? Number(row.zirkel_weekday) : DEFAULT_ZIRKEL_WD;
         if (!(zw >= 0 && zw <= 6)) zw = DEFAULT_ZIRKEL_WD;
-        applyZirkelDayUi(zw);
+        applyZirkelDayUi(zw, { clearZirkelText: true });
+        resetZirkelTextStash();
       }
       async function loadCoachPlan(accountId) {
         clearPlanForm();
@@ -1552,6 +1606,7 @@
 
       var DAY_PLAN_KEYS = ["day_mo", "day_di", "day_mi", "day_do", "day_fr", "day_sa", "day_so"];
       var coachHistoryAvailable = null;
+      var coachZirkelHistoryAvailable = null;
 
       function berlinTodayISO() {
         try {
@@ -1669,6 +1724,91 @@
         return await insertDayHistory(inserts);
       }
 
+      async function probeZirkelHistoryTable(force) {
+        if (!force && coachZirkelHistoryAvailable != null) return coachZirkelHistoryAvailable;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_coach_zirkel_history?select=id&limit=1",
+            { headers: apiHeaders() }
+          );
+          if (res.ok) {
+            coachZirkelHistoryAvailable = true;
+            return true;
+          }
+          var t = "";
+          try { t = await res.text(); } catch (e0) {}
+          if (res.status === 404 || /PGRST205|go_coach_zirkel_history|schema cache/i.test(t)) {
+            coachZirkelHistoryAvailable = false;
+            return false;
+          }
+          coachZirkelHistoryAvailable = false;
+          return false;
+        } catch (e) {
+          coachZirkelHistoryAvailable = false;
+          return false;
+        }
+      }
+
+      async function zirkelHistoryExists(accountId) {
+        if (!(await probeZirkelHistoryTable(true))) return false;
+        var res = await fetch(
+          SUPABASE_URL + "/rest/v1/go_coach_zirkel_history?account_id=eq." + encodeURIComponent(accountId) +
+          "&select=id&limit=1",
+          { headers: apiHeaders() }
+        );
+        if (!res.ok) return false;
+        var rows = await res.json();
+        return !!(rows && rows.length);
+      }
+
+      async function insertZirkelHistory(rows) {
+        if (!rows || !rows.length) return { ok: true, missing: false };
+        if (!(await probeZirkelHistoryTable(true))) return { ok: true, missing: true };
+        var res = await fetch(SUPABASE_URL + "/rest/v1/go_coach_zirkel_history", {
+          method: "POST",
+          headers: apiHeaders({
+            "Content-Type": "application/json",
+            Prefer: "return=minimal"
+          }),
+          body: JSON.stringify(rows)
+        });
+        if (res.ok) return { ok: true, missing: false };
+        var t = "";
+        try { t = await res.text(); } catch (e0) {}
+        if (res.status === 404 || /PGRST205|go_coach_zirkel_history|schema cache/i.test(t)) {
+          coachZirkelHistoryAvailable = false;
+          return { ok: true, missing: true };
+        }
+        return { ok: false, missing: false, detail: t || ("HTTP " + res.status) };
+      }
+
+      async function archiveZirkelChange(accountId, previous, payload) {
+        var oldWd = previous && previous.zirkel_weekday != null ? Number(previous.zirkel_weekday) : DEFAULT_ZIRKEL_WD;
+        var newWd = payload && payload.zirkel_weekday != null ? Number(payload.zirkel_weekday) : DEFAULT_ZIRKEL_WD;
+        if (!(oldWd >= 0 && oldWd <= 6)) oldWd = DEFAULT_ZIRKEL_WD;
+        if (!(newWd >= 0 && newWd <= 6)) newWd = DEFAULT_ZIRKEL_WD;
+        if (oldWd === newWd) return { ok: true, missing: false };
+        if (!(await probeZirkelHistoryTable(true))) {
+          return { ok: true, missing: true };
+        }
+        var today = berlinTodayISO();
+        var inserts = [];
+        var hasHist = await zirkelHistoryExists(accountId);
+        if (!hasHist) {
+          inserts.push({
+            account_id: accountId,
+            zirkel_weekday: oldWd,
+            effective_from: "2000-01-01"
+          });
+        }
+        inserts.push({
+          account_id: accountId,
+          zirkel_weekday: newWd,
+          effective_from: today
+        });
+        return await insertZirkelHistory(inserts);
+      }
+
       async function saveCoachPlan() {
         var planMsg = document.getElementById("plan-msg");
         if (!activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) {
@@ -1697,6 +1837,10 @@
           if (!archived.ok) {
             throw new Error(archived.detail || "History insert failed");
           }
+          var archivedZirkel = await archiveZirkelChange(activeAccount.id, previous, payload);
+          if (!archivedZirkel.ok) {
+            throw new Error(archivedZirkel.detail || "Zirkel history insert failed");
+          }
           var res = await fetch(SUPABASE_URL + "/rest/v1/go_coach_plans?on_conflict=account_id", {
             method: "POST",
             headers: apiHeaders({
@@ -1716,8 +1860,8 @@
           else await loadCoachPlan(activeAccount.id);
           if (planMsg) {
             planMsg.classList.remove("is-error");
-            if (archived.missing) {
-              planMsg.textContent = "Plan gespeichert. Tages-Archiv noch nicht aktiv — Seite neu laden oder go-coach-plan-history.sql prüfen.";
+            if (archived.missing || archivedZirkel.missing) {
+              planMsg.textContent = "Plan gespeichert. Archiv teilweise inaktiv — go-coach-plan-history.sql / go-coach-zirkel-history.sql prüfen.";
             } else {
               planMsg.textContent = "Gespeichert.";
             }
@@ -1727,6 +1871,8 @@
             var detail = err && err.message ? String(err.message) : "";
             if (/PGRST205|go_coach_plan_day_history/i.test(detail)) {
               planMsg.textContent = "Speichern fehlgeschlagen: Tabelle go_coach_plan_day_history fehlt oder Schema-Cache — Supabase neu laden.";
+            } else if (/go_coach_zirkel_history/i.test(detail)) {
+              planMsg.textContent = "Speichern fehlgeschlagen: Tabelle go_coach_zirkel_history fehlt — go-coach-zirkel-history.sql in Supabase ausführen.";
             } else if (/zirkel_weekday/i.test(detail)) {
               planMsg.textContent = "Speichern fehlgeschlagen: Spalte zirkel_weekday fehlt — go-coach-plans-zirkel.sql in Supabase ausführen.";
             } else if (/go_coach_plans/i.test(detail)) {
@@ -2226,19 +2372,24 @@
         el.setAttribute("aria-hidden", "true");
       }
 
-      function confirmChallengeAbort() {
+      function confirmJaNein(title) {
         return new Promise(function (resolve) {
           var modal = document.getElementById("challenge-abort-modal");
+          var titleEl = document.getElementById("challenge-abort-title");
           var yes = document.getElementById("challenge-abort-yes");
           var no = document.getElementById("challenge-abort-no");
+          var label = title || "Bestätigen?";
           if (!modal || !yes || !no) {
-            resolve(window.confirm("Challenge abbrechen?"));
+            resolve(window.confirm(label));
             return;
           }
+          var prevTitle = titleEl ? titleEl.textContent : "";
+          if (titleEl) titleEl.textContent = label;
           function finish(ok) {
             yes.removeEventListener("click", onYes);
             no.removeEventListener("click", onNo);
             modal.removeEventListener("click", onBackdrop);
+            if (titleEl) titleEl.textContent = prevTitle || "Challenge abbrechen?";
             closeChallengeModal(modal);
             resolve(!!ok);
           }
@@ -2252,6 +2403,10 @@
           no.addEventListener("click", onNo);
           modal.addEventListener("click", onBackdrop);
         });
+      }
+
+      function confirmChallengeAbort() {
+        return confirmJaNein("Challenge abbrechen?");
       }
 
       function drawAmountDialRays(svg, amount) {
