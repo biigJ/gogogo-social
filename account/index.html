@@ -1061,8 +1061,96 @@
       font-size: 0.95rem;
       letter-spacing: -0.02em;
       line-height: 1.4;
-      margin: 0 0 22px;
+      margin: 0;
       width: 100%;
+      min-width: 0;
+    }
+    .profile-mantra {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      width: 100%;
+      margin: 0 0 22px;
+      color: var(--ink-on-red);
+    }
+    .profile-mantra.is-editing {
+      flex-direction: column;
+      gap: 10px;
+    }
+    .profile-mantra__edit {
+      flex: 0 0 auto;
+      width: 1.35rem;
+      height: 1.35rem;
+      margin-top: 0.12em;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--ink-on-red);
+      opacity: 0.9;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .profile-mantra__edit svg {
+      width: 0.85rem;
+      height: 0.85rem;
+      display: block;
+    }
+    .profile-mantra__edit:focus-visible {
+      outline: 1px solid rgba(247, 245, 240, 0.85);
+      outline-offset: 2px;
+    }
+    .profile-mantra__field {
+      width: 100%;
+      min-height: 4.2em;
+      padding: 10px 12px;
+      border: 1px solid rgba(247, 245, 240, 0.35);
+      border-radius: 10px;
+      background: rgba(10, 10, 10, 0.12);
+      color: var(--ink-on-red);
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.4;
+      resize: vertical;
+    }
+    .profile-mantra__field:focus {
+      outline: none;
+      border-color: rgba(247, 245, 240, 0.75);
+    }
+    .profile-mantra__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      width: 100%;
+    }
+    .profile-mantra__save {
+      min-width: 2.4rem;
+      height: 2.4rem;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: rgba(247, 245, 240, 0.16);
+      color: var(--ink-on-red);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .profile-mantra__save svg {
+      width: 1rem;
+      height: 1rem;
+      display: block;
+    }
+    .profile-mantra__hint {
+      margin: 0;
+      font-size: 0.8rem;
+      opacity: 0.75;
+      letter-spacing: -0.02em;
     }
     .profile-plan {
       color: var(--ink-on-red);
@@ -1602,7 +1690,15 @@
           ></button>
           <span class="profile-serial__text" id="profile-serial" aria-live="polite">Identifikationsnummer anzeigen</span>
         </div>
-        <p class="profile-bio" id="profile-bio"></p>
+        <div class="profile-mantra" id="profile-mantra">
+          <p class="profile-bio" id="profile-bio"></p>
+          <button
+            class="profile-mantra__edit"
+            id="profile-mantra-edit"
+            type="button"
+            aria-label="Mantra ändern"
+          ></button>
+        </div>
         <section class="profile-plan" aria-label="Trainingsplan">
           <h2 class="profile-plan__title">Dein Trainingsplan</h2>
           <div id="profile-plan-days"></div>
@@ -2114,13 +2210,191 @@
         if (profilePlus) profilePlus.hidden = true;
       }
 
-      var PROFILE_BIO_FALLBACK =
-        "Hier steht bald Dein persönlicher Text von Joscha. Bis dahin: bleib in Bewegung, halte die Fixpunkte und melde Dich, wenn etwas hakt.";
+      var DEFAULT_MANTRAS = [
+        { slot: 1, body: "Bewegung ist die beste Medizin.", attribution: "Hippokrates" },
+        { slot: 2, body: "Der erste Reichtum ist die Gesundheit.", attribution: "Ralph Waldo Emerson" },
+        { slot: 3, body: "Ein Morgenspaziergang segnet den ganzen Tag.", attribution: "Henry David Thoreau" },
+        { slot: 4, body: "Gesundheit ist nicht alles, aber ohne Gesundheit ist alles nichts.", attribution: "Arthur Schopenhauer" },
+        { slot: 5, body: "Kümmere Dich um Deinen Körper — er ist der einzige Ort, an dem Du lebst.", attribution: "Jim Rohn" },
+        { slot: 6, body: "Der Weg entsteht beim Gehen.", attribution: "Antonio Machado" },
+        { slot: 7, body: "Ein gesunder Geist wohnt in einem gesunden Körper.", attribution: "Juvenal" },
+        { slot: 8, body: "Langsam und stetig gewinnt das Rennen.", attribution: "Äsop" },
+        { slot: 9, body: "Disziplin ist die Brücke zwischen Zielen und Erfolg.", attribution: "Jim Rohn" },
+        { slot: 10, body: "Die beste Zeit anzufangen war gestern. Die zweitbeste ist jetzt.", attribution: "Chinesisches Sprichwort" },
+        { slot: 11, body: "Stärke wächst aus dem, was Du überwindest.", attribution: "Nelson Mandela" },
+        { slot: 12, body: "Es geht nicht um Perfektion, sondern um Beständigkeit.", attribution: "Bruce Lee" },
+        { slot: 13, body: "Ruhe Dich aus, wenn Du müde bist — nicht, wenn Du fertig bist.", attribution: "Michael Jordan" },
+        { slot: 14, body: "Wer sich bewegt, bleibt lebendig.", attribution: "Konfuzius" },
+        { slot: 15, body: "Kleine tägliche Schritte schlagen große Absichten.", attribution: "Lao Tzu" },
+        { slot: 16, body: "Dein Körper erreicht, was Dein Geist glaubt.", attribution: "Napoleon Hill" },
+        { slot: 17, body: "Fitness ist die Grundlage klaren Denkens.", attribution: "John F. Kennedy" },
+        { slot: 18, body: "Geh, solange Du gehen kannst.", attribution: "Hippokrates" },
+        { slot: 19, body: "Heute zählt mehr als gestern vornehmen.", attribution: "Seneca" },
+        { slot: 20, body: "Atme. Bewege Dich. Schlafe. Wiederhole.", attribution: "Marcus Aurelius" }
+      ];
+      var cloudMantras = null;
+      var mantraEditMode = false;
+      var mantraSaveBusy = false;
       var PROFILE_WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
       var COACH_DAY_KEYS = ["day_mo", "day_di", "day_mi", "day_do", "day_fr", "day_sa", "day_so"];
       var coachPlan = null;
       var coachDayHistory = [];
       var onCoachPlanLoaded = null;
+
+      function formatMantraLine(row) {
+        if (!row || !row.body) return "";
+        var body = String(row.body).trim();
+        var who = row.attribution != null ? String(row.attribution).trim() : "";
+        if (!body) return "";
+        return who ? (body + " — " + who) : body;
+      }
+
+      function mantraSlotForAccount() {
+        var raw = String((account && (account.id || account.serial_number || account.name)) || "gogogo");
+        var hash = 0;
+        for (var i = 0; i < raw.length; i++) {
+          hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+          hash |= 0;
+        }
+        return (Math.abs(hash) % 20) + 1;
+      }
+
+      function getMantraPool() {
+        if (cloudMantras && cloudMantras.length) return cloudMantras;
+        return DEFAULT_MANTRAS;
+      }
+
+      function getDefaultMantraText() {
+        var pool = getMantraPool();
+        var slot = mantraSlotForAccount();
+        var found = null;
+        for (var i = 0; i < pool.length; i++) {
+          if (Number(pool[i].slot) === slot) {
+            found = pool[i];
+            break;
+          }
+        }
+        if (!found) found = pool[0];
+        return formatMantraLine(found) || formatMantraLine(DEFAULT_MANTRAS[0]);
+      }
+
+      function getOwnMantraText() {
+        return String((account && account.mantra) || "").trim();
+      }
+
+      function mantraEditIcon(isCheck) {
+        if (isCheck) {
+          return '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.2 17.3 4.7 12.8l1.4-1.4 3.1 3.1 8.7-8.7 1.4 1.4z"/></svg>';
+        }
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 17.3V21h3.7L17.8 9.9l-3.7-3.7L3 17.3zm17.7-10.4c.4-.4.4-1 0-1.4l-2.2-2.2c-.4-.4-1-.4-1.4 0l-1.7 1.7 3.7 3.7 1.6-1.8z"/></svg>';
+      }
+
+      function renderProfileMantra() {
+        var wrap = document.getElementById("profile-mantra");
+        var bioEl = document.getElementById("profile-bio");
+        var editBtn = document.getElementById("profile-mantra-edit");
+        if (!wrap || !bioEl) return;
+        if (mantraEditMode) {
+          wrap.classList.add("is-editing");
+          wrap.innerHTML = "";
+          var field = document.createElement("textarea");
+          field.className = "profile-mantra__field";
+          field.id = "profile-mantra-field";
+          field.maxLength = 220;
+          field.rows = 3;
+          field.setAttribute("aria-label", "Dein Mantra");
+          field.placeholder = "Dein Mantra…";
+          field.value = getOwnMantraText() || getDefaultMantraText();
+          var actions = document.createElement("div");
+          actions.className = "profile-mantra__actions";
+          var saveBtn = document.createElement("button");
+          saveBtn.type = "button";
+          saveBtn.className = "profile-mantra__save";
+          saveBtn.setAttribute("aria-label", "Mantra speichern");
+          saveBtn.innerHTML = mantraEditIcon(true);
+          saveBtn.addEventListener("click", function () {
+            submitProfileMantra(field.value);
+          });
+          actions.appendChild(saveBtn);
+          var hint = document.createElement("p");
+          hint.className = "profile-mantra__hint";
+          hint.textContent = "Mit dem Haken speichern. Leer lassen stellt das Standard-Mantra wieder her.";
+          wrap.appendChild(field);
+          wrap.appendChild(actions);
+          wrap.appendChild(hint);
+          field.focus();
+          field.setSelectionRange(field.value.length, field.value.length);
+          return;
+        }
+        wrap.classList.remove("is-editing");
+        wrap.innerHTML = "";
+        var text = document.createElement("p");
+        text.className = "profile-bio";
+        text.id = "profile-bio";
+        text.textContent = getOwnMantraText() || getDefaultMantraText();
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "profile-mantra__edit";
+        btn.id = "profile-mantra-edit";
+        btn.setAttribute("aria-label", "Mantra ändern");
+        btn.innerHTML = mantraEditIcon(false);
+        btn.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (mantraSaveBusy) return;
+          mantraEditMode = true;
+          renderProfileMantra();
+        });
+        wrap.appendChild(text);
+        wrap.appendChild(btn);
+      }
+
+      async function submitProfileMantra(raw) {
+        if (mantraSaveBusy) return;
+        var next = String(raw || "").trim().slice(0, 220);
+        mantraSaveBusy = true;
+        try {
+          if (hasCloudAccount()) {
+            var ok = await patchAccount({
+              mantra: next || null,
+              updated_at: new Date().toISOString()
+            });
+            if (!ok) {
+              mantraSaveBusy = false;
+              window.alert("Mantra konnte nicht gespeichert werden (go-mantras.sql?).");
+              return;
+            }
+          }
+          account.mantra = next || null;
+          saveAccount();
+          mantraEditMode = false;
+          mantraSaveBusy = false;
+          renderProfileMantra();
+        } catch (e) {
+          mantraSaveBusy = false;
+          window.alert("Mantra speichern fehlgeschlagen.");
+        }
+      }
+
+      async function loadMantrasFromCloud() {
+        try {
+          var rows = await restGet(
+            "go_mantras?select=slot,body,attribution&order=slot.asc&limit=20"
+          );
+          if (rows && rows.length) {
+            cloudMantras = rows.map(function (row) {
+              return {
+                slot: Number(row.slot),
+                body: row.body,
+                attribution: row.attribution
+              };
+            }).filter(function (row) {
+              return row.slot >= 1 && row.slot <= 20 && row.body;
+            });
+          }
+        } catch (e) {}
+        renderProfileMantra();
+      }
 
       function coachDayText(wd) {
         if (!coachPlan) return "";
@@ -2198,11 +2472,6 @@
 
       function renderProfilePlan() {
         var planRoot = document.getElementById("profile-plan-days");
-        var bioEl = document.getElementById("profile-bio");
-        if (bioEl) {
-          var blurb = coachPlan && coachPlan.blurb ? String(coachPlan.blurb).trim() : "";
-          bioEl.textContent = blurb || PROFILE_BIO_FALLBACK;
-        }
         if (!planRoot) return;
         planRoot.innerHTML = "";
         appendPlanBlock(planRoot, "Lebenssituation", coachPlan && coachPlan.life_situation);
@@ -2355,6 +2624,7 @@
           wertEl.textContent = String(wert).replace(".", ",");
         }
         renderProfileSerial();
+        renderProfileMantra();
         renderProfilePlan();
       }
 
@@ -3443,6 +3713,7 @@
         document.getElementById("app").hidden = false;
         if (account.photo_url) applyPhoto(account.photo_url);
         fillProfilePanel();
+        loadMantrasFromCloud().catch(function () {});
         loadCoachPlan().catch(function () {});
         loadTrainerFromCloud().then(function () {
           fillProfilePanel();
@@ -3662,6 +3933,9 @@
         if (remote.created_at) account.created_at = remote.created_at;
         account.is_trainer = !!remote.is_trainer;
         account.trainer_id = remote.trainer_id || null;
+        if (Object.prototype.hasOwnProperty.call(remote, "mantra")) {
+          account.mantra = remote.mantra ? String(remote.mantra) : null;
+        }
         var localPhoto = account.photo_url;
         var remotePhoto = remote.photo_url;
         if (remotePhoto) account.photo_url = remotePhoto;

@@ -320,6 +320,45 @@
       letter-spacing: -0.02em;
       color: rgba(247, 245, 240, 0.9);
     }
+    .admin-mantras__list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin: 0 0 14px;
+    }
+    .admin-mantras__row {
+      display: grid;
+      gap: 6px;
+    }
+    .admin-mantras__row label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      opacity: 0.85;
+    }
+    .admin-mantras__row textarea,
+    .admin-mantras__row input {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--paper);
+      color: var(--ink);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      font: inherit;
+      font-size: 0.95rem;
+    }
+    .admin-mantras__row textarea {
+      min-height: 64px;
+      resize: vertical;
+    }
+    .admin-mantras__row textarea:focus,
+    .admin-mantras__row input:focus {
+      outline: none;
+      border-color: var(--ink);
+    }
+    .admin-mantras__attr {
+      font-size: 0.9rem;
+    }
     h1 {
       font-weight: 700;
       font-size: clamp(28px, 8vw, 36px);
@@ -494,6 +533,7 @@
       <nav class="menu-panel__nav">
         <button type="button" data-view="gen">Generator</button>
         <button type="button" data-view="list">Liste</button>
+        <button type="button" data-view="mantras">Mantras</button>
         <button type="button" data-view="qr">QR anzeigen</button>
         <a href="/go/">gogogo.social</a>
       </nav>
@@ -574,6 +614,14 @@
       <h1>Liste</h1>
       <p class="msg" id="list-msg" role="status"></p>
       <div class="list" id="code-list"></div>
+    </div>
+
+    <div class="panel" id="panel-mantras" hidden>
+      <h1>Mantras</h1>
+      <p class="admin-plan__hint">20 Standard-Sätze für Nutzer ohne eigenes Mantra. Zuordnung pro Account ist stabil.</p>
+      <div class="admin-mantras__list" id="mantra-list"></div>
+      <button class="btn" type="button" id="mantra-save">Mantras speichern</button>
+      <p class="msg" id="mantra-msg" role="status"></p>
     </div>
 
     <div class="panel" id="panel-result" hidden>
@@ -703,6 +751,7 @@
       var panelGen = document.getElementById("panel-gen");
       var panelResult = document.getElementById("panel-result");
       var panelList = document.getElementById("panel-list");
+      var panelMantras = document.getElementById("panel-mantras");
       var cycleBtn = document.getElementById("cycle-btn");
       var authBtn = document.getElementById("btn-auth");
       var menuBtn = document.getElementById("btn-menu");
@@ -762,6 +811,7 @@
         panelGen.hidden = true;
         panelResult.hidden = true;
         panelList.hidden = true;
+        if (panelMantras) panelMantras.hidden = true;
       }
 
       function setCycleVisible(on) {
@@ -1656,6 +1706,154 @@
         showResult("", "", "");
       }
 
+      var DEFAULT_MANTRAS = [
+        { slot: 1, body: "Bewegung ist die beste Medizin.", attribution: "Hippokrates" },
+        { slot: 2, body: "Der erste Reichtum ist die Gesundheit.", attribution: "Ralph Waldo Emerson" },
+        { slot: 3, body: "Ein Morgenspaziergang segnet den ganzen Tag.", attribution: "Henry David Thoreau" },
+        { slot: 4, body: "Gesundheit ist nicht alles, aber ohne Gesundheit ist alles nichts.", attribution: "Arthur Schopenhauer" },
+        { slot: 5, body: "Kümmere Dich um Deinen Körper — er ist der einzige Ort, an dem Du lebst.", attribution: "Jim Rohn" },
+        { slot: 6, body: "Der Weg entsteht beim Gehen.", attribution: "Antonio Machado" },
+        { slot: 7, body: "Ein gesunder Geist wohnt in einem gesunden Körper.", attribution: "Juvenal" },
+        { slot: 8, body: "Langsam und stetig gewinnt das Rennen.", attribution: "Äsop" },
+        { slot: 9, body: "Disziplin ist die Brücke zwischen Zielen und Erfolg.", attribution: "Jim Rohn" },
+        { slot: 10, body: "Die beste Zeit anzufangen war gestern. Die zweitbeste ist jetzt.", attribution: "Chinesisches Sprichwort" },
+        { slot: 11, body: "Stärke wächst aus dem, was Du überwindest.", attribution: "Nelson Mandela" },
+        { slot: 12, body: "Es geht nicht um Perfektion, sondern um Beständigkeit.", attribution: "Bruce Lee" },
+        { slot: 13, body: "Ruhe Dich aus, wenn Du müde bist — nicht, wenn Du fertig bist.", attribution: "Michael Jordan" },
+        { slot: 14, body: "Wer sich bewegt, bleibt lebendig.", attribution: "Konfuzius" },
+        { slot: 15, body: "Kleine tägliche Schritte schlagen große Absichten.", attribution: "Lao Tzu" },
+        { slot: 16, body: "Dein Körper erreicht, was Dein Geist glaubt.", attribution: "Napoleon Hill" },
+        { slot: 17, body: "Fitness ist die Grundlage klaren Denkens.", attribution: "John F. Kennedy" },
+        { slot: 18, body: "Geh, solange Du gehen kannst.", attribution: "Hippokrates" },
+        { slot: 19, body: "Heute zählt mehr als gestern vornehmen.", attribution: "Seneca" },
+        { slot: 20, body: "Atme. Bewege Dich. Schlafe. Wiederhole.", attribution: "Marcus Aurelius" }
+      ];
+
+      function renderMantraEditor(rows) {
+        var list = document.getElementById("mantra-list");
+        if (!list) return;
+        list.innerHTML = "";
+        var bySlot = {};
+        (rows || []).forEach(function (row) {
+          if (row && row.slot) bySlot[Number(row.slot)] = row;
+        });
+        for (var slot = 1; slot <= 20; slot++) {
+          var src = bySlot[slot] || DEFAULT_MANTRAS[slot - 1] || { body: "", attribution: "" };
+          var rowEl = document.createElement("div");
+          rowEl.className = "admin-mantras__row";
+          rowEl.dataset.slot = String(slot);
+          var bodyLabel = document.createElement("label");
+          bodyLabel.setAttribute("for", "mantra-body-" + slot);
+          bodyLabel.textContent = "Mantra " + slot;
+          var body = document.createElement("textarea");
+          body.id = "mantra-body-" + slot;
+          body.maxLength = 220;
+          body.rows = 2;
+          body.value = src.body != null ? String(src.body) : "";
+          var attrLabel = document.createElement("label");
+          attrLabel.setAttribute("for", "mantra-attr-" + slot);
+          attrLabel.textContent = "Zuschreibung";
+          var attr = document.createElement("input");
+          attr.className = "admin-mantras__attr";
+          attr.id = "mantra-attr-" + slot;
+          attr.type = "text";
+          attr.maxLength = 80;
+          attr.placeholder = "Name / Quelle";
+          attr.value = src.attribution != null ? String(src.attribution) : "";
+          rowEl.appendChild(bodyLabel);
+          rowEl.appendChild(body);
+          rowEl.appendChild(attrLabel);
+          rowEl.appendChild(attr);
+          list.appendChild(rowEl);
+        }
+      }
+
+      async function showMantras() {
+        hideAllPanels();
+        if (panelMantras) panelMantras.hidden = false;
+        activeAccount = null;
+        activeAccountIds = [];
+        setCycleVisible(false);
+        setCyclePhoto(null);
+        setCycleBack(false);
+        setActorName("");
+        var msg = document.getElementById("mantra-msg");
+        if (msg) {
+          msg.textContent = "Lade …";
+          msg.classList.remove("is-error");
+        }
+        var rows = null;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_mantras?select=slot,body,attribution&order=slot.asc&limit=20",
+            { headers: apiHeaders() }
+          );
+          if (res.ok) rows = await res.json();
+        } catch (e) {}
+        renderMantraEditor(rows && rows.length ? rows : DEFAULT_MANTRAS);
+        if (msg) {
+          if (rows && rows.length) msg.textContent = "";
+          else msg.textContent = "Defaults geladen — speichern schreibt nach Supabase (go-mantras.sql?).";
+        }
+        updateAuthBtn();
+      }
+
+      async function saveMantras() {
+        var msg = document.getElementById("mantra-msg");
+        var list = document.getElementById("mantra-list");
+        if (!list) return;
+        var payload = [];
+        var rows = list.querySelectorAll(".admin-mantras__row");
+        for (var i = 0; i < rows.length; i++) {
+          var slot = Number(rows[i].dataset.slot);
+          var bodyEl = document.getElementById("mantra-body-" + slot);
+          var attrEl = document.getElementById("mantra-attr-" + slot);
+          var body = bodyEl ? String(bodyEl.value || "").trim() : "";
+          if (!body) {
+            if (msg) {
+              msg.textContent = "Mantra " + slot + " darf nicht leer sein.";
+              msg.classList.add("is-error");
+            }
+            return;
+          }
+          payload.push({
+            slot: slot,
+            body: body.slice(0, 220),
+            attribution: attrEl && String(attrEl.value || "").trim()
+              ? String(attrEl.value || "").trim().slice(0, 80)
+              : null,
+            updated_at: new Date().toISOString()
+          });
+        }
+        if (msg) {
+          msg.classList.remove("is-error");
+          msg.textContent = "Speichere …";
+        }
+        try {
+          var res = await fetch(SUPABASE_URL + "/rest/v1/go_mantras?on_conflict=slot", {
+            method: "POST",
+            headers: apiHeaders({
+              "Content-Type": "application/json",
+              Prefer: "resolution=merge-duplicates,return=minimal"
+            }),
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) {
+            if (msg) {
+              msg.textContent = "Speichern fehlgeschlagen (go-mantras.sql ausführen?).";
+              msg.classList.add("is-error");
+            }
+            return;
+          }
+          if (msg) msg.textContent = "Gespeichert.";
+        } catch (e) {
+          if (msg) {
+            msg.textContent = "Speichern fehlgeschlagen.";
+            msg.classList.add("is-error");
+          }
+        }
+      }
+
       function requireAuth(fn) {
         if (!isAuthed()) {
           showLogin();
@@ -1676,6 +1874,7 @@
           setMenu(false);
           requireAuth(function () {
             if (view === "list") showList();
+            else if (view === "mantras") showMantras();
             else if (view === "qr") showQrMenu();
             else showGen();
           });
@@ -1746,6 +1945,9 @@
 
       var planSave = document.getElementById("plan-save");
       if (planSave) planSave.addEventListener("click", function () { saveCoachPlan(); });
+
+      var mantraSave = document.getElementById("mantra-save");
+      if (mantraSave) mantraSave.addEventListener("click", function () { saveMantras(); });
 
       var trainerToggle = document.getElementById("trainer-toggle");
       if (trainerToggle) {
