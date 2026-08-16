@@ -1118,8 +1118,9 @@
             addRows(bySerial.ok ? await bySerial.json() : [], false);
           }
           if (name) {
+            var namePat = "%" + String(name).replace(/%/g, "") + "%";
             var accRes = await fetch(
-              SUPABASE_URL + "/rest/v1/go_accounts?name=ilike." + encodeURIComponent(name) +
+              SUPABASE_URL + "/rest/v1/go_accounts?name=ilike." + encodeURIComponent(namePat) +
               "&select=*&order=created_at.desc&limit=50",
               { headers: apiHeaders() }
             );
@@ -1235,8 +1236,8 @@
         return rows && rows[0] ? rows[0] : null;
       }
 
-      async function probeCoachHistoryTable() {
-        if (coachHistoryAvailable != null) return coachHistoryAvailable;
+      async function probeCoachHistoryTable(force) {
+        if (!force && coachHistoryAvailable != null) return coachHistoryAvailable;
         try {
           var res = await fetch(
             SUPABASE_URL + "/rest/v1/go_coach_plan_day_history?select=id&limit=1",
@@ -1261,7 +1262,7 @@
       }
 
       async function dayHistoryExists(accountId, dayKey) {
-        if (!(await probeCoachHistoryTable())) return false;
+        if (!(await probeCoachHistoryTable(true))) return false;
         var res = await fetch(
           SUPABASE_URL + "/rest/v1/go_coach_plan_day_history?account_id=eq." + encodeURIComponent(accountId) +
           "&day_key=eq." + encodeURIComponent(dayKey) +
@@ -1275,7 +1276,7 @@
 
       async function insertDayHistory(rows) {
         if (!rows || !rows.length) return { ok: true, missing: false };
-        if (!(await probeCoachHistoryTable())) return { ok: true, missing: true };
+        if (!(await probeCoachHistoryTable(true))) return { ok: true, missing: true };
         var res = await fetch(SUPABASE_URL + "/rest/v1/go_coach_plan_day_history", {
           method: "POST",
           headers: apiHeaders({
@@ -1296,7 +1297,7 @@
 
       /* Bei Überschreiben: alten Stand archivieren (immutable), neuer gilt ab heute. */
       async function archiveChangedDays(accountId, previous, payload) {
-        if (!(await probeCoachHistoryTable())) {
+        if (!(await probeCoachHistoryTable(true))) {
           return { ok: true, missing: true };
         }
         var today = berlinTodayISO();
@@ -1354,7 +1355,7 @@
             method: "POST",
             headers: apiHeaders({
               "Content-Type": "application/json",
-              Prefer: "resolution=merge-duplicates,return=minimal"
+              Prefer: "resolution=merge-duplicates,return=representation"
             }),
             body: JSON.stringify(payload)
           });
@@ -1363,9 +1364,14 @@
             try { t = await res.text(); } catch (e0) {}
             throw new Error(t || ("HTTP " + res.status));
           }
+          var savedRows = null;
+          try { savedRows = await res.json(); } catch (e1) { savedRows = null; }
+          if (savedRows && savedRows[0]) fillPlanForm(savedRows[0]);
+          else await loadCoachPlan(activeAccount.id);
           if (planMsg) {
+            planMsg.classList.remove("is-error");
             if (archived.missing) {
-              planMsg.textContent = "Gespeichert. Hinweis: Tages-Archiv fehlt — go-coach-plan-history.sql in Supabase ausführen.";
+              planMsg.textContent = "Plan gespeichert. Tages-Archiv noch nicht aktiv — Seite neu laden oder go-coach-plan-history.sql prüfen.";
             } else {
               planMsg.textContent = "Gespeichert.";
             }
@@ -1374,7 +1380,7 @@
           if (planMsg) {
             var detail = err && err.message ? String(err.message) : "";
             if (/PGRST205|go_coach_plan_day_history/i.test(detail)) {
-              planMsg.textContent = "Speichern fehlgeschlagen: Tabelle go_coach_plan_day_history fehlt (go-coach-plan-history.sql).";
+              planMsg.textContent = "Speichern fehlgeschlagen: Tabelle go_coach_plan_day_history fehlt oder Schema-Cache — Supabase neu laden.";
             } else if (/go_coach_plans/i.test(detail)) {
               planMsg.textContent = "Speichern fehlgeschlagen: go_coach_plans prüfen (go-coach-plans.sql).";
             } else {
