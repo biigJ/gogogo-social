@@ -2837,37 +2837,63 @@
 
       async function ensureCoachAccount() {
         if (trainerLink && trainerLink.id && String(trainerLink.id).indexOf("local-") !== 0) {
+          COACH_SLOT.id = trainerLink.id;
+          if (trainerLink.name) COACH_SLOT.name = trainerLink.name;
+          if (trainerLink.photo_url) COACH_SLOT.photo_url = trainerLink.photo_url;
           return trainerLink.id;
         }
         if (COACH_SLOT.id && COACH_SLOT.id !== "coach" && String(COACH_SLOT.id).indexOf("local-") !== 0) {
           return COACH_SLOT.id;
         }
+        function applyCoachRow(row) {
+          if (!row || !row.id) return null;
+          COACH_SLOT.id = row.id;
+          if (row.name) COACH_SLOT.name = row.name;
+          if (row.photo_url) COACH_SLOT.photo_url = row.photo_url;
+          else COACH_SLOT.photo_url = COACH_PHOTO_URL;
+          return row.id;
+        }
         try {
           var byPhone = await restGet(
             "go_accounts?phone=eq.coach&select=id,name,photo_url&order=created_at.asc&limit=5"
           );
-          if (byPhone && byPhone[0] && byPhone[0].id) {
-            COACH_SLOT.id = byPhone[0].id;
-            if (byPhone[0].name) COACH_SLOT.name = byPhone[0].name;
-            return COACH_SLOT.id;
+          if (byPhone && byPhone[0]) {
+            var idPhone = applyCoachRow(byPhone[0]);
+            if (idPhone) return idPhone;
           }
-          var byName = await restGet(
-            "go_accounts?name=ilike.Joscha&select=id,name,photo_url,phone&order=created_at.asc&limit=10"
-          );
-          var rows = byName || [];
-          for (var i = 0; i < rows.length; i++) {
-            if (!rows[i] || !rows[i].id) continue;
-            COACH_SLOT.id = rows[i].id;
-            if (rows[i].name) COACH_SLOT.name = rows[i].name;
-            return COACH_SLOT.id;
+          var names = ["Joscha", "biigJ"];
+          for (var n = 0; n < names.length; n++) {
+            var byName = await restGet(
+              "go_accounts?name=ilike." + encodeURIComponent(names[n]) +
+              "&select=id,name,photo_url,phone&order=created_at.asc&limit=10"
+            );
+            var rows = byName || [];
+            for (var i = 0; i < rows.length; i++) {
+              if (!rows[i] || !rows[i].id) continue;
+              if (String(rows[i].name || "").trim().toLowerCase() !== names[n].toLowerCase()) continue;
+              var idName = applyCoachRow(rows[i]);
+              if (idName) return idName;
+            }
           }
-          var byTrainer = await restGet(
-            "go_accounts?is_trainer=eq.true&select=id,name,photo_url&order=created_at.asc&limit=5"
-          );
-          if (byTrainer && byTrainer[0] && byTrainer[0].id) {
-            COACH_SLOT.id = byTrainer[0].id;
-            if (byTrainer[0].name) COACH_SLOT.name = byTrainer[0].name;
-            return COACH_SLOT.id;
+          try {
+            var byTrainer = await restGet(
+              "go_accounts?is_trainer=eq.true&select=id,name,photo_url&order=created_at.asc&limit=5"
+            );
+            if (byTrainer && byTrainer[0]) {
+              var idTr = applyCoachRow(byTrainer[0]);
+              if (idTr) return idTr;
+            }
+          } catch (eTrainer) {}
+          var created = await restInsert("go_accounts", {
+            name: "Joscha",
+            phone: "coach",
+            invite_code: null,
+            serial_number: null,
+            photo_url: COACH_PHOTO_URL
+          });
+          if (created && created.id) {
+            var idCreated = applyCoachRow(created);
+            if (idCreated) return idCreated;
           }
         } catch (e) {}
         return null;
@@ -3034,8 +3060,7 @@
                 circle.setAttribute("aria-label", "Trainer " + firstNameOf(coach));
                 circle.dataset.replyTarget = "1";
                 circle.addEventListener("click", function () {
-                  if (!pickingReplyBuddy) return;
-                  ensureCoachAccount().then(function (coachId) {
+                  function selectCoach(coachId) {
                     if (!coachId) {
                       var failMsg = document.getElementById("community-add-msg");
                       if (failMsg) failMsg.textContent = "Trainer gerade nicht erreichbar.";
@@ -3051,7 +3076,16 @@
                     }
                     var okMsg = document.getElementById("community-add-msg");
                     if (okMsg) okMsg.textContent = "Nachricht an " + coachName;
-                  });
+                  }
+                  if (pickingReplyBuddy) {
+                    ensureCoachAccount().then(selectCoach);
+                    return;
+                  }
+                  /* Trainer immer anschreibbar — auch ohne @ */
+                  pickingReplyBuddy = true;
+                  var pick = document.getElementById("community-reply-pick");
+                  if (pick) pick.classList.add("is-on");
+                  ensureCoachAccount().then(selectCoach);
                 });
               }
             } else if (buddy) {
@@ -3309,12 +3343,23 @@
         }
       }
 
+      var authorNameMapExtra = {};
+
       function authorNameMap() {
         var map = {};
         map[account.id] = account.name;
         getBuddies().forEach(function (b) {
           if (b && b.id) map[b.id] = b.name;
         });
+        var coach = getDisplayCoach();
+        if (coach && coach.id && String(coach.id).indexOf("local-") !== 0 && coach.id !== "coach") {
+          map[coach.id] = coach.name || "Trainer";
+        }
+        if (authorNameMapExtra) {
+          for (var k in authorNameMapExtra) {
+            if (Object.prototype.hasOwnProperty.call(authorNameMapExtra, k)) map[k] = authorNameMapExtra[k];
+          }
+        }
         return map;
       }
 
@@ -3337,6 +3382,8 @@
           who.textContent = mine ? "Du" : (firstNameOf({ name: names[post.author_id] || "Buddy" }));
           if (post.reply_to_id && names[post.reply_to_id]) {
             who.textContent += " → " + firstNameOf({ name: names[post.reply_to_id] });
+          } else if (post.reply_to_id && post.reply_to_id === account.id && !mine) {
+            who.textContent += " → Dich";
           }
           el.appendChild(who);
           if (post.photo_url) {
@@ -3388,7 +3435,18 @@
           updateCommunityNavDot();
           return;
         }
+        var coachId = null;
+        try { coachId = await ensureCoachAccount(); } catch (e0) {}
         var ids = [account.id].concat(getBuddies().map(function (b) { return b && b.id; }).filter(Boolean));
+        if (coachId) ids.push(coachId);
+        var seenIds = {};
+        var unique = [];
+        for (var u = 0; u < ids.length; u++) {
+          if (!ids[u] || seenIds[ids[u]]) continue;
+          seenIds[ids[u]] = true;
+          unique.push(ids[u]);
+        }
+        ids = unique;
         if (!ids.length) {
           communityPosts = [];
           renderCommunityFeed();
@@ -3397,10 +3455,28 @@
         }
         var inList = "(" + ids.join(",") + ")";
         var rows = await restGet(
-          "go_community_posts?author_id=in." + inList +
-          "&select=*&order=created_at.asc&limit=200"
+          "go_community_posts?or=(author_id.in." + inList +
+          ",reply_to_id.eq." + encodeURIComponent(account.id) +
+          ")&select=*&order=created_at.asc&limit=200"
         );
         communityPosts = Array.isArray(rows) ? rows : [];
+        var missing = {};
+        for (var i = 0; i < communityPosts.length; i++) {
+          var p = communityPosts[i];
+          if (!p || !p.author_id || seenIds[p.author_id]) continue;
+          missing[p.author_id] = true;
+        }
+        var missingIds = Object.keys(missing);
+        if (missingIds.length) {
+          try {
+            var people = await restGet(
+              "go_accounts?id=in.(" + missingIds.join(",") + ")&select=id,name&limit=20"
+            );
+            (people || []).forEach(function (row) {
+              if (row && row.id && row.name) authorNameMapExtra[row.id] = row.name;
+            });
+          } catch (e1) {}
+        }
         renderCommunityFeed();
         updateCommunityNavDot();
       }
