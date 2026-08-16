@@ -4197,19 +4197,27 @@
         try { localStorage.setItem(FEED_SEEN_KEY, now); } catch (e) {}
         return now;
       }
+      function postTimeMs(value) {
+        var t = Date.parse(String(value || ""));
+        return isNaN(t) ? 0 : t;
+      }
+      /* Ungelesen = Nachricht an mich (reply_to), neuer als zuletzt Community geöffnet. */
+      function isUnreadIncomingPost(p, seenAt) {
+        if (!p || !account || !account.id) return false;
+        if (p.reply_to_id !== account.id) return false;
+        if (p.author_id === account.id) return false;
+        var seenMs = postTimeMs(seenAt);
+        if (!seenMs) return true;
+        return postTimeMs(p.created_at) > seenMs;
+      }
 
       function updateCommunityNavDot() {
         var btn = document.querySelector('.nav-btn[data-goto="community"]');
         if (!btn) return;
         var seen = getFeedSeenAt();
         var hasNew = false;
-        var myId = account && account.id;
         for (var i = 0; i < communityPosts.length; i++) {
-          var p = communityPosts[i];
-          if (!p) continue;
-          /* Eigene Posts zählen nicht — Trainer/Buddy und an mich gerichtete schon. */
-          if (myId && p.author_id === myId) continue;
-          if (!seen || String(p.created_at || "") > seen) {
+          if (isUnreadIncomingPost(communityPosts[i], seen)) {
             hasNew = true;
             break;
           }
@@ -4929,6 +4937,9 @@
         if (onProfile) fillProfilePanel();
         else stopMantraRotation();
         if (onCommunity) {
+          /* Sofort als gelesen markieren — Punkt weg, bis eine neue Nachricht an dich kommt. */
+          setFeedSeenNow();
+          updateCommunityNavDot();
           fillCommunityPanel();
           requestAnimationFrame(function () {
             var ev = new Event("resize");

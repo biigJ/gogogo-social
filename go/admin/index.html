@@ -1954,6 +1954,13 @@
         var seenIds = (activeAccountIds && activeAccountIds.length)
           ? activeAccountIds.slice()
           : (activeAccount && activeAccount.id ? [activeAccount.id] : []);
+        /* Alle verknüpften Accounts dieses Nutzers als gelesen markieren */
+        try {
+          var idx = await loadAccountIndex();
+          accountIdsForInvite({ serial_number: serial, code: code }, idx).forEach(function (id) {
+            if (seenIds.indexOf(id) < 0) seenIds.push(id);
+          });
+        } catch (eSeen) {}
         markAdminFeedSeen(seenIds);
         refreshTrainerUi();
         await renderMirroredFeed(activeAccount);
@@ -2347,6 +2354,11 @@
         }
       }
 
+      function postTimeMs(value) {
+        var t = Date.parse(String(value || ""));
+        return isNaN(t) ? 0 : t;
+      }
+
       function markAdminFeedSeen(accountIds) {
         var map = getAdminFeedSeenMap();
         var now = new Date().toISOString();
@@ -2354,11 +2366,27 @@
         var changed = false;
         list.forEach(function (id) {
           if (!id || String(id).indexOf("local-") === 0) return;
-          map[id] = now;
+          map[String(id)] = now;
           changed = true;
         });
         if (!changed) return;
         try { localStorage.setItem(ADMIN_FEED_SEEN_KEY, JSON.stringify(map)); } catch (e) {}
+      }
+
+      function accountIdsForInvite(row, index) {
+        var ids = [];
+        var seen = {};
+        function add(list) {
+          (list || []).forEach(function (id) {
+            if (!id || seen[id]) return;
+            seen[id] = true;
+            ids.push(id);
+          });
+        }
+        if (!row || !index) return ids;
+        if (row.serial_number) add(index.bySerial[String(row.serial_number)]);
+        if (row.code) add(index.byCode[String(row.code)]);
+        return ids;
       }
 
       async function loadUnreadAuthorIds() {
@@ -2377,15 +2405,14 @@
           (rows || []).forEach(function (p) {
             if (!p || !p.author_id) return;
             if (coachId && p.author_id === coachId) return;
-            var ts = String(p.created_at || "");
+            var ts = postTimeMs(p.created_at);
             if (!ts) return;
-            if (!latest[p.author_id] || ts > latest[p.author_id]) {
-              latest[p.author_id] = ts;
-            }
+            var id = String(p.author_id);
+            if (!latest[id] || ts > latest[id]) latest[id] = ts;
           });
           Object.keys(latest).forEach(function (id) {
-            var seenAt = seen[id] || "";
-            if (!seenAt || latest[id] > seenAt) unread[id] = true;
+            var seenMs = postTimeMs(seen[id] || "");
+            if (!seenMs || latest[id] > seenMs) unread[id] = true;
           });
         } catch (e) {}
         return unread;
@@ -2406,12 +2433,12 @@
             if (a.serial_number) {
               var s = String(a.serial_number);
               if (!bySerial[s]) bySerial[s] = [];
-              bySerial[s].push(a.id);
+              bySerial[s].push(String(a.id));
             }
             if (a.invite_code) {
               var c = String(a.invite_code);
               if (!byCode[c]) byCode[c] = [];
-              byCode[c].push(a.id);
+              byCode[c].push(String(a.id));
             }
           });
         } catch (e) {}
@@ -2420,26 +2447,17 @@
 
       function inviteHasUnread(row, index, unread) {
         if (!row || !unread) return false;
-        var ids = [];
-        var seen = {};
-        function add(list) {
-          (list || []).forEach(function (id) {
-            if (!id || seen[id]) return;
-            seen[id] = true;
-            ids.push(id);
-          });
-        }
-        if (row.serial_number) add(index.bySerial[String(row.serial_number)]);
-        if (row.code) add(index.byCode[String(row.code)]);
+        var ids = accountIdsForInvite(row, index);
         for (var i = 0; i < ids.length; i++) {
           if (unread[ids[i]]) return true;
         }
         return false;
       }
 
-      function renderListRow(list, row, hasUnread) {
+      function renderListRow(list, row, hasUnread, linkedAccountIds) {
         var wrap = document.createElement("div");
         wrap.className = "list-row" + (row.paused ? " is-paused" : "");
+        var linkedIds = Array.isArray(linkedAccountIds) ? linkedAccountIds.slice() : [];
 
         var main = document.createElement("div");
         main.className = "list-main";
@@ -2552,6 +2570,10 @@
         adminBtn.setAttribute("aria-label", "Admin-Ansicht für " + (row.first_name || "Nutzer"));
         adminBtn.addEventListener("click", function (e) {
           e.stopPropagation();
+          /* Admin geöffnet = Nachrichten gelesen — Punkt sofort weg. */
+          markAdminFeedSeen(linkedIds);
+          msgDot.classList.remove("is-on");
+          msgDot.removeAttribute("title");
           showResult(row.first_name, row.serial_number, row.code);
         });
 
@@ -2646,7 +2668,8 @@
           var accountIndex = await loadAccountIndex();
           var unread = await loadUnreadAuthorIds();
           rows.forEach(function (row) {
-            renderListRow(list, row, inviteHasUnread(row, accountIndex, unread));
+            var linked = accountIdsForInvite(row, accountIndex);
+            renderListRow(list, row, inviteHasUnread(row, accountIndex, unread), linked);
           });
         } catch (err) {
           listMsg.textContent = "Liste nicht geladen.";
