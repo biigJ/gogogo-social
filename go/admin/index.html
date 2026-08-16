@@ -1847,11 +1847,14 @@
         }
       }
 
-      async function patchInviteChallenge(row, active) {
+      async function patchInviteChallenge(row, active, amount) {
         var payload = {
           challenge_active: !!active,
-          challenge_started_at: active ? new Date().toISOString() : null
-        };
+          challenge_started_at: active
+            ? (row.challenge_started_at || new Date().toISOString())
+            : null,
+          challenge_amount: active ? amount : null
+        }
         var res = await fetch(
           SUPABASE_URL + "/rest/v1/go_invite_codes?id=eq." + encodeURIComponent(row.id),
           {
@@ -1870,6 +1873,7 @@
         }
         row.challenge_active = !!active;
         row.challenge_started_at = payload.challenge_started_at;
+        row.challenge_amount = payload.challenge_amount;
         /* Spiegel auf go_accounts */
         try {
           var filters = [];
@@ -1893,6 +1897,21 @@
             );
           }
         } catch (e1) {}
+      }
+
+      function promptChallengeAmount(row) {
+        var current = row.challenge_amount != null ? String(row.challenge_amount) : "100";
+        var raw = window.prompt(
+          "Challenge-Einsatz in Euro (30–999) für " + (row.first_name || "Nutzer") + ":",
+          current
+        );
+        if (raw == null) return null;
+        var n = parseInt(String(raw).replace(/[^0-9]/g, ""), 10);
+        if (!(n >= 30 && n <= 999)) {
+          window.alert("Bitte eine ganze Zahl zwischen 30 und 999 eingeben.");
+          return null;
+        }
+        return n;
       }
 
       function renderListRow(list, row) {
@@ -1935,6 +1954,9 @@
           var active = !!row.challenge_active;
           euroBtn.classList.toggle("is-active", active);
           euroBtn.setAttribute("aria-pressed", active ? "true" : "false");
+          euroBtn.title = active && row.challenge_amount
+            ? (row.challenge_amount + " €")
+            : "Challenge-Einsatz setzen";
           var rem = challengeRemainingDays(row.challenge_started_at, active);
           daysEl.textContent = String(active ? rem : CHALLENGE_DAYS);
           drawAdminChallengeWheel(wheelSvg, active ? rem : 0);
@@ -1947,9 +1969,20 @@
           e.stopPropagation();
           euroBtn.disabled = true;
           try {
-            await patchInviteChallenge(row, !row.challenge_active);
+            if (row.challenge_active) {
+              await patchInviteChallenge(row, false, null);
+            } else {
+              var amount = promptChallengeAmount(row);
+              if (amount == null) {
+                euroBtn.disabled = false;
+                return;
+              }
+              await patchInviteChallenge(row, true, amount);
+            }
             refreshChallengeUi();
-            document.getElementById("list-msg").textContent = "";
+            document.getElementById("list-msg").textContent = row.challenge_active
+              ? ("Challenge aktiv · " + row.challenge_amount + " €")
+              : "";
             document.getElementById("list-msg").classList.remove("is-error");
           } catch (err) {
             document.getElementById("list-msg").textContent =
