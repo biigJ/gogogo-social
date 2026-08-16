@@ -2219,7 +2219,11 @@
         try {
           peak = peakLatestForIds(ids, await loadLatestPostMsByAuthor());
         } catch (e1) {}
-        if (peak) setInviteSeenAtNow(row, peak + 1000);
+        var ackMs = Math.max(Date.now(), peak || 0) + 1000;
+        setInviteSeenAtNow(row, ackMs);
+        /* Legacy mitführen, falls alte Clients/Keys noch greifen. */
+        if (row && row.id) setInviteOkAck(row.id, ackMs);
+        markAdminInviteSeen(row, ids, ackMs);
       }
 
       async function confirmUserAdminOk() {
