@@ -2729,6 +2729,7 @@
       var COACH_DAY_KEYS = ["day_mo", "day_di", "day_mi", "day_do", "day_fr", "day_sa", "day_so"];
       var coachPlan = null;
       var coachDayHistory = [];
+      var coachZirkelHistory = [];
       var DEFAULT_ZIRKEL_WD = 4;
 
       function zirkelWeekday() {
@@ -2741,6 +2742,64 @@
       function isZirkelWeekday(wd) {
         return Number(wd) === zirkelWeekday();
       }
+
+      function shiftDateKey(dateStr, deltaDays) {
+        var parts = String(dateStr || "").slice(0, 10).split("-");
+        if (parts.length !== 3) return dateStr;
+        var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        d.setDate(d.getDate() + deltaDays);
+        return formatDateKey(d);
+      }
+
+      /* Abgehakt = Eintrag vorhanden (Score oder ✕). */
+      function isDayCheckedOff(dateStr) {
+        return Object.prototype.hasOwnProperty.call(dayEntries, dateStr);
+      }
+
+      function zirkelWeekdayAsOf(dateStr) {
+        var best = null;
+        var bestFrom = "";
+        for (var i = 0; i < coachZirkelHistory.length; i++) {
+          var h = coachZirkelHistory[i];
+          if (!h) continue;
+          var from = String(h.effective_from || "").slice(0, 10);
+          if (!from || from > dateStr) continue;
+          if (
+            !best ||
+            from > bestFrom ||
+            (from === bestFrom && String(h.created_at || "") > String(best.created_at || ""))
+          ) {
+            best = h;
+            bestFrom = from;
+          }
+        }
+        if (best && best.zirkel_weekday != null) {
+          var n = Number(best.zirkel_weekday);
+          if (n >= 0 && n <= 6) return n;
+        }
+        return zirkelWeekday();
+      }
+
+      /*
+       * Live-Plan nur für heute/Zukunft ohne Haken.
+       * Vergangenheit und abgehakte Tage: Historie (heutige Planänderung
+       * wirkt nicht auf schon abgehaktes Heute → asOf gestern).
+       */
+      function zirkelWeekdayForDate(d) {
+        var dateStr = formatDateKey(d);
+        var today = berlinTodayKey();
+        if (dateStr >= today && !isDayCheckedOff(dateStr)) {
+          return zirkelWeekday();
+        }
+        var asOf = dateStr < today ? dateStr : shiftDateKey(today, -1);
+        return zirkelWeekdayAsOf(asOf);
+      }
+
+      function isZirkelForDate(d) {
+        var wd = (d.getDay() + 6) % 7;
+        return zirkelWeekdayForDate(d) === wd;
+      }
+
       var onCoachPlanLoaded = null;
 
       function formatMantraDisplay(row) {
@@ -3016,25 +3075,30 @@
         }
       }
 
-      /* Text für einen Kalendertag: Vergangenheit aus History, ab heute aktueller Plan. */
+      /* Text für einen Kalendertag:
+       * Offene Tage (heute/Zukunft ohne Haken): aktueller Plan.
+       * Vergangenheit / abgehakt: History (heutige Speicherung ändert sie nicht). */
       function coachDayTextForDate(d) {
         if (isAccountPaused()) return "";
         var wd = (d.getDay() + 6) % 7;
-        if (isZirkelWeekday(wd)) return "Zirkeltraining";
+        if (isZirkelForDate(d)) return "Zirkeltraining";
         var key = COACH_DAY_KEYS[wd];
         if (!key) return "";
         var dateStr = formatDateKey(d);
-        /* Ab heute: go_coach_plans — Admin-Änderungen sofort, auch wenn History nachhängt. */
-        if (dateStr >= berlinTodayKey()) {
-          return coachDayText(wd);
+        var today = berlinTodayKey();
+        var locked = dateStr < today || isDayCheckedOff(dateStr);
+        if (!locked) {
+          if (!coachPlan) return "";
+          return coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
         }
+        var asOf = dateStr < today ? dateStr : shiftDateKey(today, -1);
         var best = null;
         var bestFrom = "";
         for (var i = 0; i < coachDayHistory.length; i++) {
           var h = coachDayHistory[i];
           if (!h || h.day_key !== key) continue;
           var from = String(h.effective_from || "").slice(0, 10);
-          if (!from || from > dateStr) continue;
+          if (!from || from > asOf) continue;
           if (
             !best ||
             from > bestFrom ||
@@ -3047,7 +3111,8 @@
         if (best) {
           return best.body != null ? String(best.body).trim() : "";
         }
-        return coachDayText(wd);
+        if (!coachPlan) return "";
+        return coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
       }
 
       function splitPlanLines(text) {
@@ -3110,6 +3175,7 @@
         if (!hasCloudAccount()) {
           coachPlan = null;
           coachDayHistory = [];
+          coachZirkelHistory = [];
           renderProfilePlan();
           if (typeof onCoachPlanLoaded === "function") onCoachPlanLoaded();
           return;
@@ -3140,6 +3206,7 @@
         } catch (e0) {}
         coachPlan = null;
         coachDayHistory = [];
+        coachZirkelHistory = [];
         if (ids.length) {
           try {
             var inList = "(" + ids.join(",") + ")";
@@ -3157,6 +3224,14 @@
             );
             if (hist && hist.length) coachDayHistory = hist;
           } catch (e2) {}
+          try {
+            var zHist = await restGet(
+              "go_coach_zirkel_history?account_id=in." + inList +
+              "&select=account_id,zirkel_weekday,effective_from,created_at" +
+              "&order=effective_from.asc,created_at.asc&limit=200"
+            );
+            if (zHist && zHist.length) coachZirkelHistory = zHist;
+          } catch (e3) {}
         }
         renderProfilePlan();
         if (typeof onCoachPlanLoaded === "function") onCoachPlanLoaded();
@@ -5089,11 +5164,10 @@
           return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
         }
         function workoutFor(d) {
-          var wd = (d.getDay() + 6) % 7;
           if (isAccountPaused()) {
             return { title: "", line1: "", line2: "", rest: true, training: false, zirkel: false };
           }
-          if (isZirkelWeekday(wd)) {
+          if (isZirkelForDate(d)) {
             return {
               title: "Zirkeltraining",
               line1: "jetzt starten",
@@ -5231,7 +5305,7 @@
             btn.setAttribute("aria-label", names[i] + " " + d.getDate());
             if (isAccountPaused()) btn.disabled = true;
             if (w && !w.rest) btn.classList.add("has-workout");
-            if (isZirkelWeekday(i)) btn.classList.add("is-zirkel");
+            if (isZirkelForDate(d)) btn.classList.add("is-zirkel");
             if (key === dateKey(today)) btn.classList.add("is-today");
             if (key === selectedKey) {
               btn.classList.add("is-selected");
