@@ -3268,8 +3268,10 @@
 
       async function syncBuddyLinkCloud(buddy) {
         if (!hasCloudAccount() || !buddy || !buddy.id) return;
-        /* Einseitig: nur wer die Nummer eingibt, sieht den Buddy — nicht umgekehrt. */
+        /* Paarweise gegenseitig (Nummer = Einwilligung), aber nicht transitiv:
+           A fügt B und C hinzu → A↔B und A↔C; B und C sehen sich nicht. */
         await restInsert("go_buddies", { account_id: account.id, buddy_id: buddy.id });
+        await restInsert("go_buddies", { account_id: buddy.id, buddy_id: account.id });
       }
 
       async function loadBuddiesFromCloud() {

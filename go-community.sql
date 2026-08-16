@@ -1,8 +1,9 @@
 -- Community: Buddy-Links + Feed-Posts (Foto / 144-Zeichen-Text / Antwort)
 -- Im Supabase SQL Editor ausführen (gleiche Instanz: agpysewcsakdpmpftndp).
 --
--- Buddy-Links sind einseitig: account_id sieht buddy_id in der Community,
--- nicht umgekehrt — bis buddy_id die Nummer von account_id ebenfalls eingibt.
+-- Buddy-Links sind paarweise gegenseitig (A↔B), wenn jemand die Nummer eingibt.
+-- Nicht transitiv: A↔B und A↔C bedeuten nicht B↔C. Feed und Profilbilder
+-- kommen nur aus direkten Links von account_id.
 --
 -- Storage: Community-Fotos nutzen den bestehenden Bucket "checkin-photos" (public),
 -- Pfad community/<account-id>-<ts>.jpg — analog zur Check-in-App.
