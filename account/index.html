@@ -914,6 +914,7 @@
     .community-post__body {
       margin: 0;
       word-break: break-word;
+      white-space: pre-line;
     }
     .community-post__photo {
       display: block;
@@ -2556,14 +2557,13 @@
         return Math.max(0, CHALLENGE_DAYS - challengeElapsedDays(startedAt));
       }
 
-      /* (Einsatz − 2) / (vergangene + noch übrige Tage bis 28) */
+      /* (Einsatz − 2) / verbleibende Tage */
       function challengeDailyStake(amount, startedAt, active) {
         var stake = Number(amount);
         if (!active || !(stake >= 30)) return null;
-        var elapsed = challengeElapsedDays(startedAt);
-        var remaining = Math.max(0, CHALLENGE_DAYS - elapsed);
-        var divisor = Math.max(1, Math.min(elapsed, CHALLENGE_DAYS) + remaining);
-        return (stake - 2) / divisor;
+        var remaining = Math.max(0, CHALLENGE_DAYS - challengeElapsedDays(startedAt));
+        if (remaining <= 0) return 0;
+        return (stake - 2) / remaining;
       }
 
       function formatChallengeStake(value) {
@@ -2572,7 +2572,7 @@
         return rounded.toLocaleString("de-DE", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2
-        }) + "\u00a0€";
+        }) + "\u00a0€ zurück";
       }
 
       function renderMiniChallengeWheel(svg, remaining, allRed) {
