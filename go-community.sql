@@ -1,6 +1,9 @@
 -- Community: Buddy-Links + Feed-Posts (Foto / 144-Zeichen-Text / Antwort)
 -- Im Supabase SQL Editor ausführen (gleiche Instanz: agpysewcsakdpmpftndp).
 --
+-- Buddy-Links sind einseitig: account_id sieht buddy_id in der Community,
+-- nicht umgekehrt — bis buddy_id die Nummer von account_id ebenfalls eingibt.
+--
 -- Storage: Community-Fotos nutzen den bestehenden Bucket "checkin-photos" (public),
 -- Pfad community/<account-id>-<ts>.jpg — analog zur Check-in-App.
 -- Optional: Bucket "go-avatars" aus go-account.sql anlegen (Profilfotos).
