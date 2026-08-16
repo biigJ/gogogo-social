@@ -466,6 +466,13 @@
       align-items: end;
       margin-bottom: 18px;
     }
+    .profile-identity {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 8px;
+      min-width: 0;
+    }
     .profile-portrait {
       width: calc(132px * 0.8);
       height: calc(132px * 0.8);
@@ -495,6 +502,50 @@
       line-height: 1;
     }
     .profile-portrait__plus[hidden] { display: none; }
+    .profile-serial {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      max-width: 100%;
+      color: var(--ink-on-red);
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.4;
+      min-height: 1.4em;
+    }
+    .profile-serial[hidden] { display: none; }
+    .profile-serial__num {
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.12em;
+      min-width: 8.2ch;
+    }
+    .profile-serial__eye {
+      flex: 0 0 auto;
+      width: 1.35rem;
+      height: 1.35rem;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--ink-on-red);
+      opacity: 0.9;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .profile-serial__eye svg {
+      width: 1.05rem;
+      height: 1.05rem;
+      display: block;
+    }
+    .profile-serial__eye:focus-visible {
+      outline: 1px solid rgba(247, 245, 240, 0.85);
+      outline-offset: 2px;
+    }
     .profile-meta {
       display: grid;
       grid-template-columns: max-content max-content;
@@ -1517,10 +1568,22 @@
       <div class="panel" id="panel-profile" data-panel="profile">
         <h1 class="profile-name" id="profile-name"></h1>
         <div class="profile-top">
-          <button class="profile-portrait" id="profile-photo-btn" type="button" aria-label="Profilfoto ändern">
-            <img id="profile-photo-img" alt="" hidden />
-            <span class="profile-portrait__plus" id="profile-photo-plus">+</span>
-          </button>
+          <div class="profile-identity">
+            <button class="profile-portrait" id="profile-photo-btn" type="button" aria-label="Profilfoto ändern">
+              <img id="profile-photo-img" alt="" hidden />
+              <span class="profile-portrait__plus" id="profile-photo-plus">+</span>
+            </button>
+            <div class="profile-serial" id="profile-serial-row" hidden>
+              <span class="profile-serial__num" id="profile-serial" aria-live="polite"></span>
+              <button
+                class="profile-serial__eye"
+                id="profile-serial-toggle"
+                type="button"
+                aria-label="Nummer anzeigen"
+                aria-pressed="false"
+              ></button>
+            </div>
+          </div>
           <div class="profile-meta">
             <div class="profile-meta__row">
               <span class="profile-meta__label">Funktion</span>
@@ -2296,8 +2359,52 @@
           var wert = computeWertLast28();
           wertEl.textContent = String(wert).replace(".", ",");
         }
+        renderProfileSerial();
         renderProfilePlan();
       }
+
+      var profileSerialVisible = false;
+
+      function profileSerialDigits() {
+        return String((account && account.serial_number) || "").replace(/\D/g, "").slice(0, 8);
+      }
+
+      function profileSerialEyeIcon(showOpenEye) {
+        if (showOpenEye) {
+          return '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5C7 5 2.7 8.1 1 12.5 2.7 16.9 7 20 12 20s9.3-3.1 11-7.5C21.3 8.1 17 5 12 5zm0 12.5A5 5 0 1 1 12 7.5a5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>';
+        }
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M2.1 3.5 3.5 2.1l18.4 18.4-1.4 1.4-3.1-3.1A12.6 12.6 0 0 1 12 20C7 20 2.7 16.9 1 12.5a13.4 13.4 0 0 1 4.5-5.4L2.1 3.5zm6.7 6.7 1.5 1.5c-.1.3-.2.6-.2.9a3 3 0 0 0 3 3c.3 0 .6-.1.9-.2l1.5 1.5c-.7.4-1.5.7-2.4.7a5 5 0 0 1-5-5c0-.9.3-1.7.7-2.4zm3.3-3.3 1.6.05A3 3 0 0 1 15 12l.05 0 1.6 1.6.2-.7A5 5 0 0 0 12 7.5c-.2 0-.4 0-.6.05L12.1 6.9zM12 5c5 0 9.3 3.1 11 7.5-.5 1.2-1.2 2.3-2.1 3.2l-1.5-1.5c.6-.7 1-1.5 1.2-2.4C18.8 9.1 15.6 7 12 7c-.6 0-1.1.1-1.6.2L8.8 5.6C9.8 5.2 10.9 5 12 5z"/></svg>';
+      }
+
+      function renderProfileSerial() {
+        var row = document.getElementById("profile-serial-row");
+        var numEl = document.getElementById("profile-serial");
+        var btn = document.getElementById("profile-serial-toggle");
+        var digits = profileSerialDigits();
+        if (!row || !numEl || !btn) return;
+        if (digits.length !== 8) {
+          row.hidden = true;
+          numEl.textContent = "";
+          return;
+        }
+        row.hidden = false;
+        numEl.textContent = profileSerialVisible ? digits : "";
+        btn.setAttribute("aria-label", profileSerialVisible ? "Nummer ausblenden" : "Nummer anzeigen");
+        btn.setAttribute("aria-pressed", profileSerialVisible ? "true" : "false");
+        btn.innerHTML = profileSerialEyeIcon(!profileSerialVisible);
+      }
+
+      (function bindProfileSerialToggle() {
+        var btn = document.getElementById("profile-serial-toggle");
+        if (!btn) return;
+        btn.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          if (profileSerialDigits().length !== 8) return;
+          profileSerialVisible = !profileSerialVisible;
+          renderProfileSerial();
+        });
+      })();
 
 
       var FEED_SEEN_KEY = "gogogo_go_feed_seen_at";
