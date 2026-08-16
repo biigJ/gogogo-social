@@ -568,9 +568,28 @@
       background: var(--paper); color: var(--ink);
       border-radius: var(--radius); padding: 14px 16px;
     }
-    .list-item strong {
-      display: block; font-size: 1.05rem; letter-spacing: -0.03em;
+    .list-item__name {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 100%;
+      min-width: 0;
     }
+    .list-item__name strong {
+      display: inline;
+      font-size: 1.05rem;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+    }
+    .list-item__msg-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--red);
+      flex: 0 0 auto;
+      display: none;
+    }
+    .list-item__msg-dot.is-on { display: inline-block; }
     .list-item span {
       display: block; margin-top: 4px; font-size: 0.85rem; font-weight: 500; opacity: 0.8;
     }
@@ -1024,6 +1043,7 @@
       var ADMIN_CODE = "121276030993";
       var AUTH_KEY = "gogogo_go_admin";
       var ACCOUNT_KEY = "gogogo_go_account";
+      var ADMIN_FEED_SEEN_KEY = "gogogo_admin_feed_seen";
       var GO_BASE = (typeof location !== "undefined" && location.origin ? location.origin : "https://www.gogogo.social") + "/go";
       var adminNameBtn = document.getElementById("admin-name");
       var adminOpenProfileBtn = document.getElementById("admin-open-profile");
@@ -1931,6 +1951,10 @@
         updateAuthBtn();
         activeAccount = await resolveAccount(name, serial, code);
         if (activeAccount && activeAccount.photo_url) setCyclePhoto(activeAccount.photo_url);
+        var seenIds = (activeAccountIds && activeAccountIds.length)
+          ? activeAccountIds.slice()
+          : (activeAccount && activeAccount.id ? [activeAccount.id] : []);
+        markAdminFeedSeen(seenIds);
         refreshTrainerUi();
         await renderMirroredFeed(activeAccount);
         await loadCoachPlan(activeAccount && activeAccount.id);
@@ -2315,7 +2339,105 @@
         });
       }
 
-      function renderListRow(list, row) {
+      function getAdminFeedSeenMap() {
+        try {
+          return JSON.parse(localStorage.getItem(ADMIN_FEED_SEEN_KEY) || "{}") || {};
+        } catch (e) {
+          return {};
+        }
+      }
+
+      function markAdminFeedSeen(accountIds) {
+        var map = getAdminFeedSeenMap();
+        var now = new Date().toISOString();
+        var list = Array.isArray(accountIds) ? accountIds : [accountIds];
+        var changed = false;
+        list.forEach(function (id) {
+          if (!id || String(id).indexOf("local-") === 0) return;
+          map[id] = now;
+          changed = true;
+        });
+        if (!changed) return;
+        try { localStorage.setItem(ADMIN_FEED_SEEN_KEY, JSON.stringify(map)); } catch (e) {}
+      }
+
+      async function loadUnreadAuthorIds() {
+        var unread = {};
+        try {
+          var coach = await resolveCoachAccount();
+          var coachId = coach && coach.id ? coach.id : null;
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_community_posts?select=author_id,created_at&order=created_at.desc&limit=500",
+            { headers: apiHeaders() }
+          );
+          if (!res.ok) return unread;
+          var rows = await res.json();
+          var seen = getAdminFeedSeenMap();
+          var latest = {};
+          (rows || []).forEach(function (p) {
+            if (!p || !p.author_id) return;
+            if (coachId && p.author_id === coachId) return;
+            var ts = String(p.created_at || "");
+            if (!ts) return;
+            if (!latest[p.author_id] || ts > latest[p.author_id]) {
+              latest[p.author_id] = ts;
+            }
+          });
+          Object.keys(latest).forEach(function (id) {
+            var seenAt = seen[id] || "";
+            if (!seenAt || latest[id] > seenAt) unread[id] = true;
+          });
+        } catch (e) {}
+        return unread;
+      }
+
+      async function loadAccountIndex() {
+        var bySerial = {};
+        var byCode = {};
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_accounts?select=id,serial_number,invite_code&limit=1000",
+            { headers: apiHeaders() }
+          );
+          if (!res.ok) return { bySerial: bySerial, byCode: byCode };
+          var rows = await res.json();
+          (rows || []).forEach(function (a) {
+            if (!a || !a.id) return;
+            if (a.serial_number) {
+              var s = String(a.serial_number);
+              if (!bySerial[s]) bySerial[s] = [];
+              bySerial[s].push(a.id);
+            }
+            if (a.invite_code) {
+              var c = String(a.invite_code);
+              if (!byCode[c]) byCode[c] = [];
+              byCode[c].push(a.id);
+            }
+          });
+        } catch (e) {}
+        return { bySerial: bySerial, byCode: byCode };
+      }
+
+      function inviteHasUnread(row, index, unread) {
+        if (!row || !unread) return false;
+        var ids = [];
+        var seen = {};
+        function add(list) {
+          (list || []).forEach(function (id) {
+            if (!id || seen[id]) return;
+            seen[id] = true;
+            ids.push(id);
+          });
+        }
+        if (row.serial_number) add(index.bySerial[String(row.serial_number)]);
+        if (row.code) add(index.byCode[String(row.code)]);
+        for (var i = 0; i < ids.length; i++) {
+          if (unread[ids[i]]) return true;
+        }
+        return false;
+      }
+
+      function renderListRow(list, row, hasUnread) {
         var wrap = document.createElement("div");
         wrap.className = "list-row" + (row.paused ? " is-paused" : "");
 
@@ -2325,14 +2447,22 @@
         var openBtn = document.createElement("button");
         openBtn.type = "button";
         openBtn.className = "list-item";
+        var nameRow = document.createElement("div");
+        nameRow.className = "list-item__name";
         var title = document.createElement("strong");
         title.textContent = row.first_name || "";
+        var msgDot = document.createElement("span");
+        msgDot.className = "list-item__msg-dot" + (hasUnread ? " is-on" : "");
+        msgDot.setAttribute("aria-hidden", "true");
+        if (hasUnread) msgDot.title = "Neue Nachricht";
+        nameRow.appendChild(title);
+        nameRow.appendChild(msgDot);
         var stakeLine = document.createElement("span");
         stakeLine.className = "list-item__stake";
         var meta = document.createElement("span");
         meta.textContent = (row.serial_number || "") + " · " + (row.code || "") +
           (row.paused ? " · pausiert" : "");
-        openBtn.appendChild(title);
+        openBtn.appendChild(nameRow);
         openBtn.appendChild(stakeLine);
         openBtn.appendChild(meta);
         openBtn.setAttribute("aria-label", "Profil von " + (row.first_name || "Nutzer") + " öffnen");
@@ -2513,7 +2643,11 @@
           if (!res.ok) throw new Error("HTTP " + res.status);
           var rows = await res.json();
           listMsg.textContent = rows.length ? "" : "Noch keine Codes.";
-          rows.forEach(function (row) { renderListRow(list, row); });
+          var accountIndex = await loadAccountIndex();
+          var unread = await loadUnreadAuthorIds();
+          rows.forEach(function (row) {
+            renderListRow(list, row, inviteHasUnread(row, accountIndex, unread));
+          });
         } catch (err) {
           listMsg.textContent = "Liste nicht geladen.";
           listMsg.classList.add("is-error");

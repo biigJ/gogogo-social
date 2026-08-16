@@ -1080,13 +1080,16 @@
     }
     .nav-btn__dot {
       position: absolute;
-      top: 6px;
-      right: 10px;
-      width: 7px;
-      height: 7px;
+      top: 7px;
+      right: 11px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background: var(--paper);
+      background: var(--red);
+      box-shadow: 0 0 0 1.5px var(--chrome-bg);
       display: none;
+      pointer-events: none;
+      z-index: 2;
     }
     .nav-btn.has-dot .nav-btn__dot { display: block; }
     .share-modal__row {
@@ -4201,15 +4204,19 @@
         if (!btn) return;
         var seen = getFeedSeenAt();
         var hasNew = false;
+        var myId = account && account.id;
         for (var i = 0; i < communityPosts.length; i++) {
           var p = communityPosts[i];
-          if (!p || p.author_id === account.id) continue;
-          if (!seen || String(p.created_at) > seen) {
+          if (!p) continue;
+          /* Eigene Posts zählen nicht — Trainer/Buddy und an mich gerichtete schon. */
+          if (myId && p.author_id === myId) continue;
+          if (!seen || String(p.created_at || "") > seen) {
             hasNew = true;
             break;
           }
         }
         btn.classList.toggle("has-dot", hasNew);
+        btn.setAttribute("aria-label", hasNew ? "Community, neue Nachricht" : "Community");
       }
 
       async function refreshCommunityFeed() {
@@ -4261,6 +4268,12 @@
           } catch (e1) {}
         }
         renderCommunityFeed();
+        if (
+          document.body.classList.contains("is-community") ||
+          document.querySelector('.panel.is-active[data-panel="community"]')
+        ) {
+          setFeedSeenNow();
+        }
         updateCommunityNavDot();
       }
 
@@ -4436,12 +4449,7 @@
           var lockEl = document.getElementById("community-add-msg");
           if (lockEl) lockEl.textContent = buddySearchLockMessage();
         }
-        refreshCommunityFeed();
-        if (document.body.classList.contains("is-community") || 
-            document.querySelector('.panel.is-active[data-panel="community"]')) {
-          setFeedSeenNow();
-          updateCommunityNavDot();
-        }
+        refreshCommunityFeed().catch(function () {});
       }
 
       async function lookupAccountBySerial(serial) {
@@ -4549,6 +4557,13 @@
         }).catch(function () {
           fillCommunityPanel();
         });
+        if (!window.__gogogoFeedPoll) {
+          window.__gogogoFeedPoll = setInterval(function () {
+            if (document.hidden) return;
+            if (isAccountPaused()) return;
+            refreshCommunityFeed().catch(function () {});
+          }, 20000);
+        }
         var waEl = document.getElementById("wa-chat");
         if (waEl) {
           var n = String(WHATSAPP_NUMBER).replace(/\D/g, "");
@@ -4910,8 +4925,6 @@
         else stopMantraRotation();
         if (onCommunity) {
           fillCommunityPanel();
-          setFeedSeenNow();
-          updateCommunityNavDot();
           requestAnimationFrame(function () {
             var ev = new Event("resize");
             window.dispatchEvent(ev);
