@@ -442,11 +442,40 @@
       box-sizing: border-box;
     }
     .home-workout__box.is-zirkel {
+      width: calc(7.6rem * 1.35);
+      height: calc(7.6rem * 1.35);
+      min-height: calc(7.6rem * 1.35);
+      margin-left: auto;
+      margin-right: auto;
+      padding: 14px 12px;
+      border-radius: 50%;
+      border: 1px solid rgba(247, 245, 240, 0.85);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
       cursor: pointer;
     }
     .home-workout__box.is-zirkel:focus-visible {
       outline: 2px solid rgba(247, 245, 240, 0.85);
       outline-offset: 2px;
+    }
+    .home-workout__box.is-zirkel .home-workout__title {
+      margin-bottom: 4px;
+      min-height: 0;
+      padding-right: 0;
+      font-size: 0.92rem;
+      line-height: 1.15;
+    }
+    .home-workout__box.is-zirkel .home-workout__line {
+      min-height: 0;
+      font-size: 0.82rem;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .home-workout__box.is-zirkel .home-workout__line + .home-workout__line {
+      margin-top: 0;
     }
     .home-workout__title {
       font-size: 1.15rem;
@@ -1269,17 +1298,14 @@
     .profile-challenge__left {
       display: inline-flex;
       align-items: baseline;
-      gap: 10px;
+      flex-wrap: wrap;
+      gap: 6px;
       min-width: 0;
       flex: 1 1 auto;
     }
-    .profile-challenge__label {
-      font-weight: 700;
-      font-size: 1rem;
-      letter-spacing: -0.03em;
-      line-height: 1.1;
-      color: var(--red);
-    }
+    .profile-challenge__paid,
+    .profile-challenge__label,
+    .profile-challenge__sep,
     .profile-challenge__stake {
       font-weight: 700;
       font-size: 1rem;
@@ -1288,6 +1314,11 @@
       color: var(--red);
       white-space: nowrap;
     }
+    .profile-challenge__sep {
+      opacity: 0.85;
+    }
+    .profile-challenge__paid[hidden],
+    .profile-challenge__sep[hidden],
     .profile-challenge__stake[hidden] { display: none !important; }
     .profile-challenge__euro[hidden] { display: none !important; }
     .profile-challenge__days[hidden] { display: none !important; }
@@ -1891,7 +1922,9 @@
         </div>
         <div class="profile-challenge" id="profile-challenge" aria-label="Challenge">
           <div class="profile-challenge__left">
+            <span class="profile-challenge__paid" id="profile-challenge-paid" hidden></span>
             <span class="profile-challenge__label">Challenge</span>
+            <span class="profile-challenge__sep" id="profile-challenge-sep" hidden aria-hidden="true">–</span>
             <span class="profile-challenge__stake" id="profile-challenge-stake" hidden></span>
           </div>
           <div class="profile-challenge__squares">
@@ -2573,6 +2606,12 @@
         return (stake - 2) / remaining;
       }
 
+      function formatChallengeAmount(amount) {
+        var n = Number(amount);
+        if (!(n >= 30)) return "";
+        return Math.round(n).toLocaleString("de-DE") + "\u00a0€";
+      }
+
       function formatChallengeStake(value) {
         if (value == null || isNaN(value)) return "";
         var rounded = Math.round(value * 100) / 100;
@@ -2608,6 +2647,8 @@
         var euro = document.getElementById("profile-challenge-euro");
         var daysEl = document.getElementById("profile-challenge-days");
         var stakeEl = document.getElementById("profile-challenge-stake");
+        var paidEl = document.getElementById("profile-challenge-paid");
+        var sepEl = document.getElementById("profile-challenge-sep");
         var svg = document.getElementById("profile-challenge-rays");
         var active = !!(account && account.challenge_active);
         var rem = challengeRemainingDays(account && account.challenge_started_at, active);
@@ -2624,15 +2665,29 @@
             daysEl.textContent = "";
           }
         }
+        var paidText = active ? formatChallengeAmount(account && account.challenge_amount) : "";
+        var daily = challengeDailyStake(
+          account && account.challenge_amount,
+          account && account.challenge_started_at,
+          active
+        );
+        var stakeText = daily != null ? formatChallengeStake(daily) : "";
+        if (paidEl) {
+          if (paidText) {
+            paidEl.hidden = false;
+            paidEl.textContent = paidText;
+          } else {
+            paidEl.hidden = true;
+            paidEl.textContent = "";
+          }
+        }
+        if (sepEl) {
+          sepEl.hidden = !(paidText && stakeText);
+        }
         if (stakeEl) {
-          var daily = challengeDailyStake(
-            account && account.challenge_amount,
-            account && account.challenge_started_at,
-            active
-          );
-          if (daily != null) {
+          if (stakeText) {
             stakeEl.hidden = false;
-            stakeEl.textContent = formatChallengeStake(daily);
+            stakeEl.textContent = stakeText;
           } else {
             stakeEl.hidden = true;
             stakeEl.textContent = "";
@@ -5012,7 +5067,7 @@
           if (isZirkelWeekday(wd)) {
             return {
               title: "Zirkeltraining",
-              line1: "",
+              line1: "Jetzt starten",
               line2: "",
               rest: false,
               training: true,
@@ -5071,7 +5126,7 @@
             if (w.zirkel) {
               workoutBox.setAttribute("role", "button");
               workoutBox.setAttribute("tabindex", "0");
-              workoutBox.setAttribute("aria-label", "Zirkeltraining öffnen");
+              workoutBox.setAttribute("aria-label", "Zirkeltraining jetzt starten");
             } else {
               workoutBox.removeAttribute("role");
               workoutBox.removeAttribute("tabindex");
