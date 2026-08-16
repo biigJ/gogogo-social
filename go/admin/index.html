@@ -1949,21 +1949,36 @@
         setCyclePhoto(null);
         renderQr(url);
         updateAuthBtn();
+        /* Sofort per Invite/Serial als gelesen markieren (auch wenn Account-Resolve hakt). */
+        markAdminInviteSeen({ serial_number: serial, code: code }, []);
         activeAccount = await resolveAccount(name, serial, code);
         if (activeAccount && activeAccount.photo_url) setCyclePhoto(activeAccount.photo_url);
         var seenIds = (activeAccountIds && activeAccountIds.length)
           ? activeAccountIds.slice()
           : (activeAccount && activeAccount.id ? [activeAccount.id] : []);
-        /* Alle verknüpften Accounts dieses Nutzers als gelesen markieren */
         try {
           var idx = await loadAccountIndex();
           accountIdsForInvite({ serial_number: serial, code: code }, idx).forEach(function (id) {
             if (seenIds.indexOf(id) < 0) seenIds.push(id);
           });
         } catch (eSeen) {}
-        markAdminFeedSeen(seenIds);
+        markAdminInviteSeen({ serial_number: serial, code: code }, seenIds);
         refreshTrainerUi();
         await renderMirroredFeed(activeAccount);
+        /* Nach dem Laden des Feeds: alle Autoren in diesem Chat als gelesen (außer Trainer). */
+        try {
+          var coach = await resolveCoachAccount();
+          var coachId = coach && coach.id ? String(coach.id) : "";
+          var feed = document.getElementById("admin-feed");
+          var moreIds = seenIds.slice();
+          if (feed) {
+            /* author ids already in activeAccountIds; also mark primary again */
+          }
+          if (activeAccount && activeAccount.id && moreIds.indexOf(String(activeAccount.id)) < 0) {
+            moreIds.push(String(activeAccount.id));
+          }
+          markAdminInviteSeen({ serial_number: serial, code: code }, moreIds);
+        } catch (eFeedSeen) {}
         await loadCoachPlan(activeAccount && activeAccount.id);
       }
 
@@ -2359,18 +2374,45 @@
         return isNaN(t) ? 0 : t;
       }
 
-      function markAdminFeedSeen(accountIds) {
+      function saveAdminFeedSeenMap(map) {
+        try { localStorage.setItem(ADMIN_FEED_SEEN_KEY, JSON.stringify(map)); } catch (e) {}
+      }
+
+      /* Gelesen-Markierung pro Nutzer: Invite-Code + Seriennummer + alle Account-IDs */
+      function markAdminInviteSeen(row, accountIds) {
         var map = getAdminFeedSeenMap();
         var now = new Date().toISOString();
-        var list = Array.isArray(accountIds) ? accountIds : [accountIds];
         var changed = false;
+        if (row && row.code) {
+          map["invite:" + String(row.code)] = now;
+          changed = true;
+        }
+        if (row && row.serial_number) {
+          map["serial:" + String(row.serial_number)] = now;
+          changed = true;
+        }
+        var list = Array.isArray(accountIds) ? accountIds : [accountIds];
         list.forEach(function (id) {
           if (!id || String(id).indexOf("local-") === 0) return;
           map[String(id)] = now;
           changed = true;
         });
-        if (!changed) return;
-        try { localStorage.setItem(ADMIN_FEED_SEEN_KEY, JSON.stringify(map)); } catch (e) {}
+        if (changed) saveAdminFeedSeenMap(map);
+      }
+
+      function markAdminFeedSeen(accountIds) {
+        markAdminInviteSeen(null, accountIds);
+      }
+
+      function inviteSeenMs(row, accountIds) {
+        var map = getAdminFeedSeenMap();
+        var ms = 0;
+        if (row && row.code) ms = Math.max(ms, postTimeMs(map["invite:" + String(row.code)]));
+        if (row && row.serial_number) ms = Math.max(ms, postTimeMs(map["serial:" + String(row.serial_number)]));
+        (accountIds || []).forEach(function (id) {
+          ms = Math.max(ms, postTimeMs(map[String(id)]));
+        });
+        return ms;
       }
 
       function accountIdsForInvite(row, index) {
@@ -2380,7 +2422,7 @@
           (list || []).forEach(function (id) {
             if (!id || seen[id]) return;
             seen[id] = true;
-            ids.push(id);
+            ids.push(String(id));
           });
         }
         if (!row || !index) return ids;
@@ -2389,33 +2431,28 @@
         return ids;
       }
 
-      async function loadUnreadAuthorIds() {
-        var unread = {};
+      /* Map author_id -> latest post timestamp (ms), ohne Trainer-Posts */
+      async function loadLatestPostMsByAuthor() {
+        var latest = {};
         try {
           var coach = await resolveCoachAccount();
-          var coachId = coach && coach.id ? coach.id : null;
+          var coachId = coach && coach.id ? String(coach.id) : null;
           var res = await fetch(
             SUPABASE_URL + "/rest/v1/go_community_posts?select=author_id,created_at&order=created_at.desc&limit=500",
             { headers: apiHeaders() }
           );
-          if (!res.ok) return unread;
+          if (!res.ok) return latest;
           var rows = await res.json();
-          var seen = getAdminFeedSeenMap();
-          var latest = {};
           (rows || []).forEach(function (p) {
             if (!p || !p.author_id) return;
-            if (coachId && p.author_id === coachId) return;
+            var id = String(p.author_id);
+            if (coachId && id === coachId) return;
             var ts = postTimeMs(p.created_at);
             if (!ts) return;
-            var id = String(p.author_id);
             if (!latest[id] || ts > latest[id]) latest[id] = ts;
           });
-          Object.keys(latest).forEach(function (id) {
-            var seenMs = postTimeMs(seen[id] || "");
-            if (!seenMs || latest[id] > seenMs) unread[id] = true;
-          });
         } catch (e) {}
-        return unread;
+        return latest;
       }
 
       async function loadAccountIndex() {
@@ -2445,13 +2482,17 @@
         return { bySerial: bySerial, byCode: byCode };
       }
 
-      function inviteHasUnread(row, index, unread) {
-        if (!row || !unread) return false;
+      function inviteHasUnread(row, index, latestByAuthor) {
+        if (!row || !latestByAuthor) return false;
         var ids = accountIdsForInvite(row, index);
-        for (var i = 0; i < ids.length; i++) {
-          if (unread[ids[i]]) return true;
-        }
-        return false;
+        if (!ids.length) return false;
+        var latestMs = 0;
+        ids.forEach(function (id) {
+          if (latestByAuthor[id] && latestByAuthor[id] > latestMs) latestMs = latestByAuthor[id];
+        });
+        if (!latestMs) return false;
+        var seenMs = inviteSeenMs(row, ids);
+        return !seenMs || latestMs > seenMs;
       }
 
       function renderListRow(list, row, hasUnread, linkedAccountIds) {
@@ -2571,7 +2612,7 @@
         adminBtn.addEventListener("click", function (e) {
           e.stopPropagation();
           /* Admin geöffnet = Nachrichten gelesen — Punkt sofort weg. */
-          markAdminFeedSeen(linkedIds);
+          markAdminInviteSeen(row, linkedIds);
           msgDot.classList.remove("is-on");
           msgDot.removeAttribute("title");
           showResult(row.first_name, row.serial_number, row.code);
@@ -2666,10 +2707,10 @@
           var rows = await res.json();
           listMsg.textContent = rows.length ? "" : "Noch keine Codes.";
           var accountIndex = await loadAccountIndex();
-          var unread = await loadUnreadAuthorIds();
+          var latestByAuthor = await loadLatestPostMsByAuthor();
           rows.forEach(function (row) {
             var linked = accountIdsForInvite(row, accountIndex);
-            renderListRow(list, row, inviteHasUnread(row, accountIndex, unread), linked);
+            renderListRow(list, row, inviteHasUnread(row, accountIndex, latestByAuthor), linked);
           });
         } catch (err) {
           listMsg.textContent = "Liste nicht geladen.";
