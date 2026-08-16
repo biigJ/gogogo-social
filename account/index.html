@@ -464,14 +464,7 @@
       grid-template-columns: auto 1fr;
       gap: 16px;
       align-items: end;
-      margin-bottom: 18px;
-    }
-    .profile-identity {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 8px;
-      min-width: 0;
+      margin-bottom: 12px;
     }
     .profile-portrait {
       width: calc(132px * 0.8);
@@ -503,10 +496,11 @@
     }
     .profile-portrait__plus[hidden] { display: none; }
     .profile-serial {
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      gap: 6px;
-      max-width: 100%;
+      gap: 8px;
+      width: 100%;
+      margin: 0 0 18px;
       color: var(--ink-on-red);
       font-size: 0.95rem;
       font-weight: 500;
@@ -515,11 +509,6 @@
       min-height: 1.4em;
     }
     .profile-serial[hidden] { display: none; }
-    .profile-serial__num {
-      font-variant-numeric: tabular-nums;
-      letter-spacing: 0.12em;
-      min-width: 8.2ch;
-    }
     .profile-serial__eye {
       flex: 0 0 auto;
       width: 1.35rem;
@@ -545,6 +534,14 @@
     .profile-serial__eye:focus-visible {
       outline: 1px solid rgba(247, 245, 240, 0.85);
       outline-offset: 2px;
+    }
+    .profile-serial__text {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .profile-serial__text.is-number {
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.12em;
     }
     .profile-meta {
       display: grid;
@@ -1568,22 +1565,10 @@
       <div class="panel" id="panel-profile" data-panel="profile">
         <h1 class="profile-name" id="profile-name"></h1>
         <div class="profile-top">
-          <div class="profile-identity">
-            <button class="profile-portrait" id="profile-photo-btn" type="button" aria-label="Profilfoto ändern">
-              <img id="profile-photo-img" alt="" hidden />
-              <span class="profile-portrait__plus" id="profile-photo-plus">+</span>
-            </button>
-            <div class="profile-serial" id="profile-serial-row" hidden>
-              <span class="profile-serial__num" id="profile-serial" aria-live="polite"></span>
-              <button
-                class="profile-serial__eye"
-                id="profile-serial-toggle"
-                type="button"
-                aria-label="Nummer anzeigen"
-                aria-pressed="false"
-              ></button>
-            </div>
-          </div>
+          <button class="profile-portrait" id="profile-photo-btn" type="button" aria-label="Profilfoto ändern">
+            <img id="profile-photo-img" alt="" hidden />
+            <span class="profile-portrait__plus" id="profile-photo-plus">+</span>
+          </button>
           <div class="profile-meta">
             <div class="profile-meta__row">
               <span class="profile-meta__label">Funktion</span>
@@ -1606,6 +1591,16 @@
               <span class="profile-meta__value" id="profile-wert">0</span>
             </div>
           </div>
+        </div>
+        <div class="profile-serial" id="profile-serial-row" hidden>
+          <button
+            class="profile-serial__eye"
+            id="profile-serial-toggle"
+            type="button"
+            aria-label="Identifikationsnummer anzeigen"
+            aria-pressed="false"
+          ></button>
+          <span class="profile-serial__text" id="profile-serial" aria-live="polite">Identifikationsnummer anzeigen</span>
         </div>
         <p class="profile-bio" id="profile-bio"></p>
         <section class="profile-plan" aria-label="Trainingsplan">
@@ -2378,20 +2373,30 @@
 
       function renderProfileSerial() {
         var row = document.getElementById("profile-serial-row");
-        var numEl = document.getElementById("profile-serial");
+        var textEl = document.getElementById("profile-serial");
         var btn = document.getElementById("profile-serial-toggle");
         var digits = profileSerialDigits();
-        if (!row || !numEl || !btn) return;
+        if (!row || !textEl || !btn) return;
         if (digits.length !== 8) {
           row.hidden = true;
-          numEl.textContent = "";
+          textEl.textContent = "Identifikationsnummer anzeigen";
+          textEl.classList.remove("is-number");
           return;
         }
         row.hidden = false;
-        numEl.textContent = profileSerialVisible ? digits : "";
-        btn.setAttribute("aria-label", profileSerialVisible ? "Nummer ausblenden" : "Nummer anzeigen");
-        btn.setAttribute("aria-pressed", profileSerialVisible ? "true" : "false");
-        btn.innerHTML = profileSerialEyeIcon(!profileSerialVisible);
+        if (profileSerialVisible) {
+          textEl.textContent = digits;
+          textEl.classList.add("is-number");
+          btn.setAttribute("aria-label", "Identifikationsnummer ausblenden");
+          btn.setAttribute("aria-pressed", "true");
+          btn.innerHTML = profileSerialEyeIcon(false);
+        } else {
+          textEl.textContent = "Identifikationsnummer anzeigen";
+          textEl.classList.remove("is-number");
+          btn.setAttribute("aria-label", "Identifikationsnummer anzeigen");
+          btn.setAttribute("aria-pressed", "false");
+          btn.innerHTML = profileSerialEyeIcon(true);
+        }
       }
 
       (function bindProfileSerialToggle() {
