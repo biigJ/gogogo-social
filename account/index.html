@@ -1146,33 +1146,14 @@
       height: 1rem;
       display: block;
     }
-    .profile-mantra__hint {
-      margin: 0;
-      font-size: 0.8rem;
-      opacity: 0.75;
-      letter-spacing: -0.02em;
-    }
     .profile-plan {
       color: var(--ink-on-red);
-    }
-    .profile-plan__title {
-      font-weight: 700;
-      font-size: 1.15rem;
-      letter-spacing: -0.03em;
-      margin: 0 0 14px;
     }
     .profile-plan__block {
       margin: 0 0 16px;
     }
     .profile-plan__block:last-child {
       margin-bottom: 0;
-    }
-    .profile-plan__label {
-      font-weight: 700;
-      font-size: 0.78rem;
-      letter-spacing: -0.02em;
-      margin: 0 0 4px;
-      opacity: 0.8;
     }
     .profile-plan__text {
       font-weight: 500;
@@ -1186,12 +1167,6 @@
     .profile-plan__text.is-empty {
       opacity: 0.55;
       font-style: italic;
-    }
-    .profile-plan__day-name {
-      font-weight: 700;
-      font-size: 0.95rem;
-      letter-spacing: -0.02em;
-      margin: 0 0 4px;
     }
     .home-check {
       display: grid;
@@ -1699,8 +1674,7 @@
             aria-label="Mantra ändern"
           ></button>
         </div>
-        <section class="profile-plan" aria-label="Trainingsplan">
-          <h2 class="profile-plan__title">Dein Trainingsplan</h2>
+        <section class="profile-plan" aria-label="Plan">
           <div id="profile-plan-days"></div>
         </section>
       </div>
@@ -2316,12 +2290,8 @@
             submitProfileMantra(field.value);
           });
           actions.appendChild(saveBtn);
-          var hint = document.createElement("p");
-          hint.className = "profile-mantra__hint";
-          hint.textContent = "Mit dem Haken speichern. Leer lassen stellt das Standard-Mantra wieder her.";
           wrap.appendChild(field);
           wrap.appendChild(actions);
-          wrap.appendChild(hint);
           field.focus();
           field.setSelectionRange(field.value.length, field.value.length);
           return;
@@ -2450,22 +2420,14 @@
         };
       }
 
-      function appendPlanBlock(root, label, value) {
+      function appendPlanText(root, value) {
+        var v = String(value || "").trim();
+        if (!v) return;
         var block = document.createElement("div");
         block.className = "profile-plan__block";
-        var lab = document.createElement("p");
-        lab.className = "profile-plan__label";
-        lab.textContent = label;
         var text = document.createElement("p");
         text.className = "profile-plan__text";
-        var v = String(value || "").trim();
-        if (v) {
-          text.textContent = v;
-        } else {
-          text.textContent = "Noch offen.";
-          text.classList.add("is-empty");
-        }
-        block.appendChild(lab);
+        text.textContent = v;
         block.appendChild(text);
         root.appendChild(block);
       }
@@ -2474,25 +2436,17 @@
         var planRoot = document.getElementById("profile-plan-days");
         if (!planRoot) return;
         planRoot.innerHTML = "";
-        appendPlanBlock(planRoot, "Lebenssituation", coachPlan && coachPlan.life_situation);
-        appendPlanBlock(planRoot, "Ziel", coachPlan && coachPlan.goal);
-        appendPlanBlock(planRoot, "Aktuelle Phase & Schritte", coachPlan && coachPlan.phase_steps);
+        appendPlanText(planRoot, coachPlan && coachPlan.life_situation);
+        appendPlanText(planRoot, coachPlan && coachPlan.goal);
+        appendPlanText(planRoot, coachPlan && coachPlan.phase_steps);
         for (var i = 0; i < PROFILE_WEEKDAYS.length; i++) {
+          var dayVal = coachDayText(i);
+          if (!dayVal) continue;
           var block = document.createElement("div");
           block.className = "profile-plan__block";
-          var dayName = document.createElement("p");
-          dayName.className = "profile-plan__day-name";
-          dayName.textContent = PROFILE_WEEKDAYS[i];
           var text = document.createElement("p");
           text.className = "profile-plan__text";
-          var dayVal = coachDayText(i);
-          if (dayVal) {
-            text.textContent = dayVal;
-          } else {
-            text.textContent = "Noch offen.";
-            text.classList.add("is-empty");
-          }
-          block.appendChild(dayName);
+          text.textContent = dayVal;
           block.appendChild(text);
           planRoot.appendChild(block);
         }
