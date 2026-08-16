@@ -2179,7 +2179,8 @@
       var BUDDY_SEARCH_FAILS_KEY = "gogogo_go_buddy_search_fails";
       var BUDDY_SEARCH_LOCK_KEY = "gogogo_go_buddy_search_lock_until";
       var WHATSAPP_NUMBER = "+491747015500";
-      // Permanenter Einladungslink der gogogo Buddy WhatsApp-Gruppe (Gruppeninfo → Link)
+      // Permanenter Einladungslink der gogogo Buddy WhatsApp-Gruppe (Gruppeninfo → Link).
+      // Solange leer: Fallback auf Joscha-Chat, damit das Icon nutzbar bleibt.
       var WHATSAPP_GROUP_URL = "";
       var CYCLE_RAYS = 28;
       var RAY_GRAY = "rgba(247, 245, 240, 0.28)";
@@ -3867,7 +3868,10 @@
       function syncCommunityWhatsApp() {
         var waGroup = document.getElementById("community-wa");
         if (!waGroup) return;
-        var url = String(WHATSAPP_GROUP_URL || "").trim();
+        var groupUrl = String(WHATSAPP_GROUP_URL || "").trim();
+        var n = String(WHATSAPP_NUMBER || "").replace(/\D/g, "");
+        var fallback = n ? ("https://wa.me/" + n) : "";
+        var url = groupUrl || fallback;
         if (!url) {
           waGroup.hidden = true;
           waGroup.removeAttribute("href");
