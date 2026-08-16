@@ -564,10 +564,10 @@
     }
     .community-role {
       color: var(--ink-on-red);
-      font-size: 0.58rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      line-height: 1.1;
+      font-size: 0.7rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
       text-transform: none;
       text-align: center;
       margin: 0 0 4px;
@@ -676,12 +676,28 @@
       font-weight: 500;
       line-height: 1;
     }
-    .community-circle.is-blink {
-      animation: community-blink 0.7s ease-in-out 3;
+    .community-circle.is-glow {
+      animation: community-glow 1.5s ease-in-out infinite;
     }
-    @keyframes community-blink {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(247, 245, 240, 0); }
-      50% { box-shadow: 0 0 0 3px rgba(247, 245, 240, 0.85); }
+    @keyframes community-glow {
+      0%, 100% {
+        box-shadow:
+          0 0 0 2px rgba(247, 245, 240, 0.45),
+          0 0 10px rgba(247, 245, 240, 0.22);
+      }
+      50% {
+        box-shadow:
+          0 0 0 3px rgba(247, 245, 240, 0.95),
+          0 0 18px rgba(247, 245, 240, 0.55);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .community-circle.is-glow {
+        animation: none;
+        box-shadow:
+          0 0 0 3px rgba(247, 245, 240, 0.9),
+          0 0 14px rgba(247, 245, 240, 0.4);
+      }
     }
     .community-circle__serial {
       width: 86%;
@@ -2259,6 +2275,53 @@
       var replyTargetId = null;
       var pickingReplyBuddy = false;
 
+      function clearReplyGlow() {
+        document.querySelectorAll(".community-circle.is-glow").forEach(function (el) {
+          el.classList.remove("is-glow");
+        });
+      }
+
+      function showReplyGlow() {
+        clearReplyGlow();
+        document.querySelectorAll('.community-circle[data-reply-target="1"]').forEach(function (el) {
+          el.classList.add("is-glow");
+        });
+      }
+
+      function stopReplyPicking() {
+        pickingReplyBuddy = false;
+        clearReplyGlow();
+        var pick = document.getElementById("community-reply-pick");
+        if (pick) pick.classList.remove("is-on");
+      }
+
+      async function ensureCoachAccount() {
+        if (COACH_SLOT.id && COACH_SLOT.id !== "coach" && String(COACH_SLOT.id).indexOf("local-") !== 0) {
+          return COACH_SLOT.id;
+        }
+        try {
+          var byPhone = await restGet(
+            "go_accounts?phone=eq.coach&select=id,name,photo_url&order=created_at.asc&limit=5"
+          );
+          if (byPhone && byPhone[0] && byPhone[0].id) {
+            COACH_SLOT.id = byPhone[0].id;
+            if (byPhone[0].name) COACH_SLOT.name = byPhone[0].name;
+            return COACH_SLOT.id;
+          }
+          var byName = await restGet(
+            "go_accounts?name=ilike.Joscha&select=id,name,photo_url,phone&order=created_at.asc&limit=10"
+          );
+          var rows = byName || [];
+          for (var i = 0; i < rows.length; i++) {
+            if (!rows[i] || !rows[i].id) continue;
+            COACH_SLOT.id = rows[i].id;
+            if (rows[i].name) COACH_SLOT.name = rows[i].name;
+            return COACH_SLOT.id;
+          }
+        } catch (e) {}
+        return null;
+      }
+
       function restHeaders(extra) {
         var h = {
           apikey: SUPABASE_KEY,
@@ -2384,14 +2447,25 @@
               }
               label.textContent = firstNameOf(COACH_SLOT);
               circle.setAttribute("aria-label", "Trainer");
+              circle.dataset.replyTarget = "1";
               circle.addEventListener("click", function () {
                 if (!pickingReplyBuddy) return;
-                replyTargetId = null;
-                pickingReplyBuddy = false;
-                var pick = document.getElementById("community-reply-pick");
-                if (pick) pick.classList.remove("is-on");
-                var msg = document.getElementById("community-add-msg");
-                if (msg) msg.textContent = "Trainer ist fest — Buddy oben antippen.";
+                ensureCoachAccount().then(function (coachId) {
+                  if (!coachId) {
+                    var failMsg = document.getElementById("community-add-msg");
+                    if (failMsg) failMsg.textContent = "Trainer gerade nicht erreichbar.";
+                    return;
+                  }
+                  replyTargetId = coachId;
+                  stopReplyPicking();
+                  var input = document.getElementById("community-reply-text");
+                  if (input) {
+                    input.placeholder = "Nachricht an " + firstNameOf(COACH_SLOT) + "…";
+                    input.focus();
+                  }
+                  var okMsg = document.getElementById("community-add-msg");
+                  if (okMsg) okMsg.textContent = "Nachricht an " + firstNameOf(COACH_SLOT);
+                });
               });
             } else if (buddy) {
               if (buddy.photo_url) {
@@ -2402,19 +2476,18 @@
               }
               label.textContent = firstNameOf(buddy);
               circle.setAttribute("aria-label", firstNameOf(buddy));
+              if (buddy.id) circle.dataset.replyTarget = "1";
               circle.addEventListener("click", function () {
                 if (!pickingReplyBuddy) return;
                 replyTargetId = buddy.id || null;
-                pickingReplyBuddy = false;
-                var pick = document.getElementById("community-reply-pick");
-                if (pick) pick.classList.remove("is-on");
+                stopReplyPicking();
                 var input = document.getElementById("community-reply-text");
                 if (input) {
-                  input.placeholder = "Antwort an " + firstNameOf(buddy) + "…";
+                  input.placeholder = "Nachricht an " + firstNameOf(buddy) + "…";
                   input.focus();
                 }
                 var msg = document.getElementById("community-add-msg");
-                if (msg) msg.textContent = "Antwort an " + firstNameOf(buddy);
+                if (msg) msg.textContent = "Nachricht an " + firstNameOf(buddy);
               });
             } else if (slotIndex === items.length) {
               var plus = document.createElement("span");
@@ -2997,6 +3070,7 @@
         if (account.photo_url) applyPhoto(account.photo_url);
         fillProfilePanel();
         loadCoachPlan().catch(function () {});
+        ensureCoachAccount().catch(function () {});
         loadBuddiesFromCloud().then(function () {
           fillProfilePanel();
           fillCommunityPanel();
@@ -3969,23 +4043,15 @@
 
         if (replyPick) {
           replyPick.addEventListener("click", function () {
-            if (!getBuddies().length) {
-              if (msg) msg.textContent = "Zuerst Buddies hinzufügen.";
-              return;
-            }
             pickingReplyBuddy = !pickingReplyBuddy;
             replyPick.classList.toggle("is-on", pickingReplyBuddy);
             if (pickingReplyBuddy) {
-              if (msg) msg.textContent = "Buddy oben antippen.";
-              document.querySelectorAll(".community-circle").forEach(function (el) {
-                if (!el.disabled) el.classList.add("is-blink");
+              ensureCoachAccount().then(function () {
+                if (msg) msg.textContent = "Person oben antippen.";
+                showReplyGlow();
               });
-              setTimeout(function () {
-                document.querySelectorAll(".community-circle.is-blink").forEach(function (el) {
-                  el.classList.remove("is-blink");
-                });
-              }, 2200);
             } else {
+              clearReplyGlow();
               replyTargetId = null;
               if (replyText) replyText.placeholder = "Nachricht…";
             }
@@ -3998,7 +4064,7 @@
             var body = String((replyText && replyText.value) || "").trim().slice(0, 144);
             if (!body) return;
             if (!replyTargetId) {
-              if (msg) msg.textContent = "Zuerst @ tippen und einen Buddy wählen.";
+              if (msg) msg.textContent = "Zuerst @ tippen und jemanden wählen.";
               return;
             }
             createCommunityPost({
@@ -4015,10 +4081,9 @@
               }
               if (replySend) replySend.disabled = true;
               replyTargetId = null;
-              pickingReplyBuddy = false;
-              if (replyPick) replyPick.classList.remove("is-on");
+              stopReplyPicking();
               if (replyText) replyText.placeholder = "Nachricht…";
-              if (msg) msg.textContent = "Antwort gesendet.";
+              if (msg) msg.textContent = "Nachricht gesendet.";
               syncCommunityComposerChrome();
             });
           });
