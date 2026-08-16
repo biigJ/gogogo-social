@@ -2286,13 +2286,9 @@
         if (roleEl) roleEl.textContent = account && account.is_trainer ? "Trainer" : "Buddy";
         if (buddiesEl) buddiesEl.textContent = String(getBuddies().length);
         if (coachEl) {
-          if (trainerLink && trainerLink.name) {
-            coachEl.textContent = firstNameOf(trainerLink);
-            coachEl.setAttribute("aria-label", "Trainer: " + firstNameOf(trainerLink));
-          } else {
-            coachEl.textContent = "✕";
-            coachEl.setAttribute("aria-label", "Kein Trainer");
-          }
+          var coachShown = getDisplayCoach();
+          coachEl.textContent = firstNameOf(coachShown);
+          coachEl.setAttribute("aria-label", "Trainer: " + firstNameOf(coachShown));
         }
         var streak = computeWorkoutStreak();
         if (streakEl) streakEl.textContent = streak === 1 ? "1 Tag" : streak + " Tage";
@@ -2339,13 +2335,20 @@
           id: person.id,
           name: person.name || "Trainer",
           serial_number: person.serial_number || null,
-          photo_url: person.photo_url || null,
+          photo_url: person.photo_url || COACH_PHOTO_URL,
           isCoach: true
         };
-        COACH_SLOT.id = trainerLink.id;
-        COACH_SLOT.name = trainerLink.name;
-        COACH_SLOT.photo_url = trainerLink.photo_url || COACH_PHOTO_URL;
         account.trainer_id = trainerLink.id;
+      }
+
+      function cancelTrainerEdit() {
+        if (!trainerEditMode || trainerSerialBusy) return;
+        trainerEditMode = false;
+        var msg = document.getElementById("community-add-msg");
+        if (msg && /Trainer|Zahlen|Nummer/i.test(String(msg.textContent || ""))) {
+          msg.textContent = "";
+        }
+        renderBuddySlots();
       }
 
       async function loadTrainerFromCloud() {
@@ -2465,8 +2468,7 @@
         input.addEventListener("keydown", function (ev) {
           if (ev.key === "Escape") {
             ev.preventDefault();
-            trainerEditMode = false;
-            renderBuddySlots();
+            cancelTrainerEdit();
             return;
           }
           if (ev.key === "Enter") {
@@ -2684,8 +2686,8 @@
                 beginTrainerSerialEntry(circle);
                 label.textContent = "\u00a0";
                 circle.setAttribute("aria-label", "Trainer-Nummer eingeben");
-              } else if (trainerLink && trainerLink.name) {
-                var coach = trainerLink;
+              } else {
+                var coach = getDisplayCoach();
                 if (coach.photo_url) {
                   var cimg = document.createElement("img");
                   cimg.src = coach.photo_url;
@@ -2706,7 +2708,7 @@
                     replyTargetId = coachId;
                     stopReplyPicking();
                     var input = document.getElementById("community-reply-text");
-                    var coachName = firstNameOf(trainerLink || COACH_SLOT);
+                    var coachName = firstNameOf(getDisplayCoach());
                     if (input) {
                       input.placeholder = "Nachricht an " + coachName + "…";
                       input.focus();
@@ -2715,10 +2717,6 @@
                     if (okMsg) okMsg.textContent = "Nachricht an " + coachName;
                   });
                 });
-              } else {
-                label.textContent = "\u00a0";
-                circle.setAttribute("aria-label", "Noch kein Trainer");
-                circle.disabled = true;
               }
             } else if (buddy) {
               if (buddy.photo_url) {
@@ -2837,8 +2835,17 @@
       }
 
       document.addEventListener("pointerdown", function (ev) {
-        if (!serialEntryActive || serialSubmitBusy) return;
         var t = ev.target;
+        if (trainerEditMode && !trainerSerialBusy) {
+          if (!(t && t.closest && (
+            t.closest(".community-trainer-edit") ||
+            t.closest('.community-circle[data-trainer-serial-entry="1"]') ||
+            t.closest(".community-circle__serial")
+          ))) {
+            cancelTrainerEdit();
+          }
+        }
+        if (!serialEntryActive || serialSubmitBusy) return;
         if (t && t.closest) {
           if (t.closest(".community-circle__serial")) return;
           if (t.closest('.community-circle[data-serial-entry="1"]')) return;
