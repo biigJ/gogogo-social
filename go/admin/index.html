@@ -348,16 +348,19 @@
       font-size: 0.95rem;
     }
     .admin-mantras__row textarea {
-      min-height: 64px;
+      min-height: 88px;
       resize: vertical;
+      white-space: pre-wrap;
     }
-    .admin-mantras__row textarea:focus,
-    .admin-mantras__row input:focus {
+    .admin-mantras__row textarea:focus {
       outline: none;
       border-color: var(--ink);
     }
-    .admin-mantras__attr {
-      font-size: 0.9rem;
+    .admin-mantras__hint {
+      margin: 0 0 8px;
+      font-size: 0.8rem;
+      opacity: 0.75;
+      line-height: 1.35;
     }
     h1 {
       font-weight: 700;
@@ -618,7 +621,7 @@
 
     <div class="panel" id="panel-mantras" hidden>
       <h1>Mantras</h1>
-      <p class="admin-plan__hint">20 Standard-Sätze für Nutzer ohne eigenes Mantra. Zuordnung pro Account ist stabil.</p>
+      <p class="admin-mantras__hint">Ein Feld pro Mantra: Satz, dann Zeilenumbruch, dann der Mensch. Keine Bindestriche.</p>
       <div class="admin-mantras__list" id="mantra-list"></div>
       <button class="btn" type="button" id="mantra-save">Mantras speichern</button>
       <p class="msg" id="mantra-msg" role="status"></p>
@@ -1765,7 +1768,7 @@
         { slot: 2, body: "Der erste Reichtum ist die Gesundheit.", attribution: "Ralph Waldo Emerson" },
         { slot: 3, body: "Ein Morgenspaziergang segnet den ganzen Tag.", attribution: "Henry David Thoreau" },
         { slot: 4, body: "Gesundheit ist nicht alles, aber ohne Gesundheit ist alles nichts.", attribution: "Arthur Schopenhauer" },
-        { slot: 5, body: "Kümmere Dich um Deinen Körper — er ist der einzige Ort, an dem Du lebst.", attribution: "Jim Rohn" },
+        { slot: 5, body: "Kümmere Dich um Deinen Körper. Er ist der einzige Ort, an dem Du lebst.", attribution: "Jim Rohn" },
         { slot: 6, body: "Der Weg entsteht beim Gehen.", attribution: "Antonio Machado" },
         { slot: 7, body: "Ein gesunder Geist wohnt in einem gesunden Körper.", attribution: "Juvenal" },
         { slot: 8, body: "Langsam und stetig gewinnt das Rennen.", attribution: "Äsop" },
@@ -1773,7 +1776,7 @@
         { slot: 10, body: "Die beste Zeit anzufangen war gestern. Die zweitbeste ist jetzt.", attribution: "Chinesisches Sprichwort" },
         { slot: 11, body: "Stärke wächst aus dem, was Du überwindest.", attribution: "Nelson Mandela" },
         { slot: 12, body: "Es geht nicht um Perfektion, sondern um Beständigkeit.", attribution: "Bruce Lee" },
-        { slot: 13, body: "Ruhe Dich aus, wenn Du müde bist — nicht, wenn Du fertig bist.", attribution: "Michael Jordan" },
+        { slot: 13, body: "Ruhe Dich aus, wenn Du müde bist, nicht wenn Du fertig bist.", attribution: "Michael Jordan" },
         { slot: 14, body: "Wer sich bewegt, bleibt lebendig.", attribution: "Konfuzius" },
         { slot: 15, body: "Kleine tägliche Schritte schlagen große Absichten.", attribution: "Lao Tzu" },
         { slot: 16, body: "Dein Körper erreicht, was Dein Geist glaubt.", attribution: "Napoleon Hill" },
@@ -1782,6 +1785,43 @@
         { slot: 19, body: "Heute zählt mehr als gestern vornehmen.", attribution: "Seneca" },
         { slot: 20, body: "Atme. Bewege Dich. Schlafe. Wiederhole.", attribution: "Marcus Aurelius" }
       ];
+
+      function formatMantraField(row) {
+        if (!row) return "";
+        var body = row.body != null ? String(row.body).trim() : "";
+        var who = row.attribution != null ? String(row.attribution).trim() : "";
+        if (!who && body) {
+          var legacy = body.match(/^(.*)\s+[—–-]\s+(.+)$/);
+          if (legacy) {
+            body = String(legacy[1] || "").trim();
+            who = String(legacy[2] || "").trim();
+          }
+        }
+        if (!body) return who;
+        return who ? (body + "\n" + who) : body;
+      }
+
+      function parseMantraField(raw) {
+        var lines = String(raw || "").replace(/\r\n/g, "\n").split("\n");
+        while (lines.length && !String(lines[lines.length - 1] || "").trim()) lines.pop();
+        while (lines.length && !String(lines[0] || "").trim()) lines.shift();
+        if (!lines.length) return { body: "", attribution: null };
+        if (lines.length === 1) {
+          var one = String(lines[0]).trim();
+          // Legacy: "Satz — Person" in einer Zeile → getrennt speichern
+          var legacy = one.match(/^(.*)\s+[—–-]\s+(.+)$/);
+          if (legacy) {
+            return {
+              body: String(legacy[1] || "").trim().slice(0, 220),
+              attribution: String(legacy[2] || "").trim().slice(0, 80) || null
+            };
+          }
+          return { body: one.slice(0, 220), attribution: null };
+        }
+        var who = String(lines[lines.length - 1]).trim().slice(0, 80);
+        var body = lines.slice(0, -1).join("\n").trim().slice(0, 220);
+        return { body: body, attribution: who || null };
+      }
 
       function renderMantraEditor(rows) {
         var list = document.getElementById("mantra-list");
@@ -1801,23 +1841,12 @@
           bodyLabel.textContent = "Mantra " + slot;
           var body = document.createElement("textarea");
           body.id = "mantra-body-" + slot;
-          body.maxLength = 220;
-          body.rows = 2;
-          body.value = src.body != null ? String(src.body) : "";
-          var attrLabel = document.createElement("label");
-          attrLabel.setAttribute("for", "mantra-attr-" + slot);
-          attrLabel.textContent = "Zuschreibung";
-          var attr = document.createElement("input");
-          attr.className = "admin-mantras__attr";
-          attr.id = "mantra-attr-" + slot;
-          attr.type = "text";
-          attr.maxLength = 80;
-          attr.placeholder = "Name / Quelle";
-          attr.value = src.attribution != null ? String(src.attribution) : "";
+          body.maxLength = 320;
+          body.rows = 3;
+          body.placeholder = "Satz\nMensch";
+          body.value = formatMantraField(src);
           rowEl.appendChild(bodyLabel);
           rowEl.appendChild(body);
-          rowEl.appendChild(attrLabel);
-          rowEl.appendChild(attr);
           list.appendChild(rowEl);
         }
       }
@@ -1847,7 +1876,7 @@
         renderMantraEditor(rows && rows.length ? rows : DEFAULT_MANTRAS);
         if (msg) {
           if (rows && rows.length) msg.textContent = "";
-          else msg.textContent = "Defaults geladen — speichern schreibt nach Supabase (go-mantras.sql?).";
+          else msg.textContent = "Defaults geladen. Speichern schreibt nach Supabase (go-mantras.sql?).";
         }
         updateAuthBtn();
       }
@@ -1861,21 +1890,18 @@
         for (var i = 0; i < rows.length; i++) {
           var slot = Number(rows[i].dataset.slot);
           var bodyEl = document.getElementById("mantra-body-" + slot);
-          var attrEl = document.getElementById("mantra-attr-" + slot);
-          var body = bodyEl ? String(bodyEl.value || "").trim() : "";
-          if (!body) {
+          var parsed = parseMantraField(bodyEl ? bodyEl.value : "");
+          if (!parsed.body) {
             if (msg) {
-              msg.textContent = "Mantra " + slot + " darf nicht leer sein.";
+              msg.textContent = "Mantra " + slot + " braucht mindestens den Satz.";
               msg.classList.add("is-error");
             }
             return;
           }
           payload.push({
             slot: slot,
-            body: body.slice(0, 220),
-            attribution: attrEl && String(attrEl.value || "").trim()
-              ? String(attrEl.value || "").trim().slice(0, 80)
-              : null,
+            body: parsed.body,
+            attribution: parsed.attribution,
             updated_at: new Date().toISOString()
           });
         }

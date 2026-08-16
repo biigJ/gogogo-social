@@ -1064,6 +1064,7 @@
       margin: 0;
       width: 100%;
       min-width: 0;
+      white-space: pre-line;
     }
     .profile-mantra {
       display: flex;
@@ -2189,7 +2190,7 @@
         { slot: 2, body: "Der erste Reichtum ist die Gesundheit.", attribution: "Ralph Waldo Emerson" },
         { slot: 3, body: "Ein Morgenspaziergang segnet den ganzen Tag.", attribution: "Henry David Thoreau" },
         { slot: 4, body: "Gesundheit ist nicht alles, aber ohne Gesundheit ist alles nichts.", attribution: "Arthur Schopenhauer" },
-        { slot: 5, body: "Kümmere Dich um Deinen Körper — er ist der einzige Ort, an dem Du lebst.", attribution: "Jim Rohn" },
+        { slot: 5, body: "Kümmere Dich um Deinen Körper. Er ist der einzige Ort, an dem Du lebst.", attribution: "Jim Rohn" },
         { slot: 6, body: "Der Weg entsteht beim Gehen.", attribution: "Antonio Machado" },
         { slot: 7, body: "Ein gesunder Geist wohnt in einem gesunden Körper.", attribution: "Juvenal" },
         { slot: 8, body: "Langsam und stetig gewinnt das Rennen.", attribution: "Äsop" },
@@ -2197,7 +2198,7 @@
         { slot: 10, body: "Die beste Zeit anzufangen war gestern. Die zweitbeste ist jetzt.", attribution: "Chinesisches Sprichwort" },
         { slot: 11, body: "Stärke wächst aus dem, was Du überwindest.", attribution: "Nelson Mandela" },
         { slot: 12, body: "Es geht nicht um Perfektion, sondern um Beständigkeit.", attribution: "Bruce Lee" },
-        { slot: 13, body: "Ruhe Dich aus, wenn Du müde bist — nicht, wenn Du fertig bist.", attribution: "Michael Jordan" },
+        { slot: 13, body: "Ruhe Dich aus, wenn Du müde bist, nicht wenn Du fertig bist.", attribution: "Michael Jordan" },
         { slot: 14, body: "Wer sich bewegt, bleibt lebendig.", attribution: "Konfuzius" },
         { slot: 15, body: "Kleine tägliche Schritte schlagen große Absichten.", attribution: "Lao Tzu" },
         { slot: 16, body: "Dein Körper erreicht, was Dein Geist glaubt.", attribution: "Napoleon Hill" },
@@ -2209,28 +2210,29 @@
       var cloudMantras = null;
       var mantraEditMode = false;
       var mantraSaveBusy = false;
+      var mantraRotateIndex = 0;
+      var mantraRotateTimer = null;
       var PROFILE_WEEKDAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
       var COACH_DAY_KEYS = ["day_mo", "day_di", "day_mi", "day_do", "day_fr", "day_sa", "day_so"];
       var coachPlan = null;
       var coachDayHistory = [];
       var onCoachPlanLoaded = null;
 
-      function formatMantraLine(row) {
+      function formatMantraDisplay(row) {
         if (!row || !row.body) return "";
         var body = String(row.body).trim();
         var who = row.attribution != null ? String(row.attribution).trim() : "";
         if (!body) return "";
-        return who ? (body + " — " + who) : body;
-      }
-
-      function mantraSlotForAccount() {
-        var raw = String((account && (account.id || account.serial_number || account.name)) || "gogogo");
-        var hash = 0;
-        for (var i = 0; i < raw.length; i++) {
-          hash = ((hash << 5) - hash) + raw.charCodeAt(i);
-          hash |= 0;
+        // Legacy: attribution steckte noch im body ("Satz — Person")
+        if (!who) {
+          var legacy = body.match(/^(.*)\s+[—–-]\s+(.+)$/);
+          if (legacy) {
+            body = String(legacy[1] || "").trim();
+            who = String(legacy[2] || "").trim();
+          }
         }
-        return (Math.abs(hash) % 20) + 1;
+        if (!body) return "";
+        return who ? (body + "\n" + who) : body;
       }
 
       function getMantraPool() {
@@ -2238,22 +2240,43 @@
         return DEFAULT_MANTRAS;
       }
 
-      function getDefaultMantraText() {
+      function getRotatingMantraText() {
         var pool = getMantraPool();
-        var slot = mantraSlotForAccount();
-        var found = null;
-        for (var i = 0; i < pool.length; i++) {
-          if (Number(pool[i].slot) === slot) {
-            found = pool[i];
-            break;
-          }
-        }
-        if (!found) found = pool[0];
-        return formatMantraLine(found) || formatMantraLine(DEFAULT_MANTRAS[0]);
+        if (!pool.length) return formatMantraDisplay(DEFAULT_MANTRAS[0]);
+        var idx = ((mantraRotateIndex % pool.length) + pool.length) % pool.length;
+        return formatMantraDisplay(pool[idx]) || formatMantraDisplay(DEFAULT_MANTRAS[0]);
       }
 
       function getOwnMantraText() {
         return String((account && account.mantra) || "").trim();
+      }
+
+      function stopMantraRotation() {
+        if (mantraRotateTimer) {
+          clearInterval(mantraRotateTimer);
+          mantraRotateTimer = null;
+        }
+      }
+
+      function startMantraRotation() {
+        stopMantraRotation();
+        if (getOwnMantraText() || mantraEditMode) return;
+        var pool = getMantraPool();
+        if (!pool.length) return;
+        mantraRotateIndex = Math.floor(Date.now() / 8000) % pool.length;
+        var bio = document.getElementById("profile-bio");
+        if (bio && !mantraEditMode) bio.textContent = getRotatingMantraText();
+        mantraRotateTimer = setInterval(function () {
+          if (getOwnMantraText() || mantraEditMode) {
+            stopMantraRotation();
+            return;
+          }
+          var poolNow = getMantraPool();
+          if (!poolNow.length) return;
+          mantraRotateIndex = (mantraRotateIndex + 1) % poolNow.length;
+          var el = document.getElementById("profile-bio");
+          if (el) el.textContent = getRotatingMantraText();
+        }, 8000);
       }
 
       function mantraEditIcon(isCheck) {
@@ -2265,10 +2288,9 @@
 
       function renderProfileMantra() {
         var wrap = document.getElementById("profile-mantra");
-        var bioEl = document.getElementById("profile-bio");
-        var editBtn = document.getElementById("profile-mantra-edit");
-        if (!wrap || !bioEl) return;
+        if (!wrap) return;
         if (mantraEditMode) {
+          stopMantraRotation();
           wrap.classList.add("is-editing");
           wrap.innerHTML = "";
           var field = document.createElement("textarea");
@@ -2278,7 +2300,15 @@
           field.rows = 3;
           field.setAttribute("aria-label", "Dein Mantra");
           field.placeholder = "Dein Mantra…";
-          field.value = getOwnMantraText() || getDefaultMantraText();
+          var own = getOwnMantraText();
+          if (own) {
+            field.value = own;
+          } else {
+            var pool = getMantraPool();
+            var idx = ((mantraRotateIndex % pool.length) + pool.length) % pool.length;
+            var row = pool[idx] || DEFAULT_MANTRAS[0];
+            field.value = row && row.body ? String(row.body).trim() : "";
+          }
           var actions = document.createElement("div");
           actions.className = "profile-mantra__actions";
           var saveBtn = document.createElement("button");
@@ -2301,7 +2331,7 @@
         var text = document.createElement("p");
         text.className = "profile-bio";
         text.id = "profile-bio";
-        text.textContent = getOwnMantraText() || getDefaultMantraText();
+        text.textContent = getOwnMantraText() || getRotatingMantraText();
         var btn = document.createElement("button");
         btn.type = "button";
         btn.className = "profile-mantra__edit";
@@ -2317,6 +2347,8 @@
         });
         wrap.appendChild(text);
         wrap.appendChild(btn);
+        if (getOwnMantraText()) stopMantraRotation();
+        else startMantraRotation();
       }
 
       async function submitProfileMantra(raw) {
@@ -4083,6 +4115,7 @@
           trainingLoaded = true;
         }
         if (onProfile) fillProfilePanel();
+        else stopMantraRotation();
         if (onCommunity) {
           fillCommunityPanel();
           setFeedSeenNow();
