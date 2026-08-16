@@ -969,7 +969,7 @@
         </div>
         <div class="admin-user-ok">
           <button class="btn" type="button" id="admin-user-ok">OK</button>
-          <p class="admin-user-ok__hint">OK markiert Nachrichten als gelesen und öffnet die Übersicht.</p>
+          <p class="admin-user-ok__hint">OK = gelesen → zurück zu Alle Nutzer (Punkt weg).</p>
         </div>
         <hr class="admin-rule" />
         <section class="admin-role" id="admin-role" aria-label="Funktion">
@@ -1087,6 +1087,7 @@
       var AUTH_KEY = "gogogo_go_admin";
       var ACCOUNT_KEY = "gogogo_go_account";
       var ADMIN_FEED_SEEN_KEY = "gogogo_admin_feed_seen";
+      var ADMIN_OK_ACK_KEY = "gogogo_admin_ok_ack_v1";
       var GO_BASE = (typeof location !== "undefined" && location.origin ? location.origin : "https://www.gogogo.social") + "/go";
       var adminNameBtn = document.getElementById("admin-name");
       var adminOpenProfileBtn = document.getElementById("admin-open-profile");
@@ -2010,11 +2011,20 @@
           var res = await fetch(SUPABASE_URL + "/rest/v1/" + q, { headers: apiHeaders() });
           var rows = res.ok ? await res.json() : [];
           rows = (rows || []).filter(function (p) {
-            if (!p) return false;
-            if (coachId && String(p.author_id) === coachId) {
-              return ids.indexOf(String(p.reply_to_id || "")) >= 0;
-            }
-            return true;
+            if (!p || !p.author_id) return false;
+            var author = String(p.author_id);
+            var replyTo = p.reply_to_id != null && String(p.reply_to_id) !== ""
+              ? String(p.reply_to_id)
+              : null;
+            var isUser = ids.indexOf(author) >= 0;
+            var replyToUser = !!(replyTo && ids.indexOf(replyTo) >= 0);
+            var inCircle = authorIds.indexOf(author) >= 0;
+            /* Trainer nur an diesen Nutzer */
+            if (coachId && author === coachId) return replyToUser;
+            /* Gerichtete Nachricht: nur wenn dieser Nutzer Absender oder Empfänger ist */
+            if (replyTo) return isUser || replyToUser;
+            /* Sonstige Aktivität (z. B. Check-in): Nutzer oder seine Buddies */
+            return inCircle;
           });
           if (!rows.length) {
             feed.innerHTML = '<p class="empty">Noch kein Community-Verlauf.</p>';
@@ -2181,15 +2191,18 @@
       }
 
       async function acknowledgeCurrentUserMessages() {
-        var invite = pendingAdminInvite || {
-          id: lastQr && lastQr.inviteId,
-          serial_number: lastQr && lastQr.serial,
-          code: lastQr && lastQr.code
-        };
-        var serial = (invite && invite.serial_number) || (lastQr && lastQr.serial) || "";
-        var code = (invite && invite.code) || (lastQr && lastQr.code) || "";
-        if (invite && !invite.serial_number && serial) invite.serial_number = serial;
-        if (invite && !invite.code && code) invite.code = code;
+        var inviteId =
+          (pendingAdminInvite && pendingAdminInvite.id) ||
+          (lastQr && lastQr.inviteId) ||
+          null;
+        var serial =
+          (pendingAdminInvite && pendingAdminInvite.serial_number) ||
+          (lastQr && lastQr.serial) ||
+          "";
+        var code =
+          (pendingAdminInvite && pendingAdminInvite.code) ||
+          (lastQr && lastQr.code) ||
+          "";
         var ids = (activeAccountIds && activeAccountIds.length)
           ? activeAccountIds.slice().map(String)
           : (activeAccount && activeAccount.id ? [String(activeAccount.id)] : []);
@@ -2203,20 +2216,40 @@
         try {
           peak = peakLatestForIds(ids, await loadLatestPostMsByAuthor());
         } catch (e1) {}
-        /* Immer mindestens „jetzt“, damit OK den Punkt zuverlässig löscht. */
-        markAdminInviteSeen(invite, ids, Math.max(peak, Date.now()));
+        var ackMs = Math.max(Date.now(), peak) + 1000;
+        /* Primär: Invite-ID — das steuert den roten Punkt in Alle Nutzer. */
+        setInviteOkAck(inviteId, ackMs);
+        /* Zusätzlich Legacy-Keys (Code/Serial/Account), falls ID fehlt. */
+        markAdminInviteSeen(
+          {
+            id: inviteId,
+            serial_number: serial,
+            code: code
+          },
+          ids,
+          ackMs
+        );
       }
 
       async function confirmUserAdminOk() {
         var okBtn = document.getElementById("admin-user-ok");
-        if (okBtn) okBtn.disabled = true;
+        if (okBtn) {
+          okBtn.disabled = true;
+          okBtn.textContent = "…";
+        }
         try {
           await acknowledgeCurrentUserMessages();
         } catch (eAck) {}
         try {
           await showList();
+        } catch (eList) {
+          hideAllPanels();
+          panelList.hidden = false;
         } finally {
-          if (okBtn) okBtn.disabled = false;
+          if (okBtn) {
+            okBtn.disabled = false;
+            okBtn.textContent = "OK";
+          }
           pendingAdminInvite = null;
           window.scrollTo({ top: 0, behavior: "smooth" });
         }
@@ -2610,6 +2643,40 @@
         });
       }
 
+      function getAdminOkAckMap() {
+        var map = {};
+        try {
+          map = JSON.parse(localStorage.getItem(ADMIN_OK_ACK_KEY) || "{}") || {};
+        } catch (e0) {
+          map = {};
+        }
+        try {
+          var sess = JSON.parse(sessionStorage.getItem(ADMIN_OK_ACK_KEY) || "{}") || {};
+          Object.keys(sess).forEach(function (k) {
+            var a = Number(map[k]) || 0;
+            var b = Number(sess[k]) || 0;
+            map[k] = Math.max(a, b);
+          });
+        } catch (e1) {}
+        return map;
+      }
+
+      function setInviteOkAck(inviteId, ms) {
+        if (!inviteId) return false;
+        var id = String(inviteId);
+        var at = Number(ms) || Date.now();
+        var map = getAdminOkAckMap();
+        map[id] = Math.max(Number(map[id]) || 0, at);
+        try { localStorage.setItem(ADMIN_OK_ACK_KEY, JSON.stringify(map)); } catch (e0) {}
+        try { sessionStorage.setItem(ADMIN_OK_ACK_KEY, JSON.stringify(map)); } catch (e1) {}
+        return true;
+      }
+
+      function inviteOkAckMs(inviteId) {
+        if (!inviteId) return 0;
+        return Number(getAdminOkAckMap()[String(inviteId)]) || 0;
+      }
+
       function getAdminFeedSeenMap() {
         try {
           return JSON.parse(localStorage.getItem(ADMIN_FEED_SEEN_KEY) || "{}") || {};
@@ -2651,7 +2718,7 @@
         return peak;
       }
 
-      /* Gelesen-Markierung: Invite-ID + Code + Serial + Account-IDs. */
+      /* Legacy-Gelesen-Markierung (weiterhin mitschreiben). */
       function markAdminInviteSeen(row, accountIds, atLeastMs) {
         var map = getAdminFeedSeenMap();
         var ms = Date.now();
@@ -2660,7 +2727,6 @@
         var now = new Date(ms).toISOString();
         var keys = adminSeenKeysForInvite(row, accountIds);
         if (!keys.length) {
-          /* Fallback: wenigstens Code/Serial aus lastQr speichern */
           if (lastQr && lastQr.inviteId) keys.push("inviteid:" + String(lastQr.inviteId));
           if (lastQr && lastQr.code) keys.push("invite:" + String(lastQr.code));
           if (lastQr && lastQr.serial) keys.push("serial:" + String(lastQr.serial));
@@ -2754,16 +2820,19 @@
       }
 
       function inviteHasUnread(row, index, latestByAuthor) {
-        if (!row || !latestByAuthor) return false;
+        if (!row) return false;
         var ids = accountIdsForInvite(row, index);
-        if (!ids.length) return false;
-        var latestMs = 0;
-        ids.forEach(function (id) {
-          if (latestByAuthor[id] && latestByAuthor[id] > latestMs) latestMs = latestByAuthor[id];
-        });
+        var latestMs = peakLatestForIds(ids, latestByAuthor || {});
+        /* Keine Nutzer-Posts → kein Punkt. */
         if (!latestMs) return false;
+        /* OK-Ack für diese Invite-ID: Punkt weg, bis neuere Nachricht kommt. */
+        if (row.id) {
+          var ack = inviteOkAckMs(row.id);
+          if (ack && ack >= latestMs) return false;
+        }
         var seenMs = inviteSeenMs(row, ids);
-        return !seenMs || latestMs > seenMs;
+        if (seenMs && seenMs >= latestMs) return false;
+        return true;
       }
 
       function renderListRow(list, row, hasUnread, linkedAccountIds, latestByAuthor) {
