@@ -377,6 +377,9 @@
   }
   body.embed .wrap{ display:none; }
   body.embed #embedShell{ display:flex; }
+  body.parent-tabs .training-head{ display:none; }
+  body.parent-tabs .training-back{ display:none !important; }
+  body.parent-tabs .training-body{ margin-top:8px; }
 
   #embedShell{
     display:none; flex-direction:column;
@@ -394,13 +397,15 @@
     width:100%;
     padding:10px 0 0;
     min-height:44px;
-    z-index:5;
+    z-index:20;
+    background:var(--bg);
+    flex-shrink:0;
   }
   .training-back{
     position:absolute;
     left:8px;
-    bottom:4px;
-    z-index:2;
+    top:8px;
+    z-index:30;
     width:40px; height:40px;
     border-radius:50%;
     background:rgba(247,245,240,0.16);
@@ -408,9 +413,8 @@
     display:none;
     align-items:center; justify-content:center;
     padding:0; border:none; cursor:pointer;
-    pointer-events:none;
   }
-  .training-back.is-visible{ display:inline-flex; pointer-events:auto; }
+  .training-back.is-visible{ display:inline-flex; }
   .training-back::before{
     content:"";
     width:0; height:0;
@@ -423,8 +427,6 @@
     position:relative;
     width:100%;
     border-bottom:1px solid var(--tab-line);
-    z-index:6;
-    pointer-events:auto;
   }
   .card-tabs{
     display:flex; align-items:flex-end; justify-content:center;
@@ -432,14 +434,13 @@
     flex-wrap:nowrap;
     padding:0 12px;
     box-sizing:border-box;
-    position:relative;
-    z-index:7;
-    pointer-events:auto;
   }
   .card-tab{
     flex:0 1 auto;
     position:relative;
-    z-index:1;
+    z-index:2;
+    -webkit-appearance:none;
+    appearance:none;
     background:transparent;
     color:rgba(247,245,240,0.42);
     font-family:var(--display);
@@ -447,14 +448,15 @@
     font-weight:600;
     letter-spacing:0.03em;
     text-transform:uppercase;
+    min-height:44px;
     padding:10px 11px 9px;
     border-radius:10px 10px 0 0;
     border:1px solid var(--tab-line);
     border-bottom:none;
     margin-bottom:-1px;
     cursor:pointer;
+    touch-action:manipulation;
     transition:color .15s;
-    pointer-events:auto;
   }
   .card-tab.is-active{
     z-index:2;
@@ -467,26 +469,24 @@
     flex:1; min-height:0;
     display:flex; flex-direction:column;
     overflow:hidden;
-    margin-top:6px;
     position:relative;
-    z-index:1;
+    margin-top:8px;
+    padding-bottom:4px;
   }
   .tab-panel{
     display:none; flex:1; min-height:0;
     flex-direction:column; overflow:hidden;
   }
   .tab-panel.is-active{ display:flex; }
-  .tab-panel--center{
-    justify-content:center;
+  .tab-panel--content{
     padding:0 16px;
   }
   .panel-card{
-    width:min(100%, 390px);
-    margin:0 auto;
-    padding:22px 18px;
-    border:1px solid var(--tab-line);
-    border-radius:16px;
-    background:rgba(247,245,240,0.08);
+    width:100%;
+    padding:0;
+    border:none;
+    border-radius:0;
+    background:transparent;
     text-align:left;
   }
   .panel-card__title{
@@ -510,19 +510,13 @@
   }
   .info-scroll{
     flex:1; min-height:0;
-    display:flex;
-    flex-direction:column;
-    justify-content:center;
     overflow-y:auto; overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none; -ms-overflow-style:none;
     padding:0 16px;
   }
   .info-scroll::-webkit-scrollbar{ display:none; }
-  .info-article{
-    width:min(100%, 390px);
-    margin:auto;
-  }
+  .info-article{ max-width:100%; }
   .info-title{
     font-family:var(--display);
     font-size:1.15rem; font-weight:700;
@@ -760,27 +754,27 @@
 <body>
 <div id="embedShell" hidden>
   <div class="training-head">
-    <button type="button" class="training-back" id="trainingBack" aria-label="Zurück"></button>
     <div class="card-tabs-rail">
       <div class="card-tabs" role="tablist">
-        <button type="button" class="card-tab" data-embed-tab="kraft" role="tab">Kraft</button>
-        <button type="button" class="card-tab" data-embed-tab="ausdauer" role="tab">Ausdauer</button>
-        <button type="button" class="card-tab" data-embed-tab="intervall" role="tab">Intervall</button>
-        <button type="button" class="card-tab is-active" data-embed-tab="info" role="tab">Info</button>
+        <button type="button" class="card-tab" data-embed-tab="kraft" role="tab" aria-selected="false">Kraft</button>
+        <button type="button" class="card-tab" data-embed-tab="ausdauer" role="tab" aria-selected="false">Ausdauer</button>
+        <button type="button" class="card-tab" data-embed-tab="intervall" role="tab" aria-selected="false">Intervall</button>
+        <button type="button" class="card-tab is-active" data-embed-tab="info" role="tab" aria-selected="true">Info</button>
       </div>
     </div>
   </div>
   <div class="training-body">
-    <div class="tab-panel tab-panel--center" data-embed-panel="kraft">
+    <button type="button" class="training-back" id="trainingBack" aria-label="Zurück"></button>
+    <div class="tab-panel tab-panel--content" data-embed-panel="kraft">
       <article class="panel-card">
         <h2 class="panel-card__title">Kraft</h2>
-        <p class="panel-card__body">Die Inhalte fuer Kraft fuegen wir als Naechstes ein.</p>
+        <p class="panel-card__body">Die Inhalte für Kraft fügen wir als Nächstes ein.</p>
       </article>
     </div>
-    <div class="tab-panel tab-panel--center" data-embed-panel="ausdauer">
+    <div class="tab-panel tab-panel--content" data-embed-panel="ausdauer">
       <article class="panel-card">
         <h2 class="panel-card__title">Ausdauer</h2>
-        <p class="panel-card__body">Die Inhalte fuer Ausdauer fuegen wir als Naechstes ein.</p>
+        <p class="panel-card__body">Die Inhalte für Ausdauer fügen wir als Nächstes ein.</p>
       </article>
     </div>
     <div class="tab-panel is-active" data-embed-panel="info">
@@ -1288,6 +1282,8 @@
   }
 
   const isEmbed = document.body.classList.contains('embed');
+  const useParentTabs = isEmbed && window.parent !== window && new URLSearchParams(location.search).has('parentTabs');
+  if (useParentTabs) document.body.classList.add('parent-tabs');
   const GO_SUPABASE_URL = 'https://agpysewcsakdpmpftndp.supabase.co';
   const GO_SUPABASE_KEY = 'sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ';
 
@@ -2379,14 +2375,50 @@
   function setEmbedTab(tab){
     embedActiveTab = tab;
     document.querySelectorAll('.card-tab').forEach(function(btn){
-      btn.classList.toggle('is-active', btn.getAttribute('data-embed-tab') === tab);
+      var on = btn.getAttribute('data-embed-tab') === tab;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
     });
     document.querySelectorAll('.tab-panel[data-embed-panel]').forEach(function(panel){
       panel.classList.toggle('is-active', panel.getAttribute('data-embed-panel') === tab);
     });
     const showBack = tab === 'intervall' && embedInInterval;
     document.getElementById('trainingBack').classList.toggle('is-visible', showBack);
+    notifyParentTabState();
   }
+
+  function notifyParentTabState(){
+    if (!useParentTabs || window.parent === window) return;
+    try {
+      window.parent.postMessage({
+        type: 'gogogo-training-tab-state',
+        tab: embedActiveTab,
+        showBack: embedActiveTab === 'intervall' && embedInInterval
+      }, '*');
+    } catch (e) {}
+  }
+
+  function selectEmbedTab(tab){
+    if (!tab) return;
+    if (embedRunning && tab !== 'intervall') {
+      if (!confirm('Workout wirklich beenden?')) return;
+      clearInterval(timerId);
+      releaseWakeLock();
+      embedRunning = false;
+      notifyParentWorkout(false);
+      document.getElementById('intervalSetupView').hidden = false;
+      document.getElementById('intervalRunView').hidden = true;
+      document.getElementById('pbBar').hidden = true;
+    }
+    if (tab === 'intervall') {
+      enterIntervalView();
+    } else {
+      embedInInterval = false;
+      document.getElementById('trainingBack').classList.remove('is-visible');
+    }
+    setEmbedTab(tab);
+  }
+  window.selectEmbedTab = selectEmbedTab;
 
   function enterIntervalView(){
     embedInInterval = true;
@@ -2522,41 +2554,25 @@
     refreshEmbedSetup();
     setEmbedTab('info');
 
-    function handleEmbedTabAction(tab){
-      if (!tab) return;
-      if (tab === 'intervall') {
-        enterIntervalView();
-      } else if (embedInInterval && tab !== 'intervall') {
-        embedInInterval = false;
-        document.getElementById('trainingBack').classList.remove('is-visible');
-      }
-      setEmbedTab(tab);
-    }
-
-    var tabsRoot = document.querySelector('.card-tabs');
-    ['click', 'pointerup', 'touchend'].forEach(function(evtName){
-      tabsRoot.addEventListener(evtName, function(e){
-        var btn = e.target && e.target.closest ? e.target.closest('.card-tab') : null;
-        if (!btn) return;
-        e.preventDefault();
-        e.stopPropagation();
-        var tab = btn.getAttribute('data-embed-tab');
-        handleEmbedTabAction(tab);
-      }, { passive:false });
-    });
-
-    document.querySelectorAll('.card-tab').forEach(function(btn){
-      btn.addEventListener('keydown', function(e){
-        if (e.key !== 'Enter' && e.key !== ' ') return;
-        e.preventDefault();
-        const tab = btn.getAttribute('data-embed-tab');
-        if (tab === 'intervall') {
-          handleEmbedTabAction(tab);
-          return;
-        }
-        handleEmbedTabAction(tab);
+    if (!useParentTabs) {
+      document.querySelectorAll('.card-tab').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          e.preventDefault();
+          e.stopPropagation();
+          selectEmbedTab(btn.getAttribute('data-embed-tab'));
+        });
       });
-    });
+    } else {
+      window.addEventListener('message', function(ev){
+        if (!ev.data) return;
+        if (ev.data.type === 'gogogo-training-tab') {
+          selectEmbedTab(ev.data.tab);
+        }
+        if (ev.data.type === 'gogogo-training-back') {
+          document.getElementById('trainingBack').click();
+        }
+      });
+    }
 
     document.getElementById('trainingBack').addEventListener('click', function(){
       if (embedRunning && phase === 'log-final') {

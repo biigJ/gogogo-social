@@ -1687,6 +1687,83 @@
     }
     body.video-fs-open { overflow: hidden; }
 
+    #panel-training.is-active {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      flex: 1;
+      height: auto;
+    }
+    .training-chrome {
+      flex: 0 0 auto;
+      position: relative;
+      width: 100%;
+      padding-top: 8px;
+      color: var(--ink-on-red);
+    }
+    .training-chrome[hidden] { display: none !important; }
+    .training-chrome-back {
+      position: absolute;
+      left: 0;
+      top: 10px;
+      z-index: 2;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(247, 245, 240, 0.16);
+      color: var(--ink-on-red);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .training-chrome-back[hidden] { display: none !important; }
+    .training-chrome-back::before {
+      content: "";
+      width: 0;
+      height: 0;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-right: 12px solid currentColor;
+      margin-right: 2px;
+    }
+    .training-card-rail {
+      width: 100%;
+      border-bottom: 1px solid rgba(247, 245, 240, 0.85);
+    }
+    .training-card-tabs {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 4px;
+      padding: 0 12px;
+    }
+    .training-card-tab {
+      flex: 0 1 auto;
+      min-height: 44px;
+      padding: 10px 11px 9px;
+      border: 1px solid rgba(247, 245, 240, 0.85);
+      border-bottom: none;
+      border-radius: 10px 10px 0 0;
+      margin-bottom: -1px;
+      background: transparent;
+      color: rgba(247, 245, 240, 0.42);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .training-card-tab.is-active {
+      color: var(--ink-on-red);
+      border-bottom: 1px solid var(--red);
+      padding-bottom: 10px;
+      z-index: 1;
+    }
     .training-frame {
       width: 100%;
       height: 100%;
@@ -1694,13 +1771,7 @@
       border: 0;
       border-radius: var(--radius);
       background: var(--red);
-    }
-    #panel-training.is-active {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-      flex: 1;
-      height: auto;
+      pointer-events: auto;
     }
     body.is-training .foot,
     body.is-training .foot a { color: rgba(247, 245, 240, 0.75); }
@@ -2291,6 +2362,17 @@
       </div>
 
       <div class="panel" id="panel-training" data-panel="training">
+        <div class="training-chrome" id="training-chrome" hidden>
+          <button type="button" class="training-chrome-back" id="training-chrome-back" hidden aria-label="Zurück"></button>
+          <div class="training-card-rail">
+            <div class="training-card-tabs" role="tablist" aria-label="Training">
+              <button type="button" class="training-card-tab" data-training-tab="kraft" role="tab">Kraft</button>
+              <button type="button" class="training-card-tab" data-training-tab="ausdauer" role="tab">Ausdauer</button>
+              <button type="button" class="training-card-tab" data-training-tab="intervall" role="tab">Intervall</button>
+              <button type="button" class="training-card-tab is-active" data-training-tab="info" role="tab">Info</button>
+            </div>
+          </div>
+        </div>
         <iframe class="training-frame" id="training-frame" title="Friday Circle" src="about:blank" loading="lazy"></iframe>
       </div>
       </div>
@@ -4972,11 +5054,48 @@
 
       var homeHero = document.getElementById("home-hero");
       var trainingFrame = document.getElementById("training-frame");
+      var trainingChrome = document.getElementById("training-chrome");
+      var trainingChromeBack = document.getElementById("training-chrome-back");
       var trainingLoaded = false;
 
+      function setTrainingChromeTab(tab) {
+        if (!trainingChrome) return;
+        trainingChrome.querySelectorAll(".training-card-tab").forEach(function (btn) {
+          var on = btn.getAttribute("data-training-tab") === tab;
+          btn.classList.toggle("is-active", on);
+          btn.setAttribute("aria-selected", on ? "true" : "false");
+        });
+      }
+
+      function sendTrainingTab(tab) {
+        if (!trainingFrame || !trainingFrame.contentWindow) return;
+        trainingFrame.contentWindow.postMessage({ type: "gogogo-training-tab", tab: tab }, "*");
+      }
+
+      if (trainingChrome) {
+        trainingChrome.querySelectorAll(".training-card-tab").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            sendTrainingTab(btn.getAttribute("data-training-tab"));
+          });
+        });
+      }
+      if (trainingChromeBack) {
+        trainingChromeBack.addEventListener("click", function () {
+          if (!trainingFrame || !trainingFrame.contentWindow) return;
+          trainingFrame.contentWindow.postMessage({ type: "gogogo-training-back" }, "*");
+        });
+      }
+
       window.addEventListener("message", function (ev) {
-        if (!ev.data || ev.data.type !== "gogogo-training-workout") return;
-        document.body.classList.toggle("is-training-workout", !!ev.data.active);
+        if (!ev.data) return;
+        if (ev.data.type === "gogogo-training-workout") {
+          document.body.classList.toggle("is-training-workout", !!ev.data.active);
+          return;
+        }
+        if (ev.data.type === "gogogo-training-tab-state") {
+          setTrainingChromeTab(ev.data.tab || "info");
+          if (trainingChromeBack) trainingChromeBack.hidden = !ev.data.showBack;
+        }
       });
       var accountVideoControllers = [];
 
@@ -5013,12 +5132,14 @@
         });
         homeHero.hidden = id !== "home";
         document.body.classList.toggle("is-training", id === "training");
+        if (trainingChrome) trainingChrome.hidden = id !== "training";
         if (id !== "training") {
           document.body.classList.remove("is-training-workout");
+          if (trainingChromeBack) trainingChromeBack.hidden = true;
         }
         if (id !== "book") pauseAccountVideos();
         if (id === "training" && !trainingLoaded) {
-          trainingFrame.src = "/account/fitness-friday.html?embed=1";
+          trainingFrame.src = "/account/fitness-friday.html?embed=1&parentTabs=1";
           trainingLoaded = true;
         }
         if (onProfile) fillProfilePanel();
