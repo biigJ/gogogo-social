@@ -1704,6 +1704,10 @@
     }
     body.is-training .foot,
     body.is-training .foot a { color: rgba(247, 245, 240, 0.75); }
+    body.is-training-workout .site-chrome .site-bottom {
+      visibility: hidden;
+      pointer-events: none;
+    }
 
     .modal {
       position: fixed; inset: 0; z-index: 80; display: none;
@@ -4969,6 +4973,11 @@
       var homeHero = document.getElementById("home-hero");
       var trainingFrame = document.getElementById("training-frame");
       var trainingLoaded = false;
+
+      window.addEventListener("message", function (ev) {
+        if (!ev.data || ev.data.type !== "gogogo-training-workout") return;
+        document.body.classList.toggle("is-training-workout", !!ev.data.active);
+      });
       var accountVideoControllers = [];
 
       function pauseAccountVideos() {
@@ -5004,6 +5013,9 @@
         });
         homeHero.hidden = id !== "home";
         document.body.classList.toggle("is-training", id === "training");
+        if (id !== "training") {
+          document.body.classList.remove("is-training-workout");
+        }
         if (id !== "book") pauseAccountVideos();
         if (id === "training" && !trainingLoaded) {
           trainingFrame.src = "/account/fitness-friday.html?embed=1";

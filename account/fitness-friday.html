@@ -365,9 +365,358 @@
   }
 
   footer{margin-top:28px; font-size:11px; color:var(--text-dim); text-align:center; letter-spacing:0.5px;}
+
+  /* ---- Embed shell (Training-Tab in gogogo Account) ---- */
+  html.embed-root, html.embed-root body{
+    height:100%; min-height:100%; overflow:hidden;
+  }
+  body.embed{
+    padding:0; display:block; align-items:stretch;
+    height:100%; min-height:100%;
+  }
+  body.embed .wrap{ display:none; }
+  body.embed #embedShell{ display:flex; }
+
+  #embedShell{
+    display:none; flex-direction:column;
+    width:100%; height:100%; min-height:0;
+    max-width:100%; color:var(--text);
+  }
+  .training-topline{
+    flex:none;
+    height:1px;
+    background:var(--line);
+    margin:0 16px;
+  }
+  .training-head{
+    flex:none;
+    position:relative;
+    display:flex;
+    align-items:flex-end;
+    gap:0;
+    padding:10px 12px 0 52px;
+    min-height:44px;
+  }
+  .training-back{
+    position:absolute;
+    left:8px;
+    bottom:4px;
+    z-index:2;
+    width:40px; height:40px;
+    border-radius:50%;
+    background:rgba(247,245,240,0.16);
+    color:var(--text);
+    display:none;
+    align-items:center; justify-content:center;
+    padding:0; border:none; cursor:pointer;
+  }
+  .training-back.is-visible{ display:inline-flex; }
+  .training-back::before{
+    content:"";
+    width:0; height:0;
+    border-top:8px solid transparent;
+    border-bottom:8px solid transparent;
+    border-right:12px solid currentColor;
+    margin-right:2px;
+  }
+  .card-tabs{
+    display:flex; align-items:flex-end; gap:4px;
+    flex:1; min-width:0; overflow-x:auto;
+    scrollbar-width:none; -ms-overflow-style:none;
+  }
+  .card-tabs::-webkit-scrollbar{ display:none; }
+  .card-tab{
+    flex:none;
+    border:none;
+    background:rgba(247,245,240,0.1);
+    color:var(--text-dim);
+    font-family:var(--display);
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    padding:10px 14px 8px;
+    border-radius:10px 10px 0 0;
+    border:1px solid var(--line);
+    border-bottom:none;
+    cursor:pointer;
+    transition:background .15s, color .15s;
+  }
+  .card-tab.is-active{
+    background:rgba(247,245,240,0.22);
+    color:var(--text);
+    padding-bottom:9px;
+    margin-bottom:-1px;
+    z-index:1;
+  }
+  .training-body{
+    flex:1; min-height:0;
+    display:flex; flex-direction:column;
+    border-top:1px solid var(--line);
+    overflow:hidden;
+  }
+  .tab-panel{
+    display:none; flex:1; min-height:0;
+    flex-direction:column; overflow:hidden;
+  }
+  .tab-panel.is-active{ display:flex; }
+  .tab-placeholder{
+    flex:1; display:flex; align-items:center; justify-content:center;
+    padding:24px; text-align:center;
+    color:var(--text-dim); font-size:14px;
+  }
+  .interval-layout{
+    flex:1; min-height:0;
+    display:flex; flex-direction:column;
+  }
+  .interval-scroll{
+    flex:1; min-height:0;
+    overflow-y:auto; overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none; -ms-overflow-style:none;
+    padding:12px 16px 8px;
+  }
+  .interval-scroll::-webkit-scrollbar{ display:none; }
+  .interval-wheel-zone{
+    flex:none;
+    height:50%;
+    min-height:180px;
+    max-height:50vh;
+    border-top:1px solid var(--line);
+    display:flex; flex-direction:column;
+    position:relative;
+    background:rgba(0,0,0,0.06);
+  }
+  .interval-start-row{ margin-bottom:14px; }
+  .interval-start-btn{
+    width:100%; text-align:left; cursor:pointer;
+    background:var(--accent); border:1px solid var(--accent); border-radius:12px;
+    padding:18px 20px; display:flex; flex-direction:column; gap:4px;
+  }
+  .interval-start-btn:active{ transform:scale(0.99); filter:brightness(0.95); }
+  .interval-start-btn .title{
+    font-family:var(--display); font-size:18px; font-weight:700;
+    text-transform:uppercase; letter-spacing:1px; color:var(--on-accent);
+  }
+  .interval-start-btn .sub{ font-size:12px; color:var(--on-accent); opacity:0.75; }
+  .global-time-row{
+    display:flex; gap:10px; margin-bottom:14px;
+  }
+  .global-time-chip{
+    flex:1; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:12px 14px; cursor:pointer; text-align:center;
+  }
+  .global-time-chip.is-editing{
+    border-color:var(--accent);
+    background:var(--panel-raised);
+  }
+  .global-time-chip .lbl{
+    font-size:10px; text-transform:uppercase; letter-spacing:1px;
+    color:var(--text-dim); margin-bottom:4px;
+  }
+  .global-time-chip .val{
+    font-family:var(--display); font-size:20px; font-weight:700;
+  }
+  .plan-head{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-bottom:8px;
+  }
+  .plan-head .name{
+    font-size:11px; text-transform:uppercase; letter-spacing:1.5px;
+    color:var(--text-dim);
+  }
+  .plan-head .count{ font-size:12px; color:var(--text-dim); }
+  .drag-list{ display:flex; flex-direction:column; gap:0; }
+  .drag-row{
+    display:flex; align-items:center; gap:8px;
+    padding:11px 0; border-bottom:1px solid var(--line);
+    touch-action:none; user-select:none;
+    transition:transform .12s, opacity .12s;
+  }
+  .drag-row.is-dragging{ opacity:0.45; }
+  .drag-row.is-drop-target{ background:rgba(247,245,240,0.06); }
+  .drag-row.is-invalid{ opacity:0.35; }
+  .drag-handle{
+    flex:none; width:20px; color:var(--text-dim);
+    display:flex; align-items:center; justify-content:center;
+    cursor:grab;
+  }
+  .drag-handle svg{ display:block; }
+  .drag-row .r-num{
+    flex:none; width:26px; font-size:11px; color:var(--text-dim);
+    font-family:var(--display);
+  }
+  .drag-row .ex-icon-mini{ flex:none; width:22px; display:flex; justify-content:center; }
+  .drag-row .ex-name{ flex:1; font-size:14px; font-weight:600; }
+  .drag-row .ex-name.is-run{ color:var(--text-dim); font-weight:500; }
+  .wheel-frame{
+    flex:1; position:relative; overflow:hidden; min-height:0;
+  }
+  .wheel-highlight{
+    position:absolute; left:16px; right:16px; top:50%;
+    transform:translateY(-50%);
+    height:44px; pointer-events:none; z-index:1;
+    border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line);
+  }
+  .wheel-scroller{
+    height:100%; overflow-y:auto;
+    scroll-snap-type:y mandatory;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .wheel-scroller::-webkit-scrollbar{ display:none; }
+  .wheel-pad{ flex-shrink:0; }
+  .wheel-item{
+    display:flex; align-items:center; justify-content:center;
+    height:44px; scroll-snap-align:center;
+    font-family:var(--display); font-size:1.05rem;
+    color:rgba(247,245,240,0.38); font-weight:500;
+    border:none; background:transparent; width:100%;
+    font-variant-numeric:tabular-nums;
+  }
+  .wheel-item.is-selected{ color:var(--text); font-weight:700; font-size:1.15rem; }
+  .wheel-timer-display{
+    position:absolute; inset:0; display:flex;
+    align-items:center; justify-content:center;
+    pointer-events:none; z-index:2;
+  }
+  .wheel-timer-display.is-input{ pointer-events:auto; }
+  .wheel-timer-display .clock-big{
+    font-family:var(--display); font-weight:700;
+    font-size:clamp(48px, 14vw, 72px);
+    font-variant-numeric:tabular-nums;
+    letter-spacing:-1px;
+  }
+  .wheel-timer-display .clock-big.rest{ color:var(--rest); }
+  .wheel-timer-display .clock-big.warn{ color:var(--danger); }
+  .wheel-amount-input{
+    width:min(180px, 60%); text-align:center;
+    background:transparent; border:none; outline:none;
+    font-family:var(--display); font-weight:700;
+    font-size:clamp(40px, 12vw, 56px);
+    color:var(--chalk); font-variant-numeric:tabular-nums;
+  }
+  .wheel-phase-label{
+    position:absolute; top:10px; left:0; right:0; text-align:center;
+    font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--text-dim); z-index:3;
+  }
+  .run-info{
+    text-align:center; padding:8px 0 4px;
+  }
+  .run-info .phase{
+    font-size:12px; letter-spacing:3px; text-transform:uppercase;
+    color:var(--accent); margin-bottom:4px;
+  }
+  .run-info .phase.rest{ color:var(--rest); }
+  .run-info .round{ font-size:13px; color:var(--text-dim); }
+  .run-info .ex-block{
+    display:flex; flex-direction:column; align-items:center;
+    gap:6px; margin-top:10px;
+  }
+  .run-info .ex-block .ex-name{
+    font-size:15px; font-weight:700; text-transform:uppercase;
+    letter-spacing:1px;
+  }
+  .pb-bar{
+    flex:none;
+    display:flex; align-items:center; justify-content:center; gap:16px;
+    padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top:1px solid var(--line);
+    background:rgba(0,0,0,0.12);
+    min-height:52px;
+  }
+  .pb-bar[hidden]{ display:none !important; }
+  .pb-stat{ text-align:center; min-width:72px; }
+  .pb-stat .lbl{
+    font-size:9px; text-transform:uppercase; letter-spacing:1px;
+    color:var(--text-dim); margin-bottom:2px;
+  }
+  .pb-stat .val{
+    font-family:var(--display); font-size:17px; font-weight:700;
+    color:var(--chalk);
+  }
+  .pb-stat .unit{ font-size:10px; color:var(--text-dim); font-weight:500; }
+  .pb-divider{
+    width:1px; height:28px; background:var(--line); flex:none;
+  }
 </style>
 </head>
 <body>
+<div id="embedShell" hidden>
+  <div class="training-topline" aria-hidden="true"></div>
+  <div class="training-head">
+    <button type="button" class="training-back" id="trainingBack" aria-label="Zurück"></button>
+    <div class="card-tabs" role="tablist">
+      <button type="button" class="card-tab" data-embed-tab="kraft" role="tab">Kraft</button>
+      <button type="button" class="card-tab" data-embed-tab="ausdauer" role="tab">Ausdauer</button>
+      <button type="button" class="card-tab" data-embed-tab="intervall" role="tab">Intervall</button>
+      <button type="button" class="card-tab is-active" data-embed-tab="info" role="tab">Info</button>
+    </div>
+  </div>
+  <div class="training-body">
+    <div class="tab-panel" data-embed-panel="kraft"><div class="tab-placeholder">Kraft — Inhalt folgt.</div></div>
+    <div class="tab-panel" data-embed-panel="ausdauer"><div class="tab-placeholder">Ausdauer — Inhalt folgt.</div></div>
+    <div class="tab-panel" data-embed-panel="info"><div class="tab-placeholder">Info — Inhalt folgt.</div></div>
+    <div class="tab-panel" data-embed-panel="intervall">
+      <div class="interval-layout" id="intervalLayout">
+        <div class="interval-scroll" id="intervalScroll">
+          <div id="intervalSetupView">
+            <div class="interval-start-row">
+              <button type="button" class="interval-start-btn" id="embedStartBtn">
+                <span class="title">Workout starten</span>
+                <span class="sub" id="embedStartSub">16 Runden · 4:00 · 30s Pause</span>
+              </button>
+            </div>
+            <div class="global-time-row">
+              <button type="button" class="global-time-chip" id="editWorkChip" data-edit="work">
+                <div class="lbl">Rundenzeit</div>
+                <div class="val" id="embedWorkVal">4:00</div>
+              </button>
+              <button type="button" class="global-time-chip" id="editRestChip" data-edit="rest">
+                <div class="lbl">Pause</div>
+                <div class="val" id="embedRestVal">30s</div>
+              </button>
+            </div>
+            <div class="plan-head">
+              <span class="name">Übungsplan</span>
+              <span class="count" id="planCount">16 Runden</span>
+            </div>
+            <div class="drag-list" id="dragList"></div>
+          </div>
+          <div id="intervalRunView" hidden>
+            <div class="run-info" id="runInfo"></div>
+          </div>
+        </div>
+        <div class="interval-wheel-zone" id="wheelZone">
+          <div class="wheel-phase-label" id="wheelPhaseLabel"></div>
+          <div class="wheel-frame" id="wheelFrame">
+            <div class="wheel-highlight"></div>
+            <div class="wheel-scroller" id="wheelScroller"></div>
+            <div class="wheel-timer-display" id="wheelTimerDisplay" hidden>
+              <input type="number" class="wheel-amount-input" id="wheelAmountInput" inputmode="numeric" min="0" placeholder="0" hidden>
+              <span class="clock-big" id="wheelClockBig"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="pb-bar" id="pbBar" hidden>
+    <div class="pb-stat">
+      <div class="lbl">PB · <span id="pbExLabel">—</span></div>
+      <div class="val" id="pbVal">—</div>
+      <div class="unit" id="pbUnit"></div>
+    </div>
+    <div class="pb-divider" id="pbAvgDivider" hidden></div>
+    <div class="pb-stat" id="pbAvgStat" hidden>
+      <div class="lbl">Ø</div>
+      <div class="val" id="pbAvgVal">—</div>
+      <div class="unit" id="pbAvgUnit"></div>
+    </div>
+  </div>
+</div>
 <div class="wrap">
 
   <header>
@@ -590,14 +939,19 @@
   // ---------- exercise list (offizielle Hyrox-Stationen + Laufen) ----------
   const exercises = [
     {id:'run',      name:'Laufen',              unit:'Meter'},
-    {id:'skierg',   name:'SkiErg',              unit:'Meter'},
-    {id:'sledpush', name:'Sled Push',           unit:'Meter'},
-    {id:'sledpull', name:'Sled Pull',           unit:'Meter'},
-    {id:'burpee',   name:'Burpee Broad Jumps',  unit:'Meter'},
-    {id:'row',      name:'Rudern',              unit:'Meter'},
+    {id:'skierg',   name:'Ski Ergometer',     unit:'Meter'},
+    {id:'sledpush', name:'Schlitten push',    unit:'Meter'},
+    {id:'sledpull', name:'Schlitten pull',    unit:'Meter'},
+    {id:'burpee',   name:'Burpee Broad Jumps',unit:'Meter'},
+    {id:'row',      name:'Ruder-Ergometer',     unit:'Meter'},
     {id:'farmers',  name:'Farmers Carry',       unit:'Meter'},
     {id:'lunges',   name:'Sandbag Lunges',      unit:'Meter'},
-    {id:'wallballs',name:'Wall Balls',          unit:'Wiederholungen'}
+    {id:'wallballs',name:'Wallballs',           unit:'Wiederholungen'}
+  ];
+
+  const DEFAULT_EMBED_PLAN = [
+    'run','skierg','run','sledpush','run','sledpull','run','burpee',
+    'run','row','run','lunges','run','farmers','run','wallballs'
   ];
 
   const exerciseSelect = document.getElementById('exerciseSelect');
@@ -777,7 +1131,22 @@
 
   if (new URLSearchParams(location.search).has('embed')) {
     document.body.classList.add('embed');
+    document.documentElement.classList.add('embed-root');
   }
+
+  const isEmbed = document.body.classList.contains('embed');
+  const GO_SUPABASE_URL = 'https://agpysewcsakdpmpftndp.supabase.co';
+  const GO_SUPABASE_KEY = 'sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ';
+
+  let goAccountId = null;
+  let embedActiveTab = 'info';
+  let embedInInterval = false;
+  let embedRunning = false;
+  let embedPlan = [];
+  let wheelEditMode = null;
+  let intervalLogs = [];
+  let dragState = null;
+  let restInputMode = false;
 
   sb.auth.onAuthStateChange((event, session)=>{
     if (gogogoLocal) return;
@@ -796,15 +1165,18 @@
   (async function initAuth(){
     if (gogogoLocal) {
       try { cachedHistory = JSON.parse(localStorage.getItem(LOCAL_HISTORY_KEY) || '[]'); } catch (e) { cachedHistory = []; }
-      showScreen('home');
+      if (isEmbed) initEmbedShell();
+      else showScreen('home');
       return;
     }
     const { data } = await sb.auth.getSession();
     if(data && data.session && data.session.user){
       currentUser = data.session.user;
-      showScreen('home');
+      if (isEmbed) initEmbedShell();
+      else showScreen('home');
     } else {
-      showScreen('auth');
+      if (isEmbed) initEmbedShell();
+      else showScreen('auth');
     }
   })();
 
@@ -910,12 +1282,12 @@
   document.getElementById('backFromProfile').addEventListener('click', ()=> showScreen('home'));
 
   // ---------- setup state ----------
-  let rounds = 8;         // 2..16, Default 8, Schritt 1
-  let workSec = 240;      // 60..240 in 30er Schritten (1-4 Min), Default 4 Min
-  let restSec = 30;       // 10..60 step 5
+  let rounds = isEmbed ? 16 : 8;
+  let workSec = 240;
+  let restSec = 30;
 
   const ROUNDS_MIN = 2, ROUNDS_MAX = 16, ROUNDS_STEP = 1;
-  const WORK_MIN = 60, WORK_MAX = 240, WORK_STEP = 30;
+  const WORK_MIN = isEmbed ? 30 : 60, WORK_MAX = isEmbed ? 480 : 240, WORK_STEP = 30;
 
   let roundExercises = []; // Übung je Runde, vorab im Setup gewählt
 
@@ -1154,6 +1526,13 @@
   }
 
   function render(){
+    if (isEmbed && embedRunning) {
+      updateLane();
+      renderEmbedRunInfo();
+      showEmbedTimerWheel();
+      updatePbBar();
+      return;
+    }
     updateLane();
     exerciseDisplayEl.style.display = 'none';
 
@@ -1220,6 +1599,10 @@
   }
 
   function advancePhase(){
+    if (isEmbed && embedRunning && phase === 'rest') {
+      if (restInputMode) disableRestInput();
+      else saveLogEntryFromWheel();
+    }
     if(phase==='work'){
       if(currentRound >= rounds){
         phase = 'log-final';
@@ -1234,6 +1617,10 @@
       return;
     }
     if(phase==='rest'){
+      if (isEmbed && embedRunning) {
+        restInputMode = false;
+        document.getElementById('wheelAmountInput').value = '';
+      }
       currentRound += 1;
       phase = 'work';
       phaseRemaining = workSec;
@@ -1446,6 +1833,20 @@
   });
 
   async function finishRun(){
+    if (isEmbed && embedRunning) {
+      saveLogEntryFromWheel();
+      clearInterval(timerId);
+      releaseWakeLock();
+      beep(988,0.12); setTimeout(function(){ beep(1318,0.25); },140);
+      vibrate([120,80,120,80,200]);
+      embedRunning = false;
+      notifyParentWorkout(false);
+      document.getElementById('intervalSetupView').hidden = false;
+      document.getElementById('intervalRunView').hidden = true;
+      document.getElementById('pbBar').hidden = true;
+      await loadIntervalLogs();
+      return;
+    }
     saveLogEntry();
     clearInterval(timerId);
     releaseWakeLock();
@@ -1497,6 +1898,535 @@
     showScreen('setup');
     refreshSetup();
   });
+
+  // ---------- Embed shell (Training tab) ----------
+  const dragHandleSvg = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="9" cy="7" r="1.5"/><circle cx="15" cy="7" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="17" r="1.5"/><circle cx="15" cy="17" r="1.5"/></svg>';
+
+  function getGoAccountId(){
+    if (goAccountId) return goAccountId;
+    try {
+      const acc = JSON.parse(localStorage.getItem('gogogo_go_account') || 'null');
+      if (acc && acc.id) { goAccountId = acc.id; return goAccountId; }
+    } catch (e) {}
+    return null;
+  }
+
+  function notifyParentWorkout(active){
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'gogogo-training-workout', active: !!active }, '*');
+    }
+  }
+
+  async function goRest(path, opts){
+    const headers = {
+      apikey: GO_SUPABASE_KEY,
+      Authorization: 'Bearer ' + GO_SUPABASE_KEY,
+      'Content-Type': 'application/json'
+    };
+    if (opts && opts.prefer) headers['Prefer'] = opts.prefer;
+    const res = await fetch(GO_SUPABASE_URL + '/rest/v1/' + path, {
+      method: (opts && opts.method) || 'GET',
+      headers: headers,
+      body: opts && opts.body ? JSON.stringify(opts.body) : undefined
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(function(){ return ''; });
+      throw new Error(txt || res.statusText);
+    }
+    if (res.status === 204) return null;
+    return res.json();
+  }
+
+  async function loadIntervalLogs(){
+    const aid = getGoAccountId();
+    if (!aid) { intervalLogs = []; return; }
+    try {
+      const rows = await goRest(
+        'go_training_interval_logs?account_id=eq.' + encodeURIComponent(aid) +
+        '&select=*&order=workout_date.desc,created_at.desc'
+      );
+      intervalLogs = rows || [];
+    } catch (e) {
+      console.warn('Interval logs load failed', e);
+      intervalLogs = [];
+    }
+  }
+
+  async function saveIntervalLogEntry(exId, amount, roundNum){
+    const aid = getGoAccountId();
+    if (!aid || !exId || amount === '' || amount === null || isNaN(parseFloat(amount))) return;
+    const ex = exercises.find(function(e){ return e.id === exId; });
+    if (!ex || exId === 'run') return;
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      await goRest('go_training_interval_logs', {
+        method: 'POST',
+        prefer: 'return=minimal',
+        body: {
+          account_id: aid,
+          workout_date: today,
+          exercise_id: exId,
+          exercise_name: ex.name,
+          work_sec: workSec,
+          amount: parseFloat(amount),
+          round_num: roundNum
+        }
+      });
+      await loadIntervalLogs();
+      updatePbBar();
+    } catch (e) {
+      console.warn('Interval log save failed', e);
+    }
+  }
+
+  function pbStatsForExercise(exId){
+    const matches = intervalLogs.filter(function(row){
+      return row.exercise_id === exId && row.work_sec === workSec;
+    });
+    if (!matches.length) return { pb: null, avg: null, days: 0, unit: unitFor(exId) };
+    let pb = null;
+    matches.forEach(function(row){
+      const amt = parseFloat(row.amount);
+      if (isNaN(amt)) return;
+      if (pb === null || amt > pb) pb = amt;
+    });
+    const daySet = {};
+    matches.forEach(function(row){ daySet[row.workout_date] = true; });
+    const days = Object.keys(daySet).length;
+    let avg = null;
+    if (days >= 2) {
+      let sum = 0, n = 0;
+      matches.forEach(function(row){
+        const amt = parseFloat(row.amount);
+        if (!isNaN(amt)) { sum += amt; n++; }
+      });
+      if (n) avg = Math.round(sum / n * 10) / 10;
+    }
+    return { pb: pb, avg: avg, days: days, unit: unitFor(exId) };
+  }
+
+  function updatePbBar(){
+    const bar = document.getElementById('pbBar');
+    if (!embedRunning) { bar.hidden = true; return; }
+    bar.hidden = false;
+    const idx = currentRound - 1;
+    const exId = (log[idx] && log[idx].exercise) || embedPlan[idx] || '';
+    const ex = exercises.find(function(e){ return e.id === exId; });
+    document.getElementById('pbExLabel').textContent = ex ? ex.name : '—';
+    const stats = pbStatsForExercise(exId);
+    document.getElementById('pbVal').textContent = stats.pb !== null ? stats.pb : '—';
+    document.getElementById('pbUnit').textContent = stats.unit || '';
+    const showAvg = stats.days >= 2 && stats.avg !== null;
+    document.getElementById('pbAvgDivider').hidden = !showAvg;
+    document.getElementById('pbAvgStat').hidden = !showAvg;
+    if (showAvg) {
+      document.getElementById('pbAvgVal').textContent = stats.avg;
+      document.getElementById('pbAvgUnit').textContent = stats.unit || '';
+    }
+  }
+
+  function fmtSecShort(sec){
+    sec = Math.max(0, Math.round(sec));
+    if (sec < 60) return sec + 's';
+    const m = Math.floor(sec / 60), s = sec % 60;
+    return s ? (m + ':' + String(s).padStart(2, '0')) : (m + ':00');
+  }
+
+  function timeWheelOptions(minSec, maxSec){
+    const opts = [];
+    for (let s = minSec; s <= maxSec; s += WORK_STEP) opts.push(s);
+    return opts;
+  }
+
+  function buildWheelScroller(mode){
+    const scroller = document.getElementById('wheelScroller');
+    scroller.innerHTML = '';
+    scroller.hidden = false;
+    document.getElementById('wheelTimerDisplay').hidden = true;
+    let opts = [];
+    let current = workSec;
+    if (mode === 'rest') { opts = timeWheelOptions(30, 180); current = restSec; }
+    else if (mode === 'work') { opts = timeWheelOptions(WORK_MIN, WORK_MAX); current = workSec; }
+    else return;
+    const pad = document.createElement('div');
+    pad.className = 'wheel-pad';
+    pad.style.height = '88px';
+    scroller.appendChild(pad);
+    opts.forEach(function(sec){
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'wheel-item' + (sec === current ? ' is-selected' : '');
+      btn.dataset.sec = String(sec);
+      btn.textContent = fmtSecShort(sec);
+      btn.addEventListener('click', function(){
+        if (mode === 'work') { workSec = sec; refreshEmbedSetup(); }
+        else { restSec = sec; refreshEmbedSetup(); }
+        buildWheelScroller(mode);
+        highlightWheelSelection(scroller, sec);
+      });
+      scroller.appendChild(btn);
+    });
+    const pad2 = document.createElement('div');
+    pad2.className = 'wheel-pad';
+    pad2.style.height = '88px';
+    scroller.appendChild(pad2);
+    requestAnimationFrame(function(){
+      const sel = scroller.querySelector('.wheel-item.is-selected');
+      if (sel) sel.scrollIntoView({ block: 'center', behavior: 'instant' });
+    });
+  }
+
+  function highlightWheelSelection(scroller, sec){
+    scroller.querySelectorAll('.wheel-item').forEach(function(el){
+      el.classList.toggle('is-selected', parseInt(el.dataset.sec, 10) === sec);
+    });
+  }
+
+  function bindWheelScrollSnap(mode){
+    const scroller = document.getElementById('wheelScroller');
+    let scrollTimer = null;
+    scroller.onscroll = function(){
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(function(){
+        const items = scroller.querySelectorAll('.wheel-item');
+        if (!items.length) return;
+        const rect = scroller.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        let best = null, bestDist = Infinity;
+        items.forEach(function(item){
+          const ir = item.getBoundingClientRect();
+          const dist = Math.abs(ir.top + ir.height / 2 - mid);
+          if (dist < bestDist) { bestDist = dist; best = item; }
+        });
+        if (!best) return;
+        const sec = parseInt(best.dataset.sec, 10);
+        items.forEach(function(el){ el.classList.toggle('is-selected', el === best); });
+        if (mode === 'work' && sec !== workSec) { workSec = sec; refreshEmbedSetup(); }
+        if (mode === 'rest' && sec !== restSec) { restSec = sec; refreshEmbedSetup(); }
+      }, 80);
+    };
+  }
+
+  function showWheelPicker(mode){
+    wheelEditMode = mode;
+    document.getElementById('editWorkChip').classList.toggle('is-editing', mode === 'work');
+    document.getElementById('editRestChip').classList.toggle('is-editing', mode === 'rest');
+    document.getElementById('wheelPhaseLabel').textContent = mode === 'work' ? 'Rundenzeit' : 'Pause';
+    buildWheelScroller(mode);
+    bindWheelScrollSnap(mode);
+  }
+
+  function hideWheelPicker(){
+    wheelEditMode = null;
+    document.getElementById('editWorkChip').classList.remove('is-editing');
+    document.getElementById('editRestChip').classList.remove('is-editing');
+    document.getElementById('wheelPhaseLabel').textContent = '';
+    document.getElementById('wheelScroller').innerHTML = '';
+    document.getElementById('wheelScroller').hidden = true;
+  }
+
+  function refreshEmbedSetup(){
+    rounds = embedPlan.length;
+    roundExercises = embedPlan.slice();
+    document.getElementById('embedWorkVal').textContent = fmtMin(workSec);
+    document.getElementById('embedRestVal').textContent = restSec + 's';
+    document.getElementById('planCount').textContent = rounds + ' Runden';
+    document.getElementById('embedStartSub').textContent =
+      rounds + ' Runden · ' + fmtMin(workSec) + ' · ' + restSec + 's Pause';
+    renderDragList();
+  }
+
+  function wouldConsecutiveRun(list, fromIdx, toIdx){
+    const item = list[fromIdx];
+    if (item !== 'run') return false;
+    const copy = list.slice();
+    copy.splice(fromIdx, 1);
+    copy.splice(toIdx, 0, item);
+    for (let i = 1; i < copy.length; i++) {
+      if (copy[i] === 'run' && copy[i - 1] === 'run') return true;
+    }
+    return false;
+  }
+
+  function nearestValidDropIndex(list, fromIdx, targetIdx){
+    if (!wouldConsecutiveRun(list, fromIdx, targetIdx)) return targetIdx;
+    for (let d = 1; d < list.length; d++) {
+      if (targetIdx - d >= 0 && !wouldConsecutiveRun(list, fromIdx, targetIdx - d)) return targetIdx - d;
+      if (targetIdx + d <= list.length && !wouldConsecutiveRun(list, fromIdx, targetIdx + d)) return targetIdx + d;
+    }
+    return fromIdx;
+  }
+
+  function renderDragList(){
+    const list = document.getElementById('dragList');
+    list.innerHTML = '';
+    embedPlan.forEach(function(exId, i){
+      const ex = exercises.find(function(e){ return e.id === exId; });
+      const row = document.createElement('div');
+      row.className = 'drag-row';
+      row.dataset.index = String(i);
+      row.innerHTML =
+        '<span class="drag-handle" aria-hidden="true">' + dragHandleSvg + '</span>' +
+        '<span class="r-num">R' + (i + 1) + '</span>' +
+        '<span class="ex-icon-mini">' + iconSvg(exId, 20) + '</span>' +
+        '<span class="ex-name' + (exId === 'run' ? ' is-run' : '') + '">' + (ex ? ex.name : exId) + '</span>';
+      bindDragRow(row, i);
+      list.appendChild(row);
+    });
+  }
+
+  function bindDragRow(row, index){
+    row.addEventListener('pointerdown', function(e){
+      if (embedRunning) return;
+      if (!e.target.closest('.drag-handle')) return;
+      dragState = { from: index, row: row, pointerId: e.pointerId };
+      row.classList.add('is-dragging');
+      row.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    row.addEventListener('pointermove', function(e){
+      if (!dragState || dragState.row !== row) return;
+      const list = document.getElementById('dragList');
+      const rows = Array.from(list.querySelectorAll('.drag-row'));
+      const y = e.clientY;
+      let target = index;
+      rows.forEach(function(r, ri){
+        const rect = r.getBoundingClientRect();
+        if (y >= rect.top && y <= rect.bottom) target = ri;
+      });
+      const valid = nearestValidDropIndex(embedPlan, dragState.from, target);
+      rows.forEach(function(r, ri){
+        r.classList.toggle('is-drop-target', ri === valid && valid !== dragState.from);
+        r.classList.toggle('is-invalid', ri === target && valid !== target);
+      });
+      dragState.target = valid;
+    });
+    row.addEventListener('pointerup', function(e){
+      if (!dragState || dragState.row !== row) return;
+      row.classList.remove('is-dragging');
+      row.releasePointerCapture(e.pointerId);
+      const from = dragState.from;
+      const to = dragState.target !== undefined ? dragState.target : from;
+      dragState = null;
+      document.querySelectorAll('.drag-row').forEach(function(r){
+        r.classList.remove('is-drop-target', 'is-invalid');
+      });
+      if (to !== from && to !== undefined) {
+        const item = embedPlan.splice(from, 1)[0];
+        embedPlan.splice(to, 0, item);
+        refreshEmbedSetup();
+      }
+    });
+    row.addEventListener('pointercancel', function(){
+      dragState = null;
+      row.classList.remove('is-dragging');
+    });
+  }
+
+  function setEmbedTab(tab){
+    embedActiveTab = tab;
+    document.querySelectorAll('.card-tab').forEach(function(btn){
+      btn.classList.toggle('is-active', btn.getAttribute('data-embed-tab') === tab);
+    });
+    document.querySelectorAll('.tab-panel[data-embed-panel]').forEach(function(panel){
+      panel.classList.toggle('is-active', panel.getAttribute('data-embed-panel') === tab);
+    });
+    const showBack = tab === 'intervall' && embedInInterval;
+    document.getElementById('trainingBack').classList.toggle('is-visible', showBack);
+  }
+
+  function enterIntervalView(){
+    embedInInterval = true;
+    document.getElementById('trainingBack').classList.add('is-visible');
+    document.getElementById('intervalSetupView').hidden = false;
+    document.getElementById('intervalRunView').hidden = true;
+    hideWheelPicker();
+  }
+
+  function exitIntervalView(){
+    embedInInterval = false;
+    embedRunning = false;
+    notifyParentWorkout(false);
+    clearInterval(timerId);
+    releaseWakeLock();
+    document.getElementById('trainingBack').classList.remove('is-visible');
+    document.getElementById('intervalSetupView').hidden = false;
+    document.getElementById('intervalRunView').hidden = true;
+    document.getElementById('pbBar').hidden = true;
+    hideWheelPicker();
+    setEmbedTab('info');
+  }
+
+  function showEmbedTimerWheel(){
+    document.getElementById('wheelScroller').hidden = true;
+    const display = document.getElementById('wheelTimerDisplay');
+    display.hidden = false;
+    const clockBig = document.getElementById('wheelClockBig');
+    const amountInput = document.getElementById('wheelAmountInput');
+    const phaseLbl = document.getElementById('wheelPhaseLabel');
+
+    if (phase === 'rest') {
+      phaseLbl.textContent = 'Pause · Tippe für Wert';
+      clockBig.textContent = fmt(phaseRemaining);
+      clockBig.className = 'clock-big rest';
+      clockBig.hidden = restInputMode;
+      amountInput.hidden = !restInputMode;
+      display.classList.toggle('is-input', restInputMode);
+    } else if (phase === 'work') {
+      phaseLbl.textContent = 'Arbeit';
+      clockBig.textContent = fmt(phaseRemaining);
+      clockBig.className = 'clock-big' + (phaseRemaining <= 3 ? ' warn' : '');
+      clockBig.hidden = false;
+      amountInput.hidden = true;
+      display.classList.remove('is-input');
+    } else {
+      phaseLbl.textContent = 'Letzte Runde · Tippe für Wert';
+      clockBig.textContent = 'Fertig';
+      clockBig.hidden = restInputMode;
+      amountInput.hidden = !restInputMode;
+      display.classList.toggle('is-input', restInputMode);
+    }
+  }
+
+  function renderEmbedRunInfo(){
+    const box = document.getElementById('runInfo');
+    const exId = embedPlan[currentRound - 1] || '';
+    const ex = exercises.find(function(e){ return e.id === exId; });
+    let html = '<div class="phase' + (phase === 'rest' ? ' rest' : '') + (phase === 'log-final' ? ' log' : '') + '">' +
+      (phase === 'work' ? 'Arbeit' : phase === 'rest' ? 'Pause' : 'Fertig') + '</div>' +
+      '<div class="round">Runde ' + currentRound + ' / ' + rounds + '</div>';
+    if (phase === 'work' && ex) {
+      html += '<div class="ex-block"><div class="ex-icon">' + iconSvg(ex.id, 48) + '</div>' +
+        '<div class="ex-name">' + ex.name + '</div></div>';
+    }
+    box.innerHTML = html;
+  }
+
+  function enableRestInput(){
+    if ((phase !== 'rest' && phase !== 'log-final') || !embedRunning) return;
+    restInputMode = true;
+    const display = document.getElementById('wheelTimerDisplay');
+    const clockBig = document.getElementById('wheelClockBig');
+    const amountInput = document.getElementById('wheelAmountInput');
+    display.classList.add('is-input');
+    clockBig.hidden = true;
+    amountInput.hidden = false;
+    const entry = log[currentRound - 1] || {};
+    amountInput.value = entry.amount || '';
+    amountInput.focus();
+    document.getElementById('wheelPhaseLabel').textContent = 'Rundenwert eingeben';
+  }
+
+  function disableRestInput(){
+    restInputMode = false;
+    const amountInput = document.getElementById('wheelAmountInput');
+    if (amountInput.value !== '') {
+      saveLogEntryFromWheel();
+    }
+    showEmbedTimerWheel();
+  }
+
+  function saveLogEntryFromWheel(){
+    const amountInput = document.getElementById('wheelAmountInput');
+    const idx = currentRound - 1;
+    if (!log[idx]) log[idx] = { exercise: embedPlan[idx] || '', amount: '' };
+    log[idx].amount = amountInput.value;
+    log[idx].exercise = embedPlan[idx] || log[idx].exercise;
+    if (amountInput.value !== '') {
+      saveIntervalLogEntry(log[idx].exercise, amountInput.value, currentRound);
+    }
+  }
+
+  function startEmbedRun(){
+    embedRunning = true;
+    embedInInterval = true;
+    notifyParentWorkout(true);
+    document.getElementById('intervalSetupView').hidden = true;
+    document.getElementById('intervalRunView').hidden = false;
+    document.getElementById('trainingBack').classList.add('is-visible');
+    hideWheelPicker();
+    rounds = embedPlan.length;
+    roundExercises = embedPlan.slice();
+    showScreen('run');
+    buildLane();
+    currentRound = 1;
+    phase = 'work';
+    phaseRemaining = workSec;
+    elapsedTotal = 0;
+    paused = false;
+    restInputMode = false;
+    log = embedPlan.map(function(exId){ return { exercise: exId, amount: '' }; });
+    requestWakeLock();
+    beep(880, 0.15); vibrate(120);
+    loadIntervalLogs().then(updatePbBar);
+    render();
+    tick();
+  }
+
+  function initEmbedShell(){
+    document.getElementById('embedShell').removeAttribute('hidden');
+    embedPlan = DEFAULT_EMBED_PLAN.slice();
+    refreshEmbedSetup();
+    setEmbedTab('info');
+
+    document.querySelectorAll('.card-tab').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        const tab = btn.getAttribute('data-embed-tab');
+        if (tab === 'intervall') enterIntervalView();
+        setEmbedTab(tab);
+      });
+    });
+
+    document.getElementById('trainingBack').addEventListener('click', function(){
+      if (embedRunning && phase === 'log-final') {
+        finishRun();
+        exitIntervalView();
+        return;
+      }
+      if (embedRunning) {
+        if (confirm('Workout wirklich beenden?')) exitIntervalView();
+      } else {
+        exitIntervalView();
+      }
+    });
+
+    document.getElementById('embedStartBtn').addEventListener('click', startEmbedRun);
+
+    document.getElementById('editWorkChip').addEventListener('click', function(e){
+      e.stopPropagation();
+      showWheelPicker('work');
+    });
+    document.getElementById('editRestChip').addEventListener('click', function(e){
+      e.stopPropagation();
+      showWheelPicker('rest');
+    });
+
+    document.getElementById('intervalLayout').addEventListener('click', function(e){
+      if (!wheelEditMode || embedRunning) return;
+      if (e.target.closest('.global-time-chip') || e.target.closest('.wheel-frame')) return;
+      hideWheelPicker();
+    });
+
+    document.getElementById('wheelZone').addEventListener('click', function(e){
+      if (!embedRunning || (phase !== 'rest' && phase !== 'log-final')) return;
+      if (e.target.closest('#wheelAmountInput')) return;
+      if (phase === 'log-final') {
+        enableRestInput();
+        return;
+      }
+      enableRestInput();
+    });
+
+    document.getElementById('wheelAmountInput').addEventListener('input', function(){
+      saveLogEntryFromWheel();
+    });
+
+    document.getElementById('wheelAmountInput').addEventListener('blur', function(){
+      if (restInputMode && (phase === 'rest' || phase === 'log-final')) disableRestInput();
+    });
+
+    loadIntervalLogs();
+  }
 
 })();
 </script>
