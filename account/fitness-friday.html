@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/account/kraft-catalog.js"></script>
 <style>
   :root{
     --bg:#C7413B;
@@ -577,6 +578,9 @@
     box-sizing:border-box;
   }
   .interval-layout.is-running .plan-scrollbar:not([hidden]){
+    display:block;
+  }
+  .kraft-layout .plan-scrollbar:not([hidden]){
     display:block;
   }
   .plan-scrollbar-track{
@@ -1202,6 +1206,83 @@
     cursor:pointer;
     touch-action:manipulation;
   }
+  .kraft-head{
+    display:block;
+    flex:none;
+    padding:4px 16px 8px;
+  }
+  .kraft-layout.is-running .kraft-head-setup{ display:none; }
+  .kraft-layout.is-running .kraft-run-head{ display:block; }
+  .kraft-run-head{ display:none; }
+  .kraft-system-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+    margin-top:14px;
+  }
+  .kraft-system{
+    display:flex;
+    align-items:center; justify-content:center;
+    min-height:36px;
+    padding:6px 6px;
+    border:1.5px solid rgba(247,245,240,0.32);
+    border-radius:2px;
+    background:transparent;
+    color:var(--text);
+    font-family:var(--display);
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+    line-height:1.15;
+    text-align:center;
+    cursor:pointer;
+    touch-action:manipulation;
+    -webkit-appearance:none; appearance:none;
+  }
+  .kraft-system.is-selected{
+    border-color:var(--text);
+    background:rgba(247,245,240,0.14);
+  }
+  .kraft-layout.is-running .kraft-system-grid{ display:none !important; }
+  .kraft-ex-list{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    padding:10px 0 8px;
+  }
+  .kraft-ex-row{
+    display:grid;
+    grid-template-columns:1fr auto;
+    align-items:center;
+    min-height:40px;
+    padding:7px 10px;
+    background:rgba(0,0,0,0.22);
+    border:2px solid transparent;
+    border-radius:2px;
+    cursor:pointer;
+    touch-action:manipulation;
+    -webkit-appearance:none; appearance:none;
+    color:var(--text);
+    font-family:var(--display);
+    width:100%;
+    text-align:left;
+  }
+  .kraft-ex-row.is-selected{
+    border-color:var(--text);
+  }
+  .kraft-ex-row .ex-name{
+    font-size:14px; font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  .kraft-trainer-mark{
+    display:none;
+    width:22px; height:22px;
+    margin-left:8px;
+    color:var(--text);
+    flex:none;
+  }
+  .kraft-ex-row.is-trainer .kraft-trainer-mark{ display:block; }
+  .kraft-layout.is-running .kraft-ex-row{ cursor:default; pointer-events:none; }
 </style>
 </head>
 <body>
@@ -1218,11 +1299,41 @@
   </div>
   <div class="training-body">
     <button type="button" class="training-back" id="trainingBack" aria-label="Zurück"></button>
-    <div class="tab-panel tab-panel--content" data-embed-panel="kraft">
-      <article class="panel-card">
-        <h2 class="panel-card__title">Kraft</h2>
-        <p class="panel-card__body">Die Inhalte für Kraft fügen wir als Nächstes ein.</p>
-      </article>
+    <div class="tab-panel" data-embed-panel="kraft">
+      <div class="interval-layout kraft-layout" id="kraftLayout">
+        <div class="kraft-head kraft-head-setup" id="kraftHeadSetup">
+          <div id="kraftHeadline" class="interval-headline">KRAFT</div>
+          <div class="kraft-system-grid" id="kraftSystemGrid"></div>
+        </div>
+        <div class="kraft-head kraft-run-head" id="kraftRunHead">
+          <div id="kraftRunnerName" class="runner-name"></div>
+          <div id="kraftSummaryBar" class="run-summary"></div>
+        </div>
+        <div class="interval-main">
+          <div class="plan-scrollbar" id="kraftScrollbar" hidden>
+            <div class="plan-scrollbar-track" id="kraftScrollbarTrack">
+              <div class="plan-scrollbar-thumb" id="kraftScrollbarThumb"></div>
+            </div>
+          </div>
+          <div class="interval-scroll" id="kraftScroll">
+            <div class="kraft-ex-list" id="kraftExList"></div>
+          </div>
+        </div>
+        <div class="interval-wheel-zone" id="kraftWheelZone">
+          <div class="interval-ray-wrap">
+            <button type="button" class="interval-ray-hub" id="kraftHub" disabled>
+              <div class="ray-hub-start" id="kraftHubStart">
+                <span class="line1">Workout</span>
+                <span class="line2">starten</span>
+              </div>
+              <div class="ray-hub-start" id="kraftHubDone" hidden>
+                <span class="line1">Workout</span>
+                <span class="line2">beenden</span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="tab-panel tab-panel--content" data-embed-panel="ausdauer">
       <article class="panel-card">
@@ -1823,6 +1934,11 @@
   let dragState = null;
   let restInputMode = false;
   let embedShellReady = false;
+  let kraftRunning = false;
+  let kraftSystemId = 'full';
+  let kraftSelected = [];
+  let kraftPresetMap = {};
+  let kraftPresetsLoaded = false;
 
   sb.auth.onAuthStateChange((event, session)=>{
     if (gogogoLocal) return;
@@ -3106,6 +3222,213 @@
     });
   }
 
+  function kraftCatalog(){
+    return window.GOGOGO_KRAFT || { SYSTEMS: [], exercisesFor: function(){ return []; }, systemById: function(){ return { id: 'full', name: 'Kraft' }; }, defaultPresetsFor: function(){ return []; } };
+  }
+
+  function kraftPresetsFor(systemId){
+    if (kraftPresetMap[systemId] && kraftPresetMap[systemId].length) return kraftPresetMap[systemId].slice();
+    return kraftCatalog().defaultPresetsFor(systemId);
+  }
+
+  function applyKraftDefaults(systemId){
+    kraftSelected = kraftPresetsFor(systemId);
+  }
+
+  async function loadKraftPresets(){
+    const aid = getGoAccountId();
+    kraftPresetMap = {};
+    if (!aid) {
+      kraftPresetsLoaded = true;
+      return;
+    }
+    try {
+      const rows = await goRest(
+        'go_kraft_presets?account_id=eq.' + encodeURIComponent(aid) + '&select=system_id,exercise_ids'
+      );
+      (rows || []).forEach(function(row){
+        const ids = Array.isArray(row.exercise_ids) ? row.exercise_ids : [];
+        kraftPresetMap[row.system_id] = ids.map(String);
+      });
+    } catch (e) {
+      kraftPresetMap = {};
+    }
+    kraftPresetsLoaded = true;
+  }
+
+  function renderKraftSystems(){
+    const grid = document.getElementById('kraftSystemGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    kraftCatalog().SYSTEMS.forEach(function(sys){
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'kraft-system' + (sys.id === kraftSystemId ? ' is-selected' : '');
+      btn.dataset.system = sys.id;
+      btn.textContent = sys.name;
+      grid.appendChild(btn);
+    });
+  }
+
+  function renderKraftExercises(){
+    const list = document.getElementById('kraftExList');
+    if (!list) return;
+    const cat = kraftCatalog();
+    const presets = kraftPresetsFor(kraftSystemId);
+    const all = cat.exercisesFor(kraftSystemId);
+    const rows = kraftRunning
+      ? all.filter(function(ex){ return kraftSelected.indexOf(ex.id) !== -1; })
+      : all;
+    list.innerHTML = '';
+    const checkSvg = '<svg class="kraft-trainer-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.2 16.2 4.8 11.8l1.4-1.4 3 3 8.6-8.6 1.4 1.4z"/></svg>';
+    rows.forEach(function(ex){
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const isSel = kraftSelected.indexOf(ex.id) !== -1;
+      const isTrainer = presets.indexOf(ex.id) !== -1;
+      btn.className = 'kraft-ex-row' + (isSel ? ' is-selected' : '') + (isTrainer ? ' is-trainer' : '');
+      btn.dataset.ex = ex.id;
+      btn.innerHTML = '<span class="ex-name">' + ex.name + '</span>' + checkSvg;
+      list.appendChild(btn);
+    });
+    updateKraftHub();
+    updateKraftScrollbar();
+  }
+
+  function updateKraftHub(){
+    const hub = document.getElementById('kraftHub');
+    const start = document.getElementById('kraftHubStart');
+    const done = document.getElementById('kraftHubDone');
+    if (!hub) return;
+    hub.disabled = kraftRunning ? false : kraftSelected.length === 0;
+    if (start) start.hidden = kraftRunning;
+    if (done) done.hidden = !kraftRunning;
+  }
+
+  function refreshKraftChrome(){
+    const cat = kraftCatalog();
+    const sys = cat.systemById(kraftSystemId);
+    const head = document.getElementById('kraftHeadline');
+    if (head) head.textContent = 'KRAFT ' + formatHeadlineDate();
+    const runner = document.getElementById('kraftRunnerName');
+    if (runner) runner.textContent = getAthleteFirstName();
+    const sum = document.getElementById('kraftSummaryBar');
+    if (sum) sum.textContent = sys && sys.name ? sys.name : '';
+    const layout = document.getElementById('kraftLayout');
+    if (layout) layout.classList.toggle('is-running', kraftRunning);
+    renderKraftSystems();
+    renderKraftExercises();
+    updateKraftHub();
+  }
+
+  function setKraftSystem(id){
+    if (kraftRunning || !id || id === kraftSystemId) return;
+    kraftSystemId = id;
+    applyKraftDefaults(id);
+    refreshKraftChrome();
+  }
+
+  function toggleKraftExercise(exId){
+    if (kraftRunning || !exId) return;
+    const i = kraftSelected.indexOf(exId);
+    if (i >= 0) kraftSelected.splice(i, 1);
+    else kraftSelected.push(exId);
+    renderKraftExercises();
+  }
+
+  function startKraftSession(){
+    if (!kraftSelected.length) return;
+    kraftRunning = true;
+    notifyParentWorkout(true);
+    refreshKraftChrome();
+    notifyParentTabState();
+    requestAnimationFrame(updateKraftScrollbar);
+  }
+
+  function endKraftSession(){
+    kraftRunning = false;
+    notifyParentWorkout(false);
+    refreshKraftChrome();
+    notifyParentTabState();
+  }
+
+  function updateKraftScrollbar(){
+    const scroller = document.getElementById('kraftScroll');
+    const bar = document.getElementById('kraftScrollbar');
+    const thumb = document.getElementById('kraftScrollbarThumb');
+    const track = document.getElementById('kraftScrollbarTrack');
+    if (!scroller || !bar || !thumb || !track) return;
+    const view = scroller.clientHeight;
+    const full = scroller.scrollHeight;
+    if (full <= view + 8) {
+      bar.hidden = true;
+      return;
+    }
+    bar.hidden = false;
+    const trackH = track.clientHeight || bar.clientHeight;
+    const thumbH = Math.max(36, Math.round((view / full) * trackH));
+    const maxTop = Math.max(0, trackH - thumbH);
+    const maxScroll = Math.max(1, full - view);
+    const top = (scroller.scrollTop / maxScroll) * maxTop;
+    thumb.style.height = thumbH + 'px';
+    thumb.style.top = top + 'px';
+  }
+
+  function bindKraftScrollbar(){
+    const scroller = document.getElementById('kraftScroll');
+    const thumb = document.getElementById('kraftScrollbarThumb');
+    const track = document.getElementById('kraftScrollbarTrack');
+    if (!scroller || !thumb || !track || thumb.dataset.bound === '1') return;
+    thumb.dataset.bound = '1';
+    scroller.addEventListener('scroll', updateKraftScrollbar, { passive: true });
+    window.addEventListener('resize', updateKraftScrollbar);
+    let drag = null;
+    function maxThumbTop(){
+      return Math.max(0, track.clientHeight - thumb.offsetHeight);
+    }
+    function scrollFromThumb(top){
+      const maxT = maxThumbTop();
+      const maxS = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+      scroller.scrollTop = maxT ? (top / maxT) * maxS : 0;
+    }
+    thumb.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      drag = { startY: e.clientY, startTop: thumb.offsetTop };
+      try { thumb.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    thumb.addEventListener('pointermove', function(e){
+      if (!drag) return;
+      const maxT = maxThumbTop();
+      let top = drag.startTop + (e.clientY - drag.startY);
+      if (top < 0) top = 0;
+      if (top > maxT) top = maxT;
+      scrollFromThumb(top);
+    });
+    function endThumb(){ drag = null; }
+    thumb.addEventListener('pointerup', endThumb);
+    thumb.addEventListener('pointercancel', endThumb);
+    track.addEventListener('pointerdown', function(e){
+      if (e.target === thumb) return;
+      const rect = track.getBoundingClientRect();
+      const thumbH = thumb.offsetHeight;
+      let top = e.clientY - rect.top - thumbH / 2;
+      const maxT = maxThumbTop();
+      if (top < 0) top = 0;
+      if (top > maxT) top = maxT;
+      scrollFromThumb(top);
+    });
+  }
+
+  async function enterKraftView(){
+    document.getElementById('trainingBack').classList.toggle('is-visible', kraftRunning);
+    if (!kraftPresetsLoaded) await loadKraftPresets();
+    if (!kraftSelected.length) applyKraftDefaults(kraftSystemId);
+    refreshKraftChrome();
+    notifyParentTabState();
+    requestAnimationFrame(updateKraftScrollbar);
+  }
+
   function setEmbedTab(tab){
     embedActiveTab = tab;
     document.querySelectorAll('.card-tab').forEach(function(btn){
@@ -3116,7 +3439,7 @@
     document.querySelectorAll('.tab-panel[data-embed-panel]').forEach(function(panel){
       panel.classList.toggle('is-active', panel.getAttribute('data-embed-panel') === tab);
     });
-    const showBack = tab === 'intervall' && embedRunning;
+    const showBack = (tab === 'intervall' && embedRunning) || (tab === 'kraft' && kraftRunning);
     document.getElementById('trainingBack').classList.toggle('is-visible', showBack);
     notifyParentTabState();
   }
@@ -3126,21 +3449,32 @@
     try {
       window.parent.postMessage({
         type: 'gogogo-training-tab-state',
-        showBack: embedRunning,
-        hideTabs: embedRunning
+        showBack: !!(embedRunning || kraftRunning),
+        hideTabs: !!(embedRunning || kraftRunning)
       }, '*');
     } catch (e) {}
   }
 
   function selectEmbedTab(tab){
     if (!tab) return;
-    if (useParentTabs && tab !== 'intervall') return;
     if (embedRunning && tab !== 'intervall') {
       askAbortInterval();
       return;
     }
+    if (kraftRunning && tab !== 'kraft') {
+      endKraftSession();
+    }
+    if (useParentTabs && tab !== 'intervall' && tab !== 'kraft') {
+      embedInInterval = false;
+      document.getElementById('trainingBack').classList.remove('is-visible');
+      notifyParentTabState();
+      return;
+    }
     if (tab === 'intervall') {
       enterIntervalView();
+    } else if (tab === 'kraft') {
+      embedInInterval = false;
+      enterKraftView();
     } else {
       embedInInterval = false;
       document.getElementById('trainingBack').classList.remove('is-visible');
@@ -3627,9 +3961,30 @@
         handleRayHubTap(e);
         return;
       }
+      const ksys = e.target.closest('.kraft-system');
+      if (ksys) {
+        e.preventDefault(); e.stopPropagation();
+        setKraftSystem(ksys.dataset.system);
+        return;
+      }
+      const kex = e.target.closest('.kraft-ex-row');
+      if (kex) {
+        e.preventDefault(); e.stopPropagation();
+        toggleKraftExercise(kex.dataset.ex);
+        return;
+      }
+      if (e.target.closest('#kraftHub')) {
+        e.preventDefault(); e.stopPropagation();
+        if (kraftRunning) endKraftSession();
+        else startKraftSession();
+        return;
+      }
     });
 
-    document.getElementById('trainingBack').addEventListener('click', askAbortInterval);
+    document.getElementById('trainingBack').addEventListener('click', function(){
+      if (kraftRunning) { endKraftSession(); return; }
+      askAbortInterval();
+    });
     document.getElementById('abortStayBtn').addEventListener('click', hideAbortDialog);
     document.getElementById('abortYesBtn').addEventListener('click', function(){
       hideAbortDialog();
@@ -3687,6 +4042,7 @@
 
       bindEmbedShellEvents();
       bindPlanScrollbar();
+      bindKraftScrollbar();
       loadIntervalLogs().then(function(){
         refreshEmbedSetup(false);
       });

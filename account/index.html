@@ -5206,15 +5206,15 @@
 
       function showTrainingPanel(tab) {
         if (!trainingStack) return;
-        var isIntervall = tab === "intervall";
+        var useFrame = tab === "intervall" || tab === "kraft";
         trainingStack.querySelectorAll(".training-panel").forEach(function (panel) {
-          var on = panel.getAttribute("data-training-panel") === tab;
+          var on = !useFrame && panel.getAttribute("data-training-panel") === tab;
           panel.classList.toggle("is-active", on);
           panel.hidden = !on;
         });
         if (trainingFrame) {
-          trainingFrame.classList.toggle("is-active", isIntervall);
-          trainingFrame.hidden = !isIntervall;
+          trainingFrame.classList.toggle("is-active", useFrame);
+          trainingFrame.hidden = !useFrame;
         }
       }
 
@@ -5240,12 +5240,8 @@
         trainingActiveTab = tab;
         setTrainingChromeTab(tab);
         showTrainingPanel(tab);
-        if (tab === "intervall") {
-          callIframeTab("intervall");
-          if (trainingChromeBack) trainingChromeBack.hidden = true;
-        } else if (trainingChromeBack) {
-          trainingChromeBack.hidden = true;
-        }
+        callIframeTab(tab);
+        if (trainingChromeBack) trainingChromeBack.hidden = true;
       }
       window.activateTrainingTab = activateTrainingTab;
 
@@ -5267,7 +5263,7 @@
       if (trainingFrame) {
         trainingFrame.addEventListener("load", function () {
           if (pendingIframeTab) callIframeTab(pendingIframeTab);
-          else if (trainingActiveTab === "intervall") callIframeTab("intervall");
+          else if (trainingActiveTab === "intervall" || trainingActiveTab === "kraft") callIframeTab(trainingActiveTab);
         });
       }
 
@@ -5324,7 +5320,7 @@
         }
         if (id !== "book") pauseAccountVideos();
         if (id === "training") {
-          var TRAINING_IFRAME_V = "20260817n";
+          var TRAINING_IFRAME_V = "20260817o";
           var wantTrainingSrc = "/account/fitness-friday.html?embed=1&parentTabs=1&v=" + TRAINING_IFRAME_V;
           if (!trainingFrame.src || String(trainingFrame.src).indexOf("v=" + TRAINING_IFRAME_V) === -1) {
             trainingFrame.src = wantTrainingSrc;
