@@ -394,6 +394,7 @@
     width:100%;
     padding:10px 0 0;
     min-height:44px;
+    z-index:5;
   }
   .training-back{
     position:absolute;
@@ -422,7 +423,8 @@
     position:relative;
     width:100%;
     border-bottom:1px solid var(--tab-line);
-    z-index:1;
+    z-index:6;
+    pointer-events:auto;
   }
   .card-tabs{
     display:flex; align-items:flex-end; justify-content:center;
@@ -430,6 +432,9 @@
     flex-wrap:nowrap;
     padding:0 12px;
     box-sizing:border-box;
+    position:relative;
+    z-index:7;
+    pointer-events:auto;
   }
   .card-tab{
     flex:0 1 auto;
@@ -463,6 +468,8 @@
     display:flex; flex-direction:column;
     overflow:hidden;
     margin-top:6px;
+    position:relative;
+    z-index:1;
   }
   .tab-panel{
     display:none; flex:1; min-height:0;
@@ -2515,18 +2522,39 @@
     refreshEmbedSetup();
     setEmbedTab('info');
 
-    document.querySelectorAll('.card-tab').forEach(function(btn){
-      btn.addEventListener('click', function(e){
+    function handleEmbedTabAction(tab){
+      if (!tab) return;
+      if (tab === 'intervall') {
+        enterIntervalView();
+      } else if (embedInInterval && tab !== 'intervall') {
+        embedInInterval = false;
+        document.getElementById('trainingBack').classList.remove('is-visible');
+      }
+      setEmbedTab(tab);
+    }
+
+    var tabsRoot = document.querySelector('.card-tabs');
+    ['click', 'pointerup', 'touchend'].forEach(function(evtName){
+      tabsRoot.addEventListener(evtName, function(e){
+        var btn = e.target && e.target.closest ? e.target.closest('.card-tab') : null;
+        if (!btn) return;
         e.preventDefault();
         e.stopPropagation();
+        var tab = btn.getAttribute('data-embed-tab');
+        handleEmbedTabAction(tab);
+      }, { passive:false });
+    });
+
+    document.querySelectorAll('.card-tab').forEach(function(btn){
+      btn.addEventListener('keydown', function(e){
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
         const tab = btn.getAttribute('data-embed-tab');
         if (tab === 'intervall') {
-          enterIntervalView();
-        } else if (embedInInterval && tab !== 'intervall') {
-          embedInInterval = false;
-          document.getElementById('trainingBack').classList.remove('is-visible');
+          handleEmbedTabAction(tab);
+          return;
         }
-        setEmbedTab(tab);
+        handleEmbedTabAction(tab);
       });
     });
 
