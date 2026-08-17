@@ -616,6 +616,16 @@
     flex:1;
     min-height:0;
   }
+  .interval-run-head{
+    display:none;
+    flex:none;
+    padding:4px 16px 8px;
+  }
+  .interval-layout.is-running .interval-run-head{ display:block; }
+  .interval-layout.is-running .interval-setup-view{
+    flex:none;
+    min-height:auto;
+  }
   .interval-headline{
     flex:none;
     text-align:center;
@@ -629,7 +639,6 @@
   }
   .interval-layout.is-running .interval-headline{ display:none; }
   .runner-name{
-    display:none;
     text-align:center;
     font-family:var(--display);
     font-size:clamp(16px, 4.4vw, 20px);
@@ -638,7 +647,6 @@
     color:var(--text);
     padding:2px 8px 0;
   }
-  .interval-layout.is-running .runner-name{ display:block; }
   .interval-scroll.is-dragging-plan{
     touch-action:none;
     overflow-y:auto;
@@ -672,6 +680,7 @@
     border-radius:999px;
     cursor:pointer;
     touch-action:manipulation;
+    max-width:100%;
   }
   .interval-layout.is-running .history-open-btn{ display:none !important; }
   .interval-mid-zone{
@@ -784,7 +793,8 @@
     pointer-events:none;
   }
   .global-time-chip{
-    background:var(--panel); border:1px solid var(--line);
+    background:transparent;
+    border:1.5px solid rgba(247,245,240,0.55);
     border-radius:10px; padding:4px 8px;
     cursor:default; text-align:center;
     touch-action:pan-y;
@@ -928,16 +938,14 @@
     display:none !important;
   }
   .run-summary{
-    display:none;
     text-align:center;
     font-family:var(--display);
     font-size:clamp(15px, 4.2vw, 18px);
     font-weight:700;
     letter-spacing:0.02em;
     color:var(--text);
-    padding:4px 8px 12px;
+    padding:4px 8px 4px;
   }
-  .interval-layout.is-running .run-summary{ display:block; }
   .abort-overlay[hidden]{ display:none !important; }
   .abort-overlay:not([hidden]){
     display:flex;
@@ -1097,19 +1105,19 @@
   .history-view[hidden]{ display:none !important; }
   .history-view-head{
     flex:none;
-    display:flex; align-items:flex-start;
-    gap:8px;
+    display:flex; align-items:center; justify-content:center;
+    min-height:44px;
     margin-bottom:12px;
     position:relative;
   }
   .history-back{
+    position:absolute; left:0; top:2px;
     width:40px; height:40px; border-radius:50%;
     background:rgba(247,245,240,0.16);
     color:var(--text);
     border:none; padding:0; cursor:pointer;
     display:inline-flex; align-items:center; justify-content:center;
-    flex:none;
-    margin-top:2px;
+    z-index:2;
   }
   .history-back::before{
     content:"";
@@ -1120,8 +1128,10 @@
     margin-right:2px;
   }
   .history-head-text{
-    flex:1; min-width:0;
-    padding-top:2px;
+    width:100%;
+    min-width:0;
+    padding:0 48px;
+    text-align:center;
   }
   .history-view .history-name{
     font-family:var(--display);
@@ -1129,22 +1139,16 @@
     font-weight:700;
     letter-spacing:-0.03em;
     line-height:1.1;
-    margin-bottom:6px;
+    margin:0;
+    text-align:center;
     text-transform:none;
-  }
-  .history-view .history-title{
-    font-family:var(--display);
-    font-size:clamp(13px, 3.6vw, 15px);
-    font-weight:600;
-    letter-spacing:-0.02em;
-    line-height:1.3;
-    color:var(--text);
-    text-transform:none;
-    margin-bottom:0;
   }
   .history-table-wrap{
     flex:1; min-height:0;
-    overflow:auto;
+    width:100%;
+    max-width:100%;
+    overflow-x:auto;
+    overflow-y:auto;
     -webkit-overflow-scrolling:touch;
   }
   .history-table{
@@ -1162,13 +1166,21 @@
     text-align:center;
     font-weight:600;
   }
-  .history-table th:first-child,
-  .history-table td:first-child{
-    position:sticky; left:0;
+  .history-table thead th{
+    position:sticky;
+    top:0;
+    background:var(--bg);
+    z-index:2;
+  }
+  .history-table thead th:first-child,
+  .history-table tbody th:first-child{
+    position:sticky;
+    left:0;
     background:var(--bg);
     text-align:left;
     z-index:1;
   }
+  .history-table thead th:first-child{ z-index:3; }
   .history-empty{
     padding:28px 12px;
     text-align:center;
@@ -1244,6 +1256,10 @@
     </div>
     <div class="tab-panel" data-embed-panel="intervall">
       <div class="interval-layout" id="intervalLayout">
+        <div class="interval-run-head" id="intervalRunHead">
+          <div id="runnerName" class="runner-name"></div>
+          <div id="runSummaryBar" class="run-summary">4:00 | 30s | 16 Runden</div>
+        </div>
         <div class="interval-main">
           <div class="plan-scrollbar" id="planScrollbar" hidden>
             <div class="plan-scrollbar-track" id="planScrollbarTrack">
@@ -1253,8 +1269,6 @@
           <div class="interval-scroll" id="intervalScroll">
           <div id="intervalSetupView" class="interval-setup-view">
             <div id="intervalHeadline" class="interval-headline">FRIDAY CIRCLE</div>
-            <div id="runnerName" class="runner-name"></div>
-            <div id="runSummaryBar" class="run-summary">4:00 | 30s | 16 Runden</div>
             <div class="global-time-row">
               <div class="global-time-col">
                 <div class="lbl">Rundenzeit</div>
@@ -1277,7 +1291,7 @@
             </div>
             <div class="workout-pick-wrap" id="workoutPickWrap">
               <div class="workout-pick-grid" id="workoutPickGrid"></div>
-              <p class="workout-pick-hint">Wähle alle Workouts des heutigen Zirkeltrainings aus.</p>
+              <p class="workout-pick-hint">Wähle alle Workouts deines heutigen Zirkeltrainings</p>
             </div>
             <div class="drag-list" id="dragList"></div>
           </div>
@@ -1302,7 +1316,7 @@
               </div>
             </button>
           </div>
-          <button type="button" class="history-open-btn" id="historyOpenBtn">Vergangene Workouts</button>
+          <button type="button" class="history-open-btn" id="historyOpenBtn">Vergangene Zirkeltrainings</button>
         </div>
       </div>
     </div>
@@ -1345,7 +1359,6 @@
       <button type="button" class="history-back" id="historyBackBtn" aria-label="Zurück"></button>
       <div class="history-head-text">
         <div class="history-name" id="historyName"></div>
-        <div class="history-title" id="historyTitle">Deine vergangenen Zirkeltrainings im FRIDAY CIRCLE</div>
       </div>
     </div>
     <div class="history-table-wrap" id="historyTableWrap"></div>
@@ -2726,7 +2739,7 @@
     matches.forEach(function(row){ daySet[row.workout_date] = true; });
     const days = Object.keys(daySet).length;
     let avg = null;
-    if (days >= 2) {
+    if (matches.length) {
       let sum = 0, n = 0;
       matches.forEach(function(row){
         const amt = parseFloat(row.amount);
@@ -2750,9 +2763,8 @@
     const unitShort = unitShortLabel(unit);
     let txt = 'PB: ';
     txt += stats.pb !== null ? (formatPbAmount(stats.pb) + ' ' + unitShort) : '—';
-    if (stats.days >= 2 && stats.avg !== null) {
-      txt += ' | ø: ' + formatPbAmount(stats.avg) + ' ' + unitShort;
-    }
+    txt += ' | ø: ';
+    txt += stats.avg !== null ? (formatPbAmount(stats.avg) + ' ' + unitShort) : '—';
     pill.textContent = txt;
   }
 
@@ -3317,6 +3329,7 @@
     loadIntervalLogs().then(updatePbBar);
     renderDragList();
     updatePlanScrollbar();
+    requestAnimationFrame(updatePlanScrollbar);
     render();
     tick();
   }
