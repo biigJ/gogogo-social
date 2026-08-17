@@ -588,21 +588,29 @@
     overflow-y:auto; overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none; -ms-overflow-style:none;
-    padding:10px 16px 6px;
+    padding:10px 16px 0;
     pointer-events:auto;
+    touch-action:pan-y;
   }
+  .interval-scroll.is-dragging-plan{
+    touch-action:none;
+    overflow-y:auto;
+  }
+  .interval-scroll-inner{ padding-bottom:24px; }
+  .drag-list{ padding-bottom:140px; }
   .interval-scroll::-webkit-scrollbar{ display:none; }
   .interval-wheel-zone{
-    flex:0 0 38%;
-    min-height:210px;
-    max-height:42vh;
+    flex:0 0 auto;
+    height:min(34vh, 210px);
+    min-height:170px;
     border-top:1px solid var(--line);
     display:flex; flex-direction:column;
-    align-items:center; justify-content:center;
+    align-items:center; justify-content:flex-end;
     position:relative;
     pointer-events:auto;
     touch-action:manipulation;
-    padding:8px 0 10px;
+    padding:0 0 calc(8px + env(safe-area-inset-bottom, 0px));
+    overflow:visible;
   }
   .interval-mid-zone{
     flex:none;
@@ -621,10 +629,11 @@
   }
   .interval-ray-wrap{
     position:relative;
-    width:min(78vw, 230px);
-    height:min(78vw, 230px);
+    width:min(62vw, 190px);
+    height:min(62vw, 190px);
     flex:none;
     pointer-events:none;
+    margin-bottom:2px;
   }
   .interval-ray{
     width:100%; height:100%; display:block;
@@ -704,25 +713,42 @@
   }
   .wheel-start-display[hidden]{ display:none !important; }
   .global-time-row{
-    display:flex; gap:10px; margin-bottom:14px;
+    display:flex; gap:10px; margin-bottom:12px;
   }
   .global-time-chip{
     flex:1; background:var(--panel); border:1px solid var(--line);
-    border-radius:10px; padding:12px 14px; cursor:pointer; text-align:center;
-    touch-action:manipulation;
+    border-radius:10px; padding:8px 10px 6px; cursor:default; text-align:center;
+    touch-action:pan-y;
     -webkit-appearance:none; appearance:none;
-  }
-  .global-time-chip.is-editing{
-    border-color:var(--accent);
-    background:var(--panel-raised);
+    position:relative; overflow:hidden;
+    min-height:88px;
   }
   .global-time-chip .lbl{
     font-size:10px; text-transform:uppercase; letter-spacing:1px;
-    color:var(--text-dim); margin-bottom:4px;
+    color:var(--text-dim); margin-bottom:2px;
+    pointer-events:none;
   }
-  .global-time-chip .val{
-    font-family:var(--display); font-size:20px; font-weight:700;
+  .chip-wheel-frame{
+    position:relative; height:64px; overflow:hidden;
   }
+  .chip-wheel-frame .wheel-highlight{
+    left:8px; right:8px; height:28px;
+  }
+  .chip-wheel-scroller{
+    height:100%; overflow-y:auto;
+    scroll-snap-type:y mandatory;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .chip-wheel-scroller::-webkit-scrollbar{ display:none; }
+  .chip-wheel-scroller .wheel-item{
+    height:28px; font-size:0.95rem;
+    color:rgba(247,245,240,0.32);
+  }
+  .chip-wheel-scroller .wheel-item.is-selected{
+    color:var(--text); font-size:1.05rem;
+  }
+  .chip-wheel-scroller .wheel-pad{ height:18px !important; }
   .plan-head{
     display:flex; justify-content:space-between; align-items:baseline;
     margin-bottom:8px;
@@ -732,17 +758,19 @@
     color:var(--text-dim);
   }
   .plan-head .count{ font-size:12px; color:var(--text-dim); white-space:nowrap; }
-  .drag-list{ display:flex; flex-direction:column; gap:6px; padding-bottom:8px; }
+  .drag-list{ display:flex; flex-direction:column; gap:6px; }
   .drag-row{
-    display:flex; align-items:center; justify-content:center;
+    display:grid;
+    grid-template-columns:28px 56px 1fr 28px;
+    align-items:center;
     position:relative;
     min-height:46px;
-    padding:12px 36px 12px 16px;
+    padding:10px 0;
     border:2px solid transparent;
     border-radius:2px;
     background:rgba(0,0,0,0.18);
     touch-action:none; user-select:none;
-    transition:transform .12s, opacity .12s, border-color .12s;
+    transition:border-color .12s, background .12s;
     cursor:grab;
   }
   .drag-row.is-run{ background:rgba(0,0,0,0.32); }
@@ -750,25 +778,33 @@
     border-color:var(--accent);
     background:rgba(0,0,0,0.08);
   }
-  .drag-row.is-dragging{ opacity:0.45; }
+  .drag-row.is-dragging{
+    opacity:0.92; z-index:20;
+    border-color:rgba(247,245,240,0.75);
+    background:rgba(0,0,0,0.24);
+    box-shadow:0 8px 24px rgba(0,0,0,0.28);
+  }
   .drag-row.is-drop-target{ border-color:rgba(247,245,240,0.65); background:rgba(247,245,240,0.08); }
   .drag-row.is-invalid{ opacity:0.35; }
   .drag-handle{
-    position:absolute; left:8px; top:50%; transform:translateY(-50%);
-    width:18px; color:rgba(247,245,240,0.45);
     display:flex; align-items:center; justify-content:center;
+    width:100%; height:100%;
+    color:rgba(247,245,240,0.42);
     cursor:grab;
   }
   .drag-handle svg{ display:block; }
+  .drag-row .ex-time{
+    font-family:var(--typewriter);
+    font-size:12px; font-weight:700;
+    color:rgba(247,245,240,0.88);
+    text-align:left; padding-left:10px;
+    white-space:nowrap;
+  }
   .drag-row .ex-name{
-    flex:1; font-size:15px; font-weight:600; text-align:center;
+    font-size:15px; font-weight:600; text-align:center;
     letter-spacing:0.01em;
   }
   .drag-row .ex-name.is-run{ color:rgba(247,245,240,0.82); font-weight:500; }
-  .drag-row .ex-meta{
-    position:absolute; right:10px; top:50%; transform:translateY(-50%);
-    font-size:11px; color:rgba(247,245,240,0.55);
-  }
   .wheel-frame{
     flex:1; position:relative; overflow:hidden; min-height:0;
   }
@@ -930,14 +966,20 @@
         <div class="interval-scroll" id="intervalScroll">
           <div id="intervalSetupView">
             <div class="global-time-row">
-              <button type="button" class="global-time-chip" id="editWorkChip" data-edit="work">
+              <div class="global-time-chip" id="editWorkChip">
                 <div class="lbl">Rundenzeit</div>
-                <div class="val" id="embedWorkVal">4:00</div>
-              </button>
-              <button type="button" class="global-time-chip" id="editRestChip" data-edit="rest">
+                <div class="chip-wheel-frame">
+                  <div class="wheel-highlight"></div>
+                  <div class="wheel-scroller chip-wheel-scroller" id="workWheelScroller"></div>
+                </div>
+              </div>
+              <div class="global-time-chip" id="editRestChip">
                 <div class="lbl">Pause</div>
-                <div class="val" id="embedRestVal">30s</div>
-              </button>
+                <div class="chip-wheel-frame">
+                  <div class="wheel-highlight"></div>
+                  <div class="wheel-scroller chip-wheel-scroller" id="restWheelScroller"></div>
+                </div>
+              </div>
             </div>
             <div class="plan-head">
               <span class="name">Übungsplan</span>
@@ -951,13 +993,6 @@
           </div>
           <div id="intervalRunView" hidden>
             <div class="run-info" id="runInfo"></div>
-          </div>
-        </div>
-        <div class="interval-mid-zone" id="intervalMidZone" hidden>
-          <div class="mid-wheel-label" id="midWheelLabel"></div>
-          <div class="wheel-frame wheel-frame--mid">
-            <div class="wheel-highlight"></div>
-            <div class="wheel-scroller" id="wheelScroller"></div>
           </div>
         </div>
         <div class="interval-wheel-zone" id="wheelZone">
@@ -1433,7 +1468,6 @@
   let embedInInterval = false;
   let embedRunning = false;
   let embedPlan = [];
-  let wheelEditMode = null;
   let intervalLogs = [];
   let dragState = null;
   let restInputMode = false;
@@ -2382,17 +2416,16 @@
     drawIntervalRay(svg, filled);
   }
 
-  function buildWheelScroller(mode){
-    const scroller = document.getElementById('wheelScroller');
+  function buildChipWheelScroller(scroller, mode){
+    if (!scroller) return;
     scroller.innerHTML = '';
     let opts = [];
     let current = workSec;
     if (mode === 'rest') { opts = timeWheelOptions(30, 180); current = restSec; }
-    else if (mode === 'work') { opts = timeWheelOptions(WORK_MIN, WORK_MAX); current = workSec; }
-    else return;
+    else { opts = timeWheelOptions(WORK_MIN, WORK_MAX); current = workSec; }
     const pad = document.createElement('div');
     pad.className = 'wheel-pad';
-    pad.style.height = '44px';
+    pad.style.height = '18px';
     scroller.appendChild(pad);
     opts.forEach(function(sec){
       const btn = document.createElement('button');
@@ -2402,16 +2435,15 @@
       btn.textContent = fmtSecShort(sec);
       btn.addEventListener('click', function(e){
         e.stopPropagation();
-        if (mode === 'work') { workSec = sec; refreshEmbedSetup(); }
-        else { restSec = sec; refreshEmbedSetup(); }
-        buildWheelScroller(mode);
-        highlightWheelSelection(scroller, sec);
+        if (mode === 'work') { workSec = sec; refreshEmbedSetup(false); }
+        else { restSec = sec; refreshEmbedSetup(false); }
+        buildChipWheelScroller(scroller, mode);
       });
       scroller.appendChild(btn);
     });
     const pad2 = document.createElement('div');
     pad2.className = 'wheel-pad';
-    pad2.style.height = '44px';
+    pad2.style.height = '18px';
     scroller.appendChild(pad2);
     requestAnimationFrame(function(){
       const sel = scroller.querySelector('.wheel-item.is-selected');
@@ -2419,16 +2451,11 @@
     });
   }
 
-  function highlightWheelSelection(scroller, sec){
-    scroller.querySelectorAll('.wheel-item').forEach(function(el){
-      el.classList.toggle('is-selected', parseInt(el.dataset.sec, 10) === sec);
-    });
-  }
-
-  function bindWheelScrollSnap(mode){
-    const scroller = document.getElementById('wheelScroller');
+  function bindChipWheelScroll(scroller, mode){
+    if (!scroller || scroller.dataset.snapBound) return;
+    scroller.dataset.snapBound = '1';
     let scrollTimer = null;
-    scroller.onscroll = function(){
+    scroller.addEventListener('scroll', function(){
       clearTimeout(scrollTimer);
       scrollTimer = setTimeout(function(){
         const items = scroller.querySelectorAll('.wheel-item');
@@ -2444,26 +2471,36 @@
         if (!best) return;
         const sec = parseInt(best.dataset.sec, 10);
         items.forEach(function(el){ el.classList.toggle('is-selected', el === best); });
-        if (mode === 'work' && sec !== workSec) { workSec = sec; refreshEmbedSetup(); }
-        if (mode === 'rest' && sec !== restSec) { restSec = sec; refreshEmbedSetup(); }
+        if (mode === 'work' && sec !== workSec) { workSec = sec; refreshEmbedSetup(false); }
+        if (mode === 'rest' && sec !== restSec) { restSec = sec; refreshEmbedSetup(false); }
       }, 80);
-    };
+    });
   }
 
-  function showWheelPicker(mode){
-    wheelEditMode = mode;
-    document.getElementById('editWorkChip').classList.toggle('is-editing', mode === 'work');
-    document.getElementById('editRestChip').classList.toggle('is-editing', mode === 'rest');
-    document.getElementById('midWheelLabel').textContent = mode === 'work' ? 'Rundenzeit' : 'Pause';
-    document.getElementById('intervalMidZone').hidden = false;
-    buildWheelScroller(mode);
-    bindWheelScrollSnap(mode);
+  function buildChipWheels(){
+    buildChipWheelScroller(document.getElementById('workWheelScroller'), 'work');
+    buildChipWheelScroller(document.getElementById('restWheelScroller'), 'rest');
+    bindChipWheelScroll(document.getElementById('workWheelScroller'), 'work');
+    bindChipWheelScroll(document.getElementById('restWheelScroller'), 'rest');
+  }
+
+  function lastLogLabelForExercise(exId){
+    if (!exId || !intervalLogs.length) return fmtMin(workSec);
+    const matches = intervalLogs.filter(function(row){
+      return row.exercise_id === exId && row.work_sec === workSec;
+    });
+    if (!matches.length) return fmtMin(workSec);
+    const row = matches[0];
+    const amt = parseFloat(row.amount);
+    if (isNaN(amt)) return fmtMin(workSec);
+    const unit = unitFor(exId);
+    const unitShort = unit === 'Wiederholungen' ? 'Reps' : 'm';
+    if (exId === 'run') return Math.round(amt) + ' ' + unitShort;
+    return Math.round(amt) + ' ' + unitShort;
   }
 
   function showWheelIdle(){
     if (embedRunning) return;
-    document.getElementById('intervalMidZone').hidden = true;
-    document.getElementById('wheelScroller').innerHTML = '';
     document.getElementById('rayHubStart').hidden = false;
     document.getElementById('rayHubTimer').hidden = true;
     document.getElementById('rayHubInput').hidden = true;
@@ -2472,21 +2509,10 @@
     drawIntervalRay(document.getElementById('intervalRaySvg'), null);
   }
 
-  function hideWheelPicker(){
-    wheelEditMode = null;
-    document.getElementById('editWorkChip').classList.remove('is-editing');
-    document.getElementById('editRestChip').classList.remove('is-editing');
-    document.getElementById('intervalMidZone').hidden = true;
-    document.getElementById('wheelScroller').innerHTML = '';
-    if (embedRunning) return;
-    showWheelIdle();
-  }
-
-  function refreshEmbedSetup(){
+  function refreshEmbedSetup(rebuildWheels){
+    if (rebuildWheels !== false) buildChipWheels();
     rounds = embedPlan.length;
     roundExercises = embedPlan.slice();
-    document.getElementById('embedWorkVal').textContent = fmtMin(workSec);
-    document.getElementById('embedRestVal').textContent = restSec + 's';
     document.getElementById('planCount').textContent = rounds + ' Runden';
     document.getElementById('roundsMinusEmbed').disabled = rounds <= EMBED_ROUNDS_MIN;
     document.getElementById('roundsPlusEmbed').disabled = rounds >= EMBED_ROUNDS_MAX;
@@ -2514,7 +2540,7 @@
     } else {
       embedPlan.splice(-EMBED_ROUNDS_STEP, EMBED_ROUNDS_STEP);
     }
-    refreshEmbedSetup();
+    refreshEmbedSetup(false);
   }
 
   function hasConsecutiveRuns(list){
@@ -2554,59 +2580,105 @@
         run:'Laufen', skierg:'Ski', sledpush:'Sled push', sledpull:'Sled pull',
         burpee:'Burpee', row:'Ruder', lunges:'Lunges', farmers:'Farmers', wallballs:'Wallballs'
       })[exId] || (ex ? ex.name : exId);
+      const timeLabel = lastLogLabelForExercise(exId);
       row.innerHTML =
         '<span class="drag-handle" aria-hidden="true">' + dragHandleSvg + '</span>' +
+        '<span class="ex-time">' + timeLabel + '</span>' +
         '<span class="ex-name' + (exId === 'run' ? ' is-run' : '') + '">' + shortName + '</span>' +
-        '<span class="ex-meta">⋮⋮</span>';
+        '<span class="drag-handle drag-handle--right" aria-hidden="true">' + dragHandleSvg + '</span>';
       bindDragRow(row, i);
       list.appendChild(row);
     });
   }
 
+  let dragAutoScrollId = null;
+
+  function autoScrollPlanWhileDrag(clientY){
+    const scroller = document.getElementById('intervalScroll');
+    if (!scroller) return;
+    const rect = scroller.getBoundingClientRect();
+    const edge = 56;
+    const speed = 10;
+    if (clientY < rect.top + edge) scroller.scrollTop -= speed;
+    else if (clientY > rect.bottom - edge) scroller.scrollTop += speed;
+  }
+
+  function onPlanDragMove(e){
+    if (!dragState) return;
+    autoScrollPlanWhileDrag(e.clientY);
+    const list = document.getElementById('dragList');
+    const rows = Array.from(list.querySelectorAll('.drag-row'));
+    let target = dragState.from;
+    let bestDist = Infinity;
+    rows.forEach(function(r, ri){
+      const rect = r.getBoundingClientRect();
+      const dist = Math.abs(e.clientY - (rect.top + rect.height / 2));
+      if (dist < bestDist) { bestDist = dist; target = ri; }
+    });
+    const valid = nearestValidDropIndex(embedPlan, dragState.from, target);
+    dragState.target = valid;
+    rows.forEach(function(r, ri){
+      r.classList.toggle('is-drop-target', ri === valid && valid !== dragState.from);
+      r.classList.toggle('is-invalid', ri === target && valid !== target);
+    });
+    if (dragState.row) {
+      const dy = e.clientY - dragState.startY;
+      dragState.row.style.transform = 'translateY(' + dy + 'px)';
+    }
+  }
+
+  function endPlanDrag(e){
+    if (!dragState) return;
+    document.removeEventListener('pointermove', onPlanDragMove);
+    document.removeEventListener('pointerup', endPlanDrag);
+    document.removeEventListener('pointercancel', endPlanDrag);
+    if (dragAutoScrollId) { cancelAnimationFrame(dragAutoScrollId); dragAutoScrollId = null; }
+    const scroller = document.getElementById('intervalScroll');
+    if (scroller) scroller.classList.remove('is-dragging-plan');
+    const row = dragState.row;
+    if (row) {
+      row.classList.remove('is-dragging');
+      row.style.transform = '';
+      try { row.releasePointerCapture(e.pointerId); } catch (err) {}
+    }
+    const from = dragState.from;
+    const to = dragState.target !== undefined ? dragState.target : from;
+    dragState = null;
+    document.querySelectorAll('.drag-row').forEach(function(r){
+      r.classList.remove('is-drop-target', 'is-invalid');
+    });
+    if (to !== from && to !== undefined) {
+      const item = embedPlan.splice(from, 1)[0];
+      embedPlan.splice(to, 0, item);
+      refreshEmbedSetup();
+    }
+  }
+
   function bindDragRow(row, index){
     row.addEventListener('pointerdown', function(e){
       if (embedRunning) return;
-      dragState = { from: index, row: row, pointerId: e.pointerId };
-      row.classList.add('is-dragging');
-      try { row.setPointerCapture(e.pointerId); } catch (err) {}
       e.preventDefault();
+      dragState = {
+        from: index,
+        row: row,
+        pointerId: e.pointerId,
+        startY: e.clientY,
+        lastY: e.clientY
+      };
+      row.classList.add('is-dragging');
+      const scroller = document.getElementById('intervalScroll');
+      if (scroller) scroller.classList.add('is-dragging-plan');
+      try { row.setPointerCapture(e.pointerId); } catch (err) {}
+      document.addEventListener('pointermove', onPlanDragMove);
+      document.addEventListener('pointerup', endPlanDrag);
+      document.addEventListener('pointercancel', endPlanDrag);
+      dragAutoScrollId = requestAnimationFrame(function tick(){
+        if (dragState && dragState.lastY != null) autoScrollPlanWhileDrag(dragState.lastY);
+        if (dragState) dragAutoScrollId = requestAnimationFrame(tick);
+      });
     });
     row.addEventListener('pointermove', function(e){
-      if (!dragState || dragState.row !== row) return;
-      const list = document.getElementById('dragList');
-      const rows = Array.from(list.querySelectorAll('.drag-row'));
-      const y = e.clientY;
-      let target = index;
-      rows.forEach(function(r, ri){
-        const rect = r.getBoundingClientRect();
-        if (y >= rect.top && y <= rect.bottom) target = ri;
-      });
-      const valid = nearestValidDropIndex(embedPlan, dragState.from, target);
-      rows.forEach(function(r, ri){
-        r.classList.toggle('is-drop-target', ri === valid && valid !== dragState.from);
-        r.classList.toggle('is-invalid', ri === target && valid !== target);
-      });
-      dragState.target = valid;
-    });
-    row.addEventListener('pointerup', function(e){
-      if (!dragState || dragState.row !== row) return;
-      row.classList.remove('is-dragging');
-      row.releasePointerCapture(e.pointerId);
-      const from = dragState.from;
-      const to = dragState.target !== undefined ? dragState.target : from;
-      dragState = null;
-      document.querySelectorAll('.drag-row').forEach(function(r){
-        r.classList.remove('is-drop-target', 'is-invalid');
-      });
-      if (to !== from && to !== undefined) {
-        const item = embedPlan.splice(from, 1)[0];
-        embedPlan.splice(to, 0, item);
-        refreshEmbedSetup();
-      }
-    });
-    row.addEventListener('pointercancel', function(){
-      dragState = null;
-      row.classList.remove('is-dragging');
+      if (dragState) dragState.lastY = e.clientY;
     });
   }
 
@@ -2676,7 +2748,7 @@
     document.getElementById('trainingBack').classList.add('is-visible');
     document.getElementById('intervalSetupView').hidden = false;
     document.getElementById('intervalRunView').hidden = true;
-    hideWheelPicker();
+    showWheelIdle();
   }
 
   function exitIntervalView(){
@@ -2689,7 +2761,6 @@
     document.getElementById('intervalSetupView').hidden = false;
     document.getElementById('intervalRunView').hidden = true;
     document.getElementById('pbBar').hidden = true;
-    hideWheelPicker();
     showWheelIdle();
     if (useParentTabs) {
       notifyParentTabState();
@@ -2708,7 +2779,6 @@
 
   function showEmbedTimerWheel(){
     document.getElementById('rayHubStart').hidden = true;
-    document.getElementById('intervalMidZone').hidden = true;
     const clockBig = document.getElementById('wheelClockBig');
     const valueInput = document.getElementById('rayHubInput');
     const timerBox = document.getElementById('rayHubTimer');
@@ -2794,7 +2864,6 @@
   }
 
   function startEmbedRun(){
-    if (wheelEditMode) hideWheelPicker();
     embedRunning = true;
     embedInInterval = true;
     notifyParentWorkout(true);
@@ -2825,7 +2894,6 @@
       if ((phase === 'rest' || phase === 'log-final') && !restInputMode) enableRestInput();
       return;
     }
-    if (wheelEditMode) return;
     startEmbedRun();
   }
 
@@ -2835,16 +2903,6 @@
     root.dataset.bound = '1';
 
     root.addEventListener('click', function(e){
-      if (e.target.closest('#editWorkChip')) {
-        e.preventDefault(); e.stopPropagation();
-        showWheelPicker('work');
-        return;
-      }
-      if (e.target.closest('#editRestChip')) {
-        e.preventDefault(); e.stopPropagation();
-        showWheelPicker('rest');
-        return;
-      }
       if (e.target.closest('#roundsMinusEmbed')) {
         e.preventDefault(); e.stopPropagation();
         adjustEmbedRounds(-EMBED_ROUNDS_STEP);
@@ -2859,17 +2917,7 @@
         handleRayHubTap(e);
         return;
       }
-      if (wheelEditMode && !embedRunning) {
-        if (!e.target.closest('#intervalMidZone') && !e.target.closest('.global-time-chip')) {
-          hideWheelPicker();
-        }
-      }
-    }, true);
-
-    root.addEventListener('touchstart', function(e){
-      var t = e.target.closest('#rayHub, #editWorkChip, #editRestChip, #roundsMinusEmbed, #roundsPlusEmbed, .drag-row');
-      if (t) e.stopPropagation();
-    }, { passive: true, capture: true });
+    });
 
     document.getElementById('trainingBack').addEventListener('click', function(){
       if (embedRunning && phase === 'log-final') {
@@ -2921,7 +2969,9 @@
       }
 
       bindEmbedShellEvents();
-      loadIntervalLogs();
+      loadIntervalLogs().then(function(){
+        refreshEmbedSetup(false);
+      });
       showWheelIdle();
       embedShellReady = true;
     } catch (err) {
