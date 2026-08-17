@@ -588,13 +588,89 @@
   .interval-scroll::-webkit-scrollbar{ display:none; }
   .interval-wheel-zone{
     flex:none;
-    height:50%;
-    min-height:180px;
-    max-height:50vh;
+    height:44%;
+    min-height:200px;
+    max-height:46vh;
     border-top:1px solid var(--line);
     display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
     position:relative;
     background:rgba(0,0,0,0.06);
+    pointer-events:auto;
+    touch-action:manipulation;
+  }
+  .interval-mid-zone{
+    flex:none;
+    height:128px;
+    border-top:1px solid var(--line);
+    position:relative;
+    background:rgba(0,0,0,0.04);
+    pointer-events:auto;
+  }
+  .interval-mid-zone[hidden]{ display:none !important; }
+  .interval-mid-zone .wheel-frame{ height:100%; }
+  .mid-wheel-label{
+    position:absolute; top:6px; left:0; right:0; text-align:center;
+    font-size:10px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--text-dim); z-index:3; pointer-events:none;
+  }
+  .interval-ray-wrap{
+    position:relative;
+    width:min(92vw, 260px);
+    height:min(92vw, 260px);
+    max-height:100%;
+    flex:none;
+  }
+  .interval-ray{
+    width:100%; height:100%; display:block;
+    pointer-events:none;
+  }
+  .interval-ray.is-spinning{ animation:interval-spin 120s linear infinite; }
+  @keyframes interval-spin{ to{ transform:rotate(360deg); } }
+  @media (prefers-reduced-motion:reduce){ .interval-ray.is-spinning{ animation:none; } }
+  .interval-ray-hub{
+    position:absolute;
+    left:50%; top:50%;
+    width:54%; height:54%;
+    transform:translate(-50%, -50%);
+    border-radius:50%;
+    background:var(--bg);
+    border:0;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    cursor:pointer;
+    z-index:2;
+    pointer-events:auto;
+    touch-action:manipulation;
+    -webkit-appearance:none;
+    appearance:none;
+    color:var(--text);
+    padding:8px;
+    text-align:center;
+  }
+  .interval-ray-hub:disabled{ cursor:default; opacity:1; }
+  .ray-hub-start{
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    pointer-events:none;
+  }
+  .ray-hub-start .line1,
+  .ray-hub-start .line2{
+    font-family:var(--display); font-weight:700;
+    text-transform:uppercase; letter-spacing:0.06em;
+    line-height:1.05;
+  }
+  .ray-hub-start .line1{ font-size:clamp(15px, 4.2vw, 18px); }
+  .ray-hub-start .line2{ font-size:clamp(15px, 4.2vw, 18px); }
+  .ray-hub-timer,
+  .ray-hub-input{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    width:100%;
+  }
+  .ray-hub-timer[hidden],
+  .ray-hub-input[hidden]{ display:none !important; }
+  .ray-hub-input .wheel-value-row{ pointer-events:auto; }
+  .interval-ray-hub .clock-big{
+    font-size:clamp(28px, 8vw, 42px);
   }
   .round-stepper{
     display:flex; align-items:center; gap:6px;
@@ -605,31 +681,25 @@
     color:var(--text); font-size:16px; line-height:1;
     display:flex; align-items:center; justify-content:center;
     cursor:pointer; padding:0;
+    touch-action:manipulation;
+    -webkit-appearance:none; appearance:none;
   }
   .round-step-btn:disabled{ opacity:0.35; cursor:default; }
   .wheel-start-display{
     position:absolute; inset:0; z-index:2;
     display:flex; align-items:center; justify-content:center;
     padding:16px 20px;
+    pointer-events:none;
   }
   .wheel-start-display[hidden]{ display:none !important; }
-  .wheel-start-btn{
-    width:100%; max-width:320px; text-align:center; cursor:pointer;
-    background:var(--accent); border:1px solid var(--accent); border-radius:12px;
-    padding:20px 18px; display:flex; flex-direction:column; gap:4px;
-  }
-  .wheel-start-btn:active{ transform:scale(0.99); filter:brightness(0.95); }
-  .wheel-start-btn .title{
-    font-family:var(--display); font-size:18px; font-weight:700;
-    text-transform:uppercase; letter-spacing:1px; color:var(--on-accent);
-  }
-  .wheel-start-btn .sub{ font-size:12px; color:var(--on-accent); opacity:0.75; }
   .global-time-row{
     display:flex; gap:10px; margin-bottom:14px;
   }
   .global-time-chip{
     flex:1; background:var(--panel); border:1px solid var(--line);
     border-radius:10px; padding:12px 14px; cursor:pointer; text-align:center;
+    touch-action:manipulation;
+    -webkit-appearance:none; appearance:none;
   }
   .global-time-chip.is-editing{
     border-color:var(--accent);
@@ -859,24 +929,32 @@
             <div class="run-info" id="runInfo"></div>
           </div>
         </div>
+        <div class="interval-mid-zone" id="intervalMidZone" hidden>
+          <div class="mid-wheel-label" id="midWheelLabel"></div>
+          <div class="wheel-frame wheel-frame--mid">
+            <div class="wheel-highlight"></div>
+            <div class="wheel-scroller" id="wheelScroller"></div>
+          </div>
+        </div>
         <div class="interval-wheel-zone" id="wheelZone">
           <div class="wheel-phase-label" id="wheelPhaseLabel"></div>
-          <div class="wheel-frame" id="wheelFrame">
-            <div class="wheel-highlight"></div>
-            <div class="wheel-scroller" id="wheelScroller" hidden></div>
-            <div class="wheel-start-display" id="wheelStartDisplay">
-              <button type="button" class="wheel-start-btn" id="embedStartBtn">
-                <span class="title">Workout starten</span>
-                <span class="sub" id="embedStartSub">16 Runden · 4:00 · 30s Pause</span>
-              </button>
-            </div>
-            <div class="wheel-timer-display" id="wheelTimerDisplay" hidden>
-              <div class="wheel-value-row" id="wheelValueRow" hidden>
-                <input type="number" class="wheel-amount-input" id="wheelAmountInput" inputmode="numeric" min="0" placeholder="0">
-                <span class="wheel-unit-label" id="wheelUnitLabel"></span>
+          <div class="interval-ray-wrap">
+            <svg class="interval-ray is-spinning" id="intervalRaySvg" viewBox="0 0 240 240" aria-hidden="true"></svg>
+            <button type="button" class="interval-ray-hub" id="rayHub">
+              <div class="ray-hub-start" id="rayHubStart">
+                <span class="line1">Workout</span>
+                <span class="line2">starten</span>
               </div>
-              <span class="clock-big" id="wheelClockBig"></span>
-            </div>
+              <div class="ray-hub-timer" id="rayHubTimer" hidden>
+                <span class="clock-big" id="wheelClockBig"></span>
+              </div>
+              <div class="ray-hub-input" id="rayHubInput" hidden>
+                <div class="wheel-value-row">
+                  <input type="number" class="wheel-amount-input" id="wheelAmountInput" inputmode="numeric" min="0" placeholder="0">
+                  <span class="wheel-unit-label" id="wheelUnitLabel"></span>
+                </div>
+              </div>
+            </button>
           </div>
         </div>
       </div>
@@ -2150,7 +2228,7 @@
     const aid = getGoAccountId();
     if (!aid || !exId || amount === '' || amount === null || isNaN(parseFloat(amount))) return;
     const ex = exercises.find(function(e){ return e.id === exId; });
-    if (!ex || exId === 'run') return;
+    if (!ex) return;
     const today = new Date().toISOString().slice(0, 10);
     try {
       await goRest('go_training_interval_logs', {
@@ -2232,12 +2310,46 @@
     return opts;
   }
 
+  const INTERVAL_RAY_GRAY = 'rgba(247,245,240,0.22)';
+  const INTERVAL_RAY_LIT = 'rgba(247,245,240,0.88)';
+  const INTERVAL_RAY_COUNT = 48;
+  let embedShellReady = false;
+
+  function drawIntervalRay(svg, filledMap){
+    if (!svg) return;
+    const ns = 'http://www.w3.org/2000/svg';
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    const cx = 120, cy = 120, inner = 78, outer = 112;
+    for (let s = 0; s < INTERVAL_RAY_COUNT; s++) {
+      const a = ((s / INTERVAL_RAY_COUNT) * Math.PI * 2) - Math.PI / 2;
+      const line = document.createElementNS(ns, 'line');
+      line.setAttribute('x1', (cx + Math.cos(a) * inner).toFixed(2));
+      line.setAttribute('y1', (cy + Math.sin(a) * inner).toFixed(2));
+      line.setAttribute('x2', (cx + Math.cos(a) * outer).toFixed(2));
+      line.setAttribute('y2', (cy + Math.sin(a) * outer).toFixed(2));
+      line.setAttribute('stroke', filledMap && filledMap[s] ? INTERVAL_RAY_LIT : INTERVAL_RAY_GRAY);
+      line.setAttribute('stroke-width', '3');
+      line.setAttribute('stroke-linecap', 'round');
+      svg.appendChild(line);
+    }
+  }
+
+  function updateIntervalRayProgress(){
+    const svg = document.getElementById('intervalRaySvg');
+    if (!svg || !embedRunning || !rounds) {
+      drawIntervalRay(svg, null);
+      return;
+    }
+    const filled = {};
+    const progress = Math.max(0, Math.min(1, (currentRound - 1 + (phase === 'work' ? (1 - phaseRemaining / workSec) : 1)) / rounds));
+    const litCount = Math.round(progress * INTERVAL_RAY_COUNT);
+    for (let i = 0; i < litCount; i++) filled[i] = true;
+    drawIntervalRay(svg, filled);
+  }
+
   function buildWheelScroller(mode){
     const scroller = document.getElementById('wheelScroller');
     scroller.innerHTML = '';
-    scroller.hidden = false;
-    document.getElementById('wheelStartDisplay').hidden = true;
-    document.getElementById('wheelTimerDisplay').hidden = true;
     let opts = [];
     let current = workSec;
     if (mode === 'rest') { opts = timeWheelOptions(30, 180); current = restSec; }
@@ -2245,7 +2357,7 @@
     else return;
     const pad = document.createElement('div');
     pad.className = 'wheel-pad';
-    pad.style.height = '88px';
+    pad.style.height = '44px';
     scroller.appendChild(pad);
     opts.forEach(function(sec){
       const btn = document.createElement('button');
@@ -2253,7 +2365,8 @@
       btn.className = 'wheel-item' + (sec === current ? ' is-selected' : '');
       btn.dataset.sec = String(sec);
       btn.textContent = fmtSecShort(sec);
-      btn.addEventListener('click', function(){
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
         if (mode === 'work') { workSec = sec; refreshEmbedSetup(); }
         else { restSec = sec; refreshEmbedSetup(); }
         buildWheelScroller(mode);
@@ -2263,7 +2376,7 @@
     });
     const pad2 = document.createElement('div');
     pad2.className = 'wheel-pad';
-    pad2.style.height = '88px';
+    pad2.style.height = '44px';
     scroller.appendChild(pad2);
     requestAnimationFrame(function(){
       const sel = scroller.querySelector('.wheel-item.is-selected');
@@ -2306,26 +2419,30 @@
     wheelEditMode = mode;
     document.getElementById('editWorkChip').classList.toggle('is-editing', mode === 'work');
     document.getElementById('editRestChip').classList.toggle('is-editing', mode === 'rest');
-    document.getElementById('wheelPhaseLabel').textContent = mode === 'work' ? 'Rundenzeit' : 'Pause';
+    document.getElementById('midWheelLabel').textContent = mode === 'work' ? 'Rundenzeit' : 'Pause';
+    document.getElementById('intervalMidZone').hidden = false;
     buildWheelScroller(mode);
     bindWheelScrollSnap(mode);
   }
 
   function showWheelIdle(){
-    if (embedRunning || wheelEditMode) return;
+    if (embedRunning) return;
+    document.getElementById('intervalMidZone').hidden = true;
     document.getElementById('wheelScroller').innerHTML = '';
-    document.getElementById('wheelScroller').hidden = true;
-    document.getElementById('wheelTimerDisplay').hidden = true;
-    document.getElementById('wheelStartDisplay').hidden = false;
+    document.getElementById('rayHubStart').hidden = false;
+    document.getElementById('rayHubTimer').hidden = true;
+    document.getElementById('rayHubInput').hidden = true;
     document.getElementById('wheelPhaseLabel').textContent = '';
+    document.getElementById('rayHub').disabled = false;
+    drawIntervalRay(document.getElementById('intervalRaySvg'), null);
   }
 
   function hideWheelPicker(){
     wheelEditMode = null;
     document.getElementById('editWorkChip').classList.remove('is-editing');
     document.getElementById('editRestChip').classList.remove('is-editing');
+    document.getElementById('intervalMidZone').hidden = true;
     document.getElementById('wheelScroller').innerHTML = '';
-    document.getElementById('wheelScroller').hidden = true;
     if (embedRunning) return;
     showWheelIdle();
   }
@@ -2336,8 +2453,6 @@
     document.getElementById('embedWorkVal').textContent = fmtMin(workSec);
     document.getElementById('embedRestVal').textContent = restSec + 's';
     document.getElementById('planCount').textContent = rounds + ' Runden';
-    document.getElementById('embedStartSub').textContent =
-      rounds + ' Runden · ' + fmtMin(workSec) + ' · ' + restSec + 's Pause';
     document.getElementById('roundsMinusEmbed').disabled = rounds <= EMBED_ROUNDS_MIN;
     document.getElementById('roundsPlusEmbed').disabled = rounds >= EMBED_ROUNDS_MAX;
     renderDragList();
@@ -2550,57 +2665,48 @@
   }
 
   function canLogCurrentRound(){
-    const exId = currentEmbedExerciseId();
-    return !!exId && exId !== 'run';
+    return !!currentEmbedExerciseId();
   }
 
   function showEmbedTimerWheel(){
-    document.getElementById('wheelStartDisplay').hidden = true;
-    document.getElementById('wheelScroller').hidden = true;
-    const display = document.getElementById('wheelTimerDisplay');
-    display.hidden = false;
+    document.getElementById('rayHubStart').hidden = true;
+    document.getElementById('intervalMidZone').hidden = true;
     const clockBig = document.getElementById('wheelClockBig');
-    const amountInput = document.getElementById('wheelAmountInput');
-    const valueRow = document.getElementById('wheelValueRow');
+    const valueInput = document.getElementById('rayHubInput');
+    const timerBox = document.getElementById('rayHubTimer');
     const unitLbl = document.getElementById('wheelUnitLabel');
     const phaseLbl = document.getElementById('wheelPhaseLabel');
-    const canLog = canLogCurrentRound();
+    const exId = currentEmbedExerciseId();
+    const unit = unitFor(exId);
 
-    if (phase === 'rest') {
-      if (canLog && restInputMode) {
-        phaseLbl.textContent = 'Rundenwert eingeben';
-        valueRow.hidden = false;
-        clockBig.hidden = true;
-        unitLbl.textContent = unitFor(currentEmbedExerciseId());
+    if (phase === 'rest' || phase === 'log-final') {
+      if (restInputMode) {
+        phaseLbl.textContent = exId === 'run' ? 'Lauf · Meter eingeben' : 'Wert eingeben';
+        timerBox.hidden = true;
+        valueInput.hidden = false;
+        unitLbl.textContent = unit;
       } else {
-        phaseLbl.textContent = canLog ? 'Pause · Tippe für Wert' : 'Pause';
-        valueRow.hidden = true;
-        clockBig.hidden = false;
-        clockBig.textContent = fmt(phaseRemaining);
-        clockBig.className = 'clock-big rest';
+        timerBox.hidden = false;
+        valueInput.hidden = true;
+        if (phase === 'rest') {
+          phaseLbl.textContent = exId === 'run' ? 'Pause · Meter' : 'Pause · ' + unit;
+          clockBig.textContent = fmt(phaseRemaining);
+          clockBig.className = 'clock-big rest';
+        } else {
+          phaseLbl.textContent = exId === 'run' ? 'Tippe für Meter' : 'Tippe für ' + unit;
+          clockBig.textContent = 'Fertig';
+          clockBig.className = 'clock-big';
+        }
       }
-      display.classList.toggle('is-input', canLog && restInputMode);
-    } else if (phase === 'work') {
+    } else {
       phaseLbl.textContent = 'Arbeit';
-      valueRow.hidden = true;
+      timerBox.hidden = false;
+      valueInput.hidden = true;
       clockBig.textContent = fmt(phaseRemaining);
       clockBig.className = 'clock-big' + (phaseRemaining <= 3 ? ' warn' : '');
-      clockBig.hidden = false;
-      display.classList.remove('is-input');
-    } else {
-      if (canLog && restInputMode) {
-        phaseLbl.textContent = 'Rundenwert eingeben';
-        valueRow.hidden = false;
-        clockBig.hidden = true;
-        unitLbl.textContent = unitFor(currentEmbedExerciseId());
-      } else {
-        phaseLbl.textContent = canLog ? 'Letzte Runde · Tippe für Wert' : 'Fertig';
-        valueRow.hidden = true;
-        clockBig.textContent = 'Fertig';
-        clockBig.hidden = false;
-      }
-      display.classList.toggle('is-input', canLog && restInputMode);
     }
+    document.getElementById('rayHub').disabled = false;
+    updateIntervalRayProgress();
   }
 
   function renderEmbedRunInfo(){
@@ -2620,19 +2726,13 @@
   function enableRestInput(){
     if ((phase !== 'rest' && phase !== 'log-final') || !embedRunning || !canLogCurrentRound()) return;
     restInputMode = true;
-    const display = document.getElementById('wheelTimerDisplay');
-    const clockBig = document.getElementById('wheelClockBig');
     const amountInput = document.getElementById('wheelAmountInput');
-    const valueRow = document.getElementById('wheelValueRow');
     const unitLbl = document.getElementById('wheelUnitLabel');
-    display.classList.add('is-input');
-    valueRow.hidden = false;
-    clockBig.hidden = true;
     unitLbl.textContent = unitFor(currentEmbedExerciseId());
     const entry = log[currentRound - 1] || {};
     amountInput.value = entry.amount || '';
+    showEmbedTimerWheel();
     amountInput.focus();
-    document.getElementById('wheelPhaseLabel').textContent = 'Rundenwert eingeben';
   }
 
   function disableRestInput(){
@@ -2663,7 +2763,7 @@
     document.getElementById('intervalSetupView').hidden = true;
     document.getElementById('intervalRunView').hidden = false;
     document.getElementById('trainingBack').classList.add('is-visible');
-    document.getElementById('wheelStartDisplay').hidden = true;
+    document.getElementById('rayHubStart').hidden = true;
     rounds = embedPlan.length;
     roundExercises = embedPlan.slice();
     buildLane();
@@ -2681,16 +2781,30 @@
     tick();
   }
 
+  function handleRayHubTap(e){
+    if (e.target.closest('#wheelAmountInput')) return;
+    if (embedRunning) {
+      if ((phase === 'rest' || phase === 'log-final') && !restInputMode) enableRestInput();
+      return;
+    }
+    if (wheelEditMode) return;
+    startEmbedRun();
+  }
+
   function initEmbedShell(){
+    if (embedShellReady) return;
+    embedShellReady = true;
     document.getElementById('embedShell').removeAttribute('hidden');
     embedPlan = DEFAULT_EMBED_PLAN.slice();
     refreshEmbedSetup();
+    drawIntervalRay(document.getElementById('intervalRaySvg'), null);
 
     if (useParentTabs) {
       document.querySelectorAll('.tab-panel[data-embed-panel]').forEach(function(panel){
         panel.classList.toggle('is-active', panel.getAttribute('data-embed-panel') === 'intervall');
       });
       embedActiveTab = 'intervall';
+      embedInInterval = true;
     } else {
       setEmbedTab('info');
     }
@@ -2718,12 +2832,14 @@
       }
     });
 
-    document.getElementById('embedStartBtn').addEventListener('click', startEmbedRun);
+    document.getElementById('rayHub').addEventListener('click', handleRayHubTap);
 
-    document.getElementById('roundsMinusEmbed').addEventListener('click', function(){
+    document.getElementById('roundsMinusEmbed').addEventListener('click', function(e){
+      e.stopPropagation();
       adjustEmbedRounds(-EMBED_ROUNDS_STEP);
     });
-    document.getElementById('roundsPlusEmbed').addEventListener('click', function(){
+    document.getElementById('roundsPlusEmbed').addEventListener('click', function(e){
+      e.stopPropagation();
       adjustEmbedRounds(EMBED_ROUNDS_STEP);
     });
 
@@ -2738,14 +2854,8 @@
 
     document.getElementById('intervalLayout').addEventListener('click', function(e){
       if (!wheelEditMode || embedRunning) return;
-      if (e.target.closest('.global-time-chip') || e.target.closest('.wheel-frame')) return;
+      if (e.target.closest('.global-time-chip') || e.target.closest('#intervalMidZone')) return;
       hideWheelPicker();
-    });
-
-    document.getElementById('wheelZone').addEventListener('click', function(e){
-      if (!embedRunning || (phase !== 'rest' && phase !== 'log-final') || !canLogCurrentRound()) return;
-      if (e.target.closest('#wheelAmountInput')) return;
-      enableRestInput();
     });
 
     document.getElementById('wheelAmountInput').addEventListener('input', function(){
@@ -2758,6 +2868,10 @@
 
     loadIntervalLogs();
     showWheelIdle();
+  }
+
+  if (isEmbed) {
+    try { initEmbedShell(); } catch (err) { console.error('initEmbedShell', err); }
   }
 
 })();
