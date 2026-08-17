@@ -392,6 +392,7 @@
     max-width:100%; color:var(--text);
     box-sizing:border-box;
     padding-bottom:4px;
+    position:relative;
   }
   .training-head{
     flex:none;
@@ -588,10 +589,41 @@
     overflow-y:auto; overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none; -ms-overflow-style:none;
-    padding:6px 16px 4px;
+    padding:4px 16px 0;
     pointer-events:auto;
     touch-action:pan-y;
+    display:flex;
+    flex-direction:column;
   }
+  .interval-setup-view{
+    display:flex;
+    flex-direction:column;
+    flex:1;
+    min-height:0;
+  }
+  .interval-headline{
+    flex:none;
+    text-align:center;
+    font-family:var(--display);
+    font-size:clamp(15px, 4.2vw, 18px);
+    font-weight:700;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--text);
+    padding:4px 8px 0;
+  }
+  .interval-layout.is-running .interval-headline{ display:none; }
+  .runner-name{
+    display:none;
+    text-align:center;
+    font-family:var(--display);
+    font-size:clamp(16px, 4.4vw, 20px);
+    font-weight:700;
+    letter-spacing:-0.02em;
+    color:var(--text);
+    padding:2px 8px 0;
+  }
+  .interval-layout.is-running .runner-name{ display:block; }
   .interval-scroll.is-dragging-plan{
     touch-action:none;
     overflow-y:auto;
@@ -600,17 +632,33 @@
   .interval-wheel-zone{
     flex:none;
     min-height:0;
-    border-top:1px solid var(--line);
+    border-top:none;
     display:flex; flex-direction:column;
-    align-items:center; justify-content:center;
+    align-items:center; justify-content:flex-start;
+    gap:10px;
     position:relative;
     pointer-events:auto;
     touch-action:manipulation;
-    padding:8px 0 10px;
-    overflow:hidden;
+    padding:4px 0 18px;
+    overflow:visible;
     z-index:1;
     background:var(--bg);
   }
+  .history-open-btn{
+    appearance:none; -webkit-appearance:none;
+    background:transparent;
+    border:1.5px solid rgba(247,245,240,0.55);
+    color:var(--text);
+    font-family:var(--display);
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+    padding:8px 14px;
+    border-radius:999px;
+    cursor:pointer;
+    touch-action:manipulation;
+  }
+  .interval-layout.is-running .history-open-btn{ display:none !important; }
   .interval-mid-zone{
     flex:none;
     height:118px;
@@ -706,7 +754,10 @@
   }
   .wheel-start-display[hidden]{ display:none !important; }
   .global-time-row{
-    display:flex; gap:10px; margin-bottom:8px;
+    display:flex; gap:10px;
+    margin-top:18px;
+    margin-bottom:0;
+    flex:none;
   }
   .global-time-col{
     flex:1; min-width:0;
@@ -747,7 +798,15 @@
     color:var(--text); font-size:1.05rem;
   }
   .chip-wheel-scroller .wheel-pad{ height:18px !important; }
-  .workout-pick-wrap{ margin-top:2px; padding-bottom:0; }
+  .workout-pick-wrap{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    min-height:0;
+    margin:0;
+    padding:8px 0;
+  }
   .workout-pick-grid{
     display:grid;
     grid-template-columns:1fr 1fr;
@@ -756,14 +815,14 @@
   .workout-pick{
     display:flex;
     align-items:center; justify-content:center;
-    min-height:38px;
-    padding:7px 8px;
+    min-height:36px;
+    padding:6px 6px;
     border:1.5px solid rgba(247,245,240,0.32);
     border-radius:2px;
     background:transparent;
     color:var(--text);
     font-family:var(--display);
-    font-size:13px;
+    font-size:12px;
     font-weight:600;
     letter-spacing:-0.01em;
     line-height:1.15;
@@ -785,43 +844,40 @@
     color:var(--text-dim);
     text-align:center;
   }
-  .drag-list{ display:none; flex-direction:column; gap:8px; padding-bottom:8px; }
+  .drag-list{ display:none; flex-direction:column; gap:10px; padding-bottom:8px; }
   .interval-layout.is-running .drag-list{ display:flex; }
   .interval-layout.is-running .workout-pick-wrap{ display:none !important; }
   .drag-pair{
     display:flex; flex-direction:column;
     position:relative;
-    border:2px solid transparent;
-    border-radius:2px;
-    background:rgba(0,0,0,0.22);
+    gap:4px;
+    background:transparent;
     touch-action:none; user-select:none;
     -webkit-user-select:none;
-    transition:border-color .12s, background .12s, opacity .12s;
     cursor:grab;
   }
-  .drag-pair.is-current{ border-color:var(--accent); }
   .drag-pair.is-dragging{
     opacity:0.92; z-index:20;
-    border-color:rgba(247,245,240,0.75);
-    background:rgba(0,0,0,0.24);
     box-shadow:0 8px 24px rgba(0,0,0,0.28);
   }
-  .drag-pair.is-drop-target{ border-color:rgba(247,245,240,0.65); background:rgba(247,245,240,0.08); }
+  .drag-pair.is-drop-target .drag-row{ background:rgba(247,245,240,0.08); }
   .drag-row{
     display:grid;
-    grid-template-columns:28px 56px 1fr 28px;
+    grid-template-columns:28px 1fr auto 28px;
     align-items:center;
     position:relative;
     min-height:40px;
-    padding:8px 0;
-    background:transparent;
+    padding:7px 0;
+    background:rgba(0,0,0,0.22);
+    border:2px solid transparent;
+    border-radius:2px;
     pointer-events:none;
   }
   .drag-row--twin{
-    opacity:0.72;
-    border-bottom:1px solid rgba(247,245,240,0.18);
-    min-height:34px;
-    padding:6px 0;
+    min-height:36px;
+  }
+  .drag-row.is-current-leg{
+    border-color:var(--text);
   }
   .drag-row.is-current-leg .ex-name{ font-weight:700; }
   .drag-handle{
@@ -830,16 +886,19 @@
     color:rgba(247,245,240,0.42);
   }
   .drag-handle svg{ display:block; }
-  .drag-row .ex-time{
-    font-family:var(--display);
-    font-size:12px; font-weight:700;
-    color:rgba(247,245,240,0.88);
-    text-align:left; padding-left:10px;
-    white-space:nowrap;
-  }
   .drag-row .ex-name{
-    font-size:15px; font-weight:600; text-align:center;
+    font-size:14px; font-weight:600; text-align:left;
     letter-spacing:-0.01em;
+    padding-left:4px;
+  }
+  .drag-row .ex-amount{
+    font-family:var(--display);
+    font-size:13px; font-weight:700;
+    color:var(--text);
+    text-align:right;
+    padding-right:6px;
+    white-space:nowrap;
+    min-width:1.5em;
   }
   .interval-layout.is-running .global-time-row{
     display:none !important;
@@ -1002,6 +1061,81 @@
     text-align:center;
   }
   .pb-bar--pill .pb-sep{ opacity:0.45; padding:0 6px; }
+  .history-view{
+    position:absolute; inset:0;
+    z-index:45;
+    background:var(--bg);
+    color:var(--text);
+    display:flex; flex-direction:column;
+    padding:8px 12px 16px;
+    min-height:0;
+  }
+  .history-view[hidden]{ display:none !important; }
+  .history-view-head{
+    flex:none;
+    display:flex; align-items:center;
+    min-height:44px;
+    margin-bottom:8px;
+    position:relative;
+  }
+  .history-back{
+    width:40px; height:40px; border-radius:50%;
+    background:rgba(247,245,240,0.16);
+    color:var(--text);
+    border:none; padding:0; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center;
+    flex:none;
+  }
+  .history-back::before{
+    content:"";
+    width:0; height:0;
+    border-top:8px solid transparent;
+    border-bottom:8px solid transparent;
+    border-right:12px solid currentColor;
+    margin-right:2px;
+  }
+  .history-title{
+    position:absolute; left:48px; right:48px;
+    text-align:center;
+    font-family:var(--display);
+    font-size:clamp(18px, 5vw, 22px);
+    font-weight:700;
+    letter-spacing:-0.02em;
+    pointer-events:none;
+  }
+  .history-table-wrap{
+    flex:1; min-height:0;
+    overflow:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+  .history-table{
+    border-collapse:collapse;
+    width:max-content;
+    min-width:100%;
+    font-family:var(--display);
+    font-size:12px;
+  }
+  .history-table th,
+  .history-table td{
+    padding:8px 10px;
+    border:1px solid rgba(247,245,240,0.28);
+    white-space:nowrap;
+    text-align:center;
+    font-weight:600;
+  }
+  .history-table th:first-child,
+  .history-table td:first-child{
+    position:sticky; left:0;
+    background:var(--bg);
+    text-align:left;
+    z-index:1;
+  }
+  .history-empty{
+    padding:28px 12px;
+    text-align:center;
+    color:var(--text-dim);
+    font-weight:500;
+  }
 </style>
 </head>
 <body>
@@ -1062,7 +1196,9 @@
     <div class="tab-panel" data-embed-panel="intervall">
       <div class="interval-layout" id="intervalLayout">
         <div class="interval-scroll" id="intervalScroll">
-          <div id="intervalSetupView">
+          <div id="intervalSetupView" class="interval-setup-view">
+            <div id="intervalHeadline" class="interval-headline">FRIDAY CIRCLE</div>
+            <div id="runnerName" class="runner-name"></div>
             <div id="runSummaryBar" class="run-summary">4:00 | 30s | 16 Runden</div>
             <div class="global-time-row">
               <div class="global-time-col">
@@ -1086,7 +1222,7 @@
             </div>
             <div class="workout-pick-wrap" id="workoutPickWrap">
               <div class="workout-pick-grid" id="workoutPickGrid"></div>
-              <p class="workout-pick-hint">Wähle von acht Workouts so viele aus, wie du möchtest. Jedes Workout startet mit Laufen.</p>
+              <p class="workout-pick-hint">Wähle so viele Workouts aus, wie du möchtest. Jedes Workout startet mit Laufen.</p>
             </div>
             <div class="drag-list" id="dragList"></div>
           </div>
@@ -1110,6 +1246,7 @@
               </div>
             </button>
           </div>
+          <button type="button" class="history-open-btn" id="historyOpenBtn">Vergangene Workouts</button>
         </div>
       </div>
     </div>
@@ -1126,6 +1263,13 @@
         <button type="button" class="abort-yes" id="abortYesBtn">Abbrechen</button>
       </div>
     </div>
+  </div>
+  <div class="history-view" id="historyView" hidden>
+    <div class="history-view-head">
+      <button type="button" class="history-back" id="historyBackBtn" aria-label="Zurück"></button>
+      <div class="history-title" id="historyTitle"></div>
+    </div>
+    <div class="history-table-wrap" id="historyTableWrap"></div>
   </div>
 </div>
 <div class="wrap">
@@ -1361,20 +1505,22 @@
   // ---------- exercise list (offizielle Hyrox-Stationen + Laufen) ----------
   const exercises = [
     {id:'run',      name:'Laufen',              unit:'Meter'},
-    {id:'skierg',   name:'Ski Ergometer',     unit:'Meter'},
-    {id:'sledpush', name:'Schlitten push',    unit:'Meter'},
-    {id:'sledpull', name:'Schlitten pull',    unit:'Meter'},
-    {id:'burpee',   name:'Burpee Broad Jumps',unit:'Meter'},
-    {id:'row',      name:'Ruder-Ergometer',     unit:'Meter'},
-    {id:'farmers',  name:'Farmers Carry',       unit:'Meter'},
+    {id:'skierg',   name:'Ski Erg',             unit:'Meter'},
+    {id:'sledpush', name:'Sled push',           unit:'Meter'},
+    {id:'sledpull', name:'Sled pull',           unit:'Meter'},
+    {id:'burpee',   name:'Burpee Jumps',        unit:'Meter'},
+    {id:'row',      name:'Ruder',               unit:'Meter'},
+    {id:'assault',  name:'Assault Bike',        unit:'Kalorien'},
     {id:'lunges',   name:'Sandbag Lunges',      unit:'Meter'},
+    {id:'farmers',  name:'Farmer Carrys',       unit:'Meter'},
     {id:'wallballs',name:'Wallballs',           unit:'Wiederholungen'}
   ];
 
-  const HYROX_CYCLE = ['skierg','sledpush','sledpull','burpee','row','lunges','farmers','wallballs'];
+  const HYROX_CYCLE = ['skierg','sledpush','sledpull','burpee','row','assault','lunges','farmers','wallballs'];
   const WORKOUT_SHORT_NAMES = {
-    run:'Laufen', skierg:'Ski', sledpush:'Sled push', sledpull:'Sled pull',
-    burpee:'Burpee', row:'Ruder', lunges:'Lunges', farmers:'Farmers', wallballs:'Wallballs'
+    run:'Laufen', skierg:'Ski Erg', sledpush:'Sled push', sledpull:'Sled pull',
+    burpee:'Burpee Jumps', row:'Ruder', assault:'Assault Bike',
+    lunges:'Sandbag Lunges', farmers:'Farmer Carrys', wallballs:'Wallballs'
   };
 
   const exerciseSelect = document.getElementById('exerciseSelect');
@@ -1435,7 +1581,11 @@
       '<line x1="19" y1="2" x2="19" y2="22"/>' +
       '<circle cx="11" cy="3" r="2.4" fill="currentColor" stroke="none"/>' +
       '<circle cx="9" cy="8" r="2.6" fill="currentColor" stroke="none"/>' +
-      '<path d="M9 10.5 L9 15 M9 15 L6 18 L6 21 M9 15 L12 18 L12 21 M9 11 L11 6 M9 11 L6 10"/>'
+      '<path d="M9 10.5 L9 15 M9 15 L6 18 L6 21 M9 15 L12 18 L12 21 M9 11 L11 6 M9 11 L6 10"/>',
+    assault:
+      '<circle cx="7" cy="17" r="3.2"/>' +
+      '<circle cx="17" cy="17" r="3.2"/>' +
+      '<path d="M7 14 L12 8 L17 14 M12 8 L12 4 M10 4 L14 4"/>'
   };
   function iconSvg(exId, size){
     const inner = exerciseIcons[exId];
@@ -1929,8 +2079,28 @@
   }
 
   function unitFor(exId){
-    const ex = exercises.find(e=>e.id===exId);
-    return ex ? ex.unit : 'Meter';
+    const meta = exerciseMeta(exId);
+    return meta.unit;
+  }
+
+  function exerciseMeta(exId){
+    const runMatch = String(exId || '').match(/^run-(\d+)$/);
+    if (runMatch) {
+      return { id: exId, name: 'Laufen Rnd ' + runMatch[1], unit: 'Meter' };
+    }
+    if (exId === 'run') return { id: 'run', name: 'Laufen', unit: 'Meter' };
+    const ex = exercises.find(function(e){ return e.id === exId; });
+    return {
+      id: exId,
+      name: (ex && ex.name) || WORKOUT_SHORT_NAMES[exId] || exId || '',
+      unit: (ex && ex.unit) || 'Meter'
+    };
+  }
+
+  function unitShortLabel(unit){
+    if (unit === 'Wiederholungen') return 'Reps';
+    if (unit === 'Kalorien') return 'kcal';
+    return 'm';
   }
 
   function saveLogEntry(){
@@ -2352,6 +2522,35 @@
     return null;
   }
 
+  function getAthleteFirstName(){
+    try {
+      const acc = JSON.parse(localStorage.getItem('gogogo_go_account') || 'null');
+      const full = String((acc && acc.name) || '').trim();
+      return full.split(/\s+/)[0] || '';
+    } catch (e) { return ''; }
+  }
+
+  function formatHeadlineDate(d){
+    const dt = d || new Date();
+    const dd = String(dt.getDate()).padStart(2, '0');
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const yyyy = dt.getFullYear();
+    return dd + '.' + mm + '.' + yyyy;
+  }
+
+  function planLogId(idx){
+    const exId = embedPlan[idx];
+    if (exId === 'run') return 'run-' + (Math.floor(idx / 2) + 1);
+    return exId;
+  }
+
+  function formatLoggedAmount(amount, unit){
+    if (amount === '' || amount === null || amount === undefined) return '';
+    const n = parseFloat(amount);
+    if (isNaN(n)) return '';
+    return formatPbAmount(n) + ' ' + unitShortLabel(unit);
+  }
+
   function notifyParentWorkout(active){
     if (window.parent !== window) {
       window.parent.postMessage({ type: 'gogogo-training-workout', active: !!active }, '*');
@@ -2396,8 +2595,8 @@
   async function saveIntervalLogEntry(exId, amount, roundNum){
     const aid = getGoAccountId();
     if (!aid || !exId || amount === '' || amount === null || isNaN(parseFloat(amount))) return;
-    const ex = exercises.find(function(e){ return e.id === exId; });
-    if (!ex) return;
+    const meta = exerciseMeta(exId);
+    if (!meta || !meta.id) return;
     const today = new Date().toISOString().slice(0, 10);
     try {
       await goRest('go_training_interval_logs', {
@@ -2406,8 +2605,8 @@
         body: {
           account_id: aid,
           workout_date: today,
-          exercise_id: exId,
-          exercise_name: ex.name,
+          exercise_id: meta.id,
+          exercise_name: meta.name,
           work_sec: workSec,
           amount: parseFloat(amount),
           round_num: roundNum
@@ -2453,10 +2652,10 @@
     if (!embedRunning) { bar.hidden = true; return; }
     bar.hidden = false;
     const idx = currentRound - 1;
-    const exId = (log[idx] && log[idx].exercise) || embedPlan[idx] || '';
+    const exId = (log[idx] && log[idx].exercise) || planLogId(idx) || '';
     const stats = pbStatsForExercise(exId);
-    const unit = stats.unit || 'm';
-    const unitShort = unit === 'Wiederholungen' ? 'Reps' : 'm';
+    const unit = stats.unit || 'Meter';
+    const unitShort = unitShortLabel(unit);
     let txt = 'PB: ';
     txt += stats.pb !== null ? (formatPbAmount(stats.pb) + ' ' + unitShort) : '—';
     if (stats.days >= 2 && stats.avg !== null) {
@@ -2562,8 +2761,8 @@
     const amt = parseFloat(row.amount);
     if (isNaN(amt)) return fmtMin(workSec);
     const unit = unitFor(exId);
-    const unitShort = unit === 'Wiederholungen' ? 'Reps' : 'm';
-    if (exId === 'run') return Math.round(amt) + ' ' + unitShort;
+    const unitShort = unitShortLabel(unit);
+    if (String(exId).indexOf('run') === 0) return Math.round(amt) + ' ' + unitShort;
     return Math.round(amt) + ' ' + unitShort;
   }
 
@@ -2597,6 +2796,10 @@
     roundExercises = embedPlan.slice(0, embedRounds);
     const sum = document.getElementById('runSummaryBar');
     if (sum) sum.textContent = fmtMin(workSec) + ' | ' + restSec + 's | ' + embedRounds + ' Runden';
+    const head = document.getElementById('intervalHeadline');
+    if (head) head.textContent = 'FRIDAY CIRCLE ' + formatHeadlineDate();
+    const runner = document.getElementById('runnerName');
+    if (runner) runner.textContent = getAthleteFirstName();
     updateStartEnabled();
     if (!embedRunning) renderWorkoutPicks();
     if (embedRunning) renderDragList();
@@ -2626,12 +2829,13 @@
     refreshEmbedSetup(false);
   }
 
-  function pairRowHtml(exId){
-    const shortName = WORKOUT_SHORT_NAMES[exId] || exId;
-    const timeLabel = lastLogLabelForExercise(exId);
+  function pairRowHtml(exId, pairIndex, isRun, amount){
+    const logId = isRun ? ('run-' + (pairIndex + 1)) : exId;
+    const meta = exerciseMeta(logId);
+    const amountTxt = formatLoggedAmount(amount, meta.unit);
     return '<span class="drag-handle" aria-hidden="true">' + dragHandleSvg + '</span>' +
-      '<span class="ex-time">' + timeLabel + '</span>' +
-      '<span class="ex-name">' + shortName + '</span>' +
+      '<span class="ex-name">' + meta.name + '</span>' +
+      '<span class="ex-amount">' + amountTxt + '</span>' +
       '<span class="drag-handle drag-handle--right" aria-hidden="true">' + dragHandleSvg + '</span>';
   }
 
@@ -2642,17 +2846,19 @@
     embedSelected.forEach(function(exId, pairIndex){
       const pair = document.createElement('div');
       pair.className = 'drag-pair';
-      const currentIdx = currentRound - 1;
-      if (embedRunning && Math.floor(currentIdx / 2) === pairIndex) pair.classList.add('is-current');
+      pair.dataset.ex = exId;
       pair.dataset.pair = String(pairIndex);
+      const currentIdx = currentRound - 1;
+      const runAmt = log[pairIndex * 2] ? log[pairIndex * 2].amount : '';
+      const stAmt = log[pairIndex * 2 + 1] ? log[pairIndex * 2 + 1].amount : '';
       const twin = document.createElement('div');
       twin.className = 'drag-row drag-row--twin';
       if (embedRunning && currentIdx === pairIndex * 2) twin.classList.add('is-current-leg');
-      twin.innerHTML = pairRowHtml('run');
+      twin.innerHTML = pairRowHtml('run', pairIndex, true, runAmt);
       const station = document.createElement('div');
       station.className = 'drag-row';
       if (embedRunning && currentIdx === pairIndex * 2 + 1) station.classList.add('is-current-leg');
-      station.innerHTML = pairRowHtml(exId);
+      station.innerHTML = pairRowHtml(exId, pairIndex, false, stAmt);
       pair.appendChild(twin);
       pair.appendChild(station);
       bindDragPair(pair, pairIndex);
@@ -2672,6 +2878,22 @@
     else if (clientY > rect.bottom - edge) scroller.scrollTop += speed;
   }
 
+  function dropIndexFromY(clientY, pairs, fromIdx){
+    const others = [];
+    pairs.forEach(function(el, i){
+      if (i !== fromIdx) others.push(el);
+    });
+    let insertAt = others.length;
+    for (let k = 0; k < others.length; k++) {
+      const r = others[k].getBoundingClientRect();
+      if (clientY < r.top + r.height / 2) {
+        insertAt = k;
+        break;
+      }
+    }
+    return insertAt;
+  }
+
   function onPlanDragMove(e){
     if (!dragState) return;
     dragState.lastY = e.clientY;
@@ -2679,21 +2901,37 @@
     const list = document.getElementById('dragList');
     if (!list) return;
     const pairs = Array.from(list.querySelectorAll('.drag-pair'));
-    let target = dragState.from;
-    let bestDist = Infinity;
-    pairs.forEach(function(r, ri){
-      const rect = r.getBoundingClientRect();
-      const dist = Math.abs(e.clientY - (rect.top + rect.height / 2));
-      if (dist < bestDist) { bestDist = dist; target = ri; }
-    });
-    dragState.target = target;
-    pairs.forEach(function(r, ri){
-      r.classList.toggle('is-drop-target', ri === target && target !== dragState.from);
+    const insertAt = dropIndexFromY(e.clientY, pairs, dragState.from);
+    dragState.target = insertAt;
+    const preview = pairs.slice();
+    const moved = preview.splice(dragState.from, 1)[0];
+    preview.splice(insertAt, 0, moved);
+    pairs.forEach(function(r){
+      r.classList.toggle('is-drop-target', r === preview[insertAt] && insertAt !== dragState.from);
     });
     if (dragState.row) {
       const dy = e.clientY - dragState.startY;
       dragState.row.style.transform = 'translateY(' + dy + 'px)';
     }
+  }
+
+  function applyPairOrder(from, toAfterRemove){
+    if (from === toAfterRemove || toAfterRemove === undefined) return false;
+    const station = embedSelected.splice(from, 1)[0];
+    embedSelected.splice(toAfterRemove, 0, station);
+    if (embedRunning && log.length) {
+      const moved = log.splice(from * 2, 2);
+      log.splice(toAfterRemove * 2, 0, moved[0], moved[1]);
+    }
+    syncPlanFromSelection();
+    if (embedRunning) {
+      roundExercises = embedPlan.slice(0, embedRounds);
+      log.forEach(function(entry, i){
+        if (!entry) return;
+        entry.exercise = planLogId(i);
+      });
+    }
+    return true;
   }
 
   function endPlanDrag(e){
@@ -2709,19 +2947,12 @@
     if (dragAutoScrollId) { cancelAnimationFrame(dragAutoScrollId); dragAutoScrollId = null; }
     const from = dragState.from;
     const to = dragState.target !== undefined ? dragState.target : from;
+    const movedEnough = Math.abs((e && e.clientY || dragState.lastY) - dragState.startY) > 12;
     dragState = null;
     document.querySelectorAll('.drag-pair').forEach(function(r){
       r.classList.remove('is-drop-target');
     });
-    if (to !== from && to !== undefined) {
-      const station = embedSelected.splice(from, 1)[0];
-      embedSelected.splice(to, 0, station);
-      if (embedRunning && log.length) {
-        const moved = log.splice(from * 2, 2);
-        log.splice(to * 2, 0, moved[0], moved[1]);
-      }
-      syncPlanFromSelection();
-      if (embedRunning) roundExercises = embedPlan.slice(0, embedRounds);
+    if (movedEnough && applyPairOrder(from, to)) {
       refreshEmbedSetup(false);
     }
   }
@@ -2868,7 +3099,7 @@
       if (restInputMode) {
         timerBox.hidden = true;
         valueInput.hidden = false;
-        unitLbl.textContent = unit === 'Wiederholungen' ? 'Reps' : 'm';
+        unitLbl.textContent = unitShortLabel(unit);
       } else {
         timerBox.hidden = false;
         valueInput.hidden = true;
@@ -2889,9 +3120,8 @@
     const list = document.getElementById('dragList');
     if (!list) return;
     const idx = currentRound - 1;
-    const pairIdx = Math.floor(idx / 2);
     list.querySelectorAll('.drag-pair').forEach(function(pair, i){
-      pair.classList.toggle('is-current', embedRunning && i === pairIdx);
+      pair.classList.remove('is-current');
       const rows = pair.querySelectorAll('.drag-row');
       if (rows[0]) rows[0].classList.toggle('is-current-leg', embedRunning && idx === i * 2);
       if (rows[1]) rows[1].classList.toggle('is-current-leg', embedRunning && idx === i * 2 + 1);
@@ -2926,16 +3156,34 @@
   function saveLogEntryFromWheel(){
     const amountInput = document.getElementById('wheelAmountInput');
     const idx = currentRound - 1;
-    if (!log[idx]) log[idx] = { exercise: embedPlan[idx] || '', amount: '' };
+    const logId = planLogId(idx);
+    if (!log[idx]) log[idx] = { exercise: logId, amount: '' };
     log[idx].amount = amountInput.value;
-    log[idx].exercise = embedPlan[idx] || log[idx].exercise;
+    log[idx].exercise = logId;
+    updateRowAmountDisplay(idx);
     if (amountInput.value !== '') {
-      saveIntervalLogEntry(log[idx].exercise, amountInput.value, currentRound);
+      saveIntervalLogEntry(logId, amountInput.value, currentRound);
     }
+  }
+
+  function updateRowAmountDisplay(idx){
+    const list = document.getElementById('dragList');
+    if (!list) return;
+    const pairIdx = Math.floor(idx / 2);
+    const leg = idx % 2;
+    const pair = list.querySelectorAll('.drag-pair')[pairIdx];
+    if (!pair) return;
+    const row = pair.querySelectorAll('.drag-row')[leg];
+    if (!row) return;
+    const amountEl = row.querySelector('.ex-amount');
+    if (!amountEl) return;
+    const entry = log[idx] || {};
+    amountEl.textContent = formatLoggedAmount(entry.amount, unitFor(planLogId(idx)));
   }
 
   function startEmbedRun(){
     if (!embedSelected.length) return;
+    closeHistoryView();
     syncPlanFromSelection();
     if (!embedPlan.length) return;
     embedRunning = true;
@@ -2955,7 +3203,7 @@
     elapsedTotal = 0;
     paused = false;
     restInputMode = false;
-    log = roundExercises.map(function(exId){ return { exercise: exId, amount: '' }; });
+    log = roundExercises.map(function(exId, i){ return { exercise: planLogId(i), amount: '' }; });
     requestWakeLock();
     beep(880, 0.15); vibrate(120);
     notifyParentTabState();
@@ -2990,6 +3238,102 @@
     startEmbedRun();
   }
 
+  function formatTableDate(iso){
+    const p = String(iso || '').slice(0, 10).split('-');
+    if (p.length !== 3) return iso || '';
+    return p[2] + '.' + p[1];
+  }
+
+  function openHistoryView(){
+    const view = document.getElementById('historyView');
+    const title = document.getElementById('historyTitle');
+    if (title) title.textContent = getAthleteFirstName() || 'Workouts';
+    renderHistoryTable();
+    if (view) view.hidden = false;
+  }
+
+  function closeHistoryView(){
+    const view = document.getElementById('historyView');
+    if (view) view.hidden = true;
+  }
+
+  function renderHistoryTable(){
+    const wrap = document.getElementById('historyTableWrap');
+    if (!wrap) return;
+    if (!intervalLogs.length) {
+      wrap.innerHTML = '<div class="history-empty">Noch keine gespeicherten Workouts.</div>';
+      return;
+    }
+    const dateSet = {};
+    const dates = [];
+    intervalLogs.forEach(function(row){
+      const d = row.workout_date;
+      if (d && !dateSet[d]) { dateSet[d] = true; dates.push(d); }
+    });
+    dates.sort();
+    dates.reverse();
+    const rowOrder = [];
+    const seen = {};
+    function addRow(id, name){
+      if (!id || seen[id]) return;
+      seen[id] = true;
+      rowOrder.push({ id: id, name: name });
+    }
+    const runNames = {};
+    intervalLogs.forEach(function(row){
+      const id = row.exercise_id || '';
+      const m = id.match(/^run-(\d+)$/);
+      if (m) runNames[id] = row.exercise_name || ('Laufen Rnd ' + m[1]);
+      else if (id === 'run') runNames.run = row.exercise_name || 'Laufen';
+    });
+    Object.keys(runNames).sort(function(a, b){
+      const na = parseInt((a.match(/\d+/) || ['0'])[0], 10);
+      const nb = parseInt((b.match(/\d+/) || ['0'])[0], 10);
+      return na - nb;
+    }).forEach(function(id){ addRow(id, runNames[id]); });
+    HYROX_CYCLE.forEach(function(id){
+      if (intervalLogs.some(function(r){ return r.exercise_id === id; })) {
+        addRow(id, exerciseMeta(id).name);
+      }
+    });
+    intervalLogs.forEach(function(row){
+      addRow(row.exercise_id, row.exercise_name || exerciseMeta(row.exercise_id).name);
+    });
+    function cellValue(exId, date){
+      const matches = intervalLogs.filter(function(r){
+        return r.exercise_id === exId && r.workout_date === date;
+      });
+      if (!matches.length) return '';
+      let sum = 0, n = 0;
+      matches.forEach(function(r){
+        const amt = parseFloat(r.amount);
+        if (!isNaN(amt)) { sum += amt; n++; }
+      });
+      if (!n) return '';
+      return formatPbAmount(Math.round(sum / n * 10) / 10);
+    }
+    function avgValue(exId){
+      const matches = intervalLogs.filter(function(r){ return r.exercise_id === exId; });
+      let sum = 0, n = 0;
+      matches.forEach(function(r){
+        const amt = parseFloat(r.amount);
+        if (!isNaN(amt)) { sum += amt; n++; }
+      });
+      if (!n) return '—';
+      return formatPbAmount(Math.round(sum / n * 10) / 10);
+    }
+    let html = '<table class="history-table"><thead><tr><th></th><th>ø</th>';
+    dates.forEach(function(d){ html += '<th>' + formatTableDate(d) + '</th>'; });
+    html += '</tr></thead><tbody>';
+    rowOrder.forEach(function(row){
+      html += '<tr><th>' + row.name + '</th><td>' + avgValue(row.id) + '</td>';
+      dates.forEach(function(d){ html += '<td>' + cellValue(row.id, d) + '</td>'; });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  }
+
   function bindEmbedShellEvents(){
     var root = document.getElementById('embedShell');
     if (!root || root.dataset.bound === '1') return;
@@ -3000,6 +3344,16 @@
       if (pick) {
         e.preventDefault(); e.stopPropagation();
         toggleWorkoutPick(pick.dataset.ex);
+        return;
+      }
+      if (e.target.closest('#historyOpenBtn')) {
+        e.preventDefault(); e.stopPropagation();
+        loadIntervalLogs().then(openHistoryView);
+        return;
+      }
+      if (e.target.closest('#historyBackBtn')) {
+        e.preventDefault(); e.stopPropagation();
+        closeHistoryView();
         return;
       }
       if (e.target.closest('#rayHub')) {
@@ -3015,6 +3369,18 @@
       abortEmbedRun();
     });
 
+    document.addEventListener('pointermove', function(e){
+      if (!dragState) return;
+      onPlanDragMove(e);
+    });
+    document.addEventListener('pointerup', function(e){
+      if (!dragState) return;
+      endPlanDrag(e);
+    });
+    document.addEventListener('pointercancel', function(e){
+      if (!dragState) return;
+      endPlanDrag(e);
+    });
     document.getElementById('wheelAmountInput').addEventListener('input', function(){
       saveLogEntryFromWheel();
     });
