@@ -468,6 +468,31 @@
       border-bottom: 2px solid var(--red);
       transform: rotate(-45deg);
     }
+    .admin-kraft__new {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin: 10px 0 4px;
+    }
+    .admin-kraft__new input {
+      flex: 1 1 140px;
+      min-width: 0;
+      min-height: 42px;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: var(--radius);
+      background: var(--paper);
+      color: var(--ink);
+    }
+    .admin-kraft__new input::placeholder { color: var(--placeholder); }
+    .admin-kraft__new .btn {
+      margin: 0;
+      height: 42px;
+      min-height: 42px;
+      padding: 0 14px;
+      width: auto;
+    }
     .admin-user-ok {
       margin: 14px 0 4px;
     }
@@ -1148,6 +1173,11 @@
           <p class="admin-kraft__hint">Haken = vorausgewählte Übungen. In der App erscheint der Haken hinter dem Namen.</p>
           <div class="admin-kraft__systems" id="kraft-admin-systems"></div>
           <div class="admin-kraft__ex" id="kraft-admin-ex"></div>
+          <div class="admin-kraft__new" id="kraft-admin-new-wrap">
+            <button class="btn" type="button" id="kraft-admin-new">NEU</button>
+            <input id="kraft-admin-new-name" type="text" maxlength="48" placeholder="Übungsname" hidden />
+            <button class="btn" type="button" id="kraft-admin-new-save" hidden>speichern</button>
+          </div>
           <p class="msg" id="kraft-admin-msg" role="status"></p>
           <button class="btn admin-plan__save" type="button" id="plan-save">Plan speichern</button>
           <p class="admin-plan__hint">Wochentage überschreiben archiviert den alten Text dauerhaft: vergangene Kalendertage behalten den alten Eintrag. Das lässt sich nicht rückgängig machen.</p>
@@ -1236,6 +1266,7 @@
       var zirkelConfirmBusy = false;
       var kraftAdminSystem = "full";
       var kraftAdminMap = {};
+      var kraftAdminExtras = {};
       var kraftTableMissing = false;
 
       function kraftCat() {
@@ -1250,6 +1281,43 @@
           out[sys.id] = cat.defaultPresetsFor(sys.id);
         });
         return out;
+      }
+
+      function kraftEmptyExtras() {
+        var cat = kraftCat();
+        var out = {};
+        if (!cat) return out;
+        cat.SYSTEMS.forEach(function (sys) { out[sys.id] = []; });
+        return out;
+      }
+
+      function parseKraftList(raw) {
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === "string") {
+          try {
+            var parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch (e) { return []; }
+        }
+        return [];
+      }
+
+      function kraftExtrasFor(systemId) {
+        return (kraftAdminExtras[systemId] || []).slice();
+      }
+
+      function kraftAllAdminExercises(systemId) {
+        var cat = kraftCat();
+        var base = cat ? cat.exercisesFor(systemId).slice() : [];
+        var seen = {};
+        base.forEach(function (ex) { seen[ex.id] = true; });
+        kraftExtrasFor(systemId).forEach(function (ex) {
+          if (ex && ex.id && !seen[ex.id]) {
+            seen[ex.id] = true;
+            base.push({ id: String(ex.id), name: String(ex.name || ex.id) });
+          }
+        });
+        return base;
       }
 
       function kraftIdsFor(systemId) {
@@ -1282,11 +1350,10 @@
 
       function renderKraftAdminExercises() {
         var wrap = document.getElementById("kraft-admin-ex");
-        var cat = kraftCat();
-        if (!wrap || !cat) return;
+        if (!wrap) return;
         var selected = kraftIdsFor(kraftAdminSystem);
         wrap.innerHTML = "";
-        cat.exercisesFor(kraftAdminSystem).forEach(function (ex) {
+        kraftAllAdminExercises(kraftAdminSystem).forEach(function (ex) {
           var lab = document.createElement("label");
           var inp = document.createElement("input");
           inp.type = "checkbox";
@@ -1315,6 +1382,7 @@
 
       async function loadKraftPresets(accountId) {
         kraftAdminMap = kraftDefaultMap();
+        kraftAdminExtras = kraftEmptyExtras();
         kraftTableMissing = false;
         setKraftAdminMsg("");
         refreshKraftAdminUi();
@@ -1322,9 +1390,23 @@
         try {
           var res = await fetch(
             SUPABASE_URL + "/rest/v1/go_kraft_presets?account_id=eq." + encodeURIComponent(accountId) +
-            "&select=system_id,exercise_ids",
+            "&select=system_id,exercise_ids,custom_exercises",
             { headers: apiHeaders() }
           );
+          if (!res.ok && res.status !== 400) {
+            if (res.status === 404) {
+              kraftTableMissing = true;
+              setKraftAdminMsg("Tabelle go_kraft_presets fehlt — go-kraft-presets.sql in Supabase ausführen.", true);
+            }
+            return;
+          }
+          if (!res.ok) {
+            res = await fetch(
+              SUPABASE_URL + "/rest/v1/go_kraft_presets?account_id=eq." + encodeURIComponent(accountId) +
+              "&select=system_id,exercise_ids",
+              { headers: apiHeaders() }
+            );
+          }
           if (res.status === 404) {
             kraftTableMissing = true;
             setKraftAdminMsg("Tabelle go_kraft_presets fehlt — go-kraft-presets.sql in Supabase ausführen.", true);
@@ -1335,10 +1417,28 @@
           if (rows && rows.length) {
             rows.forEach(function (row) {
               kraftAdminMap[row.system_id] = Array.isArray(row.exercise_ids) ? row.exercise_ids.map(String) : [];
+              kraftAdminExtras[row.system_id] = parseKraftList(row.custom_exercises).map(function (ex) {
+                return { id: String(ex.id || ""), name: String(ex.name || ex.id || "") };
+              }).filter(function (ex) { return !!ex.id; });
             });
           }
           refreshKraftAdminUi();
         } catch (e) {}
+      }
+
+      function kraftPayloadFor(accountId) {
+        var cat = kraftCat();
+        var now = new Date().toISOString();
+        if (!cat) return [];
+        return cat.SYSTEMS.map(function (sys) {
+          return {
+            account_id: accountId,
+            system_id: sys.id,
+            exercise_ids: kraftIdsFor(sys.id),
+            custom_exercises: kraftExtrasFor(sys.id),
+            updated_at: now
+          };
+        });
       }
 
       async function saveKraftPresets(accountId) {
@@ -1346,15 +1446,7 @@
         if (!accountId || String(accountId).indexOf("local-") === 0) return { ok: true };
         var cat = kraftCat();
         if (!cat) return { ok: true };
-        var now = new Date().toISOString();
-        var payload = cat.SYSTEMS.map(function (sys) {
-          return {
-            account_id: accountId,
-            system_id: sys.id,
-            exercise_ids: kraftIdsFor(sys.id),
-            updated_at: now
-          };
-        });
+        var payload = kraftPayloadFor(accountId);
         try {
           var res = await fetch(SUPABASE_URL + "/rest/v1/go_kraft_presets?on_conflict=account_id,system_id", {
             method: "POST",
@@ -1364,9 +1456,28 @@
             }),
             body: JSON.stringify(payload)
           });
-          if (res.status === 404 || !res.ok) {
+          if (!res.ok) {
             var t = "";
             try { t = await res.text(); } catch (e0) {}
+            if (/custom_exercises/i.test(t)) {
+              payload = payload.map(function (row) {
+                var copy = {};
+                Object.keys(row).forEach(function (k) {
+                  if (k !== "custom_exercises") copy[k] = row[k];
+                });
+                return copy;
+              });
+              res = await fetch(SUPABASE_URL + "/rest/v1/go_kraft_presets?on_conflict=account_id,system_id", {
+                method: "POST",
+                headers: apiHeaders({
+                  "Content-Type": "application/json",
+                  Prefer: "resolution=merge-duplicates,return=minimal"
+                }),
+                body: JSON.stringify(payload)
+              });
+              if (res.ok) return { ok: false, missing: true, detail: "custom_exercises" };
+              try { t = await res.text(); } catch (e1) {}
+            }
             if (res.status === 404 || /PGRST205|go_kraft_presets|schema cache/i.test(t)) {
               kraftTableMissing = true;
               return { ok: false, missing: true, detail: t };
@@ -1377,6 +1488,54 @@
           return { ok: true };
         } catch (err) {
           return { ok: false, detail: err && err.message ? String(err.message) : "" };
+        }
+      }
+
+      function kraftCustomId(name) {
+        var slug = String(name || "").toLowerCase().replace(/[^a-z0-9äöüß]+/gi, "-").replace(/^-|-$/g, "").slice(0, 24);
+        return "c-" + (slug || "ex") + "-" + Date.now().toString(36).slice(-4);
+      }
+
+      function showKraftNewRow(on) {
+        var nameEl = document.getElementById("kraft-admin-new-name");
+        var saveEl = document.getElementById("kraft-admin-new-save");
+        if (nameEl) {
+          nameEl.hidden = !on;
+          if (on) {
+            nameEl.value = "";
+            nameEl.focus();
+          }
+        }
+        if (saveEl) saveEl.hidden = !on;
+      }
+
+      async function saveNewKraftExercise() {
+        var nameEl = document.getElementById("kraft-admin-new-name");
+        var name = nameEl ? String(nameEl.value || "").trim() : "";
+        if (!name) {
+          setKraftAdminMsg("Übungsname eingeben.", true);
+          return;
+        }
+        collectKraftAdminChecks();
+        var id = kraftCustomId(name);
+        if (!kraftAdminExtras[kraftAdminSystem]) kraftAdminExtras[kraftAdminSystem] = [];
+        kraftAdminExtras[kraftAdminSystem].push({ id: id, name: name });
+        var ids = kraftIdsFor(kraftAdminSystem);
+        if (ids.indexOf(id) === -1) ids.push(id);
+        kraftAdminMap[kraftAdminSystem] = ids;
+        refreshKraftAdminUi();
+        showKraftNewRow(false);
+        if (!activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) {
+          setKraftAdminMsg("Lokal hinzugefügt — Account speichern, damit es in der App erscheint.");
+          return;
+        }
+        setKraftAdminMsg("Speichere …");
+        var saved = await saveKraftPresets(activeAccount.id);
+        if (saved && saved.ok) setKraftAdminMsg("Gespeichert. Die Übung ist in der App sichtbar.");
+        else if (saved && saved.missing && saved.detail === "custom_exercises") {
+          setKraftAdminMsg("Übung lokal da. Für Speichern go-kraft-workout.sql in Supabase ausführen.", true);
+        } else {
+          setKraftAdminMsg("Speichern fehlgeschlagen" + (saved && saved.detail ? ": " + String(saved.detail).slice(0, 120) : "."), true);
         }
       }
 
@@ -2111,7 +2270,7 @@
           if (planMsg) {
             planMsg.classList.remove("is-error");
             if (kraftSaved && kraftSaved.missing) {
-              planMsg.textContent = "Plan gespeichert. Kraft-Vorauswahl braucht go-kraft-presets.sql in Supabase.";
+              planMsg.textContent = "Plan gespeichert. Kraft braucht go-kraft-workout.sql in Supabase (eigene Übungen + Sätze).";
             } else if (kraftSaved && !kraftSaved.ok) {
               planMsg.textContent = "Plan gespeichert. Kraft-Vorauswahl nicht gespeichert.";
             } else if (archived.missing || archivedZirkel.missing) {
@@ -3643,6 +3802,25 @@
       if (kraftExWrap) {
         kraftExWrap.addEventListener("change", function () {
           collectKraftAdminChecks();
+        });
+      }
+      var kraftNewBtn = document.getElementById("kraft-admin-new");
+      var kraftNewSave = document.getElementById("kraft-admin-new-save");
+      var kraftNewName = document.getElementById("kraft-admin-new-name");
+      if (kraftNewBtn) {
+        kraftNewBtn.addEventListener("click", function () {
+          showKraftNewRow(true);
+        });
+      }
+      if (kraftNewSave) {
+        kraftNewSave.addEventListener("click", function () { saveNewKraftExercise(); });
+      }
+      if (kraftNewName) {
+        kraftNewName.addEventListener("keydown", function (e) {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            saveNewKraftExercise();
+          }
         });
       }
       refreshKraftAdminUi();
