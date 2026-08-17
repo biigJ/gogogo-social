@@ -396,6 +396,78 @@
       border-color: var(--ink);
     }
     .admin-plan__save { margin-top: 6px; }
+    .admin-kraft__title {
+      margin: 22px 0 8px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .admin-kraft__hint {
+      margin: 0 0 12px;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      opacity: 0.8;
+    }
+    .admin-kraft__systems {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .admin-kraft__sys {
+      min-height: 40px;
+      padding: 8px 8px;
+      border: 1px solid rgba(247, 245, 240, 0.55);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--ink-on-red);
+      font-weight: 600;
+      font-size: 0.78rem;
+      letter-spacing: -0.02em;
+      text-align: center;
+    }
+    .admin-kraft__sys.is-active {
+      background: var(--paper);
+      color: var(--red);
+      border-color: var(--paper);
+    }
+    .admin-kraft__ex {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .admin-kraft__ex label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .admin-kraft__ex input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      background: var(--paper);
+      border-radius: var(--radius);
+      display: inline-grid;
+      place-items: center;
+      color: var(--red);
+      cursor: pointer;
+    }
+    .admin-kraft__ex input[type="checkbox"]:checked::after {
+      content: "";
+      width: 10px;
+      height: 5px;
+      margin-top: -2px;
+      border-left: 2px solid var(--red);
+      border-bottom: 2px solid var(--red);
+      transform: rotate(-45deg);
+    }
     .admin-user-ok {
       margin: 14px 0 4px;
     }
@@ -1072,6 +1144,11 @@
             </div>
             <textarea id="plan-so" rows="2" maxlength="400" placeholder="Sonntag…"></textarea>
           </div>
+          <h2 class="admin-kraft__title">Kraft-Einheiten</h2>
+          <p class="admin-kraft__hint">Haken = vorausgewählte Übungen. In der App erscheint der Haken hinter dem Namen.</p>
+          <div class="admin-kraft__systems" id="kraft-admin-systems"></div>
+          <div class="admin-kraft__ex" id="kraft-admin-ex"></div>
+          <p class="msg" id="kraft-admin-msg" role="status"></p>
           <button class="btn admin-plan__save" type="button" id="plan-save">Plan speichern</button>
           <p class="admin-plan__hint">Wochentage überschreiben archiviert den alten Text dauerhaft: vergangene Kalendertage behalten den alten Eintrag. Das lässt sich nicht rückgängig machen.</p>
           <p class="msg" id="plan-msg" role="status"></p>
@@ -1083,6 +1160,7 @@
     </div>
   </div>
 
+  <script src="/account/kraft-catalog.js"></script>
   <script>
     (function () {
       var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
@@ -1156,6 +1234,151 @@
       var zirkelUiWeekday = DEFAULT_ZIRKEL_WD;
       var zirkelTextStash = {};
       var zirkelConfirmBusy = false;
+      var kraftAdminSystem = "full";
+      var kraftAdminMap = {};
+      var kraftTableMissing = false;
+
+      function kraftCat() {
+        return window.GOGOGO_KRAFT || null;
+      }
+
+      function kraftDefaultMap() {
+        var cat = kraftCat();
+        var out = {};
+        if (!cat) return out;
+        cat.SYSTEMS.forEach(function (sys) {
+          out[sys.id] = cat.defaultPresetsFor(sys.id);
+        });
+        return out;
+      }
+
+      function kraftIdsFor(systemId) {
+        if (kraftAdminMap[systemId]) return kraftAdminMap[systemId].slice();
+        var cat = kraftCat();
+        return cat ? cat.defaultPresetsFor(systemId) : [];
+      }
+
+      function setKraftAdminMsg(text, isError) {
+        var el = document.getElementById("kraft-admin-msg");
+        if (!el) return;
+        el.textContent = text || "";
+        el.classList.toggle("is-error", !!isError);
+      }
+
+      function renderKraftAdminSystems() {
+        var wrap = document.getElementById("kraft-admin-systems");
+        var cat = kraftCat();
+        if (!wrap || !cat) return;
+        wrap.innerHTML = "";
+        cat.SYSTEMS.forEach(function (sys) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "admin-kraft__sys" + (sys.id === kraftAdminSystem ? " is-active" : "");
+          btn.dataset.system = sys.id;
+          btn.textContent = sys.name;
+          wrap.appendChild(btn);
+        });
+      }
+
+      function renderKraftAdminExercises() {
+        var wrap = document.getElementById("kraft-admin-ex");
+        var cat = kraftCat();
+        if (!wrap || !cat) return;
+        var selected = kraftIdsFor(kraftAdminSystem);
+        wrap.innerHTML = "";
+        cat.exercisesFor(kraftAdminSystem).forEach(function (ex) {
+          var lab = document.createElement("label");
+          var inp = document.createElement("input");
+          inp.type = "checkbox";
+          inp.dataset.ex = ex.id;
+          inp.checked = selected.indexOf(ex.id) !== -1;
+          lab.appendChild(inp);
+          lab.appendChild(document.createTextNode(ex.name));
+          wrap.appendChild(lab);
+        });
+      }
+
+      function refreshKraftAdminUi() {
+        renderKraftAdminSystems();
+        renderKraftAdminExercises();
+      }
+
+      function collectKraftAdminChecks() {
+        var wrap = document.getElementById("kraft-admin-ex");
+        if (!wrap) return;
+        var ids = [];
+        wrap.querySelectorAll("input[type='checkbox']").forEach(function (inp) {
+          if (inp.checked && inp.dataset.ex) ids.push(inp.dataset.ex);
+        });
+        kraftAdminMap[kraftAdminSystem] = ids;
+      }
+
+      async function loadKraftPresets(accountId) {
+        kraftAdminMap = kraftDefaultMap();
+        kraftTableMissing = false;
+        setKraftAdminMsg("");
+        refreshKraftAdminUi();
+        if (!accountId || String(accountId).indexOf("local-") === 0) return;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_kraft_presets?account_id=eq." + encodeURIComponent(accountId) +
+            "&select=system_id,exercise_ids",
+            { headers: apiHeaders() }
+          );
+          if (res.status === 404) {
+            kraftTableMissing = true;
+            setKraftAdminMsg("Tabelle go_kraft_presets fehlt — go-kraft-presets.sql in Supabase ausführen.", true);
+            return;
+          }
+          if (!res.ok) return;
+          var rows = await res.json();
+          if (rows && rows.length) {
+            rows.forEach(function (row) {
+              kraftAdminMap[row.system_id] = Array.isArray(row.exercise_ids) ? row.exercise_ids.map(String) : [];
+            });
+          }
+          refreshKraftAdminUi();
+        } catch (e) {}
+      }
+
+      async function saveKraftPresets(accountId) {
+        collectKraftAdminChecks();
+        if (!accountId || String(accountId).indexOf("local-") === 0) return { ok: true };
+        var cat = kraftCat();
+        if (!cat) return { ok: true };
+        var now = new Date().toISOString();
+        var payload = cat.SYSTEMS.map(function (sys) {
+          return {
+            account_id: accountId,
+            system_id: sys.id,
+            exercise_ids: kraftIdsFor(sys.id),
+            updated_at: now
+          };
+        });
+        try {
+          var res = await fetch(SUPABASE_URL + "/rest/v1/go_kraft_presets?on_conflict=account_id,system_id", {
+            method: "POST",
+            headers: apiHeaders({
+              "Content-Type": "application/json",
+              Prefer: "resolution=merge-duplicates,return=minimal"
+            }),
+            body: JSON.stringify(payload)
+          });
+          if (res.status === 404 || !res.ok) {
+            var t = "";
+            try { t = await res.text(); } catch (e0) {}
+            if (res.status === 404 || /PGRST205|go_kraft_presets|schema cache/i.test(t)) {
+              kraftTableMissing = true;
+              return { ok: false, missing: true, detail: t };
+            }
+            return { ok: false, detail: t || ("HTTP " + res.status) };
+          }
+          kraftTableMissing = false;
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, detail: err && err.message ? String(err.message) : "" };
+        }
+      }
 
       function getZirkelChecks() {
         return Array.prototype.slice.call(document.querySelectorAll(".plan-zirkel-check"));
@@ -1616,6 +1839,7 @@
       }
       async function loadCoachPlan(accountId) {
         clearPlanForm();
+        await loadKraftPresets(accountId);
         if (!accountId || String(accountId).indexOf("local-") === 0) return;
         try {
           var res = await fetch(
@@ -1883,9 +2107,14 @@
           try { savedRows = await res.json(); } catch (e1) { savedRows = null; }
           if (savedRows && savedRows[0]) fillPlanForm(savedRows[0]);
           else await loadCoachPlan(activeAccount.id);
+          var kraftSaved = await saveKraftPresets(activeAccount.id);
           if (planMsg) {
             planMsg.classList.remove("is-error");
-            if (archived.missing || archivedZirkel.missing) {
+            if (kraftSaved && kraftSaved.missing) {
+              planMsg.textContent = "Plan gespeichert. Kraft-Vorauswahl braucht go-kraft-presets.sql in Supabase.";
+            } else if (kraftSaved && !kraftSaved.ok) {
+              planMsg.textContent = "Plan gespeichert. Kraft-Vorauswahl nicht gespeichert.";
+            } else if (archived.missing || archivedZirkel.missing) {
               planMsg.textContent = "Plan gespeichert. Archiv teilweise inaktiv — go-coach-plan-history.sql / go-coach-zirkel-history.sql prüfen.";
             } else {
               planMsg.textContent = "Gespeichert.";
@@ -3400,6 +3629,23 @@
       var planSave = document.getElementById("plan-save");
       if (planSave) planSave.addEventListener("click", function () { saveCoachPlan(); });
       bindZirkelDayChecks();
+      var kraftSysWrap = document.getElementById("kraft-admin-systems");
+      if (kraftSysWrap) {
+        kraftSysWrap.addEventListener("click", function (e) {
+          var btn = e.target.closest(".admin-kraft__sys");
+          if (!btn || !btn.dataset.system) return;
+          collectKraftAdminChecks();
+          kraftAdminSystem = btn.dataset.system;
+          refreshKraftAdminUi();
+        });
+      }
+      var kraftExWrap = document.getElementById("kraft-admin-ex");
+      if (kraftExWrap) {
+        kraftExWrap.addEventListener("change", function () {
+          collectKraftAdminChecks();
+        });
+      }
+      refreshKraftAdminUi();
 
       var adminUserOk = document.getElementById("admin-user-ok");
       if (adminUserOk) {
