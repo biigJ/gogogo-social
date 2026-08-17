@@ -583,8 +583,44 @@
     flex:1; min-height:0;
     display:flex; flex-direction:column;
   }
+  .interval-main{
+    flex:1 1 auto;
+    min-height:0;
+    display:flex;
+    flex-direction:row;
+    align-items:stretch;
+  }
+  .plan-scrollbar{
+    display:none;
+    flex:none;
+    width:22px;
+    padding:8px 0 8px 8px;
+    box-sizing:border-box;
+  }
+  .interval-layout.is-running .plan-scrollbar:not([hidden]){
+    display:block;
+  }
+  .plan-scrollbar-track{
+    position:relative;
+    height:100%;
+    width:14px;
+    background:rgba(0,0,0,0.32);
+    border-radius:8px;
+    overflow:hidden;
+  }
+  .plan-scrollbar-thumb{
+    position:absolute;
+    left:0; right:0;
+    width:14px;
+    min-height:36px;
+    background:var(--text);
+    border-radius:8px;
+    touch-action:none;
+    cursor:pointer;
+  }
   .interval-scroll{
     flex:1 1 auto;
+    min-width:0;
     min-height:0;
     overflow-y:auto; overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
@@ -856,9 +892,18 @@
     -webkit-user-select:none;
     cursor:grab;
   }
-  .drag-pair.is-dragging{
-    opacity:0.92; z-index:20;
-    box-shadow:0 8px 24px rgba(0,0,0,0.28);
+  .drag-pair.is-dropped{
+    animation:pair-drop .48s ease;
+    z-index:6;
+  }
+  @keyframes pair-drop{
+    0%{ transform:scale(1.04); }
+    40%{ transform:scale(0.98); }
+    100%{ transform:scale(1); }
+  }
+  .drag-pair.is-dropped .drag-row{
+    border-color:var(--text);
+    box-shadow:0 0 0 2px rgba(247,245,240,0.85);
   }
   .drag-pair.is-drop-target .drag-row{ background:rgba(247,245,240,0.08); }
   .drag-row{
@@ -1073,9 +1118,9 @@
   .history-view[hidden]{ display:none !important; }
   .history-view-head{
     flex:none;
-    display:flex; align-items:center;
-    min-height:44px;
-    margin-bottom:8px;
+    display:flex; align-items:flex-start;
+    gap:8px;
+    margin-bottom:12px;
     position:relative;
   }
   .history-back{
@@ -1085,6 +1130,7 @@
     border:none; padding:0; cursor:pointer;
     display:inline-flex; align-items:center; justify-content:center;
     flex:none;
+    margin-top:2px;
   }
   .history-back::before{
     content:"";
@@ -1094,14 +1140,28 @@
     border-right:12px solid currentColor;
     margin-right:2px;
   }
-  .history-title{
-    position:absolute; left:48px; right:48px;
-    text-align:center;
+  .history-head-text{
+    flex:1; min-width:0;
+    padding-top:2px;
+  }
+  .history-view .history-name{
     font-family:var(--display);
-    font-size:clamp(18px, 5vw, 22px);
+    font-size:clamp(20px, 5.4vw, 26px);
     font-weight:700;
+    letter-spacing:-0.03em;
+    line-height:1.1;
+    margin-bottom:6px;
+    text-transform:none;
+  }
+  .history-view .history-title{
+    font-family:var(--display);
+    font-size:clamp(13px, 3.6vw, 15px);
+    font-weight:600;
     letter-spacing:-0.02em;
-    pointer-events:none;
+    line-height:1.3;
+    color:var(--text);
+    text-transform:none;
+    margin-bottom:0;
   }
   .history-table-wrap{
     flex:1; min-height:0;
@@ -1135,6 +1195,21 @@
     text-align:center;
     color:var(--text-dim);
     font-weight:500;
+  }
+  .history-date-head{
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  .history-del{
+    width:22px; height:22px;
+    border-radius:50%;
+    border:1px solid rgba(247,245,240,0.45);
+    background:transparent;
+    color:var(--text);
+    font-size:14px; line-height:1;
+    font-weight:700;
+    padding:0;
+    cursor:pointer;
+    touch-action:manipulation;
   }
 </style>
 </head>
@@ -1195,7 +1270,13 @@
     </div>
     <div class="tab-panel" data-embed-panel="intervall">
       <div class="interval-layout" id="intervalLayout">
-        <div class="interval-scroll" id="intervalScroll">
+        <div class="interval-main">
+          <div class="plan-scrollbar" id="planScrollbar" hidden>
+            <div class="plan-scrollbar-track" id="planScrollbarTrack">
+              <div class="plan-scrollbar-thumb" id="planScrollbarThumb"></div>
+            </div>
+          </div>
+          <div class="interval-scroll" id="intervalScroll">
           <div id="intervalSetupView" class="interval-setup-view">
             <div id="intervalHeadline" class="interval-headline">FRIDAY CIRCLE</div>
             <div id="runnerName" class="runner-name"></div>
@@ -1222,10 +1303,11 @@
             </div>
             <div class="workout-pick-wrap" id="workoutPickWrap">
               <div class="workout-pick-grid" id="workoutPickGrid"></div>
-              <p class="workout-pick-hint">Wähle so viele Workouts aus, wie du möchtest. Jedes Workout startet mit Laufen.</p>
+              <p class="workout-pick-hint">Wähle alle Workouts des heutigen Zirkeltrainings aus.</p>
             </div>
             <div class="drag-list" id="dragList"></div>
           </div>
+        </div>
         </div>
         <div class="interval-wheel-zone" id="wheelZone">
           <div class="wheel-phase-label" id="wheelPhaseLabel"></div>
@@ -1264,10 +1346,33 @@
       </div>
     </div>
   </div>
+  <div class="abort-overlay" id="finishOverlay" hidden>
+    <div class="abort-card">
+      <h2>Gratulation zum Finish des heutigen Zirkeltrainings.</h2>
+      <p>Die Werte kannst Du in der Tabelle anschauen.</p>
+      <div class="abort-actions">
+        <button type="button" class="abort-stay" id="finishTableBtn">Tabelle</button>
+        <button type="button" class="abort-yes" id="finishOkBtn">OK</button>
+      </div>
+    </div>
+  </div>
+  <div class="abort-overlay" id="deleteOverlay" hidden>
+    <div class="abort-card">
+      <h2>Zirkel löschen?</h2>
+      <p>Alle Werte dieses Datums werden entfernt.</p>
+      <div class="abort-actions">
+        <button type="button" class="abort-stay" id="deleteStayBtn">Behalten</button>
+        <button type="button" class="abort-yes" id="deleteYesBtn">Löschen</button>
+      </div>
+    </div>
+  </div>
   <div class="history-view" id="historyView" hidden>
     <div class="history-view-head">
       <button type="button" class="history-back" id="historyBackBtn" aria-label="Zurück"></button>
-      <div class="history-title" id="historyTitle"></div>
+      <div class="history-head-text">
+        <div class="history-name" id="historyName"></div>
+        <div class="history-title" id="historyTitle">Deine vergangenen Zirkeltrainings im FRIDAY CIRCLE</div>
+      </div>
     </div>
     <div class="history-table-wrap" id="historyTableWrap"></div>
   </div>
@@ -2454,13 +2559,15 @@
       beep(988,0.12); setTimeout(function(){ beep(1318,0.25); },140);
       vibrate([120,80,120,80,200]);
       embedRunning = false;
+      restInputMode = false;
       document.getElementById('intervalLayout').classList.remove('is-running');
-      notifyParentWorkout(false);
       document.getElementById('pbBar').hidden = true;
+      document.getElementById('trainingBack').classList.remove('is-visible');
       showWheelIdle();
-      notifyParentTabState();
       renderDragList();
+      updatePlanScrollbar();
       await loadIntervalLogs();
+      showFinishDialog();
       return;
     }
     saveLogEntry();
@@ -2527,11 +2634,17 @@
     return null;
   }
 
+  function toNameCase(s){
+    return String(s || '').trim().split(/\s+/).filter(Boolean).map(function(w){
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join(' ');
+  }
+
   function getAthleteFirstName(){
     try {
       const acc = JSON.parse(localStorage.getItem('gogogo_go_account') || 'null');
       const full = String((acc && acc.name) || '').trim();
-      return full.split(/\s+/)[0] || '';
+      return toNameCase(full.split(/\s+/)[0] || '');
     } catch (e) { return ''; }
   }
 
@@ -2869,6 +2982,7 @@
       bindDragPair(pair, pairIndex);
       list.appendChild(pair);
     });
+    updatePlanScrollbar();
   }
 
   let dragAutoScrollId = null;
@@ -2958,8 +3072,21 @@
       r.classList.remove('is-drop-target');
     });
     if (movedEnough && applyPairOrder(from, to)) {
+      const droppedEx = embedSelected[to];
       refreshEmbedSetup(false);
+      flashDroppedPair(droppedEx);
+      updatePlanScrollbar();
     }
+  }
+
+  function flashDroppedPair(exId){
+    if (!exId) return;
+    requestAnimationFrame(function(){
+      const el = document.querySelector('.drag-pair[data-ex="' + exId + '"]');
+      if (!el) return;
+      el.classList.add('is-dropped');
+      setTimeout(function(){ el.classList.remove('is-dropped'); }, 520);
+    });
   }
 
   function bindDragPair(pair, index){
@@ -3068,6 +3195,7 @@
     showWheelIdle();
     notifyParentTabState();
     renderDragList();
+    updatePlanScrollbar();
   }
 
   function exitIntervalView(){
@@ -3214,6 +3342,7 @@
     notifyParentTabState();
     loadIntervalLogs().then(updatePbBar);
     renderDragList();
+    updatePlanScrollbar();
     render();
     tick();
   }
@@ -3222,7 +3351,6 @@
     if (!embedRunning) return;
     if (phase === 'log-final') {
       finishRun();
-      abortEmbedRun();
       return;
     }
     const overlay = document.getElementById('abortOverlay');
@@ -3243,6 +3371,123 @@
     startEmbedRun();
   }
 
+  function showFinishDialog(){
+    const overlay = document.getElementById('finishOverlay');
+    if (overlay) overlay.hidden = false;
+  }
+
+  function hideFinishDialog(){
+    const overlay = document.getElementById('finishOverlay');
+    if (overlay) overlay.hidden = true;
+    notifyParentWorkout(false);
+    notifyParentTabState();
+  }
+
+  function updatePlanScrollbar(){
+    const scroller = document.getElementById('intervalScroll');
+    const bar = document.getElementById('planScrollbar');
+    const thumb = document.getElementById('planScrollbarThumb');
+    const track = document.getElementById('planScrollbarTrack');
+    if (!scroller || !bar || !thumb || !track) return;
+    if (!embedRunning) {
+      bar.hidden = true;
+      return;
+    }
+    const view = scroller.clientHeight;
+    const full = scroller.scrollHeight;
+    if (full <= view + 8) {
+      bar.hidden = true;
+      return;
+    }
+    bar.hidden = false;
+    const trackH = track.clientHeight || bar.clientHeight;
+    const thumbH = Math.max(36, Math.round((view / full) * trackH));
+    const maxTop = Math.max(0, trackH - thumbH);
+    const maxScroll = Math.max(1, full - view);
+    const top = (scroller.scrollTop / maxScroll) * maxTop;
+    thumb.style.height = thumbH + 'px';
+    thumb.style.top = top + 'px';
+    thumb.style.transform = '';
+  }
+
+  function bindPlanScrollbar(){
+    const scroller = document.getElementById('intervalScroll');
+    const thumb = document.getElementById('planScrollbarThumb');
+    const track = document.getElementById('planScrollbarTrack');
+    if (!scroller || !thumb || !track || thumb.dataset.bound === '1') return;
+    thumb.dataset.bound = '1';
+    scroller.addEventListener('scroll', updatePlanScrollbar, { passive: true });
+    window.addEventListener('resize', updatePlanScrollbar);
+    let drag = null;
+    function maxThumbTop(){
+      return Math.max(0, track.clientHeight - thumb.offsetHeight);
+    }
+    function scrollFromThumb(top){
+      const maxT = maxThumbTop();
+      const maxS = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+      scroller.scrollTop = maxT ? (top / maxT) * maxS : 0;
+    }
+    thumb.addEventListener('pointerdown', function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      drag = { startY: e.clientY, startTop: thumb.offsetTop };
+      try { thumb.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    thumb.addEventListener('pointermove', function(e){
+      if (!drag) return;
+      const maxT = maxThumbTop();
+      let top = drag.startTop + (e.clientY - drag.startY);
+      if (top < 0) top = 0;
+      if (top > maxT) top = maxT;
+      scrollFromThumb(top);
+    });
+    function endThumb(){ drag = null; }
+    thumb.addEventListener('pointerup', endThumb);
+    thumb.addEventListener('pointercancel', endThumb);
+    track.addEventListener('pointerdown', function(e){
+      if (e.target === thumb) return;
+      const rect = track.getBoundingClientRect();
+      const thumbH = thumb.offsetHeight;
+      let top = e.clientY - rect.top - thumbH / 2;
+      const maxT = maxThumbTop();
+      if (top < 0) top = 0;
+      if (top > maxT) top = maxT;
+      scrollFromThumb(top);
+    });
+  }
+
+  let pendingDeleteDate = null;
+
+  function askDeleteDate(date){
+    pendingDeleteDate = date;
+    const overlay = document.getElementById('deleteOverlay');
+    if (overlay) overlay.hidden = false;
+  }
+
+  function hideDeleteDialog(){
+    pendingDeleteDate = null;
+    const overlay = document.getElementById('deleteOverlay');
+    if (overlay) overlay.hidden = true;
+  }
+
+  async function confirmDeleteDate(){
+    const date = pendingDeleteDate;
+    const aid = getGoAccountId();
+    hideDeleteDialog();
+    if (!date || !aid) return;
+    try {
+      await goRest(
+        'go_training_interval_logs?account_id=eq.' + encodeURIComponent(aid) +
+        '&workout_date=eq.' + encodeURIComponent(date),
+        { method: 'DELETE', prefer: 'return=minimal' }
+      );
+      await loadIntervalLogs();
+      renderHistoryTable();
+    } catch (e) {
+      console.warn('Interval log delete failed', e);
+    }
+  }
+
   function formatTableDate(iso){
     const p = String(iso || '').slice(0, 10).split('-');
     if (p.length !== 3) return iso || '';
@@ -3251,8 +3496,8 @@
 
   function openHistoryView(){
     const view = document.getElementById('historyView');
-    const title = document.getElementById('historyTitle');
-    if (title) title.textContent = getAthleteFirstName() || 'Workouts';
+    const nameEl = document.getElementById('historyName');
+    if (nameEl) nameEl.textContent = getAthleteFirstName() || '';
     renderHistoryTable();
     if (view) view.hidden = false;
   }
@@ -3328,7 +3573,10 @@
       return formatPbAmount(Math.round(sum / n * 10) / 10);
     }
     let html = '<table class="history-table"><thead><tr><th></th><th>ø</th>';
-    dates.forEach(function(d){ html += '<th>' + formatTableDate(d) + '</th>'; });
+    dates.forEach(function(d){
+      html += '<th><div class="history-date-head"><span>' + formatTableDate(d) + '</span>' +
+        '<button type="button" class="history-del" data-date="' + d + '" aria-label="Zirkel vom ' + formatTableDate(d) + ' löschen">×</button></div></th>';
+    });
     html += '</tr></thead><tbody>';
     rowOrder.forEach(function(row){
       html += '<tr><th>' + row.name + '</th><td>' + avgValue(row.id) + '</td>';
@@ -3359,6 +3607,33 @@
       if (e.target.closest('#historyBackBtn')) {
         e.preventDefault(); e.stopPropagation();
         closeHistoryView();
+        return;
+      }
+      const del = e.target.closest('.history-del');
+      if (del && del.dataset.date) {
+        e.preventDefault(); e.stopPropagation();
+        askDeleteDate(del.dataset.date);
+        return;
+      }
+      if (e.target.closest('#finishOkBtn')) {
+        e.preventDefault(); e.stopPropagation();
+        hideFinishDialog();
+        return;
+      }
+      if (e.target.closest('#finishTableBtn')) {
+        e.preventDefault(); e.stopPropagation();
+        hideFinishDialog();
+        loadIntervalLogs().then(openHistoryView);
+        return;
+      }
+      if (e.target.closest('#deleteStayBtn')) {
+        e.preventDefault(); e.stopPropagation();
+        hideDeleteDialog();
+        return;
+      }
+      if (e.target.closest('#deleteYesBtn')) {
+        e.preventDefault(); e.stopPropagation();
+        confirmDeleteDate();
         return;
       }
       if (e.target.closest('#rayHub')) {
@@ -3424,6 +3699,7 @@
       }
 
       bindEmbedShellEvents();
+      bindPlanScrollbar();
       loadIntervalLogs().then(function(){
         refreshEmbedSetup(false);
       });
