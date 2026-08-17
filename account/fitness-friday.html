@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>gogogo · Training</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
@@ -23,7 +23,6 @@
     --on-accent:#C7413B;
     --danger:#ffd6d4;
     --display:"Space Grotesk", system-ui, sans-serif;
-    --typewriter:"Courier Prime", "Courier New", monospace;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{height:100%; touch-action:manipulation;}
@@ -629,28 +628,19 @@
   }
   .interval-ray-wrap{
     position:relative;
-    width:min(72vw, 240px);
-    height:min(72vw, 240px);
+    width:min(64vw, 220px);
+    height:min(64vw, 220px);
     max-height:100%;
     flex:none;
     pointer-events:none;
   }
-  .interval-ray{
-    width:100%; height:100%; display:block;
-    pointer-events:none;
-    overflow:visible;
-  }
-  .interval-ray.is-spinning{ animation:interval-spin 120s linear infinite; }
-  @keyframes interval-spin{ to{ transform:rotate(360deg); } }
-  @media (prefers-reduced-motion:reduce){ .interval-ray.is-spinning{ animation:none; } }
   .interval-ray-hub{
     position:absolute;
-    left:50%; top:50%;
-    width:46%; height:46%;
-    transform:translate(-50%, -50%);
+    inset:0;
+    width:100%; height:100%;
     border-radius:50%;
-    background:var(--accent);
-    border:0;
+    background:transparent;
+    border:2.5px solid var(--text);
     display:flex; flex-direction:column;
     align-items:center; justify-content:center;
     cursor:pointer;
@@ -659,23 +649,27 @@
     touch-action:manipulation;
     -webkit-appearance:none;
     appearance:none;
-    color:var(--on-accent);
+    color:var(--text);
     padding:10px 8px;
     text-align:center;
-    box-shadow:0 0 0 1px rgba(247,245,240,0.35);
+    font-family:var(--display);
+    box-shadow:none;
   }
-  .interval-ray-hub:disabled{ cursor:default; opacity:1; }
+  .interval-ray-hub:disabled{
+    cursor:default;
+    opacity:0.38;
+  }
   .ray-hub-start{
     display:flex; flex-direction:column; align-items:center; gap:0;
     pointer-events:none;
-    font-family:var(--typewriter);
+    font-family:var(--display);
   }
   .ray-hub-start .line1,
   .ray-hub-start .line2{
     font-weight:700;
-    letter-spacing:0.01em;
+    letter-spacing:-0.02em;
     line-height:1.15;
-    font-size:clamp(14px, 3.8vw, 17px);
+    font-size:clamp(16px, 4.4vw, 20px);
   }
   .ray-hub-timer,
   .ray-hub-input{
@@ -687,25 +681,16 @@
   .ray-hub-input[hidden]{ display:none !important; }
   .ray-hub-input .wheel-value-row{ pointer-events:auto; }
   .interval-ray-hub .clock-big{
-    font-size:clamp(26px, 7.5vw, 38px);
-    color:var(--on-accent);
-    font-family:var(--typewriter);
+    font-size:clamp(28px, 8vw, 42px);
+    color:var(--text);
+    font-family:var(--display);
+    font-weight:700;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:-0.03em;
   }
-  .interval-ray-hub .wheel-amount-input{ color:var(--on-accent); }
-  .interval-ray-hub .wheel-unit-label{ color:rgba(199,65,59,0.65); }
-  .round-stepper{
-    display:flex; align-items:center; gap:6px;
-  }
-  .round-step-btn{
-    width:28px; height:28px; border-radius:8px;
-    border:1px solid var(--line); background:var(--panel);
-    color:var(--text); font-size:16px; line-height:1;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer; padding:0;
-    touch-action:manipulation;
-    -webkit-appearance:none; appearance:none;
-  }
-  .round-step-btn:disabled{ opacity:0.35; cursor:default; }
+  .interval-ray-hub .clock-big.warn{ color:var(--danger); }
+  .interval-ray-hub .wheel-amount-input{ color:var(--text); }
+  .interval-ray-hub .wheel-unit-label{ color:rgba(247,245,240,0.65); }
   .wheel-start-display{
     position:absolute; inset:0; z-index:2;
     display:flex; align-items:center; justify-content:center;
@@ -755,23 +740,51 @@
     color:var(--text); font-size:1.05rem;
   }
   .chip-wheel-scroller .wheel-pad{ height:18px !important; }
-  .plan-head{
-    display:flex; justify-content:space-between; align-items:baseline;
-    margin-bottom:8px;
-  }
-  .plan-head .name{
-    font-size:11px; text-transform:uppercase; letter-spacing:1.5px;
-    color:var(--text-dim);
-  }
-  .plan-head .count{ font-size:12px; color:var(--text-dim); white-space:nowrap; }
-  .drag-list{ display:flex; flex-direction:column; gap:6px; padding-bottom:8px; }
-  .drag-row{
+  .workout-pick-wrap{ margin-top:2px; padding-bottom:8px; }
+  .workout-pick-grid{
     display:grid;
-    grid-template-columns:28px 56px 1fr 28px;
-    align-items:center;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .workout-pick{
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:6px;
+    min-height:72px;
+    padding:10px 8px;
+    border:1.5px solid rgba(247,245,240,0.32);
+    border-radius:2px;
+    background:transparent;
+    color:var(--text);
+    font-family:var(--display);
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+    line-height:1.2;
+    text-align:center;
+    cursor:pointer;
+    touch-action:manipulation;
+    -webkit-appearance:none; appearance:none;
+  }
+  .workout-pick svg{ display:block; opacity:0.9; }
+  .workout-pick.is-selected{
+    border-color:var(--text);
+    background:rgba(247,245,240,0.14);
+  }
+  .workout-pick-hint{
+    margin:12px 4px 0;
+    font-family:var(--display);
+    font-size:13px;
+    font-weight:500;
+    line-height:1.4;
+    color:var(--text-dim);
+    text-align:center;
+  }
+  .drag-list{ display:none; flex-direction:column; gap:8px; padding-bottom:8px; }
+  .interval-layout.is-running .drag-list{ display:flex; }
+  .interval-layout.is-running .workout-pick-wrap{ display:none !important; }
+  .drag-pair{
+    display:flex; flex-direction:column;
     position:relative;
-    min-height:46px;
-    padding:10px 0;
     border:2px solid transparent;
     border-radius:2px;
     background:rgba(0,0,0,0.22);
@@ -780,32 +793,39 @@
     transition:border-color .12s, background .12s, opacity .12s;
     cursor:grab;
   }
-  .drag-row.is-plan-focus{
-    border-color:var(--accent);
-  }
-  .drag-row.is-current{
-    border-color:var(--accent);
-  }
-  .drag-row.is-unused{
-    opacity:0.42;
-  }
-  .drag-row.is-dragging{
+  .drag-pair.is-current{ border-color:var(--accent); }
+  .drag-pair.is-dragging{
     opacity:0.92; z-index:20;
     border-color:rgba(247,245,240,0.75);
     background:rgba(0,0,0,0.24);
     box-shadow:0 8px 24px rgba(0,0,0,0.28);
   }
-  .drag-row.is-drop-target{ border-color:rgba(247,245,240,0.65); background:rgba(247,245,240,0.08); }
-  .drag-row.is-invalid{ opacity:0.35; }
+  .drag-pair.is-drop-target{ border-color:rgba(247,245,240,0.65); background:rgba(247,245,240,0.08); }
+  .drag-row{
+    display:grid;
+    grid-template-columns:28px 56px 1fr 28px;
+    align-items:center;
+    position:relative;
+    min-height:40px;
+    padding:8px 0;
+    background:transparent;
+    pointer-events:none;
+  }
+  .drag-row--twin{
+    opacity:0.72;
+    border-bottom:1px solid rgba(247,245,240,0.18);
+    min-height:34px;
+    padding:6px 0;
+  }
+  .drag-row.is-current-leg .ex-name{ font-weight:700; }
   .drag-handle{
     display:flex; align-items:center; justify-content:center;
     width:100%; height:100%;
     color:rgba(247,245,240,0.42);
-    cursor:grab;
   }
   .drag-handle svg{ display:block; }
   .drag-row .ex-time{
-    font-family:var(--typewriter);
+    font-family:var(--display);
     font-size:12px; font-weight:700;
     color:rgba(247,245,240,0.88);
     text-align:left; padding-left:10px;
@@ -813,16 +833,15 @@
   }
   .drag-row .ex-name{
     font-size:15px; font-weight:600; text-align:center;
-    letter-spacing:0.01em;
+    letter-spacing:-0.01em;
   }
-  .interval-layout.is-running .global-time-row,
-  .interval-layout.is-running .round-stepper{
+  .interval-layout.is-running .global-time-row{
     display:none !important;
   }
   .run-summary{
     display:none;
     text-align:center;
-    font-family:var(--typewriter);
+    font-family:var(--display);
     font-size:clamp(15px, 4.2vw, 18px);
     font-weight:700;
     letter-spacing:0.02em;
@@ -970,7 +989,7 @@
     color:var(--on-accent);
     border-radius:999px;
     padding:12px 18px;
-    font-family:var(--typewriter);
+    font-family:var(--display);
     font-size:clamp(13px, 3.6vw, 15px);
     font-weight:700;
     letter-spacing:0.01em;
@@ -1059,13 +1078,9 @@
                 </div>
               </div>
             </div>
-            <div class="plan-head">
-              <span class="name">Übungsplan</span>
-              <div class="round-stepper">
-                <button type="button" class="round-step-btn" id="roundsMinusEmbed" aria-label="2 Runden weniger">−</button>
-                <span class="count" id="planCount">16 Runden</span>
-                <button type="button" class="round-step-btn" id="roundsPlusEmbed" aria-label="2 Runden mehr">+</button>
-              </div>
+            <div class="workout-pick-wrap" id="workoutPickWrap">
+              <div class="workout-pick-grid" id="workoutPickGrid"></div>
+              <p class="workout-pick-hint">Wähle von acht Workouts so viele aus, wie du möchtest. Jedes Workout startet mit Laufen.</p>
             </div>
             <div class="drag-list" id="dragList"></div>
           </div>
@@ -1073,8 +1088,7 @@
         <div class="interval-wheel-zone" id="wheelZone">
           <div class="wheel-phase-label" id="wheelPhaseLabel"></div>
           <div class="interval-ray-wrap">
-            <svg class="interval-ray is-spinning" id="intervalRaySvg" viewBox="0 0 240 240" aria-hidden="true"></svg>
-            <button type="button" class="interval-ray-hub" id="rayHub">
+            <button type="button" class="interval-ray-hub" id="rayHub" disabled>
               <div class="ray-hub-start" id="rayHubStart">
                 <span class="line1">Workout</span>
                 <span class="line2">starten</span>
@@ -1351,14 +1365,11 @@
     {id:'wallballs',name:'Wallballs',           unit:'Wiederholungen'}
   ];
 
-  const DEFAULT_EMBED_PLAN = [
-    'run','skierg','run','sledpush','run','sledpull','run','burpee',
-    'run','row','run','lunges','run','farmers','run','wallballs'
-  ];
   const HYROX_CYCLE = ['skierg','sledpush','sledpull','burpee','row','lunges','farmers','wallballs'];
-  const EMBED_ROUNDS_MIN = 2;
-  const EMBED_ROUNDS_MAX = 16;
-  const EMBED_ROUNDS_STEP = 2;
+  const WORKOUT_SHORT_NAMES = {
+    run:'Laufen', skierg:'Ski', sledpush:'Sled push', sledpull:'Sled pull',
+    burpee:'Burpee', row:'Ruder', lunges:'Lunges', farmers:'Farmers', wallballs:'Wallballs'
+  };
 
   const exerciseSelect = document.getElementById('exerciseSelect');
   if (exerciseSelect) {
@@ -1553,7 +1564,8 @@
   let embedInInterval = false;
   let embedRunning = false;
   let embedPlan = [];
-  let embedRounds = 16;
+  let embedRounds = 0;
+  let embedSelected = [];
   let intervalLogs = [];
   let dragState = null;
   let restInputMode = false;
@@ -2466,43 +2478,6 @@
     return opts;
   }
 
-  const INTERVAL_RAY_GRAY = 'rgba(247,245,240,0.28)';
-  const INTERVAL_RAY_LIT = 'rgba(247,245,240,0.95)';
-  const INTERVAL_RAY_COUNT = 32;
-
-  function drawIntervalRay(svg, filledMap){
-    if (!svg) return;
-    const ns = 'http://www.w3.org/2000/svg';
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
-    const cx = 120, cy = 120, inner = 74, outer = 114;
-    for (let s = 0; s < INTERVAL_RAY_COUNT; s++) {
-      const a = ((s / INTERVAL_RAY_COUNT) * Math.PI * 2) - Math.PI / 2;
-      const line = document.createElementNS(ns, 'line');
-      line.setAttribute('x1', (cx + Math.cos(a) * inner).toFixed(2));
-      line.setAttribute('y1', (cy + Math.sin(a) * inner).toFixed(2));
-      line.setAttribute('x2', (cx + Math.cos(a) * outer).toFixed(2));
-      line.setAttribute('y2', (cy + Math.sin(a) * outer).toFixed(2));
-      const isTop = s === 0 || s === 1 || s === INTERVAL_RAY_COUNT - 1;
-      line.setAttribute('stroke', filledMap && filledMap[s] ? INTERVAL_RAY_LIT : INTERVAL_RAY_GRAY);
-      line.setAttribute('stroke-width', isTop ? '4.5' : '2.2');
-      line.setAttribute('stroke-linecap', 'round');
-      svg.appendChild(line);
-    }
-  }
-
-  function updateIntervalRayProgress(){
-    const svg = document.getElementById('intervalRaySvg');
-    if (!svg || !embedRunning || !rounds) {
-      drawIntervalRay(svg, null);
-      return;
-    }
-    const filled = {};
-    const progress = Math.max(0, Math.min(1, (currentRound - 1 + (phase === 'work' ? (1 - phaseRemaining / workSec) : 1)) / rounds));
-    const litCount = Math.round(progress * INTERVAL_RAY_COUNT);
-    for (let i = 0; i < litCount; i++) filled[i] = true;
-    drawIntervalRay(svg, filled);
-  }
-
   function buildChipWheelScroller(scroller, mode){
     if (!scroller) return;
     scroller.innerHTML = '';
@@ -2592,78 +2567,90 @@
     document.getElementById('rayHubTimer').hidden = true;
     document.getElementById('rayHubInput').hidden = true;
     document.getElementById('wheelPhaseLabel').textContent = '';
-    document.getElementById('rayHub').disabled = false;
-    drawIntervalRay(document.getElementById('intervalRaySvg'), null);
+    updateStartEnabled();
+  }
+
+  function syncPlanFromSelection(){
+    embedPlan = [];
+    embedSelected.forEach(function(id){
+      embedPlan.push('run', id);
+    });
+    embedRounds = embedPlan.length;
+  }
+
+  function updateStartEnabled(){
+    const hub = document.getElementById('rayHub');
+    if (!hub) return;
+    hub.disabled = embedRunning ? false : embedSelected.length === 0;
   }
 
   function refreshEmbedSetup(rebuildWheels){
     if (rebuildWheels !== false) buildChipWheels();
+    if (!embedRunning) syncPlanFromSelection();
     rounds = embedRounds;
     roundExercises = embedPlan.slice(0, embedRounds);
-    document.getElementById('planCount').textContent = embedRounds + ' Runden';
     const sum = document.getElementById('runSummaryBar');
     if (sum) sum.textContent = fmtMin(workSec) + ' | ' + restSec + 's | ' + embedRounds + ' Runden';
-    document.getElementById('roundsMinusEmbed').disabled = embedRounds <= EMBED_ROUNDS_MIN || embedRunning;
-    document.getElementById('roundsPlusEmbed').disabled = embedRounds >= EMBED_ROUNDS_MAX || embedRunning;
-    renderDragList();
+    updateStartEnabled();
+    if (!embedRunning) renderWorkoutPicks();
+    if (embedRunning) renderDragList();
   }
 
-  function adjustEmbedRounds(delta){
-    if (embedRunning) return;
-    const next = embedRounds + delta;
-    if (next < EMBED_ROUNDS_MIN || next > EMBED_ROUNDS_MAX) return;
-    embedRounds = next;
+  function renderWorkoutPicks(){
+    const grid = document.getElementById('workoutPickGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    HYROX_CYCLE.forEach(function(exId){
+      const ex = exercises.find(function(e){ return e.id === exId; });
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'workout-pick' + (embedSelected.indexOf(exId) !== -1 ? ' is-selected' : '');
+      btn.dataset.ex = exId;
+      btn.setAttribute('aria-pressed', embedSelected.indexOf(exId) !== -1 ? 'true' : 'false');
+      btn.innerHTML = iconSvg(exId, 26) + '<span>' + (WORKOUT_SHORT_NAMES[exId] || (ex ? ex.name : exId)) + '</span>';
+      grid.appendChild(btn);
+    });
+  }
+
+  function toggleWorkoutPick(exId){
+    if (embedRunning || !exId) return;
+    const i = embedSelected.indexOf(exId);
+    if (i >= 0) embedSelected.splice(i, 1);
+    else embedSelected.push(exId);
     refreshEmbedSetup(false);
   }
 
-  function hasConsecutiveRuns(list){
-    for (let i = 1; i < list.length; i++) {
-      if (list[i] === 'run' && list[i - 1] === 'run') return true;
-    }
-    return false;
-  }
-
-  function wouldCreateConsecutiveRuns(list, fromIdx, toIdx){
-    const item = list[fromIdx];
-    const copy = list.slice();
-    copy.splice(fromIdx, 1);
-    copy.splice(toIdx, 0, item);
-    return hasConsecutiveRuns(copy);
-  }
-
-  function nearestValidDropIndex(list, fromIdx, targetIdx){
-    if (!wouldCreateConsecutiveRuns(list, fromIdx, targetIdx)) return targetIdx;
-    for (let d = 1; d < list.length; d++) {
-      if (targetIdx - d >= 0 && !wouldCreateConsecutiveRuns(list, fromIdx, targetIdx - d)) return targetIdx - d;
-      if (targetIdx + d <= list.length && !wouldCreateConsecutiveRuns(list, fromIdx, targetIdx + d)) return targetIdx + d;
-    }
-    return fromIdx;
+  function pairRowHtml(exId){
+    const shortName = WORKOUT_SHORT_NAMES[exId] || exId;
+    const timeLabel = lastLogLabelForExercise(exId);
+    return '<span class="drag-handle" aria-hidden="true">' + dragHandleSvg + '</span>' +
+      '<span class="ex-time">' + timeLabel + '</span>' +
+      '<span class="ex-name">' + shortName + '</span>' +
+      '<span class="drag-handle drag-handle--right" aria-hidden="true">' + dragHandleSvg + '</span>';
   }
 
   function renderDragList(){
     const list = document.getElementById('dragList');
     if (!list) return;
     list.innerHTML = '';
-    embedPlan.forEach(function(exId, i){
-      const ex = exercises.find(function(e){ return e.id === exId; });
-      const row = document.createElement('div');
-      row.className = 'drag-row';
-      if (i === 0 && !embedRunning) row.classList.add('is-plan-focus');
-      if (embedRunning && i === currentRound - 1) row.classList.add('is-current');
-      if (i >= embedRounds) row.classList.add('is-unused');
-      row.dataset.index = String(i);
-      const shortName = ({
-        run:'Laufen', skierg:'Ski', sledpush:'Sled push', sledpull:'Sled pull',
-        burpee:'Burpee', row:'Ruder', lunges:'Lunges', farmers:'Farmers', wallballs:'Wallballs'
-      })[exId] || (ex ? ex.name : exId);
-      const timeLabel = lastLogLabelForExercise(exId);
-      row.innerHTML =
-        '<span class="drag-handle" aria-hidden="true">' + dragHandleSvg + '</span>' +
-        '<span class="ex-time">' + timeLabel + '</span>' +
-        '<span class="ex-name">' + shortName + '</span>' +
-        '<span class="drag-handle drag-handle--right" aria-hidden="true">' + dragHandleSvg + '</span>';
-      bindDragRow(row, i);
-      list.appendChild(row);
+    embedSelected.forEach(function(exId, pairIndex){
+      const pair = document.createElement('div');
+      pair.className = 'drag-pair';
+      const currentIdx = currentRound - 1;
+      if (embedRunning && Math.floor(currentIdx / 2) === pairIndex) pair.classList.add('is-current');
+      pair.dataset.pair = String(pairIndex);
+      const twin = document.createElement('div');
+      twin.className = 'drag-row drag-row--twin';
+      if (embedRunning && currentIdx === pairIndex * 2) twin.classList.add('is-current-leg');
+      twin.innerHTML = pairRowHtml('run');
+      const station = document.createElement('div');
+      station.className = 'drag-row';
+      if (embedRunning && currentIdx === pairIndex * 2 + 1) station.classList.add('is-current-leg');
+      station.innerHTML = pairRowHtml(exId);
+      pair.appendChild(twin);
+      pair.appendChild(station);
+      bindDragPair(pair, pairIndex);
+      list.appendChild(pair);
     });
   }
 
@@ -2685,19 +2672,17 @@
     autoScrollPlanWhileDrag(e.clientY);
     const list = document.getElementById('dragList');
     if (!list) return;
-    const rows = Array.from(list.querySelectorAll('.drag-row'));
+    const pairs = Array.from(list.querySelectorAll('.drag-pair'));
     let target = dragState.from;
     let bestDist = Infinity;
-    rows.forEach(function(r, ri){
+    pairs.forEach(function(r, ri){
       const rect = r.getBoundingClientRect();
       const dist = Math.abs(e.clientY - (rect.top + rect.height / 2));
       if (dist < bestDist) { bestDist = dist; target = ri; }
     });
-    const valid = nearestValidDropIndex(embedPlan, dragState.from, target);
-    dragState.target = valid;
-    rows.forEach(function(r, ri){
-      r.classList.toggle('is-drop-target', ri === valid && valid !== dragState.from);
-      r.classList.toggle('is-invalid', ri === target && valid !== target);
+    dragState.target = target;
+    pairs.forEach(function(r, ri){
+      r.classList.toggle('is-drop-target', ri === target && target !== dragState.from);
     });
     if (dragState.row) {
       const dy = e.clientY - dragState.startY;
@@ -2719,44 +2704,49 @@
     const from = dragState.from;
     const to = dragState.target !== undefined ? dragState.target : from;
     dragState = null;
-    document.querySelectorAll('.drag-row').forEach(function(r){
-      r.classList.remove('is-drop-target', 'is-invalid');
+    document.querySelectorAll('.drag-pair').forEach(function(r){
+      r.classList.remove('is-drop-target');
     });
     if (to !== from && to !== undefined) {
-      const item = embedPlan.splice(from, 1)[0];
-      embedPlan.splice(to, 0, item);
+      const station = embedSelected.splice(from, 1)[0];
+      embedSelected.splice(to, 0, station);
+      if (embedRunning && log.length) {
+        const moved = log.splice(from * 2, 2);
+        log.splice(to * 2, 0, moved[0], moved[1]);
+      }
+      syncPlanFromSelection();
+      if (embedRunning) roundExercises = embedPlan.slice(0, embedRounds);
       refreshEmbedSetup(false);
     }
   }
 
-  function bindDragRow(row, index){
-    row.addEventListener('pointerdown', function(e){
+  function bindDragPair(pair, index){
+    pair.addEventListener('pointerdown', function(e){
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (embedRunning && phase !== 'rest' && phase !== 'log-final') return;
       e.preventDefault();
       e.stopPropagation();
       dragState = {
         from: index,
-        row: row,
+        row: pair,
         pointerId: e.pointerId,
         startY: e.clientY,
         lastY: e.clientY
       };
-      row.classList.add('is-dragging');
+      pair.classList.add('is-dragging');
       const scroller = document.getElementById('intervalScroll');
       if (scroller) scroller.classList.add('is-dragging-plan');
-      try { row.setPointerCapture(e.pointerId); } catch (err) {}
+      try { pair.setPointerCapture(e.pointerId); } catch (err) {}
     });
-    row.addEventListener('pointermove', function(e){
-      if (!dragState || dragState.row !== row) return;
+    pair.addEventListener('pointermove', function(e){
+      if (!dragState || dragState.row !== pair) return;
       onPlanDragMove(e);
     });
-    row.addEventListener('pointerup', function(e){
-      if (!dragState || dragState.row !== row) return;
+    pair.addEventListener('pointerup', function(e){
+      if (!dragState || dragState.row !== pair) return;
       endPlanDrag(e);
     });
-    row.addEventListener('pointercancel', function(e){
-      if (!dragState || dragState.row !== row) return;
+    pair.addEventListener('pointercancel', function(e){
+      if (!dragState || dragState.row !== pair) return;
       endPlanDrag(e);
     });
   }
@@ -2886,16 +2876,19 @@
       clockBig.className = 'clock-big' + (phaseRemaining <= 3 ? ' warn' : '');
     }
     document.getElementById('rayHub').disabled = false;
-    updateIntervalRayProgress();
     highlightCurrentPlanRow();
   }
 
   function highlightCurrentPlanRow(){
     const list = document.getElementById('dragList');
     if (!list) return;
-    list.querySelectorAll('.drag-row').forEach(function(row, i){
-      row.classList.toggle('is-current', embedRunning && i === currentRound - 1);
-      row.classList.toggle('is-unused', i >= embedRounds);
+    const idx = currentRound - 1;
+    const pairIdx = Math.floor(idx / 2);
+    list.querySelectorAll('.drag-pair').forEach(function(pair, i){
+      pair.classList.toggle('is-current', embedRunning && i === pairIdx);
+      const rows = pair.querySelectorAll('.drag-row');
+      if (rows[0]) rows[0].classList.toggle('is-current-leg', embedRunning && idx === i * 2);
+      if (rows[1]) rows[1].classList.toggle('is-current-leg', embedRunning && idx === i * 2 + 1);
     });
   }
 
@@ -2936,6 +2929,9 @@
   }
 
   function startEmbedRun(){
+    if (!embedSelected.length) return;
+    syncPlanFromSelection();
+    if (!embedPlan.length) return;
     embedRunning = true;
     embedInInterval = true;
     document.getElementById('intervalLayout').classList.toggle('is-running', true);
@@ -2958,6 +2954,7 @@
     beep(880, 0.15); vibrate(120);
     notifyParentTabState();
     loadIntervalLogs().then(updatePbBar);
+    renderDragList();
     render();
     tick();
   }
@@ -2993,14 +2990,10 @@
     root.dataset.bound = '1';
 
     root.addEventListener('click', function(e){
-      if (e.target.closest('#roundsMinusEmbed')) {
+      const pick = e.target.closest('.workout-pick');
+      if (pick) {
         e.preventDefault(); e.stopPropagation();
-        adjustEmbedRounds(-EMBED_ROUNDS_STEP);
-        return;
-      }
-      if (e.target.closest('#roundsPlusEmbed')) {
-        e.preventDefault(); e.stopPropagation();
-        adjustEmbedRounds(EMBED_ROUNDS_STEP);
+        toggleWorkoutPick(pick.dataset.ex);
         return;
       }
       if (e.target.closest('#rayHub')) {
@@ -3038,10 +3031,10 @@
     if (embedShellReady) return;
     try {
       document.getElementById('embedShell').removeAttribute('hidden');
-      embedPlan = DEFAULT_EMBED_PLAN.slice();
-      embedRounds = 16;
+      embedSelected = [];
+      embedPlan = [];
+      embedRounds = 0;
       refreshEmbedSetup();
-      drawIntervalRay(document.getElementById('intervalRaySvg'), null);
 
       if (useParentTabs) {
         document.querySelectorAll('.tab-panel[data-embed-panel]').forEach(function(panel){
