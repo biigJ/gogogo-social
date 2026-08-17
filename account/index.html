@@ -2959,6 +2959,36 @@
         return DEFAULT_ZIRKEL_WD;
       }
 
+      function parseWeekdayList(raw) {
+        var arr = [];
+        if (Array.isArray(raw)) arr = raw;
+        else if (typeof raw === "string") {
+          try {
+            var parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) arr = parsed;
+          } catch (e) {}
+        }
+        return arr.map(function (n) { return Number(n); }).filter(function (n) {
+          return n >= 0 && n <= 6;
+        });
+      }
+
+      function kraftWeekdays() {
+        return coachPlan ? parseWeekdayList(coachPlan.kraft_weekdays) : [];
+      }
+
+      function ausdauerWeekdays() {
+        return coachPlan ? parseWeekdayList(coachPlan.ausdauer_weekdays) : [];
+      }
+
+      function isKraftWeekday(wd) {
+        return kraftWeekdays().indexOf(Number(wd)) !== -1;
+      }
+
+      function isAusdauerWeekday(wd) {
+        return ausdauerWeekdays().indexOf(Number(wd)) !== -1;
+      }
+
       function isZirkelWeekday(wd) {
         return Number(wd) === zirkelWeekday();
       }
@@ -3282,9 +3312,14 @@
       function coachDayText(wd) {
         if (isAccountPaused()) return "";
         if (isZirkelWeekday(wd)) return "Zirkeltraining";
-        if (!coachPlan) return "";
+        var bits = [];
+        if (isKraftWeekday(wd)) bits.push("Kraft");
+        if (isAusdauerWeekday(wd)) bits.push("Ausdauer");
+        if (!coachPlan) return bits.join(" · ");
         var key = COACH_DAY_KEYS[wd];
-        return key && coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
+        var note = key && coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
+        if (note) bits.push(note);
+        return bits.join(" · ");
       }
 
       function berlinTodayKey() {
@@ -3302,37 +3337,43 @@
         if (isAccountPaused()) return "";
         var wd = (d.getDay() + 6) % 7;
         if (isZirkelForDate(d)) return "Zirkeltraining";
+        var bits = [];
+        if (isKraftWeekday(wd)) bits.push("Kraft");
+        if (isAusdauerWeekday(wd)) bits.push("Ausdauer");
         var key = COACH_DAY_KEYS[wd];
-        if (!key) return "";
+        if (!key) return bits.join(" · ");
         var dateStr = formatDateKey(d);
         var today = berlinTodayKey();
         var locked = dateStr < today || isDayCheckedOff(dateStr);
+        var note = "";
         if (!locked) {
-          if (!coachPlan) return "";
-          return coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
-        }
-        var asOf = dateStr < today ? dateStr : shiftDateKey(today, -1);
-        var best = null;
-        var bestFrom = "";
-        for (var i = 0; i < coachDayHistory.length; i++) {
-          var h = coachDayHistory[i];
-          if (!h || h.day_key !== key) continue;
-          var from = String(h.effective_from || "").slice(0, 10);
-          if (!from || from > asOf) continue;
-          if (
-            !best ||
-            from > bestFrom ||
-            (from === bestFrom && String(h.created_at || "") > String(best.created_at || ""))
-          ) {
-            best = h;
-            bestFrom = from;
+          if (coachPlan) note = coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
+        } else {
+          var asOf = dateStr < today ? dateStr : shiftDateKey(today, -1);
+          var best = null;
+          var bestFrom = "";
+          for (var i = 0; i < coachDayHistory.length; i++) {
+            var h = coachDayHistory[i];
+            if (!h || h.day_key !== key) continue;
+            var from = String(h.effective_from || "").slice(0, 10);
+            if (!from || from > asOf) continue;
+            if (
+              !best ||
+              from > bestFrom ||
+              (from === bestFrom && String(h.created_at || "") > String(best.created_at || ""))
+            ) {
+              best = h;
+              bestFrom = from;
+            }
+          }
+          if (best) {
+            note = best.body != null ? String(best.body).trim() : "";
+          } else if (coachPlan) {
+            note = coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
           }
         }
-        if (best) {
-          return best.body != null ? String(best.body).trim() : "";
-        }
-        if (!coachPlan) return "";
-        return coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
+        if (note) bits.push(note);
+        return bits.join(" · ");
       }
 
       function splitPlanLines(text) {
@@ -5206,7 +5247,7 @@
 
       function showTrainingPanel(tab) {
         if (!trainingStack) return;
-        var useFrame = tab === "intervall" || tab === "kraft";
+        var useFrame = tab === "intervall" || tab === "kraft" || tab === "ausdauer";
         trainingStack.querySelectorAll(".training-panel").forEach(function (panel) {
           var on = !useFrame && panel.getAttribute("data-training-panel") === tab;
           panel.classList.toggle("is-active", on);
@@ -5263,7 +5304,7 @@
       if (trainingFrame) {
         trainingFrame.addEventListener("load", function () {
           if (pendingIframeTab) callIframeTab(pendingIframeTab);
-          else if (trainingActiveTab === "intervall" || trainingActiveTab === "kraft") callIframeTab(trainingActiveTab);
+          else if (trainingActiveTab === "intervall" || trainingActiveTab === "kraft" || trainingActiveTab === "ausdauer") callIframeTab(trainingActiveTab);
         });
       }
 
@@ -5325,7 +5366,7 @@
         }
         if (id !== "book") pauseAccountVideos();
         if (id === "training") {
-          var TRAINING_IFRAME_V = "20260817p";
+          var TRAINING_IFRAME_V = "20260817q";
           var wantTrainingSrc = "/account/fitness-friday.html?embed=1&parentTabs=1&v=" + TRAINING_IFRAME_V;
           if (!trainingFrame.src || String(trainingFrame.src).indexOf("v=" + TRAINING_IFRAME_V) === -1) {
             trainingFrame.src = wantTrainingSrc;
@@ -5498,7 +5539,25 @@
               line2: "",
               rest: false,
               training: true,
-              zirkel: true
+              zirkel: true,
+              trainingTab: "intervall"
+            };
+          }
+          var wd = (d.getDay() + 6) % 7;
+          var kraft = isKraftWeekday(wd);
+          var ausd = isAusdauerWeekday(wd);
+          if (kraft || ausd) {
+            var titles = [];
+            if (kraft) titles.push("Kraft");
+            if (ausd) titles.push("Ausdauer");
+            return {
+              title: titles.join(" · "),
+              line1: "jetzt starten",
+              line2: "",
+              rest: false,
+              training: true,
+              zirkel: false,
+              trainingTab: kraft ? "kraft" : "ausdauer"
             };
           }
           var fromCoach = coachDayTextForDate(d);
@@ -5549,14 +5608,17 @@
           while (line2El.firstChild) line2El.removeChild(line2El.firstChild);
           line2El.hidden = true;
           if (workoutBox) {
-            workoutBox.classList.toggle("is-zirkel", !!w.zirkel);
-            if (w.zirkel) {
+            var startTab = w.zirkel ? "intervall" : (w.trainingTab || "");
+            workoutBox.classList.toggle("is-zirkel", !!(w.zirkel || w.training));
+            if (w.zirkel || w.training) {
               workoutBox.setAttribute("role", "button");
               workoutBox.setAttribute("tabindex", "0");
-              workoutBox.setAttribute("aria-label", "Zirkeltraining jetzt starten");
+              workoutBox.setAttribute("data-training-tab", startTab);
+              workoutBox.setAttribute("aria-label", (w.title || "Training") + " jetzt starten");
             } else {
               workoutBox.removeAttribute("role");
               workoutBox.removeAttribute("tabindex");
+              workoutBox.removeAttribute("data-training-tab");
               workoutBox.removeAttribute("aria-label");
             }
           }
@@ -5629,7 +5691,7 @@
             btn.setAttribute("aria-label", names[i] + " " + d.getDate());
             if (isAccountPaused()) btn.disabled = true;
             if (w && !w.rest) btn.classList.add("has-workout");
-            if (isZirkelForDate(d)) btn.classList.add("is-zirkel");
+            if (w && (w.zirkel || w.training)) btn.classList.add("is-zirkel");
             if (key === dateKey(today)) btn.classList.add("is-today");
             if (key === selectedKey) {
               btn.classList.add("is-selected");
@@ -5809,13 +5871,18 @@
         if (workoutBox) {
           workoutBox.addEventListener("click", function () {
             if (isAccountPaused()) return;
-            if (!workoutBox.classList.contains("is-zirkel")) return;
+            var tab = workoutBox.getAttribute("data-training-tab");
+            if (!tab) return;
+            trainingActiveTab = tab;
             gotoPanel("training");
           });
           workoutBox.addEventListener("keydown", function (ev) {
-            if (!workoutBox.classList.contains("is-zirkel")) return;
+            if (isAccountPaused()) return;
+            var tab = workoutBox.getAttribute("data-training-tab");
+            if (!tab) return;
             if (ev.key === "Enter" || ev.key === " ") {
               ev.preventDefault();
+              trainingActiveTab = tab;
               gotoPanel("training");
             }
           });
