@@ -1282,7 +1282,71 @@
     flex:none;
   }
   .kraft-ex-row.is-trainer .kraft-trainer-mark{ display:block; }
-  .kraft-layout.is-running .kraft-ex-row{ cursor:default; pointer-events:none; }
+  .kraft-ex-card{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .kraft-ex-card .kraft-ex-row{ width:100%; }
+  .kraft-ex-card.is-current .kraft-ex-row{
+    border-color:var(--text);
+  }
+  .kraft-sets{
+    display:none;
+    flex-direction:column;
+    gap:6px;
+    padding:0 2px 4px 10px;
+  }
+  .kraft-layout.is-running .kraft-sets{ display:flex; }
+  .kraft-set{
+    display:grid;
+    grid-template-columns:2.2em 1fr auto 1fr auto;
+    align-items:center;
+    gap:6px;
+    font-size:13px;
+    font-weight:600;
+  }
+  .kraft-set .kraft-set-lbl{
+    opacity:0.8;
+    font-variant-numeric:tabular-nums;
+  }
+  .kraft-set input{
+    min-width:0;
+    width:100%;
+    height:36px;
+    border:1.5px solid rgba(247,245,240,0.45);
+    border-radius:2px;
+    background:transparent;
+    color:var(--text);
+    font-family:var(--display);
+    font-size:14px;
+    font-weight:700;
+    text-align:center;
+    -webkit-appearance:none; appearance:none;
+  }
+  .kraft-set input::placeholder{ color:rgba(247,245,240,0.35); }
+  .kraft-set .kraft-set-x{ opacity:0.7; }
+  .kraft-set .kraft-set-unit{ opacity:0.7; font-size:12px; }
+  .kraft-add-set{
+    align-self:flex-start;
+    margin-top:2px;
+    background:transparent;
+    border:1.5px solid rgba(247,245,240,0.45);
+    color:var(--text);
+    font-family:var(--display);
+    font-size:12px;
+    font-weight:600;
+    padding:6px 10px;
+    border-radius:2px;
+    cursor:pointer;
+  }
+  .pb-bar--pill.is-kraft{
+    border-radius:16px;
+    white-space:normal;
+    line-height:1.35;
+    text-align:left;
+    font-variant-numeric:tabular-nums;
+  }
 </style>
 </head>
 <body>
@@ -1452,6 +1516,15 @@
       <div class="abort-actions">
         <button type="button" class="abort-stay" id="finishTableBtn">Tabelle</button>
         <button type="button" class="abort-yes" id="finishOkBtn">OK</button>
+      </div>
+    </div>
+  </div>
+  <div class="abort-overlay" id="kraftFinishOverlay" hidden>
+    <div class="abort-card">
+      <h2>Top!</h2>
+      <p>Ist in der Datenbank gespeichert, beim nächsten Training steht es unten in der Infobox. Bewerte im Kalender wie gut es war.</p>
+      <div class="abort-actions">
+        <button type="button" class="abort-yes" id="kraftFinishOkBtn">OK</button>
       </div>
     </div>
   </div>
@@ -1938,7 +2011,11 @@
   let kraftSystemId = 'full';
   let kraftSelected = [];
   let kraftPresetMap = {};
+  let kraftCustomMap = {};
   let kraftPresetsLoaded = false;
+  let kraftLogs = [];
+  let kraftSets = {};
+  let kraftFocusId = '';
 
   sb.auth.onAuthStateChange((event, session)=>{
     if (gogogoLocal) return;
@@ -2870,6 +2947,8 @@
     const bar = document.getElementById('pbBar');
     const pill = document.getElementById('pbPill');
     if (!bar || !pill) return;
+    if (kraftRunning) { updateKraftInfoBar(); return; }
+    pill.classList.remove('is-kraft');
     if (!embedRunning) { bar.hidden = true; return; }
     bar.hidden = false;
     const idx = currentRound - 1;
@@ -3235,25 +3314,129 @@
     kraftSelected = kraftPresetsFor(systemId);
   }
 
+  function kraftCustomFor(systemId){
+    return (kraftCustomMap[systemId] || []).slice();
+  }
+
+  function kraftAllExercises(systemId){
+    const base = (kraftCatalog().exercisesFor(systemId) || []).slice();
+    const seen = {};
+    base.forEach(function(ex){ seen[ex.id] = true; });
+    kraftCustomFor(systemId).forEach(function(ex){
+      if (ex && ex.id && !seen[ex.id]) {
+        seen[ex.id] = true;
+        base.push({ id: String(ex.id), name: String(ex.name || ex.id) });
+      }
+    });
+    return base;
+  }
+
+  function kraftExerciseName(exId){
+    const all = kraftAllExercises(kraftSystemId);
+    for (let i = 0; i < all.length; i++) {
+      if (all[i].id === exId) return all[i].name;
+    }
+    return exId;
+  }
+
+  function parseKraftCustom(raw){
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (e) { return []; }
+    }
+    return [];
+  }
+
   async function loadKraftPresets(){
     const aid = getGoAccountId();
     kraftPresetMap = {};
+    kraftCustomMap = {};
     if (!aid) {
       kraftPresetsLoaded = true;
       return;
     }
     try {
-      const rows = await goRest(
-        'go_kraft_presets?account_id=eq.' + encodeURIComponent(aid) + '&select=system_id,exercise_ids'
-      );
+      let rows = null;
+      try {
+        rows = await goRest(
+          'go_kraft_presets?account_id=eq.' + encodeURIComponent(aid) +
+          '&select=system_id,exercise_ids,custom_exercises'
+        );
+      } catch (e1) {
+        rows = await goRest(
+          'go_kraft_presets?account_id=eq.' + encodeURIComponent(aid) +
+          '&select=system_id,exercise_ids'
+        );
+      }
       (rows || []).forEach(function(row){
         const ids = Array.isArray(row.exercise_ids) ? row.exercise_ids : [];
         kraftPresetMap[row.system_id] = ids.map(String);
+        kraftCustomMap[row.system_id] = parseKraftCustom(row.custom_exercises).map(function(ex){
+          return { id: String(ex.id || ''), name: String(ex.name || ex.id || '') };
+        }).filter(function(ex){ return !!ex.id; });
       });
     } catch (e) {
       kraftPresetMap = {};
+      kraftCustomMap = {};
     }
     kraftPresetsLoaded = true;
+  }
+
+  async function loadKraftLogs(){
+    const aid = getGoAccountId();
+    if (!aid) { kraftLogs = []; return; }
+    try {
+      const rows = await goRest(
+        'go_kraft_logs?account_id=eq.' + encodeURIComponent(aid) +
+        '&select=*&order=workout_date.desc,created_at.desc'
+      );
+      kraftLogs = rows || [];
+    } catch (e) {
+      kraftLogs = [];
+    }
+  }
+
+  function filledKraftSets(list){
+    return (list || []).filter(function(s){
+      return s && ((s.reps !== '' && s.reps != null) || (s.kg !== '' && s.kg != null));
+    });
+  }
+
+  function formatKraftSetLine(set, idx){
+    const reps = set.reps !== '' && set.reps != null ? String(set.reps) : '';
+    const kg = set.kg !== '' && set.kg != null ? String(set.kg) : '';
+    if (!reps && !kg) return '';
+    const body = reps && kg ? (reps + 'x' + kg + 'kg') : (reps ? (reps + 'x') : (kg + 'kg'));
+    return 's' + (idx + 1) + ': ' + body;
+  }
+
+  function lastKraftSetsFor(exId){
+    if (!exId) return [];
+    const matches = kraftLogs.filter(function(row){ return row.exercise_id === exId; });
+    if (!matches.length) return [];
+    const sets = parseKraftCustom(matches[0].sets);
+    return filledKraftSets(sets);
+  }
+
+  function updateKraftInfoBar(){
+    const bar = document.getElementById('pbBar');
+    const pill = document.getElementById('pbPill');
+    if (!bar || !pill) return;
+    if (!kraftRunning) {
+      if (!embedRunning) bar.hidden = true;
+      return;
+    }
+    bar.hidden = false;
+    pill.classList.add('is-kraft');
+    const sets = lastKraftSetsFor(kraftFocusId);
+    if (!sets.length) {
+      pill.textContent = '—';
+      return;
+    }
+    pill.textContent = sets.map(function(s, i){ return formatKraftSetLine(s, i); }).filter(Boolean).join(' | ');
   }
 
   function renderKraftSystems(){
@@ -3273,25 +3456,52 @@
   function renderKraftExercises(){
     const list = document.getElementById('kraftExList');
     if (!list) return;
-    const cat = kraftCatalog();
     const presets = kraftPresetsFor(kraftSystemId);
-    const all = cat.exercisesFor(kraftSystemId);
+    const all = kraftAllExercises(kraftSystemId);
     const rows = kraftRunning
       ? all.filter(function(ex){ return kraftSelected.indexOf(ex.id) !== -1; })
       : all;
     list.innerHTML = '';
     const checkSvg = '<svg class="kraft-trainer-mark" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.2 16.2 4.8 11.8l1.4-1.4 3 3 8.6-8.6 1.4 1.4z"/></svg>';
     rows.forEach(function(ex){
-      const btn = document.createElement('button');
-      btn.type = 'button';
       const isSel = kraftSelected.indexOf(ex.id) !== -1;
       const isTrainer = presets.indexOf(ex.id) !== -1;
+      const card = document.createElement('div');
+      card.className = 'kraft-ex-card' + (kraftRunning && kraftFocusId === ex.id ? ' is-current' : '');
+      card.dataset.ex = ex.id;
+      const btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = 'kraft-ex-row' + (isSel ? ' is-selected' : '') + (isTrainer ? ' is-trainer' : '');
       btn.dataset.ex = ex.id;
       btn.innerHTML = '<span class="ex-name">' + ex.name + '</span>' + checkSvg;
-      list.appendChild(btn);
+      card.appendChild(btn);
+      if (kraftRunning) {
+        if (!kraftSets[ex.id] || !kraftSets[ex.id].length) kraftSets[ex.id] = [{ reps: '', kg: '' }];
+        const setsWrap = document.createElement('div');
+        setsWrap.className = 'kraft-sets';
+        kraftSets[ex.id].forEach(function(set, idx){
+          const row = document.createElement('div');
+          row.className = 'kraft-set';
+          row.innerHTML =
+            '<span class="kraft-set-lbl">s' + (idx + 1) + '</span>' +
+            '<input class="kraft-reps" data-ex="' + ex.id + '" data-idx="' + idx + '" inputmode="numeric" type="number" min="0" step="1" placeholder="Wdh" value="' + (set.reps === '' || set.reps == null ? '' : String(set.reps)) + '">' +
+            '<span class="kraft-set-x">×</span>' +
+            '<input class="kraft-kg" data-ex="' + ex.id + '" data-idx="' + idx + '" inputmode="decimal" type="number" min="0" step="0.5" placeholder="kg" value="' + (set.kg === '' || set.kg == null ? '' : String(set.kg)) + '">' +
+            '<span class="kraft-set-unit">kg</span>';
+          setsWrap.appendChild(row);
+        });
+        const add = document.createElement('button');
+        add.type = 'button';
+        add.className = 'kraft-add-set';
+        add.dataset.ex = ex.id;
+        add.textContent = '+ Satz';
+        setsWrap.appendChild(add);
+        card.appendChild(setsWrap);
+      }
+      list.appendChild(card);
     });
     updateKraftHub();
+    updateKraftInfoBar();
     updateKraftScrollbar();
   }
 
@@ -3339,17 +3549,113 @@
   function startKraftSession(){
     if (!kraftSelected.length) return;
     kraftRunning = true;
+    kraftFocusId = kraftSelected[0];
+    kraftSets = {};
+    kraftSelected.forEach(function(id){ kraftSets[id] = [{ reps: '', kg: '' }]; });
     notifyParentWorkout(true);
     refreshKraftChrome();
     notifyParentTabState();
+    loadKraftLogs().then(updateKraftInfoBar);
     requestAnimationFrame(updateKraftScrollbar);
   }
 
   function endKraftSession(){
     kraftRunning = false;
+    kraftFocusId = '';
+    kraftSets = {};
+    const pill = document.getElementById('pbPill');
+    if (pill) pill.classList.remove('is-kraft');
+    const bar = document.getElementById('pbBar');
+    if (bar) bar.hidden = true;
     notifyParentWorkout(false);
     refreshKraftChrome();
     notifyParentTabState();
+  }
+
+  function readKraftSetInput(input){
+    const exId = input.dataset.ex;
+    const idx = parseInt(input.dataset.idx, 10);
+    if (!exId || isNaN(idx)) return;
+    if (!kraftSets[exId]) kraftSets[exId] = [];
+    if (!kraftSets[exId][idx]) kraftSets[exId][idx] = { reps: '', kg: '' };
+    const key = input.classList.contains('kraft-kg') ? 'kg' : 'reps';
+    kraftSets[exId][idx][key] = input.value === '' ? '' : input.value;
+  }
+
+  function addKraftSet(exId){
+    if (!exId) return;
+    if (!kraftSets[exId]) kraftSets[exId] = [];
+    kraftSets[exId].push({ reps: '', kg: '' });
+    renderKraftExercises();
+  }
+
+  function berlinTodayISO(){
+    try {
+      return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Berlin' });
+    } catch (e) {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+  }
+
+  async function saveKraftWorkout(){
+    const aid = getGoAccountId();
+    if (!aid) return;
+    const today = berlinTodayISO();
+    const rows = [];
+    kraftSelected.forEach(function(exId){
+      const sets = filledKraftSets(kraftSets[exId]).map(function(s){
+        return {
+          reps: s.reps === '' || s.reps == null ? null : Number(s.reps),
+          kg: s.kg === '' || s.kg == null ? null : Number(s.kg)
+        };
+      });
+      if (!sets.length) return;
+      rows.push({
+        account_id: aid,
+        workout_date: today,
+        system_id: kraftSystemId,
+        exercise_id: exId,
+        exercise_name: kraftExerciseName(exId),
+        sets: sets
+      });
+    });
+    if (!rows.length) return;
+    try {
+      await goRest('go_kraft_logs', {
+        method: 'POST',
+        prefer: 'return=minimal',
+        body: rows
+      });
+      await loadKraftLogs();
+    } catch (e) {
+      console.warn('Kraft log save failed', e);
+    }
+  }
+
+  function showKraftFinishDialog(){
+    const overlay = document.getElementById('kraftFinishOverlay');
+    if (overlay) overlay.hidden = false;
+  }
+
+  function hideKraftFinishDialog(){
+    const overlay = document.getElementById('kraftFinishOverlay');
+    if (overlay) overlay.hidden = true;
+  }
+
+  async function finishKraftSession(){
+    await saveKraftWorkout();
+    showKraftFinishDialog();
+  }
+
+  function goToCalendarAfterKraft(){
+    hideKraftFinishDialog();
+    endKraftSession();
+    if (window.parent !== window) {
+      try {
+        window.parent.postMessage({ type: 'gogogo-training-goto', panel: 'home' }, '*');
+      } catch (e) {}
+    }
   }
 
   function updateKraftScrollbar(){
@@ -3422,10 +3728,11 @@
 
   async function enterKraftView(){
     document.getElementById('trainingBack').classList.toggle('is-visible', kraftRunning);
-    if (!kraftPresetsLoaded) await loadKraftPresets();
+    await loadKraftPresets();
     if (!kraftSelected.length) applyKraftDefaults(kraftSystemId);
     refreshKraftChrome();
     notifyParentTabState();
+    loadKraftLogs();
     requestAnimationFrame(updateKraftScrollbar);
   }
 
@@ -3970,14 +4277,39 @@
       const kex = e.target.closest('.kraft-ex-row');
       if (kex) {
         e.preventDefault(); e.stopPropagation();
-        toggleKraftExercise(kex.dataset.ex);
+        if (kraftRunning) {
+          kraftFocusId = kex.dataset.ex;
+          document.querySelectorAll('.kraft-ex-card').forEach(function(card){
+            card.classList.toggle('is-current', card.dataset.ex === kraftFocusId);
+          });
+          updateKraftInfoBar();
+        } else {
+          toggleKraftExercise(kex.dataset.ex);
+        }
+        return;
+      }
+      const addSet = e.target.closest('.kraft-add-set');
+      if (addSet) {
+        e.preventDefault(); e.stopPropagation();
+        addKraftSet(addSet.dataset.ex);
         return;
       }
       if (e.target.closest('#kraftHub')) {
         e.preventDefault(); e.stopPropagation();
-        if (kraftRunning) endKraftSession();
+        if (kraftRunning) finishKraftSession();
         else startKraftSession();
         return;
+      }
+      if (e.target.closest('#kraftFinishOkBtn')) {
+        e.preventDefault(); e.stopPropagation();
+        goToCalendarAfterKraft();
+        return;
+      }
+    });
+
+    root.addEventListener('input', function(e){
+      if (e.target.classList.contains('kraft-reps') || e.target.classList.contains('kraft-kg')) {
+        readKraftSetInput(e.target);
       }
     });
 
