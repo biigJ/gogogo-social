@@ -596,18 +596,34 @@
     position:relative;
     background:rgba(0,0,0,0.06);
   }
-  .interval-start-row{ margin-bottom:14px; }
-  .interval-start-btn{
-    width:100%; text-align:left; cursor:pointer;
-    background:var(--accent); border:1px solid var(--accent); border-radius:12px;
-    padding:18px 20px; display:flex; flex-direction:column; gap:4px;
+  .round-stepper{
+    display:flex; align-items:center; gap:6px;
   }
-  .interval-start-btn:active{ transform:scale(0.99); filter:brightness(0.95); }
-  .interval-start-btn .title{
+  .round-step-btn{
+    width:28px; height:28px; border-radius:8px;
+    border:1px solid var(--line); background:var(--panel);
+    color:var(--text); font-size:16px; line-height:1;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; padding:0;
+  }
+  .round-step-btn:disabled{ opacity:0.35; cursor:default; }
+  .wheel-start-display{
+    position:absolute; inset:0; z-index:2;
+    display:flex; align-items:center; justify-content:center;
+    padding:16px 20px;
+  }
+  .wheel-start-display[hidden]{ display:none !important; }
+  .wheel-start-btn{
+    width:100%; max-width:320px; text-align:center; cursor:pointer;
+    background:var(--accent); border:1px solid var(--accent); border-radius:12px;
+    padding:20px 18px; display:flex; flex-direction:column; gap:4px;
+  }
+  .wheel-start-btn:active{ transform:scale(0.99); filter:brightness(0.95); }
+  .wheel-start-btn .title{
     font-family:var(--display); font-size:18px; font-weight:700;
     text-transform:uppercase; letter-spacing:1px; color:var(--on-accent);
   }
-  .interval-start-btn .sub{ font-size:12px; color:var(--on-accent); opacity:0.75; }
+  .wheel-start-btn .sub{ font-size:12px; color:var(--on-accent); opacity:0.75; }
   .global-time-row{
     display:flex; gap:10px; margin-bottom:14px;
   }
@@ -699,12 +715,20 @@
   }
   .wheel-timer-display .clock-big.rest{ color:var(--rest); }
   .wheel-timer-display .clock-big.warn{ color:var(--danger); }
+  .wheel-value-row{
+    display:flex; align-items:baseline; justify-content:center; gap:8px;
+  }
   .wheel-amount-input{
-    width:min(180px, 60%); text-align:center;
+    width:min(140px, 45vw); text-align:center;
     background:transparent; border:none; outline:none;
     font-family:var(--display); font-weight:700;
     font-size:clamp(40px, 12vw, 56px);
     color:var(--chalk); font-variant-numeric:tabular-nums;
+  }
+  .wheel-unit-label{
+    font-size:clamp(14px, 4vw, 18px); font-weight:600;
+    color:var(--text-dim); text-transform:uppercase;
+    letter-spacing:0.04em;
   }
   .wheel-phase-label{
     position:absolute; top:10px; left:0; right:0; text-align:center;
@@ -811,12 +835,6 @@
       <div class="interval-layout" id="intervalLayout">
         <div class="interval-scroll" id="intervalScroll">
           <div id="intervalSetupView">
-            <div class="interval-start-row">
-              <button type="button" class="interval-start-btn" id="embedStartBtn">
-                <span class="title">Workout starten</span>
-                <span class="sub" id="embedStartSub">16 Runden · 4:00 · 30s Pause</span>
-              </button>
-            </div>
             <div class="global-time-row">
               <button type="button" class="global-time-chip" id="editWorkChip" data-edit="work">
                 <div class="lbl">Rundenzeit</div>
@@ -829,7 +847,11 @@
             </div>
             <div class="plan-head">
               <span class="name">Übungsplan</span>
-              <span class="count" id="planCount">16 Runden</span>
+              <div class="round-stepper">
+                <button type="button" class="round-step-btn" id="roundsMinusEmbed" aria-label="2 Runden weniger">−</button>
+                <span class="count" id="planCount">16 Runden</span>
+                <button type="button" class="round-step-btn" id="roundsPlusEmbed" aria-label="2 Runden mehr">+</button>
+              </div>
             </div>
             <div class="drag-list" id="dragList"></div>
           </div>
@@ -841,9 +863,18 @@
           <div class="wheel-phase-label" id="wheelPhaseLabel"></div>
           <div class="wheel-frame" id="wheelFrame">
             <div class="wheel-highlight"></div>
-            <div class="wheel-scroller" id="wheelScroller"></div>
+            <div class="wheel-scroller" id="wheelScroller" hidden></div>
+            <div class="wheel-start-display" id="wheelStartDisplay">
+              <button type="button" class="wheel-start-btn" id="embedStartBtn">
+                <span class="title">Workout starten</span>
+                <span class="sub" id="embedStartSub">16 Runden · 4:00 · 30s Pause</span>
+              </button>
+            </div>
             <div class="wheel-timer-display" id="wheelTimerDisplay" hidden>
-              <input type="number" class="wheel-amount-input" id="wheelAmountInput" inputmode="numeric" min="0" placeholder="0" hidden>
+              <div class="wheel-value-row" id="wheelValueRow" hidden>
+                <input type="number" class="wheel-amount-input" id="wheelAmountInput" inputmode="numeric" min="0" placeholder="0">
+                <span class="wheel-unit-label" id="wheelUnitLabel"></span>
+              </div>
               <span class="clock-big" id="wheelClockBig"></span>
             </div>
           </div>
@@ -1101,6 +1132,10 @@
     'run','skierg','run','sledpush','run','sledpull','run','burpee',
     'run','row','run','lunges','run','farmers','run','wallballs'
   ];
+  const HYROX_CYCLE = ['skierg','sledpush','sledpull','burpee','row','lunges','farmers','wallballs'];
+  const EMBED_ROUNDS_MIN = 2;
+  const EMBED_ROUNDS_MAX = 16;
+  const EMBED_ROUNDS_STEP = 2;
 
   const exerciseSelect = document.getElementById('exerciseSelect');
   exercises.forEach(ex=>{
@@ -1300,6 +1335,14 @@
 
   sb.auth.onAuthStateChange((event, session)=>{
     if (gogogoLocal) return;
+    if (isEmbed) {
+      if (session && session.user) currentUser = session.user;
+      else {
+        currentUser = null;
+        cachedHistory = [];
+      }
+      return;
+    }
     if(session && session.user){
       currentUser = session.user;
       authEmailEl.value = '';
@@ -1994,6 +2037,7 @@
       document.getElementById('intervalSetupView').hidden = false;
       document.getElementById('intervalRunView').hidden = true;
       document.getElementById('pbBar').hidden = true;
+      showWheelIdle();
       await loadIntervalLogs();
       return;
     }
@@ -2192,6 +2236,7 @@
     const scroller = document.getElementById('wheelScroller');
     scroller.innerHTML = '';
     scroller.hidden = false;
+    document.getElementById('wheelStartDisplay').hidden = true;
     document.getElementById('wheelTimerDisplay').hidden = true;
     let opts = [];
     let current = workSec;
@@ -2266,13 +2311,23 @@
     bindWheelScrollSnap(mode);
   }
 
+  function showWheelIdle(){
+    if (embedRunning || wheelEditMode) return;
+    document.getElementById('wheelScroller').innerHTML = '';
+    document.getElementById('wheelScroller').hidden = true;
+    document.getElementById('wheelTimerDisplay').hidden = true;
+    document.getElementById('wheelStartDisplay').hidden = false;
+    document.getElementById('wheelPhaseLabel').textContent = '';
+  }
+
   function hideWheelPicker(){
     wheelEditMode = null;
     document.getElementById('editWorkChip').classList.remove('is-editing');
     document.getElementById('editRestChip').classList.remove('is-editing');
-    document.getElementById('wheelPhaseLabel').textContent = '';
     document.getElementById('wheelScroller').innerHTML = '';
     document.getElementById('wheelScroller').hidden = true;
+    if (embedRunning) return;
+    showWheelIdle();
   }
 
   function refreshEmbedSetup(){
@@ -2283,26 +2338,55 @@
     document.getElementById('planCount').textContent = rounds + ' Runden';
     document.getElementById('embedStartSub').textContent =
       rounds + ' Runden · ' + fmtMin(workSec) + ' · ' + restSec + 's Pause';
+    document.getElementById('roundsMinusEmbed').disabled = rounds <= EMBED_ROUNDS_MIN;
+    document.getElementById('roundsPlusEmbed').disabled = rounds >= EMBED_ROUNDS_MAX;
     renderDragList();
   }
 
-  function wouldConsecutiveRun(list, fromIdx, toIdx){
-    const item = list[fromIdx];
-    if (item !== 'run') return false;
-    const copy = list.slice();
-    copy.splice(fromIdx, 1);
-    copy.splice(toIdx, 0, item);
-    for (let i = 1; i < copy.length; i++) {
-      if (copy[i] === 'run' && copy[i - 1] === 'run') return true;
+  function nextHyroxExercise(){
+    const used = {};
+    embedPlan.forEach(function(id, i){
+      if (i % 2 === 1 && id !== 'run') used[id] = true;
+    });
+    for (let i = 0; i < HYROX_CYCLE.length; i++) {
+      const ex = HYROX_CYCLE[i];
+      if (!used[ex]) return ex;
+    }
+    return HYROX_CYCLE[(embedPlan.length / 2) % HYROX_CYCLE.length];
+  }
+
+  function adjustEmbedRounds(delta){
+    if (embedRunning) return;
+    const nextLen = embedPlan.length + delta;
+    if (nextLen < EMBED_ROUNDS_MIN || nextLen > EMBED_ROUNDS_MAX) return;
+    if (delta > 0) {
+      embedPlan.push('run', nextHyroxExercise());
+    } else {
+      embedPlan.splice(-EMBED_ROUNDS_STEP, EMBED_ROUNDS_STEP);
+    }
+    refreshEmbedSetup();
+  }
+
+  function hasConsecutiveRuns(list){
+    for (let i = 1; i < list.length; i++) {
+      if (list[i] === 'run' && list[i - 1] === 'run') return true;
     }
     return false;
   }
 
+  function wouldCreateConsecutiveRuns(list, fromIdx, toIdx){
+    const item = list[fromIdx];
+    const copy = list.slice();
+    copy.splice(fromIdx, 1);
+    copy.splice(toIdx, 0, item);
+    return hasConsecutiveRuns(copy);
+  }
+
   function nearestValidDropIndex(list, fromIdx, targetIdx){
-    if (!wouldConsecutiveRun(list, fromIdx, targetIdx)) return targetIdx;
+    if (!wouldCreateConsecutiveRuns(list, fromIdx, targetIdx)) return targetIdx;
     for (let d = 1; d < list.length; d++) {
-      if (targetIdx - d >= 0 && !wouldConsecutiveRun(list, fromIdx, targetIdx - d)) return targetIdx - d;
-      if (targetIdx + d <= list.length && !wouldConsecutiveRun(list, fromIdx, targetIdx + d)) return targetIdx + d;
+      if (targetIdx - d >= 0 && !wouldCreateConsecutiveRuns(list, fromIdx, targetIdx - d)) return targetIdx - d;
+      if (targetIdx + d <= list.length && !wouldCreateConsecutiveRuns(list, fromIdx, targetIdx + d)) return targetIdx + d;
     }
     return fromIdx;
   }
@@ -2410,6 +2494,7 @@
       document.getElementById('intervalSetupView').hidden = false;
       document.getElementById('intervalRunView').hidden = true;
       document.getElementById('pbBar').hidden = true;
+      showWheelIdle();
     }
     if (tab === 'intervall') {
       enterIntervalView();
@@ -2452,6 +2537,7 @@
     document.getElementById('intervalRunView').hidden = true;
     document.getElementById('pbBar').hidden = true;
     hideWheelPicker();
+    showWheelIdle();
     if (useParentTabs) {
       notifyParentTabState();
     } else {
@@ -2459,34 +2545,61 @@
     }
   }
 
+  function currentEmbedExerciseId(){
+    return embedPlan[currentRound - 1] || '';
+  }
+
+  function canLogCurrentRound(){
+    const exId = currentEmbedExerciseId();
+    return !!exId && exId !== 'run';
+  }
+
   function showEmbedTimerWheel(){
+    document.getElementById('wheelStartDisplay').hidden = true;
     document.getElementById('wheelScroller').hidden = true;
     const display = document.getElementById('wheelTimerDisplay');
     display.hidden = false;
     const clockBig = document.getElementById('wheelClockBig');
     const amountInput = document.getElementById('wheelAmountInput');
+    const valueRow = document.getElementById('wheelValueRow');
+    const unitLbl = document.getElementById('wheelUnitLabel');
     const phaseLbl = document.getElementById('wheelPhaseLabel');
+    const canLog = canLogCurrentRound();
 
     if (phase === 'rest') {
-      phaseLbl.textContent = 'Pause · Tippe für Wert';
-      clockBig.textContent = fmt(phaseRemaining);
-      clockBig.className = 'clock-big rest';
-      clockBig.hidden = restInputMode;
-      amountInput.hidden = !restInputMode;
-      display.classList.toggle('is-input', restInputMode);
+      if (canLog && restInputMode) {
+        phaseLbl.textContent = 'Rundenwert eingeben';
+        valueRow.hidden = false;
+        clockBig.hidden = true;
+        unitLbl.textContent = unitFor(currentEmbedExerciseId());
+      } else {
+        phaseLbl.textContent = canLog ? 'Pause · Tippe für Wert' : 'Pause';
+        valueRow.hidden = true;
+        clockBig.hidden = false;
+        clockBig.textContent = fmt(phaseRemaining);
+        clockBig.className = 'clock-big rest';
+      }
+      display.classList.toggle('is-input', canLog && restInputMode);
     } else if (phase === 'work') {
       phaseLbl.textContent = 'Arbeit';
+      valueRow.hidden = true;
       clockBig.textContent = fmt(phaseRemaining);
       clockBig.className = 'clock-big' + (phaseRemaining <= 3 ? ' warn' : '');
       clockBig.hidden = false;
-      amountInput.hidden = true;
       display.classList.remove('is-input');
     } else {
-      phaseLbl.textContent = 'Letzte Runde · Tippe für Wert';
-      clockBig.textContent = 'Fertig';
-      clockBig.hidden = restInputMode;
-      amountInput.hidden = !restInputMode;
-      display.classList.toggle('is-input', restInputMode);
+      if (canLog && restInputMode) {
+        phaseLbl.textContent = 'Rundenwert eingeben';
+        valueRow.hidden = false;
+        clockBig.hidden = true;
+        unitLbl.textContent = unitFor(currentEmbedExerciseId());
+      } else {
+        phaseLbl.textContent = canLog ? 'Letzte Runde · Tippe für Wert' : 'Fertig';
+        valueRow.hidden = true;
+        clockBig.textContent = 'Fertig';
+        clockBig.hidden = false;
+      }
+      display.classList.toggle('is-input', canLog && restInputMode);
     }
   }
 
@@ -2505,14 +2618,17 @@
   }
 
   function enableRestInput(){
-    if ((phase !== 'rest' && phase !== 'log-final') || !embedRunning) return;
+    if ((phase !== 'rest' && phase !== 'log-final') || !embedRunning || !canLogCurrentRound()) return;
     restInputMode = true;
     const display = document.getElementById('wheelTimerDisplay');
     const clockBig = document.getElementById('wheelClockBig');
     const amountInput = document.getElementById('wheelAmountInput');
+    const valueRow = document.getElementById('wheelValueRow');
+    const unitLbl = document.getElementById('wheelUnitLabel');
     display.classList.add('is-input');
+    valueRow.hidden = false;
     clockBig.hidden = true;
-    amountInput.hidden = false;
+    unitLbl.textContent = unitFor(currentEmbedExerciseId());
     const entry = log[currentRound - 1] || {};
     amountInput.value = entry.amount || '';
     amountInput.focus();
@@ -2540,16 +2656,16 @@
   }
 
   function startEmbedRun(){
+    if (wheelEditMode) hideWheelPicker();
     embedRunning = true;
     embedInInterval = true;
     notifyParentWorkout(true);
     document.getElementById('intervalSetupView').hidden = true;
     document.getElementById('intervalRunView').hidden = false;
     document.getElementById('trainingBack').classList.add('is-visible');
-    hideWheelPicker();
+    document.getElementById('wheelStartDisplay').hidden = true;
     rounds = embedPlan.length;
     roundExercises = embedPlan.slice();
-    showScreen('run');
     buildLane();
     currentRound = 1;
     phase = 'work';
@@ -2604,6 +2720,13 @@
 
     document.getElementById('embedStartBtn').addEventListener('click', startEmbedRun);
 
+    document.getElementById('roundsMinusEmbed').addEventListener('click', function(){
+      adjustEmbedRounds(-EMBED_ROUNDS_STEP);
+    });
+    document.getElementById('roundsPlusEmbed').addEventListener('click', function(){
+      adjustEmbedRounds(EMBED_ROUNDS_STEP);
+    });
+
     document.getElementById('editWorkChip').addEventListener('click', function(e){
       e.stopPropagation();
       showWheelPicker('work');
@@ -2620,12 +2743,8 @@
     });
 
     document.getElementById('wheelZone').addEventListener('click', function(e){
-      if (!embedRunning || (phase !== 'rest' && phase !== 'log-final')) return;
+      if (!embedRunning || (phase !== 'rest' && phase !== 'log-final') || !canLogCurrentRound()) return;
       if (e.target.closest('#wheelAmountInput')) return;
-      if (phase === 'log-final') {
-        enableRestInput();
-        return;
-      }
       enableRestInput();
     });
 
@@ -2638,6 +2757,7 @@
     });
 
     loadIntervalLogs();
+    showWheelIdle();
   }
 
 })();
