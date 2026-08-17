@@ -1764,15 +1764,111 @@
       padding-bottom: 10px;
       z-index: 1;
     }
+    .training-stack {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      padding: 8px 0 8px;
+    }
+    .training-panel {
+      display: none;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      padding: 0 16px;
+      color: var(--ink-on-red);
+    }
+    .training-panel.is-active { display: block; }
+    .training-panel::-webkit-scrollbar { display: none; }
+    .training-info-title {
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin: 0 0 12px;
+    }
+    .training-info-body {
+      font-weight: 500;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+      line-height: 1.4;
+    }
+    .training-info-body p { margin: 0; }
+    .training-info-body p + p { margin-top: 10px; }
+    .training-info-details { margin-top: 14px; }
+    .training-info-details summary {
+      cursor: pointer;
+      list-style: none;
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .training-info-details summary::-webkit-details-marker { display: none; }
+    .training-info-details summary::before {
+      content: "";
+      width: 0;
+      height: 0;
+      border-top: 7px solid transparent;
+      border-bottom: 7px solid transparent;
+      border-left: 11px solid currentColor;
+    }
+    .training-info-details[open] summary::before {
+      border-left: 7px solid transparent;
+      border-right: 7px solid transparent;
+      border-top: 11px solid currentColor;
+      border-bottom: 0;
+    }
+    .training-info-bg {
+      margin-top: 10px;
+      font-size: 0.88rem;
+      line-height: 1.42;
+      opacity: 0.92;
+    }
+    .training-info-bg h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 14px 0 8px;
+    }
+    .training-info-bg h4:first-child { margin-top: 0; }
+    .training-info-bg p { margin: 0; }
+    .training-info-bg p + p { margin-top: 9px; }
+    .training-info-ref {
+      margin-top: 16px;
+      font-size: 0.8rem;
+      opacity: 0.7;
+      line-height: 1.4;
+    }
+    .training-placeholder-title {
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+      margin: 0 0 10px;
+    }
+    .training-placeholder-body {
+      margin: 0;
+      font-weight: 500;
+      font-size: 0.95rem;
+      line-height: 1.4;
+      opacity: 0.75;
+    }
     .training-frame {
       width: 100%;
-      height: 100%;
+      flex: 1;
       min-height: 0;
       border: 0;
       border-radius: var(--radius);
       background: var(--red);
       pointer-events: auto;
+      display: none;
     }
+    .training-frame.is-active { display: block; }
     body.is-training .foot,
     body.is-training .foot a { color: rgba(247, 245, 240, 0.75); }
     body.is-training-workout .site-chrome .site-bottom {
@@ -2366,14 +2462,51 @@
           <button type="button" class="training-chrome-back" id="training-chrome-back" hidden aria-label="Zurück"></button>
           <div class="training-card-rail">
             <div class="training-card-tabs" role="tablist" aria-label="Training">
-              <button type="button" class="training-card-tab" data-training-tab="kraft" role="tab">Kraft</button>
-              <button type="button" class="training-card-tab" data-training-tab="ausdauer" role="tab">Ausdauer</button>
-              <button type="button" class="training-card-tab" data-training-tab="intervall" role="tab">Intervall</button>
-              <button type="button" class="training-card-tab is-active" data-training-tab="info" role="tab">Info</button>
+              <button type="button" class="training-card-tab" data-training-tab="kraft" role="tab" aria-selected="false">Kraft</button>
+              <button type="button" class="training-card-tab" data-training-tab="ausdauer" role="tab" aria-selected="false">Ausdauer</button>
+              <button type="button" class="training-card-tab" data-training-tab="intervall" role="tab" aria-selected="false">Intervall</button>
+              <button type="button" class="training-card-tab is-active" data-training-tab="info" role="tab" aria-selected="true">Info</button>
             </div>
           </div>
         </div>
-        <iframe class="training-frame" id="training-frame" title="Friday Circle" src="about:blank" loading="lazy"></iframe>
+        <div class="training-stack" id="training-stack">
+          <div class="training-panel" data-training-panel="kraft" id="training-panel-kraft" hidden>
+            <h2 class="training-placeholder-title">Kraft</h2>
+            <p class="training-placeholder-body">Die Inhalte für Kraft fügen wir als Nächstes ein.</p>
+          </div>
+          <div class="training-panel" data-training-panel="ausdauer" id="training-panel-ausdauer" hidden>
+            <h2 class="training-placeholder-title">Ausdauer</h2>
+            <p class="training-placeholder-body">Die Inhalte für Ausdauer fügen wir als Nächstes ein.</p>
+          </div>
+          <div class="training-panel is-active" data-training-panel="info" id="training-panel-info">
+            <article>
+              <h2 class="training-info-title">Drei Reize, drei Wirkungen</h2>
+              <div class="training-info-body">
+                <p>Training wirkt nicht diffus auf den ganzen Körper, sondern gezielt auf einzelne Systeme. Kraft verändert Muskulatur, Sehnen und Nervensystem. Ausdauer verändert Herz, Kreislauf und die Energieproduktion in den Zellen. Intensives Training verändert, wie viel Leistung Du aus diesem System kurzfristig abrufen kannst.</p>
+              </div>
+              <details class="training-info-details">
+                <summary aria-label="Hintergrund anzeigen"></summary>
+                <div class="training-info-bg">
+                  <h4>Der Hintergrund zu den drei Trainingsarten</h4>
+                  <p>Die drei Bereiche in dieser App sind keine Geschmacksfrage, sondern folgen der Physiologie. Jeder Reiz löst eine andere Anpassung aus, und diese Anpassungen laufen weitgehend unabhängig voneinander. Deshalb macht ein starker Mensch nicht automatisch eine gute Ausdauerleistung, und ein guter Läufer ist nicht automatisch belastbar. Wer nur in einem Bereich trainiert, entwickelt auch nur diesen.</p>
+                  <h4>Kraft</h4>
+                  <p>Krafttraining wirkt strukturell. Unter Last entstehen mechanische Signale in der Muskelzelle, die die Produktion neuer kontraktiler Proteine anstoßen. Der Muskelquerschnitt wächst, Sehnen und Bindegewebe werden dichter, die Knochendichte steigt. Parallel dazu passiert ein großer Teil der frühen Fortschritte im Nervensystem: Dein Körper lernt, mehr Fasern gleichzeitig und besser koordiniert anzusteuern. Deshalb wirst Du in den ersten Wochen deutlich stärker, ohne sichtbar mehr Muskel zu haben.</p>
+                  <p>Zusätzlich ist Muskulatur das größte Zielgewebe für Insulin. Mehr trainierte Muskelmasse bedeutet, dass Glukose schneller aus dem Blut in die Zelle gelangt. Krafttraining verbessert Insulinsensitivität und Blutzuckerregulation daher unabhängig von Gewichtsverlust. Der Reiz selbst hält etwa 48 bis 72 Stunden an, danach fällt die Proteinsynthese auf Ausgangsniveau zurück. Aus dieser Zeitspanne ergibt sich die sinnvolle Frequenz pro Muskelgruppe.</p>
+                  <h4>Ausdauer</h4>
+                  <p>Ruhiges Ausdauertraining wirkt auf zwei Ebenen. Zentral vergrößert sich die linke Herzkammer, das Schlagvolumen steigt, der Ruhepuls sinkt. Peripher entstehen in der Muskelzelle neue Mitochondrien und neue Kapillaren. Mitochondrien sind die Orte, an denen Sauerstoff, Fett und Kohlenhydrate zu Energie verarbeitet werden. Mehr Mitochondrien bedeuten, dass Du bei gleicher Geschwindigkeit einen größeren Anteil der Energie aerob bereitstellst, also ohne dass sich Laktat anstaut.</p>
+                  <p>Das ist der eigentliche Grund, warum ruhiges Training so wirksam ist, obwohl es sich zu leicht anfühlt. Die Anpassung findet nicht in der Belastung statt, sondern in der Dauer. Eine wichtige Zahl in diesem Zusammenhang: die maximale Sauerstoffaufnahme, VO2max. Sie beschreibt, wie viel Sauerstoff Dein Körper pro Minute verwerten kann, und ist in Langzeitstudien der stärkste einzelne Prädiktor für Gesamtsterblichkeit, deutlicher als Rauchen, Diabetes oder Bluthochdruck.</p>
+                  <h4>Intensiv</h4>
+                  <p>Im intensiven Bereich übersteigt der Energiebedarf, was aerob geliefert werden kann. Dein Körper deckt die Lücke über die anaerobe Glykolyse und produziert dabei Laktat. Laktat ist entgegen der alten Vorstellung kein Abfallprodukt und nicht die Ursache für brennende Muskeln. Es wird über spezielle Transportproteine in andere Muskelfasern, ins Herz und in die Leber gebracht und dort als Brennstoff genutzt.</p>
+                  <p>Was intensives Training trainiert, ist genau dieser Kreislauf: Bildung, Transport und Wiederverwertung. Dazu kommt die Pufferkapazität gegen die begleitende Übersäuerung. Das Ergebnis ist eine Verschiebung der Schwelle, ab der sich Laktat schneller anhäuft als es abgebaut wird. Praktisch heißt das: höheres Tempo bleibt kontrollierbar, und die Erholung zwischen Belastungsspitzen wird schneller. Intensives Training ist außerdem der wirksamste Weg, die VO2max zu erhöhen, weil dafür Zeit oberhalb von etwa 90 Prozent der maximalen Herzfrequenz nötig ist. Ruhiges Training baut Mitochondrien, hebt aber die Obergrenze kaum.</p>
+                  <h4>Wie sich die drei zueinander verhalten</h4>
+                  <p>In der Trainingswissenschaft hat sich eine Verteilung durchgesetzt, die als polarisiert bezeichnet wird: der größte Teil des Ausdauervolumens deutlich unterhalb der Schwelle, ein kleiner Teil klar darüber, wenig im Mittelbereich. Der Grund ist physiologisch. Der Mittelbereich erzeugt fast so viel Ermüdung wie hartes Training, liefert aber weniger Reiz für die Obergrenze und weniger Volumen für die Mitochondrien. Krafttraining läuft parallel dazu und konkurriert nur bei sehr hohem Ausdauervolumen mit dem Muskelaufbau.</p>
+                  <p class="training-info-ref">Wissenschaftliche Grundlage der Aussagen: Joyner &amp; Coyle 2008 zur Limitierung der VO2max, Brooks 2018 zum Laktat als Substrat, Mandsager et al. 2018 zur Ausdauerleistung und Sterblichkeit, Seiler 2010 zur polarisierten Verteilung.</p>
+                </div>
+              </details>
+            </article>
+          </div>
+          <iframe class="training-frame" id="training-frame" title="Friday Circle Intervall" src="about:blank" loading="lazy"></iframe>
+        </div>
       </div>
       </div>
 
@@ -5056,7 +5189,10 @@
       var trainingFrame = document.getElementById("training-frame");
       var trainingChrome = document.getElementById("training-chrome");
       var trainingChromeBack = document.getElementById("training-chrome-back");
+      var trainingStack = document.getElementById("training-stack");
       var trainingLoaded = false;
+      var trainingActiveTab = "info";
+      var pendingIframeTab = null;
 
       function setTrainingChromeTab(tab) {
         if (!trainingChrome) return;
@@ -5067,22 +5203,72 @@
         });
       }
 
-      function sendTrainingTab(tab) {
-        if (!trainingFrame || !trainingFrame.contentWindow) return;
-        trainingFrame.contentWindow.postMessage({ type: "gogogo-training-tab", tab: tab }, "*");
+      function showTrainingPanel(tab) {
+        if (!trainingStack) return;
+        var isIntervall = tab === "intervall";
+        trainingStack.querySelectorAll(".training-panel").forEach(function (panel) {
+          var on = panel.getAttribute("data-training-panel") === tab;
+          panel.classList.toggle("is-active", on);
+          panel.hidden = !on;
+        });
+        if (trainingFrame) {
+          trainingFrame.classList.toggle("is-active", isIntervall);
+          trainingFrame.hidden = !isIntervall;
+        }
       }
+
+      function callIframeTab(tab) {
+        if (!trainingFrame) return false;
+        try {
+          var win = trainingFrame.contentWindow;
+          if (win && typeof win.selectEmbedTab === "function") {
+            win.selectEmbedTab(tab);
+            pendingIframeTab = null;
+            return true;
+          }
+        } catch (e) {}
+        pendingIframeTab = tab;
+        try {
+          trainingFrame.contentWindow.postMessage({ type: "gogogo-training-tab", tab: tab }, "*");
+        } catch (e2) {}
+        return false;
+      }
+
+      function activateTrainingTab(tab) {
+        if (!tab) return;
+        trainingActiveTab = tab;
+        setTrainingChromeTab(tab);
+        showTrainingPanel(tab);
+        if (tab === "intervall") {
+          callIframeTab("intervall");
+          if (trainingChromeBack) trainingChromeBack.hidden = false;
+        } else if (trainingChromeBack) {
+          trainingChromeBack.hidden = true;
+        }
+      }
+      window.activateTrainingTab = activateTrainingTab;
 
       if (trainingChrome) {
         trainingChrome.querySelectorAll(".training-card-tab").forEach(function (btn) {
+          var tab = btn.getAttribute("data-training-tab");
           btn.addEventListener("click", function () {
-            sendTrainingTab(btn.getAttribute("data-training-tab"));
+            activateTrainingTab(tab);
           });
         });
       }
       if (trainingChromeBack) {
         trainingChromeBack.addEventListener("click", function () {
-          if (!trainingFrame || !trainingFrame.contentWindow) return;
-          trainingFrame.contentWindow.postMessage({ type: "gogogo-training-back" }, "*");
+          callIframeTab("intervall");
+          try {
+            trainingFrame.contentWindow.postMessage({ type: "gogogo-training-back" }, "*");
+          } catch (e) {}
+          activateTrainingTab("info");
+        });
+      }
+      if (trainingFrame) {
+        trainingFrame.addEventListener("load", function () {
+          if (pendingIframeTab) callIframeTab(pendingIframeTab);
+          else if (trainingActiveTab === "intervall") callIframeTab("intervall");
         });
       }
 
@@ -5093,7 +5279,6 @@
           return;
         }
         if (ev.data.type === "gogogo-training-tab-state") {
-          setTrainingChromeTab(ev.data.tab || "info");
           if (trainingChromeBack) trainingChromeBack.hidden = !ev.data.showBack;
         }
       });
@@ -5138,9 +5323,13 @@
           if (trainingChromeBack) trainingChromeBack.hidden = true;
         }
         if (id !== "book") pauseAccountVideos();
-        if (id === "training" && !trainingLoaded) {
-          trainingFrame.src = "/account/fitness-friday.html?embed=1&parentTabs=1";
-          trainingLoaded = true;
+        if (id === "training") {
+          var wantTrainingSrc = "/account/fitness-friday.html?embed=1&parentTabs=1";
+          if (!trainingLoaded || String(trainingFrame.src || "").indexOf("parentTabs=1") === -1) {
+            trainingFrame.src = wantTrainingSrc;
+            trainingLoaded = true;
+          }
+          activateTrainingTab(trainingActiveTab || "info");
         }
         if (onProfile) fillProfilePanel();
         else stopMantraRotation();

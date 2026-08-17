@@ -379,7 +379,8 @@
   body.embed #embedShell{ display:flex; }
   body.parent-tabs .training-head{ display:none; }
   body.parent-tabs .training-back{ display:none !important; }
-  body.parent-tabs .training-body{ margin-top:8px; }
+  body.parent-tabs .training-body{ margin-top:0; padding:0; }
+  body.parent-tabs #embedShell{ padding:0; }
 
   #embedShell{
     display:none; flex-direction:column;
@@ -2392,7 +2393,6 @@
     try {
       window.parent.postMessage({
         type: 'gogogo-training-tab-state',
-        tab: embedActiveTab,
         showBack: embedActiveTab === 'intervall' && embedInInterval
       }, '*');
     } catch (e) {}
@@ -2400,6 +2400,7 @@
 
   function selectEmbedTab(tab){
     if (!tab) return;
+    if (useParentTabs && tab !== 'intervall') return;
     if (embedRunning && tab !== 'intervall') {
       if (!confirm('Workout wirklich beenden?')) return;
       clearInterval(timerId);
@@ -2420,6 +2421,18 @@
   }
   window.selectEmbedTab = selectEmbedTab;
 
+  if (useParentTabs) {
+    window.addEventListener('message', function(ev){
+      if (!ev.data) return;
+      if (ev.data.type === 'gogogo-training-tab') {
+        selectEmbedTab(ev.data.tab);
+      }
+      if (ev.data.type === 'gogogo-training-back') {
+        document.getElementById('trainingBack').click();
+      }
+    });
+  }
+
   function enterIntervalView(){
     embedInInterval = true;
     document.getElementById('trainingBack').classList.add('is-visible');
@@ -2439,7 +2452,11 @@
     document.getElementById('intervalRunView').hidden = true;
     document.getElementById('pbBar').hidden = true;
     hideWheelPicker();
-    setEmbedTab('info');
+    if (useParentTabs) {
+      notifyParentTabState();
+    } else {
+      setEmbedTab('info');
+    }
   }
 
   function showEmbedTimerWheel(){
@@ -2552,7 +2569,15 @@
     document.getElementById('embedShell').removeAttribute('hidden');
     embedPlan = DEFAULT_EMBED_PLAN.slice();
     refreshEmbedSetup();
-    setEmbedTab('info');
+
+    if (useParentTabs) {
+      document.querySelectorAll('.tab-panel[data-embed-panel]').forEach(function(panel){
+        panel.classList.toggle('is-active', panel.getAttribute('data-embed-panel') === 'intervall');
+      });
+      embedActiveTab = 'intervall';
+    } else {
+      setEmbedTab('info');
+    }
 
     if (!useParentTabs) {
       document.querySelectorAll('.card-tab').forEach(function(btn){
@@ -2561,16 +2586,6 @@
           e.stopPropagation();
           selectEmbedTab(btn.getAttribute('data-embed-tab'));
         });
-      });
-    } else {
-      window.addEventListener('message', function(ev){
-        if (!ev.data) return;
-        if (ev.data.type === 'gogogo-training-tab') {
-          selectEmbedTab(ev.data.tab);
-        }
-        if (ev.data.type === 'gogogo-training-back') {
-          document.getElementById('trainingBack').click();
-        }
       });
     }
 
