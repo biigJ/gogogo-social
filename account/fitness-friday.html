@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>gogogo · Training</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
@@ -23,6 +23,7 @@
     --on-accent:#C7413B;
     --danger:#ffd6d4;
     --display:"Space Grotesk", system-ui, sans-serif;
+    --typewriter:"Courier Prime", "Courier New", monospace;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{height:100%; touch-action:manipulation;}
@@ -376,7 +377,11 @@
     height:100%; min-height:100%;
   }
   body.embed .wrap{ display:none; }
-  body.embed #embedShell{ display:flex; }
+  body.embed #embedShell{
+    display:flex;
+    pointer-events:auto;
+  }
+  body.embed #embedShell[hidden]{ display:none !important; }
   body.parent-tabs .training-head{ display:none; }
   body.parent-tabs .training-back{ display:none !important; }
   body.parent-tabs .training-body{ margin-top:0; padding:0; }
@@ -583,28 +588,28 @@
     overflow-y:auto; overflow-x:hidden;
     -webkit-overflow-scrolling:touch;
     scrollbar-width:none; -ms-overflow-style:none;
-    padding:12px 16px 8px;
+    padding:10px 16px 6px;
+    pointer-events:auto;
   }
   .interval-scroll::-webkit-scrollbar{ display:none; }
   .interval-wheel-zone{
-    flex:none;
-    height:44%;
-    min-height:200px;
-    max-height:46vh;
+    flex:0 0 38%;
+    min-height:210px;
+    max-height:42vh;
     border-top:1px solid var(--line);
     display:flex; flex-direction:column;
     align-items:center; justify-content:center;
     position:relative;
-    background:rgba(0,0,0,0.06);
     pointer-events:auto;
     touch-action:manipulation;
+    padding:8px 0 10px;
   }
   .interval-mid-zone{
     flex:none;
-    height:128px;
+    height:118px;
     border-top:1px solid var(--line);
     position:relative;
-    background:rgba(0,0,0,0.04);
+    background:rgba(0,0,0,0.08);
     pointer-events:auto;
   }
   .interval-mid-zone[hidden]{ display:none !important; }
@@ -616,14 +621,15 @@
   }
   .interval-ray-wrap{
     position:relative;
-    width:min(92vw, 260px);
-    height:min(92vw, 260px);
-    max-height:100%;
+    width:min(78vw, 230px);
+    height:min(78vw, 230px);
     flex:none;
+    pointer-events:none;
   }
   .interval-ray{
     width:100%; height:100%; display:block;
     pointer-events:none;
+    overflow:visible;
   }
   .interval-ray.is-spinning{ animation:interval-spin 120s linear infinite; }
   @keyframes interval-spin{ to{ transform:rotate(360deg); } }
@@ -631,10 +637,10 @@
   .interval-ray-hub{
     position:absolute;
     left:50%; top:50%;
-    width:54%; height:54%;
+    width:46%; height:46%;
     transform:translate(-50%, -50%);
     border-radius:50%;
-    background:var(--bg);
+    background:var(--accent);
     border:0;
     display:flex; flex-direction:column;
     align-items:center; justify-content:center;
@@ -644,23 +650,24 @@
     touch-action:manipulation;
     -webkit-appearance:none;
     appearance:none;
-    color:var(--text);
-    padding:8px;
+    color:var(--on-accent);
+    padding:10px 8px;
     text-align:center;
+    box-shadow:0 0 0 1px rgba(247,245,240,0.35);
   }
   .interval-ray-hub:disabled{ cursor:default; opacity:1; }
   .ray-hub-start{
-    display:flex; flex-direction:column; align-items:center; gap:2px;
+    display:flex; flex-direction:column; align-items:center; gap:0;
     pointer-events:none;
+    font-family:var(--typewriter);
   }
   .ray-hub-start .line1,
   .ray-hub-start .line2{
-    font-family:var(--display); font-weight:700;
-    text-transform:uppercase; letter-spacing:0.06em;
-    line-height:1.05;
+    font-weight:700;
+    letter-spacing:0.01em;
+    line-height:1.15;
+    font-size:clamp(14px, 3.8vw, 17px);
   }
-  .ray-hub-start .line1{ font-size:clamp(15px, 4.2vw, 18px); }
-  .ray-hub-start .line2{ font-size:clamp(15px, 4.2vw, 18px); }
   .ray-hub-timer,
   .ray-hub-input{
     display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -670,8 +677,12 @@
   .ray-hub-input[hidden]{ display:none !important; }
   .ray-hub-input .wheel-value-row{ pointer-events:auto; }
   .interval-ray-hub .clock-big{
-    font-size:clamp(28px, 8vw, 42px);
+    font-size:clamp(26px, 7.5vw, 38px);
+    color:var(--on-accent);
+    font-family:var(--typewriter);
   }
+  .interval-ray-hub .wheel-amount-input{ color:var(--on-accent); }
+  .interval-ray-hub .wheel-unit-label{ color:rgba(199,65,59,0.65); }
   .round-stepper{
     display:flex; align-items:center; gap:6px;
   }
@@ -720,30 +731,44 @@
     font-size:11px; text-transform:uppercase; letter-spacing:1.5px;
     color:var(--text-dim);
   }
-  .plan-head .count{ font-size:12px; color:var(--text-dim); }
-  .drag-list{ display:flex; flex-direction:column; gap:0; }
+  .plan-head .count{ font-size:12px; color:var(--text-dim); white-space:nowrap; }
+  .drag-list{ display:flex; flex-direction:column; gap:6px; padding-bottom:8px; }
   .drag-row{
-    display:flex; align-items:center; gap:8px;
-    padding:11px 0; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    position:relative;
+    min-height:46px;
+    padding:12px 36px 12px 16px;
+    border:2px solid transparent;
+    border-radius:2px;
+    background:rgba(0,0,0,0.18);
     touch-action:none; user-select:none;
-    transition:transform .12s, opacity .12s;
+    transition:transform .12s, opacity .12s, border-color .12s;
+    cursor:grab;
+  }
+  .drag-row.is-run{ background:rgba(0,0,0,0.32); }
+  .drag-row.is-plan-focus{
+    border-color:var(--accent);
+    background:rgba(0,0,0,0.08);
   }
   .drag-row.is-dragging{ opacity:0.45; }
-  .drag-row.is-drop-target{ background:rgba(247,245,240,0.06); }
+  .drag-row.is-drop-target{ border-color:rgba(247,245,240,0.65); background:rgba(247,245,240,0.08); }
   .drag-row.is-invalid{ opacity:0.35; }
   .drag-handle{
-    flex:none; width:20px; color:var(--text-dim);
+    position:absolute; left:8px; top:50%; transform:translateY(-50%);
+    width:18px; color:rgba(247,245,240,0.45);
     display:flex; align-items:center; justify-content:center;
     cursor:grab;
   }
   .drag-handle svg{ display:block; }
-  .drag-row .r-num{
-    flex:none; width:26px; font-size:11px; color:var(--text-dim);
-    font-family:var(--display);
+  .drag-row .ex-name{
+    flex:1; font-size:15px; font-weight:600; text-align:center;
+    letter-spacing:0.01em;
   }
-  .drag-row .ex-icon-mini{ flex:none; width:22px; display:flex; justify-content:center; }
-  .drag-row .ex-name{ flex:1; font-size:14px; font-weight:600; }
-  .drag-row .ex-name.is-run{ color:var(--text-dim); font-weight:500; }
+  .drag-row .ex-name.is-run{ color:rgba(247,245,240,0.82); font-weight:500; }
+  .drag-row .ex-meta{
+    position:absolute; right:10px; top:50%; transform:translateY(-50%);
+    font-size:11px; color:rgba(247,245,240,0.55);
+  }
   .wheel-frame{
     flex:1; position:relative; overflow:hidden; min-height:0;
   }
@@ -824,26 +849,25 @@
   }
   .pb-bar{
     flex:none;
-    display:flex; align-items:center; justify-content:center; gap:16px;
-    padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-    border-top:1px solid var(--line);
-    background:rgba(0,0,0,0.12);
-    min-height:52px;
+    display:flex; align-items:center; justify-content:center;
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+    min-height:48px;
+    pointer-events:none;
   }
   .pb-bar[hidden]{ display:none !important; }
-  .pb-stat{ text-align:center; min-width:72px; }
-  .pb-stat .lbl{
-    font-size:9px; text-transform:uppercase; letter-spacing:1px;
-    color:var(--text-dim); margin-bottom:2px;
+  .pb-bar--pill{
+    width:min(100%, 360px);
+    background:var(--accent);
+    color:var(--on-accent);
+    border-radius:999px;
+    padding:12px 18px;
+    font-family:var(--typewriter);
+    font-size:clamp(13px, 3.6vw, 15px);
+    font-weight:700;
+    letter-spacing:0.01em;
+    text-align:center;
   }
-  .pb-stat .val{
-    font-family:var(--display); font-size:17px; font-weight:700;
-    color:var(--chalk);
-  }
-  .pb-stat .unit{ font-size:10px; color:var(--text-dim); font-weight:500; }
-  .pb-divider{
-    width:1px; height:28px; background:var(--line); flex:none;
-  }
+  .pb-bar--pill .pb-sep{ opacity:0.45; padding:0 6px; }
 </style>
 </head>
 <body>
@@ -961,17 +985,7 @@
     </div>
   </div>
   <div class="pb-bar" id="pbBar" hidden>
-    <div class="pb-stat">
-      <div class="lbl">PB · <span id="pbExLabel">—</span></div>
-      <div class="val" id="pbVal">—</div>
-      <div class="unit" id="pbUnit"></div>
-    </div>
-    <div class="pb-divider" id="pbAvgDivider" hidden></div>
-    <div class="pb-stat" id="pbAvgStat" hidden>
-      <div class="lbl">Ø</div>
-      <div class="val" id="pbAvgVal">—</div>
-      <div class="unit" id="pbAvgUnit"></div>
-    </div>
+    <div class="pb-bar--pill" id="pbPill">PB: — | ø: —</div>
   </div>
 </div>
 <div class="wrap">
@@ -1188,10 +1202,21 @@
 
 <script>
 (function(){
-  // ---------- Supabase ----------
+  // ---------- Supabase (optional — embed darf ohne CDN laufen) ----------
   const SUPABASE_URL = 'https://uxijbecqklzwxbpvsglh.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4aWpiZWNxa2x6d3hicHZzZ2xoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTY0ODksImV4cCI6MjA5OTMzMjQ4OX0.v-wxlru3EUJcFimaFD37rquZtcIJsIu0rO7gmJR2GBc';
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const sbStub = {
+    auth: {
+      onAuthStateChange: function(){ return { data: { subscription: { unsubscribe: function(){} } } }; },
+      getSession: async function(){ return { data: { session: null } }; },
+      signInWithPassword: async function(){ return { error: new Error('offline') }; },
+      signUp: async function(){ return { error: new Error('offline') }; },
+      signOut: async function(){ return {}; }
+    }
+  };
+  const sb = (window.supabase && window.supabase.createClient)
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : sbStub;
 
   // ---------- exercise list (offizielle Hyrox-Stationen + Laufen) ----------
   const exercises = [
@@ -1216,12 +1241,14 @@
   const EMBED_ROUNDS_STEP = 2;
 
   const exerciseSelect = document.getElementById('exerciseSelect');
-  exercises.forEach(ex=>{
-    const o = document.createElement('option');
-    o.value = ex.id;
-    o.textContent = ex.name;
-    exerciseSelect.appendChild(o);
-  });
+  if (exerciseSelect) {
+    exercises.forEach(ex=>{
+      const o = document.createElement('option');
+      o.value = ex.id;
+      o.textContent = ex.name;
+      exerciseSelect.appendChild(o);
+    });
+  }
 
   // ---------- Übungs-Icons: fetter Piktogramm-Stil, an Referenzbild angelehnt, eigenständig gezeichnet ----------
   const exerciseIcons = {
@@ -1565,6 +1592,7 @@
 
   const restRangeEl = document.getElementById('restRange');
 
+  if (document.getElementById('roundsMinus')) {
   document.getElementById('roundsMinus').addEventListener('click', ()=>{
     rounds = Math.max(ROUNDS_MIN, rounds-ROUNDS_STEP); refreshSetup(); buildExercisePlan();
   });
@@ -1577,9 +1605,10 @@
   document.getElementById('workPlus').addEventListener('click', ()=>{
     workSec = Math.min(WORK_MAX, workSec+WORK_STEP); refreshSetup();
   });
-  restRangeEl.addEventListener('input', ()=>{
+  if (restRangeEl) restRangeEl.addEventListener('input', ()=>{
     restSec = parseInt(restRangeEl.value,10); refreshSetup();
   });
+  }
 
   function fmt(sec){
     sec = Math.max(0, Math.round(sec));
@@ -2280,22 +2309,27 @@
 
   function updatePbBar(){
     const bar = document.getElementById('pbBar');
+    const pill = document.getElementById('pbPill');
+    if (!bar || !pill) return;
     if (!embedRunning) { bar.hidden = true; return; }
     bar.hidden = false;
     const idx = currentRound - 1;
     const exId = (log[idx] && log[idx].exercise) || embedPlan[idx] || '';
-    const ex = exercises.find(function(e){ return e.id === exId; });
-    document.getElementById('pbExLabel').textContent = ex ? ex.name : '—';
     const stats = pbStatsForExercise(exId);
-    document.getElementById('pbVal').textContent = stats.pb !== null ? stats.pb : '—';
-    document.getElementById('pbUnit').textContent = stats.unit || '';
-    const showAvg = stats.days >= 2 && stats.avg !== null;
-    document.getElementById('pbAvgDivider').hidden = !showAvg;
-    document.getElementById('pbAvgStat').hidden = !showAvg;
-    if (showAvg) {
-      document.getElementById('pbAvgVal').textContent = stats.avg;
-      document.getElementById('pbAvgUnit').textContent = stats.unit || '';
+    const unit = stats.unit || 'm';
+    const unitShort = unit === 'Wiederholungen' ? 'Reps' : 'm';
+    let txt = 'PB: ';
+    txt += stats.pb !== null ? (formatPbAmount(stats.pb) + ' ' + unitShort) : '—';
+    if (stats.days >= 2 && stats.avg !== null) {
+      txt += ' | ø: ' + formatPbAmount(stats.avg) + ' ' + unitShort;
     }
+    pill.textContent = txt;
+  }
+
+  function formatPbAmount(n){
+    if (n === null || isNaN(n)) return '—';
+    if (n >= 1000) return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    return String(n);
   }
 
   function fmtSecShort(sec){
@@ -2311,15 +2345,15 @@
     return opts;
   }
 
-  const INTERVAL_RAY_GRAY = 'rgba(247,245,240,0.22)';
-  const INTERVAL_RAY_LIT = 'rgba(247,245,240,0.88)';
-  const INTERVAL_RAY_COUNT = 48;
+  const INTERVAL_RAY_GRAY = 'rgba(247,245,240,0.28)';
+  const INTERVAL_RAY_LIT = 'rgba(247,245,240,0.95)';
+  const INTERVAL_RAY_COUNT = 32;
 
   function drawIntervalRay(svg, filledMap){
     if (!svg) return;
     const ns = 'http://www.w3.org/2000/svg';
     while (svg.firstChild) svg.removeChild(svg.firstChild);
-    const cx = 120, cy = 120, inner = 78, outer = 112;
+    const cx = 120, cy = 120, inner = 74, outer = 114;
     for (let s = 0; s < INTERVAL_RAY_COUNT; s++) {
       const a = ((s / INTERVAL_RAY_COUNT) * Math.PI * 2) - Math.PI / 2;
       const line = document.createElementNS(ns, 'line');
@@ -2327,8 +2361,9 @@
       line.setAttribute('y1', (cy + Math.sin(a) * inner).toFixed(2));
       line.setAttribute('x2', (cx + Math.cos(a) * outer).toFixed(2));
       line.setAttribute('y2', (cy + Math.sin(a) * outer).toFixed(2));
+      const isTop = s === 0 || s === 1 || s === INTERVAL_RAY_COUNT - 1;
       line.setAttribute('stroke', filledMap && filledMap[s] ? INTERVAL_RAY_LIT : INTERVAL_RAY_GRAY);
-      line.setAttribute('stroke-width', '3');
+      line.setAttribute('stroke-width', isTop ? '4.5' : '2.2');
       line.setAttribute('stroke-linecap', 'round');
       svg.appendChild(line);
     }
@@ -2508,17 +2543,21 @@
 
   function renderDragList(){
     const list = document.getElementById('dragList');
+    if (!list) return;
     list.innerHTML = '';
     embedPlan.forEach(function(exId, i){
       const ex = exercises.find(function(e){ return e.id === exId; });
       const row = document.createElement('div');
-      row.className = 'drag-row';
+      row.className = 'drag-row' + (exId === 'run' ? ' is-run' : '') + (i === 0 ? ' is-plan-focus' : '');
       row.dataset.index = String(i);
+      const shortName = ({
+        run:'Laufen', skierg:'Ski', sledpush:'Sled push', sledpull:'Sled pull',
+        burpee:'Burpee', row:'Ruder', lunges:'Lunges', farmers:'Farmers', wallballs:'Wallballs'
+      })[exId] || (ex ? ex.name : exId);
       row.innerHTML =
         '<span class="drag-handle" aria-hidden="true">' + dragHandleSvg + '</span>' +
-        '<span class="r-num">R' + (i + 1) + '</span>' +
-        '<span class="ex-icon-mini">' + iconSvg(exId, 20) + '</span>' +
-        '<span class="ex-name' + (exId === 'run' ? ' is-run' : '') + '">' + (ex ? ex.name : exId) + '</span>';
+        '<span class="ex-name' + (exId === 'run' ? ' is-run' : '') + '">' + shortName + '</span>' +
+        '<span class="ex-meta">⋮⋮</span>';
       bindDragRow(row, i);
       list.appendChild(row);
     });
@@ -2527,10 +2566,9 @@
   function bindDragRow(row, index){
     row.addEventListener('pointerdown', function(e){
       if (embedRunning) return;
-      if (!e.target.closest('.drag-handle')) return;
       dragState = { from: index, row: row, pointerId: e.pointerId };
       row.classList.add('is-dragging');
-      row.setPointerCapture(e.pointerId);
+      try { row.setPointerCapture(e.pointerId); } catch (err) {}
       e.preventDefault();
     });
     row.addEventListener('pointermove', function(e){
@@ -2791,33 +2829,47 @@
     startEmbedRun();
   }
 
-  function initEmbedShell(){
-    if (embedShellReady) return;
-    embedShellReady = true;
-    document.getElementById('embedShell').removeAttribute('hidden');
-    embedPlan = DEFAULT_EMBED_PLAN.slice();
-    refreshEmbedSetup();
-    drawIntervalRay(document.getElementById('intervalRaySvg'), null);
+  function bindEmbedShellEvents(){
+    var root = document.getElementById('embedShell');
+    if (!root || root.dataset.bound === '1') return;
+    root.dataset.bound = '1';
 
-    if (useParentTabs) {
-      document.querySelectorAll('.tab-panel[data-embed-panel]').forEach(function(panel){
-        panel.classList.toggle('is-active', panel.getAttribute('data-embed-panel') === 'intervall');
-      });
-      embedActiveTab = 'intervall';
-      embedInInterval = true;
-    } else {
-      setEmbedTab('info');
-    }
+    root.addEventListener('click', function(e){
+      if (e.target.closest('#editWorkChip')) {
+        e.preventDefault(); e.stopPropagation();
+        showWheelPicker('work');
+        return;
+      }
+      if (e.target.closest('#editRestChip')) {
+        e.preventDefault(); e.stopPropagation();
+        showWheelPicker('rest');
+        return;
+      }
+      if (e.target.closest('#roundsMinusEmbed')) {
+        e.preventDefault(); e.stopPropagation();
+        adjustEmbedRounds(-EMBED_ROUNDS_STEP);
+        return;
+      }
+      if (e.target.closest('#roundsPlusEmbed')) {
+        e.preventDefault(); e.stopPropagation();
+        adjustEmbedRounds(EMBED_ROUNDS_STEP);
+        return;
+      }
+      if (e.target.closest('#rayHub')) {
+        handleRayHubTap(e);
+        return;
+      }
+      if (wheelEditMode && !embedRunning) {
+        if (!e.target.closest('#intervalMidZone') && !e.target.closest('.global-time-chip')) {
+          hideWheelPicker();
+        }
+      }
+    }, true);
 
-    if (!useParentTabs) {
-      document.querySelectorAll('.card-tab').forEach(function(btn){
-        btn.addEventListener('click', function(e){
-          e.preventDefault();
-          e.stopPropagation();
-          selectEmbedTab(btn.getAttribute('data-embed-tab'));
-        });
-      });
-    }
+    root.addEventListener('touchstart', function(e){
+      var t = e.target.closest('#rayHub, #editWorkChip, #editRestChip, #roundsMinusEmbed, #roundsPlusEmbed, .drag-row');
+      if (t) e.stopPropagation();
+    }, { passive: true, capture: true });
 
     document.getElementById('trainingBack').addEventListener('click', function(){
       if (embedRunning && phase === 'log-final') {
@@ -2832,42 +2884,50 @@
       }
     });
 
-    document.getElementById('rayHub').addEventListener('click', handleRayHubTap);
-
-    document.getElementById('roundsMinusEmbed').addEventListener('click', function(e){
-      e.stopPropagation();
-      adjustEmbedRounds(-EMBED_ROUNDS_STEP);
-    });
-    document.getElementById('roundsPlusEmbed').addEventListener('click', function(e){
-      e.stopPropagation();
-      adjustEmbedRounds(EMBED_ROUNDS_STEP);
-    });
-
-    document.getElementById('editWorkChip').addEventListener('click', function(e){
-      e.stopPropagation();
-      showWheelPicker('work');
-    });
-    document.getElementById('editRestChip').addEventListener('click', function(e){
-      e.stopPropagation();
-      showWheelPicker('rest');
-    });
-
-    document.getElementById('intervalLayout').addEventListener('click', function(e){
-      if (!wheelEditMode || embedRunning) return;
-      if (e.target.closest('.global-time-chip') || e.target.closest('#intervalMidZone')) return;
-      hideWheelPicker();
-    });
-
     document.getElementById('wheelAmountInput').addEventListener('input', function(){
       saveLogEntryFromWheel();
     });
-
     document.getElementById('wheelAmountInput').addEventListener('blur', function(){
       if (restInputMode && (phase === 'rest' || phase === 'log-final')) disableRestInput();
     });
 
-    loadIntervalLogs();
-    showWheelIdle();
+    if (!useParentTabs) {
+      root.querySelectorAll('.card-tab').forEach(function(btn){
+        btn.addEventListener('click', function(e){
+          e.preventDefault();
+          e.stopPropagation();
+          selectEmbedTab(btn.getAttribute('data-embed-tab'));
+        });
+      });
+    }
+  }
+
+  function initEmbedShell(){
+    if (embedShellReady) return;
+    try {
+      document.getElementById('embedShell').removeAttribute('hidden');
+      embedPlan = DEFAULT_EMBED_PLAN.slice();
+      refreshEmbedSetup();
+      drawIntervalRay(document.getElementById('intervalRaySvg'), null);
+
+      if (useParentTabs) {
+        document.querySelectorAll('.tab-panel[data-embed-panel]').forEach(function(panel){
+          panel.classList.toggle('is-active', panel.getAttribute('data-embed-panel') === 'intervall');
+        });
+        embedActiveTab = 'intervall';
+        embedInInterval = true;
+      } else {
+        setEmbedTab('info');
+      }
+
+      bindEmbedShellEvents();
+      loadIntervalLogs();
+      showWheelIdle();
+      embedShellReady = true;
+    } catch (err) {
+      console.error('initEmbedShell failed', err);
+      embedShellReady = false;
+    }
   }
 
   if (isEmbed) {
