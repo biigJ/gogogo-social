@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/account/kraft-catalog.js"></script>
+<script src="/account/ausdauer-catalog.js"></script>
 <style>
   :root{
     --bg:#C7413B;
@@ -1300,11 +1301,39 @@
   .kraft-layout.is-running .kraft-sets{ display:flex; }
   .kraft-set{
     display:grid;
-    grid-template-columns:2.2em 1fr auto 1fr auto;
+    grid-template-columns:2.2em 1fr auto 1fr auto 28px;
     align-items:center;
     gap:6px;
     font-size:13px;
     font-weight:600;
+    padding:4px 4px;
+    border-radius:2px;
+    cursor:pointer;
+  }
+  .kraft-set.is-current{
+    background:#F7F5F0;
+    color:#C7413B;
+  }
+  .kraft-set.is-current input{
+    color:#C7413B;
+    border-color:#C7413B;
+    background:#fff;
+  }
+  .kraft-set-del,
+  .kraft-info-del{
+    width:26px; height:26px;
+    border-radius:50%;
+    border:1px solid rgba(247,245,240,0.45);
+    background:transparent;
+    color:var(--text);
+    font-size:16px; line-height:1;
+    font-weight:700;
+    padding:0;
+    cursor:pointer;
+  }
+  .kraft-set.is-current .kraft-set-del{
+    border-color:#C7413B;
+    color:#C7413B;
   }
   .kraft-set .kraft-set-lbl{
     opacity:0.8;
@@ -1346,7 +1375,160 @@
     line-height:1.35;
     text-align:left;
     font-variant-numeric:tabular-nums;
+    pointer-events:auto;
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:6px 8px;
   }
+  .pb-bar.is-kraft-info,
+  .pb-bar.is-ausdauer-info{ pointer-events:auto; }
+  .kraft-info-set{
+    display:inline-block;
+  }
+  .kraft-info-set.is-focus{
+    background:#F7F5F0;
+    color:#C7413B;
+    border-radius:8px;
+    padding:2px 8px;
+  }
+  .kraft-info-set.is-focus .kraft-info-set-del{
+    color:#C7413B;
+  }
+  .kraft-info-set-del{
+    margin-left:4px;
+    border:0;
+    background:transparent;
+    color:inherit;
+    font-weight:700;
+    cursor:pointer;
+    font-size:14px;
+  }
+  .ausdauer-layout .interval-headline{ padding-top:4px; }
+  .ausdauer-own{
+    margin-top:12px;
+    padding:10px 8px 12px;
+    border:1.5px solid rgba(247,245,240,0.45);
+    border-radius:2px;
+  }
+  .ausdauer-own.is-selected{ border-color:var(--text); }
+  .ausdauer-own-title{
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    margin-bottom:8px;
+    text-align:center;
+  }
+  .ausdauer-tech-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;
+  }
+  .ausdauer-tech{
+    display:flex;
+    align-items:center; justify-content:center;
+    min-height:36px;
+    padding:6px 6px;
+    border:1.5px solid rgba(247,245,240,0.32);
+    border-radius:2px;
+    background:transparent;
+    color:var(--text);
+    font-family:var(--display);
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+    line-height:1.15;
+    text-align:center;
+    cursor:pointer;
+    touch-action:manipulation;
+    -webkit-appearance:none; appearance:none;
+  }
+  .ausdauer-tech.is-selected{
+    border-color:var(--text);
+    background:rgba(247,245,240,0.14);
+  }
+  .ausdauer-preset-empty{
+    padding:12px 8px;
+    text-align:center;
+    font-size:13px;
+    font-weight:500;
+    opacity:0.75;
+  }
+  .ausdauer-fields{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-top:10px;
+  }
+  .ausdauer-field label{
+    display:block;
+    font-size:10px;
+    letter-spacing:1.2px;
+    text-transform:uppercase;
+    opacity:0.75;
+    margin-bottom:4px;
+    text-align:center;
+  }
+  .ausdauer-field input{
+    width:100%;
+    height:40px;
+    border:1.5px solid rgba(247,245,240,0.45);
+    border-radius:2px;
+    background:transparent;
+    color:var(--text);
+    font-family:var(--display);
+    font-size:14px;
+    font-weight:700;
+    text-align:center;
+  }
+  .ausdauer-field .unit{
+    display:block;
+    text-align:center;
+    font-size:11px;
+    opacity:0.7;
+    margin-top:3px;
+  }
+  .ausdauer-preset-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    padding:10px 0 8px;
+  }
+  .ausdauer-preset{
+    width:100%;
+    text-align:left;
+    padding:10px 12px;
+    border:2px solid transparent;
+    border-radius:2px;
+    background:rgba(0,0,0,0.22);
+    color:var(--text);
+    font-family:var(--display);
+    font-size:13px;
+    font-weight:600;
+    line-height:1.35;
+    cursor:pointer;
+  }
+  .ausdauer-preset.is-selected{ border-color:var(--text); }
+  .ausdauer-preset.is-trainer::after{
+    content:" ✓";
+  }
+  .ausdauer-layout.is-running .ausdauer-own,
+  .ausdauer-layout.is-running .ausdauer-preset-list{ display:none; }
+  .ausdauer-layout.is-running #ausdauerHeadline{ display:none; }
+  .ausdauer-layout.is-running #ausdauerRunnerName,
+  .ausdauer-layout.is-running #ausdauerSummaryBar{ display:block !important; }
+  .ausdauer-run-card{
+    display:none;
+    margin-top:8px;
+    padding:14px 12px;
+    background:rgba(0,0,0,0.22);
+    border:2px solid var(--text);
+    border-radius:2px;
+    font-weight:600;
+    line-height:1.4;
+  }
+  .ausdauer-layout.is-running .ausdauer-run-card{ display:block; }
 </style>
 </head>
 <body>
@@ -1399,11 +1581,60 @@
         </div>
       </div>
     </div>
-    <div class="tab-panel tab-panel--content" data-embed-panel="ausdauer">
-      <article class="panel-card">
-        <h2 class="panel-card__title">Ausdauer</h2>
-        <p class="panel-card__body">Die Inhalte für Ausdauer fügen wir als Nächstes ein.</p>
-      </article>
+    <div class="tab-panel" data-embed-panel="ausdauer">
+      <div class="interval-layout ausdauer-layout" id="ausdauerLayout">
+        <div class="kraft-head" id="ausdauerHead">
+          <div id="ausdauerHeadline" class="interval-headline">AUSDAUER</div>
+          <div class="ausdauer-own" id="ausdauerOwn">
+            <div class="ausdauer-own-title">Eigenes</div>
+            <div class="ausdauer-tech-grid" id="ausdauerTechGrid"></div>
+            <div class="ausdauer-fields">
+              <div class="ausdauer-field" id="ausdauerInclineWrap">
+                <label for="ausdauerIncline">Steigung</label>
+                <input id="ausdauerIncline" type="number" inputmode="decimal" min="0" step="0.5" placeholder="0">
+                <span class="unit">%</span>
+              </div>
+              <div class="ausdauer-field">
+                <label for="ausdauerDuration">Dauer</label>
+                <input id="ausdauerDuration" type="number" inputmode="numeric" min="1" step="1" placeholder="45">
+                <span class="unit">min</span>
+              </div>
+              <div class="ausdauer-field">
+                <label for="ausdauerSpeed">Geschwindigkeit</label>
+                <input id="ausdauerSpeed" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0">
+                <span class="unit" id="ausdauerSpeedUnit">min/km</span>
+              </div>
+              <div class="ausdauer-field">
+                <label for="ausdauerHr">Durchschn. Herzfrequenz</label>
+                <input id="ausdauerHr" type="number" inputmode="numeric" min="0" step="1" placeholder="140">
+                <span class="unit">HF</span>
+              </div>
+            </div>
+          </div>
+          <div id="ausdauerRunnerName" class="runner-name" hidden></div>
+          <div id="ausdauerSummaryBar" class="run-summary" hidden></div>
+        </div>
+        <div class="interval-main">
+          <div class="interval-scroll" id="ausdauerScroll">
+            <div class="ausdauer-preset-list" id="ausdauerPresetList"></div>
+            <div class="ausdauer-run-card" id="ausdauerRunCard"></div>
+          </div>
+        </div>
+        <div class="interval-wheel-zone">
+          <div class="interval-ray-wrap">
+            <button type="button" class="interval-ray-hub" id="ausdauerHub" disabled>
+              <div class="ray-hub-start" id="ausdauerHubStart">
+                <span class="line1">Workout</span>
+                <span class="line2">starten</span>
+              </div>
+              <div class="ray-hub-start" id="ausdauerHubDone" hidden>
+                <span class="line1">Workout</span>
+                <span class="line2">beenden</span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="tab-panel is-active" data-embed-panel="info">
       <div class="info-scroll">
@@ -1525,6 +1756,16 @@
       <p>Ist in der Datenbank gespeichert, beim nächsten Training steht es unten in der Infobox. Bewerte im Kalender wie gut es war.</p>
       <div class="abort-actions">
         <button type="button" class="abort-yes" id="kraftFinishOkBtn">OK</button>
+      </div>
+    </div>
+  </div>
+  <div class="abort-overlay" id="kraftDeleteOverlay" hidden>
+    <div class="abort-card">
+      <h2 id="kraftDeleteTitle">Eintrag löschen?</h2>
+      <p id="kraftDeleteBody">Der gespeicherte Wert wird entfernt.</p>
+      <div class="abort-actions">
+        <button type="button" class="abort-stay" id="kraftDeleteStayBtn">Behalten</button>
+        <button type="button" class="abort-yes" id="kraftDeleteYesBtn">Löschen</button>
       </div>
     </div>
   </div>
@@ -2016,6 +2257,7 @@
   let kraftLogs = [];
   let kraftSets = {};
   let kraftFocusId = '';
+  let kraftFocusSetIdx = 0;
 
   sb.auth.onAuthStateChange((event, session)=>{
     if (gogogoLocal) return;
@@ -3413,12 +3655,18 @@
     return 's' + (idx + 1) + ': ' + body;
   }
 
+  function lastKraftLogFor(exId){
+    if (!exId) return null;
+    for (let i = 0; i < kraftLogs.length; i++) {
+      if (kraftLogs[i].exercise_id === exId) return kraftLogs[i];
+    }
+    return null;
+  }
+
   function lastKraftSetsFor(exId){
-    if (!exId) return [];
-    const matches = kraftLogs.filter(function(row){ return row.exercise_id === exId; });
-    if (!matches.length) return [];
-    const sets = parseKraftCustom(matches[0].sets);
-    return filledKraftSets(sets);
+    const row = lastKraftLogFor(exId);
+    if (!row) return [];
+    return filledKraftSets(parseKraftCustom(row.sets));
   }
 
   function updateKraftInfoBar(){
@@ -3426,17 +3674,30 @@
     const pill = document.getElementById('pbPill');
     if (!bar || !pill) return;
     if (!kraftRunning) {
-      if (!embedRunning) bar.hidden = true;
+      bar.classList.remove('is-kraft-info');
+      if (!embedRunning && !ausdauerRunning) bar.hidden = true;
       return;
     }
     bar.hidden = false;
+    bar.classList.add('is-kraft-info');
+    bar.classList.remove('is-ausdauer-info');
     pill.classList.add('is-kraft');
     const sets = lastKraftSetsFor(kraftFocusId);
     if (!sets.length) {
-      pill.textContent = '—';
+      pill.innerHTML = '<span class="kraft-info-set">—</span>';
       return;
     }
-    pill.textContent = sets.map(function(s, i){ return formatKraftSetLine(s, i); }).filter(Boolean).join(' | ');
+    const html = sets.map(function(s, i){
+      const line = formatKraftSetLine(s, i);
+      if (!line) return '';
+      const focus = i === kraftFocusSetIdx ? ' is-focus' : '';
+      return '<span class="kraft-info-set' + focus + '" data-ex="' + kraftFocusId + '" data-idx="' + i + '">' +
+        line +
+        '<button type="button" class="kraft-info-set-del" data-ex="' + kraftFocusId + '" data-idx="' + i + '" aria-label="Gespeicherten Satz löschen">×</button>' +
+        '</span>';
+    }).filter(Boolean).join('');
+    pill.innerHTML = html +
+      '<button type="button" class="kraft-info-del" data-ex="' + kraftFocusId + '" aria-label="Letztes Workout dieser Übung löschen">×</button>';
   }
 
   function renderKraftSystems(){
@@ -3481,13 +3742,16 @@
         setsWrap.className = 'kraft-sets';
         kraftSets[ex.id].forEach(function(set, idx){
           const row = document.createElement('div');
-          row.className = 'kraft-set';
+          row.className = 'kraft-set' + (kraftFocusId === ex.id && kraftFocusSetIdx === idx ? ' is-current' : '');
+          row.dataset.ex = ex.id;
+          row.dataset.idx = String(idx);
           row.innerHTML =
             '<span class="kraft-set-lbl">s' + (idx + 1) + '</span>' +
             '<input class="kraft-reps" data-ex="' + ex.id + '" data-idx="' + idx + '" inputmode="numeric" type="number" min="0" step="1" placeholder="Wdh" value="' + (set.reps === '' || set.reps == null ? '' : String(set.reps)) + '">' +
             '<span class="kraft-set-x">×</span>' +
             '<input class="kraft-kg" data-ex="' + ex.id + '" data-idx="' + idx + '" inputmode="decimal" type="number" min="0" step="0.5" placeholder="kg" value="' + (set.kg === '' || set.kg == null ? '' : String(set.kg)) + '">' +
-            '<span class="kraft-set-unit">kg</span>';
+            '<span class="kraft-set-unit">kg</span>' +
+            '<button type="button" class="kraft-set-del" data-ex="' + ex.id + '" data-idx="' + idx + '" aria-label="Satz löschen">×</button>';
           setsWrap.appendChild(row);
         });
         const add = document.createElement('button');
@@ -3550,6 +3814,7 @@
     if (!kraftSelected.length) return;
     kraftRunning = true;
     kraftFocusId = kraftSelected[0];
+    kraftFocusSetIdx = 0;
     kraftSets = {};
     kraftSelected.forEach(function(id){ kraftSets[id] = [{ reps: '', kg: '' }]; });
     notifyParentWorkout(true);
@@ -3562,6 +3827,7 @@
   function endKraftSession(){
     kraftRunning = false;
     kraftFocusId = '';
+    kraftFocusSetIdx = 0;
     kraftSets = {};
     const pill = document.getElementById('pbPill');
     if (pill) pill.classList.remove('is-kraft');
@@ -3586,7 +3852,91 @@
     if (!exId) return;
     if (!kraftSets[exId]) kraftSets[exId] = [];
     kraftSets[exId].push({ reps: '', kg: '' });
+    kraftFocusId = exId;
+    kraftFocusSetIdx = kraftSets[exId].length - 1;
     renderKraftExercises();
+  }
+
+  function focusKraftSet(exId, idx){
+    if (!exId) return;
+    kraftFocusId = exId;
+    kraftFocusSetIdx = Math.max(0, parseInt(idx, 10) || 0);
+    document.querySelectorAll('.kraft-ex-card').forEach(function(card){
+      card.classList.toggle('is-current', card.dataset.ex === kraftFocusId);
+    });
+    document.querySelectorAll('.kraft-set').forEach(function(row){
+      row.classList.toggle('is-current', row.dataset.ex === kraftFocusId && String(row.dataset.idx) === String(kraftFocusSetIdx));
+    });
+    updateKraftInfoBar();
+  }
+
+  function removeCurrentKraftSet(exId, idx){
+    if (!kraftSets[exId]) return;
+    kraftSets[exId].splice(idx, 1);
+    if (!kraftSets[exId].length) kraftSets[exId] = [{ reps: '', kg: '' }];
+    if (kraftFocusSetIdx >= kraftSets[exId].length) kraftFocusSetIdx = kraftSets[exId].length - 1;
+    kraftFocusId = exId;
+    renderKraftExercises();
+  }
+
+  let pendingKraftDelete = null;
+
+  function askKraftDelete(kind, exId, setIdx){
+    pendingKraftDelete = { kind: kind, exId: exId, setIdx: setIdx };
+    const overlay = document.getElementById('kraftDeleteOverlay');
+    const title = document.getElementById('kraftDeleteTitle');
+    const body = document.getElementById('kraftDeleteBody');
+    if (kind === 'set') {
+      if (title) title.textContent = 'Satz löschen?';
+      if (body) body.textContent = 'Dieser gespeicherte Satz wird entfernt.';
+    } else if (kind === 'ausdauer') {
+      if (title) title.textContent = 'Workout löschen?';
+      if (body) body.textContent = 'Der letzte gespeicherte Ausdauer-Eintrag wird entfernt.';
+    } else {
+      if (title) title.textContent = 'Workout löschen?';
+      if (body) body.textContent = 'Der letzte gespeicherte Eintrag dieser Übung wird entfernt.';
+    }
+    if (overlay) overlay.hidden = false;
+  }
+
+  function hideKraftDeleteDialog(){
+    pendingKraftDelete = null;
+    const overlay = document.getElementById('kraftDeleteOverlay');
+    if (overlay) overlay.hidden = true;
+  }
+
+  async function confirmKraftDelete(){
+    const pending = pendingKraftDelete;
+    hideKraftDeleteDialog();
+    if (!pending) return;
+    if (pending.kind === 'ausdauer') {
+      await deleteLastAusdauerLog();
+      return;
+    }
+    if (!pending.exId) return;
+    const row = lastKraftLogFor(pending.exId);
+    if (!row || !row.id) return;
+    try {
+      if (pending.kind === 'set') {
+        const sets = filledKraftSets(parseKraftCustom(row.sets));
+        sets.splice(pending.setIdx, 1);
+        if (!sets.length) {
+          await goRest('go_kraft_logs?id=eq.' + encodeURIComponent(row.id), { method: 'DELETE', prefer: 'return=minimal' });
+        } else {
+          await goRest('go_kraft_logs?id=eq.' + encodeURIComponent(row.id), {
+            method: 'PATCH',
+            prefer: 'return=minimal',
+            body: { sets: sets }
+          });
+        }
+      } else {
+        await goRest('go_kraft_logs?id=eq.' + encodeURIComponent(row.id), { method: 'DELETE', prefer: 'return=minimal' });
+      }
+      await loadKraftLogs();
+      updateKraftInfoBar();
+    } catch (e) {
+      console.warn('Kraft delete failed', e);
+    }
   }
 
   function berlinTodayISO(){
@@ -3650,7 +4000,12 @@
 
   function goToCalendarAfterKraft(){
     hideKraftFinishDialog();
-    endKraftSession();
+    if (pendingAusdauerFinish) {
+      pendingAusdauerFinish = false;
+      endAusdauerSession();
+    } else {
+      endKraftSession();
+    }
     if (window.parent !== window) {
       try {
         window.parent.postMessage({ type: 'gogogo-training-goto', panel: 'home' }, '*');
@@ -3736,6 +4091,316 @@
     requestAnimationFrame(updateKraftScrollbar);
   }
 
+  let ausdauerRunning = false;
+  let ausdauerTech = 'run';
+  let ausdauerSelectedId = 'own';
+  let ausdauerPresets = [];
+  let ausdauerActive = null;
+  let ausdauerLogs = [];
+  let pendingAusdauerFinish = false;
+
+  function ausdauerCat(){
+    return window.GOGOGO_AUSDAUER || { TECHNIQUES: [], techniqueById: function(){ return { id: 'run', name: 'Laufen', speedUnit: 'min/km', hasIncline: true }; }, summarize: function(){ return ''; } };
+  }
+
+  function ausdauerReadForm(){
+    return {
+      id: 'own',
+      source: 'user',
+      technique: ausdauerTech,
+      incline: document.getElementById('ausdauerIncline').value,
+      duration_min: document.getElementById('ausdauerDuration').value,
+      speed: document.getElementById('ausdauerSpeed').value,
+      hr_avg: document.getElementById('ausdauerHr').value
+    };
+  }
+
+  function ausdauerFillForm(row){
+    if (!row) return;
+    ausdauerTech = row.technique || 'run';
+    const inc = document.getElementById('ausdauerIncline');
+    const dur = document.getElementById('ausdauerDuration');
+    const spd = document.getElementById('ausdauerSpeed');
+    const hr = document.getElementById('ausdauerHr');
+    if (inc) inc.value = row.incline != null ? row.incline : '';
+    if (dur) dur.value = row.duration_min != null ? row.duration_min : '';
+    if (spd) spd.value = row.speed != null ? row.speed : '';
+    if (hr) hr.value = row.hr_avg != null ? row.hr_avg : '';
+    renderAusdauerTech();
+  }
+
+  function renderAusdauerTech(){
+    const grid = document.getElementById('ausdauerTechGrid');
+    const cat = ausdauerCat();
+    if (!grid) return;
+    grid.innerHTML = '';
+    cat.TECHNIQUES.forEach(function(tech){
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ausdauer-tech' + (tech.id === ausdauerTech ? ' is-selected' : '');
+      btn.dataset.tech = tech.id;
+      btn.textContent = tech.name;
+      grid.appendChild(btn);
+    });
+    const meta = cat.techniqueById(ausdauerTech);
+    const unit = document.getElementById('ausdauerSpeedUnit');
+    if (unit) unit.textContent = meta.speedUnit;
+    const wrap = document.getElementById('ausdauerInclineWrap');
+    if (wrap) wrap.style.display = meta.hasIncline ? '' : 'none';
+  }
+
+  function renderAusdauerPresets(){
+    const list = document.getElementById('ausdauerPresetList');
+    if (!list) return;
+    const cat = ausdauerCat();
+    list.innerHTML = '';
+    const rows = (ausdauerPresets || []).slice().sort(function(a, b){
+      if (a.source === 'trainer' && b.source !== 'trainer') return -1;
+      if (a.source !== 'trainer' && b.source === 'trainer') return 1;
+      return 0;
+    });
+    if (!rows.length) {
+      const empty = document.createElement('div');
+      empty.className = 'ausdauer-preset-empty';
+      empty.textContent = 'Noch keine Voreinstellung. Oben Eigenes ausfüllen.';
+      list.appendChild(empty);
+    }
+    rows.forEach(function(row){
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ausdauer-preset' + (row.source === 'trainer' ? ' is-trainer' : '') +
+        (String(ausdauerSelectedId) === String(row.id) ? ' is-selected' : '');
+      btn.dataset.id = String(row.id);
+      btn.textContent = cat.summarize(row);
+      list.appendChild(btn);
+    });
+    updateAusdauerHub();
+  }
+
+  function updateAusdauerHub(){
+    const hub = document.getElementById('ausdauerHub');
+    const start = document.getElementById('ausdauerHubStart');
+    const done = document.getElementById('ausdauerHubDone');
+    if (!hub) return;
+    const form = ausdauerCurrent();
+    hub.disabled = ausdauerRunning ? false : !(form && form.technique);
+    if (start) start.hidden = ausdauerRunning;
+    if (done) done.hidden = !ausdauerRunning;
+  }
+
+  function ausdauerCurrent(){
+    if (ausdauerRunning && ausdauerActive) return ausdauerActive;
+    if (ausdauerSelectedId && ausdauerSelectedId !== 'own') {
+      for (let i = 0; i < ausdauerPresets.length; i++) {
+        if (String(ausdauerPresets[i].id) === String(ausdauerSelectedId)) return ausdauerPresets[i];
+      }
+    }
+    return ausdauerReadForm();
+  }
+
+  function selectAusdauerOwn(){
+    if (ausdauerRunning) return;
+    if (ausdauerSelectedId === 'own') {
+      const own = document.getElementById('ausdauerOwn');
+      if (own) own.classList.add('is-selected');
+      document.querySelectorAll('.ausdauer-preset').forEach(function(btn){
+        btn.classList.remove('is-selected');
+      });
+      updateAusdauerHub();
+      return;
+    }
+    ausdauerSelectedId = 'own';
+    refreshAusdauerChrome();
+  }
+
+  function selectAusdauerPreset(id){
+    if (ausdauerRunning || !id) return;
+    ausdauerSelectedId = String(id);
+    refreshAusdauerChrome();
+  }
+
+  function setAusdauerTech(id){
+    if (ausdauerRunning || !id) return;
+    ausdauerTech = id;
+    ausdauerSelectedId = 'own';
+    refreshAusdauerChrome();
+  }
+
+  function refreshAusdauerChrome(){
+    const layout = document.getElementById('ausdauerLayout');
+    if (layout) layout.classList.toggle('is-running', ausdauerRunning);
+    const own = document.getElementById('ausdauerOwn');
+    if (own) own.classList.toggle('is-selected', !ausdauerRunning && ausdauerSelectedId === 'own');
+    const head = document.getElementById('ausdauerHeadline');
+    if (head) head.textContent = 'AUSDAUER ' + formatHeadlineDate();
+    const runner = document.getElementById('ausdauerRunnerName');
+    if (runner) runner.textContent = getAthleteFirstName();
+    const sum = document.getElementById('ausdauerSummaryBar');
+    const card = document.getElementById('ausdauerRunCard');
+    const cur = ausdauerCurrent();
+    const text = ausdauerCat().summarize(cur);
+    if (sum) sum.textContent = text;
+    if (card) card.textContent = text;
+    renderAusdauerTech();
+    renderAusdauerPresets();
+    updateAusdauerHub();
+    updateAusdauerInfoBar();
+  }
+
+  async function loadAusdauerLogs(){
+    const aid = getGoAccountId();
+    ausdauerLogs = [];
+    if (!aid) return;
+    try {
+      const rows = await goRest(
+        'go_ausdauer_logs?account_id=eq.' + encodeURIComponent(aid) +
+        '&select=*&order=workout_date.desc,created_at.desc&limit=20'
+      );
+      ausdauerLogs = rows || [];
+    } catch (e) {
+      ausdauerLogs = [];
+    }
+  }
+
+  function lastAusdauerLog(){
+    return ausdauerLogs && ausdauerLogs.length ? ausdauerLogs[0] : null;
+  }
+
+  function updateAusdauerInfoBar(){
+    const bar = document.getElementById('pbBar');
+    const pill = document.getElementById('pbPill');
+    if (!bar || !pill) return;
+    if (!ausdauerRunning) {
+      if (!kraftRunning && !embedRunning) bar.hidden = true;
+      return;
+    }
+    bar.hidden = false;
+    bar.classList.add('is-kraft-info', 'is-ausdauer-info');
+    pill.classList.add('is-kraft');
+    const last = lastAusdauerLog();
+    if (!last) {
+      pill.textContent = 'Noch kein gespeichertes Workout';
+      return;
+    }
+    pill.innerHTML = '<span class="kraft-info-set is-focus">' + ausdauerCat().summarize(last) +
+      '<button type="button" class="kraft-info-set-del" data-ausdauer-del-log="1" aria-label="Letztes Workout löschen">×</button></span>';
+  }
+
+  async function deleteLastAusdauerLog(){
+    const last = lastAusdauerLog();
+    if (!last || !last.id) return;
+    try {
+      await goRest('go_ausdauer_logs?id=eq.' + encodeURIComponent(last.id), { method: 'DELETE', prefer: 'return=minimal' });
+      await loadAusdauerLogs();
+      updateAusdauerInfoBar();
+    } catch (e) {
+      console.warn('Ausdauer delete failed', e);
+    }
+  }
+  async function loadAusdauerPresets(){
+    const aid = getGoAccountId();
+    ausdauerPresets = [];
+    if (!aid) return;
+    try {
+      const rows = await goRest(
+        'go_ausdauer_presets?account_id=eq.' + encodeURIComponent(aid) +
+        '&select=*&order=source.asc,created_at.asc'
+      );
+      ausdauerPresets = rows || [];
+    } catch (e) {
+      ausdauerPresets = [];
+    }
+  }
+
+  async function saveOwnAusdauerPreset(){
+    const aid = getGoAccountId();
+    const form = ausdauerReadForm();
+    if (!aid || !form.technique) return;
+    try {
+      const row = await goRest('go_ausdauer_presets', {
+        method: 'POST',
+        prefer: 'return=representation',
+        body: {
+          account_id: aid,
+          source: 'user',
+          technique: form.technique,
+          incline: form.incline === '' ? null : Number(form.incline),
+          duration_min: form.duration_min === '' ? null : Number(form.duration_min),
+          speed: form.speed === '' ? null : Number(form.speed),
+          hr_avg: form.hr_avg === '' ? null : Number(form.hr_avg)
+        }
+      });
+      await loadAusdauerPresets();
+      if (row && row[0] && row[0].id) ausdauerSelectedId = row[0].id;
+      refreshAusdauerChrome();
+    } catch (e) {
+      console.warn('Ausdauer preset save failed', e);
+    }
+  }
+
+  function startAusdauerSession(){
+    const cur = ausdauerCurrent();
+    if (!cur || !cur.technique) return;
+    ausdauerActive = {
+      technique: cur.technique,
+      incline: cur.incline,
+      duration_min: cur.duration_min,
+      speed: cur.speed,
+      hr_avg: cur.hr_avg
+    };
+    ausdauerRunning = true;
+    notifyParentWorkout(true);
+    refreshAusdauerChrome();
+    notifyParentTabState();
+    loadAusdauerLogs().then(updateAusdauerInfoBar);
+  }
+
+  function endAusdauerSession(){
+    ausdauerRunning = false;
+    ausdauerActive = null;
+    notifyParentWorkout(false);
+    refreshAusdauerChrome();
+    notifyParentTabState();
+  }
+
+  async function finishAusdauerSession(){
+    const aid = getGoAccountId();
+    const cur = ausdauerCurrent();
+    if (aid && cur && cur.technique) {
+      try {
+        await goRest('go_ausdauer_logs', {
+          method: 'POST',
+          prefer: 'return=minimal',
+          body: {
+            account_id: aid,
+            workout_date: berlinTodayISO(),
+            technique: cur.technique,
+            incline: cur.incline === '' || cur.incline == null ? null : Number(cur.incline),
+            duration_min: cur.duration_min === '' || cur.duration_min == null ? null : Number(cur.duration_min),
+            speed: cur.speed === '' || cur.speed == null ? null : Number(cur.speed),
+            hr_avg: cur.hr_avg === '' || cur.hr_avg == null ? null : Number(cur.hr_avg)
+          }
+        });
+      } catch (e) {
+        console.warn('Ausdauer log save failed', e);
+      }
+    }
+    showKraftFinishDialog();
+    pendingAusdauerFinish = true;
+  }
+
+  async function enterAusdauerView(){
+    document.getElementById('trainingBack').classList.toggle('is-visible', ausdauerRunning);
+    await loadAusdauerPresets();
+    if (!ausdauerRunning && ausdauerSelectedId === 'own') {
+      const trainer = ausdauerPresets.filter(function(r){ return r.source === 'trainer'; })[0];
+      if (trainer) ausdauerSelectedId = String(trainer.id);
+    }
+    refreshAusdauerChrome();
+    notifyParentTabState();
+    loadAusdauerLogs().then(updateAusdauerInfoBar);
+  }
+
   function setEmbedTab(tab){
     embedActiveTab = tab;
     document.querySelectorAll('.card-tab').forEach(function(btn){
@@ -3746,7 +4411,7 @@
     document.querySelectorAll('.tab-panel[data-embed-panel]').forEach(function(panel){
       panel.classList.toggle('is-active', panel.getAttribute('data-embed-panel') === tab);
     });
-    const showBack = (tab === 'intervall' && embedRunning) || (tab === 'kraft' && kraftRunning);
+    const showBack = (tab === 'intervall' && embedRunning) || (tab === 'kraft' && kraftRunning) || (tab === 'ausdauer' && ausdauerRunning);
     document.getElementById('trainingBack').classList.toggle('is-visible', showBack);
     notifyParentTabState();
   }
@@ -3756,8 +4421,8 @@
     try {
       window.parent.postMessage({
         type: 'gogogo-training-tab-state',
-        showBack: !!(embedRunning || kraftRunning),
-        hideTabs: !!(embedRunning || kraftRunning)
+        showBack: !!(embedRunning || kraftRunning || ausdauerRunning),
+        hideTabs: !!(embedRunning || kraftRunning || ausdauerRunning)
       }, '*');
     } catch (e) {}
   }
@@ -3771,7 +4436,10 @@
     if (kraftRunning && tab !== 'kraft') {
       endKraftSession();
     }
-    if (useParentTabs && tab !== 'intervall' && tab !== 'kraft') {
+    if (ausdauerRunning && tab !== 'ausdauer') {
+      endAusdauerSession();
+    }
+    if (useParentTabs && tab !== 'intervall' && tab !== 'kraft' && tab !== 'ausdauer') {
       embedInInterval = false;
       document.getElementById('trainingBack').classList.remove('is-visible');
       notifyParentTabState();
@@ -3782,6 +4450,9 @@
     } else if (tab === 'kraft') {
       embedInInterval = false;
       enterKraftView();
+    } else if (tab === 'ausdauer') {
+      embedInInterval = false;
+      enterAusdauerView();
     } else {
       embedInInterval = false;
       document.getElementById('trainingBack').classList.remove('is-visible');
@@ -4274,18 +4945,76 @@
         setKraftSystem(ksys.dataset.system);
         return;
       }
+      const aTech = e.target.closest('.ausdauer-tech');
+      if (aTech) {
+        e.preventDefault(); e.stopPropagation();
+        setAusdauerTech(aTech.dataset.tech);
+        return;
+      }
+      const aPreset = e.target.closest('.ausdauer-preset');
+      if (aPreset && aPreset.dataset.id) {
+        e.preventDefault(); e.stopPropagation();
+        selectAusdauerPreset(aPreset.dataset.id);
+        return;
+      }
+      if (e.target.closest('#ausdauerOwn')) {
+        selectAusdauerOwn();
+        if (!e.target.closest('input')) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+      if (e.target.closest('#ausdauerHub')) {
+        e.preventDefault(); e.stopPropagation();
+        if (ausdauerRunning) finishAusdauerSession();
+        else startAusdauerSession();
+        return;
+      }
+      const aDel = e.target.closest('[data-ausdauer-del-log]');
+      if (aDel) {
+        e.preventDefault(); e.stopPropagation();
+        askKraftDelete('ausdauer', '', 0);
+        return;
+      }
       const kex = e.target.closest('.kraft-ex-row');
       if (kex) {
         e.preventDefault(); e.stopPropagation();
         if (kraftRunning) {
-          kraftFocusId = kex.dataset.ex;
-          document.querySelectorAll('.kraft-ex-card').forEach(function(card){
-            card.classList.toggle('is-current', card.dataset.ex === kraftFocusId);
-          });
-          updateKraftInfoBar();
+          focusKraftSet(kex.dataset.ex, kraftFocusSetIdx);
         } else {
           toggleKraftExercise(kex.dataset.ex);
         }
+        return;
+      }
+      const ksetDel = e.target.closest('.kraft-set-del');
+      if (ksetDel) {
+        e.preventDefault(); e.stopPropagation();
+        removeCurrentKraftSet(ksetDel.dataset.ex, parseInt(ksetDel.dataset.idx, 10) || 0);
+        return;
+      }
+      const kset = e.target.closest('.kraft-set');
+      if (kset && !e.target.closest('input')) {
+        e.preventDefault(); e.stopPropagation();
+        focusKraftSet(kset.dataset.ex, kset.dataset.idx);
+        return;
+      }
+      const infoSetDel = e.target.closest('.kraft-info-set-del');
+      if (infoSetDel) {
+        e.preventDefault(); e.stopPropagation();
+        askKraftDelete('set', infoSetDel.dataset.ex, parseInt(infoSetDel.dataset.idx, 10) || 0);
+        return;
+      }
+      const infoDel = e.target.closest('.kraft-info-del');
+      if (infoDel) {
+        e.preventDefault(); e.stopPropagation();
+        askKraftDelete('log', infoDel.dataset.ex, 0);
+        return;
+      }
+      const infoSet = e.target.closest('.kraft-info-set');
+      if (infoSet && infoSet.dataset.ex) {
+        e.preventDefault(); e.stopPropagation();
+        focusKraftSet(infoSet.dataset.ex, infoSet.dataset.idx);
         return;
       }
       const addSet = e.target.closest('.kraft-add-set');
@@ -4305,16 +5034,41 @@
         goToCalendarAfterKraft();
         return;
       }
+      if (e.target.closest('#kraftDeleteStayBtn')) {
+        e.preventDefault(); e.stopPropagation();
+        hideKraftDeleteDialog();
+        return;
+      }
+      if (e.target.closest('#kraftDeleteYesBtn')) {
+        e.preventDefault(); e.stopPropagation();
+        confirmKraftDelete();
+        return;
+      }
     });
 
     root.addEventListener('input', function(e){
       if (e.target.classList.contains('kraft-reps') || e.target.classList.contains('kraft-kg')) {
         readKraftSetInput(e.target);
       }
+      if (e.target.closest('#ausdauerOwn')) {
+        ausdauerSelectedId = 'own';
+        const own = document.getElementById('ausdauerOwn');
+        if (own) own.classList.add('is-selected');
+        document.querySelectorAll('.ausdauer-preset').forEach(function(btn){
+          btn.classList.remove('is-selected');
+        });
+        updateAusdauerHub();
+      }
+    });
+    root.addEventListener('focusin', function(e){
+      if (e.target.classList.contains('kraft-reps') || e.target.classList.contains('kraft-kg')) {
+        focusKraftSet(e.target.dataset.ex, e.target.dataset.idx);
+      }
     });
 
     document.getElementById('trainingBack').addEventListener('click', function(){
       if (kraftRunning) { endKraftSession(); return; }
+      if (ausdauerRunning) { endAusdauerSession(); return; }
       askAbortInterval();
     });
     document.getElementById('abortStayBtn').addEventListener('click', hideAbortDialog);
