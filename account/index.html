@@ -1885,6 +1885,19 @@
       visibility: hidden;
       pointer-events: none;
     }
+    body.is-training-workout .training-card-rail {
+      display: none;
+    }
+    body.is-training-workout .training-chrome {
+      min-height: 48px;
+      padding-top: 8px;
+    }
+    body.is-training-workout .wrap__scroll {
+      padding-bottom: 0;
+    }
+    body.is-training-workout .training-stack {
+      padding-bottom: 0;
+    }
 
     .modal {
       position: fixed; inset: 0; z-index: 80; display: none;
@@ -5251,7 +5264,7 @@
         showTrainingPanel(tab);
         if (tab === "intervall") {
           callIframeTab("intervall");
-          if (trainingChromeBack) trainingChromeBack.hidden = false;
+          if (trainingChromeBack) trainingChromeBack.hidden = true;
         } else if (trainingChromeBack) {
           trainingChromeBack.hidden = true;
         }
@@ -5268,11 +5281,9 @@
       }
       if (trainingChromeBack) {
         trainingChromeBack.addEventListener("click", function () {
-          callIframeTab("intervall");
           try {
             trainingFrame.contentWindow.postMessage({ type: "gogogo-training-back" }, "*");
           } catch (e) {}
-          activateTrainingTab("info");
         });
       }
       if (trainingFrame) {
@@ -5290,6 +5301,7 @@
         }
         if (ev.data.type === "gogogo-training-tab-state") {
           if (trainingChromeBack) trainingChromeBack.hidden = !ev.data.showBack;
+          if (trainingChrome) trainingChrome.classList.toggle("is-workout", !!ev.data.hideTabs);
         }
       });
       var accountVideoControllers = [];
@@ -5334,7 +5346,7 @@
         }
         if (id !== "book") pauseAccountVideos();
         if (id === "training") {
-          var TRAINING_IFRAME_V = "20260817d";
+          var TRAINING_IFRAME_V = "20260817e";
           var wantTrainingSrc = "/account/fitness-friday.html?embed=1&parentTabs=1&v=" + TRAINING_IFRAME_V;
           if (!trainingFrame.src || String(trainingFrame.src).indexOf("v=" + TRAINING_IFRAME_V) === -1) {
             trainingFrame.src = wantTrainingSrc;

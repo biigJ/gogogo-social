@@ -596,21 +596,21 @@
     touch-action:none;
     overflow-y:auto;
   }
-  .interval-scroll-inner{ padding-bottom:24px; }
-  .drag-list{ padding-bottom:140px; }
   .interval-scroll::-webkit-scrollbar{ display:none; }
   .interval-wheel-zone{
     flex:0 0 auto;
-    height:min(34vh, 210px);
-    min-height:170px;
+    height:min(32vh, 188px);
+    min-height:156px;
     border-top:1px solid var(--line);
     display:flex; flex-direction:column;
-    align-items:center; justify-content:flex-end;
+    align-items:center; justify-content:center;
     position:relative;
     pointer-events:auto;
     touch-action:manipulation;
-    padding:0 0 calc(8px + env(safe-area-inset-bottom, 0px));
-    overflow:visible;
+    padding:6px 0 8px;
+    overflow:hidden;
+    z-index:1;
+    background:var(--bg);
   }
   .interval-mid-zone{
     flex:none;
@@ -629,11 +629,10 @@
   }
   .interval-ray-wrap{
     position:relative;
-    width:min(62vw, 190px);
-    height:min(62vw, 190px);
+    width:min(52vw, 156px);
+    height:min(52vw, 156px);
     flex:none;
     pointer-events:none;
-    margin-bottom:2px;
   }
   .interval-ray{
     width:100%; height:100%; display:block;
@@ -715,18 +714,23 @@
   .global-time-row{
     display:flex; gap:10px; margin-bottom:12px;
   }
+  .global-time-col{
+    flex:1; min-width:0;
+    display:flex; flex-direction:column; gap:6px;
+  }
+  .global-time-col .lbl{
+    font-size:10px; text-transform:uppercase; letter-spacing:1.4px;
+    color:var(--text-dim); text-align:center;
+    pointer-events:none;
+  }
   .global-time-chip{
-    flex:1; background:var(--panel); border:1px solid var(--line);
-    border-radius:10px; padding:8px 10px 6px; cursor:default; text-align:center;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:6px 8px;
+    cursor:default; text-align:center;
     touch-action:pan-y;
     -webkit-appearance:none; appearance:none;
     position:relative; overflow:hidden;
-    min-height:88px;
-  }
-  .global-time-chip .lbl{
-    font-size:10px; text-transform:uppercase; letter-spacing:1px;
-    color:var(--text-dim); margin-bottom:2px;
-    pointer-events:none;
+    min-height:72px;
   }
   .chip-wheel-frame{
     position:relative; height:64px; overflow:hidden;
@@ -758,7 +762,7 @@
     color:var(--text-dim);
   }
   .plan-head .count{ font-size:12px; color:var(--text-dim); white-space:nowrap; }
-  .drag-list{ display:flex; flex-direction:column; gap:6px; }
+  .drag-list{ display:flex; flex-direction:column; gap:6px; padding-bottom:8px; }
   .drag-row{
     display:grid;
     grid-template-columns:28px 56px 1fr 28px;
@@ -768,15 +772,19 @@
     padding:10px 0;
     border:2px solid transparent;
     border-radius:2px;
-    background:rgba(0,0,0,0.18);
+    background:rgba(0,0,0,0.22);
     touch-action:none; user-select:none;
-    transition:border-color .12s, background .12s;
+    transition:border-color .12s, background .12s, opacity .12s;
     cursor:grab;
   }
-  .drag-row.is-run{ background:rgba(0,0,0,0.32); }
   .drag-row.is-plan-focus{
     border-color:var(--accent);
-    background:rgba(0,0,0,0.08);
+  }
+  .drag-row.is-current{
+    border-color:var(--accent);
+  }
+  .drag-row.is-unused{
+    opacity:0.42;
   }
   .drag-row.is-dragging{
     opacity:0.92; z-index:20;
@@ -804,7 +812,11 @@
     font-size:15px; font-weight:600; text-align:center;
     letter-spacing:0.01em;
   }
-  .drag-row .ex-name.is-run{ color:rgba(247,245,240,0.82); font-weight:500; }
+  .interval-layout.is-running .global-time-row,
+  .interval-layout.is-running .round-stepper{
+    pointer-events:none;
+    opacity:0.45;
+  }
   .wheel-frame{
     flex:1; position:relative; overflow:hidden; min-height:0;
   }
@@ -862,9 +874,7 @@
     letter-spacing:0.04em;
   }
   .wheel-phase-label{
-    position:absolute; top:10px; left:0; right:0; text-align:center;
-    font-size:11px; letter-spacing:2px; text-transform:uppercase;
-    color:var(--text-dim); z-index:3;
+    display:none;
   }
   .run-info{
     text-align:center; padding:8px 0 4px;
@@ -886,9 +896,10 @@
   .pb-bar{
     flex:none;
     display:flex; align-items:center; justify-content:center;
-    padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
-    min-height:48px;
+    padding:10px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    min-height:56px;
     pointer-events:none;
+    background:var(--bg);
   }
   .pb-bar[hidden]{ display:none !important; }
   .pb-bar--pill{
@@ -966,18 +977,22 @@
         <div class="interval-scroll" id="intervalScroll">
           <div id="intervalSetupView">
             <div class="global-time-row">
-              <div class="global-time-chip" id="editWorkChip">
+              <div class="global-time-col">
                 <div class="lbl">Rundenzeit</div>
-                <div class="chip-wheel-frame">
-                  <div class="wheel-highlight"></div>
-                  <div class="wheel-scroller chip-wheel-scroller" id="workWheelScroller"></div>
+                <div class="global-time-chip" id="editWorkChip">
+                  <div class="chip-wheel-frame">
+                    <div class="wheel-highlight"></div>
+                    <div class="wheel-scroller chip-wheel-scroller" id="workWheelScroller"></div>
+                  </div>
                 </div>
               </div>
-              <div class="global-time-chip" id="editRestChip">
+              <div class="global-time-col">
                 <div class="lbl">Pause</div>
-                <div class="chip-wheel-frame">
-                  <div class="wheel-highlight"></div>
-                  <div class="wheel-scroller chip-wheel-scroller" id="restWheelScroller"></div>
+                <div class="global-time-chip" id="editRestChip">
+                  <div class="chip-wheel-frame">
+                    <div class="wheel-highlight"></div>
+                    <div class="wheel-scroller chip-wheel-scroller" id="restWheelScroller"></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -990,9 +1005,6 @@
               </div>
             </div>
             <div class="drag-list" id="dragList"></div>
-          </div>
-          <div id="intervalRunView" hidden>
-            <div class="run-info" id="runInfo"></div>
           </div>
         </div>
         <div class="interval-wheel-zone" id="wheelZone">
@@ -1468,6 +1480,7 @@
   let embedInInterval = false;
   let embedRunning = false;
   let embedPlan = [];
+  let embedRounds = 16;
   let intervalLogs = [];
   let dragState = null;
   let restInputMode = false;
@@ -2175,11 +2188,12 @@
       beep(988,0.12); setTimeout(function(){ beep(1318,0.25); },140);
       vibrate([120,80,120,80,200]);
       embedRunning = false;
+      document.getElementById('intervalLayout').classList.remove('is-running');
       notifyParentWorkout(false);
-      document.getElementById('intervalSetupView').hidden = false;
-      document.getElementById('intervalRunView').hidden = true;
       document.getElementById('pbBar').hidden = true;
       showWheelIdle();
+      notifyParentTabState();
+      renderDragList();
       await loadIntervalLogs();
       return;
     }
@@ -2511,35 +2525,19 @@
 
   function refreshEmbedSetup(rebuildWheels){
     if (rebuildWheels !== false) buildChipWheels();
-    rounds = embedPlan.length;
-    roundExercises = embedPlan.slice();
-    document.getElementById('planCount').textContent = rounds + ' Runden';
-    document.getElementById('roundsMinusEmbed').disabled = rounds <= EMBED_ROUNDS_MIN;
-    document.getElementById('roundsPlusEmbed').disabled = rounds >= EMBED_ROUNDS_MAX;
+    rounds = embedRounds;
+    roundExercises = embedPlan.slice(0, embedRounds);
+    document.getElementById('planCount').textContent = embedRounds + ' Runden';
+    document.getElementById('roundsMinusEmbed').disabled = embedRounds <= EMBED_ROUNDS_MIN || embedRunning;
+    document.getElementById('roundsPlusEmbed').disabled = embedRounds >= EMBED_ROUNDS_MAX || embedRunning;
     renderDragList();
-  }
-
-  function nextHyroxExercise(){
-    const used = {};
-    embedPlan.forEach(function(id, i){
-      if (i % 2 === 1 && id !== 'run') used[id] = true;
-    });
-    for (let i = 0; i < HYROX_CYCLE.length; i++) {
-      const ex = HYROX_CYCLE[i];
-      if (!used[ex]) return ex;
-    }
-    return HYROX_CYCLE[(embedPlan.length / 2) % HYROX_CYCLE.length];
   }
 
   function adjustEmbedRounds(delta){
     if (embedRunning) return;
-    const nextLen = embedPlan.length + delta;
-    if (nextLen < EMBED_ROUNDS_MIN || nextLen > EMBED_ROUNDS_MAX) return;
-    if (delta > 0) {
-      embedPlan.push('run', nextHyroxExercise());
-    } else {
-      embedPlan.splice(-EMBED_ROUNDS_STEP, EMBED_ROUNDS_STEP);
-    }
+    const next = embedRounds + delta;
+    if (next < EMBED_ROUNDS_MIN || next > EMBED_ROUNDS_MAX) return;
+    embedRounds = next;
     refreshEmbedSetup(false);
   }
 
@@ -2574,7 +2572,10 @@
     embedPlan.forEach(function(exId, i){
       const ex = exercises.find(function(e){ return e.id === exId; });
       const row = document.createElement('div');
-      row.className = 'drag-row' + (exId === 'run' ? ' is-run' : '') + (i === 0 ? ' is-plan-focus' : '');
+      row.className = 'drag-row';
+      if (i === 0 && !embedRunning) row.classList.add('is-plan-focus');
+      if (embedRunning && i === currentRound - 1) row.classList.add('is-current');
+      if (i >= embedRounds) row.classList.add('is-unused');
       row.dataset.index = String(i);
       const shortName = ({
         run:'Laufen', skierg:'Ski', sledpush:'Sled push', sledpull:'Sled pull',
@@ -2584,7 +2585,7 @@
       row.innerHTML =
         '<span class="drag-handle" aria-hidden="true">' + dragHandleSvg + '</span>' +
         '<span class="ex-time">' + timeLabel + '</span>' +
-        '<span class="ex-name' + (exId === 'run' ? ' is-run' : '') + '">' + shortName + '</span>' +
+        '<span class="ex-name">' + shortName + '</span>' +
         '<span class="drag-handle drag-handle--right" aria-hidden="true">' + dragHandleSvg + '</span>';
       bindDragRow(row, i);
       list.appendChild(row);
@@ -2656,7 +2657,7 @@
 
   function bindDragRow(row, index){
     row.addEventListener('pointerdown', function(e){
-      if (embedRunning) return;
+      if (embedRunning && phase !== 'rest' && phase !== 'log-final') return;
       e.preventDefault();
       dragState = {
         from: index,
@@ -2692,7 +2693,7 @@
     document.querySelectorAll('.tab-panel[data-embed-panel]').forEach(function(panel){
       panel.classList.toggle('is-active', panel.getAttribute('data-embed-panel') === tab);
     });
-    const showBack = tab === 'intervall' && embedInInterval;
+    const showBack = tab === 'intervall' && embedRunning;
     document.getElementById('trainingBack').classList.toggle('is-visible', showBack);
     notifyParentTabState();
   }
@@ -2702,7 +2703,8 @@
     try {
       window.parent.postMessage({
         type: 'gogogo-training-tab-state',
-        showBack: embedActiveTab === 'intervall' && embedInInterval
+        showBack: embedRunning,
+        hideTabs: embedRunning
       }, '*');
     } catch (e) {}
   }
@@ -2711,15 +2713,8 @@
     if (!tab) return;
     if (useParentTabs && tab !== 'intervall') return;
     if (embedRunning && tab !== 'intervall') {
-      if (!confirm('Workout wirklich beenden?')) return;
-      clearInterval(timerId);
-      releaseWakeLock();
-      embedRunning = false;
-      notifyParentWorkout(false);
-      document.getElementById('intervalSetupView').hidden = false;
-      document.getElementById('intervalRunView').hidden = true;
-      document.getElementById('pbBar').hidden = true;
-      showWheelIdle();
+      if (!confirm('Intervall abbrechen?')) return;
+      abortEmbedRun();
     }
     if (tab === 'intervall') {
       enterIntervalView();
@@ -2745,23 +2740,29 @@
 
   function enterIntervalView(){
     embedInInterval = true;
-    document.getElementById('trainingBack').classList.add('is-visible');
-    document.getElementById('intervalSetupView').hidden = false;
-    document.getElementById('intervalRunView').hidden = true;
+    document.getElementById('trainingBack').classList.toggle('is-visible', embedRunning);
     showWheelIdle();
+    notifyParentTabState();
+  }
+
+  function abortEmbedRun(){
+    clearInterval(timerId);
+    releaseWakeLock();
+    embedRunning = false;
+    restInputMode = false;
+    document.getElementById('intervalLayout').classList.remove('is-running');
+    notifyParentWorkout(false);
+    document.getElementById('pbBar').hidden = true;
+    document.getElementById('trainingBack').classList.remove('is-visible');
+    showWheelIdle();
+    notifyParentTabState();
+    renderDragList();
   }
 
   function exitIntervalView(){
+    if (embedRunning) abortEmbedRun();
     embedInInterval = false;
-    embedRunning = false;
-    notifyParentWorkout(false);
-    clearInterval(timerId);
-    releaseWakeLock();
     document.getElementById('trainingBack').classList.remove('is-visible');
-    document.getElementById('intervalSetupView').hidden = false;
-    document.getElementById('intervalRunView').hidden = true;
-    document.getElementById('pbBar').hidden = true;
-    showWheelIdle();
     if (useParentTabs) {
       notifyParentTabState();
     } else {
@@ -2786,28 +2787,20 @@
     const phaseLbl = document.getElementById('wheelPhaseLabel');
     const exId = currentEmbedExerciseId();
     const unit = unitFor(exId);
+    phaseLbl.textContent = '';
 
     if (phase === 'rest' || phase === 'log-final') {
       if (restInputMode) {
-        phaseLbl.textContent = exId === 'run' ? 'Lauf · Meter eingeben' : 'Wert eingeben';
         timerBox.hidden = true;
         valueInput.hidden = false;
-        unitLbl.textContent = unit;
+        unitLbl.textContent = unit === 'Wiederholungen' ? 'Reps' : 'm';
       } else {
         timerBox.hidden = false;
         valueInput.hidden = true;
-        if (phase === 'rest') {
-          phaseLbl.textContent = exId === 'run' ? 'Pause · Meter' : 'Pause · ' + unit;
-          clockBig.textContent = fmt(phaseRemaining);
-          clockBig.className = 'clock-big rest';
-        } else {
-          phaseLbl.textContent = exId === 'run' ? 'Tippe für Meter' : 'Tippe für ' + unit;
-          clockBig.textContent = 'Fertig';
-          clockBig.className = 'clock-big';
-        }
+        clockBig.textContent = phase === 'rest' ? fmt(phaseRemaining) : 'Fertig';
+        clockBig.className = 'clock-big' + (phase === 'rest' ? ' rest' : '');
       }
     } else {
-      phaseLbl.textContent = 'Arbeit';
       timerBox.hidden = false;
       valueInput.hidden = true;
       clockBig.textContent = fmt(phaseRemaining);
@@ -2815,20 +2808,11 @@
     }
     document.getElementById('rayHub').disabled = false;
     updateIntervalRayProgress();
+    renderDragList();
   }
 
   function renderEmbedRunInfo(){
-    const box = document.getElementById('runInfo');
-    const exId = embedPlan[currentRound - 1] || '';
-    const ex = exercises.find(function(e){ return e.id === exId; });
-    let html = '<div class="phase' + (phase === 'rest' ? ' rest' : '') + (phase === 'log-final' ? ' log' : '') + '">' +
-      (phase === 'work' ? 'Arbeit' : phase === 'rest' ? 'Pause' : 'Fertig') + '</div>' +
-      '<div class="round">Runde ' + currentRound + ' / ' + rounds + '</div>';
-    if (phase === 'work' && ex) {
-      html += '<div class="ex-block"><div class="ex-icon">' + iconSvg(ex.id, 48) + '</div>' +
-        '<div class="ex-name">' + ex.name + '</div></div>';
-    }
-    box.innerHTML = html;
+    /* Plan bleibt sichtbar; kein Workout-Name / keine Überschrift Arbeit. */
   }
 
   function enableRestInput(){
@@ -2866,13 +2850,12 @@
   function startEmbedRun(){
     embedRunning = true;
     embedInInterval = true;
+    document.getElementById('intervalLayout').classList.toggle('is-running', true);
     notifyParentWorkout(true);
-    document.getElementById('intervalSetupView').hidden = true;
-    document.getElementById('intervalRunView').hidden = false;
     document.getElementById('trainingBack').classList.add('is-visible');
     document.getElementById('rayHubStart').hidden = true;
-    rounds = embedPlan.length;
-    roundExercises = embedPlan.slice();
+    rounds = embedRounds;
+    roundExercises = embedPlan.slice(0, embedRounds);
     buildLane();
     currentRound = 1;
     phase = 'work';
@@ -2880,9 +2863,10 @@
     elapsedTotal = 0;
     paused = false;
     restInputMode = false;
-    log = embedPlan.map(function(exId){ return { exercise: exId, amount: '' }; });
+    log = roundExercises.map(function(exId){ return { exercise: exId, amount: '' }; });
     requestWakeLock();
     beep(880, 0.15); vibrate(120);
+    notifyParentTabState();
     loadIntervalLogs().then(updatePbBar);
     render();
     tick();
@@ -2920,16 +2904,13 @@
     });
 
     document.getElementById('trainingBack').addEventListener('click', function(){
-      if (embedRunning && phase === 'log-final') {
+      if (!embedRunning) return;
+      if (phase === 'log-final') {
         finishRun();
-        exitIntervalView();
+        abortEmbedRun();
         return;
       }
-      if (embedRunning) {
-        if (confirm('Workout wirklich beenden?')) exitIntervalView();
-      } else {
-        exitIntervalView();
-      }
+      if (confirm('Intervall abbrechen?')) abortEmbedRun();
     });
 
     document.getElementById('wheelAmountInput').addEventListener('input', function(){
@@ -2955,6 +2936,7 @@
     try {
       document.getElementById('embedShell').removeAttribute('hidden');
       embedPlan = DEFAULT_EMBED_PLAN.slice();
+      embedRounds = 16;
       refreshEmbedSetup();
       drawIntervalRay(document.getElementById('intervalRaySvg'), null);
 
