@@ -4,8 +4,9 @@
      Farbe FG: Rot #C7413B, BG: Off-White #F7F5F0 — rein zweitonig, keine Originalfarben */
   var FG = [0xc7, 0x41, 0x3b];
   var BG = [0xf7, 0xf5, 0xf0];
-  var PIXEL = 3;        /* Raster-Pixelgröße */
-  var CONTRAST = -10;   /* Kontrast-Offset */
+  var PIXEL = 1;        /* 1px = maximale Feinheit, 2× feiner als zuvor */
+  var BRIGHTNESS = -55; /* Abdunkeln vor dem Dithering → mehr FG-Pixel → dunkler */
+  var CONTRAST = 18;    /* Kontrast anheben für klare Kanten */
 
   /* Atkinson-Dithering (Apple/Hermes-Look) */
   function ditherAtkinson(src, w, h, out) {
@@ -137,8 +138,8 @@
         var sy = Math.min(ty * PIXEL + Math.floor(PIXEL / 2), h - 1);
         var si = (sy * w + sx) * 4;
         var g = 0.299 * px[si] + 0.587 * px[si + 1] + 0.114 * px[si + 2];
-        /* Kontrast -10 → etwas heller Richtung Mitte schieben */
-        g = g + CONTRAST;
+        /* Helligkeit + Kontrast anwenden */
+        g = (g - 128) * (1 + CONTRAST / 100) + 128 + BRIGHTNESS;
         if (g < 0) g = 0; else if (g > 255) g = 255;
         gray[ty * sw + tx] = g;
       }
