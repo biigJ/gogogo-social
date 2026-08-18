@@ -4,7 +4,7 @@
      Farbe FG: Rot #C7413B, BG: Off-White #F7F5F0 — rein zweitonig, keine Originalfarben */
   var FG = [0xc7, 0x41, 0x3b];
   var BG = [0xf7, 0xf5, 0xf0];
-  var PIXEL = 2;        /* 2px Raster — 1 Stufe gröber als 1px */
+  var PIXEL = 1;        /* 1px = feinstes Atkinson-Raster */
   var BRIGHTNESS = -55; /* Abdunkeln vor dem Dithering → mehr FG-Pixel → dunkler */
   var CONTRAST = 18;    /* Kontrast anheben für klare Kanten */
   var HERO_BRIGHTEN = 26; /* hero.mp4 (Index 0) zusätzlich aufhellen — ca. 10% */
