@@ -6,5 +6,5 @@
     var account = JSON.parse(localStorage.getItem("gogogo_go_account") || "null");
     loggedIn = !!(account && account.name);
   } catch (e) {}
-  el.setAttribute("href", loggedIn ? "/account/" : "/go/");
+  el.setAttribute("href", loggedIn ? "/account/" : "/");
 })();
