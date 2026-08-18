@@ -130,6 +130,11 @@
     body.has-scroll-overflow .site-chrome::before {
       opacity: 1;
     }
+    body.is-keyboard .site-chrome:not(.site-chrome--top) {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
     .site-chrome--top {
       top: 0;
       left: 0;
@@ -189,14 +194,6 @@
       box-shadow: 0 8px 24px rgba(52, 34, 32, 0.18);
       transform: scale(1);
       transform-origin: center bottom;
-      transition: transform 938ms ease-in-out;
-      will-change: transform;
-    }
-    .site-header.is-compact {
-      transform: scale(0.8);
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .site-header { transition: none; }
     }
     .nav-btn {
       position: relative;
@@ -226,10 +223,6 @@
       padding: 0 var(--pad);
       /* Nur Safe-Area: beim Hochscrollen läuft Inhalt hinter die Kamera. */
       padding-top: env(safe-area-inset-top, 0px);
-      /* Kurzseiten: nur Platz für Menü/Footer, ohne großen Blur-Puffer */
-      padding-bottom: calc(var(--header-h) + 52px + env(safe-area-inset-bottom, 0px));
-    }
-    body.has-scroll-overflow .wrap__scroll {
       padding-bottom: calc(var(--chrome-stack) + 32px);
     }
     body.is-training .wrap,
@@ -1320,8 +1313,14 @@
       padding: 10px 12px;
       background: #fff;
       color: var(--ink);
+      border: 0;
       border-radius: var(--radius);
       box-sizing: border-box;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      -webkit-appearance: none;
+      appearance: none;
     }
     .profile-challenge__left {
       display: inline-flex;
@@ -1411,6 +1410,110 @@
       background: transparent;
       box-shadow: none;
     }
+
+    .profile-refresh {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 0;
+      margin: 0 auto;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .profile-refresh.is-on { height: 52px; margin-bottom: 8px; }
+    .profile-refresh__spin {
+      width: 34px;
+      height: 34px;
+      animation: profile-refresh-spin 0.28s linear infinite;
+    }
+    @keyframes profile-refresh-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .profile-refresh__spin { animation: none; }
+    }
+
+    .challenge-modal {
+      position: fixed; inset: 0; z-index: 90;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+      background: rgba(10, 10, 10, 0.28);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .challenge-modal.is-open { display: flex; }
+    .challenge-modal__sheet {
+      width: min(100%, 340px);
+      background: var(--red);
+      color: var(--ink-on-red);
+      border-radius: var(--chrome-radius);
+      padding: 28px 22px 22px;
+      text-align: center;
+      box-shadow: 0 18px 48px rgba(10, 10, 10, 0.28);
+    }
+    .challenge-modal__title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.3;
+      margin-bottom: 18px;
+    }
+    .challenge-modal__actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .challenge-modal__btn {
+      min-height: 48px;
+      border-radius: var(--radius);
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: -0.02em;
+      background: var(--paper);
+      color: var(--btn-ink);
+    }
+    .challenge-modal__btn.is-ghost {
+      background: transparent;
+      color: var(--ink-on-red);
+      border: 1.5px solid rgba(247, 245, 240, 0.55);
+    }
+    .challenge-amount-dial {
+      position: relative;
+      width: 220px;
+      height: 220px;
+      margin: 0 auto;
+      touch-action: none;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .challenge-amount-dial:active { cursor: grabbing; }
+    .challenge-amount-dial svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+    }
+    .challenge-amount-dial__value {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      font-size: 1.85rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: var(--paper);
+    }
+    .challenge-amount-dial__hint {
+      margin-top: 10px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      opacity: 0.85;
+    }
+
     .profile-plan {
       color: var(--ink-on-red);
     }
@@ -2077,6 +2180,12 @@
       </div>
 
       <div class="panel" id="panel-profile" data-panel="profile">
+        <div class="profile-refresh" id="profile-refresh" hidden aria-hidden="true">
+          <svg class="profile-refresh__spin" viewBox="0 0 40 40" aria-hidden="true">
+            <circle cx="20" cy="20" r="14" fill="none" stroke="rgba(247,245,240,0.35)" stroke-width="3"></circle>
+            <path d="M20 6a14 14 0 0 1 14 14" fill="none" stroke="rgba(247,245,240,0.95)" stroke-width="3" stroke-linecap="round"></path>
+          </svg>
+        </div>
         <h1 class="profile-name" id="profile-name"></h1>
         <p class="profile-coach-badge" id="profile-coach-badge" hidden></p>
         <button class="profile-trainer-admin" type="button" id="profile-trainer-admin" hidden>Trainer-Bereich</button>
@@ -2123,7 +2232,7 @@
             aria-label="Mantra ändern"
           ></button>
         </div>
-        <div class="profile-challenge" id="profile-challenge" aria-label="Challenge">
+        <button class="profile-challenge" id="profile-challenge" type="button" aria-label="Challenge">
           <div class="profile-challenge__left">
             <span class="profile-challenge__paid" id="profile-challenge-paid" hidden></span>
             <span class="profile-challenge__label">Challenge</span>
@@ -2137,7 +2246,7 @@
               <span class="profile-challenge__days" id="profile-challenge-days" hidden>28</span>
             </div>
           </div>
-        </div>
+        </button>
         <section class="profile-plan" aria-label="Plan">
           <div id="profile-plan-days"></div>
         </section>
@@ -2585,6 +2694,31 @@
     </div>
   </div>
 
+  <div class="challenge-modal" id="challenge-abort-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="challenge-abort-title">
+      <p class="challenge-modal__title" id="challenge-abort-title">Challenge beenden?</p>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn is-ghost" id="challenge-abort-no">Nein</button>
+        <button type="button" class="challenge-modal__btn" id="challenge-abort-yes">Ja</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="challenge-amount-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="challenge-amount-title">
+      <p class="challenge-modal__title" id="challenge-amount-title">Challenge-Einsatz</p>
+      <div class="challenge-amount-dial" id="challenge-amount-dial" aria-label="Einsatz drehen">
+        <svg id="challenge-amount-rays" viewBox="0 0 220 220" aria-hidden="true"></svg>
+        <div class="challenge-amount-dial__value" id="challenge-amount-value">30&nbsp;€</div>
+      </div>
+      <p class="challenge-amount-dial__hint">Drehen · 30–999&nbsp;€</p>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn is-ghost" id="challenge-amount-cancel">Abbrechen</button>
+        <button type="button" class="challenge-modal__btn" id="challenge-amount-ok">Weiter</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="share-modal" hidden>
     <div class="modal__panel">
       <h2>Teilen mit Buddies</h2>
@@ -2940,6 +3074,257 @@
           }
         }
         renderMiniChallengeWheel(svg, rem, !active);
+      }
+
+      function openChallengeModal(el) {
+        if (!el) return;
+        el.hidden = false;
+        el.setAttribute("aria-hidden", "false");
+        el.classList.add("is-open");
+      }
+      function closeChallengeModal(el) {
+        if (!el) return;
+        el.classList.remove("is-open");
+        el.hidden = true;
+        el.setAttribute("aria-hidden", "true");
+      }
+
+      function confirmJaNein(title) {
+        return new Promise(function (resolve) {
+          var modal = document.getElementById("challenge-abort-modal");
+          var titleEl = document.getElementById("challenge-abort-title");
+          var yes = document.getElementById("challenge-abort-yes");
+          var no = document.getElementById("challenge-abort-no");
+          var label = title || "Bestätigen?";
+          if (!modal || !yes || !no) {
+            resolve(window.confirm(label));
+            return;
+          }
+          var prevTitle = titleEl ? titleEl.textContent : "";
+          if (titleEl) titleEl.textContent = label;
+          function finish(ok) {
+            yes.removeEventListener("click", onYes);
+            no.removeEventListener("click", onNo);
+            modal.removeEventListener("click", onBackdrop);
+            if (titleEl) titleEl.textContent = prevTitle || "Challenge beenden?";
+            closeChallengeModal(modal);
+            resolve(!!ok);
+          }
+          function onYes(e) { e.stopPropagation(); finish(true); }
+          function onNo(e) { e.stopPropagation(); finish(false); }
+          function onBackdrop(e) {
+            if (e.target === modal) finish(false);
+          }
+          openChallengeModal(modal);
+          yes.addEventListener("click", onYes);
+          no.addEventListener("click", onNo);
+          modal.addEventListener("click", onBackdrop);
+        });
+      }
+
+      function drawAmountDialRays(svg, amount) {
+        if (!svg) return;
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+        var ns = "http://www.w3.org/2000/svg";
+        var cx = 110, cy = 110, inner = 58, outer = 98;
+        var rays = 36;
+        var t = (Math.max(30, Math.min(999, Number(amount) || 30)) - 30) / (999 - 30);
+        var lit = Math.max(1, Math.round(t * rays));
+        var rot = t * Math.PI * 2;
+        for (var s = 0; s < rays; s++) {
+          var a = ((s / rays) * Math.PI * 2) - Math.PI / 2 + rot;
+          var line = document.createElementNS(ns, "line");
+          line.setAttribute("x1", (cx + Math.cos(a) * inner).toFixed(2));
+          line.setAttribute("y1", (cy + Math.sin(a) * inner).toFixed(2));
+          line.setAttribute("x2", (cx + Math.cos(a) * outer).toFixed(2));
+          line.setAttribute("y2", (cy + Math.sin(a) * outer).toFixed(2));
+          line.setAttribute("stroke", s < lit ? "#F7F5F0" : "rgba(247,245,240,0.28)");
+          line.setAttribute("stroke-width", "3.2");
+          line.setAttribute("stroke-linecap", "round");
+          svg.appendChild(line);
+        }
+      }
+
+      function pickChallengeAmount() {
+        return new Promise(function (resolve) {
+          var modal = document.getElementById("challenge-amount-modal");
+          var dial = document.getElementById("challenge-amount-dial");
+          var valueEl = document.getElementById("challenge-amount-value");
+          var rays = document.getElementById("challenge-amount-rays");
+          var ok = document.getElementById("challenge-amount-ok");
+          var cancel = document.getElementById("challenge-amount-cancel");
+          if (!modal || !dial || !valueEl || !ok || !cancel) {
+            resolve(null);
+            return;
+          }
+          var amount = 30;
+          var lastAngle = null;
+          var dragging = false;
+
+          function render() {
+            valueEl.textContent = String(amount) + "\u00a0€";
+            drawAmountDialRays(rays, amount);
+          }
+          function angleFromEvent(ev) {
+            var rect = dial.getBoundingClientRect();
+            var cx = rect.left + rect.width / 2;
+            var cy = rect.top + rect.height / 2;
+            var pt = ev.touches && ev.touches[0] ? ev.touches[0] : ev;
+            return Math.atan2(pt.clientY - cy, pt.clientX - cx);
+          }
+          function onPointerDown(ev) {
+            ev.preventDefault();
+            dragging = true;
+            lastAngle = angleFromEvent(ev);
+          }
+          function onPointerMove(ev) {
+            if (!dragging) return;
+            ev.preventDefault();
+            var angle = angleFromEvent(ev);
+            var delta = angle - lastAngle;
+            while (delta > Math.PI) delta -= Math.PI * 2;
+            while (delta < -Math.PI) delta += Math.PI * 2;
+            lastAngle = angle;
+            var next = amount + (delta / (Math.PI * 2)) * 90;
+            amount = Math.max(30, Math.min(999, Math.round(next)));
+            render();
+          }
+          function onPointerUp() {
+            dragging = false;
+            lastAngle = null;
+          }
+          function finish(value) {
+            dial.removeEventListener("mousedown", onPointerDown);
+            dial.removeEventListener("touchstart", onPointerDown);
+            window.removeEventListener("mousemove", onPointerMove);
+            window.removeEventListener("touchmove", onPointerMove);
+            window.removeEventListener("mouseup", onPointerUp);
+            window.removeEventListener("touchend", onPointerUp);
+            ok.removeEventListener("click", onOk);
+            cancel.removeEventListener("click", onCancel);
+            modal.removeEventListener("click", onBackdrop);
+            closeChallengeModal(modal);
+            resolve(value);
+          }
+          function onOk(e) { e.stopPropagation(); finish(amount); }
+          function onCancel(e) { e.stopPropagation(); finish(null); }
+          function onBackdrop(e) { if (e.target === modal) finish(null); }
+
+          render();
+          openChallengeModal(modal);
+          dial.addEventListener("mousedown", onPointerDown);
+          dial.addEventListener("touchstart", onPointerDown, { passive: false });
+          window.addEventListener("mousemove", onPointerMove, { passive: false });
+          window.addEventListener("touchmove", onPointerMove, { passive: false });
+          window.addEventListener("mouseup", onPointerUp);
+          window.addEventListener("touchend", onPointerUp);
+          ok.addEventListener("click", onOk);
+          cancel.addEventListener("click", onCancel);
+          modal.addEventListener("click", onBackdrop);
+        });
+      }
+
+      function displayedChallengeRefund() {
+        var daily = challengeDailyStake(
+          account && account.challenge_amount,
+          account && account.challenge_started_at,
+          !!(account && account.challenge_active)
+        );
+        if (daily != null) return daily;
+        var n = Number(account && account.challenge_amount);
+        return n >= 30 ? n : 0;
+      }
+
+      async function patchInviteChallengeMirror(active, amount) {
+        var payload = {
+          challenge_active: !!active,
+          challenge_started_at: active
+            ? (account.challenge_started_at || new Date().toISOString())
+            : null,
+          challenge_amount: active ? amount : null
+        };
+        var filters = [];
+        if (account && account.serial_number) {
+          filters.push("serial_number.eq." + encodeURIComponent(account.serial_number));
+        }
+        if (account && account.invite_code) {
+          filters.push("code.eq." + encodeURIComponent(account.invite_code));
+        }
+        if (!filters.length) return;
+        try {
+          await fetch(
+            SUPABASE_URL + "/rest/v1/go_invite_codes?or=(" + filters.join(",") + ")",
+            {
+              method: "PATCH",
+              headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY,
+                "Content-Type": "application/json",
+                Prefer: "return=minimal"
+              },
+              body: JSON.stringify(payload)
+            }
+          );
+        } catch (e) {}
+      }
+
+      async function persistProfileChallenge(active, amount) {
+        var started = active ? new Date().toISOString() : null;
+        account.challenge_active = !!active;
+        account.challenge_started_at = started;
+        account.challenge_amount = active ? amount : null;
+        saveAccount();
+        renderProfileChallenge();
+        var ok = false;
+        try {
+          ok = await patchAccount({
+            challenge_active: !!active,
+            challenge_started_at: started,
+            challenge_amount: active ? amount : null,
+            updated_at: new Date().toISOString()
+          });
+        } catch (e) { ok = false; }
+        await patchInviteChallengeMirror(active, amount);
+        fillProfilePanel();
+        return ok;
+      }
+
+      var profileChallengeBusy = false;
+      async function onProfileChallengeClick() {
+        if (profileChallengeBusy) return;
+        profileChallengeBusy = true;
+        var btn = document.getElementById("profile-challenge");
+        if (btn) btn.disabled = true;
+        try {
+          if (account && account.challenge_active) {
+            var refund = displayedChallengeRefund();
+            var refundText = formatChallengeStake(refund);
+            var abort = await confirmJaNein(
+              "Challenge beenden? Du bekommst nur " +
+              (refundText || "den angezeigten Betrag") +
+              ", nicht den vollen Einsatz."
+            );
+            if (!abort) return;
+            await persistProfileChallenge(false, null);
+          } else {
+            var amount = await pickChallengeAmount();
+            if (amount == null) return;
+            var start = await confirmJaNein(
+              "Challenge mit " + Math.round(amount) + "\u00a0€ starten? Der Einsatz ist gebunden, bis Du beendest oder 28 Tage vorbei sind."
+            );
+            if (!start) return;
+            await persistProfileChallenge(true, amount);
+          }
+        } catch (err) {
+          window.alert(
+            (err && err.message && /challenge_/i.test(err.message))
+              ? "Challenge-Spalten fehlen — go-challenge.sql in Supabase ausführen."
+              : "Challenge speichern fehlgeschlagen."
+          );
+        } finally {
+          profileChallengeBusy = false;
+          if (btn) btn.disabled = false;
+        }
       }
 
       var DEFAULT_MANTRAS = [
@@ -3703,6 +4088,15 @@
         if (!btn) return;
         btn.addEventListener("click", function () {
           window.location.href = "/go/admin/?trainer=1";
+        });
+      })();
+
+      (function bindProfileChallenge() {
+        var btn = document.getElementById("profile-challenge");
+        if (!btn) return;
+        btn.addEventListener("click", function (e) {
+          e.preventDefault();
+          onProfileChallengeClick();
         });
       })();
 
@@ -5497,7 +5891,7 @@
         }
         if (id !== "book") pauseAccountVideos();
         if (id === "training") {
-          var TRAINING_IFRAME_V = "20260818k";
+          var TRAINING_IFRAME_V = "20260818m";
           var wantTrainingSrc = "/account/fitness-friday.html?embed=1&parentTabs=1&v=" + TRAINING_IFRAME_V;
           if (!trainingFrame.src || String(trainingFrame.src).indexOf("v=" + TRAINING_IFRAME_V) === -1) {
             trainingFrame.src = wantTrainingSrc;
@@ -5519,7 +5913,7 @@
         }
         var scrollEl = document.querySelector(".wrap__scroll");
         if (scrollEl) scrollEl.scrollTop = 0;
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        window.scrollTo({ top: 0, behavior: "auto" });
         setNavCompact(false);
         requestAnimationFrame(function () {
           updateScrollOverflow();
@@ -5565,6 +5959,97 @@
       window.addEventListener("load", updateScrollOverflow);
       updateScrollOverflow();
       setTimeout(updateScrollOverflow, 200);
+
+      (function bindKeyboardChrome() {
+        function sync() {
+          var vv = window.visualViewport;
+          var kb = false;
+          if (vv) kb = (window.innerHeight - vv.height) > 120;
+          document.body.classList.toggle("is-keyboard", kb);
+        }
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener("resize", sync);
+          window.visualViewport.addEventListener("scroll", sync);
+        }
+        window.addEventListener("resize", sync);
+        sync();
+      })();
+
+      (function bindProfilePullRefresh() {
+        var startY = 0;
+        var pulling = false;
+        var busy = false;
+        var loader = document.getElementById("profile-refresh");
+        var THRESH = 64;
+
+        function onProfile() {
+          return document.body.classList.contains("is-profile");
+        }
+        function showLoader(on) {
+          if (!loader) return;
+          loader.hidden = !on;
+          loader.classList.toggle("is-on", !!on);
+          loader.setAttribute("aria-hidden", on ? "false" : "true");
+        }
+        async function runRefresh() {
+          busy = true;
+          showLoader(true);
+          try {
+            if (hasCloudAccount()) {
+              try {
+                var rows = await restGet(
+                  "go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1"
+                );
+                if (rows && rows[0]) {
+                  var remote = rows[0];
+                  if (Object.prototype.hasOwnProperty.call(remote, "challenge_active")) {
+                    account.challenge_active = !!remote.challenge_active;
+                  }
+                  if (Object.prototype.hasOwnProperty.call(remote, "challenge_started_at")) {
+                    account.challenge_started_at = remote.challenge_started_at || null;
+                  }
+                  if (Object.prototype.hasOwnProperty.call(remote, "challenge_amount")) {
+                    var amt = remote.challenge_amount == null ? null : Number(remote.challenge_amount);
+                    account.challenge_amount = amt != null && !isNaN(amt) ? amt : null;
+                  }
+                  saveAccount();
+                }
+              } catch (e0) {}
+            }
+            await Promise.all([
+              loadCoachPlan().catch(function () {}),
+              refreshCommunityFeed().catch(function () {})
+            ]);
+            if (typeof dayEntriesReady === "function") dayEntriesReady();
+            fillProfilePanel();
+          } finally {
+            busy = false;
+            showLoader(false);
+          }
+        }
+
+        document.addEventListener("touchstart", function (e) {
+          if (!onProfile() || busy) return;
+          if ((window.scrollY || 0) > 4) return;
+          if (!e.touches || !e.touches[0]) return;
+          startY = e.touches[0].clientY;
+          pulling = true;
+        }, { passive: true });
+
+        document.addEventListener("touchmove", function (e) {
+          if (!pulling || !onProfile() || busy) return;
+          var y = e.touches[0].clientY;
+          if (y - startY > 16) showLoader(true);
+        }, { passive: true });
+
+        document.addEventListener("touchend", function (e) {
+          if (!pulling) return;
+          pulling = false;
+          var y = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientY : startY;
+          if (y - startY >= THRESH && onProfile() && !busy) runRefresh();
+          else if (!busy) showLoader(false);
+        });
+      })();
 
       document.querySelectorAll("[data-goto]").forEach(function (el) {
         el.addEventListener("click", function () {

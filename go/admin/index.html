@@ -141,7 +141,13 @@
       font-size: clamp(1.05rem, 4vw, 1.3rem);
       font-weight: 700; letter-spacing: -0.02em;
     }
-    body.menu-open { overflow: hidden; }
+    body.menu-open {
+      overflow: hidden;
+      position: fixed;
+      width: 100%;
+      left: 0;
+      right: 0;
+    }
     body.menu-open .site-top { z-index: 70; }
 
     .wrap {
@@ -1421,6 +1427,10 @@
               <input id="ausdauer-admin-hr" type="number" inputmode="numeric" min="0" step="1" placeholder="140" />
               <span class="admin-ausdauer__unit">bpm</span>
             </label>
+            <label>Distanz
+              <input id="ausdauer-admin-distance" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0" />
+              <span class="admin-ausdauer__unit">km</span>
+            </label>
           </div>
           <div class="admin-kraft__new">
             <button class="btn" type="button" id="ausdauer-admin-save">speichern</button>
@@ -1772,6 +1782,14 @@
           return;
         }
         collectKraftAdminChecks();
+        var needle = name.toLowerCase();
+        var dup = kraftAllAdminExercises(kraftAdminSystem).some(function (ex) {
+          return String(ex.name || "").trim().toLowerCase() === needle;
+        });
+        if (dup) {
+          setKraftAdminMsg("Die Übung gibt es schon.", true);
+          return;
+        }
         var id = kraftCustomId(name);
         if (!kraftAdminExtras[kraftAdminSystem]) kraftAdminExtras[kraftAdminSystem] = [];
         kraftAdminExtras[kraftAdminSystem].push({ id: id, name: name });
@@ -2168,7 +2186,8 @@
           incline: numOrNull(document.getElementById("ausdauer-admin-incline")),
           duration_min: numOrNull(document.getElementById("ausdauer-admin-duration")),
           speed: numOrNull(document.getElementById("ausdauer-admin-speed")),
-          hr_avg: numOrNull(document.getElementById("ausdauer-admin-hr"))
+          hr_avg: numOrNull(document.getElementById("ausdauer-admin-hr")),
+          distance_km: numOrNull(document.getElementById("ausdauer-admin-distance"))
         };
       }
 
@@ -2221,7 +2240,8 @@
               incline: form.incline,
               duration_min: form.duration_min,
               speed: form.speed,
-              hr_avg: form.hr_avg
+              hr_avg: form.hr_avg,
+              distance_km: form.distance_km
             })
           });
           var t = "";
@@ -2230,6 +2250,31 @@
             ausdauerTableMissing = true;
             setAusdauerAdminMsg("Tabelle go_ausdauer_presets fehlt — go-ausdauer-plan.sql in Supabase ausführen.", true);
             return;
+          }
+          if (!res.ok && /distance_km/i.test(t)) {
+            res = await fetch(SUPABASE_URL + "/rest/v1/go_ausdauer_presets", {
+              method: "POST",
+              headers: apiHeaders({
+                "Content-Type": "application/json",
+                Prefer: "return=representation"
+              }),
+              body: JSON.stringify({
+                account_id: activeAccount.id,
+                source: "trainer",
+                technique: form.technique,
+                incline: form.incline,
+                duration_min: form.duration_min,
+                speed: form.speed,
+                hr_avg: form.hr_avg
+              })
+            });
+            t = "";
+            try { t = await res.text(); } catch (e1) {}
+            if (res.ok) {
+              setAusdauerAdminMsg("Gespeichert. Distanz-Spalte fehlt — go-ausdauer-plan.sql in Supabase ausführen.");
+              await loadAusdauerPresets(activeAccount.id);
+              return;
+            }
           }
           if (!res.ok) {
             setAusdauerAdminMsg("Speichern fehlgeschlagen" + (t ? ": " + t.slice(0, 120) : "."), true);
@@ -2417,12 +2462,21 @@
         authBtn.textContent = isAuthed() ? "Logout" : "Login";
       }
 
+      var menuLockY = 0;
       function setMenu(open) {
+        if (open && !menuPanel.classList.contains("is-open")) {
+          menuLockY = window.scrollY || document.documentElement.scrollTop || 0;
+          document.body.style.top = "-" + menuLockY + "px";
+        }
         menuBtn.classList.toggle("is-open", open);
         menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
         menuPanel.classList.toggle("is-open", open);
         menuPanel.hidden = !open;
         document.body.classList.toggle("menu-open", open);
+        if (!open) {
+          document.body.style.top = "";
+          window.scrollTo(0, menuLockY || 0);
+        }
       }
 
       function hideAllPanels() {
@@ -3366,6 +3420,8 @@
 
       async function showResult(name, serial, code, inviteRow) {
         var url = GO_BASE;
+        window.scrollTo(0, 0);
+        if (document.documentElement) document.documentElement.scrollTop = 0;
         hideAllPanels();
         if (inviteRow && inviteRow.id) pendingAdminInvite = inviteRow;
         lastQr = {
@@ -4649,8 +4705,7 @@
       }
 
       try {
-        if (initTrainerAdminMode()) showList();
-        else if (isAuthed()) showGen();
+        if (initTrainerAdminMode() || isAuthed()) showList();
         else showLogin();
       } catch (e) { showLogin(); }
       updateAuthBtn();

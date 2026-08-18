@@ -83,3 +83,9 @@ create policy "go_ausdauer_logs_delete_anon"
   on go_ausdauer_logs for delete
   to anon, authenticated
   using (true);
+
+alter table go_ausdauer_presets
+  add column if not exists distance_km numeric;
+
+alter table go_ausdauer_logs
+  add column if not exists distance_km numeric;
