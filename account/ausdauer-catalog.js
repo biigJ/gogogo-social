@@ -26,7 +26,7 @@
     if (tech.hasIncline && row.incline != null && row.incline !== "") parts.push(row.incline + "%");
     if (row.duration_min != null && row.duration_min !== "") parts.push(row.duration_min + " min");
     if (row.speed != null && row.speed !== "") parts.push(formatSpeed(row.technique, row.speed));
-    if (row.hr_avg != null && row.hr_avg !== "") parts.push(row.hr_avg + " HF");
+    if (row.hr_avg != null && row.hr_avg !== "") parts.push(row.hr_avg + " bpm");
     return parts.join(" · ");
   }
 
