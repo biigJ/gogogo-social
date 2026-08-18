@@ -3014,19 +3014,34 @@
       }
 
       function dayTrainingUnitFor(wd) {
-        if (!coachPlan || !coachPlan.day_training_units) return null;
+        if (!coachPlan) return null;
         var map = coachPlan.day_training_units;
         if (typeof map === "string") {
-          try { map = JSON.parse(map); } catch (e) { return null; }
+          try { map = JSON.parse(map); } catch (e) { map = null; }
         }
-        if (!map || typeof map !== "object") return null;
-        var u = map[String(wd)] || map[wd];
-        if (!u || !u.kind) return null;
+        if (map && typeof map === "object") {
+          var u = map[String(wd)] || map[wd];
+          if (u && u.kind) {
+            return {
+              kind: String(u.kind),
+              label: u.label != null ? String(u.label) : "",
+              systemId: u.systemId != null ? String(u.systemId) : "",
+              presetId: u.presetId != null ? String(u.presetId) : ""
+            };
+          }
+        }
+        /* Fallback: Einheitsname im Tages-Text, wenn JSON-Spalte fehlt. */
+        var kraft = isKraftWeekday(wd);
+        var ausd = isAusdauerWeekday(wd);
+        if (!kraft && !ausd) return null;
+        var key = COACH_DAY_KEYS[wd];
+        var note = key && coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
+        if (!note) return null;
         return {
-          kind: String(u.kind),
-          label: u.label != null ? String(u.label) : "",
-          systemId: u.systemId != null ? String(u.systemId) : "",
-          presetId: u.presetId != null ? String(u.presetId) : ""
+          kind: kraft ? "kraft" : "ausdauer",
+          label: note,
+          systemId: "",
+          presetId: ""
         };
       }
 
@@ -3353,6 +3368,8 @@
       function coachDayText(wd) {
         if (isAccountPaused()) return "";
         if (isZirkelWeekday(wd)) return "Zirkeltraining";
+        var unit = dayTrainingUnitFor(wd);
+        if (unit && unit.label) return unit.label;
         var bits = [];
         if (isKraftWeekday(wd)) bits.push("Kraft");
         if (isAusdauerWeekday(wd)) bits.push("Ausdauer");
@@ -3378,9 +3395,13 @@
         if (isAccountPaused()) return "";
         var wd = (d.getDay() + 6) % 7;
         if (isZirkelForDate(d)) return "Zirkeltraining";
+        var unitLive = dayTrainingUnitFor(wd);
         var bits = [];
-        if (isKraftWeekday(wd)) bits.push("Kraft");
-        if (isAusdauerWeekday(wd)) bits.push("Ausdauer");
+        if (unitLive && unitLive.label) bits.push(unitLive.label);
+        else {
+          if (isKraftWeekday(wd)) bits.push("Kraft");
+          if (isAusdauerWeekday(wd)) bits.push("Ausdauer");
+        }
         var key = COACH_DAY_KEYS[wd];
         if (!key) return bits.join(" · ");
         var dateStr = formatDateKey(d);
@@ -3413,7 +3434,7 @@
             note = coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
           }
         }
-        if (note) bits.push(note);
+        if (note && bits.indexOf(note) === -1) bits.push(note);
         return bits.join(" · ");
       }
 

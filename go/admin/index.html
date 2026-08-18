@@ -1954,8 +1954,7 @@
             ok.removeEventListener("click", onOk);
             cancel.removeEventListener("click", onCancel);
             modal.removeEventListener("click", onBackdrop);
-            modal.hidden = true;
-            modal.setAttribute("aria-hidden", "true");
+            closeChallengeModal(modal);
             resolve(value);
           }
 
@@ -1978,11 +1977,10 @@
             if (e.target === modal) close(null);
           }
 
-          modal.hidden = false;
-          modal.setAttribute("aria-hidden", "false");
           ok.addEventListener("click", onOk);
           cancel.addEventListener("click", onCancel);
           modal.addEventListener("click", onBackdrop);
+          openChallengeModal(modal);
           requestAnimationFrame(function () {
             var first = scroller.querySelector(".unit-wheel-item");
             if (first) first.scrollIntoView({ block: "center" });
@@ -2004,6 +2002,11 @@
         if (box.checked && other) other.checked = false;
         if (!box.checked) {
           clearDayTrainingUnit(wd);
+          var taOff = document.getElementById(PLAN_DAY_FIELD_IDS[wd]);
+          if (taOff && taOff.placeholder !== "Zirkeltraining") {
+            taOff.disabled = false;
+            taOff.placeholder = (ZIRKEL_DAY_NAMES[wd] || "Tag") + "…";
+          }
           return;
         }
         var opts = kind === "kraft" ? kraftSystemOptions() : ausdauerPresetOptions();
@@ -2031,7 +2034,7 @@
         renderDayUnitLabels();
         var ta = document.getElementById(PLAN_DAY_FIELD_IDS[wd]);
         if (ta) {
-          ta.value = "";
+          ta.value = picked.label || "";
           ta.disabled = true;
           ta.placeholder = picked.label;
         }
@@ -3001,12 +3004,16 @@
         payload.kraft_weekdays = getCheckedWeekdays(".plan-kraft-check");
         payload.ausdauer_weekdays = getCheckedWeekdays(".plan-ausdauer-check");
         payload.day_training_units = dayTrainingUnitsPayload();
-        Object.keys(dayTrainingUnits).forEach(function (k) {
-          var dk = DAY_PLAN_KEYS[Number(k)];
-          if (dk) payload[dk] = null;
-        });
         var zirkelKey = DAY_PLAN_KEYS[zirkelWd];
         if (zirkelKey) payload[zirkelKey] = null;
+        Object.keys(dayTrainingUnits).forEach(function (k) {
+          var wdNum = Number(k);
+          var dk = DAY_PLAN_KEYS[wdNum];
+          var u = dayTrainingUnits[wdNum];
+          if (!dk || !u) return;
+          /* Name der Einheit auch als Tages-Text — Kreis zeigt das auch ohne day_training_units-Spalte. */
+          payload[dk] = u.label || (u.kind === "ausdauer" ? "Ausdauer" : "Kraft");
+        });
         if (planMsg) {
           planMsg.classList.remove("is-error");
           planMsg.textContent = "Speichere …";
@@ -3053,7 +3060,7 @@
                 await saveKraftPresets(activeAccount.id);
                 if (planMsg) {
                   planMsg.classList.remove("is-error");
-                  planMsg.textContent = "Plan gespeichert. Wochentage Kraft/Ausdauer brauchen go-ausdauer-plan.sql in Supabase.";
+                  planMsg.textContent = "Plan gespeichert. Für die spezifische Einheitsauswahl go-coach-plans-day-units.sql in Supabase ausführen.";
                 }
                 return;
               }
@@ -3088,6 +3095,8 @@
               planMsg.textContent = "Speichern fehlgeschlagen: Tabelle go_coach_zirkel_history fehlt — go-coach-zirkel-history.sql in Supabase ausführen.";
             } else if (/zirkel_weekday/i.test(detail)) {
               planMsg.textContent = "Speichern fehlgeschlagen: Spalte zirkel_weekday fehlt — go-coach-plans-zirkel.sql in Supabase ausführen.";
+            } else if (/day_training_units/i.test(detail)) {
+              planMsg.textContent = "Speichern fehlgeschlagen: Spalte day_training_units fehlt — go-coach-plans-day-units.sql in Supabase ausführen.";
             } else if (/kraft_weekdays|ausdauer_weekdays/i.test(detail)) {
               planMsg.textContent = "Speichern fehlgeschlagen: Spalten kraft_weekdays / ausdauer_weekdays fehlen — go-ausdauer-plan.sql in Supabase ausführen.";
             } else if (/go_coach_plans/i.test(detail)) {
