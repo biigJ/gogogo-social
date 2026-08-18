@@ -4,9 +4,10 @@
      Farbe FG: Rot #C7413B, BG: Off-White #F7F5F0 — rein zweitonig, keine Originalfarben */
   var FG = [0xc7, 0x41, 0x3b];
   var BG = [0xf7, 0xf5, 0xf0];
-  var PIXEL = 1;        /* 1px = maximale Feinheit, 2× feiner als zuvor */
+  var PIXEL = 2;        /* 2px Raster — 1 Stufe gröber als 1px */
   var BRIGHTNESS = -55; /* Abdunkeln vor dem Dithering → mehr FG-Pixel → dunkler */
   var CONTRAST = 18;    /* Kontrast anheben für klare Kanten */
+  var HERO_BRIGHTEN = 26; /* hero.mp4 (Index 0) zusätzlich aufhellen — ca. 10% */
 
   /* Atkinson-Dithering (Apple/Hermes-Look) */
   function ditherAtkinson(src, w, h, out) {
@@ -138,8 +139,11 @@
         var sy = Math.min(ty * PIXEL + Math.floor(PIXEL / 2), h - 1);
         var si = (sy * w + sx) * 4;
         var g = 0.299 * px[si] + 0.587 * px[si + 1] + 0.114 * px[si + 2];
-        /* Helligkeit + Kontrast anwenden */
-        g = (g - 128) * (1 + CONTRAST / 100) + 128 + BRIGHTNESS;
+        /* Helligkeit + Kontrast anwenden; hero.mp4 (Slide 0) extra aufhellen */
+        var extraBright = (curIdx === 0 && blendStart === null) ? HERO_BRIGHTEN :
+                          (blendStart !== null && nextIdx === 0) ? HERO_BRIGHTEN * nextAlpha :
+                          (blendStart !== null && curIdx === 0) ? HERO_BRIGHTEN * curAlpha : 0;
+        g = (g - 128) * (1 + CONTRAST / 100) + 128 + BRIGHTNESS + extraBright;
         if (g < 0) g = 0; else if (g > 255) g = 255;
         gray[ty * sw + tx] = g;
       }
@@ -301,9 +305,29 @@
   }
 
   /* ── de/en Sprachumschalter ── */
+  function applyLang(lang) {
+    document.documentElement.lang = lang;
+    document.querySelectorAll("[data-de][data-en]").forEach(function (el) {
+      var text = lang === "de" ? el.getAttribute("data-de") : el.getAttribute("data-en");
+      /* Für Elemente die HTML-Entities im Attribut haben, innerHTML nutzen */
+      if (text.indexOf("&lt;") !== -1 || text.indexOf("&amp;") !== -1) {
+        el.innerHTML = text.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+      } else {
+        el.textContent = text;
+      }
+    });
+    /* Trainer-Mailto Übersetzung für den Button-Text */
+    var trainerBtns = document.querySelectorAll("[data-trainer-mail]");
+    trainerBtns.forEach(function (el) {
+      el.textContent = lang === "de" ? "Trainer werden" : "Become a trainer";
+    });
+  }
+
   var langBtn = document.getElementById("lp-lang-btn");
   if (langBtn) {
     var savedLang = localStorage.getItem("gg-lang") || "de";
+    /* Beim Laden: falls gespeicherte Sprache en ist, sofort anwenden */
+    if (savedLang === "en") applyLang("en");
     langBtn.textContent = savedLang === "de" ? "en" : "de";
     langBtn.setAttribute("aria-label", savedLang === "de" ? "Switch to English" : "Zu Deutsch wechseln");
     langBtn.addEventListener("click", function () {
@@ -312,10 +336,7 @@
       localStorage.setItem("gg-lang", next);
       langBtn.textContent = next === "de" ? "en" : "de";
       langBtn.setAttribute("aria-label", next === "de" ? "Switch to English" : "Zu Deutsch wechseln");
-      /* Einfaches Toggle: alle [data-de] / [data-en] Elemente umschalten */
-      document.querySelectorAll("[data-de][data-en]").forEach(function (el) {
-        el.textContent = next === "de" ? el.getAttribute("data-de") : el.getAttribute("data-en");
-      });
+      applyLang(next);
     });
   }
 })();
