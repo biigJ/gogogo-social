@@ -4461,11 +4461,25 @@
   }
   window.selectEmbedTab = selectEmbedTab;
 
+  function applyTrainingPreset(tab, preset){
+    if (!tab) return;
+    selectEmbedTab(tab);
+    if (tab === 'kraft' && preset && preset.systemId) {
+      setKraftSystem(String(preset.systemId));
+    } else if (tab === 'ausdauer' && preset && preset.presetId) {
+      selectAusdauerPreset(String(preset.presetId));
+    }
+  }
+  window.applyTrainingPreset = applyTrainingPreset;
+
   if (useParentTabs) {
     window.addEventListener('message', function(ev){
       if (!ev.data) return;
       if (ev.data.type === 'gogogo-training-tab') {
         selectEmbedTab(ev.data.tab);
+      }
+      if (ev.data.type === 'gogogo-training-preset') {
+        applyTrainingPreset(ev.data.tab, ev.data.preset);
       }
       if (ev.data.type === 'gogogo-training-back') {
         document.getElementById('trainingBack').click();

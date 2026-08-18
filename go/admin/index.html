@@ -346,7 +346,20 @@
       flex-wrap: wrap;
       justify-content: flex-end;
       gap: 6px 12px;
+      align-items: center;
     }
+    .plan-unit-label {
+      display: block;
+      width: 100%;
+      text-align: right;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--red);
+      opacity: 0.95;
+      margin-top: 2px;
+    }
+    .plan-unit-label:empty { display: none; }
     .admin-plan__dayhead label[for] {
       margin-bottom: 0;
     }
@@ -968,6 +981,67 @@
       font-weight: 500;
       opacity: 0.8;
     }
+    .unit-wheel-modal .challenge-modal__sheet { padding-bottom: 18px; }
+    .unit-wheel-frame {
+      position: relative;
+      height: 168px;
+      margin: 8px 0 4px;
+      overflow: hidden;
+    }
+    .unit-wheel-highlight {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      top: 50%;
+      height: 44px;
+      margin-top: -22px;
+      border: 1px solid rgba(247, 245, 240, 0.35);
+      border-radius: var(--radius);
+      pointer-events: none;
+    }
+    .unit-wheel-scroller {
+      height: 100%;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .unit-wheel-scroller::-webkit-scrollbar { display: none; }
+    .unit-wheel-pad { height: 62px; flex-shrink: 0; }
+    .unit-wheel-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      scroll-snap-align: center;
+      font-size: 0.92rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      opacity: 0.45;
+      border: 0;
+      background: none;
+      color: inherit;
+      width: 100%;
+      cursor: pointer;
+      padding: 0 12px;
+      text-align: center;
+    }
+    .unit-wheel-item.is-selected { opacity: 1; font-size: 1rem; }
+    body.is-trainer-mode .site-header__left,
+    body.is-trainer-mode #btn-menu { display: none !important; }
+    body.is-trainer-mode .list-action.is-disabled,
+    body.is-trainer-mode .list-challenge-euro.is-disabled,
+    body.is-trainer-mode .list-challenge-wheel.is-disabled {
+      opacity: 0.35;
+      pointer-events: none;
+    }
+    .list-item__trainer {
+      display: block;
+      margin-top: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      opacity: 0.85;
+    }
   </style>
 </head>
 <body>
@@ -1094,6 +1168,20 @@
         <div class="challenge-modal__actions">
           <button type="button" class="challenge-modal__btn is-ghost" id="challenge-amount-cancel">Abbrechen</button>
           <button type="button" class="challenge-modal__btn" id="challenge-amount-ok">Starten</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="challenge-modal unit-wheel-modal" id="unit-wheel-modal" hidden aria-hidden="true">
+      <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="unit-wheel-title">
+        <p class="challenge-modal__title" id="unit-wheel-title">Einheit wählen</p>
+        <div class="unit-wheel-frame">
+          <div class="unit-wheel-highlight" aria-hidden="true"></div>
+          <div class="unit-wheel-scroller" id="unit-wheel-scroller" tabindex="0" role="listbox"></div>
+        </div>
+        <div class="challenge-modal__actions">
+          <button type="button" class="challenge-modal__btn is-ghost" id="unit-wheel-cancel">Abbrechen</button>
+          <button type="button" class="challenge-modal__btn" id="unit-wheel-ok">OK</button>
         </div>
       </div>
     </div>
@@ -1356,6 +1444,9 @@
       var ADMIN_NAME = "biigJ";
       var ADMIN_CODE = "121276030993";
       var AUTH_KEY = "gogogo_go_admin";
+      var TRAINER_ADMIN_KEY = "gogogo_trainer_admin";
+      var trainerSessionAccount = null;
+      var trainerAdminMode = false;
       var ACCOUNT_KEY = "gogogo_go_account";
       var ADMIN_FEED_SEEN_KEY = "gogogo_admin_feed_seen";
       var ADMIN_OK_ACK_KEY = "gogogo_admin_ok_ack_v1";
@@ -1731,6 +1822,263 @@
         return arr.map(Number).filter(function (n) { return n >= 0 && n <= 6; });
       }
 
+      var dayTrainingUnits = {};
+
+      function parseDayTrainingUnits(raw) {
+        var out = {};
+        var m = raw;
+        if (typeof raw === "string") {
+          try { m = JSON.parse(raw); } catch (e) { m = {}; }
+        }
+        if (!m || typeof m !== "object") return out;
+        Object.keys(m).forEach(function (k) {
+          var wd = Number(k);
+          if (!(wd >= 0 && wd <= 6)) return;
+          var row = m[k];
+          if (!row || !row.kind) return;
+          out[wd] = {
+            kind: String(row.kind),
+            label: row.label != null ? String(row.label) : "",
+            systemId: row.systemId != null ? String(row.systemId) : "",
+            presetId: row.presetId != null ? String(row.presetId) : ""
+          };
+        });
+        return out;
+      }
+
+      function ensureDayUnitLabel(wd) {
+        var block = document.querySelector('.admin-plan__block[data-plan-day="' + wd + '"]');
+        if (!block) return null;
+        var span = block.querySelector(".plan-unit-label[data-wd='" + wd + "']");
+        if (!span) {
+          span = document.createElement("span");
+          span.className = "plan-unit-label";
+          span.setAttribute("data-wd", String(wd));
+          var head = block.querySelector(".admin-plan__dayhead");
+          if (head) head.appendChild(span);
+        }
+        return span;
+      }
+
+      function renderDayUnitLabels() {
+        for (var wd = 0; wd <= 6; wd++) {
+          var span = ensureDayUnitLabel(wd);
+          if (!span) continue;
+          var u = dayTrainingUnits[wd];
+          span.textContent = u && u.label ? u.label : "";
+        }
+      }
+
+      function clearDayTrainingUnit(wd) {
+        delete dayTrainingUnits[wd];
+        renderDayUnitLabels();
+      }
+
+      function kraftSystemOptions() {
+        var cat = kraftCat();
+        return (cat.SYSTEMS || []).map(function (sys) {
+          return { id: sys.id, label: sys.name, systemId: sys.id, kind: "kraft" };
+        });
+      }
+
+      function ausdauerPresetOptions() {
+        var cat = ausdauerCat();
+        return (ausdauerAdminPresets || []).map(function (row) {
+          return {
+            id: String(row.id),
+            label: cat.summarize(row),
+            presetId: String(row.id),
+            kind: "ausdauer"
+          };
+        });
+      }
+
+      function nearestUnitWheelItem(scroller) {
+        if (!scroller) return null;
+        var items = scroller.querySelectorAll(".unit-wheel-item");
+        if (!items.length) return null;
+        var mid = scroller.scrollTop + scroller.clientHeight / 2;
+        var best = items[0];
+        var bestDist = Infinity;
+        items.forEach(function (btn) {
+          var d = Math.abs(btn.offsetTop + btn.offsetHeight / 2 - mid);
+          if (d < bestDist) {
+            bestDist = d;
+            best = btn;
+          }
+        });
+        return best;
+      }
+
+      function pickUnitWheel(title, options) {
+        return new Promise(function (resolve) {
+          var modal = document.getElementById("unit-wheel-modal");
+          var scroller = document.getElementById("unit-wheel-scroller");
+          var ok = document.getElementById("unit-wheel-ok");
+          var cancel = document.getElementById("unit-wheel-cancel");
+          var titleEl = document.getElementById("unit-wheel-title");
+          if (!modal || !scroller || !ok || !cancel || !options || !options.length) {
+            resolve(null);
+            return;
+          }
+          if (titleEl) titleEl.textContent = title || "Einheit wählen";
+          scroller.innerHTML =
+            '<div class="unit-wheel-pad"></div>' +
+            options.map(function (opt, i) {
+              return '<button type="button" class="unit-wheel-item' + (i === 0 ? " is-selected" : "") +
+                '" data-idx="' + i + '">' + String(opt.label || "").replace(/</g, "&lt;") + "</button>";
+            }).join("") +
+            '<div class="unit-wheel-pad"></div>';
+
+          function markSelected(btn) {
+            scroller.querySelectorAll(".unit-wheel-item").forEach(function (el) {
+              el.classList.toggle("is-selected", el === btn);
+            });
+          }
+
+          function onScroll() {
+            markSelected(nearestUnitWheelItem(scroller));
+          }
+
+          scroller.addEventListener("scroll", onScroll);
+
+          scroller.querySelectorAll(".unit-wheel-item").forEach(function (btn) {
+            btn.addEventListener("click", function () {
+              btn.scrollIntoView({ block: "center", behavior: "smooth" });
+              markSelected(btn);
+            });
+          });
+
+          function close(value) {
+            scroller.removeEventListener("scroll", onScroll);
+            ok.removeEventListener("click", onOk);
+            cancel.removeEventListener("click", onCancel);
+            modal.removeEventListener("click", onBackdrop);
+            modal.hidden = true;
+            modal.setAttribute("aria-hidden", "true");
+            resolve(value);
+          }
+
+          function selectedOption() {
+            var btn = scroller.querySelector(".unit-wheel-item.is-selected") || nearestUnitWheelItem(scroller);
+            if (!btn) return null;
+            var idx = parseInt(btn.getAttribute("data-idx"), 10);
+            return options[idx] || null;
+          }
+
+          function onOk(e) {
+            e.stopPropagation();
+            close(selectedOption());
+          }
+          function onCancel(e) {
+            e.stopPropagation();
+            close(null);
+          }
+          function onBackdrop(e) {
+            if (e.target === modal) close(null);
+          }
+
+          modal.hidden = false;
+          modal.setAttribute("aria-hidden", "false");
+          ok.addEventListener("click", onOk);
+          cancel.addEventListener("click", onCancel);
+          modal.addEventListener("click", onBackdrop);
+          requestAnimationFrame(function () {
+            var first = scroller.querySelector(".unit-wheel-item");
+            if (first) first.scrollIntoView({ block: "center" });
+          });
+        });
+      }
+
+      async function onKindCheckChange(box, kind) {
+        var wd = parseInt(box.getAttribute("data-wd"), 10);
+        if (!(wd >= 0 && wd <= 6)) return;
+        var zirkelWd = getSelectedZirkelWeekday();
+        if (box.checked && wd === zirkelWd) {
+          box.checked = false;
+          window.alert("Zirkeltraining ist an diesem Tag aktiv — Kraft/Ausdauer nicht möglich.");
+          return;
+        }
+        var otherSel = kind === "kraft" ? ".plan-ausdauer-check[data-wd='" + wd + "']" : ".plan-kraft-check[data-wd='" + wd + "']";
+        var other = document.querySelector(otherSel);
+        if (box.checked && other) other.checked = false;
+        if (!box.checked) {
+          clearDayTrainingUnit(wd);
+          return;
+        }
+        var opts = kind === "kraft" ? kraftSystemOptions() : ausdauerPresetOptions();
+        if (!opts.length) {
+          box.checked = false;
+          window.alert(kind === "kraft"
+            ? "Keine Kraft-Einheiten verfügbar."
+            : "Zuerst unten eine Ausdauer-Voreinstellung speichern, dann erneut wählen.");
+          return;
+        }
+        var picked = await pickUnitWheel(
+          (kind === "kraft" ? "Kraft" : "Ausdauer") + " · " + (ZIRKEL_DAY_NAMES[wd] || "Tag"),
+          opts
+        );
+        if (!picked) {
+          box.checked = false;
+          return;
+        }
+        dayTrainingUnits[wd] = {
+          kind: kind,
+          label: picked.label,
+          systemId: picked.systemId || "",
+          presetId: picked.presetId || ""
+        };
+        renderDayUnitLabels();
+        var ta = document.getElementById(PLAN_DAY_FIELD_IDS[wd]);
+        if (ta) {
+          ta.value = "";
+          ta.disabled = true;
+          ta.placeholder = picked.label;
+        }
+      }
+
+      function bindKindDayChecks() {
+        document.querySelectorAll(".plan-kraft-check").forEach(function (box) {
+          box.addEventListener("change", function () { onKindCheckChange(box, "kraft"); });
+        });
+        document.querySelectorAll(".plan-ausdauer-check").forEach(function (box) {
+          box.addEventListener("change", function () { onKindCheckChange(box, "ausdauer"); });
+        });
+      }
+
+      function syncKindUiFromUnits() {
+        var zirkelWd = getSelectedZirkelWeekday();
+        PLAN_DAY_FIELD_IDS.forEach(function (id, idx) {
+          var ta = document.getElementById(id);
+          if (!ta) return;
+          var u = dayTrainingUnits[idx];
+          if (idx === zirkelWd) return;
+          if (u && u.label) {
+            ta.disabled = true;
+            ta.placeholder = u.label;
+          } else if (ta.placeholder && ta.placeholder !== "Zirkeltraining") {
+            if (!ta.value) ta.disabled = false;
+          }
+        });
+        renderDayUnitLabels();
+      }
+
+      function dayTrainingUnitsPayload() {
+        var out = {};
+        Object.keys(dayTrainingUnits).forEach(function (k) {
+          var wd = Number(k);
+          var u = dayTrainingUnits[wd];
+          if (!u || !u.kind) return;
+          out[String(wd)] = {
+            kind: u.kind,
+            label: u.label || "",
+            systemId: u.systemId || null,
+            presetId: u.presetId || null
+          };
+        });
+        return out;
+      }
+
       function ausdauerCat() {
         return window.GOGOGO_AUSDAUER || {
           TECHNIQUES: [],
@@ -1944,12 +2292,22 @@
           if (isZirkel) {
             if (clearZirkelText) el.value = "";
             el.placeholder = "Zirkeltraining";
+            delete dayTrainingUnits[idx];
+            var kBox = document.querySelector('.plan-kraft-check[data-wd="' + idx + '"]');
+            var aBox = document.querySelector('.plan-ausdauer-check[data-wd="' + idx + '"]');
+            if (kBox) kBox.checked = false;
+            if (aBox) aBox.checked = false;
           } else if (el.placeholder === "Zirkeltraining") {
             var labels = ["Montag…", "Dienstag…", "Mittwoch…", "Donnerstag…", "Freitag…", "Samstag…", "Sonntag…"];
             el.placeholder = labels[idx] || "";
           }
         });
+        document.querySelectorAll(".plan-kraft-check, .plan-ausdauer-check").forEach(function (box) {
+          var n = parseInt(box.getAttribute("data-wd"), 10);
+          box.disabled = n === selected;
+        });
         zirkelUiWeekday = selected;
+        syncKindUiFromUnits();
       }
 
       function bindZirkelDayChecks() {
@@ -1999,9 +2357,37 @@
       }
 
       function isAuthed() {
+        if (trainerAdminMode && trainerSessionAccount && trainerSessionAccount.id) return true;
         try {
           return localStorage.getItem(AUTH_KEY) === "1" || sessionStorage.getItem(AUTH_KEY) === "1";
         } catch (e) { return false; }
+      }
+
+      function readAccountSession() {
+        try {
+          if (window.GoAccountSession && typeof GoAccountSession.load === "function") {
+            return GoAccountSession.load();
+          }
+          return JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null");
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function adminFirstName(name) {
+        return String(name || "").trim().split(/\s+/)[0] || "";
+      }
+
+      function initTrainerAdminMode() {
+        var params = new URLSearchParams(location.search || "");
+        if (params.get("trainer") !== "1") return false;
+        var acc = readAccountSession();
+        if (!acc || !acc.id || !acc.is_trainer) return false;
+        trainerSessionAccount = acc;
+        trainerAdminMode = true;
+        document.body.classList.add("is-trainer-mode");
+        setAuthed(true);
+        return true;
       }
 
       function setAuthed(on) {
@@ -2017,6 +2403,10 @@
       }
 
       function updateAuthBtn() {
+        if (trainerAdminMode && trainerSessionAccount) {
+          authBtn.textContent = "Logout";
+          return;
+        }
         authBtn.textContent = isAuthed() ? "Logout" : "Login";
       }
 
@@ -2345,6 +2735,8 @@
         applyZirkelDayUi(DEFAULT_ZIRKEL_WD, { clearZirkelText: true });
         applyKindChecks(".plan-kraft-check", []);
         applyKindChecks(".plan-ausdauer-check", []);
+        dayTrainingUnits = {};
+        renderDayUnitLabels();
         resetZirkelTextStash();
         var planMsg = document.getElementById("plan-msg");
         if (planMsg) {
@@ -2364,6 +2756,8 @@
         applyZirkelDayUi(zw, { clearZirkelText: true });
         applyKindChecks(".plan-kraft-check", parseWeekdayList(row.kraft_weekdays));
         applyKindChecks(".plan-ausdauer-check", parseWeekdayList(row.ausdauer_weekdays));
+        dayTrainingUnits = parseDayTrainingUnits(row.day_training_units);
+        syncKindUiFromUnits();
         resetZirkelTextStash();
       }
       async function loadCoachPlan(accountId) {
@@ -2606,6 +3000,11 @@
         payload.zirkel_weekday = zirkelWd;
         payload.kraft_weekdays = getCheckedWeekdays(".plan-kraft-check");
         payload.ausdauer_weekdays = getCheckedWeekdays(".plan-ausdauer-check");
+        payload.day_training_units = dayTrainingUnitsPayload();
+        Object.keys(dayTrainingUnits).forEach(function (k) {
+          var dk = DAY_PLAN_KEYS[Number(k)];
+          if (dk) payload[dk] = null;
+        });
         var zirkelKey = DAY_PLAN_KEYS[zirkelWd];
         if (zirkelKey) payload[zirkelKey] = null;
         if (planMsg) {
@@ -2633,10 +3032,10 @@
           if (!res.ok) {
             var t = "";
             try { t = await res.text(); } catch (e0) {}
-            if (/kraft_weekdays|ausdauer_weekdays/i.test(t)) {
+            if (/kraft_weekdays|ausdauer_weekdays|day_training_units/i.test(t)) {
               var retry = {};
               Object.keys(payload).forEach(function (k) {
-                if (k !== "kraft_weekdays" && k !== "ausdauer_weekdays") retry[k] = payload[k];
+                if (k !== "kraft_weekdays" && k !== "ausdauer_weekdays" && k !== "day_training_units") retry[k] = payload[k];
               });
               res = await fetch(SUPABASE_URL + "/rest/v1/go_coach_plans?on_conflict=account_id", {
                 method: "POST",
@@ -3706,6 +4105,12 @@
         openBtn.appendChild(nameRow);
         openBtn.appendChild(stakeLine);
         openBtn.appendChild(meta);
+        if (trainerAdminMode && trainerSessionAccount) {
+          var trainerLine = document.createElement("span");
+          trainerLine.className = "list-item__trainer";
+          trainerLine.textContent = "Trainer: " + adminFirstName(trainerSessionAccount.name);
+          openBtn.appendChild(trainerLine);
+        }
         openBtn.setAttribute("aria-label", "Profil von " + (row.first_name || "Nutzer") + " öffnen");
         openBtn.addEventListener("click", function () {
           enterUserAccount(row.first_name, row.serial_number, row.code);
@@ -3783,6 +4188,12 @@
         main.appendChild(euroBtn);
         main.appendChild(wheel);
 
+        if (trainerAdminMode) {
+          euroBtn.classList.add("is-disabled");
+          euroBtn.disabled = true;
+          wheel.classList.add("is-disabled");
+        }
+
         var actions = document.createElement("div");
         actions.className = "list-actions";
 
@@ -3859,6 +4270,14 @@
         actions.appendChild(adminBtn);
         actions.appendChild(pauseBtn);
         actions.appendChild(delBtn);
+        if (trainerAdminMode) {
+          adminBtn.classList.add("is-disabled");
+          adminBtn.disabled = true;
+          pauseBtn.classList.add("is-disabled");
+          pauseBtn.disabled = true;
+          delBtn.classList.add("is-disabled");
+          delBtn.disabled = true;
+        }
         wrap.appendChild(main);
         wrap.appendChild(actions);
         list.appendChild(wrap);
@@ -3875,22 +4294,62 @@
         setActorName("");
         var list = document.getElementById("code-list");
         var listMsg = document.getElementById("list-msg");
+        var listTitle = panelList.querySelector("h1");
+        if (listTitle) {
+          listTitle.textContent = trainerAdminMode ? "Meine Nutzer" : "Alle Nutzer";
+        }
         list.innerHTML = "";
         listMsg.textContent = "Lade …";
         listMsg.classList.remove("is-error");
         try {
-          var res = await fetch(
-            SUPABASE_URL + "/rest/v1/go_invite_codes?select=*&order=created_at.desc",
-            { headers: apiHeaders() }
-          );
-          if (!res.ok) throw new Error("HTTP " + res.status);
-          var rows = await res.json();
-          listMsg.textContent = rows.length ? "" : "Noch keine Codes.";
+          var rows = [];
+          if (trainerAdminMode && trainerSessionAccount && trainerSessionAccount.id) {
+            var clientsRes = await fetch(
+              SUPABASE_URL + "/rest/v1/go_accounts?trainer_id=eq." + encodeURIComponent(trainerSessionAccount.id) +
+              "&select=id,name,serial_number,invite_code&order=created_at.desc",
+              { headers: apiHeaders() }
+            );
+            var clients = clientsRes.ok ? await clientsRes.json() : [];
+            var inviteRes = await fetch(
+              SUPABASE_URL + "/rest/v1/go_invite_codes?select=*&order=created_at.desc",
+              { headers: apiHeaders() }
+            );
+            var invites = inviteRes.ok ? await inviteRes.json() : [];
+            var inviteBySerial = {};
+            var inviteByCode = {};
+            (invites || []).forEach(function (inv) {
+              if (inv.serial_number) inviteBySerial[String(inv.serial_number)] = inv;
+              if (inv.code) inviteByCode[String(inv.code)] = inv;
+            });
+            (clients || []).forEach(function (acc) {
+              var inv = null;
+              if (acc.serial_number) inv = inviteBySerial[String(acc.serial_number)];
+              if (!inv && acc.invite_code) inv = inviteByCode[String(acc.invite_code)];
+              rows.push({
+                id: inv && inv.id ? inv.id : null,
+                first_name: adminFirstName(acc.name),
+                serial_number: (inv && inv.serial_number) || acc.serial_number || "",
+                code: (inv && inv.code) || acc.invite_code || "",
+                paused: inv ? !!inv.paused : false,
+                challenge_active: inv ? !!inv.challenge_active : false,
+                challenge_started_at: inv ? inv.challenge_started_at : null,
+                challenge_amount: inv ? inv.challenge_amount : null
+              });
+            });
+          } else {
+            var res = await fetch(
+              SUPABASE_URL + "/rest/v1/go_invite_codes?select=*&order=created_at.desc",
+              { headers: apiHeaders() }
+            );
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            rows = await res.json();
+          }
+          listMsg.textContent = rows.length ? "" : (trainerAdminMode ? "Noch keine Nutzer mit Dir als Trainer." : "Noch keine Codes.");
           var accountIndex = await loadAccountIndex();
-          var latestByAuthor = await loadLatestPostMsByAuthor();
+          var latestByAuthor = trainerAdminMode ? {} : await loadLatestPostMsByAuthor();
           rows.forEach(function (row) {
             var linked = accountIdsForInvite(row, accountIndex);
-            renderListRow(list, row, inviteHasUnread(row, accountIndex, latestByAuthor), linked, latestByAuthor);
+            renderListRow(list, row, trainerAdminMode ? false : inviteHasUnread(row, accountIndex, latestByAuthor), linked, latestByAuthor);
           });
         } catch (err) {
           listMsg.textContent = "Liste nicht geladen.";
@@ -4100,6 +4559,10 @@
       }
 
       function requireAuth(fn) {
+        if (trainerAdminMode) {
+          if (typeof fn === "function") fn();
+          return;
+        }
         if (!isAuthed()) {
           showLogin();
           return;
@@ -4127,6 +4590,10 @@
       });
       authBtn.addEventListener("click", function () {
         setMenu(false);
+        if (trainerAdminMode) {
+          window.location.href = "/account/?goto=profile";
+          return;
+        }
         showLogin();
       });
       adminNameBtn.addEventListener("click", function () {
@@ -4169,7 +4636,8 @@
       }
 
       try {
-        if (isAuthed()) showGen();
+        if (initTrainerAdminMode()) showList();
+        else if (isAuthed()) showGen();
         else showLogin();
       } catch (e) { showLogin(); }
       updateAuthBtn();
@@ -4191,6 +4659,7 @@
       var planSave = document.getElementById("plan-save");
       if (planSave) planSave.addEventListener("click", function () { saveCoachPlan(); });
       bindZirkelDayChecks();
+      bindKindDayChecks();
       var kraftSysWrap = document.getElementById("kraft-admin-systems");
       if (kraftSysWrap) {
         kraftSysWrap.addEventListener("click", function (e) {

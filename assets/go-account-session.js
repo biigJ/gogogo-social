@@ -13,9 +13,8 @@
       serial_number: account.serial_number || null,
       created_at: account.created_at || null
     };
-    if (account.photo_url && String(account.photo_url).indexOf("http") === 0) {
-      slim.photo_url = account.photo_url;
-    }
+    if (account.is_trainer) slim.is_trainer = true;
+    if (account.trainer_id) slim.trainer_id = account.trainer_id;
     return slim;
   }
 
