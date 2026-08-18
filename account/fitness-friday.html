@@ -2254,6 +2254,7 @@
   let kraftPresetMap = {};
   let kraftCustomMap = {};
   let kraftPresetsLoaded = false;
+  let pendingKraftPreset = null;
   let kraftLogs = [];
   let kraftSets = {};
   let kraftFocusId = '';
@@ -3795,11 +3796,38 @@
     updateKraftHub();
   }
 
-  function setKraftSystem(id){
-    if (kraftRunning || !id || id === kraftSystemId) return;
+  function kraftSystemIdFromPreset(preset){
+    const cat = kraftCatalog();
+    const systems = cat.SYSTEMS || [];
+    if (preset && preset.systemId) {
+      for (let i = 0; i < systems.length; i++) {
+        if (systems[i].id === String(preset.systemId)) return systems[i].id;
+      }
+    }
+    if (preset && preset.label) {
+      const label = String(preset.label).trim().toLowerCase();
+      for (let j = 0; j < systems.length; j++) {
+        if (String(systems[j].name).trim().toLowerCase() === label) return systems[j].id;
+      }
+    }
+    return '';
+  }
+
+  function setKraftSystem(id, force){
+    if (kraftRunning || !id) return;
+    if (!force && id === kraftSystemId && kraftSelected.length) return;
     kraftSystemId = id;
     applyKraftDefaults(id);
     refreshKraftChrome();
+  }
+
+  async function applyPendingKraftPreset(){
+    const preset = pendingKraftPreset;
+    if (!preset) return;
+    await loadKraftPresets();
+    const id = kraftSystemIdFromPreset(preset) || kraftSystemId || 'full';
+    setKraftSystem(id, true);
+    pendingKraftPreset = null;
   }
 
   function toggleKraftExercise(exId){
@@ -4084,7 +4112,11 @@
   async function enterKraftView(){
     document.getElementById('trainingBack').classList.toggle('is-visible', kraftRunning);
     await loadKraftPresets();
-    if (!kraftSelected.length) applyKraftDefaults(kraftSystemId);
+    if (pendingKraftPreset) {
+      await applyPendingKraftPreset();
+    } else if (!kraftSelected.length) {
+      applyKraftDefaults(kraftSystemId);
+    }
     refreshKraftChrome();
     notifyParentTabState();
     loadKraftLogs();
@@ -4463,9 +4495,10 @@
 
   function applyTrainingPreset(tab, preset){
     if (!tab) return;
+    if (tab === 'kraft') pendingKraftPreset = preset || { systemId: 'full' };
     selectEmbedTab(tab);
-    if (tab === 'kraft' && preset && preset.systemId) {
-      setKraftSystem(String(preset.systemId));
+    if (tab === 'kraft') {
+      applyPendingKraftPreset();
     } else if (tab === 'ausdauer' && preset && preset.presetId) {
       selectAusdauerPreset(String(preset.presetId));
     }

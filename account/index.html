@@ -5318,14 +5318,38 @@
       var pendingTrainingPreset = null;
 
       function sendTrainingPreset(tab, preset) {
-        if (!trainingFrame || !tab) return;
+        if (!trainingFrame || !tab) return false;
+        try {
+          var win = trainingFrame.contentWindow;
+          if (win && typeof win.applyTrainingPreset === "function") {
+            win.applyTrainingPreset(tab, preset || null);
+            return true;
+          }
+        } catch (e) {}
         try {
           trainingFrame.contentWindow.postMessage({
             type: "gogogo-training-preset",
             tab: tab,
             preset: preset || null
           }, "*");
-        } catch (e) {}
+        } catch (e2) {}
+        return false;
+      }
+
+      function sendTrainingPresetWhenReady(tab, preset) {
+        if (!tab) return;
+        if (sendTrainingPreset(tab, preset)) {
+          pendingTrainingPreset = null;
+          return;
+        }
+        var n = 0;
+        var t = setInterval(function () {
+          n += 1;
+          if (sendTrainingPreset(tab, preset) || n > 20) {
+            clearInterval(t);
+            if (n <= 20) pendingTrainingPreset = null;
+          }
+        }, 80);
       }
 
       function openTrainingFromCalendar(tab, preset) {
@@ -5334,7 +5358,7 @@
         trainingActiveTab = tab;
         gotoPanel("training");
         activateTrainingTab(tab);
-        if (trainingLoaded) sendTrainingPreset(tab, pendingTrainingPreset);
+        sendTrainingPresetWhenReady(tab, pendingTrainingPreset);
       }
 
       function setTrainingChromeTab(tab) {
@@ -5473,7 +5497,7 @@
         }
         if (id !== "book") pauseAccountVideos();
         if (id === "training") {
-          var TRAINING_IFRAME_V = "20260817q";
+          var TRAINING_IFRAME_V = "20260818k";
           var wantTrainingSrc = "/account/fitness-friday.html?embed=1&parentTabs=1&v=" + TRAINING_IFRAME_V;
           if (!trainingFrame.src || String(trainingFrame.src).indexOf("v=" + TRAINING_IFRAME_V) === -1) {
             trainingFrame.src = wantTrainingSrc;
@@ -5661,7 +5685,7 @@
               training: true,
               zirkel: false,
               trainingTab: "kraft",
-              trainingPreset: { systemId: unit.systemId || "full" }
+              trainingPreset: { systemId: unit.systemId || "", label: unit.label || "" }
             };
           }
           if (unit && unit.kind === "ausdauer") {
@@ -5840,6 +5864,10 @@
             btn.innerHTML =
               "<span>" + names[i] + "</span><span class='home-cal__n'>" + d.getDate() + "</span>";
             btn.addEventListener("click", function () {
+              if (key === selectedKey && w && w.training && w.trainingTab) {
+                openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null);
+                return;
+              }
               selectDay(key, false);
             });
 
