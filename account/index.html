@@ -5997,15 +5997,23 @@
 
       async function syncFromCloud() {
         var remote = null;
+        var fetchWorked = false;
+
+        async function safeGet(path) {
+          var result = await restGet(path);
+          fetchWorked = true;
+          return result;
+        }
+
         try {
           if (account.id && String(account.id).indexOf("local-") !== 0) {
-            var byId = await restGet("go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1");
+            var byId = await safeGet("go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1");
             if (byId && byId[0]) remote = byId[0];
           }
         } catch (e0) {}
         if (!remote && account.serial_number) {
           try {
-            var bySerial = await restGet(
+            var bySerial = await safeGet(
               "go_accounts?serial_number=eq." + encodeURIComponent(account.serial_number) +
               "&select=*&limit=1"
             );
@@ -6014,7 +6022,7 @@
         }
         if (!remote && account.invite_code) {
           try {
-            var byCode = await restGet(
+            var byCode = await safeGet(
               "go_accounts?invite_code=eq." + encodeURIComponent(account.invite_code) +
               "&select=*&limit=1"
             );
@@ -6036,15 +6044,19 @@
             }
           }
           if (account.phone) {
-            addRows(await restGet(
-              "go_accounts?phone=eq." + encodeURIComponent(account.phone) +
-              "&select=*&order=created_at.asc&limit=50"
-            ));
+            try {
+              addRows(await safeGet(
+                "go_accounts?phone=eq." + encodeURIComponent(account.phone) +
+                "&select=*&order=created_at.asc&limit=50"
+              ));
+            } catch (e3) {}
           }
           if (candidates.length) remote = candidates[0];
         }
         if (!remote) {
-          if (accountHasCloudIdentity()) {
+          /* Nur als gelöscht markieren wenn die Anfrage tatsächlich funktioniert hat
+             und wirklich kein Account gefunden wurde – nicht bei Netzwerkfehlern. */
+          if (fetchWorked && accountHasCloudIdentity()) {
             showAccountDeletedPage();
             return;
           }
