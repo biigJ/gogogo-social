@@ -3306,10 +3306,25 @@
       }
 
       function openCalendly() {
-        var w = 700, h = 700;
-        var left = Math.max(0, Math.round((screen.width - w) / 2));
-        var top = Math.max(0, Math.round((screen.height - h) / 2));
-        window.open(CALENDLY_URL, "calendly", "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top + ",resizable=yes,scrollbars=yes");
+        if (window.Calendly) {
+          window.Calendly.initPopupWidget({ url: CALENDLY_URL });
+        } else {
+          // Calendly script noch nicht geladen — dynamisch laden, dann öffnen
+          var s = document.createElement("script");
+          s.src = "https://assets.calendly.com/assets/external/widget.js";
+          s.onload = function () {
+            if (window.Calendly) window.Calendly.initPopupWidget({ url: CALENDLY_URL });
+          };
+          document.head.appendChild(s);
+          // CSS einmalig laden
+          if (!document.getElementById("calendly-css")) {
+            var l = document.createElement("link");
+            l.id = "calendly-css";
+            l.rel = "stylesheet";
+            l.href = "https://assets.calendly.com/assets/external/widget.css";
+            document.head.appendChild(l);
+          }
+        }
       }
 
       (function bindBooking() {
