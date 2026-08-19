@@ -485,6 +485,19 @@
       opacity: 0.4;
       padding: 0 2px;
     }
+    .admin-kraft__ex label .kraft-del {
+      margin-left: auto;
+      background: none;
+      border: none;
+      padding: 0 2px;
+      font-size: 1.15rem;
+      line-height: 1;
+      color: var(--red);
+      opacity: 0.5;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .admin-kraft__ex label .kraft-del:hover { opacity: 1; }
     .admin-kraft__ex label.is-dragging {
       opacity: 0.35;
     }
@@ -1661,6 +1674,13 @@
           inp.checked = selected.indexOf(ex.id) !== -1;
           lab.appendChild(inp);
           lab.appendChild(document.createTextNode(ex.name));
+          var del = document.createElement("button");
+          del.type = "button";
+          del.className = "kraft-del";
+          del.textContent = "×";
+          del.dataset.ex = ex.id;
+          del.title = "Übung löschen";
+          lab.appendChild(del);
           wrap.appendChild(lab);
         });
       }
@@ -1856,6 +1876,23 @@
         } else {
           setKraftAdminMsg("Speichern fehlgeschlagen" + (saved && saved.detail ? ": " + String(saved.detail).slice(0, 120) : "."), true);
         }
+      }
+
+      async function deleteKraftExercise(exId) {
+        collectKraftAdminChecks();
+        var sys = kraftAdminSystem;
+        if (kraftAdminExtras[sys]) {
+          kraftAdminExtras[sys] = kraftAdminExtras[sys].filter(function (ex) { return ex.id !== exId; });
+        }
+        if (kraftAdminMap[sys]) {
+          kraftAdminMap[sys] = kraftAdminMap[sys].filter(function (id) { return id !== exId; });
+        }
+        refreshKraftAdminUi();
+        if (!activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) return;
+        setKraftAdminMsg("Speichere …");
+        var saved = await saveKraftPresets(activeAccount.id);
+        if (saved && saved.ok) setKraftAdminMsg("Gespeichert.");
+        else setKraftAdminMsg("Speichern fehlgeschlagen" + (saved && saved.detail ? ": " + String(saved.detail).slice(0, 120) : "."), true);
       }
 
       function getCheckedWeekdays(selector) {
@@ -4877,6 +4914,12 @@
       if (kraftExWrap) {
         kraftExWrap.addEventListener("change", function () {
           collectKraftAdminChecks();
+        });
+        kraftExWrap.addEventListener("click", function (e) {
+          var del = e.target.closest(".kraft-del");
+          if (!del || !del.dataset.ex) return;
+          e.preventDefault();
+          deleteKraftExercise(del.dataset.ex);
         });
         (function initKraftDragDrop(wrap) {
           var dragSrc = null;
