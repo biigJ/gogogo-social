@@ -473,6 +473,24 @@
       font-size: 0.88rem;
       font-weight: 600;
       cursor: pointer;
+      position: relative;
+      transition: opacity 0.15s;
+    }
+    .admin-kraft__ex label .kraft-drag {
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      font-size: 1rem;
+      opacity: 0.4;
+      padding: 0 2px;
+    }
+    .admin-kraft__ex label.is-dragging {
+      opacity: 0.35;
+    }
+    .admin-kraft__ex label.drag-over {
+      border-top: 2px solid var(--red);
+      margin-top: -2px;
     }
     .admin-kraft__ex input[type="checkbox"] {
       appearance: none;
@@ -1407,6 +1425,7 @@
             <button class="btn" type="button" id="kraft-admin-new-save" hidden>speichern</button>
           </div>
           <p class="msg" id="kraft-admin-msg" role="status"></p>
+          <button class="btn admin-plan__save" type="button" id="kraft-plan-save">Plan speichern</button>
           <h2 class="admin-kraft__title">Ausdauer-Einheiten</h2>
           <p class="admin-kraft__hint">Voreinstellungen erscheinen in der App unter Ausdauer. Der Nutzer kann oben ein eigenes erstellen.</p>
           <div class="admin-kraft__systems" id="ausdauer-admin-tech"></div>
@@ -1618,8 +1637,24 @@
         if (!wrap) return;
         var selected = kraftIdsFor(kraftAdminSystem);
         wrap.innerHTML = "";
-        kraftAllAdminExercises(kraftAdminSystem).forEach(function (ex) {
+        var orderedExercises = kraftAllAdminExercises(kraftAdminSystem);
+        var selOrder = kraftAdminMap[kraftAdminSystem] || [];
+        if (selOrder.length) {
+          var byId = {};
+          orderedExercises.forEach(function (ex) { byId[ex.id] = ex; });
+          var sorted = [];
+          selOrder.forEach(function (id) { if (byId[id]) { sorted.push(byId[id]); delete byId[id]; } });
+          orderedExercises.forEach(function (ex) { if (byId[ex.id]) sorted.push(ex); });
+          orderedExercises = sorted;
+        }
+        orderedExercises.forEach(function (ex) {
           var lab = document.createElement("label");
+          lab.draggable = true;
+          lab.dataset.ex = ex.id;
+          var grip = document.createElement("span");
+          grip.className = "kraft-drag";
+          grip.textContent = "☰";
+          lab.appendChild(grip);
           var inp = document.createElement("input");
           inp.type = "checkbox";
           inp.dataset.ex = ex.id;
@@ -1638,11 +1673,22 @@
       function collectKraftAdminChecks() {
         var wrap = document.getElementById("kraft-admin-ex");
         if (!wrap) return;
-        var ids = [];
-        wrap.querySelectorAll("input[type='checkbox']").forEach(function (inp) {
-          if (inp.checked && inp.dataset.ex) ids.push(inp.dataset.ex);
+        var checked = [];
+        var allOrder = [];
+        wrap.querySelectorAll("label[data-ex]").forEach(function (lab) {
+          allOrder.push(lab.dataset.ex);
+          var inp = lab.querySelector("input[type='checkbox']");
+          if (inp && inp.checked) checked.push(lab.dataset.ex);
         });
-        kraftAdminMap[kraftAdminSystem] = ids;
+        kraftAdminMap[kraftAdminSystem] = checked.length ? reorderByRef(checked, allOrder) : [];
+      }
+      function reorderByRef(ids, refOrder) {
+        var set = {};
+        ids.forEach(function (id) { set[id] = true; });
+        var out = [];
+        refOrder.forEach(function (id) { if (set[id]) out.push(id); });
+        ids.forEach(function (id) { if (out.indexOf(id) === -1) out.push(id); });
+        return out;
       }
 
       async function loadKraftPresets(accountId) {
@@ -4813,6 +4859,8 @@
 
       var planSave = document.getElementById("plan-save");
       if (planSave) planSave.addEventListener("click", function () { saveCoachPlan(); });
+      var kraftPlanSave = document.getElementById("kraft-plan-save");
+      if (kraftPlanSave) kraftPlanSave.addEventListener("click", function () { saveCoachPlan(); });
       bindZirkelDayChecks();
       bindKindDayChecks();
       var kraftSysWrap = document.getElementById("kraft-admin-systems");
@@ -4830,6 +4878,77 @@
         kraftExWrap.addEventListener("change", function () {
           collectKraftAdminChecks();
         });
+        (function initKraftDragDrop(wrap) {
+          var dragSrc = null;
+          wrap.addEventListener("dragstart", function (e) {
+            var lab = e.target.closest("label[data-ex]");
+            if (!lab) return;
+            dragSrc = lab;
+            lab.classList.add("is-dragging");
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", lab.dataset.ex);
+          });
+          wrap.addEventListener("dragend", function () {
+            if (dragSrc) dragSrc.classList.remove("is-dragging");
+            wrap.querySelectorAll(".drag-over").forEach(function (el) { el.classList.remove("drag-over"); });
+            dragSrc = null;
+          });
+          wrap.addEventListener("dragover", function (e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            var lab = e.target.closest("label[data-ex]");
+            wrap.querySelectorAll(".drag-over").forEach(function (el) { el.classList.remove("drag-over"); });
+            if (lab && lab !== dragSrc) lab.classList.add("drag-over");
+          });
+          wrap.addEventListener("drop", function (e) {
+            e.preventDefault();
+            var target = e.target.closest("label[data-ex]");
+            if (!target || !dragSrc || target === dragSrc) return;
+            wrap.insertBefore(dragSrc, target);
+            collectKraftAdminChecks();
+          });
+
+          var touchSrc = null, touchClone = null, touchLast = null;
+          wrap.addEventListener("touchstart", function (e) {
+            var grip = e.target.closest(".kraft-drag");
+            if (!grip) return;
+            var lab = grip.closest("label[data-ex]");
+            if (!lab) return;
+            touchSrc = lab;
+            touchLast = e.touches[0];
+            touchClone = lab.cloneNode(true);
+            touchClone.style.cssText = "position:fixed;pointer-events:none;opacity:0.7;z-index:9999;width:" + lab.offsetWidth + "px;left:" + lab.getBoundingClientRect().left + "px;top:" + touchLast.clientY + "px;";
+            document.body.appendChild(touchClone);
+            lab.classList.add("is-dragging");
+          }, { passive: true });
+          wrap.addEventListener("touchmove", function (e) {
+            if (!touchSrc) return;
+            e.preventDefault();
+            touchLast = e.touches[0];
+            if (touchClone) touchClone.style.top = touchLast.clientY - 18 + "px";
+            var el = document.elementFromPoint(touchLast.clientX, touchLast.clientY);
+            var lab = el ? el.closest("label[data-ex]") : null;
+            wrap.querySelectorAll(".drag-over").forEach(function (el) { el.classList.remove("drag-over"); });
+            if (lab && lab !== touchSrc) lab.classList.add("drag-over");
+          }, { passive: false });
+          function touchEnd() {
+            if (!touchSrc) return;
+            if (touchClone) { touchClone.remove(); touchClone = null; }
+            if (touchLast) {
+              var el = document.elementFromPoint(touchLast.clientX, touchLast.clientY);
+              var target = el ? el.closest("label[data-ex]") : null;
+              if (target && target !== touchSrc) {
+                wrap.insertBefore(touchSrc, target);
+                collectKraftAdminChecks();
+              }
+            }
+            touchSrc.classList.remove("is-dragging");
+            wrap.querySelectorAll(".drag-over").forEach(function (el) { el.classList.remove("drag-over"); });
+            touchSrc = null; touchLast = null;
+          }
+          wrap.addEventListener("touchend", touchEnd);
+          wrap.addEventListener("touchcancel", touchEnd);
+        })(kraftExWrap);
       }
       var kraftNewBtn = document.getElementById("kraft-admin-new");
       var kraftNewSave = document.getElementById("kraft-admin-new-save");
