@@ -1,6 +1,13 @@
 -- Vollständiges Löschen von Nutzer-Accounts (Admin + Self-Service)
 -- Im Supabase SQL Editor ausführen (Projekt agpysewcsakdpmpftndp).
 
+alter table go_accounts
+  add column if not exists deleted_at timestamptz;
+
+create index if not exists go_accounts_deleted_at_idx
+  on go_accounts (deleted_at)
+  where deleted_at is not null;
+
 drop policy if exists "go_accounts_delete_anon" on go_accounts;
 create policy "go_accounts_delete_anon"
   on go_accounts for delete
@@ -105,6 +112,10 @@ begin
     delete from storage.objects
     where bucket_id = 'checkin-photos'
       and name like 'community/' || v_account_id::text || '%';
+
+    update go_accounts
+    set deleted_at = now(), updated_at = now()
+    where id = v_account_id;
 
     delete from go_accounts where id = v_account_id;
   elsif v_code is not null then

@@ -3131,6 +3131,7 @@
         try { account = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch (e) {}
       }
       var accountPaused = false;
+      var accountSessionBlocked = false;
       var onAccountPausedChange = null;
       var dayEntries = {};
       try { dayEntries = JSON.parse(localStorage.getItem(DAY_ENTRIES_KEY) || "{}") || {}; } catch (e2) { dayEntries = {}; }
@@ -5543,6 +5544,7 @@
       async function createCommunityPost(payload) {
         if (isAccountPaused()) return null;
         if (!hasCloudAccount()) return null;
+        if (!(await verifyAccountStillExists())) return null;
         var row = await restInsert("go_community_posts", payload);
         if (row) {
           communityPosts.push(row);
@@ -5806,6 +5808,7 @@
       window.addEventListener("focus", restoreShareModalAfterCamera);
 
       function showApp() {
+        if (accountSessionBlocked || !account) return;
         document.getElementById("app").hidden = false;
         if (account.photo_url) applyPhoto(account.photo_url);
         else applyPhoto(null);
@@ -5869,6 +5872,39 @@
         }
       }
 
+      function accountRowRetired(row) {
+        return !!(row && row.deleted_at);
+      }
+
+      async function inviteRegistrationActive() {
+        if (!account) return true;
+        var code = account.invite_code ? String(account.invite_code).trim() : "";
+        var serial = account.serial_number
+          ? String(account.serial_number).replace(/\D/g, "").slice(0, 8)
+          : "";
+        if (!code && !serial) return true;
+        var sawOk = false;
+        if (code) {
+          var byCode = await restGetRows(
+            "go_invite_codes?code=eq." + encodeURIComponent(code) + "&select=id&limit=1"
+          );
+          if (byCode.ok) {
+            sawOk = true;
+            if (byCode.rows && byCode.rows[0]) return true;
+          }
+        }
+        if (serial.length === 8) {
+          var bySerial = await restGetRows(
+            "go_invite_codes?serial_number=eq." + encodeURIComponent(serial) + "&select=id&limit=1"
+          );
+          if (bySerial.ok) {
+            sawOk = true;
+            if (bySerial.rows && bySerial.rows[0]) return true;
+          }
+        }
+        return sawOk ? false : true;
+      }
+
       async function lookupRemoteAccount() {
         if (!account || !accountHasCloudIdentity()) return { status: "local" };
         var paths = [];
@@ -5893,7 +5929,12 @@
           var hit = await restGetRows(paths[i]);
           if (!hit.ok) continue;
           sawOk = true;
-          if (hit.rows && hit.rows[0]) return { status: "found", remote: hit.rows[0] };
+          if (hit.rows && hit.rows[0]) {
+            if (accountRowRetired(hit.rows[0])) return { status: "missing" };
+            var inviteOk = await inviteRegistrationActive();
+            if (!inviteOk) return { status: "missing" };
+            return { status: "found", remote: hit.rows[0] };
+          }
         }
         if (sawOk) return { status: "missing" };
         return { status: "unknown" };
@@ -6062,6 +6103,7 @@
       }
 
       function showAccountDeletedPage() {
+        accountSessionBlocked = true;
         clearLocalAccountData();
         var app = document.getElementById("app");
         var gate = document.getElementById("app-gate");

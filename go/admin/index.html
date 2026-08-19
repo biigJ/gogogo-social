@@ -3811,6 +3811,42 @@
         }
       }
 
+      async function blockAccountsForRow(row) {
+        if (!row) return;
+        var now = new Date().toISOString();
+        var filters = [];
+        if (row.serial_number) {
+          filters.push("serial_number=eq." + encodeURIComponent(String(row.serial_number)));
+        }
+        if (row.code) {
+          filters.push("invite_code=eq." + encodeURIComponent(String(row.code)));
+        }
+        for (var i = 0; i < filters.length; i++) {
+          var patch = await fetch(
+            SUPABASE_URL + "/rest/v1/go_accounts?" + filters[i],
+            {
+              method: "PATCH",
+              headers: apiHeaders({
+                "Content-Type": "application/json",
+                Prefer: "return=minimal"
+              }),
+              body: JSON.stringify({ deleted_at: now, updated_at: now })
+            }
+          );
+          if (patch.ok) return;
+          var patchText = "";
+          try { patchText = await patch.text(); } catch (ePatch) {}
+          if (/deleted_at|42703|PGRST204/i.test(patchText)) break;
+        }
+        for (var j = 0; j < filters.length; j++) {
+          var del = await fetch(
+            SUPABASE_URL + "/rest/v1/go_accounts?" + filters[j],
+            { method: "DELETE", headers: apiHeaders({ Prefer: "return=minimal" }) }
+          );
+          if (del.ok) return;
+        }
+      }
+
       async function deleteUser(row) {
         var args = {};
         if (row && row.id) args.p_invite_id = row.id;
@@ -3818,11 +3854,9 @@
         if (row && row.code) args.p_code = row.code;
         var res = await callRpc("delete_go_user", args);
         if (res.status === 404) {
-          if (row && row.id) {
-            await deleteInvite(row.id);
-            return;
-          }
-          throw new Error(actionError("delete_go_user fehlt"));
+          if (row && row.id) await deleteInvite(row.id);
+          await blockAccountsForRow(row);
+          return;
         }
         if (!res.ok) {
           var t = "";
