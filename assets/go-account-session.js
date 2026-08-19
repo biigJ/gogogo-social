@@ -15,6 +15,7 @@
     };
     if (account.is_trainer) slim.is_trainer = true;
     if (account.trainer_id) slim.trainer_id = account.trainer_id;
+    if (account.training_date) slim.training_date = account.training_date;
     return slim;
   }
 
