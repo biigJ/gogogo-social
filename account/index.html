@@ -5997,30 +5997,16 @@
 
       async function syncFromCloud() {
         var remote = null;
-        /* confirmedEmpty = true bedeutet: Supabase hat geantwortet und das Array war leer.
-           null-Rückgabe von restGet bedeutet Netzwerkfehler oder non-200 → nicht als gelöscht werten. */
-        var confirmedEmpty = false;
-
-        async function checkedGet(path) {
-          var rows = await restGet(path);
-          if (Array.isArray(rows)) {
-            if (rows.length > 0) return rows;
-            confirmedEmpty = true;
-            return rows;
-          }
-          /* rows === null → restGet hat !res.ok oder Exception abgefangen → ignorieren */
-          return null;
-        }
 
         try {
           if (account.id && String(account.id).indexOf("local-") !== 0) {
-            var byId = await checkedGet("go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1");
+            var byId = await restGet("go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1");
             if (byId && byId[0]) remote = byId[0];
           }
         } catch (e0) {}
         if (!remote && account.serial_number) {
           try {
-            var bySerial = await checkedGet(
+            var bySerial = await restGet(
               "go_accounts?serial_number=eq." + encodeURIComponent(account.serial_number) +
               "&select=*&limit=1"
             );
@@ -6029,7 +6015,7 @@
         }
         if (!remote && account.invite_code) {
           try {
-            var byCode = await checkedGet(
+            var byCode = await restGet(
               "go_accounts?invite_code=eq." + encodeURIComponent(account.invite_code) +
               "&select=*&limit=1"
             );
@@ -6061,11 +6047,6 @@
           if (candidates.length) remote = candidates[0];
         }
         if (!remote) {
-          /* Als gelöscht markieren nur wenn Supabase explizit ein leeres Array zurückgegeben hat. */
-          if (confirmedEmpty && accountHasCloudIdentity()) {
-            showAccountDeletedPage();
-            return;
-          }
           if (typeof dayEntriesReady === "function") dayEntriesReady();
           return;
         }
