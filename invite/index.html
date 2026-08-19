@@ -218,6 +218,72 @@
 
     .form-msg.is-error { text-decoration: underline; }
 
+    /* ── WhatsApp-Hinweis-Overlay ── */
+    .wa-hint-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px 16px;
+      background: rgba(10, 10, 10, 0.55);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      opacity: 0;
+      transition: opacity 220ms ease;
+    }
+    .wa-hint-overlay.is-visible { opacity: 1; }
+    .wa-hint-overlay[hidden] { display: none !important; }
+    .wa-hint-sheet {
+      width: min(100%, 360px);
+      background: var(--red);
+      border-radius: 22px;
+      padding: 28px 22px 24px;
+      text-align: center;
+    }
+    .wa-hint-icon { font-size: 2.4rem; margin-bottom: 14px; }
+    .wa-hint-title {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 1.35rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 10px;
+      color: var(--ink-on-red);
+    }
+    .wa-hint-body {
+      font-family: var(--display);
+      font-weight: 500;
+      font-size: 0.9rem;
+      letter-spacing: -0.02em;
+      line-height: 1.45;
+      margin-bottom: 22px;
+      color: var(--ink-on-red);
+      opacity: 0.92;
+    }
+    .wa-hint-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 52px;
+      background: var(--paper);
+      color: var(--btn-ink);
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: -0.03em;
+      border-radius: var(--radius);
+      border: 0;
+      cursor: pointer;
+    }
+    .wa-hint-cta:hover { opacity: 0.92; }
+    .wa-hint-countdown {
+      display: block;
+      margin-top: 12px;
+      font-family: var(--display);
+      font-size: 0.75rem;
+      font-weight: 500;
+      opacity: 0.65;
+      letter-spacing: -0.01em;
+    }
+
     /* ── Success ── */
     .success {
       text-align: center;
@@ -386,6 +452,18 @@
         <button class="btn" id="inv-submit" type="submit" disabled>Los geht's</button>
         <p class="form-msg" id="inv-msg" role="status" aria-live="polite"></p>
       </form>
+    </div>
+
+    <div class="wa-hint-overlay" id="wa-hint-overlay" hidden aria-modal="true" role="dialog" aria-labelledby="wa-hint-title">
+      <div class="wa-hint-sheet">
+        <div class="wa-hint-icon" aria-hidden="true">📲</div>
+        <h2 class="wa-hint-title" id="wa-hint-title">Gleich weiter!</h2>
+        <p class="wa-hint-body">
+          Joscha meldet sich gleich bei Dir per WhatsApp. Du wirst jetzt auf die App weitergeleitet.
+        </p>
+        <button class="wa-hint-cta" type="button" id="wa-hint-go">Zur App</button>
+        <span class="wa-hint-countdown" id="wa-hint-countdown"></span>
+      </div>
     </div>
 
     <section class="success" id="flow-success" aria-live="polite">
@@ -648,14 +726,8 @@
           try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
 
           msgEl.textContent = "";
-          successTitle.textContent = name + ", Du bist dabei!";
-          waBtn.href = waLink(name);
-
           flowMain.classList.add("is-hidden");
-          setTimeout(function () {
-            flowMain.hidden = true;
-            flowSuccess.classList.add("is-visible");
-          }, 310);
+          showWaHint();
 
         } catch (err) {
           msgEl.textContent = "Etwas ist schief gelaufen. Bitte versuche es noch einmal.";
@@ -669,6 +741,32 @@
         noWa.addEventListener("click", function () {
           noWaNote.textContent = "Erledigt. Joscha wird sich bald melden.";
           noWa.hidden = true;
+        });
+      }
+
+      function showWaHint() {
+        var overlay = document.getElementById("wa-hint-overlay");
+        var cta = document.getElementById("wa-hint-go");
+        var countdown = document.getElementById("wa-hint-countdown");
+        if (!overlay) { window.location.href = "/account/?goto=profile"; return; }
+        overlay.hidden = false;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { overlay.classList.add("is-visible"); });
+        });
+        var secs = 4;
+        function tick() {
+          if (countdown) countdown.textContent = "Weiter in " + secs + " …";
+          if (secs <= 0) { go(); return; }
+          secs--;
+          setTimeout(tick, 1000);
+        }
+        function go() {
+          window.location.href = "/account/?goto=profile";
+        }
+        tick();
+        if (cta) cta.addEventListener("click", go);
+        overlay.addEventListener("click", function (e) {
+          if (e.target === overlay) go();
         });
       }
     })();
