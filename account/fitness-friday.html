@@ -2254,6 +2254,10 @@
   let kraftSelected = [];
   let kraftPresetMap = {};
   let kraftCustomMap = {};
+  let kraftGlobalMap = {};
+  let kraftGlobalLoaded = false;
+  let kraftHiddenBySystem = {};
+  let kraftHiddenLoaded = false;
   let kraftPresetsLoaded = false;
   let pendingKraftPreset = null;
   let kraftLogs = [];
@@ -3564,11 +3568,27 @@
   }
 
   function kraftCustomFor(systemId){
-    return (kraftCustomMap[systemId] || []).slice();
+    const seen = {};
+    const out = [];
+    function add(ex){
+      if (!ex || !ex.id || seen[ex.id]) return;
+      seen[ex.id] = true;
+      out.push({ id: String(ex.id), name: String(ex.name || ex.id) });
+    }
+    (kraftGlobalMap[systemId] || []).forEach(add);
+    if (!kraftGlobalLoaded) (kraftCustomMap[systemId] || []).forEach(add);
+    return out;
+  }
+
+  function kraftHiddenFor(systemId){
+    return kraftHiddenBySystem[systemId] || {};
   }
 
   function kraftAllExercises(systemId){
-    const base = (kraftCatalog().exercisesFor(systemId) || []).slice();
+    const hidden = kraftHiddenFor(systemId);
+    const base = (kraftCatalog().exercisesFor(systemId) || []).slice().filter(function(ex){
+      return !hidden[ex.id];
+    });
     const seen = {};
     base.forEach(function(ex){ seen[ex.id] = true; });
     kraftCustomFor(systemId).forEach(function(ex){
@@ -3610,10 +3630,47 @@
     return [];
   }
 
+  async function loadGlobalKraftExercises(){
+    kraftGlobalMap = {};
+    kraftGlobalLoaded = false;
+    try {
+      const rows = await goRest('go_kraft_exercises?select=id,system_id,name&order=created_at.asc');
+      (rows || []).forEach(function(row){
+        if (!row || !row.system_id || !row.id) return;
+        if (!kraftGlobalMap[row.system_id]) kraftGlobalMap[row.system_id] = [];
+        kraftGlobalMap[row.system_id].push({
+          id: String(row.id),
+          name: String(row.name || row.id)
+        });
+      });
+      kraftGlobalLoaded = true;
+    } catch (e) {
+      kraftGlobalMap = {};
+    }
+  }
+
+  async function loadGlobalKraftHidden(){
+    kraftHiddenBySystem = {};
+    kraftHiddenLoaded = false;
+    try {
+      const rows = await goRest('go_kraft_hidden?select=system_id,exercise_id');
+      (rows || []).forEach(function(row){
+        if (!row || !row.system_id || !row.exercise_id) return;
+        if (!kraftHiddenBySystem[row.system_id]) kraftHiddenBySystem[row.system_id] = {};
+        kraftHiddenBySystem[row.system_id][String(row.exercise_id)] = true;
+      });
+      kraftHiddenLoaded = true;
+    } catch (e) {
+      kraftHiddenBySystem = {};
+    }
+  }
+
   async function loadKraftPresets(){
     const aid = getGoAccountId();
     kraftPresetMap = {};
     kraftCustomMap = {};
+    if (!kraftGlobalLoaded) await loadGlobalKraftExercises();
+    if (!kraftHiddenLoaded) await loadGlobalKraftHidden();
     if (!aid) {
       kraftPresetsLoaded = true;
       return;
