@@ -7,11 +7,17 @@ create policy "go_accounts_delete_anon"
   to anon, authenticated
   using (true);
 
-drop policy if exists "go_leads_delete_anon" on go_leads;
-create policy "go_leads_delete_anon"
-  on go_leads for delete
-  to anon, authenticated
-  using (true);
+-- go_leads ist optional (nur wenn Tabelle existiert)
+do $$
+begin
+  if to_regclass('public.go_leads') is not null then
+    execute 'drop policy if exists "go_leads_delete_anon" on go_leads';
+    execute 'create policy "go_leads_delete_anon"
+      on go_leads for delete
+      to anon, authenticated
+      using (true)';
+  end if;
+end $$;
 
 drop policy if exists "go_avatars_delete" on storage.objects;
 create policy "go_avatars_delete"
@@ -87,7 +93,7 @@ begin
     end if;
   end if;
 
-  if v_code is not null then
+  if v_code is not null and to_regclass('public.go_leads') is not null then
     delete from go_leads where invite_code = v_code;
   end if;
 
