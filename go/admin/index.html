@@ -751,6 +751,21 @@
     .msg { min-height: 1.2em; margin-top: 12px; font-size: 0.85rem; font-weight: 500; }
     .msg.is-error { text-decoration: underline; }
     .panel[hidden] { display: none !important; }
+    .ptr-spinner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 0;
+      overflow: hidden;
+      color: var(--ink-on-red);
+      opacity: 0;
+      transition: height 0.15s ease, opacity 0.15s ease;
+    }
+    .ptr-spinner.is-pulling { height: 48px; opacity: 0.6; }
+    .ptr-spinner.is-ready { height: 48px; opacity: 1; }
+    .ptr-spinner.is-loading { height: 48px; opacity: 1; }
+    @keyframes ptr-spin { to { transform: rotate(360deg); } }
+    .ptr-spinner.is-loading svg { animation: ptr-spin 0.7s linear infinite; }
     #admin-result-extras[hidden] { display: none !important; }
     .qr-box {
       padding: 0;
@@ -1184,6 +1199,9 @@
     </div>
 
     <div class="panel" id="panel-list" hidden>
+      <div class="ptr-spinner" id="ptr-spinner" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="40 20" /></svg>
+      </div>
       <h1>Alle Nutzer</h1>
       <p class="msg" id="list-msg" role="status"></p>
       <div class="list" id="code-list"></div>
@@ -4609,6 +4627,50 @@
         }
         updateAuthBtn();
       }
+
+      (function initPullToRefresh() {
+        var THRESHOLD = 72;
+        var startY = 0;
+        var pulling = false;
+        var spinner = document.getElementById("ptr-spinner");
+
+        function isListVisible() {
+          return panelList && !panelList.hidden;
+        }
+
+        document.addEventListener("touchstart", function (e) {
+          if (!isListVisible()) return;
+          if (window.scrollY > 2) return;
+          startY = e.touches[0].clientY;
+          pulling = false;
+        }, { passive: true });
+
+        document.addEventListener("touchmove", function (e) {
+          if (!isListVisible() || !startY) return;
+          var dy = e.touches[0].clientY - startY;
+          if (dy <= 0) { pulling = false; return; }
+          pulling = true;
+          if (dy < THRESHOLD) {
+            spinner.classList.add("is-pulling");
+            spinner.classList.remove("is-ready");
+          } else {
+            spinner.classList.add("is-ready");
+            spinner.classList.remove("is-pulling");
+          }
+        }, { passive: true });
+
+        document.addEventListener("touchend", async function () {
+          if (!isListVisible() || !pulling) { startY = 0; return; }
+          var wasReady = spinner.classList.contains("is-ready");
+          spinner.classList.remove("is-pulling", "is-ready");
+          startY = 0;
+          pulling = false;
+          if (!wasReady) return;
+          spinner.classList.add("is-loading");
+          await showList();
+          spinner.classList.remove("is-loading");
+        });
+      })();
 
       function showQrMenu() {
         var url = GO_BASE;
