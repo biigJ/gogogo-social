@@ -5796,9 +5796,13 @@
         if (!document.hidden) {
           restoreShareModalAfterCamera();
           refreshAccountPausedStatus().catch(function () {});
+          verifyAccountStillExists().catch(function () {});
         }
       });
-      window.addEventListener("pageshow", restoreShareModalAfterCamera);
+      window.addEventListener("pageshow", function () {
+        restoreShareModalAfterCamera();
+        verifyAccountStillExists().catch(function () {});
+      });
       window.addEventListener("focus", restoreShareModalAfterCamera);
 
       function showApp() {
@@ -5851,7 +5855,59 @@
         waGroup.href = url;
         waGroup.hidden = false;
       }
-      showApp();
+
+      async function restGetRows(path) {
+        var res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
+          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY }
+        });
+        if (!res.ok) return { ok: false, rows: null };
+        try {
+          var rows = await res.json();
+          return { ok: true, rows: Array.isArray(rows) ? rows : [] };
+        } catch (e) {
+          return { ok: false, rows: null };
+        }
+      }
+
+      async function lookupRemoteAccount() {
+        if (!account || !accountHasCloudIdentity()) return { status: "local" };
+        var paths = [];
+        if (account.id && String(account.id).indexOf("local-") !== 0) {
+          paths.push("go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1");
+        }
+        if (account.serial_number) {
+          paths.push(
+            "go_accounts?serial_number=eq." + encodeURIComponent(account.serial_number) +
+            "&select=*&limit=1"
+          );
+        }
+        if (account.invite_code) {
+          paths.push(
+            "go_accounts?invite_code=eq." + encodeURIComponent(account.invite_code) +
+            "&select=*&limit=1"
+          );
+        }
+        if (!paths.length) return { status: "local" };
+        var sawOk = false;
+        for (var i = 0; i < paths.length; i++) {
+          var hit = await restGetRows(paths[i]);
+          if (!hit.ok) continue;
+          sawOk = true;
+          if (hit.rows && hit.rows[0]) return { status: "found", remote: hit.rows[0] };
+        }
+        if (sawOk) return { status: "missing" };
+        return { status: "unknown" };
+      }
+
+      async function verifyAccountStillExists() {
+        if (!account || !accountHasCloudIdentity()) return true;
+        var lookup = await lookupRemoteAccount();
+        if (lookup.status === "missing") {
+          showAccountDeletedPage();
+          return false;
+        }
+        return true;
+      }
 
       async function restGet(path) {
         var res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
@@ -6222,32 +6278,15 @@
       var dayEntriesReady = null;
 
       async function syncFromCloud() {
-        var remote = null;
+        var lookup = await lookupRemoteAccount();
+        if (lookup.status === "missing") {
+          showAccountDeletedPage();
+          if (typeof dayEntriesReady === "function") dayEntriesReady();
+          return;
+        }
 
-        try {
-          if (account.id && String(account.id).indexOf("local-") !== 0) {
-            var byId = await restGet("go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1");
-            if (byId && byId[0]) remote = byId[0];
-          }
-        } catch (e0) {}
-        if (!remote && account.serial_number) {
-          try {
-            var bySerial = await restGet(
-              "go_accounts?serial_number=eq." + encodeURIComponent(account.serial_number) +
-              "&select=*&limit=1"
-            );
-            if (bySerial && bySerial[0]) remote = bySerial[0];
-          } catch (e1) {}
-        }
-        if (!remote && account.invite_code) {
-          try {
-            var byCode = await restGet(
-              "go_accounts?invite_code=eq." + encodeURIComponent(account.invite_code) +
-              "&select=*&limit=1"
-            );
-            if (byCode && byCode[0]) remote = byCode[0];
-          } catch (e2) {}
-        }
+        var remote = lookup.status === "found" ? lookup.remote : null;
+
         if (!remote && !account.serial_number && !account.invite_code) {
           var nameLc = String(account.name || "").trim().toLowerCase();
           var candidates = [];
@@ -6273,6 +6312,7 @@
           if (candidates.length) remote = candidates[0];
         }
         if (!remote) {
+          showApp();
           if (typeof dayEntriesReady === "function") dayEntriesReady();
           return;
         }
@@ -6322,6 +6362,7 @@
         }
       }
       syncFromCloud().catch(function () {
+        showApp();
         if (typeof dayEntriesReady === "function") dayEntriesReady();
       });
 
@@ -6671,9 +6712,14 @@
           try {
             if (hasCloudAccount()) {
               try {
-                var rows = await restGet(
+                var hit = await restGetRows(
                   "go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1"
                 );
+                if (hit.ok && (!hit.rows || !hit.rows[0])) {
+                  showAccountDeletedPage();
+                  return;
+                }
+                var rows = hit.ok ? hit.rows : null;
                 if (rows && rows[0]) {
                   var remote = rows[0];
                   if (Object.prototype.hasOwnProperty.call(remote, "challenge_active")) {
