@@ -1512,6 +1512,7 @@
       var TRAINER_ADMIN_KEY = "gogogo_trainer_admin";
       var trainerSessionAccount = null;
       var trainerAdminMode = false;
+      var trainerSchemaOk = null;
       var ACCOUNT_KEY = "gogogo_go_account";
       var ADMIN_FEED_SEEN_KEY = "gogogo_admin_feed_seen";
       var ADMIN_OK_ACK_KEY = "gogogo_admin_ok_ack_v1";
@@ -3688,15 +3689,39 @@
         var btn = document.getElementById("trainer-toggle");
         var msg = document.getElementById("trainer-msg");
         if (msg) {
-          msg.textContent = "";
-          msg.classList.remove("is-error");
+          if (trainerSchemaOk === false) {
+            msg.textContent = "Spalte is_trainer fehlt — go-trainer.sql in Supabase ausführen.";
+            msg.classList.add("is-error");
+          } else if (!msg.classList.contains("is-error") || !msg.textContent) {
+            msg.textContent = "";
+            msg.classList.remove("is-error");
+          }
         }
         var isTrainer = !!(activeAccount && activeAccount.is_trainer);
         if (status) status.textContent = "Funktion: " + (isTrainer ? "Trainer" : "Buddy");
         if (btn) {
-          btn.disabled = !activeAccount || !activeAccount.id;
+          btn.disabled = !activeAccount || !activeAccount.id || trainerSchemaOk === false;
           btn.textContent = isTrainer ? "Trainer-Status entfernen" : "Als Trainer markieren";
         }
+      }
+
+      async function probeTrainerSchema() {
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_accounts?select=is_trainer&limit=1",
+            { headers: apiHeaders() }
+          );
+          if (!res.ok) {
+            var t = "";
+            try { t = await res.text(); } catch (e0) {}
+            trainerSchemaOk = !/42703|is_trainer|PGRST204/i.test(t);
+          } else {
+            trainerSchemaOk = true;
+          }
+        } catch (e) {
+          trainerSchemaOk = null;
+        }
+        refreshTrainerUi();
       }
 
       async function setTrainerRole(on) {
@@ -3704,6 +3729,13 @@
         if (!activeAccount || !activeAccount.id) {
           if (msg) {
             msg.textContent = "Kein Account — Trainer-Status nicht speicherbar.";
+            msg.classList.add("is-error");
+          }
+          return;
+        }
+        if (trainerSchemaOk === false) {
+          if (msg) {
+            msg.textContent = "Spalte is_trainer fehlt — go-trainer.sql in Supabase SQL Editor ausführen.";
             msg.classList.add("is-error");
           }
           return;
@@ -3728,10 +3760,16 @@
             }
           );
           if (!res.ok) {
+            var errText = "";
+            try { errText = await res.text(); } catch (e1) {}
+            if (/42703|is_trainer|PGRST204/i.test(errText)) trainerSchemaOk = false;
             if (msg) {
-              msg.textContent = "Speichern fehlgeschlagen (go-trainer.sql ausführen?).";
+              msg.textContent = /42703|is_trainer/i.test(errText)
+                ? "Spalte is_trainer fehlt — go-trainer.sql in Supabase SQL Editor ausführen."
+                : "Speichern fehlgeschlagen" + (errText ? ": " + String(errText).slice(0, 100) : ".");
               msg.classList.add("is-error");
             }
+            refreshTrainerUi();
             return;
           }
           var rows = await res.json();

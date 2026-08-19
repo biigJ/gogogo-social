@@ -1,5 +1,7 @@
 -- Vollständiges Löschen von Nutzer-Accounts (Admin + Self-Service)
 -- Im Supabase SQL Editor ausführen (Projekt agpysewcsakdpmpftndp).
+--
+-- Auch ausführen (falls noch nicht): go-trainer.sql (is_trainer, trainer_id für „Als Trainer markieren“)
 
 alter table go_accounts
   add column if not exists deleted_at timestamptz;
