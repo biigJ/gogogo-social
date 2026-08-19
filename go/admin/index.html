@@ -1772,6 +1772,20 @@
         return out;
       }
 
+      function setKraftExerciseChecked(exId, checked) {
+        var sys = kraftAdminSystem;
+        var id = String(exId);
+        var ids = kraftIdsFor(sys).slice();
+        if (checked) {
+          ids = ids.filter(function (x) { return x !== id; });
+          ids.push(id);
+        } else {
+          ids = ids.filter(function (x) { return x !== id; });
+        }
+        kraftAdminMap[sys] = ids;
+        renderKraftAdminExercises();
+      }
+
       async function loadGlobalKraftExercises() {
         kraftGlobalExtras = kraftEmptyExtras();
         kraftGlobalTableOk = false;
@@ -5256,8 +5270,10 @@
       }
       var kraftExWrap = document.getElementById("kraft-admin-ex");
       if (kraftExWrap) {
-        kraftExWrap.addEventListener("change", function () {
-          collectKraftAdminChecks();
+        kraftExWrap.addEventListener("change", function (e) {
+          var inp = e.target;
+          if (!inp || inp.type !== "checkbox" || !inp.dataset.ex) return;
+          setKraftExerciseChecked(inp.dataset.ex, inp.checked);
         });
         kraftExWrap.addEventListener("click", function (e) {
           var del = e.target.closest(".kraft-del");
