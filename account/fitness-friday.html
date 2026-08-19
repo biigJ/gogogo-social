@@ -3555,7 +3555,12 @@
   }
 
   function applyKraftDefaults(systemId){
-    kraftSelected = kraftPresetsFor(systemId);
+    // Use admin order: kraftAllExercises is already sorted, pick those in presets
+    const presets = kraftPresetsFor(systemId);
+    const all = kraftAllExercises(systemId);
+    // Preserve admin sort order for selected exercises
+    kraftSelected = all.map(function(ex){ return ex.id; }).filter(function(id){ return presets.indexOf(id) !== -1; });
+    if (!kraftSelected.length) kraftSelected = presets.slice();
   }
 
   function kraftCustomFor(systemId){
@@ -3572,6 +3577,17 @@
         base.push({ id: String(ex.id), name: String(ex.name || ex.id) });
       }
     });
+    // Sort by admin-defined order (exercise_ids from go_kraft_presets)
+    const adminOrder = kraftPresetMap[systemId];
+    if (adminOrder && adminOrder.length) {
+      const posMap = {};
+      adminOrder.forEach(function(id, i){ posMap[id] = i; });
+      base.sort(function(a, b){
+        const pa = posMap[a.id] != null ? posMap[a.id] : adminOrder.length;
+        const pb = posMap[b.id] != null ? posMap[b.id] : adminOrder.length;
+        return pa - pb;
+      });
+    }
     return base;
   }
 
