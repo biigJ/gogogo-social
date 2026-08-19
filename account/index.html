@@ -40,6 +40,7 @@
     html {
       scroll-behavior: smooth;
       touch-action: manipulation;
+      background: var(--red);
     }
     body {
       font-family: var(--display);
@@ -66,6 +67,19 @@
       height: constant(safe-area-inset-top);
       height: env(safe-area-inset-top, 0px);
       background: var(--chrome-bg);
+      pointer-events: none;
+    }
+    /* Home-Indicator-Bereich: sonst weißer Streifen unter der Dock-Leiste. */
+    body::after {
+      content: "";
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 48;
+      height: constant(safe-area-inset-bottom);
+      height: env(safe-area-inset-bottom, 0px);
+      background: var(--red);
       pointer-events: none;
     }
     #app {
@@ -97,7 +111,7 @@
       display: flex;
       flex-direction: column;
       align-items: stretch;
-      padding: var(--chrome-fade) var(--pad) 0;
+      padding: var(--chrome-fade) var(--pad) env(safe-area-inset-bottom, 0px);
       pointer-events: none;
       background: transparent;
     }
@@ -167,6 +181,17 @@
     }
     .site-chrome--top::after {
       display: none;
+    }
+    .site-chrome:not(.site-chrome--top)::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 0;
+      height: env(safe-area-inset-bottom, 0px);
+      background: var(--red);
+      pointer-events: none;
     }
     .site-bottom {
       position: relative;
@@ -2262,7 +2287,7 @@
       width: min(100%, var(--max));
       margin: 0 auto;
       text-align: center;
-      padding: 6px 0 max(18px, calc(env(safe-area-inset-bottom, 0px) + 8px));
+      padding: 6px 0 8px;
       font-size: 12px;
       font-weight: 500;
       color: var(--ink-on-red);
