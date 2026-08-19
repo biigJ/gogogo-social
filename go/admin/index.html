@@ -490,8 +490,15 @@
       opacity: 0.4;
       padding: 0 2px;
     }
-    .admin-kraft__ex label .kraft-del {
+    .admin-kraft__ex label .kraft-actions {
       margin-left: auto;
+      flex-shrink: 0;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .admin-kraft__ex label .kraft-rename,
+    .admin-kraft__ex label .kraft-del {
       flex-shrink: 0;
       background: rgba(247, 245, 240, 0.14);
       border: 1px solid rgba(247, 245, 240, 0.45);
@@ -499,13 +506,18 @@
       padding: 2px 8px;
       min-width: 32px;
       min-height: 32px;
-      font-size: 1.35rem;
+      font-size: 1.05rem;
       line-height: 1;
       color: var(--paper);
       opacity: 0.95;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
+    .admin-kraft__ex label .kraft-del {
+      font-size: 1.35rem;
+    }
+    .admin-kraft__ex label .kraft-rename:hover,
+    .admin-kraft__ex label .kraft-rename:active,
     .admin-kraft__ex label .kraft-del:hover,
     .admin-kraft__ex label .kraft-del:active {
       opacity: 1;
@@ -1014,6 +1026,19 @@
       border: 1.5px solid rgba(247, 245, 240, 0.55);
     }
     .challenge-modal__btn:disabled { opacity: 0.45; cursor: wait; }
+    .kraft-rename-input {
+      width: 100%;
+      min-height: 48px;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: var(--radius);
+      background: var(--paper);
+      color: var(--ink);
+      text-align: center;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .kraft-rename-input::placeholder { color: var(--placeholder); }
     .challenge-amount-dial {
       position: relative;
       width: 220px;
@@ -1253,6 +1278,17 @@
         <div class="challenge-modal__actions">
           <button type="button" class="challenge-modal__btn is-ghost" id="unit-wheel-cancel">Abbrechen</button>
           <button type="button" class="challenge-modal__btn" id="unit-wheel-ok">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="challenge-modal" id="kraft-rename-modal" hidden aria-hidden="true">
+      <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="kraft-rename-title">
+        <p class="challenge-modal__title" id="kraft-rename-title">Übung umbenennen</p>
+        <input type="text" class="kraft-rename-input" id="kraft-rename-input" maxlength="80" autocomplete="off" placeholder="Neuer Name" />
+        <div class="challenge-modal__actions">
+          <button type="button" class="challenge-modal__btn is-ghost" id="kraft-rename-cancel">Abbrechen</button>
+          <button type="button" class="challenge-modal__btn" id="kraft-rename-ok">Speichern</button>
         </div>
       </div>
     </div>
@@ -1735,13 +1771,23 @@
           nameEl.className = "kraft-name";
           nameEl.textContent = ex.name;
           lab.appendChild(nameEl);
+          var actions = document.createElement("span");
+          actions.className = "kraft-actions";
+          var ren = document.createElement("button");
+          ren.type = "button";
+          ren.className = "kraft-rename";
+          ren.textContent = "✎";
+          ren.dataset.ex = ex.id;
+          ren.title = "Übung umbenennen";
+          actions.appendChild(ren);
           var del = document.createElement("button");
           del.type = "button";
           del.className = "kraft-del";
           del.textContent = "×";
           del.dataset.ex = ex.id;
           del.title = "Übung löschen";
-          lab.appendChild(del);
+          actions.appendChild(del);
+          lab.appendChild(actions);
           wrap.appendChild(lab);
         });
       }
@@ -2086,6 +2132,117 @@
         } else {
           setKraftAdminMsg("Übung global da. Haken für diesen Nutzer: " + (saved && saved.detail ? String(saved.detail).slice(0, 80) : "Plan speichern."), true);
         }
+      }
+
+      function kraftExerciseNameById(exId) {
+        var id = String(exId);
+        var all = kraftAllAdminExercises(kraftAdminSystem);
+        for (var i = 0; i < all.length; i++) {
+          if (all[i].id === id) return all[i].name;
+        }
+        return id;
+      }
+
+      function promptKraftRename(currentName) {
+        return new Promise(function (resolve) {
+          var modal = document.getElementById("kraft-rename-modal");
+          var input = document.getElementById("kraft-rename-input");
+          var ok = document.getElementById("kraft-rename-ok");
+          var cancel = document.getElementById("kraft-rename-cancel");
+          if (!modal || !input || !ok || !cancel) {
+            resolve(null);
+            return;
+          }
+          input.value = currentName || "";
+          function finish(val) {
+            ok.removeEventListener("click", onOk);
+            cancel.removeEventListener("click", onCancel);
+            input.removeEventListener("keydown", onKey);
+            modal.removeEventListener("click", onBackdrop);
+            closeChallengeModal(modal);
+            resolve(val);
+          }
+          function onOk(e) { e.stopPropagation(); finish(String(input.value || "").trim()); }
+          function onCancel(e) { e.stopPropagation(); finish(null); }
+          function onBackdrop(e) { if (e.target === modal) finish(null); }
+          function onKey(e) {
+            if (e.key === "Enter") { e.preventDefault(); onOk(e); }
+            if (e.key === "Escape") { e.preventDefault(); onCancel(e); }
+          }
+          openChallengeModal(modal);
+          ok.addEventListener("click", onOk);
+          cancel.addEventListener("click", onCancel);
+          input.addEventListener("keydown", onKey);
+          modal.addEventListener("click", onBackdrop);
+          setTimeout(function () { input.focus(); input.select(); }, 50);
+        });
+      }
+
+      async function renameGlobalKraftExercise(exId, name) {
+        if (!kraftGlobalTableOk) return { ok: false, missing: true };
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_kraft_exercises?id=eq." + encodeURIComponent(exId),
+            {
+              method: "PATCH",
+              headers: apiHeaders({ "Content-Type": "application/json", Prefer: "return=minimal" }),
+              body: JSON.stringify({ name: name })
+            }
+          );
+          return { ok: res.ok };
+        } catch (e) {
+          return { ok: false };
+        }
+      }
+
+      async function renameKraftExercise(exId) {
+        collectKraftAdminChecks();
+        var sys = kraftAdminSystem;
+        var exIdStr = String(exId);
+        if (!kraftIsCustomExercise(sys, exIdStr)) {
+          setKraftAdminMsg("Standard-Übungen können nicht umbenannt werden.", true);
+          return;
+        }
+        var current = kraftExerciseNameById(exIdStr);
+        var name = await promptKraftRename(current);
+        if (!name || name === current) return;
+        var needle = name.toLowerCase();
+        var dup = kraftAllAdminExercises(sys).some(function (ex) {
+          return ex.id !== exIdStr && String(ex.name || "").trim().toLowerCase() === needle;
+        });
+        if (dup) {
+          setKraftAdminMsg("Die Übung gibt es schon.", true);
+          return;
+        }
+        setKraftAdminMsg("Speichere …");
+        if (kraftGlobalTableOk) {
+          var renamed = await renameGlobalKraftExercise(exIdStr, name);
+          if (!renamed.ok && !renamed.missing) {
+            setKraftAdminMsg("Umbenennen fehlgeschlagen.", true);
+            return;
+          }
+        }
+        function patchList(list) {
+          if (!list) return;
+          list.forEach(function (ex) { if (ex.id === exIdStr) ex.name = name; });
+        }
+        patchList(kraftGlobalExtras[sys]);
+        patchList(kraftLegacyExtras[sys]);
+        refreshKraftAdminUi();
+        if (!activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) {
+          setKraftAdminMsg("Umbenannt.");
+          return;
+        }
+        var saved = await saveKraftPresets(activeAccount.id);
+        if (saved && saved.ok) setKraftAdminMsg("Gespeichert.");
+        else setKraftAdminMsg("Name geändert. Plan speichern fehlgeschlagen.", true);
+      }
+
+      async function confirmDeleteKraftExercise(exId) {
+        var name = kraftExerciseNameById(exId);
+        var ok = await confirmJaNein("„" + name + "“ wirklich löschen?");
+        if (!ok) return;
+        await deleteKraftExercise(exId);
       }
 
       async function deleteKraftExercise(exId) {
@@ -5277,9 +5434,18 @@
         });
         kraftExWrap.addEventListener("click", function (e) {
           var del = e.target.closest(".kraft-del");
-          if (!del || !del.dataset.ex) return;
-          e.preventDefault();
-          deleteKraftExercise(del.dataset.ex);
+          if (del && del.dataset.ex) {
+            e.preventDefault();
+            e.stopPropagation();
+            confirmDeleteKraftExercise(del.dataset.ex);
+            return;
+          }
+          var ren = e.target.closest(".kraft-rename");
+          if (ren && ren.dataset.ex) {
+            e.preventDefault();
+            e.stopPropagation();
+            renameKraftExercise(ren.dataset.ex);
+          }
         });
         (function initKraftDragDrop(wrap) {
           var dragSrc = null;
