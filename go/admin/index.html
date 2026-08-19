@@ -2538,6 +2538,74 @@
         return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
       }
 
+      function accountMatchesIdentity(acc, serial, code, name) {
+        if (!acc) return false;
+        if (serial && String(acc.serial_number || "") === String(serial)) return true;
+        if (code && String(acc.invite_code || "") === String(code)) return true;
+        if (!serial && !code && name && namesMatch(acc.name, name)) return true;
+        return false;
+      }
+
+      async function fetchAccountBySerial(serial) {
+        if (!serial) return null;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_accounts?serial_number=eq." + encodeURIComponent(serial) +
+            "&select=*&order=created_at.desc&limit=1",
+            { headers: apiHeaders() }
+          );
+          var rows = res.ok ? await res.json() : [];
+          return rows && rows[0] ? rows[0] : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      async function fetchAccountByCode(code) {
+        if (!code) return null;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_accounts?invite_code=eq." + encodeURIComponent(code) +
+            "&select=*&order=created_at.desc&limit=1",
+            { headers: apiHeaders() }
+          );
+          var rows = res.ok ? await res.json() : [];
+          return rows && rows[0] ? rows[0] : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      async function fetchInviteBySerial(serial) {
+        if (!serial) return null;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_invite_codes?serial_number=eq." + encodeURIComponent(serial) +
+            "&select=*&order=created_at.desc&limit=1",
+            { headers: apiHeaders() }
+          );
+          var rows = res.ok ? await res.json() : [];
+          return rows && rows[0] ? rows[0] : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      async function fetchInviteByCode(code) {
+        if (!code) return null;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_invite_codes?code=eq." + encodeURIComponent(code) +
+            "&select=*&order=created_at.desc&limit=1",
+            { headers: apiHeaders() }
+          );
+          var rows = res.ok ? await res.json() : [];
+          return rows && rows[0] ? rows[0] : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
       function quoteFilterValue(value) {
         return '"' + String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
       }
@@ -2569,9 +2637,9 @@
         if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = true;
         var account = null;
 
-        if (accountHint && accountHint.id && accountHint.name) {
+        if (accountHint && accountHint.id && accountMatchesIdentity(accountHint, serial, code, displayName)) {
           account = accountHint;
-        } else if (activeAccount && activeAccount.id && namesMatch(activeAccount.name, displayName)) {
+        } else if (activeAccount && activeAccount.id && accountMatchesIdentity(activeAccount, serial, code, displayName)) {
           account = activeAccount;
         }
 
@@ -2583,48 +2651,21 @@
 
         if (!account) {
           try {
-            var accRes = await fetch(
-              SUPABASE_URL + "/rest/v1/go_accounts?name=ilike." + encodeURIComponent(quoteFilterValue(displayName)) +
-              "&select=*&order=created_at.desc&limit=20",
-              { headers: apiHeaders() }
-            );
-            var accounts = accRes.ok ? await accRes.json() : [];
-            var matches = (accounts || []).filter(function (row) {
-              return namesMatch(row.name, displayName);
-            });
-            if (code) {
-              for (var i = 0; i < matches.length; i++) {
-                if (String(matches[i].invite_code || "") === String(code)) {
-                  account = matches[i];
-                  break;
-                }
-              }
-            }
-            if (!account) {
-              for (var p = 0; p < matches.length; p++) {
-                if (matches[p].photo_url) { account = matches[p]; break; }
-              }
-            }
-            if (!account && matches.length) account = matches[0];
+            account = await fetchAccountBySerial(serial);
           } catch (e2) {}
+        }
+        if (!account) {
+          try {
+            account = await fetchAccountByCode(code);
+          } catch (e3) {}
         }
 
         if (!account) {
           var invite = { serial_number: serial || null, code: code || null };
           try {
-            var invRes = await fetch(
-              SUPABASE_URL + "/rest/v1/go_invite_codes?first_name=ilike." + encodeURIComponent(quoteFilterValue(displayName)) +
-              "&select=*&order=created_at.desc&limit=5",
-              { headers: apiHeaders() }
-            );
-            var invites = invRes.ok ? await invRes.json() : [];
-            for (var n = 0; n < (invites || []).length; n++) {
-              if (namesMatch(invites[n].first_name, displayName)) {
-                invite = invites[n];
-                break;
-              }
-            }
-          } catch (e3) {}
+            if (serial) invite = await fetchInviteBySerial(serial) || invite;
+            else if (code) invite = await fetchInviteByCode(code) || invite;
+          } catch (e4) {}
           try {
             var created = await fetch(SUPABASE_URL + "/rest/v1/go_accounts", {
               method: "POST",
@@ -2643,7 +2684,7 @@
               var rows = await created.json();
               account = rows && rows[0] ? rows[0] : null;
             }
-          } catch (e4) {}
+          } catch (e5) {}
         }
 
         if (!account) {
@@ -2676,8 +2717,8 @@
           "";
         name = String(name || "").trim();
         if (!name) return;
-        var serial = lastQr && namesMatch(lastQr.name, name) ? lastQr.serial : (activeAccount && activeAccount.serial_number) || "";
-        var code = lastQr && namesMatch(lastQr.name, name) ? lastQr.code : (activeAccount && activeAccount.invite_code) || "";
+        var serial = (lastQr && lastQr.serial) || (activeAccount && activeAccount.serial_number) || "";
+        var code = (lastQr && lastQr.code) || (activeAccount && activeAccount.invite_code) || "";
         enterUserAccount(name, serial, code, activeAccount);
       }
 
@@ -2708,25 +2749,35 @@
       async function resolveRelatedAccounts(name, serial, code) {
         var seen = {};
         var list = [];
-        function addRows(rows, requireName) {
+        function addRows(rows) {
           if (!rows) return;
           for (var i = 0; i < rows.length; i++) {
             var row = rows[i];
             if (!row || !row.id || seen[row.id]) continue;
-            if (requireName && name && !namesMatch(row.name, name)) continue;
             seen[row.id] = true;
             list.push(row);
           }
         }
         try {
-          if (serial) {
-            var bySerial = await fetch(
-              SUPABASE_URL + "/rest/v1/go_accounts?serial_number=eq." + encodeURIComponent(serial) +
-              "&select=*&order=created_at.desc&limit=50",
-              { headers: apiHeaders() }
-            );
-            /* Mit Namen: nur passende Accounts — verhindert fremde Feeds bei doppelter Serial. */
-            addRows(bySerial.ok ? await bySerial.json() : [], !!name);
+          /* Seriennummer/Code sind eindeutig — nicht nach Vorname mischen. */
+          if (serial || code) {
+            if (serial) {
+              var bySerial = await fetch(
+                SUPABASE_URL + "/rest/v1/go_accounts?serial_number=eq." + encodeURIComponent(serial) +
+                "&select=*&order=created_at.desc&limit=5",
+                { headers: apiHeaders() }
+              );
+              addRows(bySerial.ok ? await bySerial.json() : []);
+            }
+            if (code) {
+              var byCode = await fetch(
+                SUPABASE_URL + "/rest/v1/go_accounts?invite_code=eq." + encodeURIComponent(code) +
+                "&select=*&order=created_at.desc&limit=5",
+                { headers: apiHeaders() }
+              );
+              addRows(byCode.ok ? await byCode.json() : []);
+            }
+            return list;
           }
           if (name) {
             var namePat = "%" + String(name).replace(/%/g, "") + "%";
@@ -2735,22 +2786,31 @@
               "&select=*&order=created_at.desc&limit=50",
               { headers: apiHeaders() }
             );
-            addRows(accRes.ok ? await accRes.json() : [], true);
-          }
-          if (code) {
-            var byCode = await fetch(
-              SUPABASE_URL + "/rest/v1/go_accounts?invite_code=eq." + encodeURIComponent(code) +
-              "&select=*&order=created_at.desc&limit=50",
-              { headers: apiHeaders() }
-            );
-            addRows(byCode.ok ? await byCode.json() : [], name ? true : false);
+            var nameRows = accRes.ok ? await accRes.json() : [];
+            (nameRows || []).forEach(function (row) {
+              if (row && row.id && !seen[row.id] && namesMatch(row.name, name)) {
+                seen[row.id] = true;
+                list.push(row);
+              }
+            });
           }
         } catch (e) {}
         return list;
       }
 
-      async function pickPrimaryAccount(accounts) {
+      async function pickPrimaryAccount(accounts, serial, code) {
         if (!accounts || !accounts.length) return null;
+        var i;
+        if (serial) {
+          for (i = 0; i < accounts.length; i++) {
+            if (String(accounts[i].serial_number || "") === String(serial)) return accounts[i];
+          }
+        }
+        if (code) {
+          for (i = 0; i < accounts.length; i++) {
+            if (String(accounts[i].invite_code || "") === String(code)) return accounts[i];
+          }
+        }
         var best = accounts[0];
         var bestCount = -1;
         for (var i = 0; i < accounts.length; i++) {
@@ -2782,7 +2842,7 @@
           activeAccountIds = [];
           return null;
         }
-        return await pickPrimaryAccount(related);
+        return await pickPrimaryAccount(related, serial, code);
       }
 
       function clearPlanForm() {

@@ -5633,47 +5633,56 @@
       var dayEntriesReady = null;
 
       async function syncFromCloud() {
-        var nameLc = String(account.name || "").trim().toLowerCase();
-        var seen = {};
-        var candidates = [];
-        function addRows(rows) {
-          if (!rows) return;
-          for (var i = 0; i < rows.length; i++) {
-            var row = rows[i];
-            if (!row || !row.id || seen[row.id]) continue;
-            if (nameLc && String(row.name || "").trim().toLowerCase() !== nameLc) continue;
-            seen[row.id] = true;
-            candidates.push(row);
+        var remote = null;
+        try {
+          if (account.id && String(account.id).indexOf("local-") !== 0) {
+            var byId = await restGet("go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1");
+            if (byId && byId[0]) remote = byId[0];
           }
+        } catch (e0) {}
+        if (!remote && account.serial_number) {
+          try {
+            var bySerial = await restGet(
+              "go_accounts?serial_number=eq." + encodeURIComponent(account.serial_number) +
+              "&select=*&limit=1"
+            );
+            if (bySerial && bySerial[0]) remote = bySerial[0];
+          } catch (e1) {}
         }
-        if (account.id && String(account.id).indexOf("local-") !== 0) {
-          addRows(await restGet("go_accounts?id=eq." + encodeURIComponent(account.id) + "&select=*&limit=1"));
+        if (!remote && account.invite_code) {
+          try {
+            var byCode = await restGet(
+              "go_accounts?invite_code=eq." + encodeURIComponent(account.invite_code) +
+              "&select=*&limit=1"
+            );
+            if (byCode && byCode[0]) remote = byCode[0];
+          } catch (e2) {}
         }
-        if (account.invite_code) {
-          addRows(await restGet(
-            "go_accounts?invite_code=eq." + encodeURIComponent(account.invite_code) +
-            "&select=*&order=created_at.asc&limit=50"
-          ));
+        if (!remote && !account.serial_number && !account.invite_code) {
+          var nameLc = String(account.name || "").trim().toLowerCase();
+          var candidates = [];
+          var seen = {};
+          function addRows(rows) {
+            if (!rows) return;
+            for (var i = 0; i < rows.length; i++) {
+              var row = rows[i];
+              if (!row || !row.id || seen[row.id]) continue;
+              if (nameLc && String(row.name || "").trim().toLowerCase() !== nameLc) continue;
+              seen[row.id] = true;
+              candidates.push(row);
+            }
+          }
+          if (account.phone) {
+            addRows(await restGet(
+              "go_accounts?phone=eq." + encodeURIComponent(account.phone) +
+              "&select=*&order=created_at.asc&limit=50"
+            ));
+          }
+          if (candidates.length) remote = candidates[0];
         }
-        if (account.phone) {
-          addRows(await restGet(
-            "go_accounts?phone=eq." + encodeURIComponent(account.phone) +
-            "&select=*&order=created_at.asc&limit=50"
-          ));
-        }
-        if (!candidates.length) {
+        if (!remote) {
           if (typeof dayEntriesReady === "function") dayEntriesReady();
           return;
-        }
-        var remote = candidates[0];
-        var i;
-        for (i = 0; i < candidates.length; i++) {
-          if (account.id && candidates[i].id === account.id) { remote = candidates[i]; break; }
-        }
-        if (!remote.photo_url) {
-          for (i = 0; i < candidates.length; i++) {
-            if (candidates[i].photo_url) { remote = candidates[i]; break; }
-          }
         }
         account.id = remote.id || account.id;
         if (remote.serial_number) account.serial_number = remote.serial_number;
@@ -5961,7 +5970,7 @@
         }
         if (id !== "book") pauseAccountVideos();
         if (id === "training") {
-          var TRAINING_IFRAME_V = "20260818m";
+          var TRAINING_IFRAME_V = "20260819a";
           var wantTrainingSrc = "/account/fitness-friday.html?embed=1&parentTabs=1&v=" + TRAINING_IFRAME_V;
           if (!trainingFrame.src || String(trainingFrame.src).indexOf("v=" + TRAINING_IFRAME_V) === -1) {
             trainingFrame.src = wantTrainingSrc;
