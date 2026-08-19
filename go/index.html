@@ -987,29 +987,27 @@
         }
         if (!stored || !stored.name) return;
         var remote = null;
-        var fetchWorked = false;
+        /* Supabase gibt leeres Array zurück wenn Account nicht existiert, null bei Fehler */
         try {
           if (stored.id && String(stored.id).indexOf("local-") !== 0) {
             remote = await restGet("go_accounts?id=eq." + encodeURIComponent(stored.id) + "&select=id&limit=1");
-            fetchWorked = true;
           }
-          if ((!remote || !remote[0]) && stored.serial_number) {
+          if ((!Array.isArray(remote) || !remote[0]) && stored.serial_number) {
             remote = await restGet(
               "go_accounts?serial_number=eq." + encodeURIComponent(stored.serial_number) + "&select=id&limit=1"
             );
-            fetchWorked = true;
           }
-          if ((!remote || !remote[0]) && stored.invite_code) {
+          if ((!Array.isArray(remote) || !remote[0]) && stored.invite_code) {
             remote = await restGet(
               "go_accounts?invite_code=eq." + encodeURIComponent(stored.invite_code) + "&select=id&limit=1"
             );
-            fetchWorked = true;
           }
         } catch (err) {
           return;
         }
-        if (!fetchWorked) return;
-        if (remote && remote[0]) return;
+        /* null = Fehler/non-200 → nicht als gelöscht werten */
+        if (!Array.isArray(remote)) return;
+        if (remote[0]) return;
         if (window.GoAccountSession) GoAccountSession.clear();
         else {
           try { localStorage.removeItem("gogogo_go_account"); } catch (e2) {}
