@@ -6,6 +6,7 @@
   <meta name="robots" content="noindex, nofollow" />
   <meta name="theme-color" content="#C7413B" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/go/admin/manifest.webmanifest" />
   <title>gogogo lead code generator</title>
@@ -20,6 +21,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="/assets/go-qr.js"></script>
   <script src="/assets/go-account-session.js"></script>
+  <script>
+    (function () {
+      var standalone = window.navigator.standalone === true ||
+        (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+      if (standalone) document.documentElement.classList.add("is-standalone");
+    })();
+  </script>
   <style>
     :root {
       --red: #C7413B;
@@ -44,12 +52,14 @@
       width: 100%;
       max-width: 100%;
       touch-action: manipulation;
+      background: var(--red);
     }
     body {
       font-family: var(--display);
       background: var(--red);
       color: var(--ink-on-red);
-      min-height: 100svh;
+      min-height: 100dvh;
+      min-height: 100vh;
       width: 100%;
       max-width: 100%;
       -webkit-font-smoothing: antialiased;
@@ -59,7 +69,16 @@
       -webkit-overflow-scrolling: touch;
       touch-action: manipulation;
     }
-    /* Neutral hinter dem Notch — kein roter Rand unter der Statusleiste */
+    html.is-standalone,
+    html.is-standalone body {
+      min-height: calc(100vh + env(safe-area-inset-bottom, 0px));
+    }
+    @media (display-mode: standalone) {
+      html, body {
+        min-height: calc(100vh + env(safe-area-inset-bottom, 0px));
+      }
+    }
+    /* Notch: in PWA Marken-Rot, im Browser neutral-grau */
     body::before {
       content: "";
       position: fixed;
@@ -70,6 +89,26 @@
       height: constant(safe-area-inset-top);
       height: env(safe-area-inset-top, 0px);
       background: var(--chrome-bg);
+      pointer-events: none;
+    }
+    html.is-standalone body::before {
+      background: var(--red);
+    }
+    @media (display-mode: standalone) {
+      body::before {
+        background: var(--red);
+      }
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 45;
+      height: constant(safe-area-inset-bottom);
+      height: env(safe-area-inset-bottom, 0px);
+      background: var(--red);
       pointer-events: none;
     }
     button, input, textarea { font: inherit; color: inherit; }
@@ -127,6 +166,11 @@
       padding: calc(14px + env(safe-area-inset-top, 0px) + var(--header-h) + 10px) 16px 24px;
       background: rgba(10, 10, 10, 0.18);
       backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    }
+    html:not(.is-standalone) .menu-panel {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      background: rgba(10, 10, 10, 0.35);
     }
     .menu-panel.is-open { display: flex; }
     .menu-panel__sheet {
@@ -1557,6 +1601,8 @@
       var ADMIN_CODE = "121276030993";
       var AUTH_KEY = "gogogo_go_admin";
       var TRAINER_ADMIN_KEY = "gogogo_trainer_admin";
+      var ADMIN_RETURN_KEY = "gogogo_admin_return";
+      var ADMIN_RETURN_ACC_KEY = "gogogo_admin_return_acc";
       var trainerSessionAccount = null;
       var trainerAdminMode = false;
       var trainerSchemaOk = null;
@@ -2902,10 +2948,43 @@
         return String(name || "").trim().split(/\s+/)[0] || "";
       }
 
+      function stashAdminReturn() {
+        try {
+          var payload = {
+            mode: trainerAdminMode ? "trainer" : "full",
+            href: trainerAdminMode ? "/go/admin/?trainer=1" : "/go/admin/"
+          };
+          sessionStorage.setItem(ADMIN_RETURN_KEY, JSON.stringify(payload));
+          if (trainerAdminMode && trainerSessionAccount) {
+            sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(trainerSessionAccount));
+          } else {
+            var acc = readAccountSession();
+            if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
+          }
+        } catch (e) {}
+      }
+
+      function restoreTrainerSessionFromStash() {
+        try {
+          var accRaw = sessionStorage.getItem(ADMIN_RETURN_ACC_KEY);
+          if (!accRaw) return null;
+          var acc = JSON.parse(accRaw);
+          if (!acc || !acc.id || !acc.is_trainer) return null;
+          if (window.GoAccountSession) GoAccountSession.save(acc);
+          else localStorage.setItem(ACCOUNT_KEY, JSON.stringify(acc));
+          return acc;
+        } catch (e) {
+          return null;
+        }
+      }
+
       function initTrainerAdminMode() {
         var params = new URLSearchParams(location.search || "");
         if (params.get("trainer") !== "1") return false;
         var acc = readAccountSession();
+        if ((!acc || !acc.id || !acc.is_trainer) && restoreTrainerSessionFromStash()) {
+          acc = readAccountSession();
+        }
         if (!acc || !acc.id || !acc.is_trainer) return false;
         trainerSessionAccount = acc;
         trainerAdminMode = true;
@@ -2975,6 +3054,7 @@
         cycleBtn.classList.toggle("is-back", on);
         cycleBtn.disabled = !on;
         cycleBtn.setAttribute("aria-disabled", on ? "false" : "true");
+        cycleBtn.setAttribute("aria-label", on ? "Zurück zur Nutzerliste" : "Zurück zum Generator");
       }
       function setCyclePhoto(url) {
         if (!cyclePortrait || !cyclePortraitImg) return;
@@ -3187,6 +3267,7 @@
           window.alert("Account konnte lokal nicht gespeichert werden.");
           return;
         }
+        stashAdminReturn();
         window.location.href = "/account/?goto=profile";
       }
 
@@ -5345,6 +5426,7 @@
       authBtn.addEventListener("click", function () {
         setMenu(false);
         if (trainerAdminMode) {
+          stashAdminReturn();
           window.location.href = "/account/?goto=profile";
           return;
         }
@@ -5400,6 +5482,15 @@
 
       cycleBtn.addEventListener("click", function () {
         if (cycleBtn.disabled) return;
+        if (cycleBtn.classList.contains("is-back")) {
+          if (panelResult && !panelResult.hidden) {
+            confirmUserAdminOk();
+          } else {
+            showList();
+          }
+          window.scrollTo({ top: 0, behavior: "smooth" });
+          return;
+        }
         document.getElementById("gen-name").value = "";
         document.getElementById("gen-msg").textContent = "";
         document.getElementById("gen-msg").classList.remove("is-error");

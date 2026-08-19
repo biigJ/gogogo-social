@@ -64,7 +64,7 @@
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
     }
-    /* Neutraler Streifen hinter dem Notch: sonst färbt Seiten-Rot jeden Blur rosa. */
+    /* Browser: neutraler Streifen hinter dem Notch (Blur-Tint vermeiden). */
     body.has-scroll-overflow::before {
       content: "";
       position: fixed;
@@ -76,6 +76,33 @@
       height: env(safe-area-inset-top, 0px);
       background: var(--chrome-bg);
       pointer-events: none;
+    }
+    /* PWA/Home-Screen: Notch immer mit Marken-Rot füllen (kein weißer/grauer Streifen). */
+    html.is-standalone body::before {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 59;
+      height: constant(safe-area-inset-top);
+      height: env(safe-area-inset-top, 0px);
+      background: var(--red);
+      pointer-events: none;
+    }
+    @media (display-mode: standalone) {
+      body::before {
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 59;
+        height: constant(safe-area-inset-top);
+        height: env(safe-area-inset-top, 0px);
+        background: var(--red);
+        pointer-events: none;
+      }
     }
     /* Home-Indicator-Bereich: sonst weißer Streifen unter der Dock-Leiste. */
     body::after {
@@ -164,6 +191,14 @@
     body.has-scroll-overflow .site-chrome::before {
       opacity: 1;
     }
+    /* Safari (Browser-Tab): kein Frost-Blur — Tabs und Inhalt wirken sonst verschwommen. */
+    html:not(.is-standalone) body.has-scroll-overflow .site-chrome::before,
+    html:not(.is-standalone) body.has-scroll-overflow .site-chrome.site-chrome--top::before {
+      opacity: 0;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: transparent;
+    }
     body.is-keyboard .site-chrome:not(.site-chrome--top) {
       opacity: 0;
       visibility: hidden;
@@ -194,10 +229,16 @@
       mask-image: none;
     }
     body.has-scroll-overflow .site-chrome.site-chrome--top::before {
-      /* Farbloser Blur — Untergrund ist bereits neutral (body::before), kein Rot-Tint */
+      /* Farbloser Blur — in PWA hinter rotem Notch-Streifen */
       background: rgba(255, 255, 255, 0.04);
       -webkit-backdrop-filter: blur(20px) saturate(1.2);
       backdrop-filter: blur(20px) saturate(1.2);
+    }
+    html.is-standalone body.has-scroll-overflow .site-chrome.site-chrome--top::before {
+      background: transparent;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      opacity: 0;
     }
     .site-chrome--top::after {
       display: none;
@@ -729,6 +770,22 @@
       cursor: pointer;
     }
     .profile-trainer-admin[hidden] { display: none !important; }
+    .profile-admin-return {
+      display: block;
+      width: 100%;
+      margin: 0 0 10px;
+      padding: 12px 16px;
+      border: 1px solid rgba(247, 245, 240, 0.55);
+      border-radius: var(--radius);
+      background: var(--paper);
+      color: var(--btn-ink);
+      font: inherit;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      text-align: center;
+      cursor: pointer;
+    }
+    .profile-admin-return[hidden] { display: none !important; }
     .profile-portrait {
       width: calc(132px * 0.8);
       height: calc(132px * 0.8);
@@ -2477,6 +2534,7 @@
           </button>
         </div>
         <p class="profile-coach-badge" id="profile-coach-badge" hidden></p>
+        <button class="profile-admin-return" type="button" id="profile-admin-return" hidden>← Admin-Bereich</button>
         <button class="profile-trainer-admin" type="button" id="profile-trainer-admin" hidden>Trainer-Bereich</button>
         <div class="profile-top">
           <button class="profile-portrait" id="profile-photo-btn" type="button" aria-label="Profilfoto ändern">
@@ -4458,6 +4516,7 @@
           var isTrainer = !!(account && account.is_trainer);
           trainerAdminBtn.hidden = !isTrainer;
         }
+        updateProfileAdminReturn();
         var streak = computeWorkoutStreak();
         if (streakEl) streakEl.textContent = streak === 1 ? "1 Tag" : streak + " Tage";
         if (wertEl) {
@@ -4529,6 +4588,54 @@
         if (!btn) return;
         btn.addEventListener("click", function () {
           window.location.href = "/go/admin/?trainer=1";
+        });
+      })();
+
+      var ADMIN_AUTH_KEY = "gogogo_go_admin";
+      var ADMIN_RETURN_KEY = "gogogo_admin_return";
+      var ADMIN_RETURN_ACC_KEY = "gogogo_admin_return_acc";
+
+      function hasStoredAdminAuth() {
+        try {
+          return localStorage.getItem(ADMIN_AUTH_KEY) === "1" || sessionStorage.getItem(ADMIN_AUTH_KEY) === "1";
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function readAdminReturn() {
+        try {
+          var raw = sessionStorage.getItem(ADMIN_RETURN_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function updateProfileAdminReturn() {
+        var btn = document.getElementById("profile-admin-return");
+        if (!btn) return;
+        var ret = readAdminReturn();
+        var show = !!(ret && ret.href) || hasStoredAdminAuth();
+        btn.hidden = !show;
+        btn.textContent = "← Admin-Bereich";
+      }
+
+      (function bindProfileAdminReturn() {
+        var btn = document.getElementById("profile-admin-return");
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          var accRaw = sessionStorage.getItem(ADMIN_RETURN_ACC_KEY);
+          if (accRaw) {
+            try {
+              var acc = JSON.parse(accRaw);
+              if (acc && acc.id && window.GoAccountSession) GoAccountSession.save(acc);
+              else if (acc && acc.id) localStorage.setItem("gogogo_go_account", JSON.stringify(acc));
+            } catch (e0) {}
+            sessionStorage.removeItem(ADMIN_RETURN_ACC_KEY);
+          }
+          sessionStorage.removeItem(ADMIN_RETURN_KEY);
+          window.location.href = "/go/admin/";
         });
       })();
 
