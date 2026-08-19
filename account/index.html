@@ -1538,6 +1538,54 @@
       .profile-refresh__spin { animation: none; }
     }
 
+    .profile-booking {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      margin: 0 0 18px;
+      padding: 8px 12px;
+      background: #fff;
+      color: var(--ink);
+      border: 0;
+      border-radius: var(--radius);
+      box-sizing: border-box;
+      cursor: pointer;
+      text-align: left;
+      font: inherit;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .profile-booking__left {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .profile-booking__label {
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--red);
+    }
+    .profile-booking__date {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: rgba(52, 34, 32, 0.72);
+      white-space: nowrap;
+    }
+    .profile-booking__icon {
+      font-size: 1.5rem;
+      flex: 0 0 auto;
+      opacity: 0.7;
+    }
+
     .challenge-modal {
       position: fixed; inset: 0; z-index: 90;
       display: none;
@@ -2392,6 +2440,13 @@
             </div>
           </div>
         </button>
+        <button class="profile-booking" id="profile-booking" type="button" aria-label="Personal Training buchen">
+          <div class="profile-booking__left">
+            <span class="profile-booking__label" id="profile-booking-label">Personal Training</span>
+            <span class="profile-booking__date" id="profile-booking-date"></span>
+          </div>
+          <span class="profile-booking__icon" aria-hidden="true">📅</span>
+        </button>
         <section class="profile-plan" aria-label="Plan">
           <div id="profile-plan-days"></div>
         </section>
@@ -3228,6 +3283,55 @@
           strokeWidth: "1.45"
         });
       }
+
+      var CALENDLY_URL = "https://calendly.com/biig-meeting/30min?back=1&month=2026-08";
+
+      function renderProfileBooking() {
+        var labelEl = document.getElementById("profile-booking-label");
+        var dateEl = document.getElementById("profile-booking-date");
+        if (!labelEl || !dateEl) return;
+        var raw = account && account.training_date;
+        if (raw) {
+          var d = new Date(raw);
+          var valid = !isNaN(d.getTime());
+          labelEl.textContent = "Trainertermin";
+          dateEl.textContent = valid
+            ? "am " + d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+              " um " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " Uhr"
+            : raw;
+        } else {
+          labelEl.textContent = "Personal Training buchen";
+          dateEl.textContent = "";
+        }
+      }
+
+      function openCalendly() {
+        var w = 700, h = 700;
+        var left = Math.max(0, Math.round((screen.width - w) / 2));
+        var top = Math.max(0, Math.round((screen.height - h) / 2));
+        window.open(CALENDLY_URL, "calendly", "width=" + w + ",height=" + h + ",left=" + left + ",top=" + top + ",resizable=yes,scrollbars=yes");
+      }
+
+      (function bindBooking() {
+        var btn = document.getElementById("profile-booking");
+        if (btn) btn.addEventListener("click", openCalendly);
+        window.addEventListener("message", async function (e) {
+          if (!e.data || e.data.event !== "calendly.event_scheduled") return;
+          var payload = e.data.payload || {};
+          var eventStart = (payload.event && payload.event.start_time) || null;
+          if (!eventStart) return;
+          var isoDate = new Date(eventStart).toISOString();
+          if (account) {
+            account.training_date = isoDate;
+            try {
+              var sess = window.GoAccountSession ? window.GoAccountSession.get() : JSON.parse(localStorage.getItem("gogogo_go_account") || "null");
+              if (sess) { sess.training_date = isoDate; if (window.GoAccountSession) window.GoAccountSession.set(sess); else localStorage.setItem("gogogo_go_account", JSON.stringify(sess)); }
+            } catch (e2) {}
+            renderProfileBooking();
+          }
+          await patchAccount({ training_date: isoDate, updated_at: new Date().toISOString() });
+        });
+      })();
 
       function renderProfileChallenge() {
         var euro = document.getElementById("profile-challenge-euro");
@@ -4248,6 +4352,7 @@
         renderProfileSerial();
         renderProfileMantra();
         renderProfileChallenge();
+        renderProfileBooking();
         renderProfilePlan();
       }
 

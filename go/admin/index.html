@@ -2600,7 +2600,15 @@
         }
       }
 
-      function setActorName(name) {
+      function formatTrainingDate(iso) {
+        if (!iso) return "";
+        var d = new Date(iso);
+        if (isNaN(d.getTime())) return "";
+        return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+          " " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+      }
+
+      function setActorName(name, trainingDate) {
         if (!isAuthed() || !name) {
           adminNameBtn.hidden = true;
           adminNameBtn.textContent = "";
@@ -2608,9 +2616,11 @@
           if (adminOpenProfileBtn) adminOpenProfileBtn.hidden = true;
           return;
         }
+        var dateStr = formatTrainingDate(trainingDate || (activeAccount && activeAccount.training_date));
+        var display = dateStr ? name + " · " + dateStr : name;
         adminNameBtn.hidden = false;
         adminNameBtn.disabled = false;
-        adminNameBtn.textContent = name;
+        adminNameBtn.textContent = display;
         adminNameBtn.setAttribute("aria-label", "Profil von " + name + " öffnen");
         if (adminOpenProfileBtn) {
           adminOpenProfileBtn.hidden = false;
@@ -3596,6 +3606,7 @@
         /* Gelesen erst mit OK — kein automatisches Löschen beim Öffnen. */
         activeAccount = await resolveAccount(name, serial, code);
         if (activeAccount && activeAccount.photo_url) setCyclePhoto(activeAccount.photo_url);
+        if (activeAccount && activeAccount.training_date) setActorName(name || "", activeAccount.training_date);
         refreshTrainerUi();
         await renderMirroredFeed(activeAccount);
         await loadCoachPlan(activeAccount && activeAccount.id);
