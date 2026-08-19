@@ -402,6 +402,24 @@
       white-space: nowrap;
       border: 0;
     }
+    .deleted-gate {
+      display: none;
+      text-align: center;
+      padding: 48px 24px 64px;
+    }
+    .deleted-gate.is-on { display: block; }
+    .deleted-gate h2 {
+      font-size: clamp(1.35rem, 5.5vw, 1.85rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.25;
+      margin-bottom: 14px;
+    }
+    .deleted-gate p {
+      font-weight: 500;
+      line-height: 1.45;
+      opacity: 0.95;
+    }
   </style>
 </head>
 <body>
@@ -420,6 +438,11 @@
         </div>
       </div>
       <h1 class="hero__title">Challenge Deinen Bewegungsmangel</h1>
+    </section>
+
+    <section class="deleted-gate" id="deleted-gate" aria-live="polite">
+      <h2>Ihr Account wurde gelöscht.</h2>
+      <p>Alle Daten wurden aus der Datenbank entfernt.</p>
     </section>
 
     <div class="flow-out" id="flow-main">
@@ -943,6 +966,52 @@
 
       if (/[?&]login=1(?:&|$)/.test(location.search)) {
         showBuddyLogin();
+      }
+
+      function showDeletedGate() {
+        var gate = document.getElementById("deleted-gate");
+        if (gate) gate.classList.add("is-on");
+        if (flowMain) flowMain.hidden = true;
+        if (flowSuccess) flowSuccess.hidden = true;
+        var hero = document.querySelector(".hero");
+        if (hero) hero.hidden = true;
+        var foot = document.querySelector(".foot");
+        if (foot) foot.hidden = true;
+      }
+
+      async function verifyStoredAccountStillExists() {
+        var stored = null;
+        if (window.GoAccountSession) stored = GoAccountSession.load();
+        else {
+          try { stored = JSON.parse(localStorage.getItem("gogogo_go_account") || "null"); } catch (e) {}
+        }
+        if (!stored || !stored.name) return;
+        var remote = null;
+        if (stored.id && String(stored.id).indexOf("local-") !== 0) {
+          remote = await restGet("go_accounts?id=eq." + encodeURIComponent(stored.id) + "&select=id&limit=1");
+        }
+        if ((!remote || !remote[0]) && stored.serial_number) {
+          remote = await restGet(
+            "go_accounts?serial_number=eq." + encodeURIComponent(stored.serial_number) + "&select=id&limit=1"
+          );
+        }
+        if ((!remote || !remote[0]) && stored.invite_code) {
+          remote = await restGet(
+            "go_accounts?invite_code=eq." + encodeURIComponent(stored.invite_code) + "&select=id&limit=1"
+          );
+        }
+        if (remote && remote[0]) return;
+        if (window.GoAccountSession) GoAccountSession.clear();
+        else {
+          try { localStorage.removeItem("gogogo_go_account"); } catch (e2) {}
+        }
+        showDeletedGate();
+      }
+
+      if (/[?&]deleted=1(?:&|$)/.test(location.search)) {
+        showDeletedGate();
+      } else {
+        verifyStoredAccountStillExists().catch(function () {});
       }
 
       window.addEventListener("load", function () {

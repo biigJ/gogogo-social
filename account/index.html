@@ -508,9 +508,87 @@
       letter-spacing: -0.03em;
       line-height: 1.1;
       color: var(--ink-on-red);
-      margin: 0 0 18px;
+      margin: 0;
       text-align: center;
     }
+    .profile-name-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      margin: 0 0 18px;
+      min-height: 2rem;
+      padding: 0 44px;
+    }
+    .profile-settings {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--ink-on-red);
+      opacity: 0.92;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .profile-settings svg {
+      width: 1.15rem;
+      height: 1.15rem;
+      display: block;
+    }
+    .profile-settings:focus-visible {
+      outline: 1px solid rgba(247, 245, 240, 0.85);
+      outline-offset: 2px;
+    }
+    .profile-settings-menu {
+      display: grid;
+      gap: 10px;
+    }
+    .profile-settings-menu__btn {
+      width: 100%;
+      min-height: 48px;
+      border: 1px solid rgba(10, 10, 10, 0.12);
+      border-radius: var(--radius);
+      background: var(--paper);
+      color: var(--ink);
+      font: inherit;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      cursor: pointer;
+    }
+    .profile-settings-menu__btn.is-danger {
+      color: #8b1a12;
+      border-color: rgba(139, 26, 18, 0.25);
+    }
+    .profile-settings-field {
+      width: 100%;
+      height: 48px;
+      margin-top: 8px;
+      padding: 0 12px;
+      border: 1px solid rgba(10, 10, 10, 0.12);
+      border-radius: var(--radius);
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-size: 1.1rem;
+      text-align: center;
+      letter-spacing: 0.2em;
+    }
+    .profile-settings-msg {
+      margin-top: 10px;
+      font-size: 0.92rem;
+      font-weight: 500;
+      line-height: 1.35;
+    }
+    .profile-settings-msg.is-error { color: #8b1a12; }
     .profile-top {
       display: grid;
       grid-template-columns: auto 1fr;
@@ -2134,6 +2212,30 @@
     .gate {
       text-align: center; padding: 80px 24px;
     }
+    .gate.is-deleted {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--red);
+      color: var(--ink-on-red);
+    }
+    .gate.is-deleted .hero__hello {
+      font-size: clamp(1.35rem, 5.5vw, 1.85rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.25;
+      max-width: 18em;
+      margin: 0 auto;
+    }
+    .gate.is-deleted p {
+      margin-top: 14px;
+      font-weight: 500;
+      line-height: 1.45;
+      max-width: 22em;
+      opacity: 0.95;
+    }
     .gate a {
       display: inline-flex; margin-top: 16px; padding: 14px 22px;
       background: var(--paper); color: var(--btn-ink); font-weight: 700;
@@ -2148,6 +2250,10 @@
     <p class="hero__hello">Kein Account gefunden.</p>
     <p style="margin-top:12px;font-weight:500">Melde Dich zuerst über die Buddy-Challenge an.</p>
     <a href="/go/">Zu /go</a>
+  </div>
+  <div id="app-gate-deleted" class="gate is-deleted" hidden>
+    <p class="hero__hello">Ihr Account wurde gelöscht.</p>
+    <p>Alle Daten wurden aus der Datenbank entfernt.</p>
   </div>
 
   <div id="app" hidden>
@@ -2202,7 +2308,12 @@
             <path d="M20 6a14 14 0 0 1 14 14" fill="none" stroke="rgba(247,245,240,0.95)" stroke-width="3" stroke-linecap="round"></path>
           </svg>
         </div>
-        <h1 class="profile-name" id="profile-name"></h1>
+        <div class="profile-name-row">
+          <h1 class="profile-name" id="profile-name"></h1>
+          <button class="profile-settings" id="profile-settings-btn" type="button" aria-label="Einstellungen" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.07 7.07 0 0 0-1.63-.94l-.36-2.54A.48.48 0 0 0 14 2h-4a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.13.22.39.3.59.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.05.24.24.41.47.41h4c.23 0 .42-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.2.08.46 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
+          </button>
+        </div>
         <p class="profile-coach-badge" id="profile-coach-badge" hidden></p>
         <button class="profile-trainer-admin" type="button" id="profile-trainer-admin" hidden>Trainer-Bereich</button>
         <div class="profile-top">
@@ -2734,6 +2845,41 @@
       <div class="challenge-modal__actions">
         <button type="button" class="challenge-modal__btn is-ghost" id="challenge-amount-cancel">Abbrechen</button>
         <button type="button" class="challenge-modal__btn" id="challenge-amount-ok">Weiter</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="profile-settings-modal" hidden>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="profile-settings-title">
+      <h2 id="profile-settings-title">Einstellungen</h2>
+      <div class="profile-settings-menu">
+        <button class="profile-settings-menu__btn" type="button" id="profile-change-code-btn">Code ändern</button>
+        <button class="profile-settings-menu__btn is-danger" type="button" id="profile-delete-account-btn">Account löschen</button>
+        <button class="profile-settings-menu__btn" type="button" id="profile-settings-close">Schließen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="profile-change-code-modal" hidden>
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="profile-change-code-title">
+      <h2 id="profile-change-code-title">Code ändern</h2>
+      <p style="font-size:0.92rem;line-height:1.4;margin-bottom:8px">Neuer 4-stelliger Einladungscode für Deinen Login.</p>
+      <input class="profile-settings-field" id="profile-new-code" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="0000" aria-label="Neuer Code" />
+      <p class="profile-settings-msg" id="profile-change-code-msg" hidden></p>
+      <div class="modal__actions" style="margin-top:14px">
+        <button class="btn btn--ghost" type="button" id="profile-change-code-cancel">Abbrechen</button>
+        <button class="btn" type="button" id="profile-change-code-save">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="profile-delete-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="profile-delete-title">
+      <p class="challenge-modal__title" id="profile-delete-title">Account endgültig löschen?</p>
+      <p style="font-size:0.92rem;line-height:1.4;opacity:0.95">Alle Deine Daten werden aus der Datenbank entfernt. Das kann nicht rückgängig gemacht werden.</p>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn is-ghost" id="profile-delete-no">Abbrechen</button>
+        <button type="button" class="challenge-modal__btn" id="profile-delete-yes">Löschen</button>
       </div>
     </div>
   </div>
@@ -5591,6 +5737,223 @@
         return res.ok;
       }
 
+      async function callAccountRpc(name, args) {
+        var res = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(args || {})
+        });
+        if (!res.ok) {
+          var t = "";
+          try { t = await res.text(); } catch (e) {}
+          if (/PGRST202|function.*(delete_go_user|change_go_user_code)/i.test(t || "")) {
+            throw new Error("In Supabase SQL Editor go-delete-user.sql ausführen.");
+          }
+          throw new Error(t || ("HTTP " + res.status));
+        }
+      }
+
+      function accountHasCloudIdentity() {
+        if (!account) return false;
+        if (account.id && String(account.id).indexOf("local-") !== 0) return true;
+        if (account.serial_number) return true;
+        if (account.invite_code) return true;
+        return false;
+      }
+
+      function clearLocalAccountData() {
+        try { localStorage.removeItem(DAY_ENTRIES_KEY); } catch (e0) {}
+        try { localStorage.removeItem(BUDDIES_KEY); } catch (e1) {}
+        try { localStorage.removeItem(BUDDY_SEARCH_FAILS_KEY); } catch (e2) {}
+        try { localStorage.removeItem(BUDDY_SEARCH_LOCK_KEY); } catch (e3) {}
+        if (window.GoAccountSession) GoAccountSession.clear();
+        else {
+          try { localStorage.removeItem(ACCOUNT_KEY); } catch (e4) {}
+        }
+        account = null;
+        buddyList = [];
+        dayEntries = {};
+      }
+
+      function showAccountDeletedPage() {
+        clearLocalAccountData();
+        var app = document.getElementById("app");
+        var gate = document.getElementById("app-gate");
+        var deletedGate = document.getElementById("app-gate-deleted");
+        if (app) app.hidden = true;
+        if (gate) gate.hidden = true;
+        if (deletedGate) deletedGate.hidden = false;
+        document.body.classList.remove("is-profile", "is-community", "is-training", "is-book");
+      }
+
+      async function deleteOwnAccount() {
+        var args = {};
+        if (account.id && String(account.id).indexOf("local-") !== 0) args.p_account_id = account.id;
+        if (account.serial_number) args.p_serial = account.serial_number;
+        if (account.invite_code) args.p_code = account.invite_code;
+        await callAccountRpc("delete_go_user", args);
+        showAccountDeletedPage();
+      }
+
+      async function changeOwnCode(newCode) {
+        if (!account || !account.id || String(account.id).indexOf("local-") === 0) {
+          throw new Error("Account noch nicht synchronisiert.");
+        }
+        await callAccountRpc("change_go_user_code", {
+          p_account_id: account.id,
+          p_new_code: newCode
+        });
+        account.invite_code = newCode;
+        saveAccount();
+      }
+
+      function openProfileModal(id) {
+        var modal = document.getElementById(id);
+        if (!modal) return;
+        modal.hidden = false;
+        modal.classList.add("is-open");
+        modal.setAttribute("aria-hidden", "false");
+      }
+
+      function closeProfileModal(id) {
+        var modal = document.getElementById(id);
+        if (!modal) return;
+        modal.classList.remove("is-open");
+        modal.hidden = true;
+        modal.setAttribute("aria-hidden", "true");
+      }
+
+      (function bindProfileSettings() {
+        var settingsBtn = document.getElementById("profile-settings-btn");
+        var settingsModal = document.getElementById("profile-settings-modal");
+        var settingsClose = document.getElementById("profile-settings-close");
+        var changeCodeBtn = document.getElementById("profile-change-code-btn");
+        var changeCodeModal = document.getElementById("profile-change-code-modal");
+        var changeCodeCancel = document.getElementById("profile-change-code-cancel");
+        var changeCodeSave = document.getElementById("profile-change-code-save");
+        var changeCodeInput = document.getElementById("profile-new-code");
+        var changeCodeMsg = document.getElementById("profile-change-code-msg");
+        var deleteBtn = document.getElementById("profile-delete-account-btn");
+        var deleteModal = document.getElementById("profile-delete-modal");
+        var deleteNo = document.getElementById("profile-delete-no");
+        var deleteYes = document.getElementById("profile-delete-yes");
+
+        function setChangeCodeMsg(text, isError) {
+          if (!changeCodeMsg) return;
+          if (!text) {
+            changeCodeMsg.hidden = true;
+            changeCodeMsg.textContent = "";
+            changeCodeMsg.classList.remove("is-error");
+            return;
+          }
+          changeCodeMsg.hidden = false;
+          changeCodeMsg.textContent = text;
+          changeCodeMsg.classList.toggle("is-error", !!isError);
+        }
+
+        if (settingsBtn && settingsModal) {
+          settingsBtn.addEventListener("click", function () {
+            openProfileModal("profile-settings-modal");
+          });
+        }
+        if (settingsClose) {
+          settingsClose.addEventListener("click", function () {
+            closeProfileModal("profile-settings-modal");
+          });
+        }
+        if (settingsModal) {
+          settingsModal.addEventListener("click", function (e) {
+            if (e.target === settingsModal) closeProfileModal("profile-settings-modal");
+          });
+        }
+        if (changeCodeBtn) {
+          changeCodeBtn.addEventListener("click", function () {
+            closeProfileModal("profile-settings-modal");
+            if (changeCodeInput) {
+              changeCodeInput.value = account && account.invite_code ? String(account.invite_code) : "";
+            }
+            setChangeCodeMsg("", false);
+            openProfileModal("profile-change-code-modal");
+            if (changeCodeInput) changeCodeInput.focus();
+          });
+        }
+        if (changeCodeInput) {
+          changeCodeInput.addEventListener("input", function () {
+            this.value = this.value.replace(/\D/g, "").slice(0, 4);
+            setChangeCodeMsg("", false);
+          });
+        }
+        if (changeCodeCancel) {
+          changeCodeCancel.addEventListener("click", function () {
+            closeProfileModal("profile-change-code-modal");
+          });
+        }
+        if (changeCodeModal) {
+          changeCodeModal.addEventListener("click", function (e) {
+            if (e.target === changeCodeModal) closeProfileModal("profile-change-code-modal");
+          });
+        }
+        if (changeCodeSave) {
+          changeCodeSave.addEventListener("click", async function () {
+            var code = changeCodeInput ? changeCodeInput.value.trim() : "";
+            if (!/^\d{4}$/.test(code)) {
+              setChangeCodeMsg("Bitte genau 4 Ziffern eingeben.", true);
+              return;
+            }
+            if (account && String(account.invite_code || "") === code) {
+              closeProfileModal("profile-change-code-modal");
+              return;
+            }
+            changeCodeSave.disabled = true;
+            setChangeCodeMsg("Speichere …", false);
+            try {
+              await changeOwnCode(code);
+              closeProfileModal("profile-change-code-modal");
+              renderProfileSerial();
+            } catch (err) {
+              var msg = err && err.message ? err.message : "Code konnte nicht geändert werden.";
+              if (/bereits vergeben/i.test(msg)) msg = "Dieser Code ist bereits vergeben.";
+              setChangeCodeMsg(msg, true);
+            } finally {
+              changeCodeSave.disabled = false;
+            }
+          });
+        }
+        if (deleteBtn) {
+          deleteBtn.addEventListener("click", function () {
+            closeProfileModal("profile-settings-modal");
+            openChallengeModal(deleteModal);
+          });
+        }
+        if (deleteNo) {
+          deleteNo.addEventListener("click", function () {
+            closeChallengeModal(deleteModal);
+          });
+        }
+        if (deleteModal) {
+          deleteModal.addEventListener("click", function (e) {
+            if (e.target === deleteModal) closeChallengeModal(deleteModal);
+          });
+        }
+        if (deleteYes) {
+          deleteYes.addEventListener("click", async function () {
+            deleteYes.disabled = true;
+            if (deleteNo) deleteNo.disabled = true;
+            try {
+              await deleteOwnAccount();
+            } catch (err) {
+              window.alert(err && err.message ? err.message : "Account konnte nicht gelöscht werden.");
+              deleteYes.disabled = false;
+              if (deleteNo) deleteNo.disabled = false;
+            }
+          });
+        }
+      })();
+
       async function persistPhoto(url) {
         account.photo_url = url;
         saveAccount();
@@ -5681,6 +6044,10 @@
           if (candidates.length) remote = candidates[0];
         }
         if (!remote) {
+          if (accountHasCloudIdentity()) {
+            showAccountDeletedPage();
+            return;
+          }
           if (typeof dayEntriesReady === "function") dayEntriesReady();
           return;
         }

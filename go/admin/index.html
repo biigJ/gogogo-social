@@ -3646,8 +3646,8 @@
       }
 
       function actionError(text) {
-        if (/42703|paused does not exist|PGRST202|function.*(pause_go_invite|delete_go_invite)/i.test(text || "")) {
-          return "In Supabase SQL Editor go-invite-admin.sql ausführen.";
+        if (/42703|paused does not exist|PGRST202|function.*(pause_go_invite|delete_go_invite|delete_go_user|change_go_user_code)/i.test(text || "")) {
+          return "In Supabase SQL Editor go-delete-user.sql ausführen.";
         }
         return text || "Aktion fehlgeschlagen.";
       }
@@ -3689,6 +3689,26 @@
             SUPABASE_URL + "/rest/v1/go_invite_codes?id=eq." + encodeURIComponent(id),
             { method: "DELETE", headers: apiHeaders() }
           );
+        }
+        if (!res.ok) {
+          var t = "";
+          try { t = await res.text(); } catch (e) {}
+          throw new Error(actionError(t));
+        }
+      }
+
+      async function deleteUser(row) {
+        var args = {};
+        if (row && row.id) args.p_invite_id = row.id;
+        if (row && row.serial_number) args.p_serial = row.serial_number;
+        if (row && row.code) args.p_code = row.code;
+        var res = await callRpc("delete_go_user", args);
+        if (res.status === 404) {
+          if (row && row.id) {
+            await deleteInvite(row.id);
+            return;
+          }
+          throw new Error(actionError("delete_go_user fehlt"));
         }
         if (!res.ok) {
           var t = "";
@@ -4380,11 +4400,18 @@
 
         delBtn.addEventListener("click", async function (e) {
           e.stopPropagation();
-          if (!window.confirm("Eintrag für " + (row.first_name || "diesen Code") + " löschen?")) return;
+          if (!window.confirm(
+            "Account für " + (row.first_name || "diesen Nutzer") +
+            " endgültig löschen? Alle Daten werden aus der Datenbank entfernt."
+          )) return;
           setBusy(true);
           try {
-            await deleteInvite(row.id);
+            await deleteUser(row);
             if (lastQr && lastQr.code === row.code) lastQr = null;
+            if (activeAccount && activeAccount.invite_code === row.code) {
+              activeAccount = null;
+              activeAccountIds = [];
+            }
             wrap.remove();
             var remaining = list.querySelectorAll(".list-row").length;
             document.getElementById("list-msg").classList.remove("is-error");
