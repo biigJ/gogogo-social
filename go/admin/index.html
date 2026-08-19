@@ -1092,6 +1092,10 @@
       opacity: 0.35;
       pointer-events: none;
     }
+    body.is-trainer-mode #admin-role,
+    body.is-trainer-mode #plan-blurb-block {
+      display: none;
+    }
     .list-item__trainer {
       display: block;
       margin-top: 4px;
@@ -1292,7 +1296,7 @@
         <hr class="admin-rule" />
         <section class="admin-plan" id="admin-plan" aria-label="Trainingsplan">
           <h2 class="admin-plan__title">Trainingsplan</h2>
-          <div class="admin-plan__block">
+          <div class="admin-plan__block" id="plan-blurb-block">
             <label for="plan-blurb">Kurzer Satz zum Nutzer</label>
             <textarea id="plan-blurb" rows="2" maxlength="280" placeholder="Kurzbeschreibung…"></textarea>
           </div>
@@ -1449,7 +1453,7 @@
             <textarea id="plan-so" rows="2" maxlength="400" placeholder="Sonntag…"></textarea>
           </div>
           <h2 class="admin-kraft__title">Kraft-Einheiten</h2>
-          <p class="admin-kraft__hint">Haken = vorausgewählte Übungen. In der App erscheint der Haken hinter dem Namen.</p>
+          <p class="admin-kraft__hint">Haken = vorausgewählte Übungen pro Nutzer. Neue Übungen (NEU) gelten global für alle.</p>
           <div class="admin-kraft__systems" id="kraft-admin-systems"></div>
           <div class="admin-kraft__ex" id="kraft-admin-ex"></div>
           <div class="admin-kraft__new" id="kraft-admin-new-wrap">
@@ -1580,7 +1584,9 @@
       var zirkelConfirmBusy = false;
       var kraftAdminSystem = "full";
       var kraftAdminMap = {};
-      var kraftAdminExtras = {};
+      var kraftGlobalExtras = {};
+      var kraftLegacyExtras = {};
+      var kraftGlobalTableOk = false;
       var kraftTableMissing = false;
       var ausdauerAdminTech = "run";
       var ausdauerAdminPresets = [];
@@ -1620,7 +1626,16 @@
       }
 
       function kraftExtrasFor(systemId) {
-        return (kraftAdminExtras[systemId] || []).slice();
+        var seen = {};
+        var out = [];
+        function add(ex) {
+          if (!ex || !ex.id || seen[ex.id]) return;
+          seen[ex.id] = true;
+          out.push({ id: String(ex.id), name: String(ex.name || ex.id) });
+        }
+        (kraftGlobalExtras[systemId] || []).forEach(add);
+        if (!kraftGlobalTableOk) (kraftLegacyExtras[systemId] || []).forEach(add);
+        return out;
       }
 
       function kraftAllAdminExercises(systemId) {
@@ -1700,6 +1715,7 @@
           del.textContent = "×";
           del.dataset.ex = ex.id;
           del.title = "Übung löschen";
+          if (!/^c-/.test(String(ex.id))) del.hidden = true;
           lab.appendChild(del);
           wrap.appendChild(lab);
         });
@@ -1731,11 +1747,37 @@
         return out;
       }
 
+      async function loadGlobalKraftExercises() {
+        kraftGlobalExtras = kraftEmptyExtras();
+        kraftGlobalTableOk = false;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_kraft_exercises?select=id,system_id,name&order=created_at.asc",
+            { headers: apiHeaders() }
+          );
+          if (!res.ok) return false;
+          var rows = await res.json();
+          (rows || []).forEach(function (row) {
+            if (!row || !row.system_id || !row.id) return;
+            if (!kraftGlobalExtras[row.system_id]) kraftGlobalExtras[row.system_id] = [];
+            kraftGlobalExtras[row.system_id].push({
+              id: String(row.id),
+              name: String(row.name || row.id)
+            });
+          });
+          kraftGlobalTableOk = true;
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
       async function loadKraftPresets(accountId) {
         kraftAdminMap = kraftDefaultMap();
-        kraftAdminExtras = kraftEmptyExtras();
+        kraftLegacyExtras = kraftEmptyExtras();
         kraftTableMissing = false;
         setKraftAdminMsg("");
+        if (!kraftGlobalTableOk) await loadGlobalKraftExercises();
         refreshKraftAdminUi();
         if (!accountId || String(accountId).indexOf("local-") === 0) return;
         try {
@@ -1768,9 +1810,11 @@
           if (rows && rows.length) {
             rows.forEach(function (row) {
               kraftAdminMap[row.system_id] = Array.isArray(row.exercise_ids) ? row.exercise_ids.map(String) : [];
-              kraftAdminExtras[row.system_id] = parseKraftList(row.custom_exercises).map(function (ex) {
-                return { id: String(ex.id || ""), name: String(ex.name || ex.id || "") };
-              }).filter(function (ex) { return !!ex.id; });
+              if (!kraftGlobalTableOk) {
+                kraftLegacyExtras[row.system_id] = parseKraftList(row.custom_exercises).map(function (ex) {
+                  return { id: String(ex.id || ""), name: String(ex.name || ex.id || "") };
+                }).filter(function (ex) { return !!ex.id; });
+              }
             });
           }
           refreshKraftAdminUi();
@@ -1782,13 +1826,14 @@
         var now = new Date().toISOString();
         if (!cat) return [];
         return cat.SYSTEMS.map(function (sys) {
-          return {
+          var row = {
             account_id: accountId,
             system_id: sys.id,
             exercise_ids: kraftIdsFor(sys.id),
-            custom_exercises: kraftExtrasFor(sys.id),
             updated_at: now
           };
+          if (!kraftGlobalTableOk) row.custom_exercises = kraftExtrasFor(sys.id);
+          return row;
         });
       }
 
@@ -1860,6 +1905,48 @@
         if (saveEl) saveEl.hidden = !on;
       }
 
+      async function saveGlobalKraftExercise(systemId, id, name) {
+        var creator = trainerAdminMode && trainerSessionAccount
+          ? trainerSessionAccount.id
+          : (activeAccount && activeAccount.id ? activeAccount.id : null);
+        var res = await fetch(SUPABASE_URL + "/rest/v1/go_kraft_exercises", {
+          method: "POST",
+          headers: apiHeaders({
+            "Content-Type": "application/json",
+            Prefer: "return=representation"
+          }),
+          body: JSON.stringify({
+            id: id,
+            system_id: systemId,
+            name: name,
+            created_by: creator
+          })
+        });
+        if (res.ok) {
+          kraftGlobalTableOk = true;
+          return { ok: true };
+        }
+        var t = "";
+        try { t = await res.text(); } catch (e0) {}
+        if (/PGRST205|go_kraft_exercises|schema cache/i.test(t) || res.status === 404) {
+          return { ok: false, missing: true, detail: t };
+        }
+        return { ok: false, detail: t || ("HTTP " + res.status) };
+      }
+
+      async function deleteGlobalKraftExercise(exId) {
+        if (!kraftGlobalTableOk) return { ok: false, missing: true };
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_kraft_exercises?id=eq." + encodeURIComponent(exId),
+            { method: "DELETE", headers: apiHeaders({ Prefer: "return=minimal" }) }
+          );
+          return { ok: res.ok };
+        } catch (e) {
+          return { ok: false };
+        }
+      }
+
       async function saveNewKraftExercise() {
         var nameEl = document.getElementById("kraft-admin-new-name");
         var name = nameEl ? String(nameEl.value || "").trim() : "";
@@ -1877,32 +1964,58 @@
           return;
         }
         var id = kraftCustomId(name);
-        if (!kraftAdminExtras[kraftAdminSystem]) kraftAdminExtras[kraftAdminSystem] = [];
-        kraftAdminExtras[kraftAdminSystem].push({ id: id, name: name });
+        setKraftAdminMsg("Speichere …");
+        var globalSaved = await saveGlobalKraftExercise(kraftAdminSystem, id, name);
+        if (globalSaved && globalSaved.missing) {
+          if (!kraftLegacyExtras[kraftAdminSystem]) kraftLegacyExtras[kraftAdminSystem] = [];
+          kraftLegacyExtras[kraftAdminSystem].push({ id: id, name: name });
+        } else if (!globalSaved || !globalSaved.ok) {
+          setKraftAdminMsg(
+            "Speichern fehlgeschlagen" + (globalSaved && globalSaved.detail ? ": " + String(globalSaved.detail).slice(0, 120) : ".") +
+            " — go-kraft-exercises-global.sql in Supabase ausführen?",
+            true
+          );
+          return;
+        } else {
+          if (!kraftGlobalExtras[kraftAdminSystem]) kraftGlobalExtras[kraftAdminSystem] = [];
+          kraftGlobalExtras[kraftAdminSystem].push({ id: id, name: name });
+        }
         var ids = kraftIdsFor(kraftAdminSystem);
         if (ids.indexOf(id) === -1) ids.push(id);
         kraftAdminMap[kraftAdminSystem] = ids;
         refreshKraftAdminUi();
         showKraftNewRow(false);
         if (!activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) {
-          setKraftAdminMsg("Lokal hinzugefügt — Account speichern, damit es in der App erscheint.");
+          setKraftAdminMsg("Übung global gespeichert. Haken pro Nutzer mit Plan speichern.");
           return;
         }
-        setKraftAdminMsg("Speichere …");
         var saved = await saveKraftPresets(activeAccount.id);
-        if (saved && saved.ok) setKraftAdminMsg("Gespeichert. Die Übung ist in der App sichtbar.");
-        else if (saved && saved.missing && saved.detail === "custom_exercises") {
-          setKraftAdminMsg("Übung lokal da. Für Speichern go-kraft-workout.sql in Supabase ausführen.", true);
+        if (saved && saved.ok) {
+          setKraftAdminMsg(
+            kraftGlobalTableOk
+              ? "Gespeichert. Die Übung ist für alle Nutzer sichtbar."
+              : "Gespeichert (nur dieser Nutzer). go-kraft-exercises-global.sql ausführen für globale Übungen."
+          );
         } else {
-          setKraftAdminMsg("Speichern fehlgeschlagen" + (saved && saved.detail ? ": " + String(saved.detail).slice(0, 120) : "."), true);
+          setKraftAdminMsg("Übung global da. Haken für diesen Nutzer: " + (saved && saved.detail ? String(saved.detail).slice(0, 80) : "Plan speichern."), true);
         }
       }
 
       async function deleteKraftExercise(exId) {
         collectKraftAdminChecks();
         var sys = kraftAdminSystem;
-        if (kraftAdminExtras[sys]) {
-          kraftAdminExtras[sys] = kraftAdminExtras[sys].filter(function (ex) { return ex.id !== exId; });
+        if (/^c-/.test(String(exId))) {
+          var removed = await deleteGlobalKraftExercise(exId);
+          if (kraftGlobalExtras[sys]) {
+            kraftGlobalExtras[sys] = kraftGlobalExtras[sys].filter(function (ex) { return ex.id !== exId; });
+          }
+          if (removed && removed.missing) {
+            setKraftAdminMsg("Tabelle go_kraft_exercises fehlt — go-kraft-exercises-global.sql ausführen.", true);
+            return;
+          }
+        }
+        if (kraftLegacyExtras[sys]) {
+          kraftLegacyExtras[sys] = kraftLegacyExtras[sys].filter(function (ex) { return ex.id !== exId; });
         }
         if (kraftAdminMap[sys]) {
           kraftAdminMap[sys] = kraftAdminMap[sys].filter(function (id) { return id !== exId; });
@@ -2542,6 +2655,7 @@
         trainerAdminMode = true;
         document.body.classList.add("is-trainer-mode");
         setAuthed(true);
+        refreshTrainerModeUi();
         return true;
       }
 
@@ -3552,7 +3666,9 @@
         if (!activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) {
           return;
         }
-        var coach = await resolveCoachAccount();
+        var coach = (trainerAdminMode && trainerSessionAccount && trainerSessionAccount.id)
+          ? trainerSessionAccount
+          : await resolveCoachAccount();
         if (!coach || !coach.id) {
           window.alert("Trainer-Account nicht gefunden.");
           return;
@@ -3591,6 +3707,15 @@
         if (extras) extras.hidden = !on;
       }
 
+      function refreshTrainerModeUi() {
+        var okHint = document.querySelector(".admin-user-ok__hint");
+        if (okHint) {
+          okHint.textContent = trainerAdminMode
+            ? "OK = gelesen → zurück zu Meine Nutzer."
+            : "OK = gelesen → zurück zu Alle Nutzer (Punkt weg).";
+        }
+      }
+
       async function showResult(name, serial, code, inviteRow) {
         var url = GO_BASE;
         window.scrollTo(0, 0);
@@ -3623,9 +3748,17 @@
         updateAuthBtn();
         /* Gelesen erst mit OK — kein automatisches Löschen beim Öffnen. */
         activeAccount = await resolveAccount(name, serial, code);
+        if (trainerAdminMode && trainerSessionAccount && trainerSessionAccount.id) {
+          if (!activeAccount || String(activeAccount.trainer_id || "") !== String(trainerSessionAccount.id)) {
+            window.alert("Dieser Nutzer ist Dir nicht zugeordnet.");
+            showList();
+            return;
+          }
+        }
         if (activeAccount && activeAccount.photo_url) setCyclePhoto(activeAccount.photo_url);
         if (activeAccount && activeAccount.training_date) setActorName(name || "", activeAccount.training_date);
         refreshTrainerUi();
+        refreshTrainerModeUi();
         await renderMirroredFeed(activeAccount);
         await loadCoachPlan(activeAccount && activeAccount.id);
       }
@@ -4463,8 +4596,8 @@
         var adminBtn = document.createElement("button");
         adminBtn.type = "button";
         adminBtn.className = "list-action";
-        adminBtn.textContent = "Admin";
-        adminBtn.setAttribute("aria-label", "Admin-Ansicht für " + (row.first_name || "Nutzer"));
+        adminBtn.textContent = trainerAdminMode ? "Plan" : "Admin";
+        adminBtn.setAttribute("aria-label", (trainerAdminMode ? "Plan bearbeiten für " : "Admin-Ansicht für ") + (row.first_name || "Nutzer"));
         adminBtn.addEventListener("click", function (e) {
           e.stopPropagation();
           /* Punkt bleibt, bis OK in der Nutzer-Ansicht gedrückt wird. */
@@ -4541,8 +4674,6 @@
         actions.appendChild(pauseBtn);
         actions.appendChild(delBtn);
         if (trainerAdminMode) {
-          adminBtn.classList.add("is-disabled");
-          adminBtn.disabled = true;
           pauseBtn.classList.add("is-disabled");
           pauseBtn.disabled = true;
           delBtn.classList.add("is-disabled");
@@ -4950,6 +5081,7 @@
       }
 
       try {
+        loadGlobalKraftExercises();
         if (initTrainerAdminMode() || isAuthed()) showList();
         else showLogin();
       } catch (e) { showLogin(); }
