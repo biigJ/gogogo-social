@@ -37,7 +37,7 @@
       --chrome-radius: 22px;
       --header-h: calc(52px * 1.3);
       --chrome-fade: 56px;
-      --chrome-stack: calc(var(--chrome-fade) + var(--header-h) + 44px + env(safe-area-inset-bottom, 0px));
+      --chrome-stack: calc(var(--chrome-fade) + var(--header-h) + 12px + env(safe-area-inset-bottom, 0px));
       --display: "Space Grotesk", system-ui, sans-serif;
       --max: 420px;
       --pad: 24px;
@@ -688,8 +688,8 @@
       -webkit-tap-highlight-color: transparent;
     }
     .profile-settings svg {
-      width: 1.15rem;
-      height: 1.15rem;
+      width: 1.2rem;
+      height: 1.2rem;
       display: block;
     }
     .profile-settings:focus-visible {
@@ -703,18 +703,27 @@
     .profile-settings-menu__btn {
       width: 100%;
       min-height: 48px;
-      border: 1px solid rgba(10, 10, 10, 0.12);
+      border: 1.5px solid rgba(247, 245, 240, 0.45);
       border-radius: var(--radius);
-      background: var(--paper);
-      color: var(--ink);
+      background: transparent;
+      color: var(--ink-on-red);
       font: inherit;
       font-weight: 700;
       letter-spacing: -0.02em;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
     }
     .profile-settings-menu__btn.is-danger {
-      color: #8b1a12;
-      border-color: rgba(139, 26, 18, 0.25);
+      background: var(--paper);
+      color: var(--btn-ink);
+      border-color: transparent;
+    }
+    #profile-settings-modal .challenge-modal__sheet {
+      text-align: left;
+      padding-top: 24px;
     }
     .profile-settings-field {
       width: 100%;
@@ -1435,11 +1444,19 @@
       flex-direction: column;
       gap: 10px;
     }
-    .profile-mantra__edit {
+    .profile-mantra__tools {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      margin-top: 0.08em;
+    }
+    .profile-mantra__edit,
+    .profile-mantra__reset {
       flex: 0 0 auto;
       width: 1.35rem;
       height: 1.35rem;
-      margin-top: 0.12em;
       padding: 0;
       border: 0;
       border-radius: 0;
@@ -1452,12 +1469,14 @@
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
-    .profile-mantra__edit svg {
+    .profile-mantra__edit svg,
+    .profile-mantra__reset svg {
       width: 0.85rem;
       height: 0.85rem;
       display: block;
     }
-    .profile-mantra__edit:focus-visible {
+    .profile-mantra__edit:focus-visible,
+    .profile-mantra__reset:focus-visible {
       outline: 1px solid rgba(247, 245, 240, 0.85);
       outline-offset: 2px;
     }
@@ -2408,22 +2427,81 @@
     }
     .about-card p:last-child { margin-bottom: 0; }
 
-    .foot {
-      position: relative;
-      z-index: 1;
-      flex-shrink: 0;
-      pointer-events: auto;
-      width: min(100%, var(--max));
-      margin: 0 auto;
-      text-align: center;
-      padding: 6px 0 8px;
-      font-size: 12px;
-      font-weight: 500;
+    .app-greeting {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: none;
+      background: var(--red);
       color: var(--ink-on-red);
-      background: transparent;
-      text-shadow: 0 1px 2px rgba(52, 34, 32, 0.35);
+      padding:
+        calc(28px + env(safe-area-inset-top, 0px))
+        24px
+        calc(28px + env(safe-area-inset-bottom, 0px));
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
     }
-    .foot a:hover { text-decoration: underline; }
+    .app-greeting.is-open { display: flex; }
+    .app-greeting__inner {
+      width: min(100%, 420px);
+      margin: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      text-align: left;
+    }
+    .app-greeting__hello {
+      font-size: clamp(1.35rem, 5vw, 1.75rem);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.25;
+    }
+    .app-greeting__lede {
+      font-size: 1.02rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.45;
+      opacity: 0.95;
+    }
+    .app-greeting__ctas {
+      display: grid;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .app-greeting__cta {
+      width: 100%;
+      min-height: 48px;
+      padding: 12px 16px;
+      border: 1.5px solid rgba(247, 245, 240, 0.5);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--ink-on-red);
+      font: inherit;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      text-align: left;
+      cursor: pointer;
+    }
+    .app-greeting__cta:active {
+      background: rgba(247, 245, 240, 0.12);
+    }
+    .app-greeting__mantra {
+      margin-top: 10px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.4;
+      white-space: pre-line;
+      opacity: 0.9;
+      min-height: calc(1.4em * 2);
+    }
+    body.is-greeting .site-chrome,
+    body.is-greeting .site-chrome--top {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
     .gate {
       text-align: center; padding: 80px 24px;
     }
@@ -2471,6 +2549,20 @@
   <div id="app-gate-deleted" class="gate is-deleted" hidden>
     <p class="hero__hello">Ihr Account wurde gelöscht.</p>
     <p>Alle Daten wurden aus der Datenbank entfernt.</p>
+  </div>
+
+  <div class="app-greeting" id="app-greeting" hidden aria-hidden="true">
+    <div class="app-greeting__inner">
+      <p class="app-greeting__hello" id="greeting-hello"></p>
+      <p class="app-greeting__lede" id="greeting-lede"></p>
+      <div class="app-greeting__ctas">
+        <button class="app-greeting__cta" type="button" data-greeting-goto="home">Beweg Dich.</button>
+        <button class="app-greeting__cta" type="button" data-greeting-goto="community">Schreib Deinem Trainer.</button>
+        <button class="app-greeting__cta" type="button" data-greeting-goto="profile">Deine Challenge / PT buchen.</button>
+        <button class="app-greeting__cta" type="button" data-greeting-goto="training">einfach browsen.</button>
+      </div>
+      <p class="app-greeting__mantra" id="greeting-mantra"></p>
+    </div>
   </div>
 
   <div id="app" hidden>
@@ -2527,8 +2619,8 @@
         </div>
         <div class="profile-name-row">
           <h1 class="profile-name" id="profile-name"></h1>
-          <button class="profile-settings" id="profile-settings-btn" type="button" aria-label="Einstellungen" aria-haspopup="dialog">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.07 7.07 0 0 0-1.63-.94l-.36-2.54A.48.48 0 0 0 14 2h-4a.48.48 0 0 0-.47.41l-.36 2.54c-.59.24-1.13.56-1.63.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.13.22.39.3.59.22l2.39-.96c.5.38 1.04.7 1.63.94l.36 2.54c.05.24.24.41.47.41h4c.23 0 .42-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.63-.94l2.39.96c.2.08.46 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
+          <button class="profile-settings" id="profile-settings-btn" type="button" aria-label="Menü" aria-haspopup="dialog" aria-expanded="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 7h16v1.8H4V7Zm0 4.1h16v1.8H4v-1.8Zm0 4.1h16V17H4v-1.8Z"/></svg>
           </button>
         </div>
         <p class="profile-coach-badge" id="profile-coach-badge" hidden></p>
@@ -2569,12 +2661,20 @@
         </div>
         <div class="profile-mantra" id="profile-mantra">
           <p class="profile-bio" id="profile-bio"></p>
-          <button
-            class="profile-mantra__edit"
-            id="profile-mantra-edit"
-            type="button"
-            aria-label="Mantra ändern"
-          ></button>
+          <div class="profile-mantra__tools">
+            <button
+              class="profile-mantra__edit"
+              id="profile-mantra-edit"
+              type="button"
+              aria-label="Mantra ändern"
+            ></button>
+            <button
+              class="profile-mantra__reset"
+              id="profile-mantra-reset"
+              type="button"
+              aria-label="System-Mantras neu starten"
+            ></button>
+          </div>
         </div>
         <button class="profile-challenge" id="profile-challenge" type="button" aria-label="Challenge">
           <div class="profile-challenge__left">
@@ -3021,12 +3121,6 @@
             </button>
           </nav>
         </div>
-
-        <footer class="foot">
-          <a href="/impressum/">Impressum</a> ·
-          <a href="/datenschutz/">Datenschutz</a> ·
-          <a href="/kontakt/">Kontakt</a>
-        </footer>
       </div>
     </div>
   </div>
@@ -3073,13 +3167,25 @@
     </div>
   </div>
 
-  <div class="modal" id="profile-settings-modal" hidden>
-    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="profile-settings-title">
-      <h2 id="profile-settings-title">Einstellungen</h2>
+  <div class="challenge-modal" id="mantra-choice-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="mantra-choice-title">
+      <p class="challenge-modal__title" id="mantra-choice-title">Mantra: eigenen Eintrag speichern oder System-Rotation behalten?</p>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn is-ghost" id="mantra-choice-system">System behalten</button>
+        <button type="button" class="challenge-modal__btn" id="mantra-choice-own">Eigenes speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="profile-settings-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="profile-settings-title">
+      <p class="challenge-modal__title" id="profile-settings-title" hidden>Menü</p>
       <div class="profile-settings-menu">
         <button class="profile-settings-menu__btn" type="button" id="profile-change-code-btn">Code ändern</button>
+        <a class="profile-settings-menu__btn" href="/datenschutz/">Datenschutz</a>
+        <a class="profile-settings-menu__btn" href="/impressum/">Impressum</a>
+        <a class="profile-settings-menu__btn" href="/kontakt/">Kontakt</a>
         <button class="profile-settings-menu__btn is-danger" type="button" id="profile-delete-account-btn">Account löschen</button>
-        <button class="profile-settings-menu__btn" type="button" id="profile-settings-close">Schließen</button>
       </div>
     </div>
   </div>
@@ -4056,6 +4162,53 @@
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 17.3V21h3.7L17.8 9.9l-3.7-3.7L3 17.3zm17.7-10.4c.4-.4.4-1 0-1.4l-2.2-2.2c-.4-.4-1-.4-1.4 0l-1.7 1.7 3.7 3.7 1.6-1.8z"/></svg>';
       }
 
+      function mantraResetIcon() {
+        return '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 5V2.2L8.2 6 12 9.8V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>';
+      }
+
+      function askMantraEditChoice() {
+        return new Promise(function (resolve) {
+          var modal = document.getElementById("mantra-choice-modal");
+          var ownBtn = document.getElementById("mantra-choice-own");
+          var sysBtn = document.getElementById("mantra-choice-system");
+          if (!modal || !ownBtn || !sysBtn) {
+            resolve(window.confirm("Eigenes Mantra speichern?") ? "own" : "system");
+            return;
+          }
+          function finish(choice) {
+            ownBtn.removeEventListener("click", onOwn);
+            sysBtn.removeEventListener("click", onSys);
+            modal.removeEventListener("click", onBackdrop);
+            closeChallengeModal(modal);
+            resolve(choice);
+          }
+          function onOwn(e) { e.stopPropagation(); finish("own"); }
+          function onSys(e) { e.stopPropagation(); finish("system"); }
+          function onBackdrop(e) {
+            if (e.target === modal) finish("system");
+          }
+          openChallengeModal(modal);
+          ownBtn.addEventListener("click", onOwn);
+          sysBtn.addEventListener("click", onSys);
+          modal.addEventListener("click", onBackdrop);
+        });
+      }
+
+      async function beginMantraEdit() {
+        if (mantraSaveBusy || mantraEditMode) return;
+        var choice = await askMantraEditChoice();
+        if (choice !== "own") return;
+        mantraEditMode = true;
+        renderProfileMantra();
+      }
+
+      async function resetMantraToSystem() {
+        if (mantraSaveBusy || mantraEditMode) return;
+        var ok = await confirmJaNein("System-Mantras neu starten? Dein eigener Eintrag wird gelöscht.");
+        if (!ok) return;
+        await submitProfileMantra("");
+      }
+
       function renderProfileMantra() {
         var wrap = document.getElementById("profile-mantra");
         if (!wrap) return;
@@ -4110,6 +4263,8 @@
         text.className = "profile-bio";
         text.id = "profile-bio";
         text.textContent = getOwnMantraText() || getRotatingMantraText();
+        var tools = document.createElement("div");
+        tools.className = "profile-mantra__tools";
         var btn = document.createElement("button");
         btn.type = "button";
         btn.className = "profile-mantra__edit";
@@ -4119,14 +4274,26 @@
         btn.addEventListener("click", function (ev) {
           ev.preventDefault();
           ev.stopPropagation();
-          if (mantraSaveBusy) return;
-          mantraEditMode = true;
-          renderProfileMantra();
+          beginMantraEdit();
         });
+        var resetBtn = document.createElement("button");
+        resetBtn.type = "button";
+        resetBtn.className = "profile-mantra__reset";
+        resetBtn.id = "profile-mantra-reset";
+        resetBtn.setAttribute("aria-label", "System-Mantras neu starten");
+        resetBtn.innerHTML = mantraResetIcon();
+        resetBtn.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          resetMantraToSystem();
+        });
+        tools.appendChild(btn);
+        tools.appendChild(resetBtn);
         wrap.appendChild(text);
-        wrap.appendChild(btn);
+        wrap.appendChild(tools);
         if (getOwnMantraText()) stopMantraRotation();
         else startMantraRotation();
+        updateGreetingMantra();
       }
 
       async function submitProfileMantra(raw) {
@@ -5874,7 +6041,10 @@
         loadTrainerFromCloud().then(function () {
           fillProfilePanel();
           renderBuddySlots();
-        }).catch(function () {});
+          maybeShowGreeting();
+        }).catch(function () {
+          maybeShowGreeting();
+        });
         ensureCoachAccount().catch(function () {});
         loadBuddiesFromCloud().then(function () {
           fillProfilePanel();
@@ -5896,7 +6066,82 @@
           waEl.href = waHref;
         }
         syncCommunityWhatsApp();
+        maybeShowGreeting();
       }
+
+      var GREETING_SEEN_KEY = "gogogo_greeting_seen_v1";
+      var WEEKDAY_DE = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+
+      function weekdayDeToday() {
+        return WEEKDAY_DE[(new Date()).getDay()] || "heute";
+      }
+
+      function updateGreetingMantra() {
+        var el = document.getElementById("greeting-mantra");
+        if (!el) return;
+        el.textContent = getOwnMantraText() || getRotatingMantraText() || "";
+      }
+
+      function fillGreetingCopy() {
+        var hello = document.getElementById("greeting-hello");
+        var lede = document.getElementById("greeting-lede");
+        var first = firstNameOf(account);
+        var trainer = firstNameOf(getDisplayCoach());
+        if (hello) {
+          hello.textContent = "Hallo " + first + ", wie geht es Dir, heute am " + weekdayDeToday() + "?";
+        }
+        if (lede) {
+          lede.textContent =
+            "Ich bin keine KI sondern Dein direkter Draht zu " + trainer +
+            ". Warum? Weil zwei Dinge essenziell für ein zufriedenes Leben sind. Bewegung und Verbindung.";
+        }
+        updateGreetingMantra();
+      }
+
+      function hideGreeting() {
+        var el = document.getElementById("app-greeting");
+        if (el) {
+          el.classList.remove("is-open");
+          el.hidden = true;
+          el.setAttribute("aria-hidden", "true");
+        }
+        document.body.classList.remove("is-greeting");
+        try { sessionStorage.setItem(GREETING_SEEN_KEY, "1"); } catch (e) {}
+      }
+
+      function maybeShowGreeting() {
+        if (accountSessionBlocked || !account) return;
+        var deep = "";
+        try {
+          deep = String(new URLSearchParams(location.search || "").get("goto") || "").trim();
+        } catch (e0) {}
+        if (deep) {
+          hideGreeting();
+          return;
+        }
+        var seen = false;
+        try { seen = sessionStorage.getItem(GREETING_SEEN_KEY) === "1"; } catch (e1) {}
+        if (seen) return;
+        fillGreetingCopy();
+        var el = document.getElementById("app-greeting");
+        if (!el) return;
+        el.hidden = false;
+        el.classList.add("is-open");
+        el.setAttribute("aria-hidden", "false");
+        document.body.classList.add("is-greeting");
+      }
+
+      (function bindGreeting() {
+        var root = document.getElementById("app-greeting");
+        if (!root) return;
+        root.addEventListener("click", function (e) {
+          var btn = e.target && e.target.closest ? e.target.closest("[data-greeting-goto]") : null;
+          if (!btn) return;
+          var target = btn.getAttribute("data-greeting-goto") || "home";
+          hideGreeting();
+          if (typeof gotoPanel === "function") gotoPanel(target);
+        });
+      })();
 
       function syncCommunityWhatsApp() {
         var waGroup = document.getElementById("community-wa");
@@ -6160,13 +6405,14 @@
       function showAccountDeletedPage() {
         accountSessionBlocked = true;
         clearLocalAccountData();
+        hideGreeting();
         var app = document.getElementById("app");
         var gate = document.getElementById("app-gate");
         var deletedGate = document.getElementById("app-gate-deleted");
         if (app) app.hidden = true;
         if (gate) gate.hidden = true;
         if (deletedGate) deletedGate.hidden = false;
-        document.body.classList.remove("is-profile", "is-community", "is-training", "is-book");
+        document.body.classList.remove("is-profile", "is-community", "is-training", "is-book", "is-greeting");
       }
 
       async function deleteOwnAccount() {
@@ -6209,7 +6455,6 @@
       (function bindProfileSettings() {
         var settingsBtn = document.getElementById("profile-settings-btn");
         var settingsModal = document.getElementById("profile-settings-modal");
-        var settingsClose = document.getElementById("profile-settings-close");
         var changeCodeBtn = document.getElementById("profile-change-code-btn");
         var changeCodeModal = document.getElementById("profile-change-code-modal");
         var changeCodeCancel = document.getElementById("profile-change-code-cancel");
@@ -6234,24 +6479,31 @@
           changeCodeMsg.classList.toggle("is-error", !!isError);
         }
 
+        function openSettingsMenu() {
+          if (!settingsModal) return;
+          openChallengeModal(settingsModal);
+          if (settingsBtn) settingsBtn.setAttribute("aria-expanded", "true");
+        }
+
+        function closeSettingsMenu() {
+          if (!settingsModal) return;
+          closeChallengeModal(settingsModal);
+          if (settingsBtn) settingsBtn.setAttribute("aria-expanded", "false");
+        }
+
         if (settingsBtn && settingsModal) {
           settingsBtn.addEventListener("click", function () {
-            openProfileModal("profile-settings-modal");
-          });
-        }
-        if (settingsClose) {
-          settingsClose.addEventListener("click", function () {
-            closeProfileModal("profile-settings-modal");
+            openSettingsMenu();
           });
         }
         if (settingsModal) {
           settingsModal.addEventListener("click", function (e) {
-            if (e.target === settingsModal) closeProfileModal("profile-settings-modal");
+            if (e.target === settingsModal) closeSettingsMenu();
           });
         }
         if (changeCodeBtn) {
           changeCodeBtn.addEventListener("click", function () {
-            closeProfileModal("profile-settings-modal");
+            closeSettingsMenu();
             if (changeCodeInput) {
               changeCodeInput.value = account && account.invite_code ? String(account.invite_code) : "";
             }
@@ -6304,7 +6556,7 @@
         }
         if (deleteBtn) {
           deleteBtn.addEventListener("click", function () {
-            closeProfileModal("profile-settings-modal");
+            closeSettingsMenu();
             openChallengeModal(deleteModal);
           });
         }
