@@ -1787,9 +1787,10 @@
       var ADMIN_NAME = "biigJ";
       var ADMIN_CODE = "121276030993";
       var AUTH_KEY = "gogogo_go_admin";
-      var TRAINER_ADMIN_KEY = "gogogo_trainer_admin";
       var ADMIN_RETURN_KEY = "gogogo_admin_return";
       var ADMIN_RETURN_ACC_KEY = "gogogo_admin_return_acc";
+      /* Getrennt vom Admin-Return: Trainer-Session beim Verlassen des Trainerbereichs. */
+      var TRAINER_SESSION_STASH_KEY = "gogogo_trainer_session_stash";
       var trainerSessionAccount = null;
       var trainerAdminMode = false;
       var trainerSchemaOk = null;
@@ -3179,17 +3180,42 @@
         try {
           var payload = {
             mode: opts.mode || "full",
+            /* Immer Voll-Admin, nie ?trainer=1 — sonst landet Return im Trainerbereich. */
             href: "/go/admin/"
           };
           sessionStorage.setItem(ADMIN_RETURN_KEY, JSON.stringify(payload));
           var acc = readAccountSession();
           if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
+          else sessionStorage.removeItem(ADMIN_RETURN_ACC_KEY);
+        } catch (e) {}
+      }
+
+      function readAdminReturnPayload() {
+        try {
+          var raw = sessionStorage.getItem(ADMIN_RETURN_KEY);
+          if (!raw) return null;
+          var d = JSON.parse(raw);
+          if (!d || d.mode !== "full") return null;
+          return d;
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function stashTrainerSession(acc) {
+        if (!acc || !acc.id || !acc.is_trainer) return;
+        try {
+          sessionStorage.setItem(TRAINER_SESSION_STASH_KEY, JSON.stringify(acc));
         } catch (e) {}
       }
 
       function restoreTrainerSessionFromStash() {
         try {
-          var accRaw = sessionStorage.getItem(ADMIN_RETURN_ACC_KEY);
+          var accRaw = sessionStorage.getItem(TRAINER_SESSION_STASH_KEY);
+          if (!accRaw) {
+            /* Legacy-Fallback: früher wurde ADMIN_RETURN_ACC_KEY mitgenutzt. */
+            accRaw = sessionStorage.getItem(ADMIN_RETURN_ACC_KEY);
+          }
           if (!accRaw) return null;
           var acc = JSON.parse(accRaw);
           if (!acc || !acc.id || !acc.is_trainer) return null;
@@ -3201,9 +3227,55 @@
         }
       }
 
+      function exitTrainerAdminToAccount() {
+        /* Admin hat einen Trainer-Nutzer geöffnet und den Trainerbereich betreten:
+           Logout führt zurück in den Voll-Admin, nicht in dessen Nutzerprofil. */
+        var adminRet = readAdminReturnPayload();
+        if (adminRet) {
+          try {
+            if (window.GoAccountSession && typeof GoAccountSession.clear === "function") {
+              GoAccountSession.clear();
+            } else {
+              localStorage.removeItem(ACCOUNT_KEY);
+            }
+          } catch (e0) {}
+          try {
+            sessionStorage.removeItem(ADMIN_RETURN_KEY);
+            sessionStorage.removeItem(ADMIN_RETURN_ACC_KEY);
+            sessionStorage.removeItem(TRAINER_SESSION_STASH_KEY);
+          } catch (e1) {}
+          try {
+            localStorage.setItem(AUTH_KEY, "1");
+            sessionStorage.setItem(AUTH_KEY, "1");
+          } catch (e2) {}
+          window.location.replace("/go/admin/");
+          return;
+        }
+        if (trainerSessionAccount) stashTrainerSession(trainerSessionAccount);
+        window.location.href = "/account/?goto=profile";
+      }
+
       function initTrainerAdminMode() {
         var params = new URLSearchParams(location.search || "");
         if (params.get("trainer") !== "1") return false;
+        /* Admin-Impersonation aktiv + Admin noch eingeloggt: kein Trainerbereich. */
+        if (readAdminReturnPayload()) {
+          var adminStillAuthed = false;
+          try {
+            adminStillAuthed =
+              localStorage.getItem(AUTH_KEY) === "1" ||
+              sessionStorage.getItem(AUTH_KEY) === "1";
+          } catch (eAuth) {}
+          if (adminStillAuthed) {
+            window.location.replace("/go/admin/");
+            return false;
+          }
+          /* Verwaistes Return-Flag ohne Admin-Login — für echte Trainer freigeben. */
+          try {
+            sessionStorage.removeItem(ADMIN_RETURN_KEY);
+            sessionStorage.removeItem(ADMIN_RETURN_ACC_KEY);
+          } catch (eClr) {}
+        }
         var acc = readAccountSession();
         if ((!acc || !acc.id || !acc.is_trainer) && restoreTrainerSessionFromStash()) {
           acc = readAccountSession();
@@ -6121,7 +6193,7 @@
       authBtn.addEventListener("click", function () {
         setMenu(false);
         if (trainerAdminMode) {
-          window.location.href = "/account/?goto=profile";
+          exitTrainerAdminToAccount();
           return;
         }
         showLogin();
