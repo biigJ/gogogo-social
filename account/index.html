@@ -2434,32 +2434,6 @@
     }
     .about-card p:last-child { margin-bottom: 0; }
 
-    .staff-return-bar {
-      position: sticky;
-      top: 0;
-      z-index: 70;
-      display: flex;
-      justify-content: center;
-      padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px;
-      background: rgba(10, 10, 10, 0.35);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-    }
-    .staff-return-bar[hidden] { display: none !important; }
-    .staff-return-bar__btn {
-      min-height: 40px;
-      padding: 0 16px;
-      border: 1.5px solid rgba(247, 245, 240, 0.55);
-      border-radius: 2px;
-      background: transparent;
-      color: var(--ink-on-red);
-      font-family: var(--display, inherit);
-      font-weight: 700;
-      font-size: 0.92rem;
-      letter-spacing: -0.02em;
-    }
-    .staff-return-bar__btn:active { transform: scale(0.97); }
-
     .app-greeting {
       position: fixed;
       inset: 0;
@@ -2647,10 +2621,6 @@
   <div id="app-gate-deleted" class="gate is-deleted" hidden>
     <p class="hero__hello">Ihr Account wurde gelöscht.</p>
     <p>Alle Daten wurden aus der Datenbank entfernt.</p>
-  </div>
-
-  <div class="staff-return-bar" id="staff-return-bar" hidden>
-    <button type="button" class="staff-return-bar__btn" id="staff-return-btn">Zurück</button>
   </div>
 
   <div class="app-greeting" id="app-greeting" hidden aria-hidden="true">
@@ -4737,10 +4707,6 @@ browsen</span>
         return getStaffCalendarMode() === "full";
       }
 
-      function isTrainerCalendarOverride() {
-        return false;
-      }
-
       /* Nutzer: nur heute. Admin mit Profil-Override: alles. */
       function canRateCalendarDay(dateStr) {
         if (isAccountPaused()) return false;
@@ -4748,35 +4714,6 @@ browsen</span>
         if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
         if (getStaffCalendarMode() === "full") return true;
         return key === berlinTodayKey();
-      }
-
-      function setupStaffReturnBar() {
-        var bar = document.getElementById("staff-return-bar");
-        var btn = document.getElementById("staff-return-btn");
-        if (!bar || !btn) return;
-        var mode = getStaffCalendarMode();
-        var payload = getAdminReturnPayload();
-        if (mode !== "full" || !payload) {
-          bar.hidden = true;
-          return;
-        }
-        bar.hidden = false;
-        btn.textContent = t("Zurück zum Admin", "Back to admin");
-        btn.onclick = function () {
-          try {
-            var accRaw = sessionStorage.getItem("gogogo_admin_return_acc");
-            if (accRaw) {
-              var acc = JSON.parse(accRaw);
-              if (acc && acc.name) {
-                if (window.GoAccountSession) GoAccountSession.save(acc);
-                else localStorage.setItem(ACCOUNT_KEY, JSON.stringify(acc));
-              }
-            }
-          } catch (e0) {}
-          var href = (payload && payload.href) || "/go/admin/";
-          try { sessionStorage.removeItem("gogogo_admin_return"); } catch (e1) {}
-          window.location.href = href;
-        };
       }
 
       /* Text für einen Kalendertag:
@@ -6385,7 +6322,6 @@ browsen</span>
         if (accountSessionBlocked || !account) return;
         document.getElementById("app").hidden = false;
         applyUiLang(uiLang);
-        setupStaffReturnBar();
         if (account.photo_url) applyPhoto(account.photo_url);
         else applyPhoto(null);
         fillProfilePanel();
