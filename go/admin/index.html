@@ -1881,13 +1881,13 @@
               <input id="ausdauer-admin-speed" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0" />
               <span class="admin-ausdauer__unit" id="ausdauer-admin-speed-unit">min/km</span>
             </label>
-            <label>ø HF
-              <input id="ausdauer-admin-hr" type="number" inputmode="numeric" min="0" step="1" placeholder="140" />
-              <span class="admin-ausdauer__unit">bpm</span>
-            </label>
             <label>Distanz
               <input id="ausdauer-admin-distance" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0" />
               <span class="admin-ausdauer__unit">km</span>
+            </label>
+            <label>ø HF
+              <input id="ausdauer-admin-hr" type="number" inputmode="numeric" min="0" step="1" placeholder="140" />
+              <span class="admin-ausdauer__unit">bpm</span>
             </label>
           </div>
           <div class="admin-kraft__new">
@@ -5651,10 +5651,16 @@
         openBtn.appendChild(nameRow);
         openBtn.appendChild(stakeLine);
         openBtn.appendChild(meta);
+        var trainerLabel = "";
         if (trainerAdminMode && trainerSessionAccount) {
+          trainerLabel = adminFirstName(trainerSessionAccount.name);
+        } else if (row.trainerName) {
+          trainerLabel = String(row.trainerName);
+        }
+        if (trainerLabel) {
           var trainerLine = document.createElement("span");
           trainerLine.className = "list-item__trainer";
-          trainerLine.textContent = "Trainer: " + adminFirstName(trainerSessionAccount.name);
+          trainerLine.textContent = "Trainer: " + trainerLabel;
           openBtn.appendChild(trainerLine);
         }
         openBtn.setAttribute("aria-label", "Profil von " + (row.first_name || "Nutzer") + " öffnen");
@@ -5910,31 +5916,72 @@
             );
             if (!res.ok) throw new Error("HTTP " + res.status);
             rows = await res.json();
+            var trainerNameById = {};
+            var trainerIdBySerial = {};
+            var trainerIdByCode = {};
+            try {
+              var accMapRes = await fetch(
+                SUPABASE_URL + "/rest/v1/go_accounts?select=id,name,serial_number,invite_code,trainer_id,is_trainer,phone&order=created_at.asc&limit=1000",
+                { headers: apiHeaders() }
+              );
+              var accMapRows = accMapRes.ok ? await accMapRes.json() : [];
+              (accMapRows || []).forEach(function (acc) {
+                if (!acc || !acc.id) return;
+                if (acc.is_trainer) {
+                  trainerNameById[String(acc.id)] = adminFirstName(acc.name) || "Trainer";
+                }
+                if (acc.trainer_id) {
+                  if (acc.serial_number) trainerIdBySerial[String(acc.serial_number)] = String(acc.trainer_id);
+                  if (acc.invite_code) trainerIdByCode[String(acc.invite_code)] = String(acc.trainer_id);
+                }
+              });
+            } catch (eAccMap) {}
+            function resolveTrainerNameForRow(row) {
+              if (!row || row.isAdminStar) return "";
+              var tid = row.trainer_id ? String(row.trainer_id) : "";
+              if (!tid && row.serial_number) tid = trainerIdBySerial[String(row.serial_number)] || "";
+              if (!tid && row.code) tid = trainerIdByCode[String(row.code)] || "";
+              if (tid && trainerNameById[tid]) return trainerNameById[tid];
+              return "Joscha";
+            }
             try {
               var joschaRes = await fetch(
-                SUPABASE_URL + "/rest/v1/go_accounts?or=(phone.eq.coach,name.ilike.joscha)&select=id,name,serial_number,invite_code,phone,is_trainer&order=created_at.asc&limit=5",
+                SUPABASE_URL + "/rest/v1/go_accounts?or=(phone.eq.coach,phone.eq.admin,name.ilike.joscha)&select=id,name,serial_number,invite_code,phone,is_trainer&order=created_at.asc&limit=10",
                 { headers: apiHeaders() }
               );
               var joschaRows = joschaRes.ok ? await joschaRes.json() : [];
               var joscha = null;
               (joschaRows || []).forEach(function (acc) {
-                if (joscha) return;
+                if (!acc) return;
                 var phone = String(acc.phone || "").toLowerCase();
                 var nm = String(acc.name || "").toLowerCase();
-                if (phone === "coach" || nm === "joscha") joscha = acc;
+                if (!(phone === "coach" || phone === "admin" || nm === "joscha")) return;
+                /* Admin-Joscha mit Seriennummer/Code bevorzugen (nicht nur Coach-Seed). */
+                if (!joscha) {
+                  joscha = acc;
+                  return;
+                }
+                var hasCreds = !!(acc.serial_number && acc.invite_code);
+                var curHas = !!(joscha.serial_number && joscha.invite_code);
+                if (hasCreds && !curHas) joscha = acc;
+                else if (phone === "admin" && String(joscha.phone || "").toLowerCase() !== "admin" && (hasCreds || !curHas)) {
+                  joscha = acc;
+                }
               });
               if (joscha) {
+                var joschaSerial = joscha.serial_number || "";
+                var joschaCode = joscha.invite_code || "";
                 var already = rows.some(function (r) {
-                  return (joscha.serial_number && String(r.serial_number) === String(joscha.serial_number))
-                    || (joscha.invite_code && String(r.code) === String(joscha.invite_code))
+                  return (joschaSerial && String(r.serial_number) === String(joschaSerial))
+                    || (joschaCode && String(r.code) === String(joschaCode))
                     || String(r.first_name || "").toLowerCase() === "joscha";
                 });
                 if (!already) {
                   rows.unshift({
                     id: null,
                     first_name: adminFirstName(joscha.name) || "Joscha",
-                    serial_number: joscha.serial_number || "",
-                    code: joscha.invite_code || "",
+                    serial_number: joschaSerial,
+                    code: joschaCode,
                     paused: false,
                     challenge_active: false,
                     challenge_started_at: null,
@@ -5945,20 +5992,30 @@
                 } else {
                   rows.forEach(function (r) {
                     if (String(r.first_name || "").toLowerCase() === "joscha"
-                      || (joscha.serial_number && String(r.serial_number) === String(joscha.serial_number))
-                      || (joscha.invite_code && String(r.code) === String(joscha.invite_code))) {
+                      || (joschaSerial && String(r.serial_number) === String(joschaSerial))
+                      || (joschaCode && String(r.code) === String(joschaCode))) {
                       r.isAdminStar = true;
+                      if (joschaSerial) r.serial_number = joschaSerial;
+                      if (joschaCode) r.code = joschaCode;
+                      if (joscha.id) r.accountId = joscha.id;
                     }
                   });
                 }
               }
             } catch (eJoscha) {}
+            rows.forEach(function (row) {
+              var label = resolveTrainerNameForRow(row);
+              if (label) row.trainerName = label;
+            });
           }
           listMsg.textContent = rows.length ? "" : (trainerAdminMode ? "Noch keine Nutzer mit Dir als Trainer." : "Noch keine Codes.");
           var accountIndex = await loadAccountIndex();
           var latestByAuthor = trainerAdminMode ? {} : await loadLatestPostMsByAuthor();
           rows.forEach(function (row) {
             var linked = accountIdsForInvite(row, accountIndex);
+            if (row.accountId && linked.indexOf(String(row.accountId)) < 0) {
+              linked = linked.concat([String(row.accountId)]);
+            }
             renderListRow(list, row, trainerAdminMode ? false : inviteHasUnread(row, accountIndex, latestByAuthor), linked, latestByAuthor);
           });
         } catch (err) {
