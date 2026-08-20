@@ -4690,9 +4690,32 @@ browsen</span>
         }
       }
 
-      function syncAdminPreviewState() {
+      function hasStoredAdminAuth() {
+        try {
+          return localStorage.getItem("gogogo_go_admin") === "1" ||
+            sessionStorage.getItem("gogogo_go_admin") === "1";
+        } catch (e) {
+          return false;
+        }
+      }
+
+      /* Nur echte Admin-Impersonation — nicht verwaiste Return-Flags ohne Admin-Login. */
+      function isAdminImpersonation() {
         var ret = getAdminReturnPayload();
-        var show = !!(ret && ret.mode === "full");
+        return !!(ret && ret.mode === "full" && hasStoredAdminAuth());
+      }
+
+      function clearStaleAdminReturn() {
+        if (isAdminImpersonation()) return;
+        try {
+          sessionStorage.removeItem("gogogo_admin_return");
+          sessionStorage.removeItem("gogogo_admin_return_acc");
+        } catch (e) {}
+      }
+
+      function syncAdminPreviewState() {
+        var show = isAdminImpersonation();
+        if (!show) clearStaleAdminReturn();
         document.body.classList.toggle("is-admin-preview", show);
         return show;
       }
@@ -4701,13 +4724,8 @@ browsen</span>
         var d = getAdminReturnPayload();
         if (!d) return null;
         if (d.mode === "trainer-calendar" || d.mode === "trainer") return null;
-        try {
-          if (localStorage.getItem("gogogo_go_admin") === "1" ||
-              sessionStorage.getItem("gogogo_go_admin") === "1") {
-            return "full";
-          }
-        } catch (e1) {}
-        return null;
+        if (!hasStoredAdminAuth()) return null;
+        return d.mode === "full" ? "full" : null;
       }
 
       function isStaffCalendarOverride() {
@@ -4969,7 +4987,7 @@ browsen</span>
         if (trainerAdminBtn) {
           var isTrainer = !!(account && account.is_trainer);
           var adminPreview = syncAdminPreviewState();
-          /* Während Admin-Impersonation keinen Trainerbereich öffnen — Return-Loop. */
+          /* Button für echte Trainer immer sichtbar; nur bei aktiver Admin-Impersonation aus. */
           trainerAdminBtn.hidden = !isTrainer || adminPreview;
         }
         var streak = computeWorkoutStreak();
@@ -5048,11 +5066,12 @@ browsen</span>
         var btn = document.getElementById("profile-trainer-admin");
         if (!btn) return;
         btn.addEventListener("click", function () {
-          var ret = getAdminReturnPayload();
-          if (ret && ret.mode === "full") {
+          /* Nur bei aktiver Admin-Impersonation blockieren — echte Trainer immer durchlassen. */
+          if (isAdminImpersonation()) {
             window.location.replace("/go/admin/");
             return;
           }
+          clearStaleAdminReturn();
           window.location.href = "/go/admin/?trainer=1";
         });
       })();
