@@ -770,31 +770,6 @@
       opacity: 0.92;
     }
     .profile-coach-badge[hidden] { display: none !important; }
-    .profile-admin-return {
-      position: fixed;
-      top: calc(10px + env(safe-area-inset-top, 0px));
-      left: 14px;
-      z-index: 80;
-      width: 40px;
-      height: 40px;
-      margin: 0;
-      padding: 0;
-      border: 0;
-      border-radius: 50%;
-      background: var(--paper);
-      color: var(--btn-ink);
-      font: inherit;
-      font-size: 1.55rem;
-      font-weight: 700;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 6px 18px rgba(52, 34, 32, 0.22);
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .profile-admin-return[hidden] { display: none !important; }
     .profile-trainer-admin {
       display: block;
       width: 100%;
@@ -2741,7 +2716,6 @@ browsen</span>
           </button>
         </div>
         <p class="profile-coach-badge" id="profile-coach-badge" hidden></p>
-        <button class="profile-admin-return" type="button" id="profile-admin-return" hidden aria-label="Zurück zum Admin">×</button>
         <button class="profile-trainer-admin" type="button" id="profile-trainer-admin" hidden data-de="Trainer-Bereich" data-en="Trainer area">Trainer-Bereich</button>
         <div class="profile-top">
           <button class="profile-portrait" id="profile-photo-btn" type="button" aria-label="Profilfoto ändern">
@@ -4716,53 +4690,12 @@ browsen</span>
         }
       }
 
-      function updateProfileAdminReturn() {
-        var btn = document.getElementById("profile-admin-return");
-        if (!btn) return;
+      function syncAdminPreviewState() {
         var ret = getAdminReturnPayload();
-        /* Nur nach Voll-Admin-Impersonation — nie für Trainer. */
         var show = !!(ret && ret.mode === "full");
-        btn.hidden = !show;
-        btn.textContent = "×";
         document.body.classList.toggle("is-admin-preview", show);
+        return show;
       }
-
-      function returnToAdminFromProfile() {
-        var payload = getAdminReturnPayload();
-        if (!payload || payload.mode !== "full") {
-          updateProfileAdminReturn();
-          return;
-        }
-        /* Impersonation beenden — nicht die Trainer-Session wiederherstellen. */
-        try {
-          if (window.GoAccountSession && typeof GoAccountSession.clear === "function") {
-            GoAccountSession.clear();
-          } else {
-            localStorage.removeItem(ACCOUNT_KEY);
-          }
-        } catch (e0) {}
-        try {
-          sessionStorage.removeItem("gogogo_admin_return");
-          sessionStorage.removeItem("gogogo_admin_return_acc");
-          sessionStorage.removeItem("gogogo_trainer_session_stash");
-        } catch (e1) {}
-        try {
-          localStorage.setItem("gogogo_go_admin", "1");
-          sessionStorage.setItem("gogogo_go_admin", "1");
-        } catch (e2) {}
-        /* replace: History-Back darf nicht wieder in ?trainer=1 landen. */
-        window.location.replace("/go/admin/");
-      }
-
-      (function bindProfileAdminReturn() {
-        var btn = document.getElementById("profile-admin-return");
-        if (!btn) return;
-        btn.addEventListener("click", function (ev) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          returnToAdminFromProfile();
-        });
-      })();
 
       function getStaffCalendarMode() {
         var d = getAdminReturnPayload();
@@ -5035,12 +4968,10 @@ browsen</span>
         }
         if (trainerAdminBtn) {
           var isTrainer = !!(account && account.is_trainer);
-          var adminRet = getAdminReturnPayload();
-          var adminPreview = !!(adminRet && adminRet.mode === "full");
+          var adminPreview = syncAdminPreviewState();
           /* Während Admin-Impersonation keinen Trainerbereich öffnen — Return-Loop. */
           trainerAdminBtn.hidden = !isTrainer || adminPreview;
         }
-        updateProfileAdminReturn();
         var streak = computeWorkoutStreak();
         if (streakEl) {
           streakEl.textContent = streak === 1
@@ -6405,7 +6336,7 @@ browsen</span>
         if (accountSessionBlocked || !account) return;
         document.getElementById("app").hidden = false;
         applyUiLang(uiLang);
-        updateProfileAdminReturn();
+        syncAdminPreviewState();
         if (account.photo_url) applyPhoto(account.photo_url);
         else applyPhoto(null);
         fillProfilePanel();
