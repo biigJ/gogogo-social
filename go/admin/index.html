@@ -3041,52 +3041,30 @@
       }
 
       function stashAdminReturn() {
+        if (trainerAdminMode) return;
         try {
           var payload = {
-            mode: trainerAdminMode ? "trainer" : "full",
-            href: trainerAdminMode ? "/go/admin/?trainer=1" : "/go/admin/"
+            mode: "full",
+            href: "/go/admin/"
           };
           sessionStorage.setItem(ADMIN_RETURN_KEY, JSON.stringify(payload));
-          if (trainerAdminMode && trainerSessionAccount && trainerSessionAccount.id) {
-            sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(trainerSessionAccount));
-          } else {
-            var acc = readAccountSession();
-            if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
-          }
+          var acc = readAccountSession();
+          if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
         } catch (e) {}
       }
 
       function restoreTrainerSessionFromStash() {
-        try {
-          var accRaw = sessionStorage.getItem(ADMIN_RETURN_ACC_KEY);
-          if (!accRaw) return null;
-          var acc = JSON.parse(accRaw);
-          if (!acc || !acc.id || !acc.is_trainer) return null;
-          if (window.GoAccountSession) GoAccountSession.save(acc);
-          else localStorage.setItem(ACCOUNT_KEY, JSON.stringify(acc));
-          return acc;
-        } catch (e) {
-          return null;
-        }
+        return null;
       }
 
       function initTrainerAdminMode() {
+        /* Trainer-Zugang zum Adminbereich ist deaktiviert. */
         var params = new URLSearchParams(location.search || "");
-        if (params.get("trainer") !== "1") return false;
-        var acc = readAccountSession();
-        if ((!acc || !acc.id || !acc.is_trainer) && restoreTrainerSessionFromStash()) {
-          acc = readAccountSession();
+        if (params.get("trainer") === "1") {
+          window.location.replace("/account/?goto=profile");
+          return "blocked";
         }
-        if (!acc || !acc.id || !acc.is_trainer) return false;
-        trainerSessionAccount = acc;
-        trainerAdminMode = true;
-        document.body.classList.add("is-trainer-mode");
-        var brand = document.querySelector(".site-header__brand");
-        if (brand) brand.textContent = "Trainer";
-        var listBtn = document.querySelector(".menu-list-label");
-        if (listBtn) listBtn.textContent = "Meine Nutzer";
-        /* Kein setAuthed — Trainer dürfen AUTH_KEY nicht bekommen (kein Voll-Admin). */
-        return true;
+        return false;
       }
 
       function setAuthed(on) {
@@ -3187,8 +3165,8 @@
         adminNameBtn.textContent = display;
         adminNameBtn.setAttribute("aria-label", "Profil von " + name + " öffnen");
         if (adminOpenProfileBtn) {
-          adminOpenProfileBtn.hidden = false;
-          adminOpenProfileBtn.disabled = false;
+          adminOpenProfileBtn.hidden = !!trainerAdminMode;
+          adminOpenProfileBtn.disabled = !!trainerAdminMode;
           adminOpenProfileBtn.textContent = "Profil von " + name + " öffnen";
         }
       }
@@ -3290,6 +3268,10 @@
       }
 
       async function enterUserAccount(name, serial, code, accountHint) {
+        if (trainerAdminMode) {
+          window.alert("Trainer haben keinen Zugang zum Adminbereich.");
+          return;
+        }
         if (!name && !(accountHint && accountHint.name)) return;
         var displayName = (accountHint && accountHint.name) || name;
         adminNameBtn.disabled = true;
@@ -3369,7 +3351,8 @@
       }
 
       function openCurrentUserProfile() {
-        if (!isAuthed() && !trainerAdminMode) return;
+        if (trainerAdminMode) return;
+        if (!isAuthed()) return;
         var name =
           (activeAccount && activeAccount.name) ||
           (lastQr && lastQr.name) ||
@@ -5688,10 +5671,12 @@
         showLogin();
       });
       adminNameBtn.addEventListener("click", function () {
+        if (trainerAdminMode) return;
         openCurrentUserProfile();
       });
       if (adminOpenProfileBtn) {
         adminOpenProfileBtn.addEventListener("click", function () {
+          if (trainerAdminMode) return;
           openCurrentUserProfile();
         });
       }
@@ -5727,8 +5712,14 @@
       }
 
       try {
-        if (initTrainerAdminMode() || isAuthed()) showList();
-        else showLogin();
+        var trainerGate = initTrainerAdminMode();
+        if (trainerGate === "blocked") {
+          /* Redirect läuft — keine Admin-UI rendern. */
+        } else if (trainerGate || isAuthed()) {
+          showList();
+        } else {
+          showLogin();
+        }
       } catch (e) { showLogin(); }
       updateAuthBtn();
 

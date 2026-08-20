@@ -4684,33 +4684,19 @@ browsen</span>
           if (!raw) return false;
           var d = JSON.parse(raw);
           if (!d || !d.href) return false;
-          function hasFullAdminAuth() {
-            try {
-              return localStorage.getItem("gogogo_go_admin") === "1" ||
-                sessionStorage.getItem("gogogo_go_admin") === "1";
-            } catch (e0) {
-              return false;
-            }
+          if (d.mode === "trainer") return false;
+          try {
+            return localStorage.getItem("gogogo_go_admin") === "1" ||
+              sessionStorage.getItem("gogogo_go_admin") === "1";
+          } catch (e0) {
+            return false;
           }
-          function hasTrainerStash() {
-            try {
-              var accRaw = sessionStorage.getItem("gogogo_admin_return_acc");
-              if (!accRaw) return false;
-              var acc = JSON.parse(accRaw);
-              return !!(acc && acc.id && acc.is_trainer);
-            } catch (e1) {
-              return false;
-            }
-          }
-          if (d.mode === "full") return hasFullAdminAuth();
-          if (d.mode === "trainer") return hasTrainerStash();
-          return hasFullAdminAuth() || hasTrainerStash();
         } catch (e) {
           return false;
         }
       }
 
-      /* Nutzer: nur heute (Berlin). Trainer/Admin mit Profil-Override: auch nachträglich. */
+      /* Nutzer: nur heute (Berlin). Voll-Admin mit Profil-Override: auch nachträglich. */
       function canRateCalendarDay(dateStr) {
         if (isAccountPaused()) return false;
         var key = String(dateStr || "").slice(0, 10);
@@ -4963,8 +4949,7 @@ browsen</span>
           coachBadge.textContent = showBadge ? coachName : "";
         }
         if (trainerAdminBtn) {
-          var isTrainer = !!(account && account.is_trainer);
-          trainerAdminBtn.hidden = !isTrainer;
+          trainerAdminBtn.hidden = true;
         }
         var streak = computeWorkoutStreak();
         if (streakEl) {
@@ -5041,8 +5026,9 @@ browsen</span>
       (function bindProfileTrainerAdmin() {
         var btn = document.getElementById("profile-trainer-admin");
         if (!btn) return;
-        btn.addEventListener("click", function () {
-          window.location.href = "/go/admin/?trainer=1";
+        btn.hidden = true;
+        btn.addEventListener("click", function (e) {
+          e.preventDefault();
         });
       })();
 
