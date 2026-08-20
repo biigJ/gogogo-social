@@ -458,8 +458,9 @@
       <div class="wa-hint-sheet">
         <div class="wa-hint-icon" aria-hidden="true">📲</div>
         <h2 class="wa-hint-title" id="wa-hint-title">Gleich weiter!</h2>
-        <p class="wa-hint-body">
-          Joscha meldet sich gleich bei Dir per WhatsApp. Du wirst jetzt auf die App weitergeleitet.
+        <p class="wa-hint-body" id="wa-hint-body">
+          Dein Trainer meldet sich gleich bei Dir per WhatsApp. Du wirst jetzt auf die App weitergeleitet.
+          Für optimale Nutzung: Teilen &gt; Zum Home-Bildschirm und dann über den Button des Smartphones öffnen.
         </p>
         <button class="wa-hint-cta" type="button" id="wa-hint-go">Zur App</button>
         <span class="wa-hint-countdown" id="wa-hint-countdown"></span>
@@ -474,12 +475,12 @@
         </div>
       </div>
       <h2 class="success__title" id="success-title">Stark.</h2>
-      <p class="success__text">
+      <p class="success__text" id="success-text">
         Ein Tap noch, dann sind wir im Gespräch.<br />
-        Joscha antwortet persönlich, meist noch am selben Tag.
+        Dein Trainer antwortet persönlich, meist noch am selben Tag.
       </p>
       <a class="btn" id="wa-btn" href="#" target="_blank" rel="noopener">Weiter auf WhatsApp</a>
-      <button class="success__alt" type="button" id="no-wa">Lieber ohne WhatsApp? Joscha meldet sich bei dir.</button>
+      <button class="success__alt" type="button" id="no-wa">Lieber ohne WhatsApp? Dein Trainer meldet sich bei dir.</button>
       <p class="success__note" id="no-wa-note"></p>
     </section>
 
@@ -499,6 +500,8 @@
       var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
       var QUEUE_KEY = "gogogo_go_leads_queue";
       var SESSION_KEY = "gogogo_invite_draft";
+      var resolvedTrainerWa = WHATSAPP_NUMBER;
+      var resolvedTrainerId = null;
 
       var params = new URLSearchParams(window.location.search);
       var inviteFromQr = (params.get("c") || "").trim();
@@ -599,12 +602,30 @@
 
       // ── WhatsApp ──────────────────────────────────────────────
       function waMessage(name) {
-        return "Hi Joscha, ich bin " + name + ". Ich mache bei der 4 Wochen Buddy-Challenge mit.";
+        return "Hi, ich bin " + name + ". Ich mache bei der 4 Wochen Buddy-Challenge mit.";
       }
 
-      function waLink(name) {
-        var n = String(WHATSAPP_NUMBER).replace(/\D/g, "");
+      function waLink(name, phone) {
+        var n = String(phone || resolvedTrainerWa || WHATSAPP_NUMBER).replace(/\D/g, "");
         return "https://wa.me/" + n + "?text=" + encodeURIComponent(waMessage(name));
+      }
+
+      async function resolveTrainerFromInvite(invite) {
+        resolvedTrainerWa = WHATSAPP_NUMBER;
+        resolvedTrainerId = null;
+        if (!invite) return;
+        var tid = invite.trainer_id || null;
+        if (!tid) return;
+        try {
+          var rows = await restGet(
+            "go_accounts?id=eq." + encodeURIComponent(tid) +
+            "&select=id,whatsapp_phone,is_trainer&limit=1"
+          );
+          if (rows && rows[0]) {
+            resolvedTrainerId = rows[0].id || tid;
+            if (rows[0].whatsapp_phone) resolvedTrainerWa = String(rows[0].whatsapp_phone);
+          }
+        } catch (e) {}
       }
 
       // ── Queue ─────────────────────────────────────────────────
@@ -677,6 +698,8 @@
             return;
           }
 
+          await resolveTrainerFromInvite(invite);
+
           var serial = invite.serial_number || null;
 
           // Account anlegen
@@ -689,6 +712,7 @@
             created_at: now,
             updated_at: now
           };
+          if (resolvedTrainerId) accountPayload.trainer_id = resolvedTrainerId;
 
           var accounts = null;
           try {
@@ -698,7 +722,16 @@
               "resolution=merge-duplicates,return=representation"
             );
           } catch (err) {
-            queueLead(accountPayload);
+            try {
+              delete accountPayload.trainer_id;
+              accounts = await restInsert(
+                "go_accounts?on_conflict=invite_code",
+                accountPayload,
+                "resolution=merge-duplicates,return=representation"
+              );
+            } catch (err2) {
+              queueLead(accountPayload);
+            }
           }
 
           var accountId = accounts && accounts[0] ? accounts[0].id : null;
@@ -719,11 +752,41 @@
             queueLead(leadPayload);
           }
 
+          // Job: Trainer per WhatsApp benachrichtigen (Worker/API braucht notify_phone)
+          try {
+            await restInsert("go_wa_jobs", {
+              account_id: accountId,
+              name: name,
+              phone: phone,
+              invite_code: code,
+              notify_phone: resolvedTrainerWa,
+              trainer_id: resolvedTrainerId,
+              status: "pending",
+              note: "Neuer Nutzer über Invite — Trainer benachrichtigen"
+            }, "return=minimal");
+          } catch (errWa) {
+            try {
+              await restInsert("go_wa_jobs", {
+                account_id: accountId,
+                name: name,
+                phone: phone,
+                invite_code: code,
+                status: "pending"
+              }, "return=minimal");
+            } catch (errWa2) {}
+          }
+
           // Account lokal speichern
           var localAccount = { name: name, phone: phone, invite_code: code, serial_number: serial };
           if (accountId) localAccount.id = accountId;
-          try { localStorage.setItem("gogogo_go_account", JSON.stringify(localAccount)); } catch (e) {}
+          if (resolvedTrainerId) localAccount.trainer_id = resolvedTrainerId;
+          try {
+            if (window.GoAccountSession) GoAccountSession.save(localAccount);
+            else localStorage.setItem("gogogo_go_account", JSON.stringify(localAccount));
+          } catch (e) {}
           try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+
+          if (waBtn) waBtn.href = waLink(name, resolvedTrainerWa);
 
           msgEl.textContent = "";
           flowMain.classList.add("is-hidden");
@@ -739,16 +802,22 @@
       // ── Ohne WhatsApp ─────────────────────────────────────────
       if (noWa) {
         noWa.addEventListener("click", function () {
-          noWaNote.textContent = "Erledigt. Joscha wird sich bald melden.";
+          noWaNote.textContent = "Erledigt. Dein Trainer wird sich bald melden.";
           noWa.hidden = true;
         });
       }
 
       function showWaHint() {
         var overlay = document.getElementById("wa-hint-overlay");
+        var body = document.getElementById("wa-hint-body");
         var cta = document.getElementById("wa-hint-go");
         var countdown = document.getElementById("wa-hint-countdown");
         if (!overlay) { window.location.href = "/account/?goto=profile"; return; }
+        if (body) {
+          body.innerHTML =
+            "Dein Trainer meldet sich gleich bei Dir per WhatsApp. Du wirst jetzt auf die App weitergeleitet.<br /><br />" +
+            "Für optimale Nutzung: Teilen &gt; Zum Home-Bildschirm und dann über den Button des Smartphones öffnen.";
+        }
         overlay.hidden = false;
         requestAnimationFrame(function () {
           requestAnimationFrame(function () { overlay.classList.add("is-visible"); });

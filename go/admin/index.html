@@ -1184,14 +1184,35 @@
       text-align: center;
     }
     .unit-wheel-item.is-selected { opacity: 1; font-size: 1rem; }
-    body.is-trainer-mode .site-header__left,
-    body.is-trainer-mode #btn-menu { display: none !important; }
+    body.is-trainer-mode .site-header__brand::after {
+      content: none;
+    }
+    body.is-trainer-mode .menu-admin-only { display: none !important; }
+    body.is-trainer-mode .menu-trainer-only { display: block; }
+    .menu-trainer-only { display: none; }
     body.is-trainer-mode .list-action.is-disabled,
     body.is-trainer-mode .list-challenge-euro.is-disabled,
     body.is-trainer-mode .list-challenge-wheel.is-disabled {
       opacity: 0.35;
       pointer-events: none;
     }
+    .admin-wa-phone {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .admin-wa-phone input {
+      width: 100%;
+      min-height: 48px;
+      padding: 10px 12px;
+      border: 0;
+      border-radius: var(--radius);
+      background: var(--paper);
+      color: var(--ink);
+      font-weight: 600;
+    }
+    .admin-wa-phone .msg { margin-top: 4px; }
     .list-item__trainer {
       display: block;
       margin-top: 4px;
@@ -1220,10 +1241,12 @@
     <div class="menu-panel__sheet" role="dialog" aria-label="Menü">
       <nav class="menu-panel__nav">
         <button type="button" data-view="gen">Generator</button>
-        <button type="button" data-view="list">Alle Nutzer</button>
-        <button type="button" data-view="mantras">Mantras</button>
+        <button type="button" data-view="list" class="menu-list-label">Alle Nutzer</button>
+        <button type="button" data-view="wa" class="menu-trainer-only">WhatsApp-Nummer</button>
+        <button type="button" data-view="mantras" class="menu-admin-only">Mantras</button>
         <button type="button" data-view="qr">QR anzeigen</button>
-        <a href="/go/">gogogo.social</a>
+        <a href="/go/">gogogo.social/go</a>
+        <a href="/invite/">gogogo.social/invite</a>
       </nav>
     </div>
   </div>
@@ -1242,6 +1265,17 @@
       </span>
     </button>
     <button class="admin-name" id="admin-name" type="button" hidden></button>
+
+    <div class="panel" id="panel-wa" hidden>
+      <h1>WhatsApp-Nummer</h1>
+      <p class="admin-kraft__hint">Neue Nutzer, die Du einlädst, öffnen WhatsApp an diese Nummer. Format: +49…</p>
+      <div class="admin-wa-phone">
+        <label class="visually-hidden" for="trainer-wa-phone">WhatsApp-Nummer</label>
+        <input id="trainer-wa-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+491701234567" maxlength="20" />
+        <button class="btn" type="button" id="trainer-wa-save">Speichern</button>
+        <p class="msg" id="trainer-wa-msg" role="status"></p>
+      </div>
+    </div>
 
     <div class="panel" id="panel-login">
       <h1>gogogo lead code generator</h1>
@@ -1632,6 +1666,14 @@
       /* Wie Nutzer-Community: ISO-Zeitstempel „gelesen bis“ pro Invite (OK). */
       var ADMIN_INVITE_SEEN_AT_KEY = "gogogo_admin_invite_seen_at_v2";
       var GO_BASE = (typeof location !== "undefined" && location.origin ? location.origin : "https://www.gogogo.social") + "/go";
+      var INVITE_BASE = (typeof location !== "undefined" && location.origin ? location.origin : "https://www.gogogo.social") + "/invite";
+      var DEFAULT_TRAINER_WA = "+491747015500";
+
+      function inviteUrlForCode(code) {
+        var c = String(code || "").replace(/\D/g, "").slice(0, 4);
+        if (c) return INVITE_BASE + "/?c=" + encodeURIComponent(c);
+        return INVITE_BASE + "/";
+      }
       var adminNameBtn = document.getElementById("admin-name");
       var adminOpenProfileBtn = document.getElementById("admin-open-profile");
       var DAY_ENTRIES_KEY = "gogogo_go_day_entries";
@@ -1663,6 +1705,7 @@
       var panelResult = document.getElementById("panel-result");
       var panelList = document.getElementById("panel-list");
       var panelMantras = document.getElementById("panel-mantras");
+      var panelWa = document.getElementById("panel-wa");
       var cycleBtn = document.getElementById("cycle-btn");
       var authBtn = document.getElementById("btn-auth");
       var menuBtn = document.getElementById("btn-menu");
@@ -3035,6 +3078,10 @@
         trainerSessionAccount = acc;
         trainerAdminMode = true;
         document.body.classList.add("is-trainer-mode");
+        var brand = document.querySelector(".site-header__brand");
+        if (brand) brand.textContent = "Trainer";
+        var listBtn = document.querySelector(".menu-list-label");
+        if (listBtn) listBtn.textContent = "Meine Nutzer";
         /* Kein setAuthed — Trainer dürfen AUTH_KEY nicht bekommen (kein Voll-Admin). */
         return true;
       }
@@ -3082,6 +3129,7 @@
         panelResult.hidden = true;
         panelList.hidden = true;
         if (panelMantras) panelMantras.hidden = true;
+        if (panelWa) panelWa.hidden = true;
         setQrOnlyMode(false);
       }
 
@@ -4092,7 +4140,7 @@
       }
 
       async function showResult(name, serial, code, inviteRow) {
-        var url = GO_BASE;
+        var url = inviteUrlForCode(code);
         window.scrollTo(0, 0);
         if (document.documentElement) document.documentElement.scrollTop = 0;
         hideAllPanels();
@@ -4105,7 +4153,11 @@
           inviteId: (inviteRow && inviteRow.id) || (pendingAdminInvite && pendingAdminInvite.id) || null
         };
         panelResult.hidden = false;
-        setResultExtrasVisible(true);
+        setResultExtrasVisible(!trainerAdminMode || !!(inviteRow || activeAccount));
+        /* Trainer: nach Generator nur QR + Meta, Plan wenn Nutzer gewählt */
+        if (trainerAdminMode && !inviteRow && !activeAccount) {
+          setResultExtrasVisible(false);
+        }
         var metaEl = document.getElementById("result-meta");
         metaEl.hidden = !(serial || code);
         metaEl.textContent = serial || code ? (serial + " · " + code) : "";
@@ -4113,7 +4165,7 @@
         if (link) {
           link.href = url;
           link.textContent = url;
-          link.hidden = true;
+          link.hidden = false;
         }
         setCycleVisible(true);
         setCycleBack(true);
@@ -4126,8 +4178,10 @@
         if (activeAccount && activeAccount.photo_url) setCyclePhoto(activeAccount.photo_url);
         if (activeAccount && activeAccount.training_date) setActorName(name || "", activeAccount.training_date);
         refreshTrainerUi();
-        await renderMirroredFeed(activeAccount);
-        await loadCoachPlan(activeAccount && activeAccount.id);
+        if (!trainerAdminMode || activeAccount) {
+          await renderMirroredFeed(activeAccount);
+          await loadCoachPlan(activeAccount && activeAccount.id);
+        }
       }
 
       async function acknowledgeCurrentUserMessages() {
@@ -5300,7 +5354,7 @@
       })();
 
       function showQrMenu() {
-        var url = GO_BASE;
+        var url = INVITE_BASE + "/";
         hideAllPanels();
         lastQr = { name: "", serial: "", code: "", url: url };
         activeAccount = null;
@@ -5326,6 +5380,100 @@
         setCyclePhoto(null);
         renderQr(url);
         updateAuthBtn();
+      }
+
+      async function showWaPanel() {
+        hideAllPanels();
+        if (panelWa) panelWa.hidden = false;
+        setCycleVisible(false);
+        setCycleBack(false);
+        setActorName("");
+        var input = document.getElementById("trainer-wa-phone");
+        var msg = document.getElementById("trainer-wa-msg");
+        if (msg) {
+          msg.textContent = "";
+          msg.classList.remove("is-error");
+        }
+        var phone = "";
+        if (trainerSessionAccount && trainerSessionAccount.whatsapp_phone) {
+          phone = String(trainerSessionAccount.whatsapp_phone);
+        } else if (trainerSessionAccount && trainerSessionAccount.id) {
+          try {
+            var res = await fetch(
+              SUPABASE_URL + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(trainerSessionAccount.id) +
+              "&select=whatsapp_phone&limit=1",
+              { headers: apiHeaders() }
+            );
+            if (res.ok) {
+              var rows = await res.json();
+              if (rows && rows[0] && rows[0].whatsapp_phone) phone = String(rows[0].whatsapp_phone);
+            }
+          } catch (e) {}
+        }
+        if (!phone) phone = DEFAULT_TRAINER_WA;
+        if (input) input.value = phone;
+        updateAuthBtn();
+      }
+
+      async function saveTrainerWhatsapp() {
+        var input = document.getElementById("trainer-wa-phone");
+        var msg = document.getElementById("trainer-wa-msg");
+        var btn = document.getElementById("trainer-wa-save");
+        var raw = input ? String(input.value || "").trim() : "";
+        var digits = raw.replace(/[^\d+]/g, "");
+        if (!/^\+[1-9]\d{7,14}$/.test(digits)) {
+          if (msg) {
+            msg.textContent = "Bitte Nummer im Format +491701234567 eingeben.";
+            msg.classList.add("is-error");
+          }
+          return;
+        }
+        if (!trainerSessionAccount || !trainerSessionAccount.id) {
+          if (msg) {
+            msg.textContent = "Kein Trainer-Account.";
+            msg.classList.add("is-error");
+          }
+          return;
+        }
+        if (btn) btn.disabled = true;
+        if (msg) {
+          msg.textContent = "Speichere …";
+          msg.classList.remove("is-error");
+        }
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(trainerSessionAccount.id),
+            {
+              method: "PATCH",
+              headers: apiHeaders({ "Content-Type": "application/json", Prefer: "return=representation" }),
+              body: JSON.stringify({ whatsapp_phone: digits })
+            }
+          );
+          if (!res.ok) {
+            var t = "";
+            try { t = await res.text(); } catch (e0) {}
+            if (/whatsapp_phone|PGRST204|schema cache/i.test(t) || res.status === 400) {
+              throw new Error("Spalte fehlt — go-trainer-whatsapp.sql in Supabase ausführen.");
+            }
+            throw new Error(t || ("HTTP " + res.status));
+          }
+          var rows = await res.json();
+          if (rows && rows[0]) {
+            trainerSessionAccount.whatsapp_phone = rows[0].whatsapp_phone || digits;
+            try {
+              if (window.GoAccountSession) GoAccountSession.save(trainerSessionAccount);
+              else localStorage.setItem(ACCOUNT_KEY, JSON.stringify(trainerSessionAccount));
+            } catch (e1) {}
+          }
+          if (msg) msg.textContent = "Gespeichert.";
+        } catch (err) {
+          if (msg) {
+            msg.textContent = err && err.message ? String(err.message) : "Speichern fehlgeschlagen.";
+            msg.classList.add("is-error");
+          }
+        } finally {
+          if (btn) btn.disabled = false;
+        }
       }
 
       var DEFAULT_MANTRAS = [
@@ -5523,7 +5671,10 @@
           setMenu(false);
           requireAuth(function () {
             if (view === "list") showList();
-            else if (view === "mantras") showMantras();
+            else if (view === "mantras") {
+              if (trainerAdminMode) return;
+              showMantras();
+            } else if (view === "wa") showWaPanel();
             else if (view === "qr") showQrMenu();
             else showGen();
           });
@@ -5551,11 +5702,11 @@
       function renderQr(url) {
         var mount = document.getElementById("qr-mount");
         if (typeof renderGoQr === "function") {
-          renderGoQr(mount, url || GO_BASE);
+          renderGoQr(mount, url || INVITE_BASE + "/");
           return;
         }
         mount.innerHTML = "";
-        mount.textContent = url || GO_BASE;
+        mount.textContent = url || INVITE_BASE + "/";
       }
 
       function randomDigits(n) {
@@ -5781,6 +5932,11 @@
       }
       refreshTrainerUi();
 
+      var trainerWaSave = document.getElementById("trainer-wa-save");
+      if (trainerWaSave) {
+        trainerWaSave.addEventListener("click", function () { saveTrainerWhatsapp(); });
+      }
+
       (function bindAdminComposer() {
         var composer = document.getElementById("admin-composer");
         var replyText = document.getElementById("admin-reply-text");
@@ -5889,15 +6045,39 @@
         msg.textContent = "Speichere …";
         var warn = "";
         try {
-          await insertCode({ first_name: name, serial_number: serial, code: code });
+          var payload = { first_name: name, serial_number: serial, code: code };
+          var inviteTrainerId = null;
+          if (trainerAdminMode && trainerSessionAccount && trainerSessionAccount.id) {
+            inviteTrainerId = trainerSessionAccount.id;
+          } else {
+            try {
+              var coachAcc = await resolveCoachAccount();
+              if (coachAcc && coachAcc.id) inviteTrainerId = coachAcc.id;
+            } catch (eCoach) {}
+          }
+          if (inviteTrainerId) payload.trainer_id = inviteTrainerId;
+          await insertCode(payload);
         } catch (err) {
           if (err && err.offline) {
             warn = String(err.message || err);
           } else {
-            msg.textContent = "Fehler: " + (err && err.message ? err.message : err);
-            msg.classList.add("is-error");
-            btn.disabled = false;
-            return;
+            var detail = err && err.message ? String(err.message) : String(err);
+            if (/trainer_id|PGRST204|schema cache/i.test(detail)) {
+              try {
+                await insertCode({ first_name: name, serial_number: serial, code: code });
+                warn = "Invite gespeichert (ohne trainer_id). go-trainer-whatsapp.sql ausführen.";
+              } catch (err2) {
+                msg.textContent = "Fehler: " + (err2 && err2.message ? err2.message : err2);
+                msg.classList.add("is-error");
+                btn.disabled = false;
+                return;
+              }
+            } else {
+              msg.textContent = "Fehler: " + detail;
+              msg.classList.add("is-error");
+              btn.disabled = false;
+              return;
+            }
           }
         }
         showResult(name, serial, code);
