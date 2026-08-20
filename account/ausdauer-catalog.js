@@ -8,11 +8,26 @@
     { id: "xc", name: "Crosstrainer", speedUnit: "km/h", hasIncline: true }
   ];
 
+  function localized(item) {
+    if (!item) return item;
+    var n = item.name;
+    if (typeof window !== "undefined" && window.GoUiI18n) {
+      n = window.GoUiI18n.localizeName(item.name);
+    }
+    if (n === item.name) return item;
+    var out = {};
+    for (var k in item) {
+      if (Object.prototype.hasOwnProperty.call(item, k)) out[k] = item[k];
+    }
+    out.name = n;
+    return out;
+  }
+
   function techniqueById(id) {
     for (var i = 0; i < TECHNIQUES.length; i++) {
-      if (TECHNIQUES[i].id === id) return TECHNIQUES[i];
+      if (TECHNIQUES[i].id === id) return localized(TECHNIQUES[i]);
     }
-    return TECHNIQUES[0];
+    return localized(TECHNIQUES[0]);
   }
 
   function formatSpeed(techId, value) {
@@ -33,7 +48,7 @@
   }
 
   root.GOGOGO_AUSDAUER = {
-    TECHNIQUES: TECHNIQUES,
+    get TECHNIQUES() { return TECHNIQUES.map(localized); },
     techniqueById: techniqueById,
     formatSpeed: formatSpeed,
     summarize: summarize

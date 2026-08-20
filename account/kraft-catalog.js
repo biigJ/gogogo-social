@@ -120,15 +120,30 @@
     pull: ["deadlift", "pullup", "row", "latpulldown", "facepull"]
   };
 
+  function localized(item) {
+    if (!item) return item;
+    var n = item.name;
+    if (typeof window !== "undefined" && window.GoUiI18n) {
+      n = window.GoUiI18n.localizeName(item.name);
+    }
+    if (n === item.name) return item;
+    var out = {};
+    for (var k in item) {
+      if (Object.prototype.hasOwnProperty.call(item, k)) out[k] = item[k];
+    }
+    out.name = n;
+    return out;
+  }
+
   function systemById(id) {
     for (var i = 0; i < SYSTEMS.length; i++) {
-      if (SYSTEMS[i].id === id) return SYSTEMS[i];
+      if (SYSTEMS[i].id === id) return localized(SYSTEMS[i]);
     }
-    return SYSTEMS[0];
+    return localized(SYSTEMS[0]);
   }
 
   function exercisesFor(systemId) {
-    return EXERCISES[systemId] || EXERCISES.full;
+    return (EXERCISES[systemId] || EXERCISES.full).map(localized);
   }
 
   function defaultPresetsFor(systemId) {
@@ -136,7 +151,7 @@
   }
 
   root.GOGOGO_KRAFT = {
-    SYSTEMS: SYSTEMS,
+    get SYSTEMS() { return SYSTEMS.map(localized); },
     EXERCISES: EXERCISES,
     DEFAULT_PRESETS: DEFAULT_PRESETS,
     systemById: systemById,
