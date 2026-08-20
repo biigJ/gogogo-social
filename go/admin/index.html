@@ -3054,17 +3054,36 @@
       }
 
       function restoreTrainerSessionFromStash() {
-        return null;
+        try {
+          var accRaw = sessionStorage.getItem(ADMIN_RETURN_ACC_KEY);
+          if (!accRaw) return null;
+          var acc = JSON.parse(accRaw);
+          if (!acc || !acc.id || !acc.is_trainer) return null;
+          if (window.GoAccountSession) GoAccountSession.save(acc);
+          else localStorage.setItem(ACCOUNT_KEY, JSON.stringify(acc));
+          return acc;
+        } catch (e) {
+          return null;
+        }
       }
 
       function initTrainerAdminMode() {
-        /* Trainer-Zugang zum Adminbereich ist deaktiviert. */
         var params = new URLSearchParams(location.search || "");
-        if (params.get("trainer") === "1") {
-          window.location.replace("/account/?goto=profile");
-          return "blocked";
+        if (params.get("trainer") !== "1") return false;
+        var acc = readAccountSession();
+        if ((!acc || !acc.id || !acc.is_trainer) && restoreTrainerSessionFromStash()) {
+          acc = readAccountSession();
         }
-        return false;
+        if (!acc || !acc.id || !acc.is_trainer) return false;
+        trainerSessionAccount = acc;
+        trainerAdminMode = true;
+        document.body.classList.add("is-trainer-mode");
+        var brand = document.querySelector(".site-header__brand");
+        if (brand) brand.textContent = "Trainer";
+        var listBtn = document.querySelector(".menu-list-label");
+        if (listBtn) listBtn.textContent = "Meine Nutzer";
+        /* Kein setAuthed — Trainer dürfen AUTH_KEY nicht bekommen (kein Voll-Admin). */
+        return true;
       }
 
       function setAuthed(on) {
@@ -3269,7 +3288,7 @@
 
       async function enterUserAccount(name, serial, code, accountHint) {
         if (trainerAdminMode) {
-          window.alert("Trainer haben keinen Zugang zum Adminbereich.");
+          window.alert("Nutzer-Accounts öffnen ist nur dem Admin erlaubt.");
           return;
         }
         if (!name && !(accountHint && accountHint.name)) return;
@@ -5712,14 +5731,8 @@
       }
 
       try {
-        var trainerGate = initTrainerAdminMode();
-        if (trainerGate === "blocked") {
-          /* Redirect läuft — keine Admin-UI rendern. */
-        } else if (trainerGate || isAuthed()) {
-          showList();
-        } else {
-          showLogin();
-        }
+        if (initTrainerAdminMode() || isAuthed()) showList();
+        else showLogin();
       } catch (e) { showLogin(); }
       updateAuthBtn();
 
