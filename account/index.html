@@ -2434,6 +2434,32 @@
     }
     .about-card p:last-child { margin-bottom: 0; }
 
+    .staff-return-bar {
+      position: sticky;
+      top: 0;
+      z-index: 70;
+      display: flex;
+      justify-content: center;
+      padding: calc(8px + env(safe-area-inset-top, 0px)) 16px 8px;
+      background: rgba(10, 10, 10, 0.35);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .staff-return-bar[hidden] { display: none !important; }
+    .staff-return-bar__btn {
+      min-height: 40px;
+      padding: 0 16px;
+      border: 1.5px solid rgba(247, 245, 240, 0.55);
+      border-radius: 2px;
+      background: transparent;
+      color: var(--ink-on-red);
+      font-family: var(--display, inherit);
+      font-weight: 700;
+      font-size: 0.92rem;
+      letter-spacing: -0.02em;
+    }
+    .staff-return-bar__btn:active { transform: scale(0.97); }
+
     .app-greeting {
       position: fixed;
       inset: 0;
@@ -2621,6 +2647,10 @@
   <div id="app-gate-deleted" class="gate is-deleted" hidden>
     <p class="hero__hello">Ihr Account wurde gelöscht.</p>
     <p>Alle Daten wurden aus der Datenbank entfernt.</p>
+  </div>
+
+  <div class="staff-return-bar" id="staff-return-bar" hidden>
+    <button type="button" class="staff-return-bar__btn" id="staff-return-btn">Zurück</button>
   </div>
 
   <div class="app-greeting" id="app-greeting" hidden aria-hidden="true">
@@ -4678,31 +4708,91 @@ browsen</span>
         }
       }
 
-      function isStaffCalendarOverride() {
+      function getAdminReturnPayload() {
         try {
           var raw = sessionStorage.getItem("gogogo_admin_return");
-          if (!raw) return false;
+          if (!raw) return null;
           var d = JSON.parse(raw);
-          if (!d || !d.href) return false;
-          if (d.mode === "trainer") return false;
-          try {
-            return localStorage.getItem("gogogo_go_admin") === "1" ||
-              sessionStorage.getItem("gogogo_go_admin") === "1";
-          } catch (e0) {
-            return false;
-          }
+          if (!d || !d.href) return null;
+          return d;
         } catch (e) {
-          return false;
+          return null;
         }
       }
 
-      /* Nutzer: nur heute (Berlin). Voll-Admin mit Profil-Override: auch nachträglich. */
+      function getStaffCalendarMode() {
+        var d = getAdminReturnPayload();
+        if (!d) return null;
+        if (d.mode === "trainer-calendar") {
+          try {
+            var accRaw = sessionStorage.getItem("gogogo_admin_return_acc");
+            if (!accRaw) return null;
+            var acc = JSON.parse(accRaw);
+            if (acc && acc.id && acc.is_trainer) return "trainer-calendar";
+          } catch (e0) {}
+          return null;
+        }
+        if (d.mode === "trainer") return null;
+        try {
+          if (localStorage.getItem("gogogo_go_admin") === "1" ||
+              sessionStorage.getItem("gogogo_go_admin") === "1") {
+            return "full";
+          }
+        } catch (e1) {}
+        return null;
+      }
+
+      function isStaffCalendarOverride() {
+        return getStaffCalendarMode() === "full";
+      }
+
+      function isTrainerCalendarOverride() {
+        return getStaffCalendarMode() === "trainer-calendar";
+      }
+
+      /* Nutzer: nur heute. Trainer: nur Vergangenheit ohne Eintrag. Admin: alles. */
       function canRateCalendarDay(dateStr) {
         if (isAccountPaused()) return false;
         var key = String(dateStr || "").slice(0, 10);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
-        if (isStaffCalendarOverride()) return true;
+        var mode = getStaffCalendarMode();
+        if (mode === "full") return true;
+        if (mode === "trainer-calendar") {
+          if (key >= berlinTodayKey()) return false;
+          return !Object.prototype.hasOwnProperty.call(dayEntries, key);
+        }
         return key === berlinTodayKey();
+      }
+
+      function setupStaffReturnBar() {
+        var bar = document.getElementById("staff-return-bar");
+        var btn = document.getElementById("staff-return-btn");
+        if (!bar || !btn) return;
+        var mode = getStaffCalendarMode();
+        var payload = getAdminReturnPayload();
+        if (!mode || !payload) {
+          bar.hidden = true;
+          return;
+        }
+        bar.hidden = false;
+        btn.textContent = mode === "trainer-calendar"
+          ? t("Zurück zum Trainerbereich", "Back to trainer area")
+          : t("Zurück zum Admin", "Back to admin");
+        btn.onclick = function () {
+          try {
+            var accRaw = sessionStorage.getItem("gogogo_admin_return_acc");
+            if (accRaw) {
+              var acc = JSON.parse(accRaw);
+              if (acc && acc.name) {
+                if (window.GoAccountSession) GoAccountSession.save(acc);
+                else localStorage.setItem(ACCOUNT_KEY, JSON.stringify(acc));
+              }
+            }
+          } catch (e0) {}
+          var href = (payload && payload.href) || "/go/admin/";
+          try { sessionStorage.removeItem("gogogo_admin_return"); } catch (e1) {}
+          window.location.href = href;
+        };
       }
 
       /* Text für einen Kalendertag:
@@ -6311,6 +6401,7 @@ browsen</span>
         if (accountSessionBlocked || !account) return;
         document.getElementById("app").hidden = false;
         applyUiLang(uiLang);
+        setupStaffReturnBar();
         if (account.photo_url) applyPhoto(account.photo_url);
         else applyPhoto(null);
         fillProfilePanel();
@@ -6415,6 +6506,10 @@ browsen</span>
 
       function maybeShowGreeting() {
         if (accountSessionBlocked || !account) return;
+        if (getStaffCalendarMode()) {
+          hideGreeting();
+          return;
+        }
         var deep = "";
         try {
           deep = String(new URLSearchParams(location.search || "").get("goto") || "").trim();
@@ -7840,7 +7935,8 @@ browsen</span>
             refreshCycleRays();
             renderWeek();
             fillProfilePanel();
-            if (score != null) {
+            var staffMode = getStaffCalendarMode();
+            if (score != null && !staffMode) {
               if (hasCloudAccount()) {
                 try {
                   await createCommunityPost({

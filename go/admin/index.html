@@ -1189,6 +1189,11 @@
     }
     body.is-trainer-mode .menu-admin-only { display: none !important; }
     body.is-trainer-mode .menu-trainer-only { display: block; }
+    body.is-trainer-mode .menu-qr-hide,
+    body.is-trainer-mode .qr-box,
+    body.is-trainer-mode #admin-role {
+      display: none !important;
+    }
     .menu-trainer-only { display: none; }
     body.is-trainer-mode .list-action.is-disabled,
     body.is-trainer-mode .list-challenge-euro.is-disabled,
@@ -1244,9 +1249,9 @@
         <button type="button" data-view="list" class="menu-list-label">Alle Nutzer</button>
         <button type="button" data-view="wa" class="menu-trainer-only">WhatsApp-Nummer</button>
         <button type="button" data-view="mantras" class="menu-admin-only">Mantras</button>
-        <button type="button" data-view="qr">QR anzeigen</button>
+        <button type="button" data-view="qr" class="menu-qr-hide">QR anzeigen</button>
         <a href="/go/">gogogo.social/go</a>
-        <a href="/invite/">gogogo.social/invite</a>
+        <a href="/invite/" class="menu-qr-hide">gogogo.social/invite</a>
       </nav>
     </div>
   </div>
@@ -3040,16 +3045,21 @@
         return String(name || "").trim().split(/\s+/)[0] || "";
       }
 
-      function stashAdminReturn() {
-        if (trainerAdminMode) return;
+      function stashAdminReturn(opts) {
+        opts = opts || {};
         try {
+          var mode = opts.mode || (trainerAdminMode ? "trainer-calendar" : "full");
           var payload = {
-            mode: "full",
-            href: "/go/admin/"
+            mode: mode,
+            href: trainerAdminMode ? "/go/admin/?trainer=1" : "/go/admin/"
           };
           sessionStorage.setItem(ADMIN_RETURN_KEY, JSON.stringify(payload));
-          var acc = readAccountSession();
-          if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
+          if (trainerAdminMode && trainerSessionAccount && trainerSessionAccount.id) {
+            sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(trainerSessionAccount));
+          } else {
+            var acc = readAccountSession();
+            if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
+          }
         } catch (e) {}
       }
 
@@ -3182,11 +3192,15 @@
         adminNameBtn.hidden = false;
         adminNameBtn.disabled = false;
         adminNameBtn.textContent = display;
-        adminNameBtn.setAttribute("aria-label", "Profil von " + name + " öffnen");
+        adminNameBtn.setAttribute("aria-label", trainerAdminMode
+          ? ("Kalender von " + name + " öffnen")
+          : ("Profil von " + name + " öffnen"));
         if (adminOpenProfileBtn) {
-          adminOpenProfileBtn.hidden = !!trainerAdminMode;
-          adminOpenProfileBtn.disabled = !!trainerAdminMode;
-          adminOpenProfileBtn.textContent = "Profil von " + name + " öffnen";
+          adminOpenProfileBtn.hidden = false;
+          adminOpenProfileBtn.disabled = false;
+          adminOpenProfileBtn.textContent = trainerAdminMode
+            ? "Kalender öffnen"
+            : ("Profil von " + name + " öffnen");
         }
       }
 
@@ -3286,15 +3300,9 @@
         }
       }
 
-      async function enterUserAccount(name, serial, code, accountHint) {
-        if (trainerAdminMode) {
-          window.alert("Nutzer-Accounts öffnen ist nur dem Admin erlaubt.");
-          return;
-        }
-        if (!name && !(accountHint && accountHint.name)) return;
+      async function resolveUserAccountForOpen(name, serial, code, accountHint) {
+        if (!name && !(accountHint && accountHint.name)) return null;
         var displayName = (accountHint && accountHint.name) || name;
-        adminNameBtn.disabled = true;
-        if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = true;
         var account = null;
 
         if (accountHint && accountHint.id && accountMatchesIdentity(accountHint, serial, code, displayName)) {
@@ -3357,7 +3365,23 @@
             photo_url: null
           };
         }
+        return account;
+      }
 
+      async function enterUserAccount(name, serial, code, accountHint) {
+        if (trainerAdminMode) {
+          window.alert("Nutzer-Accounts öffnen ist nur dem Admin erlaubt.");
+          return;
+        }
+        if (!name && !(accountHint && accountHint.name)) return;
+        adminNameBtn.disabled = true;
+        if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = true;
+        var account = await resolveUserAccountForOpen(name, serial, code, accountHint);
+        if (!account) {
+          adminNameBtn.disabled = false;
+          if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = false;
+          return;
+        }
         clearLocalUserCaches();
         if (!persistImpersonatedAccount(account)) {
           adminNameBtn.disabled = false;
@@ -3365,8 +3389,30 @@
           window.alert("Account konnte lokal nicht gespeichert werden.");
           return;
         }
-        stashAdminReturn();
+        stashAdminReturn({ mode: "full" });
         window.location.href = "/account/?goto=profile";
+      }
+
+      /* Trainer: Kalender des Nutzers (nur vergangene Tage ohne Eintrag bewertbar). */
+      async function enterUserCalendar(name, serial, code, accountHint) {
+        if (!name && !(accountHint && accountHint.name)) return;
+        adminNameBtn.disabled = true;
+        if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = true;
+        var account = await resolveUserAccountForOpen(name, serial, code, accountHint);
+        if (!account) {
+          adminNameBtn.disabled = false;
+          if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = false;
+          return;
+        }
+        clearLocalUserCaches();
+        if (!persistImpersonatedAccount(account)) {
+          adminNameBtn.disabled = false;
+          if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = false;
+          window.alert("Account konnte lokal nicht gespeichert werden.");
+          return;
+        }
+        stashAdminReturn({ mode: trainerAdminMode ? "trainer-calendar" : "full" });
+        window.location.href = "/account/?goto=home";
       }
 
       function openCurrentUserProfile() {
@@ -3377,11 +3423,25 @@
           (lastQr && lastQr.name) ||
           (adminNameBtn && adminNameBtn.textContent) ||
           "";
-        name = String(name || "").trim();
+        name = String(name || "").trim().replace(/\s·\s.*$/, "");
         if (!name) return;
         var serial = (lastQr && lastQr.serial) || (activeAccount && activeAccount.serial_number) || "";
         var code = (lastQr && lastQr.code) || (activeAccount && activeAccount.invite_code) || "";
         enterUserAccount(name, serial, code, activeAccount);
+      }
+
+      function openCurrentUserCalendar() {
+        if (!isAuthed() && !trainerAdminMode) return;
+        var name =
+          (activeAccount && activeAccount.name) ||
+          (lastQr && lastQr.name) ||
+          (adminNameBtn && adminNameBtn.textContent) ||
+          "";
+        name = String(name || "").trim().replace(/\s·\s.*$/, "");
+        if (!name) return;
+        var serial = (lastQr && lastQr.serial) || (activeAccount && activeAccount.serial_number) || "";
+        var code = (lastQr && lastQr.code) || (activeAccount && activeAccount.invite_code) || "";
+        enterUserCalendar(name, serial, code, activeAccount);
       }
 
       function showGen() {
@@ -4163,16 +4223,29 @@
         metaEl.hidden = !(serial || code);
         metaEl.textContent = serial || code ? (serial + " · " + code) : "";
         var link = document.getElementById("qr-link");
-        if (link) {
-          link.href = url;
-          link.textContent = url;
-          link.hidden = false;
+        var qrBox = document.getElementById("qr-box");
+        if (trainerAdminMode) {
+          if (link) {
+            link.removeAttribute("href");
+            link.textContent = "";
+            link.hidden = true;
+          }
+          if (qrBox) qrBox.hidden = true;
+          var qrMount = document.getElementById("qr-mount");
+          if (qrMount) qrMount.innerHTML = "";
+        } else {
+          if (qrBox) qrBox.hidden = false;
+          if (link) {
+            link.href = url;
+            link.textContent = url;
+            link.hidden = false;
+          }
+          renderQr(url);
         }
         setCycleVisible(true);
         setCycleBack(true);
         setActorName(name || "");
         setCyclePhoto(null);
-        renderQr(url);
         updateAuthBtn();
         /* Gelesen erst mit OK — kein automatisches Löschen beim Öffnen. */
         activeAccount = await resolveAccount(name, serial, code);
@@ -4239,9 +4312,15 @@
       }
 
       function refreshTrainerUi() {
+        var roleSec = document.getElementById("admin-role");
         var status = document.getElementById("trainer-status");
         var btn = document.getElementById("trainer-toggle");
         var msg = document.getElementById("trainer-msg");
+        if (trainerAdminMode) {
+          if (roleSec) roleSec.hidden = true;
+          return;
+        }
+        if (roleSec) roleSec.hidden = false;
         if (msg) {
           if (trainerSchemaOk === false) {
             msg.textContent = "Spalte is_trainer fehlt — go-trainer.sql in Supabase ausführen.";
@@ -4279,6 +4358,7 @@
       }
 
       async function setTrainerRole(on) {
+        if (trainerAdminMode) return;
         var msg = document.getElementById("trainer-msg");
         if (!activeAccount || !activeAccount.id) {
           if (msg) {
@@ -5355,6 +5435,10 @@
       })();
 
       function showQrMenu() {
+        if (trainerAdminMode) {
+          showList();
+          return;
+        }
         var url = INVITE_BASE + "/";
         hideAllPanels();
         lastQr = { name: "", serial: "", code: "", url: url };
@@ -5690,13 +5774,13 @@
         showLogin();
       });
       adminNameBtn.addEventListener("click", function () {
-        if (trainerAdminMode) return;
-        openCurrentUserProfile();
+        if (trainerAdminMode) openCurrentUserCalendar();
+        else openCurrentUserProfile();
       });
       if (adminOpenProfileBtn) {
         adminOpenProfileBtn.addEventListener("click", function () {
-          if (trainerAdminMode) return;
-          openCurrentUserProfile();
+          if (trainerAdminMode) openCurrentUserCalendar();
+          else openCurrentUserProfile();
         });
       }
 
@@ -5927,6 +6011,7 @@
       var trainerToggle = document.getElementById("trainer-toggle");
       if (trainerToggle) {
         trainerToggle.addEventListener("click", function () {
+          if (trainerAdminMode) return;
           var next = !(activeAccount && activeAccount.is_trainer);
           setTrainerRole(next);
         });
