@@ -3041,15 +3041,18 @@
       }
 
       function stashAdminReturn() {
-        if (trainerAdminMode) return;
         try {
           var payload = {
-            mode: "full",
-            href: "/go/admin/"
+            mode: trainerAdminMode ? "trainer" : "full",
+            href: trainerAdminMode ? "/go/admin/?trainer=1" : "/go/admin/"
           };
           sessionStorage.setItem(ADMIN_RETURN_KEY, JSON.stringify(payload));
-          var acc = readAccountSession();
-          if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
+          if (trainerAdminMode && trainerSessionAccount && trainerSessionAccount.id) {
+            sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(trainerSessionAccount));
+          } else {
+            var acc = readAccountSession();
+            if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
+          }
         } catch (e) {}
       }
 
@@ -3184,8 +3187,8 @@
         adminNameBtn.textContent = display;
         adminNameBtn.setAttribute("aria-label", "Profil von " + name + " öffnen");
         if (adminOpenProfileBtn) {
-          adminOpenProfileBtn.hidden = !!trainerAdminMode;
-          adminOpenProfileBtn.disabled = !!trainerAdminMode;
+          adminOpenProfileBtn.hidden = false;
+          adminOpenProfileBtn.disabled = false;
           adminOpenProfileBtn.textContent = "Profil von " + name + " öffnen";
         }
       }
@@ -3287,10 +3290,6 @@
       }
 
       async function enterUserAccount(name, serial, code, accountHint) {
-        if (trainerAdminMode) {
-          window.alert("Trainer können Nutzer-Accounts nicht öffnen.");
-          return;
-        }
         if (!name && !(accountHint && accountHint.name)) return;
         var displayName = (accountHint && accountHint.name) || name;
         adminNameBtn.disabled = true;
@@ -3370,7 +3369,7 @@
       }
 
       function openCurrentUserProfile() {
-        if (!isAuthed()) return;
+        if (!isAuthed() && !trainerAdminMode) return;
         var name =
           (activeAccount && activeAccount.name) ||
           (lastQr && lastQr.name) ||
@@ -5689,12 +5688,10 @@
         showLogin();
       });
       adminNameBtn.addEventListener("click", function () {
-        if (trainerAdminMode) return;
         openCurrentUserProfile();
       });
       if (adminOpenProfileBtn) {
         adminOpenProfileBtn.addEventListener("click", function () {
-          if (trainerAdminMode) return;
           openCurrentUserProfile();
         });
       }

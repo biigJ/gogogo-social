@@ -555,6 +555,11 @@
       opacity: 0;
       pointer-events: none;
     }
+    .home-cal__mark.is-readonly {
+      opacity: 1;
+      pointer-events: none;
+      cursor: default;
+    }
     body.is-account-paused .home-cal,
     body.is-account-paused .home-check {
       pointer-events: none;
@@ -4673,6 +4678,47 @@ browsen</span>
         }
       }
 
+      function isStaffCalendarOverride() {
+        try {
+          var raw = sessionStorage.getItem("gogogo_admin_return");
+          if (!raw) return false;
+          var d = JSON.parse(raw);
+          if (!d || !d.href) return false;
+          function hasFullAdminAuth() {
+            try {
+              return localStorage.getItem("gogogo_go_admin") === "1" ||
+                sessionStorage.getItem("gogogo_go_admin") === "1";
+            } catch (e0) {
+              return false;
+            }
+          }
+          function hasTrainerStash() {
+            try {
+              var accRaw = sessionStorage.getItem("gogogo_admin_return_acc");
+              if (!accRaw) return false;
+              var acc = JSON.parse(accRaw);
+              return !!(acc && acc.id && acc.is_trainer);
+            } catch (e1) {
+              return false;
+            }
+          }
+          if (d.mode === "full") return hasFullAdminAuth();
+          if (d.mode === "trainer") return hasTrainerStash();
+          return hasFullAdminAuth() || hasTrainerStash();
+        } catch (e) {
+          return false;
+        }
+      }
+
+      /* Nutzer: nur heute (Berlin). Trainer/Admin mit Profil-Override: auch nachträglich. */
+      function canRateCalendarDay(dateStr) {
+        if (isAccountPaused()) return false;
+        var key = String(dateStr || "").slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+        if (isStaffCalendarOverride()) return true;
+        return key === berlinTodayKey();
+      }
+
       /* Text für einen Kalendertag:
        * Offene Tage (heute/Zukunft ohne Haken): aktueller Plan.
        * Vergangenheit / abgehakt: History (heutige Speicherung ändert sie nicht). */
@@ -6531,6 +6577,7 @@ browsen</span>
       }
 
       async function restUpsertDayEntry(row) {
+        if (!row || !canRateCalendarDay(row.date)) return false;
         var res = await fetch(SUPABASE_URL + "/rest/v1/go_day_entries?on_conflict=account_id,date", {
           method: "POST",
           headers: {
@@ -6549,8 +6596,10 @@ browsen</span>
       }
 
       function setDayEntryLocal(date, score) {
+        if (!canRateCalendarDay(date)) return false;
         dayEntries[date] = { score: score };
         saveDayEntriesLocal();
+        return true;
       }
 
       function clearDayEntryLocal(date) {
@@ -7630,6 +7679,7 @@ browsen</span>
 
         function syncCheckControls(key) {
           var e = entryFor(key);
+          var rateable = canRateCalendarDay(key);
           if (e && e.score != null) {
             scoreInput.value = String(e.score);
           } else if (!e) {
@@ -7638,22 +7688,33 @@ browsen</span>
           updateScoreFill();
           checkOk.classList.toggle("is-active", !!(e && e.score != null));
           checkNo.classList.toggle("is-active", !!(e && e.score == null));
-          var show = editingOpen || !e;
+          var show = rateable && (editingOpen || !e);
           checkRow.hidden = !show;
+          scoreInput.disabled = !rateable;
+          checkOk.disabled = !rateable;
+          checkNo.disabled = !rateable;
         }
 
         function selectDay(key, openEditor) {
           if (isAccountPaused()) return;
           selectedKey = key;
-          if (openEditor) editingOpen = true;
-          else editingOpen = !entryFor(key);
+          var rateable = canRateCalendarDay(key);
+          if (openEditor && rateable) editingOpen = true;
+          else editingOpen = rateable && !entryFor(key);
           renderWeek();
         }
 
         function renderWeek() {
           names = dayNames();
           WEEKDAY_WORKOUTS = weekdayWorkouts();
+          var todayKey = berlinTodayKey();
           var today = startOfDay(new Date());
+          try {
+            var parts = todayKey.split("-");
+            if (parts.length === 3) {
+              today = startOfDay(new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+            }
+          } catch (eToday) {}
           var base = mondayOf(today);
           base.setDate(base.getDate() + weekOffset * 7);
           labelEl.textContent = monthLabelForWeek(base);
@@ -7667,25 +7728,26 @@ browsen</span>
           }
 
           if (!selectedKey) {
-            var inWeek = days.some(function (d) { return dateKey(d) === dateKey(today); });
-            selectedKey = inWeek ? dateKey(today) : dateKey(days[0]);
-            editingOpen = !entryFor(selectedKey);
+            var inWeek = days.some(function (d) { return dateKey(d) === todayKey; });
+            selectedKey = inWeek ? todayKey : dateKey(days[0]);
           } else {
             var still = days.some(function (d) { return dateKey(d) === selectedKey; });
             if (!still) {
               selectedKey = dateKey(days[0]);
-              editingOpen = !entryFor(selectedKey);
             }
           }
 
-          if (isAccountPaused()) {
+          if (isAccountPaused() || !canRateCalendarDay(selectedKey)) {
             editingOpen = false;
+          } else if (!entryFor(selectedKey) && selectedKey === todayKey) {
+            editingOpen = true;
           }
 
           days.forEach(function (d, i) {
             var key = dateKey(d);
             var w = workoutFor(d);
             var mark = markFor(key);
+            var rateable = canRateCalendarDay(key);
             var cell = document.createElement("div");
             cell.className = "home-cal__cell";
 
@@ -7697,7 +7759,7 @@ browsen</span>
             if (isAccountPaused()) btn.disabled = true;
             if (w && !w.rest) btn.classList.add("has-workout");
             if (w && (w.zirkel || w.training)) btn.classList.add("is-zirkel");
-            if (key === dateKey(today)) btn.classList.add("is-today");
+            if (key === todayKey) btn.classList.add("is-today");
             if (key === selectedKey) {
               btn.classList.add("is-selected");
               btn.setAttribute("aria-selected", "true");
@@ -7719,13 +7781,18 @@ browsen</span>
             markBtn.className = "home-cal__mark";
             if (mark) {
               markBtn.textContent = mark;
-              markBtn.setAttribute(
-                "aria-label",
-                mark === "✕" ? "Eintrag bearbeiten" : "Bewertung " + mark + " bearbeiten"
-              );
-              if (isAccountPaused()) {
-                markBtn.disabled = true;
+              if (!rateable || isAccountPaused()) {
+                markBtn.classList.add("is-readonly");
+                markBtn.setAttribute("aria-disabled", "true");
+                markBtn.setAttribute(
+                  "aria-label",
+                  mark === "✕" ? t("Eintrag", "Entry") : t("Bewertung", "Score") + " " + mark
+                );
               } else {
+                markBtn.setAttribute(
+                  "aria-label",
+                  mark === "✕" ? t("Eintrag bearbeiten", "Edit entry") : t("Bewertung", "Score") + " " + mark + " " + t("bearbeiten", "edit")
+                );
                 markBtn.addEventListener("click", function (ev) {
                   ev.stopPropagation();
                   selectDay(key, true);
@@ -7776,12 +7843,13 @@ browsen</span>
 
         async function persistEntry(key, score) {
           if (isAccountPaused()) return;
+          if (!canRateCalendarDay(key)) return;
           if (saving) return;
           saving = true;
           checkOk.disabled = true;
           checkNo.disabled = true;
           try {
-            setDayEntryLocal(key, score);
+            if (!setDayEntryLocal(key, score)) return;
             editingOpen = false;
             refreshCycleRays();
             renderWeek();
@@ -7812,6 +7880,7 @@ browsen</span>
             saving = false;
             checkOk.disabled = false;
             checkNo.disabled = false;
+            syncCheckControls(selectedKey || key);
           }
         }
 
@@ -7826,15 +7895,20 @@ browsen</span>
             "go_day_entries?account_id=eq." + encodeURIComponent(account.id) +
             "&select=date,score&order=date.asc&limit=400"
           );
+          /* Nur Cloud-Stand — verhindert lokale Fake-Einträge für andere Tage. */
+          var next = {};
           if (rows && rows.length) {
             for (var i = 0; i < rows.length; i++) {
               var row = rows[i];
               if (!row || !row.date) continue;
-              dayEntries[row.date] = { score: row.score == null ? null : Number(row.score) };
+              next[row.date] = { score: row.score == null ? null : Number(row.score) };
             }
-            saveDayEntriesLocal();
           }
-          if (selectedKey) editingOpen = !entryFor(selectedKey);
+          dayEntries = next;
+          saveDayEntriesLocal();
+          if (selectedKey) {
+            editingOpen = canRateCalendarDay(selectedKey) && !entryFor(selectedKey);
+          }
           refreshCycleRays();
           renderWeek();
           fillProfilePanel();
@@ -7849,14 +7923,14 @@ browsen</span>
 
         checkOk.addEventListener("click", function () {
           if (isAccountPaused()) return;
-          if (!selectedKey) return;
+          if (!selectedKey || !canRateCalendarDay(selectedKey)) return;
           var val = parseInt(scoreInput.value, 10);
           if (!(val >= 1 && val <= 10)) val = 5;
           persistEntry(selectedKey, val);
         });
         checkNo.addEventListener("click", function () {
           if (isAccountPaused()) return;
-          if (!selectedKey) return;
+          if (!selectedKey || !canRateCalendarDay(selectedKey)) return;
           persistEntry(selectedKey, null);
         });
 
