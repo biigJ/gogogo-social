@@ -510,11 +510,18 @@
       gap: 8px;
       margin-bottom: 8px;
     }
+    .admin-kraft__ex .kraft-ex-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
     .admin-kraft__ex label {
       display: flex;
       align-items: center;
       gap: 10px;
       margin: 0;
+      flex: 1 1 auto;
+      min-width: 0;
       font-size: 0.88rem;
       font-weight: 600;
       cursor: pointer;
@@ -534,15 +541,14 @@
       opacity: 0.4;
       padding: 0 2px;
     }
-    .admin-kraft__ex label .kraft-actions {
-      margin-left: auto;
+    .admin-kraft__ex .kraft-actions {
       flex-shrink: 0;
       display: flex;
       gap: 6px;
       align-items: center;
     }
-    .admin-kraft__ex label .kraft-rename,
-    .admin-kraft__ex label .kraft-del {
+    .admin-kraft__ex .kraft-rename,
+    .admin-kraft__ex .kraft-del {
       flex-shrink: 0;
       background: rgba(247, 245, 240, 0.14);
       border: 1px solid rgba(247, 245, 240, 0.45);
@@ -557,21 +563,21 @@
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
-    .admin-kraft__ex label .kraft-del {
+    .admin-kraft__ex .kraft-del {
       font-size: 1.35rem;
     }
-    .admin-kraft__ex label .kraft-rename:hover,
-    .admin-kraft__ex label .kraft-rename:active,
-    .admin-kraft__ex label .kraft-del:hover,
-    .admin-kraft__ex label .kraft-del:active {
+    .admin-kraft__ex .kraft-rename:hover,
+    .admin-kraft__ex .kraft-rename:active,
+    .admin-kraft__ex .kraft-del:hover,
+    .admin-kraft__ex .kraft-del:active {
       opacity: 1;
       background: rgba(247, 245, 240, 0.24);
     }
-    .admin-kraft__ex label.is-dragging {
+    .admin-kraft__ex .kraft-ex-row.is-dragging {
       opacity: 0.35;
     }
-    .admin-kraft__ex label.drag-over {
-      border-top: 2px solid var(--red);
+    .admin-kraft__ex .kraft-ex-row.drag-over {
+      border-top: 2px solid var(--paper);
       margin-top: -2px;
     }
     .admin-kraft__ex input[type="checkbox"] {
@@ -898,9 +904,23 @@
       align-items: stretch;
     }
     .list-item {
+      position: relative;
       width: 100%; text-align: left;
       background: var(--paper); color: var(--ink);
       border-radius: var(--radius); padding: 14px 16px;
+    }
+    .list-item__admin-star {
+      position: absolute;
+      top: 8px;
+      left: 10px;
+      font-size: 0.95rem;
+      line-height: 1;
+      color: var(--red);
+      opacity: 1;
+      pointer-events: none;
+    }
+    .list-item.is-admin-star {
+      padding-left: 28px;
     }
     .list-item__name {
       display: inline-flex;
@@ -1676,6 +1696,7 @@
       var kraftAdminMap = {};
       var kraftGlobalExtras = {};
       var kraftLegacyExtras = {};
+      var kraftNameOverrides = {};
       var kraftGlobalTableOk = false;
       var kraftHiddenBySystem = {};
       var kraftHiddenTableOk = false;
@@ -1745,13 +1766,20 @@
         var cat = kraftCat();
         var hidden = kraftHiddenFor(systemId);
         var base = cat ? cat.exercisesFor(systemId).slice() : [];
-        base = base.filter(function (ex) { return !hidden[ex.id]; });
+        base = base.filter(function (ex) { return !hidden[ex.id]; }).map(function (ex) {
+          var ov = kraftNameOverrides[ex.id];
+          return { id: String(ex.id), name: ov ? String(ov) : String(ex.name || ex.id) };
+        });
         var seen = {};
         base.forEach(function (ex) { seen[ex.id] = true; });
         kraftExtrasFor(systemId).forEach(function (ex) {
           if (ex && ex.id && !seen[ex.id]) {
             seen[ex.id] = true;
-            base.push({ id: String(ex.id), name: String(ex.name || ex.id) });
+            var ov = kraftNameOverrides[ex.id];
+            base.push({
+              id: String(ex.id),
+              name: ov ? String(ov) : String(ex.name || ex.id)
+            });
           }
         });
         return base;
@@ -1801,8 +1829,11 @@
           orderedExercises = sorted;
         }
         orderedExercises.forEach(function (ex) {
+          var row = document.createElement("div");
+          row.className = "kraft-ex-row";
+          row.draggable = true;
+          row.dataset.ex = ex.id;
           var lab = document.createElement("label");
-          lab.draggable = true;
           lab.dataset.ex = ex.id;
           var grip = document.createElement("span");
           grip.className = "kraft-drag";
@@ -1817,6 +1848,7 @@
           nameEl.className = "kraft-name";
           nameEl.textContent = ex.name;
           lab.appendChild(nameEl);
+          row.appendChild(lab);
           var actions = document.createElement("span");
           actions.className = "kraft-actions";
           var ren = document.createElement("button");
@@ -1833,8 +1865,8 @@
           del.dataset.ex = ex.id;
           del.title = "Übung löschen";
           actions.appendChild(del);
-          lab.appendChild(actions);
-          wrap.appendChild(lab);
+          row.appendChild(actions);
+          wrap.appendChild(row);
         });
       }
 
@@ -1848,10 +1880,10 @@
         if (!wrap) return;
         var checked = [];
         var allOrder = [];
-        wrap.querySelectorAll("label[data-ex]").forEach(function (lab) {
-          allOrder.push(lab.dataset.ex);
-          var inp = lab.querySelector("input[type='checkbox']");
-          if (inp && inp.checked) checked.push(lab.dataset.ex);
+        wrap.querySelectorAll(".kraft-ex-row[data-ex]").forEach(function (row) {
+          allOrder.push(row.dataset.ex);
+          var inp = row.querySelector("input[type='checkbox']");
+          if (inp && inp.checked) checked.push(row.dataset.ex);
         });
         kraftAdminMap[kraftAdminSystem] = checked.length ? reorderByRef(checked, allOrder) : [];
       }
@@ -1880,6 +1912,7 @@
 
       async function loadGlobalKraftExercises() {
         kraftGlobalExtras = kraftEmptyExtras();
+        kraftNameOverrides = {};
         kraftGlobalTableOk = false;
         try {
           var res = await fetch(
@@ -1888,13 +1921,24 @@
           );
           if (!res.ok) return false;
           var rows = await res.json();
-          (rows || []).forEach(function (row) {
-            if (!row || !row.system_id || !row.id) return;
-            if (!kraftGlobalExtras[row.system_id]) kraftGlobalExtras[row.system_id] = [];
-            kraftGlobalExtras[row.system_id].push({
-              id: String(row.id),
-              name: String(row.name || row.id)
+          var cat = kraftCat();
+          var catalogIds = {};
+          if (cat && cat.SYSTEMS) {
+            cat.SYSTEMS.forEach(function (sys) {
+              (cat.exercisesFor(sys.id) || []).forEach(function (ex) {
+                if (ex && ex.id) catalogIds[String(ex.id)] = true;
+              });
             });
+          }
+          (rows || []).forEach(function (row) {
+            if (!row || !row.id) return;
+            var id = String(row.id);
+            var name = String(row.name || row.id);
+            kraftNameOverrides[id] = name;
+            if (!row.system_id) return;
+            if (catalogIds[id]) return;
+            if (!kraftGlobalExtras[row.system_id]) kraftGlobalExtras[row.system_id] = [];
+            kraftGlobalExtras[row.system_id].push({ id: id, name: name });
           });
           kraftGlobalTableOk = true;
           return true;
@@ -2063,11 +2107,12 @@
         var creator = trainerAdminMode && trainerSessionAccount
           ? trainerSessionAccount.id
           : (activeAccount && activeAccount.id ? activeAccount.id : null);
-        var res = await fetch(SUPABASE_URL + "/rest/v1/go_kraft_exercises", {
+        if (creator && String(creator).indexOf("local-") === 0) creator = null;
+        var res = await fetch(SUPABASE_URL + "/rest/v1/go_kraft_exercises?on_conflict=id", {
           method: "POST",
           headers: apiHeaders({
             "Content-Type": "application/json",
-            Prefer: "return=representation"
+            Prefer: "resolution=merge-duplicates,return=representation"
           }),
           body: JSON.stringify({
             id: id,
@@ -2078,6 +2123,7 @@
         });
         if (res.ok) {
           kraftGlobalTableOk = true;
+          kraftNameOverrides[String(id)] = String(name);
           return { ok: true };
         }
         var t = "";
@@ -2245,10 +2291,6 @@
         collectKraftAdminChecks();
         var sys = kraftAdminSystem;
         var exIdStr = String(exId);
-        if (!kraftIsCustomExercise(sys, exIdStr)) {
-          setKraftAdminMsg("Standard-Übungen können nicht umbenannt werden.", true);
-          return;
-        }
         var current = kraftExerciseNameById(exIdStr);
         var name = await promptKraftRename(current);
         if (!name || name === current) return;
@@ -2261,27 +2303,34 @@
           return;
         }
         setKraftAdminMsg("Speichere …");
-        if (kraftGlobalTableOk) {
-          var renamed = await renameGlobalKraftExercise(exIdStr, name);
-          if (!renamed.ok && !renamed.missing) {
-            setKraftAdminMsg("Umbenennen fehlgeschlagen.", true);
+        var globalSaved = await saveGlobalKraftExercise(sys, exIdStr, name);
+        if (globalSaved && globalSaved.missing) {
+          setKraftAdminMsg("Tabelle go_kraft_exercises fehlt — go-kraft-exercises-global.sql ausführen.", true);
+          return;
+        }
+        if (!globalSaved || !globalSaved.ok) {
+          var patched = await renameGlobalKraftExercise(exIdStr, name);
+          if (!patched || !patched.ok) {
+            setKraftAdminMsg(
+              "Umbenennen fehlgeschlagen" + (globalSaved && globalSaved.detail ? ": " + String(globalSaved.detail).slice(0, 100) : "."),
+              true
+            );
             return;
           }
         }
+        kraftNameOverrides[exIdStr] = name;
         function patchList(list) {
           if (!list) return;
           list.forEach(function (ex) { if (ex.id === exIdStr) ex.name = name; });
         }
         patchList(kraftGlobalExtras[sys]);
         patchList(kraftLegacyExtras[sys]);
-        refreshKraftAdminUi();
-        if (!activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) {
-          setKraftAdminMsg("Umbenannt.");
-          return;
+        if (kraftIsCustomExercise(sys, exIdStr) && kraftGlobalExtras[sys]) {
+          var found = kraftGlobalExtras[sys].some(function (ex) { return ex.id === exIdStr; });
+          if (!found) kraftGlobalExtras[sys].push({ id: exIdStr, name: name });
         }
-        var saved = await saveKraftPresets(activeAccount.id);
-        if (saved && saved.ok) setKraftAdminMsg("Gespeichert.");
-        else setKraftAdminMsg("Name geändert. Plan speichern fehlgeschlagen.", true);
+        refreshKraftAdminUi();
+        setKraftAdminMsg("Name global geändert.");
       }
 
       async function confirmDeleteKraftExercise(exId) {
@@ -2949,18 +2998,15 @@
       }
 
       function stashAdminReturn() {
+        if (trainerAdminMode) return;
         try {
           var payload = {
-            mode: trainerAdminMode ? "trainer" : "full",
-            href: trainerAdminMode ? "/go/admin/?trainer=1" : "/go/admin/"
+            mode: "full",
+            href: "/go/admin/"
           };
           sessionStorage.setItem(ADMIN_RETURN_KEY, JSON.stringify(payload));
-          if (trainerAdminMode && trainerSessionAccount) {
-            sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(trainerSessionAccount));
-          } else {
-            var acc = readAccountSession();
-            if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
-          }
+          var acc = readAccountSession();
+          if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
         } catch (e) {}
       }
 
@@ -2989,7 +3035,7 @@
         trainerSessionAccount = acc;
         trainerAdminMode = true;
         document.body.classList.add("is-trainer-mode");
-        setAuthed(true);
+        /* Kein setAuthed — Trainer dürfen AUTH_KEY nicht bekommen (kein Voll-Admin). */
         return true;
       }
 
@@ -3090,8 +3136,8 @@
         adminNameBtn.textContent = display;
         adminNameBtn.setAttribute("aria-label", "Profil von " + name + " öffnen");
         if (adminOpenProfileBtn) {
-          adminOpenProfileBtn.hidden = false;
-          adminOpenProfileBtn.disabled = false;
+          adminOpenProfileBtn.hidden = !!trainerAdminMode;
+          adminOpenProfileBtn.disabled = !!trainerAdminMode;
           adminOpenProfileBtn.textContent = "Profil von " + name + " öffnen";
         }
       }
@@ -3193,6 +3239,10 @@
       }
 
       async function enterUserAccount(name, serial, code, accountHint) {
+        if (trainerAdminMode) {
+          window.alert("Trainer können Nutzer-Accounts nicht öffnen.");
+          return;
+        }
         if (!name && !(accountHint && accountHint.name)) return;
         var displayName = (accountHint && accountHint.name) || name;
         adminNameBtn.disabled = true;
@@ -4896,7 +4946,20 @@
           openBtn.appendChild(trainerLine);
         }
         openBtn.setAttribute("aria-label", "Profil von " + (row.first_name || "Nutzer") + " öffnen");
+        if (row.isAdminStar) {
+          openBtn.classList.add("is-admin-star");
+          var star = document.createElement("span");
+          star.className = "list-item__admin-star";
+          star.setAttribute("aria-label", "Admin");
+          star.textContent = "★";
+          openBtn.insertBefore(star, openBtn.firstChild);
+        }
         openBtn.addEventListener("click", function () {
+          if (trainerAdminMode) {
+            pendingAdminInvite = row;
+            showResult(row.first_name, row.serial_number, row.code, row);
+            return;
+          }
           enterUserAccount(row.first_name, row.serial_number, row.code);
         });
 
@@ -5062,8 +5125,8 @@
         actions.appendChild(pauseBtn);
         actions.appendChild(delBtn);
         if (trainerAdminMode) {
-          adminBtn.classList.add("is-disabled");
-          adminBtn.disabled = true;
+          adminBtn.textContent = "Plan";
+          adminBtn.setAttribute("aria-label", "Plan für " + (row.first_name || "Nutzer"));
           pauseBtn.classList.add("is-disabled");
           pauseBtn.disabled = true;
           delBtn.classList.add("is-disabled");
@@ -5134,6 +5197,49 @@
             );
             if (!res.ok) throw new Error("HTTP " + res.status);
             rows = await res.json();
+            try {
+              var joschaRes = await fetch(
+                SUPABASE_URL + "/rest/v1/go_accounts?or=(phone.eq.coach,name.ilike.joscha)&select=id,name,serial_number,invite_code,phone,is_trainer&order=created_at.asc&limit=5",
+                { headers: apiHeaders() }
+              );
+              var joschaRows = joschaRes.ok ? await joschaRes.json() : [];
+              var joscha = null;
+              (joschaRows || []).forEach(function (acc) {
+                if (joscha) return;
+                var phone = String(acc.phone || "").toLowerCase();
+                var nm = String(acc.name || "").toLowerCase();
+                if (phone === "coach" || nm === "joscha") joscha = acc;
+              });
+              if (joscha) {
+                var already = rows.some(function (r) {
+                  return (joscha.serial_number && String(r.serial_number) === String(joscha.serial_number))
+                    || (joscha.invite_code && String(r.code) === String(joscha.invite_code))
+                    || String(r.first_name || "").toLowerCase() === "joscha";
+                });
+                if (!already) {
+                  rows.unshift({
+                    id: null,
+                    first_name: adminFirstName(joscha.name) || "Joscha",
+                    serial_number: joscha.serial_number || "",
+                    code: joscha.invite_code || "",
+                    paused: false,
+                    challenge_active: false,
+                    challenge_started_at: null,
+                    challenge_amount: null,
+                    isAdminStar: true,
+                    accountId: joscha.id
+                  });
+                } else {
+                  rows.forEach(function (r) {
+                    if (String(r.first_name || "").toLowerCase() === "joscha"
+                      || (joscha.serial_number && String(r.serial_number) === String(joscha.serial_number))
+                      || (joscha.invite_code && String(r.code) === String(joscha.invite_code))) {
+                      r.isAdminStar = true;
+                    }
+                  });
+                }
+              }
+            } catch (eJoscha) {}
           }
           listMsg.textContent = rows.length ? "" : (trainerAdminMode ? "Noch keine Nutzer mit Dir als Trainer." : "Noch keine Codes.");
           var accountIndex = await loadAccountIndex();
@@ -5426,17 +5532,18 @@
       authBtn.addEventListener("click", function () {
         setMenu(false);
         if (trainerAdminMode) {
-          stashAdminReturn();
           window.location.href = "/account/?goto=profile";
           return;
         }
         showLogin();
       });
       adminNameBtn.addEventListener("click", function () {
+        if (trainerAdminMode) return;
         openCurrentUserProfile();
       });
       if (adminOpenProfileBtn) {
         adminOpenProfileBtn.addEventListener("click", function () {
+          if (trainerAdminMode) return;
           openCurrentUserProfile();
         });
       }
@@ -5541,12 +5648,12 @@
         (function initKraftDragDrop(wrap) {
           var dragSrc = null;
           wrap.addEventListener("dragstart", function (e) {
-            var lab = e.target.closest("label[data-ex]");
-            if (!lab) return;
-            dragSrc = lab;
-            lab.classList.add("is-dragging");
+            var row = e.target.closest(".kraft-ex-row[data-ex]");
+            if (!row) return;
+            dragSrc = row;
+            row.classList.add("is-dragging");
             e.dataTransfer.effectAllowed = "move";
-            e.dataTransfer.setData("text/plain", lab.dataset.ex);
+            e.dataTransfer.setData("text/plain", row.dataset.ex);
           });
           wrap.addEventListener("dragend", function () {
             if (dragSrc) dragSrc.classList.remove("is-dragging");
@@ -5556,13 +5663,13 @@
           wrap.addEventListener("dragover", function (e) {
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
-            var lab = e.target.closest("label[data-ex]");
+            var row = e.target.closest(".kraft-ex-row[data-ex]");
             wrap.querySelectorAll(".drag-over").forEach(function (el) { el.classList.remove("drag-over"); });
-            if (lab && lab !== dragSrc) lab.classList.add("drag-over");
+            if (row && row !== dragSrc) row.classList.add("drag-over");
           });
           wrap.addEventListener("drop", function (e) {
             e.preventDefault();
-            var target = e.target.closest("label[data-ex]");
+            var target = e.target.closest(".kraft-ex-row[data-ex]");
             if (!target || !dragSrc || target === dragSrc) return;
             wrap.insertBefore(dragSrc, target);
             collectKraftAdminChecks();
@@ -5572,14 +5679,14 @@
           wrap.addEventListener("touchstart", function (e) {
             var grip = e.target.closest(".kraft-drag");
             if (!grip) return;
-            var lab = grip.closest("label[data-ex]");
-            if (!lab) return;
-            touchSrc = lab;
+            var row = grip.closest(".kraft-ex-row[data-ex]");
+            if (!row) return;
+            touchSrc = row;
             touchLast = e.touches[0];
-            touchClone = lab.cloneNode(true);
-            touchClone.style.cssText = "position:fixed;pointer-events:none;opacity:0.7;z-index:9999;width:" + lab.offsetWidth + "px;left:" + lab.getBoundingClientRect().left + "px;top:" + touchLast.clientY + "px;";
+            touchClone = row.cloneNode(true);
+            touchClone.style.cssText = "position:fixed;pointer-events:none;opacity:0.7;z-index:9999;width:" + row.offsetWidth + "px;left:" + row.getBoundingClientRect().left + "px;top:" + touchLast.clientY + "px;";
             document.body.appendChild(touchClone);
-            lab.classList.add("is-dragging");
+            row.classList.add("is-dragging");
           }, { passive: true });
           wrap.addEventListener("touchmove", function (e) {
             if (!touchSrc) return;
@@ -5587,27 +5694,28 @@
             touchLast = e.touches[0];
             if (touchClone) touchClone.style.top = touchLast.clientY - 18 + "px";
             var el = document.elementFromPoint(touchLast.clientX, touchLast.clientY);
-            var lab = el ? el.closest("label[data-ex]") : null;
-            wrap.querySelectorAll(".drag-over").forEach(function (el) { el.classList.remove("drag-over"); });
-            if (lab && lab !== touchSrc) lab.classList.add("drag-over");
+            var row = el ? el.closest(".kraft-ex-row[data-ex]") : null;
+            wrap.querySelectorAll(".drag-over").forEach(function (x) { x.classList.remove("drag-over"); });
+            if (row && row !== touchSrc) row.classList.add("drag-over");
           }, { passive: false });
-          function touchEnd() {
+          wrap.addEventListener("touchend", function () {
             if (!touchSrc) return;
-            if (touchClone) { touchClone.remove(); touchClone = null; }
-            if (touchLast) {
-              var el = document.elementFromPoint(touchLast.clientX, touchLast.clientY);
-              var target = el ? el.closest("label[data-ex]") : null;
-              if (target && target !== touchSrc) {
-                wrap.insertBefore(touchSrc, target);
-                collectKraftAdminChecks();
-              }
-            }
+            var over = wrap.querySelector(".kraft-ex-row.drag-over");
+            if (over && over !== touchSrc) wrap.insertBefore(touchSrc, over);
+            if (touchClone && touchClone.parentNode) touchClone.parentNode.removeChild(touchClone);
+            wrap.querySelectorAll(".drag-over").forEach(function (x) { x.classList.remove("drag-over"); });
             touchSrc.classList.remove("is-dragging");
-            wrap.querySelectorAll(".drag-over").forEach(function (el) { el.classList.remove("drag-over"); });
-            touchSrc = null; touchLast = null;
-          }
-          wrap.addEventListener("touchend", touchEnd);
-          wrap.addEventListener("touchcancel", touchEnd);
+            touchSrc = null;
+            touchClone = null;
+            collectKraftAdminChecks();
+          });
+          wrap.addEventListener("touchcancel", function () {
+            if (touchClone && touchClone.parentNode) touchClone.parentNode.removeChild(touchClone);
+            wrap.querySelectorAll(".drag-over").forEach(function (x) { x.classList.remove("drag-over"); });
+            if (touchSrc) touchSrc.classList.remove("is-dragging");
+            touchSrc = null;
+            touchClone = null;
+          });
         })(kraftExWrap);
       }
       var kraftNewBtn = document.getElementById("kraft-admin-new");

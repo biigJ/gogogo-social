@@ -2256,6 +2256,7 @@
   let kraftCustomMap = {};
   let kraftGlobalMap = {};
   let kraftGlobalLoaded = false;
+  let kraftNameOverrides = {};
   let kraftHiddenBySystem = {};
   let kraftHiddenLoaded = false;
   let kraftPresetsLoaded = false;
@@ -3588,13 +3589,17 @@
     const hidden = kraftHiddenFor(systemId);
     const base = (kraftCatalog().exercisesFor(systemId) || []).slice().filter(function(ex){
       return !hidden[ex.id];
+    }).map(function(ex){
+      const ov = kraftNameOverrides[ex.id];
+      return { id: String(ex.id), name: ov ? String(ov) : String(ex.name || ex.id) };
     });
     const seen = {};
     base.forEach(function(ex){ seen[ex.id] = true; });
     kraftCustomFor(systemId).forEach(function(ex){
       if (ex && ex.id && !seen[ex.id]) {
         seen[ex.id] = true;
-        base.push({ id: String(ex.id), name: String(ex.name || ex.id) });
+        const ov = kraftNameOverrides[ex.id];
+        base.push({ id: String(ex.id), name: ov ? String(ov) : String(ex.name || ex.id) });
       }
     });
     // Sort by admin-defined order (exercise_ids from go_kraft_presets)
@@ -3632,20 +3637,32 @@
 
   async function loadGlobalKraftExercises(){
     kraftGlobalMap = {};
+    kraftNameOverrides = {};
     kraftGlobalLoaded = false;
     try {
       const rows = await goRest('go_kraft_exercises?select=id,system_id,name&order=created_at.asc');
-      (rows || []).forEach(function(row){
-        if (!row || !row.system_id || !row.id) return;
-        if (!kraftGlobalMap[row.system_id]) kraftGlobalMap[row.system_id] = [];
-        kraftGlobalMap[row.system_id].push({
-          id: String(row.id),
-          name: String(row.name || row.id)
+      const catalogIds = {};
+      const cat = kraftCatalog();
+      if (cat && cat.SYSTEMS) {
+        cat.SYSTEMS.forEach(function(sys){
+          (cat.exercisesFor(sys.id) || []).forEach(function(ex){
+            if (ex && ex.id) catalogIds[String(ex.id)] = true;
+          });
         });
+      }
+      (rows || []).forEach(function(row){
+        if (!row || !row.id) return;
+        const id = String(row.id);
+        const name = String(row.name || row.id);
+        kraftNameOverrides[id] = name;
+        if (!row.system_id || catalogIds[id]) return;
+        if (!kraftGlobalMap[row.system_id]) kraftGlobalMap[row.system_id] = [];
+        kraftGlobalMap[row.system_id].push({ id: id, name: name });
       });
       kraftGlobalLoaded = true;
     } catch (e) {
       kraftGlobalMap = {};
+      kraftNameOverrides = {};
     }
   }
 
