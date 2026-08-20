@@ -770,31 +770,6 @@
       cursor: pointer;
     }
     .profile-trainer-admin[hidden] { display: none !important; }
-    .profile-admin-return {
-      position: fixed;
-      top: calc(10px + env(safe-area-inset-top, 0px));
-      left: 14px;
-      z-index: 80;
-      width: 40px;
-      height: 40px;
-      margin: 0;
-      padding: 0;
-      border: 0;
-      border-radius: 50%;
-      background: var(--paper);
-      color: var(--btn-ink);
-      font: inherit;
-      font-size: 1.55rem;
-      font-weight: 700;
-      line-height: 1;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 6px 18px rgba(52, 34, 32, 0.22);
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .profile-admin-return[hidden] { display: none !important; }
 
     /* Calendly-Popup: X unter dem Notch, tippbar */
     .calendly-overlay .calendly-popup-close,
@@ -2557,7 +2532,6 @@
           </button>
         </div>
         <p class="profile-coach-badge" id="profile-coach-badge" hidden></p>
-        <button class="profile-admin-return" type="button" id="profile-admin-return" hidden aria-label="Zurück zum Admin">×</button>
         <button class="profile-trainer-admin" type="button" id="profile-trainer-admin" hidden>Trainer-Bereich</button>
         <div class="profile-top">
           <button class="profile-portrait" id="profile-photo-btn" type="button" aria-label="Profilfoto ändern">
@@ -4539,7 +4513,6 @@
           var isTrainer = !!(account && account.is_trainer);
           trainerAdminBtn.hidden = !isTrainer;
         }
-        updateProfileAdminReturn();
         var streak = computeWorkoutStreak();
         if (streakEl) streakEl.textContent = streak === 1 ? "1 Tag" : streak + " Tage";
         if (wertEl) {
@@ -4614,52 +4587,8 @@
         });
       })();
 
-      var ADMIN_AUTH_KEY = "gogogo_go_admin";
       var ADMIN_RETURN_KEY = "gogogo_admin_return";
       var ADMIN_RETURN_ACC_KEY = "gogogo_admin_return_acc";
-
-      function hasStoredAdminAuth() {
-        try {
-          return localStorage.getItem(ADMIN_AUTH_KEY) === "1" || sessionStorage.getItem(ADMIN_AUTH_KEY) === "1";
-        } catch (e) {
-          return false;
-        }
-      }
-
-      function readAdminReturn() {
-        try {
-          var raw = sessionStorage.getItem(ADMIN_RETURN_KEY);
-          return raw ? JSON.parse(raw) : null;
-        } catch (e) {
-          return null;
-        }
-      }
-
-      function updateProfileAdminReturn() {
-        var btn = document.getElementById("profile-admin-return");
-        if (!btn) return;
-        var ret = readAdminReturn();
-        /* Nur nach Voll-Admin-Impersonation — nie für Trainer. */
-        var show = !!(ret && ret.mode === "full");
-        btn.hidden = !show;
-        btn.textContent = "×";
-        document.body.classList.toggle("is-admin-preview", show);
-      }
-
-      (function bindProfileAdminReturn() {
-        var btn = document.getElementById("profile-admin-return");
-        if (!btn) return;
-        btn.addEventListener("click", function () {
-          var ret = readAdminReturn();
-          if (!ret || ret.mode !== "full") {
-            btn.hidden = true;
-            return;
-          }
-          sessionStorage.removeItem(ADMIN_RETURN_KEY);
-          sessionStorage.removeItem(ADMIN_RETURN_ACC_KEY);
-          window.location.href = "/go/admin/";
-        });
-      })();
 
       (function bindProfileChallenge() {
         var btn = document.getElementById("profile-challenge");
