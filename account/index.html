@@ -4723,16 +4723,7 @@ browsen</span>
       function getStaffCalendarMode() {
         var d = getAdminReturnPayload();
         if (!d) return null;
-        if (d.mode === "trainer-calendar") {
-          try {
-            var accRaw = sessionStorage.getItem("gogogo_admin_return_acc");
-            if (!accRaw) return null;
-            var acc = JSON.parse(accRaw);
-            if (acc && acc.id && acc.is_trainer) return "trainer-calendar";
-          } catch (e0) {}
-          return null;
-        }
-        if (d.mode === "trainer") return null;
+        if (d.mode === "trainer-calendar" || d.mode === "trainer") return null;
         try {
           if (localStorage.getItem("gogogo_go_admin") === "1" ||
               sessionStorage.getItem("gogogo_go_admin") === "1") {
@@ -4747,20 +4738,15 @@ browsen</span>
       }
 
       function isTrainerCalendarOverride() {
-        return getStaffCalendarMode() === "trainer-calendar";
+        return false;
       }
 
-      /* Nutzer: nur heute. Trainer: nur Vergangenheit ohne Eintrag. Admin: alles. */
+      /* Nutzer: nur heute. Admin mit Profil-Override: alles. */
       function canRateCalendarDay(dateStr) {
         if (isAccountPaused()) return false;
         var key = String(dateStr || "").slice(0, 10);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
-        var mode = getStaffCalendarMode();
-        if (mode === "full") return true;
-        if (mode === "trainer-calendar") {
-          if (key >= berlinTodayKey()) return false;
-          return !Object.prototype.hasOwnProperty.call(dayEntries, key);
-        }
+        if (getStaffCalendarMode() === "full") return true;
         return key === berlinTodayKey();
       }
 
@@ -4770,14 +4756,12 @@ browsen</span>
         if (!bar || !btn) return;
         var mode = getStaffCalendarMode();
         var payload = getAdminReturnPayload();
-        if (!mode || !payload) {
+        if (mode !== "full" || !payload) {
           bar.hidden = true;
           return;
         }
         bar.hidden = false;
-        btn.textContent = mode === "trainer-calendar"
-          ? t("Zurück zum Trainerbereich", "Back to trainer area")
-          : t("Zurück zum Admin", "Back to admin");
+        btn.textContent = t("Zurück zum Admin", "Back to admin");
         btn.onclick = function () {
           try {
             var accRaw = sessionStorage.getItem("gogogo_admin_return_acc");

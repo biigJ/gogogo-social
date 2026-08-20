@@ -700,6 +700,111 @@
       letter-spacing: -0.02em;
       color: rgba(247, 245, 240, 0.72);
     }
+    .admin-cal {
+      margin-top: 8px;
+    }
+    .admin-cal[hidden],
+    .admin-cal-rule[hidden] {
+      display: none !important;
+    }
+    .admin-cal__nav {
+      display: grid;
+      grid-template-columns: 40px 1fr 40px;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0 12px;
+    }
+    .admin-cal__nav-btn {
+      height: 40px;
+      border: 1.5px solid rgba(247, 245, 240, 0.45);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--ink-on-red);
+      font-size: 1.4rem;
+      line-height: 1;
+    }
+    .admin-cal__label {
+      text-align: center;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .admin-cal__week {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+    }
+    .admin-cal__daybtn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      min-height: 64px;
+      padding: 6px 2px;
+      border: 1.5px solid rgba(247, 245, 240, 0.35);
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--ink-on-red);
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+    .admin-cal__daybtn.is-today {
+      border-color: rgba(247, 245, 240, 0.9);
+    }
+    .admin-cal__daybtn.is-selected {
+      background: rgba(247, 245, 240, 0.14);
+    }
+    .admin-cal__daybtn.is-rateable {
+      border-color: var(--paper);
+    }
+    .admin-cal__daybtn:disabled {
+      opacity: 0.55;
+      cursor: default;
+    }
+    .admin-cal__n {
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    .admin-cal__mark {
+      min-height: 1.1em;
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+    .admin-cal__edit {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(247, 245, 240, 0.25);
+    }
+    .admin-cal__day {
+      margin: 0 0 10px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .admin-cal__score-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .admin-cal__range {
+      width: 100%;
+      accent-color: var(--paper);
+    }
+    .admin-cal__score-val {
+      font-weight: 700;
+      min-width: 1.5em;
+      text-align: center;
+    }
+    .admin-cal__actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    body.is-trainer-mode .admin-name {
+      text-decoration: none;
+      cursor: default;
+    }
     .admin-role__status {
       margin: 0 0 10px;
       font-size: 0.95rem;
@@ -1642,6 +1747,29 @@
           <button class="btn admin-plan__save" type="button" id="plan-save">Plan speichern</button>
           <p class="admin-plan__hint">Wochentage überschreiben archiviert den alten Text dauerhaft: vergangene Kalendertage behalten den alten Eintrag. Das lässt sich nicht rückgängig machen.</p>
           <p class="msg" id="plan-msg" role="status"></p>
+        </section>
+        <hr class="admin-rule admin-cal-rule" />
+        <section class="admin-cal" id="admin-cal" aria-label="Kalender" hidden>
+          <h2 class="admin-plan__title">Kalender</h2>
+          <p class="admin-kraft__hint">Vergangene Tage ohne Eintrag kannst Du nachtragen. Heute und Zukunft sind gesperrt.</p>
+          <div class="admin-cal__nav">
+            <button type="button" class="admin-cal__nav-btn" id="admin-cal-prev" aria-label="Vorherige Woche">‹</button>
+            <span class="admin-cal__label" id="admin-cal-label"></span>
+            <button type="button" class="admin-cal__nav-btn" id="admin-cal-next" aria-label="Nächste Woche">›</button>
+          </div>
+          <div class="admin-cal__week" id="admin-cal-week" role="listbox" aria-label="Wochentage"></div>
+          <div class="admin-cal__edit" id="admin-cal-edit" hidden>
+            <p class="admin-cal__day" id="admin-cal-day-label"></p>
+            <div class="admin-cal__score-row">
+              <input class="admin-cal__range" id="admin-cal-score" type="range" min="1" max="10" step="1" value="5" aria-label="Bewertung 1 bis 10" />
+              <span class="admin-cal__score-val" id="admin-cal-score-val">5</span>
+            </div>
+            <div class="admin-cal__actions">
+              <button type="button" class="btn admin-plan__save" id="admin-cal-ok">✓ Speichern</button>
+              <button type="button" class="btn admin-plan__save" id="admin-cal-no">✕ Ohne Wert</button>
+            </div>
+          </div>
+          <p class="msg" id="admin-cal-msg" role="status"></p>
         </section>
       </div>
       <button class="btn admin-open-profile" id="admin-open-profile" type="button" hidden>
@@ -3046,20 +3174,16 @@
       }
 
       function stashAdminReturn(opts) {
+        if (trainerAdminMode) return;
         opts = opts || {};
         try {
-          var mode = opts.mode || (trainerAdminMode ? "trainer-calendar" : "full");
           var payload = {
-            mode: mode,
-            href: trainerAdminMode ? "/go/admin/?trainer=1" : "/go/admin/"
+            mode: opts.mode || "full",
+            href: "/go/admin/"
           };
           sessionStorage.setItem(ADMIN_RETURN_KEY, JSON.stringify(payload));
-          if (trainerAdminMode && trainerSessionAccount && trainerSessionAccount.id) {
-            sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(trainerSessionAccount));
-          } else {
-            var acc = readAccountSession();
-            if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
-          }
+          var acc = readAccountSession();
+          if (acc && acc.id) sessionStorage.setItem(ADMIN_RETURN_ACC_KEY, JSON.stringify(acc));
         } catch (e) {}
       }
 
@@ -3193,14 +3317,12 @@
         adminNameBtn.disabled = false;
         adminNameBtn.textContent = display;
         adminNameBtn.setAttribute("aria-label", trainerAdminMode
-          ? ("Kalender von " + name + " öffnen")
+          ? name
           : ("Profil von " + name + " öffnen"));
         if (adminOpenProfileBtn) {
-          adminOpenProfileBtn.hidden = false;
-          adminOpenProfileBtn.disabled = false;
-          adminOpenProfileBtn.textContent = trainerAdminMode
-            ? "Kalender öffnen"
-            : ("Profil von " + name + " öffnen");
+          adminOpenProfileBtn.hidden = !!trainerAdminMode;
+          adminOpenProfileBtn.disabled = !!trainerAdminMode;
+          adminOpenProfileBtn.textContent = "Profil von " + name + " öffnen";
         }
       }
 
@@ -3393,28 +3515,6 @@
         window.location.href = "/account/?goto=profile";
       }
 
-      /* Trainer: Kalender des Nutzers (nur vergangene Tage ohne Eintrag bewertbar). */
-      async function enterUserCalendar(name, serial, code, accountHint) {
-        if (!name && !(accountHint && accountHint.name)) return;
-        adminNameBtn.disabled = true;
-        if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = true;
-        var account = await resolveUserAccountForOpen(name, serial, code, accountHint);
-        if (!account) {
-          adminNameBtn.disabled = false;
-          if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = false;
-          return;
-        }
-        clearLocalUserCaches();
-        if (!persistImpersonatedAccount(account)) {
-          adminNameBtn.disabled = false;
-          if (adminOpenProfileBtn) adminOpenProfileBtn.disabled = false;
-          window.alert("Account konnte lokal nicht gespeichert werden.");
-          return;
-        }
-        stashAdminReturn({ mode: trainerAdminMode ? "trainer-calendar" : "full" });
-        window.location.href = "/account/?goto=home";
-      }
-
       function openCurrentUserProfile() {
         if (trainerAdminMode) return;
         if (!isAuthed()) return;
@@ -3430,25 +3530,12 @@
         enterUserAccount(name, serial, code, activeAccount);
       }
 
-      function openCurrentUserCalendar() {
-        if (!isAuthed() && !trainerAdminMode) return;
-        var name =
-          (activeAccount && activeAccount.name) ||
-          (lastQr && lastQr.name) ||
-          (adminNameBtn && adminNameBtn.textContent) ||
-          "";
-        name = String(name || "").trim().replace(/\s·\s.*$/, "");
-        if (!name) return;
-        var serial = (lastQr && lastQr.serial) || (activeAccount && activeAccount.serial_number) || "";
-        var code = (lastQr && lastQr.code) || (activeAccount && activeAccount.invite_code) || "";
-        enterUserCalendar(name, serial, code, activeAccount);
-      }
-
       function showGen() {
         hideAllPanels();
         panelGen.hidden = false;
         activeAccount = null;
         activeAccountIds = [];
+        hideAdminCalendar();
         setCycleVisible(true);
         setCyclePhoto(null);
         setCycleBack(false);
@@ -3461,6 +3548,7 @@
         panelLogin.hidden = false;
         activeAccount = null;
         activeAccountIds = [];
+        hideAdminCalendar();
         setCycleVisible(true);
         setCyclePhoto(null);
         setCycleBack(false);
@@ -3618,6 +3706,267 @@
           var rows = await res.json();
           if (rows && rows[0]) fillPlanForm(rows[0]);
         } catch (e) {}
+      }
+
+      /* Kalender im Plan-Panel: Trainer bewertet nur Vergangenheit ohne Eintrag. */
+      var adminCalEntries = {};
+      var adminCalWeekOffset = 0;
+      var adminCalSelectedKey = null;
+      var adminCalSaving = false;
+      var ADMIN_CAL_DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+      function adminCalEls() {
+        return {
+          root: document.getElementById("admin-cal"),
+          rule: document.querySelector(".admin-cal-rule"),
+          week: document.getElementById("admin-cal-week"),
+          label: document.getElementById("admin-cal-label"),
+          edit: document.getElementById("admin-cal-edit"),
+          dayLabel: document.getElementById("admin-cal-day-label"),
+          score: document.getElementById("admin-cal-score"),
+          scoreVal: document.getElementById("admin-cal-score-val"),
+          msg: document.getElementById("admin-cal-msg"),
+          ok: document.getElementById("admin-cal-ok"),
+          no: document.getElementById("admin-cal-no"),
+          prev: document.getElementById("admin-cal-prev"),
+          next: document.getElementById("admin-cal-next")
+        };
+      }
+
+      function hideAdminCalendar() {
+        var els = adminCalEls();
+        if (els.root) els.root.hidden = true;
+        if (els.rule) els.rule.hidden = true;
+        if (els.edit) els.edit.hidden = true;
+        adminCalEntries = {};
+        adminCalSelectedKey = null;
+        adminCalWeekOffset = 0;
+      }
+
+      function adminCalDateKey(d) {
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+      }
+
+      function adminCalParseKey(key) {
+        var p = String(key || "").split("-");
+        if (p.length !== 3) return null;
+        return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+      }
+
+      function adminCalMondayOf(d) {
+        var x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        var day = (x.getDay() + 6) % 7;
+        x.setDate(x.getDate() - day);
+        return x;
+      }
+
+      function adminCalCanRate(key) {
+        var today = berlinTodayISO();
+        if (!key || key >= today) return false;
+        return !Object.prototype.hasOwnProperty.call(adminCalEntries, key);
+      }
+
+      function adminCalMark(key) {
+        if (!Object.prototype.hasOwnProperty.call(adminCalEntries, key)) return "";
+        var e = adminCalEntries[key];
+        if (!e || e.score == null) return "✕";
+        var n = Number(e.score);
+        if (!(n >= 1 && n <= 10)) n = 5;
+        return String(n);
+      }
+
+      function renderAdminCalendar() {
+        var els = adminCalEls();
+        if (!els.root || !els.week || !activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) {
+          hideAdminCalendar();
+          return;
+        }
+        els.root.hidden = false;
+        if (els.rule) els.rule.hidden = false;
+        var todayKey = berlinTodayISO();
+        var todayParts = todayKey.split("-");
+        var today = new Date(Number(todayParts[0]), Number(todayParts[1]) - 1, Number(todayParts[2]));
+        var base = adminCalMondayOf(today);
+        base.setDate(base.getDate() + adminCalWeekOffset * 7);
+        if (els.label) {
+          var mid = new Date(base);
+          mid.setDate(base.getDate() + 3);
+          els.label.textContent = mid.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+        }
+        els.week.innerHTML = "";
+        var days = [];
+        for (var i = 0; i < 7; i++) {
+          var d = new Date(base);
+          d.setDate(base.getDate() + i);
+          days.push(d);
+        }
+        if (!adminCalSelectedKey || !days.some(function (d) { return adminCalDateKey(d) === adminCalSelectedKey; })) {
+          var pastEmpty = null;
+          for (var j = days.length - 1; j >= 0; j--) {
+            var k0 = adminCalDateKey(days[j]);
+            if (adminCalCanRate(k0)) { pastEmpty = k0; break; }
+          }
+          adminCalSelectedKey = pastEmpty || adminCalDateKey(days[0]);
+        }
+        days.forEach(function (d, idx) {
+          var key = adminCalDateKey(d);
+          var rateable = adminCalCanRate(key);
+          var mark = adminCalMark(key);
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "admin-cal__daybtn";
+          btn.setAttribute("role", "option");
+          if (key === todayKey) btn.classList.add("is-today");
+          if (key === adminCalSelectedKey) {
+            btn.classList.add("is-selected");
+            btn.setAttribute("aria-selected", "true");
+          } else {
+            btn.setAttribute("aria-selected", "false");
+          }
+          if (rateable) btn.classList.add("is-rateable");
+          btn.innerHTML =
+            "<span>" + ADMIN_CAL_DAYS[idx] + "</span>" +
+            "<span class='admin-cal__n'>" + d.getDate() + "</span>" +
+            "<span class='admin-cal__mark'>" + (mark || (rateable ? "·" : "")) + "</span>";
+          btn.addEventListener("click", function () {
+            adminCalSelectedKey = key;
+            renderAdminCalendar();
+          });
+          els.week.appendChild(btn);
+        });
+        syncAdminCalEdit();
+      }
+
+      function syncAdminCalEdit() {
+        var els = adminCalEls();
+        if (!els.edit) return;
+        var key = adminCalSelectedKey;
+        var rateable = adminCalCanRate(key);
+        if (!rateable) {
+          els.edit.hidden = true;
+          return;
+        }
+        els.edit.hidden = false;
+        var d = adminCalParseKey(key);
+        if (els.dayLabel) {
+          els.dayLabel.textContent = d
+            ? d.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long" })
+            : key;
+        }
+        if (els.score) els.score.value = "5";
+        if (els.scoreVal) els.scoreVal.textContent = "5";
+        if (els.msg) {
+          els.msg.textContent = "";
+          els.msg.classList.remove("is-error");
+        }
+      }
+
+      async function loadAdminCalendar() {
+        var els = adminCalEls();
+        if (!activeAccount || !activeAccount.id || String(activeAccount.id).indexOf("local-") === 0) {
+          hideAdminCalendar();
+          return;
+        }
+        adminCalEntries = {};
+        adminCalWeekOffset = -1;
+        adminCalSelectedKey = null;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_day_entries?account_id=eq." + encodeURIComponent(activeAccount.id) +
+            "&select=date,score&order=date.asc&limit=400",
+            { headers: apiHeaders() }
+          );
+          if (res.ok) {
+            var rows = await res.json();
+            (rows || []).forEach(function (row) {
+              if (!row || !row.date) return;
+              adminCalEntries[row.date] = { score: row.score == null ? null : Number(row.score) };
+            });
+          }
+        } catch (e) {}
+        if (els.root) els.root.hidden = false;
+        if (els.rule) els.rule.hidden = false;
+        renderAdminCalendar();
+      }
+
+      async function persistAdminCalEntry(score) {
+        var els = adminCalEls();
+        var key = adminCalSelectedKey;
+        if (!adminCalCanRate(key) || !activeAccount || !activeAccount.id) return;
+        if (adminCalSaving) return;
+        adminCalSaving = true;
+        if (els.ok) els.ok.disabled = true;
+        if (els.no) els.no.disabled = true;
+        if (els.msg) {
+          els.msg.textContent = "Speichere …";
+          els.msg.classList.remove("is-error");
+        }
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_day_entries?on_conflict=account_id,date",
+            {
+              method: "POST",
+              headers: apiHeaders({
+                "Content-Type": "application/json",
+                Prefer: "resolution=merge-duplicates,return=minimal"
+              }),
+              body: JSON.stringify({
+                account_id: activeAccount.id,
+                date: key,
+                score: score,
+                updated_at: new Date().toISOString()
+              })
+            }
+          );
+          if (!res.ok) throw new Error("HTTP " + res.status);
+          adminCalEntries[key] = { score: score };
+          if (els.msg) els.msg.textContent = "Gespeichert.";
+          renderAdminCalendar();
+        } catch (err) {
+          if (els.msg) {
+            els.msg.textContent = err && err.message ? String(err.message) : "Speichern fehlgeschlagen.";
+            els.msg.classList.add("is-error");
+          }
+        } finally {
+          adminCalSaving = false;
+          if (els.ok) els.ok.disabled = false;
+          if (els.no) els.no.disabled = false;
+        }
+      }
+
+      function bindAdminCalendar() {
+        var els = adminCalEls();
+        if (els.prev) {
+          els.prev.addEventListener("click", function () {
+            adminCalWeekOffset -= 1;
+            adminCalSelectedKey = null;
+            renderAdminCalendar();
+          });
+        }
+        if (els.next) {
+          els.next.addEventListener("click", function () {
+            adminCalWeekOffset += 1;
+            adminCalSelectedKey = null;
+            renderAdminCalendar();
+          });
+        }
+        if (els.score) {
+          els.score.addEventListener("input", function () {
+            if (els.scoreVal) els.scoreVal.textContent = String(els.score.value);
+          });
+        }
+        if (els.ok) {
+          els.ok.addEventListener("click", function () {
+            var val = parseInt(els.score && els.score.value, 10);
+            if (!(val >= 1 && val <= 10)) val = 5;
+            persistAdminCalEntry(val);
+          });
+        }
+        if (els.no) {
+          els.no.addEventListener("click", function () {
+            persistAdminCalEntry(null);
+          });
+        }
       }
 
       var DAY_PLAN_KEYS = ["day_mo", "day_di", "day_mi", "day_do", "day_fr", "day_sa", "day_so"];
@@ -4255,6 +4604,9 @@
         if (!trainerAdminMode || activeAccount) {
           await renderMirroredFeed(activeAccount);
           await loadCoachPlan(activeAccount && activeAccount.id);
+          await loadAdminCalendar();
+        } else {
+          hideAdminCalendar();
         }
       }
 
@@ -5277,6 +5629,7 @@
         panelList.hidden = false;
         activeAccount = null;
         activeAccountIds = [];
+        hideAdminCalendar();
         setCycleVisible(false);
         setCyclePhoto(null);
         setCycleBack(false);
@@ -5774,13 +6127,13 @@
         showLogin();
       });
       adminNameBtn.addEventListener("click", function () {
-        if (trainerAdminMode) openCurrentUserCalendar();
-        else openCurrentUserProfile();
+        if (trainerAdminMode) return;
+        openCurrentUserProfile();
       });
       if (adminOpenProfileBtn) {
         adminOpenProfileBtn.addEventListener("click", function () {
-          if (trainerAdminMode) openCurrentUserCalendar();
-          else openCurrentUserProfile();
+          if (trainerAdminMode) return;
+          openCurrentUserProfile();
         });
       }
 
@@ -6017,6 +6370,7 @@
         });
       }
       refreshTrainerUi();
+      bindAdminCalendar();
 
       var trainerWaSave = document.getElementById("trainer-wa-save");
       if (trainerWaSave) {
