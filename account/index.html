@@ -920,7 +920,10 @@
     }
     .community-head .profile-name {
       margin: 0;
-      width: 100%;
+      position: absolute;
+      left: 44px;
+      right: 92px;
+      width: auto;
       text-align: center;
       pointer-events: none;
     }
@@ -979,25 +982,28 @@
       margin: 4px 0 14px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 0;
+      padding: 10px 14px;
+      border: 1px solid rgba(247, 245, 240, 0.55);
+      border-radius: var(--radius);
+      background: rgba(10, 10, 10, 0.12);
     }
     .profile-pref {
       width: 100%;
       margin: 0;
-      padding: 4px 2px;
+      padding: 6px 2px;
       border: 0;
       background: transparent;
       color: var(--ink-on-red);
       font: inherit;
-      font-size: clamp(1.35rem, 6.2vw, 1.85rem);
-      font-weight: 700;
-      letter-spacing: -0.04em;
-      line-height: 1.15;
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.4;
       text-align: left;
       cursor: pointer;
     }
     .profile-pref--connect {
-      font-size: clamp(1.05rem, 4.6vw, 1.35rem);
       opacity: 0.55;
     }
     .profile-pref--connect.is-on {
@@ -1046,12 +1052,28 @@
     }
     .pref-wheel-item.is-selected { opacity: 1; }
     .discover-sheet { max-height: min(78vh, 560px); overflow: auto; }
+    .discover-sheet .challenge-modal__title { display: none; }
     .discover-goal {
-      margin: 0 0 12px;
-      font-size: 1.15rem;
-      font-weight: 700;
-      letter-spacing: -0.03em;
+      margin: 0 0 10px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      opacity: 0.9;
     }
+    .discover-search {
+      width: 100%;
+      margin: 0 0 12px;
+      padding: 12px 14px;
+      border: 1.5px solid rgba(247, 245, 240, 0.45);
+      border-radius: var(--radius);
+      background: rgba(10, 10, 10, 0.16);
+      color: var(--ink-on-red);
+      font: inherit;
+      font-size: 0.95rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+    }
+    .discover-search::placeholder { color: rgba(247, 245, 240, 0.55); }
     .discover-list {
       display: flex;
       flex-direction: column;
@@ -1060,6 +1082,45 @@
       max-height: 42vh;
       overflow: auto;
     }
+    .discover-sheet .challenge-modal__actions {
+      grid-template-columns: 1fr;
+      justify-items: center;
+    }
+    .discover-sheet .challenge-modal__actions .challenge-modal__btn {
+      min-width: 160px;
+    }
+    .plan-edit-templates {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 14px;
+      max-height: 36vh;
+      overflow: auto;
+    }
+    .plan-edit-templates[hidden] { display: none !important; }
+    .plan-edit-tpl {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      border: 1.5px solid rgba(247, 245, 240, 0.45);
+      border-radius: var(--radius);
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+    }
+    .plan-edit-tpl.is-on {
+      border-color: var(--ink-on-red);
+      background: rgba(247, 245, 240, 0.14);
+    }
+    .plan-edit-tpl-hint {
+      margin: 12px 0 0;
+      font-size: 0.85rem;
+      opacity: 0.75;
+    }
+    .plan-edit-tpl-hint[hidden] { display: none !important; }
     .discover-row {
       display: grid;
       grid-template-columns: 44px 1fr auto;
@@ -3303,11 +3364,11 @@ browsen</span>
               class="community-discover"
               type="button"
               id="community-discover"
-              aria-label="Open to connect entdecken"
+              aria-label="Buddies suchen"
               hidden
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="currentColor" d="M6 7a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm12 0a4 4 0 1 0 0 8 4 4 0 0 0 0-8zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM8.8 9.2l1.4-.7 3.6 7.2-1.4.7-3.6-7.2zm6.4 0-1.4-.7-3.6 7.2 1.4.7 3.6-7.2zM3.2 10.5H1.5c.2-1.6.9-3 1.9-4.1l1.3 1.1c-.7.8-1.2 1.8-1.5 3zm19.3 0c-.3-1.2-.8-2.2-1.5-3l1.3-1.1c1 1.1 1.7 2.5 1.9 4.1h-1.7z"/>
+                <path fill="currentColor" d="M10.5 3a7.5 7.5 0 0 1 5.95 12.05l4.25 4.25-1.4 1.4-4.25-4.25A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z"/>
               </svg>
             </button>
             <a
@@ -3544,9 +3605,18 @@ browsen</span>
   </div>
 
   <div class="challenge-modal" id="discover-modal" hidden aria-hidden="true">
-    <div class="challenge-modal__sheet discover-sheet" role="dialog" aria-modal="true" aria-labelledby="discover-title">
-      <p class="challenge-modal__title" id="discover-title">Open to connect</p>
+    <div class="challenge-modal__sheet discover-sheet" role="dialog" aria-modal="true" aria-labelledby="discover-goal">
+      <p class="challenge-modal__title" id="discover-title" hidden>Suchen</p>
       <p class="discover-goal" id="discover-goal"></p>
+      <input
+        class="discover-search"
+        id="discover-search"
+        type="search"
+        inputmode="search"
+        autocomplete="off"
+        placeholder="Suchen…"
+        aria-label="Suchen"
+      />
       <div class="discover-list" id="discover-list"></div>
       <div class="challenge-modal__actions">
         <button type="button" class="challenge-modal__btn is-ghost" id="discover-close">Schließen</button>
@@ -3563,9 +3633,11 @@ browsen</span>
         <button type="button" class="plan-edit-opt" data-kind="zirkel">Zirkeltraining</button>
         <button type="button" class="plan-edit-opt" data-kind="rest">Baseline / Pause</button>
       </div>
+      <p class="plan-edit-tpl-hint" id="plan-edit-tpl-hint" hidden>Vorlage wählen</p>
+      <div class="plan-edit-templates" id="plan-edit-templates" hidden></div>
       <div class="challenge-modal__actions">
         <button type="button" class="challenge-modal__btn is-ghost" id="plan-edit-cancel">Abbrechen</button>
-        <button type="button" class="challenge-modal__btn" id="plan-edit-save">Speichern</button>
+        <button type="button" class="challenge-modal__btn" id="plan-edit-save" disabled>Speichern</button>
       </div>
     </div>
   </div>
@@ -5330,7 +5402,20 @@ browsen</span>
       var prefWheelDraft = null;
       var planEditWeekday = null;
       var planEditKind = null;
+      var planEditTemplate = null;
       var planShareWeekday = null;
+      var discoverRowsCache = [];
+
+      var KRAFT_PLAN_SYSTEMS = [
+        { id: "full", label: "Ganzkörpertraining" },
+        { id: "upper", label: "Oberkörpertraining" },
+        { id: "lower", label: "Unterkörpertraining" },
+        { id: "legs", label: "Beintraining" },
+        { id: "glutes", label: "Glutes/Legs" },
+        { id: "athletic", label: "Athletic Day" },
+        { id: "push", label: "Push Day" },
+        { id: "pull", label: "Pull Day" }
+      ];
 
       function renderProfilePrefs() {
         var goalBtn = document.getElementById("profile-pref-goal");
@@ -5451,8 +5536,10 @@ browsen</span>
         var modal = document.getElementById("discover-modal");
         var goalEl = document.getElementById("discover-goal");
         var list = document.getElementById("discover-list");
+        var search = document.getElementById("discover-search");
         if (!modal || !list) return;
         if (goalEl) goalEl.textContent = (account && account.training_goal) || "Ziel noch offen";
+        if (search) search.value = "";
         list.innerHTML = "<p style='opacity:0.8'>Lade …</p>";
         modal.hidden = false;
         modal.classList.add("is-open");
@@ -5461,51 +5548,64 @@ browsen</span>
           var rows = await restGet(
             "go_accounts?open_to_connect=eq.true&select=id,name,photo_url,training_goal,city_area,spoken_lang&order=name.asc&limit=80"
           );
-          var buddyIds = {};
-          getBuddies().forEach(function (b) {
-            if (b && b.id) buddyIds[String(b.id)] = true;
-          });
-          var mine = account && account.id ? String(account.id) : "";
-          list.innerHTML = "";
-          var shown = 0;
-          (rows || []).forEach(function (row) {
-            if (!row || !row.id) return;
-            if (String(row.id) === mine) return;
-            if (buddyIds[String(row.id)]) return;
-            shown++;
-            var el = document.createElement("div");
-            el.className = "discover-row";
-            var img = document.createElement("img");
-            img.alt = "";
-            if (row.photo_url) img.src = row.photo_url;
-            var mid = document.createElement("div");
-            var name = document.createElement("div");
-            name.className = "discover-row__name";
-            name.textContent = firstNameOf(row);
-            var meta = document.createElement("div");
-            meta.className = "discover-row__meta";
-            meta.textContent = [row.training_goal, row.city_area].filter(Boolean).join(" · ");
-            mid.appendChild(name);
-            mid.appendChild(meta);
-            var add = document.createElement("button");
-            add.type = "button";
-            add.className = "discover-row__add";
-            add.textContent = "+";
-            add.addEventListener("click", function () {
-              addBuddyFromDiscover(row).then(function () {
-                openDiscoverModal();
-              });
-            });
-            el.appendChild(img);
-            el.appendChild(mid);
-            el.appendChild(add);
-            list.appendChild(el);
-          });
-          if (!shown) {
-            list.innerHTML = "<p style='opacity:0.85'>Gerade keine offenen Profile.</p>";
-          }
+          discoverRowsCache = rows || [];
+          renderDiscoverList("");
         } catch (e) {
+          discoverRowsCache = [];
           list.innerHTML = "<p style='opacity:0.85'>Konnte nicht laden. SQL go-account-profile-prefs.sql prüfen.</p>";
+        }
+      }
+
+      function renderDiscoverList(query) {
+        var list = document.getElementById("discover-list");
+        if (!list) return;
+        var q = String(query || "").trim().toLowerCase();
+        var buddyIds = {};
+        getBuddies().forEach(function (b) {
+          if (b && b.id) buddyIds[String(b.id)] = true;
+        });
+        var mine = account && account.id ? String(account.id) : "";
+        list.innerHTML = "";
+        var shown = 0;
+        (discoverRowsCache || []).forEach(function (row) {
+          if (!row || !row.id) return;
+          if (String(row.id) === mine) return;
+          if (buddyIds[String(row.id)]) return;
+          var hay = [row.name, row.training_goal, row.city_area, row.spoken_lang]
+            .filter(Boolean).join(" ").toLowerCase();
+          if (q && hay.indexOf(q) === -1) return;
+          shown++;
+          var el = document.createElement("div");
+          el.className = "discover-row";
+          var img = document.createElement("img");
+          img.alt = "";
+          if (row.photo_url) img.src = row.photo_url;
+          var mid = document.createElement("div");
+          var name = document.createElement("div");
+          name.className = "discover-row__name";
+          name.textContent = firstNameOf(row);
+          var meta = document.createElement("div");
+          meta.className = "discover-row__meta";
+          meta.textContent = [row.training_goal, row.city_area].filter(Boolean).join(" · ");
+          mid.appendChild(name);
+          mid.appendChild(meta);
+          var add = document.createElement("button");
+          add.type = "button";
+          add.className = "discover-row__add";
+          add.textContent = "+";
+          add.addEventListener("click", function () {
+            addBuddyFromDiscover(row).then(function () {
+              openDiscoverModal();
+            });
+          });
+          el.appendChild(img);
+          el.appendChild(mid);
+          el.appendChild(add);
+          list.appendChild(el);
+        });
+        if (!shown) {
+          list.innerHTML = "<p style='opacity:0.85'>" +
+            (q ? "Keine Treffer." : "Gerade keine offenen Profile.") + "</p>";
         }
       }
 
@@ -5659,24 +5759,136 @@ browsen</span>
           if (e.target === discoverModal) closeDiscoverModal();
         });
 
+        function syncPlanEditSaveBtn() {
+          var saveBtn = document.getElementById("plan-edit-save");
+          if (!saveBtn) return;
+          var ready = !!planEditKind;
+          if (planEditKind === "kraft" || planEditKind === "ausdauer") {
+            ready = !!(planEditTemplate && planEditTemplate.id);
+          }
+          saveBtn.disabled = !ready;
+        }
+
+        function hidePlanEditTemplates() {
+          planEditTemplate = null;
+          var wrap = document.getElementById("plan-edit-templates");
+          var hint = document.getElementById("plan-edit-tpl-hint");
+          if (wrap) {
+            wrap.hidden = true;
+            wrap.innerHTML = "";
+          }
+          if (hint) hint.hidden = true;
+          syncPlanEditSaveBtn();
+        }
+
+        function renderPlanEditTemplates(options) {
+          var wrap = document.getElementById("plan-edit-templates");
+          var hint = document.getElementById("plan-edit-tpl-hint");
+          if (!wrap) return;
+          planEditTemplate = null;
+          wrap.innerHTML = "";
+          if (!options || !options.length) {
+            wrap.hidden = true;
+            if (hint) {
+              hint.hidden = false;
+              hint.textContent = planEditKind === "ausdauer"
+                ? "Keine Ausdauer-Vorlage. Speichere zuerst eine unter Ausdauer."
+                : "Keine Vorlage verfügbar.";
+            }
+            syncPlanEditSaveBtn();
+            return;
+          }
+          if (hint) {
+            hint.hidden = false;
+            hint.textContent = "Vorlage wählen";
+          }
+          wrap.hidden = false;
+          options.forEach(function (opt) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "plan-edit-tpl";
+            btn.textContent = opt.label;
+            btn.addEventListener("click", function () {
+              planEditTemplate = opt;
+              wrap.querySelectorAll(".plan-edit-tpl").forEach(function (el) {
+                el.classList.toggle("is-on", el === btn);
+              });
+              syncPlanEditSaveBtn();
+            });
+            wrap.appendChild(btn);
+          });
+          syncPlanEditSaveBtn();
+        }
+
+        async function loadPlanEditTemplates(kind) {
+          if (kind === "kraft") {
+            renderPlanEditTemplates(KRAFT_PLAN_SYSTEMS.map(function (sys) {
+              return { id: sys.id, label: sys.label, systemId: sys.id, kind: "kraft" };
+            }));
+            return;
+          }
+          if (kind === "ausdauer") {
+            var wrap = document.getElementById("plan-edit-templates");
+            var hint = document.getElementById("plan-edit-tpl-hint");
+            if (hint) {
+              hint.hidden = false;
+              hint.textContent = "Vorlagen laden …";
+            }
+            if (wrap) {
+              wrap.hidden = true;
+              wrap.innerHTML = "";
+            }
+            try {
+              var rows = await restGet(
+                "go_ausdauer_presets?account_id=eq." + encodeURIComponent(account.id) +
+                "&select=id,technique,incline,duration_min,speed,distance_km,source&order=source.asc,created_at.asc&limit=40"
+              );
+              var opts = (rows || []).map(function (row) {
+                var bits = [row.technique];
+                if (row.duration_min != null) bits.push(row.duration_min + " min");
+                if (row.distance_km != null) bits.push(row.distance_km + " km");
+                return {
+                  id: String(row.id),
+                  label: bits.filter(Boolean).join(" · "),
+                  presetId: String(row.id),
+                  kind: "ausdauer"
+                };
+              });
+              renderPlanEditTemplates(opts);
+            } catch (e) {
+              renderPlanEditTemplates([]);
+            }
+            return;
+          }
+          hidePlanEditTemplates();
+        }
+
         function openPlanEdit(wd) {
           planEditWeekday = Number(wd);
           planEditKind = null;
+          planEditTemplate = null;
           document.querySelectorAll(".plan-edit-opt").forEach(function (btn) {
             btn.classList.remove("is-on");
           });
+          hidePlanEditTemplates();
           var title = document.getElementById("plan-edit-title");
           if (title) title.textContent = "Training · " + profileWeekdays()[planEditWeekday];
           openChallengeModal("plan-edit-modal");
+          syncPlanEditSaveBtn();
         }
         function closePlanEdit() {
           planEditWeekday = null;
           planEditKind = null;
+          planEditTemplate = null;
+          hidePlanEditTemplates();
           closeChallengeModal("plan-edit-modal");
         }
         async function savePlanEdit() {
           if (planEditWeekday == null || !planEditKind || !hasCloudAccount()) {
             closePlanEdit();
+            return;
+          }
+          if ((planEditKind === "kraft" || planEditKind === "ausdauer") && !(planEditTemplate && planEditTemplate.id)) {
             return;
           }
           if (!coachPlan) coachPlan = { account_id: account.id };
@@ -5694,12 +5906,20 @@ browsen</span>
           var label = "";
           if (planEditKind === "kraft") {
             kraft.push(planEditWeekday);
-            label = "Kraft";
-            units[String(planEditWeekday)] = { kind: "kraft", label: label };
+            label = (planEditTemplate && planEditTemplate.label) || "Kraft";
+            units[String(planEditWeekday)] = {
+              kind: "kraft",
+              label: label,
+              systemId: (planEditTemplate && planEditTemplate.systemId) || planEditTemplate.id || ""
+            };
           } else if (planEditKind === "ausdauer") {
             ausd.push(planEditWeekday);
-            label = "Ausdauer";
-            units[String(planEditWeekday)] = { kind: "ausdauer", label: label };
+            label = (planEditTemplate && planEditTemplate.label) || "Ausdauer";
+            units[String(planEditWeekday)] = {
+              kind: "ausdauer",
+              label: label,
+              presetId: (planEditTemplate && planEditTemplate.presetId) || planEditTemplate.id || ""
+            };
           } else if (planEditKind === "zirkel") {
             zirkel = planEditWeekday;
             label = "Zirkeltraining";
@@ -5821,10 +6041,22 @@ browsen</span>
             document.querySelectorAll(".plan-edit-opt").forEach(function (b) {
               b.classList.toggle("is-on", b === opt);
             });
+            if (planEditKind === "kraft" || planEditKind === "ausdauer") {
+              loadPlanEditTemplates(planEditKind);
+            } else {
+              hidePlanEditTemplates();
+            }
+            syncPlanEditSaveBtn();
           }
         });
         var planEditCancel = document.getElementById("plan-edit-cancel");
         var planEditSave = document.getElementById("plan-edit-save");
+        var discoverSearch = document.getElementById("discover-search");
+        if (discoverSearch) {
+          discoverSearch.addEventListener("input", function () {
+            renderDiscoverList(discoverSearch.value);
+          });
+        }
         if (planEditCancel) planEditCancel.addEventListener("click", closePlanEdit);
         if (planEditSave) planEditSave.addEventListener("click", function () { savePlanEdit(); });
         var planShareCancel = document.getElementById("plan-share-cancel");

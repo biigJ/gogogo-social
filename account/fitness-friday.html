@@ -880,11 +880,6 @@
     flex-direction:column;
     gap:2px;
   }
-  .workout-pick__kg{
-    font-size:0.72em;
-    font-weight:700;
-    opacity:0.9;
-  }
   .weight-overlay{
     position:absolute; inset:0;
     z-index:42;
@@ -909,8 +904,38 @@
     letter-spacing:-0.02em;
   }
   .weight-card .chip-wheel-frame{
-    height:120px;
+    height:140px;
     margin:0 auto 12px;
+    perspective: 420px;
+  }
+  .weight-card .chip-wheel-scroller{
+    transform-style: preserve-3d;
+  }
+  .weight-card .chip-wheel-scroller .wheel-item{
+    transition: transform 0.22s ease, opacity 0.22s ease, font-size 0.22s ease;
+    transform: rotateX(28deg) scale(0.88);
+    opacity: 0.35;
+  }
+  .weight-card .chip-wheel-scroller .wheel-item.is-selected{
+    transform: rotateX(0deg) scale(1.08);
+    opacity: 1;
+    animation: weight-wheel-spin 0.45s ease;
+  }
+  .weight-card .chip-wheel-scroller .wheel-item.is-near{
+    transform: rotateX(14deg) scale(0.96);
+    opacity: 0.7;
+  }
+  @keyframes weight-wheel-spin{
+    0%{ transform: rotateX(55deg) scale(0.7); opacity:0.2; }
+    55%{ transform: rotateX(-8deg) scale(1.12); opacity:1; }
+    100%{ transform: rotateX(0deg) scale(1.08); opacity:1; }
+  }
+  .workout-pick__kg{
+    font-size:0.72em;
+    font-weight:700;
+    opacity:0.9;
+    text-decoration: underline;
+    text-underline-offset: 2px;
   }
   .weight-card__actions{
     display:flex;
@@ -1602,7 +1627,7 @@
   .ausdauer-layout.is-running .ausdauer-run-card{ display:block; }
   .ausdauer-save-preset,
   .kraft-save-preset{
-    margin-top:10px;
+    margin-top:0;
     width:100%;
     min-height:40px;
     padding:8px 12px;
@@ -1616,12 +1641,16 @@
     letter-spacing:-0.01em;
     cursor:pointer;
   }
+  .ausdauer-own .ausdauer-save-preset{ margin-top:10px; }
   .ausdauer-save-preset.is-saved,
   .kraft-save-preset.is-saved{
     background:rgba(247,245,240,0.14);
   }
   .kraft-save-wrap{
-    padding:0 0 8px;
+    padding:8px 0;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
   }
   .kraft-layout.is-running .kraft-save-wrap{ display:none; }
 </style>
@@ -1659,6 +1688,7 @@
           <div class="interval-scroll" id="kraftScroll">
             <div class="kraft-ex-list" id="kraftExList"></div>
             <div class="kraft-save-wrap">
+              <button type="button" class="kraft-save-preset" id="kraftNewExercise" data-de="Neue Übung" data-en="New exercise">Neue Übung</button>
               <button type="button" class="kraft-save-preset" id="kraftSavePreset" data-de="Als Vorlage speichern" data-en="Save as template">Als Vorlage speichern</button>
             </div>
           </div>
@@ -1792,7 +1822,7 @@
             </div>
             <div class="workout-pick-wrap" id="workoutPickWrap">
               <div class="workout-pick-grid" id="workoutPickGrid"></div>
-              <p class="workout-pick-hint" data-de="Wähle alle Workouts deines heutigen Zirkeltrainings. Nochmal tippen = Gewicht." data-en="Pick today’s circuit stations. Tap again to set weight.">Wähle alle Workouts deines heutigen Zirkeltrainings. Nochmal tippen = Gewicht.</p>
+              <p class="workout-pick-hint" data-de="Tippen = wählen/abwählen. Auf kg tippen = Gewicht." data-en="Tap to select/deselect. Tap kg to set weight.">Tippen = wählen/abwählen. Auf kg tippen = Gewicht.</p>
             </div>
             <div class="drag-list" id="dragList"></div>
           </div>
@@ -3611,15 +3641,42 @@
       const ex = exercises.find(function(e){ return e.id === exId; });
       const selected = embedSelected.indexOf(exId) !== -1;
       const kg = exerciseWeights[exId];
+      const canWeight = !!weightOptionsFor(exId);
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'workout-pick' + (selected ? ' is-selected' : '') + (kg ? ' has-weight' : '');
       btn.dataset.ex = exId;
       btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
       var label = WORKOUT_SHORT_NAMES[exId] || (ex ? ex.name : exId);
-      btn.innerHTML = '<span class="workout-pick__name">' + label + '</span>' +
-        (kg ? '<span class="workout-pick__kg">' + kg + ' kg</span>' : '');
+      var kgHtml = '';
+      if (selected && canWeight) {
+        kgHtml = '<span class="workout-pick__kg" data-weight-ex="' + exId + '">' +
+          (kg != null ? (kg + ' kg') : 'kg …') + '</span>';
+      }
+      btn.innerHTML = '<span class="workout-pick__name">' + label + '</span>' + kgHtml;
       grid.appendChild(btn);
+    });
+  }
+
+  function markWeightWheelNear(scroller){
+    if (!scroller) return;
+    const items = Array.prototype.slice.call(scroller.querySelectorAll('.wheel-item'));
+    if (!items.length) return;
+    const mid = scroller.scrollTop + scroller.clientHeight / 2;
+    let best = null;
+    let bestDist = Infinity;
+    items.forEach(function(btn){
+      const d = Math.abs(btn.offsetTop + btn.offsetHeight / 2 - mid);
+      if (d < bestDist) {
+        bestDist = d;
+        best = btn;
+      }
+    });
+    items.forEach(function(btn){
+      const d = Math.abs(btn.offsetTop + btn.offsetHeight / 2 - mid);
+      btn.classList.toggle('is-selected', btn === best);
+      btn.classList.toggle('is-near', btn !== best && d < btn.offsetHeight * 1.2);
+      if (btn === best) weightPickDraft = Number(btn.dataset.kg);
     });
   }
 
@@ -3629,7 +3686,7 @@
     scroller.innerHTML = '';
     const pad = document.createElement('div');
     pad.className = 'wheel-pad';
-    pad.style.height = '18px';
+    pad.style.height = '42px';
     scroller.appendChild(pad);
     opts.forEach(function(kg){
       const btn = document.createElement('button');
@@ -3646,11 +3703,18 @@
     });
     const pad2 = document.createElement('div');
     pad2.className = 'wheel-pad';
-    pad2.style.height = '18px';
+    pad2.style.height = '42px';
     scroller.appendChild(pad2);
+    if (!scroller._weightScrollBound) {
+      scroller._weightScrollBound = true;
+      scroller.addEventListener('scroll', function(){
+        markWeightWheelNear(scroller);
+      }, { passive: true });
+    }
     requestAnimationFrame(function(){
       const sel = scroller.querySelector('.wheel-item.is-selected');
-      if (sel) sel.scrollIntoView({ block: 'center', behavior: 'instant' });
+      if (sel) sel.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      markWeightWheelNear(scroller);
     });
   }
 
@@ -3690,10 +3754,6 @@
     if (embedRunning || !exId) return;
     const i = embedSelected.indexOf(exId);
     if (i >= 0) {
-      if (weightOptionsFor(exId)) {
-        openWeightPicker(exId);
-        return;
-      }
       embedSelected.splice(i, 1);
     } else {
       embedSelected.push(exId);
@@ -3905,7 +3965,7 @@
       out.push({ id: String(ex.id), name: String(ex.name || ex.id) });
     }
     (kraftGlobalMap[systemId] || []).forEach(add);
-    if (!kraftGlobalLoaded) (kraftCustomMap[systemId] || []).forEach(add);
+    (kraftCustomMap[systemId] || []).forEach(add);
     return out;
   }
 
@@ -4830,18 +4890,35 @@
     const aid = getGoAccountId();
     if (!aid || !kraftSystemId || !kraftSelected.length) return;
     const btn = document.getElementById('kraftSavePreset');
+    const customs = (kraftCustomMap[kraftSystemId] || []).slice();
     const body = {
       account_id: aid,
       system_id: kraftSystemId,
       exercise_ids: kraftSelected.slice(),
+      custom_exercises: customs,
       updated_at: new Date().toISOString()
     };
     try {
-      await goRest('go_kraft_presets?on_conflict=account_id,system_id', {
-        method: 'POST',
-        prefer: 'resolution=merge-duplicates,return=minimal',
-        body: body
-      });
+      try {
+        await goRest('go_kraft_presets?on_conflict=account_id,system_id', {
+          method: 'POST',
+          prefer: 'resolution=merge-duplicates,return=minimal',
+          body: body
+        });
+      } catch (eCustom) {
+        if (!/custom_exercises/i.test(String(eCustom && eCustom.message))) throw eCustom;
+        var copy = {
+          account_id: aid,
+          system_id: kraftSystemId,
+          exercise_ids: kraftSelected.slice(),
+          updated_at: body.updated_at
+        };
+        await goRest('go_kraft_presets?on_conflict=account_id,system_id', {
+          method: 'POST',
+          prefer: 'resolution=merge-duplicates,return=minimal',
+          body: copy
+        });
+      }
       kraftPresetMap[kraftSystemId] = kraftSelected.slice();
       renderKraftExercises();
       if (btn) {
@@ -4854,6 +4931,52 @@
       }
     } catch (e) {
       console.warn('Kraft preset save failed', e);
+    }
+  }
+
+  function kraftUserExerciseId(name){
+    var slug = String(name || '').toLowerCase().replace(/[^a-z0-9äöüß]+/gi, '-').replace(/^-|-$/g, '').slice(0, 24);
+    return 'u-' + (slug || 'ex') + '-' + Date.now().toString(36).slice(-4);
+  }
+
+  async function createOwnKraftExercise(){
+    if (kraftRunning || !kraftSystemId) return;
+    var name = window.prompt('Name der neuen Übung');
+    if (name == null) return;
+    name = String(name).trim();
+    if (!name) return;
+    var id = kraftUserExerciseId(name);
+    if (!kraftCustomMap[kraftSystemId]) kraftCustomMap[kraftSystemId] = [];
+    kraftCustomMap[kraftSystemId].push({ id: id, name: name });
+    if (kraftSelected.indexOf(id) < 0) kraftSelected.push(id);
+    renderKraftExercises();
+    const aid = getGoAccountId();
+    if (!aid) return;
+    const body = {
+      account_id: aid,
+      system_id: kraftSystemId,
+      exercise_ids: kraftSelected.slice(),
+      custom_exercises: kraftCustomMap[kraftSystemId].slice(),
+      updated_at: new Date().toISOString()
+    };
+    try {
+      await goRest('go_kraft_presets?on_conflict=account_id,system_id', {
+        method: 'POST',
+        prefer: 'resolution=merge-duplicates,return=minimal',
+        body: body
+      });
+      kraftPresetMap[kraftSystemId] = kraftSelected.slice();
+      const btn = document.getElementById('kraftNewExercise');
+      if (btn) {
+        btn.classList.add('is-saved');
+        btn.textContent = 'Gespeichert';
+        setTimeout(function(){
+          btn.classList.remove('is-saved');
+          btn.textContent = btn.getAttribute('data-de') || 'Neue Übung';
+        }, 1400);
+      }
+    } catch (e) {
+      console.warn('Kraft custom exercise save failed', e);
     }
   }
 
@@ -5502,6 +5625,12 @@
     root.dataset.bound = '1';
 
     root.addEventListener('click', function(e){
+      const weightTap = e.target.closest('[data-weight-ex]');
+      if (weightTap) {
+        e.preventDefault(); e.stopPropagation();
+        openWeightPicker(weightTap.getAttribute('data-weight-ex'));
+        return;
+      }
       const pick = e.target.closest('.workout-pick');
       if (pick) {
         e.preventDefault(); e.stopPropagation();
@@ -5611,6 +5740,11 @@
       if (e.target.closest('#kraftSavePreset')) {
         e.preventDefault(); e.stopPropagation();
         saveOwnKraftPreset();
+        return;
+      }
+      if (e.target.closest('#kraftNewExercise')) {
+        e.preventDefault(); e.stopPropagation();
+        createOwnKraftExercise();
         return;
       }
       const aDel = e.target.closest('[data-ausdauer-del-log]');
