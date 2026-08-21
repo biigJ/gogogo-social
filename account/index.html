@@ -960,8 +960,16 @@
       width: 100%;
       flex: 0 0 auto;
       min-height: 40px;
-      z-index: 6;
+      z-index: 8;
       background: var(--red);
+    }
+    body.is-community .community-head {
+      position: sticky;
+      top: 0;
+      margin-top: 0;
+      padding-bottom: 4px;
+      /* Falls der Scroll-Container doch verrutscht: Kopf bleibt bedienbar */
+      box-shadow: 0 8px 16px var(--red);
     }
     .community-head .profile-name {
       margin: 0;
@@ -1529,6 +1537,15 @@
       overscroll-behavior: none;
       touch-action: manipulation;
     }
+    html.is-community-lock,
+    html.is-community-lock body {
+      overscroll-behavior: none;
+    }
+    html.is-community-lock {
+      overflow: hidden;
+      height: 100%;
+      height: 100dvh;
+    }
     body.is-community #app,
     body.is-community .wrap {
       height: 100%;
@@ -1537,15 +1554,18 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      transform: none !important;
     }
     body.is-community .wrap__scroll {
       flex: 1;
       min-height: 0;
-      overflow: hidden;
+      overflow: hidden !important;
       display: flex;
       flex-direction: column;
       padding-bottom: calc(var(--community-composer-h, 58px) + 14px);
       overscroll-behavior: none;
+      /* Safe-Area bleibt — Kopf darf nicht unter die Notch rutschen */
+      padding-top: env(safe-area-inset-top, 0px);
     }
     body.is-community #panel-community.is-active {
       display: flex;
@@ -9003,6 +9023,7 @@ browsen</span>
         var onCommunity = id === "community";
         document.body.classList.toggle("is-profile", onProfile);
         document.body.classList.toggle("is-community", onCommunity);
+        document.documentElement.classList.toggle("is-community-lock", onCommunity);
         document.querySelectorAll(".nav-btn").forEach(function (btn) {
           var on = btn.getAttribute("data-goto") === id;
           btn.classList.toggle("is-active", on);
@@ -9042,7 +9063,9 @@ browsen</span>
           if (appEl) {
             appEl.style.transform = "";
             appEl.style.height = "";
+            appEl.style.top = "";
           }
+          document.documentElement.classList.remove("is-community-lock");
         }
         var scrollEl = document.querySelector(".wrap__scroll");
         if (scrollEl) scrollEl.scrollTop = 0;
@@ -9882,27 +9905,21 @@ browsen</span>
         function pinCommunityViewport() {
           if (!document.body.classList.contains("is-community")) return;
           try {
-            if (window.scrollX || window.scrollY) {
-              window.scrollTo(0, 0);
-            }
+            window.scrollTo(0, 0);
           } catch (e0) {}
           try {
             if (document.documentElement) document.documentElement.scrollTop = 0;
             if (document.body) document.body.scrollTop = 0;
           } catch (e1) {}
           var scrollEl = document.querySelector(".wrap__scroll");
-          if (scrollEl && scrollEl.scrollTop) scrollEl.scrollTop = 0;
-          /* iOS schiebt den Visual-Viewport nach oben — Layout gegenhalten. */
-          var vv = window.visualViewport;
-          var offset = vv ? Math.max(0, vv.offsetTop || 0) : 0;
+          if (scrollEl) scrollEl.scrollTop = 0;
           var app = document.getElementById("app");
           if (app) {
-            if (offset > 0) {
-              app.style.transform = "translateY(" + offset + "px)";
-              app.style.height = Math.round(vv.height) + "px";
-            } else {
+            /* Alter iOS-Hack entfernen (hat den Kopf dauerhaft nach oben geschoben) */
+            if (app.style.transform || app.style.height || app.style.top) {
               app.style.transform = "";
               app.style.height = "";
+              app.style.top = "";
             }
           }
         }
@@ -9914,15 +9931,19 @@ browsen</span>
           if (window.visualViewport) {
             kb = Math.max(
               0,
-              window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop
+              window.innerHeight - window.visualViewport.height - (window.visualViewport.offsetTop || 0)
             );
           }
           if (kb > 8) {
             composer.style.bottom = kb + "px";
             composer.style.paddingBottom = "8px";
+            document.body.classList.add("is-keyboard");
           } else {
             composer.style.bottom = "0px";
             composer.style.paddingBottom = "";
+            if (!(replyText && document.activeElement === replyText)) {
+              document.body.classList.remove("is-keyboard");
+            }
           }
           var h = Math.ceil(composer.getBoundingClientRect().height || 58);
           document.documentElement.style.setProperty("--community-composer-h", h + "px");
@@ -9942,6 +9963,23 @@ browsen</span>
           syncCommunityComposerChrome();
         }
 
+        var communityPinTimer = null;
+        function startCommunityPinLoop() {
+          stopCommunityPinLoop();
+          var ticks = 0;
+          communityPinTimer = setInterval(function () {
+            pinCommunityViewport();
+            ticks += 1;
+            if (ticks > 40) stopCommunityPinLoop();
+          }, 50);
+        }
+        function stopCommunityPinLoop() {
+          if (communityPinTimer) {
+            clearInterval(communityPinTimer);
+            communityPinTimer = null;
+          }
+        }
+
         if (replyText) {
           replyText.addEventListener("input", function () {
             var v = String(replyText.value || "");
@@ -9951,27 +9989,55 @@ browsen</span>
           });
           replyText.addEventListener("focus", function () {
             pinCommunityViewport();
+            startCommunityPinLoop();
             setTimeout(syncCommunityComposerChrome, 50);
             setTimeout(syncCommunityComposerChrome, 320);
             setTimeout(pinCommunityViewport, 450);
           });
           replyText.addEventListener("blur", function () {
+            stopCommunityPinLoop();
             setTimeout(function () {
-              var app = document.getElementById("app");
-              if (app) {
-                app.style.transform = "";
-                app.style.height = "";
-              }
+              pinCommunityViewport();
               syncCommunityComposerChrome();
             }, 50);
-            setTimeout(syncCommunityComposerChrome, 320);
+            setTimeout(function () {
+              pinCommunityViewport();
+              syncCommunityComposerChrome();
+            }, 320);
+            setTimeout(pinCommunityViewport, 600);
           });
           if (replySend) replySend.disabled = true;
           resizeReplyField();
+
+          /* iOS scrollt sonst den Wrap und schiebt Zurück/Headline aus dem Viewport */
+          var origFocus = replyText.focus.bind(replyText);
+          replyText.focus = function (opts) {
+            if (opts && typeof opts === "object") {
+              if (opts.preventScroll == null) opts.preventScroll = true;
+              return origFocus(opts);
+            }
+            return origFocus({ preventScroll: true });
+          };
         }
+
+        document.addEventListener("scroll", function (ev) {
+          if (!document.body.classList.contains("is-community")) return;
+          var t = ev.target;
+          if (t === document || t === document.documentElement || t === document.body) {
+            pinCommunityViewport();
+            return;
+          }
+          if (t && t.classList && t.classList.contains("wrap__scroll")) {
+            t.scrollTop = 0;
+          }
+        }, true);
+
         if (window.visualViewport) {
           window.visualViewport.addEventListener("resize", syncCommunityComposerChrome);
-          window.visualViewport.addEventListener("scroll", syncCommunityComposerChrome);
+          window.visualViewport.addEventListener("scroll", function () {
+            pinCommunityViewport();
+            syncCommunityComposerChrome();
+          });
         }
         window.addEventListener("resize", syncCommunityComposerChrome);
         window.__gogogoPinCommunity = pinCommunityViewport;
@@ -9979,6 +10045,7 @@ browsen</span>
 
         if (communityBack) {
           communityBack.addEventListener("click", function () {
+            stopCommunityPinLoop();
             gotoPanel("home");
           });
         }
