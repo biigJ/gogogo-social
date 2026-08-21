@@ -603,24 +603,12 @@
       position: relative;
       z-index: 2;
     }
-    .home-cal__invite-sq.is-handshake {
+    .home-cal__invite-sq.is-mail {
       color: #F7F5F0;
-      /* Emoji-Farbe ist plattformabhängig — Icon als SVG erzwingen */
-      filter: none;
-      -webkit-filter: none;
-    }
-    .home-cal__invite-sq.is-handshake .home-cal__handshake-icon {
-      display: block;
-      width: 58%;
-      height: 58%;
-      max-width: 22px;
-      max-height: 22px;
-      fill: #F7F5F0;
-      color: #F7F5F0;
-      pointer-events: none;
+      font-size: clamp(0.85rem, 3.8vw, 1.05rem);
     }
     .home-cal__invite-sq.is-on {
-      border-radius: 50%;
+      border-radius: 2px;
       border-color: #F7F5F0;
       background: rgba(247, 245, 240, 0.22);
       color: #F7F5F0;
@@ -632,10 +620,15 @@
       position: relative;
       z-index: 2;
     }
-    .home-cal__invite-sq:disabled:not(.is-active):not(.is-on) {
-      border-color: transparent;
-      opacity: 0;
+    .home-cal__invite-sq.is-empty {
+      border-color: rgba(180, 180, 180, 0.55);
+      opacity: 1;
       pointer-events: none;
+    }
+    .home-cal__invite-sq.is-active.is-empty {
+      pointer-events: auto;
+      opacity: 1;
+      border-color: rgba(180, 180, 180, 0.9);
     }
     .home-cal__mark:disabled,
     .home-cal__mark[aria-hidden="true"] {
@@ -1149,28 +1142,64 @@
     .pref-wheel-item.is-selected { opacity: 1; }
     .discover-sheet { max-height: min(78vh, 560px); overflow: auto; }
     .discover-sheet .challenge-modal__title { display: none; }
-    .discover-goal {
-      display: block;
-      width: 100%;
-      box-sizing: border-box;
-      margin: 0 0 10px;
-      padding: 10px 12px;
+    .discover-goal-label {
+      margin: 0 0 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      opacity: 0.75;
+      text-align: left;
+    }
+    .discover-goal-frame {
+      height: 52px;
+      margin: 0 0 12px;
       border: 1.5px solid rgba(247, 245, 240, 0.45);
       border-radius: var(--radius);
       background: rgba(247, 245, 240, 0.1);
-      color: var(--ink-on-red);
+      position: relative;
+      overflow: hidden;
+    }
+    .discover-goal-frame .wheel-highlight {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 28px;
+      pointer-events: none;
+      z-index: 1;
+      border-top: 1px solid rgba(247, 245, 240, 0.35);
+      border-bottom: 1px solid rgba(247, 245, 240, 0.35);
+    }
+    .discover-goal-scroller {
+      height: 100%;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      touch-action: pan-y;
+    }
+    .discover-goal-scroller::-webkit-scrollbar { display: none; }
+    .discover-goal-item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 28px;
+      scroll-snap-align: center;
+      border: 0;
+      background: transparent;
+      color: rgba(247, 245, 240, 0.38);
       font: inherit;
       font-size: 0.95rem;
       font-weight: 600;
       letter-spacing: -0.02em;
-      text-align: left;
+      width: 100%;
       cursor: pointer;
-      opacity: 1;
     }
-    .discover-goal::after {
-      content: " ▾";
-      opacity: 0.7;
-      font-weight: 500;
+    .discover-goal-item.is-selected {
+      color: var(--ink-on-red);
+      font-weight: 700;
+      font-size: 1.02rem;
     }
     .discover-search {
       width: 100%;
@@ -3888,9 +3917,13 @@ browsen</span>
   </div>
 
   <div class="challenge-modal" id="discover-modal" hidden aria-hidden="true">
-    <div class="challenge-modal__sheet discover-sheet" role="dialog" aria-modal="true" aria-labelledby="discover-goal">
+    <div class="challenge-modal__sheet discover-sheet" role="dialog" aria-modal="true" aria-labelledby="discover-goal-label">
       <p class="challenge-modal__title" id="discover-title" hidden>Suchen</p>
-      <button type="button" class="discover-goal" id="discover-goal" aria-label="Ziel wählen"></button>
+      <p class="discover-goal-label" id="discover-goal-label">Ziel</p>
+      <div class="discover-goal-frame" id="discover-goal-frame">
+        <div class="wheel-highlight" aria-hidden="true"></div>
+        <div class="discover-goal-scroller" id="discover-goal-scroller" role="listbox" aria-label="Ziel wählen"></div>
+      </div>
       <input
         class="discover-search"
         id="discover-search"
@@ -4379,15 +4412,6 @@ browsen</span>
           saveOutboundSharesLocal();
         }
         return outboundShares[key] || merged;
-      }
-
-      function handshakeIconHtml() {
-        /* Zwei ineinandergreifende Hände (Handshake), nicht Stop-Hand */
-        return (
-          '<svg class="home-cal__handshake-icon" viewBox="0 0 24 24" aria-hidden="true">' +
-          '<path fill="currentColor" d="M12.2 8.1c.4-.4 1-.4 1.4 0l.9.9 1.3-1.3c.8-.8 2-.8 2.8 0l1.4 1.4c.8.8.8 2 0 2.8l-2.1 2.1c.2.5.3 1 .3 1.5 0 .8-.2 1.5-.6 2.1-.3.5-.9.6-1.3.3-.5-.3-.6-.9-.3-1.3.2-.3.3-.7.3-1.1 0-.6-.2-1.1-.6-1.5l-3.1-3.1-.9.9 2.2 2.2c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0l-2.9-2.9c-.4-.4-.4-1 0-1.4.4-.4 1-.4 1.4 0l.8.8.9-.9-1.5-1.5c-.4-.4-.4-1 0-1.4zm-5.3 3c.4-.4 1-.4 1.4 0l2 2-1.4 1.4-2-2c-.4-.4-.4-1 0-1.4zm1.9 5.1 1.6 1.6c.5.5 1.2.8 1.9.8h.5c.5 0 1-.2 1.4-.6l1.8-1.8c.4-.4 1-.4 1.4 0 .4.4.4 1 0 1.4l-1.8 1.8c-.8.8-1.8 1.2-2.9 1.2h-.7c-1.2 0-2.3-.5-3.1-1.3l-1.6-1.6c-.4-.4-.4-1 0-1.4.4-.5 1.1-.5 1.5-.1zM18.2 9.2l-1.4-1.4c-.3-.3-.7-.3-1 0L14.7 9l1.5 1.5 1.1-1.1c.2-.2.2-.6-.1-.8z"/>' +
-          "</svg>"
-        );
       }
 
       function formatInviteWhen(dateKey) {
@@ -6744,7 +6768,7 @@ browsen</span>
       var planSharePlace = null;
       var planShareTime = "18:00";
       var discoverRowsCache = [];
-      var discoverGoalFilter = "";
+      var discoverGoalFilter = null;
 
       var KRAFT_PLAN_SYSTEMS = [
         { id: "full", label: "Ganzkörpertraining" },
@@ -6820,27 +6844,24 @@ browsen</span>
 
       function openPrefWheel(kind, selectedOpt) {
         prefWheelKind = kind;
-        var opts = (kind === "goal" || kind === "discover-goal") ? PROFILE_GOAL_OPTIONS
+        var opts = kind === "goal" ? PROFILE_GOAL_OPTIONS
           : kind === "lang" ? PROFILE_LANG_OPTIONS
           : kind === "city" ? PROFILE_CITY_OPTIONS
           : kind === "place" ? PROFILE_PLACE_OPTIONS
           : [];
         if (!opts.length) return;
-        var saved = kind === "discover-goal" ? discoverGoalFilter
-          : kind === "goal" ? (account && account.training_goal)
+        var saved = kind === "goal" ? (account && account.training_goal)
           : kind === "lang" ? (account && account.spoken_lang)
           : kind === "place" ? (account && account.workout_place)
           : (account && account.city_area);
         var current = selectedOpt != null ? selectedOpt : (saved || null);
         if (current == null || opts.indexOf(current) < 0) {
-          current = (kind === "discover-goal" && account && account.training_goal && opts.indexOf(account.training_goal) >= 0)
-            ? account.training_goal
-            : opts[0];
+          current = opts[0];
         }
         prefWheelDraft = current;
         var title = document.getElementById("pref-wheel-title");
         if (title) {
-          title.textContent = (kind === "goal" || kind === "discover-goal") ? "Ziel"
+          title.textContent = kind === "goal" ? "Ziel"
             : kind === "lang" ? "Sprache"
             : kind === "place" ? "Ort"
             : "Stadtteil";
@@ -6908,15 +6929,6 @@ browsen</span>
           closePrefWheel();
           return;
         }
-        if (prefWheelKind === "discover-goal") {
-          discoverGoalFilter = prefWheelDraft;
-          closePrefWheel();
-          var goalEl = document.getElementById("discover-goal");
-          if (goalEl) goalEl.textContent = discoverGoalFilter;
-          var search = document.getElementById("discover-search");
-          renderDiscoverList(search ? search.value : "");
-          return;
-        }
         if (!account) {
           closePrefWheel();
           return;
@@ -6964,20 +6976,115 @@ browsen</span>
         btn.hidden = false;
       }
 
+      function discoverGoalAllLabel() {
+        return uiLang === "en" ? "All" : "Alle";
+      }
+
+      function nearestDiscoverGoalItem(scroller) {
+        if (!scroller) return null;
+        var items = scroller.querySelectorAll(".discover-goal-item");
+        if (!items.length) return null;
+        var mid = scroller.scrollTop + scroller.clientHeight / 2;
+        var best = items[0];
+        var bestDist = Infinity;
+        items.forEach(function (btn) {
+          var d = Math.abs(btn.offsetTop + btn.offsetHeight / 2 - mid);
+          if (d < bestDist) {
+            bestDist = d;
+            best = btn;
+          }
+        });
+        return best;
+      }
+
+      function markDiscoverGoalSelected(scroller, btn) {
+        if (!scroller) return;
+        scroller.querySelectorAll(".discover-goal-item").forEach(function (el) {
+          el.classList.toggle("is-selected", el === btn);
+        });
+        if (!btn) return;
+        discoverGoalFilter = btn.dataset.value != null ? String(btn.dataset.value) : "";
+      }
+
+      function applyDiscoverGoalFromWheel(scrollToSelected) {
+        var scroller = document.getElementById("discover-goal-scroller");
+        if (!scroller) return;
+        var nearest = nearestDiscoverGoalItem(scroller);
+        markDiscoverGoalSelected(scroller, nearest);
+        if (scrollToSelected && nearest) {
+          var top = nearest.offsetTop - (scroller.clientHeight / 2) + (nearest.offsetHeight / 2);
+          scroller.scrollTop = Math.max(0, top);
+        }
+        var search = document.getElementById("discover-search");
+        renderDiscoverList(search ? search.value : "");
+      }
+
+      function buildDiscoverGoalWheel() {
+        var scroller = document.getElementById("discover-goal-scroller");
+        if (!scroller) return;
+        var allLabel = discoverGoalAllLabel();
+        var opts = [""].concat(PROFILE_GOAL_OPTIONS.slice());
+        var current = discoverGoalFilter;
+        if (current == null) current = "";
+        if (current && opts.indexOf(current) < 0) {
+          opts.push(current);
+        }
+        scroller.innerHTML = "";
+        var pad = document.createElement("div");
+        pad.style.height = "12px";
+        pad.setAttribute("aria-hidden", "true");
+        scroller.appendChild(pad);
+        opts.forEach(function (opt) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "discover-goal-item" + (opt === current ? " is-selected" : "");
+          btn.textContent = opt === "" ? allLabel : opt;
+          btn.dataset.value = opt;
+          btn.setAttribute("role", "option");
+          btn.setAttribute("aria-selected", opt === current ? "true" : "false");
+          btn.addEventListener("click", function () {
+            discoverGoalFilter = opt;
+            markDiscoverGoalSelected(scroller, btn);
+            btn.scrollIntoView({ block: "center", behavior: "smooth" });
+            var search = document.getElementById("discover-search");
+            renderDiscoverList(search ? search.value : "");
+          });
+          scroller.appendChild(btn);
+        });
+        var pad2 = document.createElement("div");
+        pad2.style.height = "12px";
+        pad2.setAttribute("aria-hidden", "true");
+        scroller.appendChild(pad2);
+        if (!scroller._discoverGoalBound) {
+          scroller._discoverGoalBound = true;
+          var scrollTimer = null;
+          scroller.addEventListener("scroll", function () {
+            markDiscoverGoalSelected(scroller, nearestDiscoverGoalItem(scroller));
+            if (scrollTimer) clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(function () {
+              applyDiscoverGoalFromWheel(false);
+            }, 120);
+          }, { passive: true });
+        }
+        requestAnimationFrame(function () {
+          var sel = scroller.querySelector(".discover-goal-item.is-selected") || nearestDiscoverGoalItem(scroller);
+          if (sel) {
+            var top = sel.offsetTop - (scroller.clientHeight / 2) + (sel.offsetHeight / 2);
+            scroller.scrollTop = Math.max(0, top);
+          }
+          markDiscoverGoalSelected(scroller, nearestDiscoverGoalItem(scroller) || sel);
+        });
+      }
+
       async function openDiscoverModal() {
         var modal = document.getElementById("discover-modal");
-        var goalEl = document.getElementById("discover-goal");
         var list = document.getElementById("discover-list");
         var search = document.getElementById("discover-search");
         if (!modal || !list) return;
-        if (!discoverGoalFilter) {
+        if (discoverGoalFilter == null) {
           discoverGoalFilter = (account && account.training_goal) ? String(account.training_goal) : "";
         }
-        if (goalEl) {
-          goalEl.textContent = discoverGoalFilter
-            ? discoverGoalFilter
-            : (uiLang === "en" ? "Choose goal" : "Ziel wählen");
-        }
+        buildDiscoverGoalWheel();
         if (search) {
           search.value = "";
           search.placeholder = uiLang === "en" ? "Name or profile number…" : "Name oder Profilnummer…";
@@ -7283,19 +7390,11 @@ browsen</span>
         var discoverBtn = document.getElementById("community-discover");
         var discoverClose = document.getElementById("discover-close");
         var discoverModal = document.getElementById("discover-modal");
-        var discoverGoalBtn = document.getElementById("discover-goal");
         if (discoverBtn) discoverBtn.addEventListener("click", function () { openDiscoverModal(); });
         if (discoverClose) discoverClose.addEventListener("click", closeDiscoverModal);
         if (discoverModal) discoverModal.addEventListener("click", function (e) {
           if (e.target === discoverModal) closeDiscoverModal();
         });
-        if (discoverGoalBtn) {
-          discoverGoalBtn.addEventListener("click", function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            openPrefWheel("discover-goal", discoverGoalFilter || (account && account.training_goal) || null);
-          });
-        }
 
         function syncPlanEditSaveBtn() {
           var saveBtn = document.getElementById("plan-edit-save");
@@ -10979,57 +11078,55 @@ browsen</span>
             var sq = document.createElement("button");
             sq.type = "button";
             sq.className = "home-cal__invite-sq";
-            if (hasOutbound || pendingInvites.length || accepted) {
-              var acceptedTime = accepted ? normalizeMeetTime(accepted.meet_time) : "";
-              if (hasOutbound) {
-                sq.innerHTML = handshakeIconHtml();
-                sq.classList.add("is-active", "is-handshake");
-                sq.disabled = false;
-                sq.removeAttribute("aria-hidden");
-                sq.setAttribute("aria-label", t("Einladung ansehen", "View invite"));
-                sq.addEventListener("click", function (ev) {
-                  ev.preventDefault();
-                  ev.stopPropagation();
-                  selectDay(key, false);
-                  var share = outboundShareForDate(key) || outbound || {
-                    label: "Workout",
-                    buddy_ids: myOutboundRows.map(function (r) { return r.to_id; }).filter(Boolean),
-                    buddy_names: [],
-                    place: (myOutboundRows[0] && myOutboundRows[0].place) || "",
-                    meet_time: (myOutboundRows[0] && myOutboundRows[0].meet_time) || ""
-                  };
-                  openOutboundInviteInfo(key, share);
-                });
-              } else if (accepted) {
-                sq.textContent = acceptedTime || "✓";
-                sq.classList.add("is-on");
-                sq.disabled = false;
-                sq.setAttribute(
-                  "aria-label",
-                  acceptedTime
-                    ? (t("Treffen um", "Meet at") + " " + acceptedTime)
-                    : t("Einladung angenommen", "Invite accepted")
-                );
-                sq.addEventListener("click", function (ev) {
-                  ev.preventDefault();
-                  ev.stopPropagation();
-                  selectDay(key, false);
-                  openAcceptedInviteInfo(key, accepted);
-                });
-              } else {
-                sq.innerHTML = handshakeIconHtml();
-                sq.classList.add("is-active", "is-handshake");
-                sq.disabled = false;
-                sq.setAttribute("aria-label", t("Einladung zusagen oder absagen", "Accept or decline invite"));
-                sq.addEventListener("click", function (ev) {
-                  ev.preventDefault();
-                  ev.stopPropagation();
-                  selectDay(key, false);
-                  openInviteDecide(pendingInvites[0]);
-                });
-              }
+            var acceptedTime = accepted ? normalizeMeetTime(accepted.meet_time) : "";
+            if (hasOutbound) {
+              sq.textContent = "";
+              sq.classList.add("is-active", "is-empty");
+              sq.disabled = false;
+              sq.setAttribute("aria-label", t("Einladung ansehen", "View invite"));
+              sq.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                selectDay(key, false);
+                var share = outboundShareForDate(key) || outbound || {
+                  label: "Workout",
+                  buddy_ids: myOutboundRows.map(function (r) { return r.to_id; }).filter(Boolean),
+                  buddy_names: [],
+                  place: (myOutboundRows[0] && myOutboundRows[0].place) || "",
+                  meet_time: (myOutboundRows[0] && myOutboundRows[0].meet_time) || ""
+                };
+                openOutboundInviteInfo(key, share);
+              });
+            } else if (accepted) {
+              sq.textContent = acceptedTime || "✓";
+              sq.classList.add("is-on");
+              sq.disabled = false;
+              sq.setAttribute(
+                "aria-label",
+                acceptedTime
+                  ? (t("Treffen um", "Meet at") + " " + acceptedTime)
+                  : t("Einladung angenommen", "Invite accepted")
+              );
+              sq.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                selectDay(key, false);
+                openAcceptedInviteInfo(key, accepted);
+              });
+            } else if (pendingInvites.length) {
+              sq.textContent = "✉️";
+              sq.classList.add("is-active", "is-mail");
+              sq.disabled = false;
+              sq.setAttribute("aria-label", t("Einladung zusagen oder absagen", "Accept or decline invite"));
+              sq.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                selectDay(key, false);
+                openInviteDecide(pendingInvites[0]);
+              });
             } else {
               sq.textContent = "";
+              sq.classList.add("is-empty");
               sq.disabled = true;
               sq.setAttribute("aria-hidden", "true");
             }
