@@ -1149,6 +1149,17 @@
     text-align:center;
     text-transform:none;
   }
+  .history-tabs-rail{
+    flex:none;
+    margin:0 0 10px;
+  }
+  .history-tabs-rail .card-tabs{
+    justify-content:flex-start;
+  }
+  .history-tabs-rail .card-tab{
+    flex:0 0 auto;
+    white-space:nowrap;
+  }
   .history-table-wrap{
     flex:1; min-height:0;
     width:100%;
@@ -1787,6 +1798,9 @@
       <div class="history-head-text">
         <div class="history-name" id="historyName"></div>
       </div>
+    </div>
+    <div class="card-tabs-rail history-tabs-rail" id="historyTabsRail" hidden>
+      <div class="card-tabs" id="historyTabs" role="tablist" aria-label="Runden und Minuten"></div>
     </div>
     <div class="history-table-wrap" id="historyTableWrap"></div>
   </div>
@@ -3146,7 +3160,17 @@
     const meta = exerciseMeta(exId);
     if (!meta || !meta.id) return;
     const today = new Date().toISOString().slice(0, 10);
+    const round = Math.max(1, parseInt(roundNum, 10) || 1);
     try {
+      /* Alte Tippel-/Zwischenstände derselben Runde ersetzen. */
+      await goRest(
+        'go_training_interval_logs?account_id=eq.' + encodeURIComponent(aid) +
+        '&workout_date=eq.' + encodeURIComponent(today) +
+        '&exercise_id=eq.' + encodeURIComponent(meta.id) +
+        '&work_sec=eq.' + encodeURIComponent(String(workSec)) +
+        '&round_num=eq.' + encodeURIComponent(String(round)),
+        { method: 'DELETE', prefer: 'return=minimal' }
+      );
       await goRest('go_training_interval_logs', {
         method: 'POST',
         prefer: 'return=minimal',
@@ -3157,7 +3181,7 @@
           exercise_name: meta.name,
           work_sec: workSec,
           amount: parseFloat(amount),
-          round_num: roundNum
+          round_num: round
         }
       });
       await loadIntervalLogs();
@@ -3167,8 +3191,106 @@
     }
   }
 
+  /* Pro Runde nur den neuesten Wert (Tipp-Fragmente aus alten Saves raus). */
+  function dedupeIntervalLogs(rows){
+    const best = {};
+    (rows || []).forEach(function(row){
+      if (!row) return;
+      const key = [
+        String(row.workout_date || '').slice(0, 10),
+        String(row.exercise_id || ''),
+        String(row.work_sec || ''),
+        String(row.round_num == null ? 0 : row.round_num)
+      ].join('|');
+      const prev = best[key];
+      if (!prev) {
+        best[key] = row;
+        return;
+      }
+      const tNew = String(row.created_at || '');
+      const tOld = String(prev.created_at || '');
+      if (tNew > tOld) best[key] = row;
+    });
+    return Object.keys(best).map(function(k){ return best[k]; });
+  }
+
+  function historySessionKey(workSec, rounds){
+    return String(workSec || 0) + '|' + String(rounds || 0);
+  }
+
+  function historyGroupLabel(workSec, rounds){
+    return String(rounds || 0) + ' / ' + fmtMin(workSec || 0);
+  }
+
+  /* Sessions nach Rundenanzahl + Rundenzeit (wie Workout-Karteireiter). */
+  function buildHistoryGroups(){
+    const clean = dedupeIntervalLogs(intervalLogs);
+    const sessionMeta = {};
+    clean.forEach(function(row){
+      const date = String(row.workout_date || '').slice(0, 10);
+      const ws = Number(row.work_sec) || 0;
+      if (!date || !ws) return;
+      const sk = date + '|' + ws;
+      if (!sessionMeta[sk]) sessionMeta[sk] = { date: date, workSec: ws, rounds: 0 };
+      const rn = parseInt(row.round_num, 10);
+      if (!isNaN(rn) && rn > sessionMeta[sk].rounds) sessionMeta[sk].rounds = rn;
+    });
+    Object.keys(sessionMeta).forEach(function(sk){
+      if (!sessionMeta[sk].rounds) {
+        const date = sessionMeta[sk].date;
+        const ws = sessionMeta[sk].workSec;
+        const ids = {};
+        clean.forEach(function(row){
+          if (String(row.workout_date || '').slice(0, 10) !== date) return;
+          if (Number(row.work_sec) !== ws) return;
+          if (row.exercise_id) ids[row.exercise_id] = true;
+        });
+        sessionMeta[sk].rounds = Object.keys(ids).length || 1;
+      }
+    });
+    const groupsMap = {};
+    Object.keys(sessionMeta).forEach(function(sk){
+      const meta = sessionMeta[sk];
+      const key = historySessionKey(meta.workSec, meta.rounds);
+      if (!groupsMap[key]) {
+        groupsMap[key] = {
+          key: key,
+          workSec: meta.workSec,
+          rounds: meta.rounds,
+          label: historyGroupLabel(meta.workSec, meta.rounds),
+          dates: [],
+          dateSet: {},
+          logs: []
+        };
+      }
+      if (!groupsMap[key].dateSet[meta.date]) {
+        groupsMap[key].dateSet[meta.date] = true;
+        groupsMap[key].dates.push(meta.date);
+      }
+    });
+    clean.forEach(function(row){
+      const date = String(row.workout_date || '').slice(0, 10);
+      const ws = Number(row.work_sec) || 0;
+      const meta = sessionMeta[date + '|' + ws];
+      if (!meta) return;
+      const key = historySessionKey(meta.workSec, meta.rounds);
+      if (groupsMap[key]) groupsMap[key].logs.push(row);
+    });
+    const groups = Object.keys(groupsMap).map(function(k){ return groupsMap[k]; });
+    groups.forEach(function(g){
+      g.dates.sort();
+      g.dates.reverse();
+      delete g.dateSet;
+    });
+    groups.sort(function(a, b){
+      if (b.workSec !== a.workSec) return b.workSec - a.workSec;
+      return b.rounds - a.rounds;
+    });
+    return groups;
+  }
+
   function pbStatsForExercise(exId){
-    const matches = intervalLogs.filter(function(row){
+    const matches = dedupeIntervalLogs(intervalLogs).filter(function(row){
       return row.exercise_id === exId && row.work_sec === workSec;
     });
     if (!matches.length) return { pb: null, avg: null, days: 0, unit: unitFor(exId) };
@@ -4732,7 +4854,7 @@
     restInputMode = false;
     const amountInput = document.getElementById('wheelAmountInput');
     if (amountInput.value !== '') {
-      saveLogEntryFromWheel();
+      flushSaveLogEntryFromWheel();
     }
     showEmbedTimerWheel();
   }
@@ -4748,6 +4870,23 @@
     if (amountInput.value !== '') {
       saveIntervalLogEntry(logId, amountInput.value, currentRound);
     }
+  }
+
+  let wheelSaveTimer = null;
+  function scheduleSaveLogEntryFromWheel(){
+    if (wheelSaveTimer) clearTimeout(wheelSaveTimer);
+    wheelSaveTimer = setTimeout(function(){
+      wheelSaveTimer = null;
+      saveLogEntryFromWheel();
+    }, 450);
+  }
+
+  function flushSaveLogEntryFromWheel(){
+    if (wheelSaveTimer) {
+      clearTimeout(wheelSaveTimer);
+      wheelSaveTimer = null;
+    }
+    saveLogEntryFromWheel();
   }
 
   function updateRowAmountDisplay(idx){
@@ -4909,30 +5048,36 @@
   }
 
   let pendingDeleteDate = null;
+  let pendingDeleteWorkSec = null;
+  let historyActiveGroupKey = null;
 
-  function askDeleteDate(date){
+  function askDeleteDate(date, workSec){
     pendingDeleteDate = date;
+    pendingDeleteWorkSec = workSec == null ? null : Number(workSec);
     const overlay = document.getElementById('deleteOverlay');
     if (overlay) overlay.hidden = false;
   }
 
   function hideDeleteDialog(){
     pendingDeleteDate = null;
+    pendingDeleteWorkSec = null;
     const overlay = document.getElementById('deleteOverlay');
     if (overlay) overlay.hidden = true;
   }
 
   async function confirmDeleteDate(){
     const date = pendingDeleteDate;
+    const ws = pendingDeleteWorkSec;
     const aid = getGoAccountId();
     hideDeleteDialog();
     if (!date || !aid) return;
     try {
-      await goRest(
-        'go_training_interval_logs?account_id=eq.' + encodeURIComponent(aid) +
-        '&workout_date=eq.' + encodeURIComponent(date),
-        { method: 'DELETE', prefer: 'return=minimal' }
-      );
+      var path = 'go_training_interval_logs?account_id=eq.' + encodeURIComponent(aid) +
+        '&workout_date=eq.' + encodeURIComponent(date);
+      if (ws != null && !isNaN(ws)) {
+        path += '&work_sec=eq.' + encodeURIComponent(String(ws));
+      }
+      await goRest(path, { method: 'DELETE', prefer: 'return=minimal' });
       await loadIntervalLogs();
       renderHistoryTable();
     } catch (e) {
@@ -4950,6 +5095,7 @@
     const view = document.getElementById('historyView');
     const nameEl = document.getElementById('historyName');
     if (nameEl) nameEl.textContent = getAthleteFirstName() || '';
+    historyActiveGroupKey = null;
     renderHistoryTable();
     if (view) view.hidden = false;
   }
@@ -4961,19 +5107,47 @@
 
   function renderHistoryTable(){
     const wrap = document.getElementById('historyTableWrap');
+    const tabsRail = document.getElementById('historyTabsRail');
+    const tabsEl = document.getElementById('historyTabs');
     if (!wrap) return;
     if (!intervalLogs.length) {
       wrap.innerHTML = '<div class="history-empty">Noch keine gespeicherten Workouts.</div>';
+      if (tabsRail) tabsRail.hidden = true;
+      if (tabsEl) tabsEl.innerHTML = '';
       return;
     }
-    const dateSet = {};
-    const dates = [];
-    intervalLogs.forEach(function(row){
-      const d = row.workout_date;
-      if (d && !dateSet[d]) { dateSet[d] = true; dates.push(d); }
-    });
-    dates.sort();
-    dates.reverse();
+    const groups = buildHistoryGroups();
+    if (!groups.length) {
+      wrap.innerHTML = '<div class="history-empty">Noch keine gespeicherten Workouts.</div>';
+      if (tabsRail) tabsRail.hidden = true;
+      if (tabsEl) tabsEl.innerHTML = '';
+      return;
+    }
+    let active = groups.find(function(g){ return g.key === historyActiveGroupKey; });
+    if (!active) active = groups[0];
+    historyActiveGroupKey = active.key;
+
+    if (tabsEl) {
+      tabsEl.innerHTML = '';
+      groups.forEach(function(g){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'card-tab' + (g.key === active.key ? ' is-active' : '');
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', g.key === active.key ? 'true' : 'false');
+        btn.setAttribute('data-history-group', g.key);
+        btn.setAttribute(
+          'aria-label',
+          g.rounds + ' Runden, Rundenzeit ' + fmtMin(g.workSec)
+        );
+        btn.textContent = g.label;
+        tabsEl.appendChild(btn);
+      });
+    }
+    if (tabsRail) tabsRail.hidden = groups.length < 1;
+
+    const logs = active.logs || [];
+    const dates = active.dates.slice();
     const rowOrder = [];
     const seen = {};
     function addRow(id, name){
@@ -4982,7 +5156,7 @@
       rowOrder.push({ id: id, name: name });
     }
     const runNames = {};
-    intervalLogs.forEach(function(row){
+    logs.forEach(function(row){
       const id = row.exercise_id || '';
       const m = id.match(/^run-(\d+)$/);
       if (m) runNames[id] = row.exercise_name || ('Laufen Rnd ' + m[1]);
@@ -4994,32 +5168,40 @@
       return na - nb;
     }).forEach(function(id){ addRow(id, runNames[id]); });
     HYROX_CYCLE.forEach(function(id){
-      if (intervalLogs.some(function(r){ return r.exercise_id === id; })) {
+      if (logs.some(function(r){ return r.exercise_id === id; })) {
         addRow(id, exerciseMeta(id).name);
       }
     });
-    intervalLogs.forEach(function(row){
+    logs.forEach(function(row){
       addRow(row.exercise_id, row.exercise_name || exerciseMeta(row.exercise_id).name);
     });
+
+    /* Pro Tag: finaler Wert der Übung (bei mehreren Runden: letzter Round). */
+    function cellAmount(exId, date){
+      const matches = logs.filter(function(r){
+        return r.exercise_id === exId && String(r.workout_date || '').slice(0, 10) === date;
+      });
+      if (!matches.length) return null;
+      matches.sort(function(a, b){
+        const ra = parseInt(a.round_num, 10) || 0;
+        const rb = parseInt(b.round_num, 10) || 0;
+        if (rb !== ra) return rb - ra;
+        return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+      });
+      const amt = parseFloat(matches[0].amount);
+      return isNaN(amt) ? null : amt;
+    }
     function cellValue(exId, date){
-      const matches = intervalLogs.filter(function(r){
-        return r.exercise_id === exId && r.workout_date === date;
-      });
-      if (!matches.length) return '';
-      let sum = 0, n = 0;
-      matches.forEach(function(r){
-        const amt = parseFloat(r.amount);
-        if (!isNaN(amt)) { sum += amt; n++; }
-      });
-      if (!n) return '';
-      return formatPbAmount(Math.round(sum / n * 10) / 10);
+      const amt = cellAmount(exId, date);
+      return amt === null ? '' : formatPbAmount(amt);
     }
     function avgValue(exId){
-      const matches = intervalLogs.filter(function(r){ return r.exercise_id === exId; });
       let sum = 0, n = 0;
-      matches.forEach(function(r){
-        const amt = parseFloat(r.amount);
-        if (!isNaN(amt)) { sum += amt; n++; }
+      dates.forEach(function(d){
+        const amt = cellAmount(exId, d);
+        if (amt === null) return;
+        sum += amt;
+        n++;
       });
       if (!n) return '—';
       return formatPbAmount(Math.round(sum / n * 10) / 10);
@@ -5027,7 +5209,9 @@
     let html = '<table class="history-table"><thead><tr><th></th><th>ø</th>';
     dates.forEach(function(d){
       html += '<th><div class="history-date-head"><span>' + formatTableDate(d) + '</span>' +
-        '<button type="button" class="history-del" data-date="' + d + '" aria-label="Zirkel vom ' + formatTableDate(d) + ' löschen">×</button></div></th>';
+        '<button type="button" class="history-del" data-date="' + d +
+        '" data-work-sec="' + active.workSec +
+        '" aria-label="Zirkel vom ' + formatTableDate(d) + ' löschen">×</button></div></th>';
     });
     html += '</tr></thead><tbody>';
     rowOrder.forEach(function(row){
@@ -5061,10 +5245,17 @@
         closeHistoryView();
         return;
       }
+      const histTab = e.target.closest('#historyTabs .card-tab');
+      if (histTab && histTab.dataset.historyGroup) {
+        e.preventDefault(); e.stopPropagation();
+        historyActiveGroupKey = histTab.dataset.historyGroup;
+        renderHistoryTable();
+        return;
+      }
       const del = e.target.closest('.history-del');
       if (del && del.dataset.date) {
         e.preventDefault(); e.stopPropagation();
-        askDeleteDate(del.dataset.date);
+        askDeleteDate(del.dataset.date, del.dataset.workSec);
         return;
       }
       if (e.target.closest('#finishOkBtn')) {
@@ -5243,9 +5434,20 @@
       endPlanDrag(e);
     });
     document.getElementById('wheelAmountInput').addEventListener('input', function(){
-      saveLogEntryFromWheel();
+      const amountInput = document.getElementById('wheelAmountInput');
+      const idx = currentRound - 1;
+      const logId = planLogId(idx);
+      if (!log[idx]) log[idx] = { exercise: logId, amount: '' };
+      log[idx].amount = amountInput.value;
+      log[idx].exercise = logId;
+      updateRowAmountDisplay(idx);
+      scheduleSaveLogEntryFromWheel();
+    });
+    document.getElementById('wheelAmountInput').addEventListener('change', function(){
+      flushSaveLogEntryFromWheel();
     });
     document.getElementById('wheelAmountInput').addEventListener('blur', function(){
+      flushSaveLogEntryFromWheel();
       if (restInputMode && (phase === 'rest' || phase === 'log-final')) disableRestInput();
     });
 
