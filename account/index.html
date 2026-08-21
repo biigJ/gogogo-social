@@ -960,6 +960,8 @@
       width: 100%;
       flex: 0 0 auto;
       min-height: 40px;
+      z-index: 6;
+      background: var(--red);
     }
     .community-head .profile-name {
       margin: 0;
@@ -1432,6 +1434,7 @@
       flex: 1;
       min-height: 0;
       width: 100%;
+      overflow: hidden;
     }
     .community-slot {
       display: flex;
@@ -1516,12 +1519,20 @@
       overscroll-behavior: contain;
     }
     body.is-community {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      max-width: 100%;
       overflow: hidden;
+      height: 100%;
       height: 100dvh;
+      overscroll-behavior: none;
+      touch-action: manipulation;
     }
     body.is-community #app,
     body.is-community .wrap {
       height: 100%;
+      max-height: 100%;
       min-height: 0;
       overflow: hidden;
       display: flex;
@@ -1534,6 +1545,7 @@
       display: flex;
       flex-direction: column;
       padding-bottom: calc(var(--community-composer-h, 58px) + 14px);
+      overscroll-behavior: none;
     }
     body.is-community #panel-community.is-active {
       display: flex;
@@ -1541,6 +1553,7 @@
       flex: 1;
       min-height: 0;
       margin-top: 4px;
+      overflow: hidden;
     }
     body.is-community .community-add-msg {
       flex: 0 0 auto;
@@ -9024,6 +9037,12 @@ browsen</span>
             var ev = new Event("resize");
             window.dispatchEvent(ev);
           });
+        } else {
+          var appEl = document.getElementById("app");
+          if (appEl) {
+            appEl.style.transform = "";
+            appEl.style.height = "";
+          }
         }
         var scrollEl = document.querySelector(".wrap__scroll");
         if (scrollEl) scrollEl.scrollTop = 0;
@@ -9032,6 +9051,9 @@ browsen</span>
         requestAnimationFrame(function () {
           updateScrollOverflow();
           setTimeout(updateScrollOverflow, 120);
+          if (onCommunity && typeof window.__gogogoPinCommunity === "function") {
+            window.__gogogoPinCommunity();
+          }
         });
       }
 
@@ -9857,8 +9879,37 @@ browsen</span>
         var msg = document.getElementById("community-add-msg");
         var communityBack = document.getElementById("community-back");
 
+        function pinCommunityViewport() {
+          if (!document.body.classList.contains("is-community")) return;
+          try {
+            if (window.scrollX || window.scrollY) {
+              window.scrollTo(0, 0);
+            }
+          } catch (e0) {}
+          try {
+            if (document.documentElement) document.documentElement.scrollTop = 0;
+            if (document.body) document.body.scrollTop = 0;
+          } catch (e1) {}
+          var scrollEl = document.querySelector(".wrap__scroll");
+          if (scrollEl && scrollEl.scrollTop) scrollEl.scrollTop = 0;
+          /* iOS schiebt den Visual-Viewport nach oben — Layout gegenhalten. */
+          var vv = window.visualViewport;
+          var offset = vv ? Math.max(0, vv.offsetTop || 0) : 0;
+          var app = document.getElementById("app");
+          if (app) {
+            if (offset > 0) {
+              app.style.transform = "translateY(" + offset + "px)";
+              app.style.height = Math.round(vv.height) + "px";
+            } else {
+              app.style.transform = "";
+              app.style.height = "";
+            }
+          }
+        }
+
         function syncCommunityComposerChrome() {
           if (!composer) return;
+          pinCommunityViewport();
           var kb = 0;
           if (window.visualViewport) {
             kb = Math.max(
@@ -9899,11 +9950,20 @@ browsen</span>
             if (replySend) replySend.disabled = !String(replyText.value || "").trim();
           });
           replyText.addEventListener("focus", function () {
+            pinCommunityViewport();
             setTimeout(syncCommunityComposerChrome, 50);
             setTimeout(syncCommunityComposerChrome, 320);
+            setTimeout(pinCommunityViewport, 450);
           });
           replyText.addEventListener("blur", function () {
-            setTimeout(syncCommunityComposerChrome, 50);
+            setTimeout(function () {
+              var app = document.getElementById("app");
+              if (app) {
+                app.style.transform = "";
+                app.style.height = "";
+              }
+              syncCommunityComposerChrome();
+            }, 50);
             setTimeout(syncCommunityComposerChrome, 320);
           });
           if (replySend) replySend.disabled = true;
@@ -9914,6 +9974,7 @@ browsen</span>
           window.visualViewport.addEventListener("scroll", syncCommunityComposerChrome);
         }
         window.addEventListener("resize", syncCommunityComposerChrome);
+        window.__gogogoPinCommunity = pinCommunityViewport;
         syncCommunityComposerChrome();
 
         if (communityBack) {
