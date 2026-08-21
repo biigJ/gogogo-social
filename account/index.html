@@ -1158,9 +1158,15 @@
       opacity: 0.75;
       text-align: left;
     }
+    .discover-filters {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 0 0 12px;
+    }
     .discover-goal-frame {
       height: 52px;
-      margin: 0 0 12px;
+      margin: 0;
       border: 1.5px solid rgba(247, 245, 240, 0.45);
       border-radius: var(--radius);
       background: rgba(247, 245, 240, 0.1);
@@ -1435,7 +1441,15 @@
       white-space: pre-line;
     }
     .invite-info-actions {
+      grid-template-columns: 1fr 1fr;
+    }
+    .invite-info-actions.is-single-ok {
       grid-template-columns: 1fr;
+      justify-items: center;
+    }
+    .invite-info-actions.is-single-ok #invite-info-ok {
+      width: min(100%, 220px);
+      justify-self: center;
     }
     .invite-info-actions #invite-info-cancel:not([hidden]) ~ #invite-info-ok {
       margin-top: 0;
@@ -1589,18 +1603,26 @@
       width: 100%;
       touch-action: pan-y;
       cursor: grab;
+      container-type: inline-size;
     }
     .community-buddy-viewport.is-dragging {
       cursor: grabbing;
     }
     .community-buddy-track {
       display: flex;
-      width: 100%;
+      gap: 8px;
+      width: max-content;
+      max-width: none;
       will-change: transform;
       transition: transform 0.42s cubic-bezier(0.22, 0.82, 0.18, 1);
     }
     .community-buddy-track.is-dragging {
       transition: none;
+    }
+    .community-buddy-track > .community-slot {
+      flex: 0 0 calc((100cqw - 16px) / 3);
+      width: calc((100cqw - 16px) / 3);
+      box-sizing: border-box;
     }
     .community-buddy-page {
       flex: 0 0 100%;
@@ -3925,12 +3947,38 @@ browsen</span>
   </div>
 
   <div class="challenge-modal" id="discover-modal" hidden aria-hidden="true">
-    <div class="challenge-modal__sheet discover-sheet" role="dialog" aria-modal="true" aria-labelledby="discover-goal-label">
+    <div class="challenge-modal__sheet discover-sheet" role="dialog" aria-modal="true" aria-labelledby="discover-filters-title">
       <p class="challenge-modal__title" id="discover-title" hidden>Suchen</p>
-      <p class="discover-goal-label" id="discover-goal-label">Ziel</p>
-      <div class="discover-goal-frame" id="discover-goal-frame">
-        <div class="wheel-highlight" aria-hidden="true"></div>
-        <div class="discover-goal-scroller" id="discover-goal-scroller" role="listbox" aria-label="Ziel wählen"></div>
+      <p class="discover-goal-label" id="discover-filters-title" hidden>Filter</p>
+      <div class="discover-filters" id="discover-filters">
+        <div>
+          <p class="discover-goal-label" id="discover-goal-label">Ziel</p>
+          <div class="discover-goal-frame" id="discover-goal-frame">
+            <div class="wheel-highlight" aria-hidden="true"></div>
+            <div class="discover-goal-scroller" id="discover-goal-scroller" data-discover-filter="goal" role="listbox" aria-label="Ziel wählen"></div>
+          </div>
+        </div>
+        <div>
+          <p class="discover-goal-label" id="discover-lang-label">Sprache</p>
+          <div class="discover-goal-frame" id="discover-lang-frame">
+            <div class="wheel-highlight" aria-hidden="true"></div>
+            <div class="discover-goal-scroller" id="discover-lang-scroller" data-discover-filter="lang" role="listbox" aria-label="Sprache wählen"></div>
+          </div>
+        </div>
+        <div>
+          <p class="discover-goal-label" id="discover-city-label">Stadtteil</p>
+          <div class="discover-goal-frame" id="discover-city-frame">
+            <div class="wheel-highlight" aria-hidden="true"></div>
+            <div class="discover-goal-scroller" id="discover-city-scroller" data-discover-filter="city" role="listbox" aria-label="Stadtteil wählen"></div>
+          </div>
+        </div>
+        <div>
+          <p class="discover-goal-label" id="discover-place-label">Ort</p>
+          <div class="discover-goal-frame" id="discover-place-frame">
+            <div class="wheel-highlight" aria-hidden="true"></div>
+            <div class="discover-goal-scroller" id="discover-place-scroller" data-discover-filter="place" role="listbox" aria-label="Ort wählen"></div>
+          </div>
+        </div>
       </div>
       <input
         class="discover-search"
@@ -4920,6 +4968,10 @@ browsen</span>
           } else {
             cancelBtn.textContent = uiLang === "en" ? "Cancel invite" : "Einladung absagen";
           }
+        }
+        var actions = document.querySelector("#invite-info-modal .invite-info-actions");
+        if (actions) {
+          actions.classList.toggle("is-single-ok", !opts.canWithdraw);
         }
         openInviteModal("invite-info-modal");
       }
@@ -7100,6 +7152,9 @@ browsen</span>
       var planShareTime = "18:00";
       var discoverRowsCache = [];
       var discoverGoalFilter = null;
+      var discoverLangFilter = null;
+      var discoverCityFilter = null;
+      var discoverPlaceFilter = null;
 
       var KRAFT_PLAN_SYSTEMS = [
         { id: "full", label: "Ganzkörpertraining" },
@@ -7304,14 +7359,37 @@ browsen</span>
       function syncCommunityDiscoverBtn() {
         var btn = document.getElementById("community-discover");
         if (!btn) return;
-        btn.hidden = false;
+        /* Lupe nur bei open to connect — sonst nur + mit Profilnummer. */
+        btn.hidden = !isOpenToConnect();
       }
 
-      function discoverGoalAllLabel() {
+      function discoverAllLabel() {
         return uiLang === "en" ? "All" : "Alle";
       }
 
-      function nearestDiscoverGoalItem(scroller) {
+      function discoverFilterValue(kind) {
+        if (kind === "lang") return discoverLangFilter;
+        if (kind === "city") return discoverCityFilter;
+        if (kind === "place") return discoverPlaceFilter;
+        return discoverGoalFilter;
+      }
+
+      function setDiscoverFilterValue(kind, value) {
+        var v = value != null ? String(value) : "";
+        if (kind === "lang") discoverLangFilter = v;
+        else if (kind === "city") discoverCityFilter = v;
+        else if (kind === "place") discoverPlaceFilter = v;
+        else discoverGoalFilter = v;
+      }
+
+      function discoverFilterOptions(kind) {
+        if (kind === "lang") return PROFILE_LANG_OPTIONS;
+        if (kind === "city") return PROFILE_CITY_OPTIONS;
+        if (kind === "place") return PROFILE_PLACE_OPTIONS;
+        return PROFILE_GOAL_OPTIONS;
+      }
+
+      function nearestDiscoverFilterItem(scroller) {
         if (!scroller) return null;
         var items = scroller.querySelectorAll(".discover-goal-item");
         if (!items.length) return null;
@@ -7328,38 +7406,24 @@ browsen</span>
         return best;
       }
 
-      function markDiscoverGoalSelected(scroller, btn) {
+      function markDiscoverFilterSelected(scroller, btn) {
         if (!scroller) return;
         scroller.querySelectorAll(".discover-goal-item").forEach(function (el) {
           el.classList.toggle("is-selected", el === btn);
         });
         if (!btn) return;
-        discoverGoalFilter = btn.dataset.value != null ? String(btn.dataset.value) : "";
+        var kind = scroller.getAttribute("data-discover-filter") || "goal";
+        setDiscoverFilterValue(kind, btn.dataset.value != null ? String(btn.dataset.value) : "");
       }
 
-      function applyDiscoverGoalFromWheel(scrollToSelected) {
-        var scroller = document.getElementById("discover-goal-scroller");
+      function buildDiscoverFilterWheel(kind) {
+        var scroller = document.getElementById("discover-" + kind + "-scroller");
         if (!scroller) return;
-        var nearest = nearestDiscoverGoalItem(scroller);
-        markDiscoverGoalSelected(scroller, nearest);
-        if (scrollToSelected && nearest) {
-          var top = nearest.offsetTop - (scroller.clientHeight / 2) + (nearest.offsetHeight / 2);
-          scroller.scrollTop = Math.max(0, top);
-        }
-        var search = document.getElementById("discover-search");
-        renderDiscoverList(search ? search.value : "");
-      }
-
-      function buildDiscoverGoalWheel() {
-        var scroller = document.getElementById("discover-goal-scroller");
-        if (!scroller) return;
-        var allLabel = discoverGoalAllLabel();
-        var opts = [""].concat(PROFILE_GOAL_OPTIONS.slice());
-        var current = discoverGoalFilter;
+        var allLabel = discoverAllLabel();
+        var opts = [""].concat(discoverFilterOptions(kind).slice());
+        var current = discoverFilterValue(kind);
         if (current == null) current = "";
-        if (current && opts.indexOf(current) < 0) {
-          opts.push(current);
-        }
+        if (current && opts.indexOf(current) < 0) opts.push(current);
         scroller.innerHTML = "";
         var pad = document.createElement("div");
         pad.style.height = "12px";
@@ -7374,8 +7438,8 @@ browsen</span>
           btn.setAttribute("role", "option");
           btn.setAttribute("aria-selected", opt === current ? "true" : "false");
           btn.addEventListener("click", function () {
-            discoverGoalFilter = opt;
-            markDiscoverGoalSelected(scroller, btn);
+            setDiscoverFilterValue(kind, opt);
+            markDiscoverFilterSelected(scroller, btn);
             btn.scrollIntoView({ block: "center", behavior: "smooth" });
             var search = document.getElementById("discover-search");
             renderDiscoverList(search ? search.value : "");
@@ -7386,37 +7450,51 @@ browsen</span>
         pad2.style.height = "12px";
         pad2.setAttribute("aria-hidden", "true");
         scroller.appendChild(pad2);
-        if (!scroller._discoverGoalBound) {
-          scroller._discoverGoalBound = true;
+        if (!scroller._discoverFilterBound) {
+          scroller._discoverFilterBound = true;
           var scrollTimer = null;
           scroller.addEventListener("scroll", function () {
-            markDiscoverGoalSelected(scroller, nearestDiscoverGoalItem(scroller));
+            markDiscoverFilterSelected(scroller, nearestDiscoverFilterItem(scroller));
             if (scrollTimer) clearTimeout(scrollTimer);
             scrollTimer = setTimeout(function () {
-              applyDiscoverGoalFromWheel(false);
+              var search = document.getElementById("discover-search");
+              renderDiscoverList(search ? search.value : "");
             }, 120);
           }, { passive: true });
         }
         requestAnimationFrame(function () {
-          var sel = scroller.querySelector(".discover-goal-item.is-selected") || nearestDiscoverGoalItem(scroller);
+          var sel = scroller.querySelector(".discover-goal-item.is-selected") || nearestDiscoverFilterItem(scroller);
           if (sel) {
             var top = sel.offsetTop - (scroller.clientHeight / 2) + (sel.offsetHeight / 2);
             scroller.scrollTop = Math.max(0, top);
           }
-          markDiscoverGoalSelected(scroller, nearestDiscoverGoalItem(scroller) || sel);
+          markDiscoverFilterSelected(scroller, nearestDiscoverFilterItem(scroller) || sel);
         });
       }
 
+      function buildDiscoverFilterWheels() {
+        ["goal", "lang", "city", "place"].forEach(buildDiscoverFilterWheel);
+      }
+
       async function openDiscoverModal() {
+        if (!isOpenToConnect()) {
+          var msg = document.getElementById("community-add-msg");
+          if (msg) {
+            msg.textContent = uiLang === "en"
+              ? "Turn on “open to connect” to search — or add via + and profile number."
+              : "Aktiviere „open to connect“ für die Suche — oder füge per + und Profilnummer hinzu.";
+          }
+          return;
+        }
         var modal = document.getElementById("discover-modal");
         var list = document.getElementById("discover-list");
         var search = document.getElementById("discover-search");
         if (!modal || !list) return;
-        /* Standard: Alle — Profilnummer/Name nicht durch Ziel-Vorauswahl verstecken. */
-        if (discoverGoalFilter == null) {
-          discoverGoalFilter = "";
-        }
-        buildDiscoverGoalWheel();
+        if (discoverGoalFilter == null) discoverGoalFilter = "";
+        if (discoverLangFilter == null) discoverLangFilter = "";
+        if (discoverCityFilter == null) discoverCityFilter = "";
+        if (discoverPlaceFilter == null) discoverPlaceFilter = "";
+        buildDiscoverFilterWheels();
         if (search) {
           search.value = "";
           search.placeholder = uiLang === "en" ? "Name or profile number…" : "Name oder Profilnummer…";
@@ -7442,11 +7520,16 @@ browsen</span>
 
       var discoverSerialBusy = false;
 
-      function discoverRowMatchesGoal(row) {
-        var goalFilter = String(discoverGoalFilter || "").trim().toLowerCase();
-        if (!goalFilter) return true;
-        var rowGoal = String(row && row.training_goal || "").trim().toLowerCase();
-        return rowGoal === goalFilter;
+      function discoverRowMatchesFilters(row) {
+        function match(filter, value) {
+          var f = String(filter || "").trim().toLowerCase();
+          if (!f) return true;
+          return String(value || "").trim().toLowerCase() === f;
+        }
+        return match(discoverGoalFilter, row && row.training_goal)
+          && match(discoverLangFilter, row && row.spoken_lang)
+          && match(discoverCityFilter, row && row.city_area)
+          && match(discoverPlaceFilter, row && row.workout_place);
       }
 
       function discoverFirstName(row) {
@@ -7481,7 +7564,7 @@ browsen</span>
             alreadyBuddy = true;
             return;
           }
-          if (!discoverRowMatchesGoal(row)) {
+          if (!discoverRowMatchesFilters(row)) {
             goalBlocked++;
             return;
           }
@@ -7511,7 +7594,7 @@ browsen</span>
             add.textContent = "+";
             add.addEventListener("click", function () {
               addBuddyFromDiscover(row).then(function () {
-                openDiscoverModal();
+                closeDiscoverModal();
               });
             });
           }
@@ -7530,13 +7613,13 @@ browsen</span>
           }
           if (goalBlocked && (serialQ.length === 8 || q)) {
             return uiLang === "en"
-              ? "Found, but goal does not match the filter above. Choose “All” or the matching goal."
-              : "Gefunden, aber Ziel passt nicht zum Filter oben. Wähle „Alle“ oder das passende Ziel.";
+              ? "Found, but filters above do not match. Choose “All” where needed."
+              : "Gefunden, aber Filter oben passen nicht. Wähle ggf. „Alle“.";
           }
           if (serialQ.length === 8) {
             return uiLang === "en" ? "No profile with this number." : "Keine Profilnummer gefunden.";
           }
-          if (q || goalFilter) {
+          if (q || goalFilter || String(discoverLangFilter || "") || String(discoverCityFilter || "") || String(discoverPlaceFilter || "")) {
             return uiLang === "en" ? "No matches." : "Keine Treffer.";
           }
           return uiLang === "en" ? "No open profiles right now." : "Gerade keine offenen Profile.";
@@ -7679,6 +7762,10 @@ browsen</span>
             : "Aktiviere „open to connect“ für mehr als 3 Buddies.");
           return;
         }
+        var already = getBuddies().some(function (b) {
+          return b && row.id && String(b.id) === String(row.id);
+        });
+        if (already) return;
         var buddy = {
           id: row.id || null,
           name: row.name,
@@ -7687,9 +7774,14 @@ browsen</span>
         };
         buddyList.push(buddy);
         saveBuddies();
-        await syncBuddyLinkCloud(buddy);
+        /* Neuen Buddy in der sichtbaren Leiste zeigen (1er-Schritte). */
+        buddyCarouselPage = Math.max(0, getBuddies().length + 1 - 3);
+        try { await syncBuddyLinkCloud(buddy); } catch (eSync) {}
         fillProfilePanel();
         renderBuddySlots();
+        try { await refreshCommunityFeed(); } catch (eFeed) {}
+        var msg = document.getElementById("community-add-msg");
+        if (msg) msg.textContent = firstNameOf(buddy) + (uiLang === "en" ? " added." : " hinzugefügt.");
       }
 
       var profileSerialVisible = false;
@@ -8748,15 +8840,22 @@ browsen</span>
         }
       })();
 
-      function buddyCarouselPageCount(cellCount) {
-        return Math.max(1, Math.ceil(Math.max(cellCount, 1) / 3));
+      function buddyCarouselMaxOffset(cellCount) {
+        return Math.max(0, Math.max(cellCount, 1) - 3);
       }
 
-      function applyBuddyCarouselTransform(track, page, dragPx, animate) {
+      function buddyCarouselStep(viewport) {
+        var w = viewport ? viewport.clientWidth : 0;
+        if (!(w > 0)) return 0;
+        /* Ein Slot + Gap: (W - 2*8)/3 + 8 = (W + 8)/3 */
+        return (w + 8) / 3;
+      }
+
+      function applyBuddyCarouselTransform(track, offset, dragPx, animate) {
         if (!track) return;
         var viewport = track.parentElement;
-        var w = viewport ? viewport.clientWidth : 0;
-        var x = (-page * w) + (dragPx || 0);
+        var step = buddyCarouselStep(viewport);
+        var x = (-offset * step) + (dragPx || 0);
         if (animate === false) track.classList.add("is-dragging");
         else track.classList.remove("is-dragging");
         track.style.transform = "translate3d(" + x + "px,0,0)";
@@ -8777,9 +8876,9 @@ browsen</span>
         buddySwipeState = null;
       }
 
-      function bindBuddyCarouselSwipe(viewport, track, pageCount) {
+      function bindBuddyCarouselSwipe(viewport, track, maxOffset) {
         unbindBuddyCarouselSwipe();
-        if (!viewport || !track || pageCount < 2) return;
+        if (!viewport || !track || maxOffset < 1) return;
         var startX = 0;
         var startY = 0;
         var dragX = 0;
@@ -8820,7 +8919,7 @@ browsen</span>
           if (Math.abs(dx) > 10) buddySwipeMoved = true;
           if (ev.cancelable) ev.preventDefault();
           var atStart = buddyCarouselPage <= 0 && dx > 0;
-          var atEnd = buddyCarouselPage >= pageCount - 1 && dx < 0;
+          var atEnd = buddyCarouselPage >= maxOffset && dx < 0;
           dragX = (atStart || atEnd) ? dx * 0.35 : dx;
           applyBuddyCarouselTransform(track, buddyCarouselPage, dragX, false);
         }
@@ -8833,8 +8932,9 @@ browsen</span>
           dragging = false;
           viewport.classList.remove("is-dragging");
           if (wasX) {
-            var threshold = Math.max(42, width * 0.18);
-            if (dragX <= -threshold && buddyCarouselPage < pageCount - 1) {
+            var step = buddyCarouselStep(viewport) || width;
+            var threshold = Math.max(28, step * 0.35);
+            if (dragX <= -threshold && buddyCarouselPage < maxOffset) {
               buddyCarouselPage += 1;
             } else if (dragX >= threshold && buddyCarouselPage > 0) {
               buddyCarouselPage -= 1;
@@ -9055,7 +9155,7 @@ browsen</span>
                   : "Buddy-Limit erreicht. Öffne Dich für mehr Plätze.";
                 return;
               }
-              openDiscoverModal();
+              beginSerialEntry(circle, label);
             });
           } else {
             circle.setAttribute("aria-label", "Leerer Buddy-Platz");
@@ -9090,15 +9190,13 @@ browsen</span>
         if (items.length < buddyCap && !buddyEditMode) {
           cells.push({ type: "plus" });
         }
-        while (cells.length % 3 !== 0) {
+        /* Mindestens 3 sichtbare Plätze (leere Füller rechts). */
+        while (cells.length < 3) {
           cells.push({ type: "empty" });
         }
-        if (!cells.length) {
-          cells = [{ type: "plus" }, { type: "empty" }, { type: "empty" }];
-        }
 
-        var pageCount = buddyCarouselPageCount(cells.length);
-        if (buddyCarouselPage >= pageCount) buddyCarouselPage = pageCount - 1;
+        var maxOffset = buddyCarouselMaxOffset(cells.length);
+        if (buddyCarouselPage > maxOffset) buddyCarouselPage = maxOffset;
         if (buddyCarouselPage < 0) buddyCarouselPage = 0;
 
         var rail = document.createElement("div");
@@ -9110,21 +9208,14 @@ browsen</span>
         track.className = "community-buddy-track";
         track.id = "community-buddy-track";
 
-        for (var p = 0; p < pageCount; p++) {
-          var page = document.createElement("div");
-          page.className = "community-buddy-page";
-          for (var c = 0; c < 3; c++) {
-            var cell = cells[p * 3 + c];
-            if (!cell) cell = { type: "empty" };
-            page.appendChild(buildBuddySlotEl({
-              buddy: cell.type === "buddy" ? cell.buddy : null,
-              isPlus: cell.type === "plus",
-              isEmpty: cell.type === "empty",
-              slotIndex: p * 3 + c
-            }));
-          }
-          track.appendChild(page);
-        }
+        cells.forEach(function (cell, idx) {
+          track.appendChild(buildBuddySlotEl({
+            buddy: cell.type === "buddy" ? cell.buddy : null,
+            isPlus: cell.type === "plus",
+            isEmpty: cell.type === "empty",
+            slotIndex: idx
+          }));
+        });
         viewport.appendChild(track);
         rail.appendChild(viewport);
         root.appendChild(rail);
@@ -9141,7 +9232,7 @@ browsen</span>
             applyBuddyCarouselTransform(track, buddyCarouselPage, 0, true);
           });
         });
-        bindBuddyCarouselSwipe(viewport, track, pageCount);
+        bindBuddyCarouselSwipe(viewport, track, maxOffset);
       }
 
       var serialEntryActive = false;
@@ -9276,6 +9367,7 @@ browsen</span>
           };
           buddyList.push(buddy);
           saveBuddies();
+          buddyCarouselPage = Math.max(0, getBuddies().length + 1 - 3);
           await syncBuddyLinkCloud(buddy);
           fillProfilePanel();
           serialSubmitBusy = false;
@@ -9337,6 +9429,19 @@ browsen</span>
             photo_url: remote.photo_url || null
           };
           next.push(entry);
+        }
+        /* Lokale Adds behalten, falls Cloud-Reload vor/ohne Sync noch hinterherhinkt. */
+        var localOnly = [];
+        for (var li = 0; li < buddyList.length; li++) {
+          var lb = buddyList[li];
+          if (!lb || !lb.id) continue;
+          var inCloud = next.some(function (n) {
+            return n && String(n.id) === String(lb.id);
+          });
+          if (!inCloud) localOnly.push(lb);
+        }
+        for (var lo = 0; lo < localOnly.length && next.length < maxBuddiesAllowed(); lo++) {
+          next.push(localOnly[lo]);
         }
         if (!next.length) return false;
         var prev = getBuddies();
@@ -9734,6 +9839,7 @@ browsen</span>
 
       function fillCommunityPanel() {
         syncCommunityWhatsApp();
+        syncCommunityDiscoverBtn();
         renderBuddySlots();
         if (isBuddySearchLocked()) {
           var lockEl = document.getElementById("community-add-msg");
