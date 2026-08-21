@@ -1135,18 +1135,26 @@
       letter-spacing: -0.02em;
       opacity: 0.9;
     }
+    .discover-goal::before {
+      content: none;
+    }
     .discover-search {
       width: 100%;
+      box-sizing: border-box;
       margin: 0 0 12px;
       padding: 12px 14px;
-      border: 1.5px solid rgba(247, 245, 240, 0.45);
+      border: 1.5px solid rgba(247, 245, 240, 0.55);
       border-radius: var(--radius);
-      background: rgba(10, 10, 10, 0.16);
+      background: rgba(247, 245, 240, 0.12);
       color: var(--ink-on-red);
       font: inherit;
-      font-size: 0.95rem;
-      font-weight: 500;
+      font-size: 1rem;
+      font-weight: 600;
       letter-spacing: -0.02em;
+      outline: none;
+    }
+    .discover-search:focus {
+      border-color: rgba(247, 245, 240, 0.9);
     }
     .discover-search::placeholder { color: rgba(247, 245, 240, 0.55); }
     .discover-list {
@@ -1354,6 +1362,12 @@
       line-height: 1.4;
       letter-spacing: -0.02em;
       white-space: pre-line;
+    }
+    .invite-info-actions {
+      grid-template-columns: 1fr;
+    }
+    .invite-info-actions #invite-info-cancel:not([hidden]) ~ #invite-info-ok {
+      margin-top: 0;
     }
     .invite-decide__body {
       margin: 0 0 10px;
@@ -3849,8 +3863,10 @@ browsen</span>
         type="search"
         inputmode="search"
         autocomplete="off"
-        placeholder="Suchen…"
-        aria-label="Suchen"
+        placeholder="Name oder Profilnummer…"
+        data-ph-de="Name oder Profilnummer…"
+        data-ph-en="Name or profile number…"
+        aria-label="Buddy suchen"
       />
       <div class="discover-list" id="discover-list"></div>
       <div class="challenge-modal__actions">
@@ -3913,7 +3929,8 @@ browsen</span>
       <p class="challenge-modal__title" id="invite-info-title">Einladung</p>
       <p class="invite-decide__body" id="invite-info-body"></p>
       <p class="invite-decide__meta" id="invite-info-meta"></p>
-      <div class="challenge-modal__actions">
+      <div class="challenge-modal__actions invite-info-actions">
+        <button type="button" class="challenge-modal__btn is-ghost" id="invite-info-cancel" hidden>Einladung absagen</button>
         <button type="button" class="challenge-modal__btn" id="invite-info-ok">OK</button>
       </div>
     </div>
@@ -4523,11 +4540,15 @@ browsen</span>
         closeInviteModal("invite-decide-modal");
       }
 
+      var pendingInviteInfo = null;
+
       function openInviteInfo(opts) {
         opts = opts || {};
+        pendingInviteInfo = opts;
         var title = document.getElementById("invite-info-title");
         var body = document.getElementById("invite-info-body");
         var meta = document.getElementById("invite-info-meta");
+        var cancelBtn = document.getElementById("invite-info-cancel");
         if (title) title.textContent = opts.title || (uiLang === "en" ? "Invite" : "Einladung");
         if (body) {
           body.textContent = opts.body || "";
@@ -4537,10 +4558,16 @@ browsen</span>
           meta.textContent = opts.meta || "";
           meta.hidden = !opts.meta;
         }
+        if (cancelBtn) {
+          var canWithdraw = !!opts.canWithdraw;
+          cancelBtn.hidden = !canWithdraw;
+          cancelBtn.textContent = uiLang === "en" ? "Cancel invite" : "Einladung absagen";
+        }
         openInviteModal("invite-info-modal");
       }
 
       function closeInviteInfo() {
+        pendingInviteInfo = null;
         closeInviteModal("invite-info-modal");
       }
 
@@ -4551,6 +4578,35 @@ browsen</span>
           : null;
         if (buddy) return firstNameOf(buddy);
         return "";
+      }
+
+      async function withdrawOutboundInvites(dateKey) {
+        if (!account || !account.id || !dateKey) return;
+        var key = String(dateKey).slice(0, 10);
+        var mine = (workoutInvites || []).filter(function (inv) {
+          if (!inv) return false;
+          if (String(inv.from_id) !== String(account.id)) return false;
+          if (String(inv.workout_date || "").slice(0, 10) !== key) return false;
+          var st = String(inv.status || "pending");
+          return st === "pending" || st === "accepted";
+        });
+        for (var i = 0; i < mine.length; i++) {
+          mine[i].status = "declined";
+          await patchWorkoutInviteStatus(mine[i], "declined");
+        }
+        if (outboundShares[key]) {
+          delete outboundShares[key];
+          saveOutboundSharesLocal();
+        }
+        if (acceptedInvites[key] && String(acceptedInvites[key].from_id) === String(account.id)) {
+          delete acceptedInvites[key];
+          saveAcceptedInvitesLocal();
+        }
+        saveWorkoutInvitesLocal();
+        if (typeof window.__gogogoRenderWeek === "function") {
+          try { window.__gogogoRenderWeek(); } catch (e2) {}
+        }
+        try { await refreshCommunityFeed(); } catch (e3) {}
       }
 
       function openOutboundInviteInfo(dateKey, outbound) {
@@ -4585,7 +4641,9 @@ browsen</span>
         openInviteInfo({
           title: uiLang === "en" ? "Your invite" : "Deine Einladung",
           body: body,
-          meta: lines.join("\n")
+          meta: lines.join("\n"),
+          canWithdraw: true,
+          dateKey: dateKey
         });
       }
 
@@ -4605,7 +4663,8 @@ browsen</span>
         openInviteInfo({
           title: uiLang === "en" ? "Meetup" : "Treffen",
           body: body,
-          meta: lines.join("\n")
+          meta: lines.join("\n"),
+          canWithdraw: false
         });
       }
 
@@ -4617,6 +4676,7 @@ browsen</span>
         var decideDecline = document.getElementById("invite-decide-decline");
         var decideModal = document.getElementById("invite-decide-modal");
         var infoOk = document.getElementById("invite-info-ok");
+        var infoCancel = document.getElementById("invite-info-cancel");
         var infoModal = document.getElementById("invite-info-modal");
         if (noticeAccept) {
           noticeAccept.addEventListener("click", function () {
@@ -4673,6 +4733,17 @@ browsen</span>
           });
         }
         if (infoOk) infoOk.addEventListener("click", closeInviteInfo);
+        if (infoCancel) {
+          infoCancel.addEventListener("click", function () {
+            var info = pendingInviteInfo;
+            var key = info && info.dateKey ? String(info.dateKey).slice(0, 10) : "";
+            closeInviteInfo();
+            if (!key) return;
+            withdrawOutboundInvites(key).catch(function (e) {
+              console.warn("Invite withdraw failed", e);
+            });
+          });
+        }
         if (infoModal) {
           infoModal.addEventListener("click", function (e) {
             if (e.target === infoModal) closeInviteInfo();
@@ -5681,18 +5752,16 @@ browsen</span>
       }
 
       /*
-       * Live-Plan nur für heute/Zukunft ohne Haken.
-       * Vergangenheit und abgehakte Tage: Historie (heutige Planänderung
-       * wirkt nicht auf schon abgehaktes Heute → asOf gestern).
+       * Live-Plan für heute und Zukunft (auch wenn heute schon bewertet).
+       * Nur Vergangenheit nutzt Historie — sonst verschwindet „starten“ nach dem Abhaken.
        */
       function zirkelWeekdayForDate(d) {
         var dateStr = formatDateKey(d);
         var today = berlinTodayKey();
-        if (dateStr >= today && !isDayCheckedOff(dateStr)) {
+        if (dateStr >= today) {
           return zirkelWeekday();
         }
-        var asOf = dateStr < today ? dateStr : shiftDateKey(today, -1);
-        return zirkelWeekdayAsOf(asOf);
+        return zirkelWeekdayAsOf(dateStr);
       }
 
       function isZirkelForDate(d) {
@@ -6145,8 +6214,8 @@ browsen</span>
       }
 
       /* Text für einen Kalendertag:
-       * Offene Tage (heute/Zukunft ohne Haken): aktueller Plan.
-       * Vergangenheit / abgehakt: History (heutige Speicherung ändert sie nicht). */
+       * Heute/Zukunft: aktueller Plan (auch nach Bewertung startbar).
+       * Vergangenheit: History. */
       function coachDayTextForDate(d) {
         if (isAccountPaused()) return "";
         var wd = (d.getDay() + 6) % 7;
@@ -6162,12 +6231,12 @@ browsen</span>
         if (!key) return bits.join(" · ");
         var dateStr = formatDateKey(d);
         var today = berlinTodayKey();
-        var locked = dateStr < today || isDayCheckedOff(dateStr);
+        var locked = dateStr < today;
         var note = "";
         if (!locked) {
           if (coachPlan) note = coachPlan[key] != null ? String(coachPlan[key]).trim() : "";
         } else {
-          var asOf = dateStr < today ? dateStr : shiftDateKey(today, -1);
+          var asOf = dateStr;
           var best = null;
           var bestFrom = "";
           for (var i = 0; i < coachDayHistory.length; i++) {
@@ -6671,28 +6740,41 @@ browsen</span>
         var list = document.getElementById("discover-list");
         var search = document.getElementById("discover-search");
         if (!modal || !list) return;
-        if (goalEl) goalEl.textContent = (account && account.training_goal) || "Ziel noch offen";
-        if (search) search.value = "";
+        if (goalEl) {
+          goalEl.textContent = (account && account.training_goal)
+            ? String(account.training_goal)
+            : (uiLang === "en" ? "Goal still open" : "Ziel noch offen");
+        }
+        if (search) {
+          search.value = "";
+          search.placeholder = uiLang === "en" ? "Name or profile number…" : "Name oder Profilnummer…";
+        }
         list.innerHTML = "<p style='opacity:0.8'>Lade …</p>";
         modal.hidden = false;
         modal.classList.add("is-open");
         modal.setAttribute("aria-hidden", "false");
+        setTimeout(function () {
+          if (search) search.focus();
+        }, 40);
         try {
           var rows = await restGet(
-            "go_accounts?open_to_connect=eq.true&select=id,name,photo_url,training_goal,city_area,workout_place,spoken_lang&order=name.asc&limit=80"
+            "go_accounts?open_to_connect=eq.true&select=id,name,photo_url,training_goal,city_area,workout_place,spoken_lang,serial_number&order=name.asc&limit=80"
           );
           discoverRowsCache = rows || [];
-          renderDiscoverList("");
+          renderDiscoverList(search ? search.value : "");
         } catch (e) {
           discoverRowsCache = [];
           list.innerHTML = "<p style='opacity:0.85'>Konnte nicht laden. SQL go-account-profile-prefs.sql prüfen.</p>";
         }
       }
 
-      function renderDiscoverList(query) {
+      var discoverSerialBusy = false;
+
+      async function renderDiscoverList(query) {
         var list = document.getElementById("discover-list");
         if (!list) return;
         var q = String(query || "").trim().toLowerCase();
+        var serialQ = normalizeBuddySerial(query);
         var buddyIds = {};
         getBuddies().forEach(function (b) {
           if (b && b.id) buddyIds[String(b.id)] = true;
@@ -6700,13 +6782,11 @@ browsen</span>
         var mine = account && account.id ? String(account.id) : "";
         list.innerHTML = "";
         var shown = 0;
-        (discoverRowsCache || []).forEach(function (row) {
+
+        function appendDiscoverRow(row) {
           if (!row || !row.id) return;
           if (String(row.id) === mine) return;
           if (buddyIds[String(row.id)]) return;
-          var hay = [row.name, row.training_goal, row.city_area, row.workout_place, row.spoken_lang]
-            .filter(Boolean).join(" ").toLowerCase();
-          if (q && hay.indexOf(q) === -1) return;
           shown++;
           var el = document.createElement("div");
           el.className = "discover-row";
@@ -6735,10 +6815,47 @@ browsen</span>
           el.appendChild(mid);
           el.appendChild(add);
           list.appendChild(el);
+        }
+
+        if (serialQ.length === 8) {
+          if (discoverSerialBusy) return;
+          discoverSerialBusy = true;
+          list.innerHTML = "<p style='opacity:0.8'>Suche …</p>";
+          try {
+            var found = null;
+            try {
+              var bySerial = await restGet(
+                "go_accounts?serial_number=eq." + encodeURIComponent(serialQ) +
+                "&select=id,name,photo_url,training_goal,city_area,workout_place,spoken_lang,serial_number&limit=1"
+              );
+              found = bySerial && bySerial[0] ? bySerial[0] : null;
+            } catch (eSer) { found = null; }
+            list.innerHTML = "";
+            shown = 0;
+            if (found) appendDiscoverRow(found);
+            if (!shown) {
+              list.innerHTML = "<p style='opacity:0.85'>" +
+                (uiLang === "en" ? "No profile with this number." : "Keine Profilnummer gefunden.") +
+                "</p>";
+            }
+          } finally {
+            discoverSerialBusy = false;
+          }
+          return;
+        }
+
+        (discoverRowsCache || []).forEach(function (row) {
+          if (!row || !row.id) return;
+          if (String(row.id) === mine) return;
+          if (buddyIds[String(row.id)]) return;
+          var hay = [row.name, row.training_goal, row.city_area, row.workout_place, row.spoken_lang, row.serial_number]
+            .filter(Boolean).join(" ").toLowerCase();
+          if (q && hay.indexOf(q) === -1) return;
+          appendDiscoverRow(row);
         });
         if (!shown) {
           list.innerHTML = "<p style='opacity:0.85'>" +
-            (q ? "Keine Treffer." : "Gerade keine offenen Profile.") + "</p>";
+            (q ? (uiLang === "en" ? "No matches." : "Keine Treffer.") : (uiLang === "en" ? "No open profiles right now." : "Gerade keine offenen Profile.")) + "</p>";
         }
       }
 
@@ -7312,8 +7429,13 @@ browsen</span>
         var planEditSave = document.getElementById("plan-edit-save");
         var discoverSearch = document.getElementById("discover-search");
         if (discoverSearch) {
+          var discoverSearchTimer = null;
           discoverSearch.addEventListener("input", function () {
-            renderDiscoverList(discoverSearch.value);
+            var val = discoverSearch.value;
+            if (discoverSearchTimer) clearTimeout(discoverSearchTimer);
+            discoverSearchTimer = setTimeout(function () {
+              renderDiscoverList(val);
+            }, 180);
           });
         }
         if (planEditCancel) planEditCancel.addEventListener("click", closePlanEdit);
@@ -8119,7 +8241,13 @@ browsen</span>
                 if (msg) msg.textContent = buddySearchLockMessage();
                 return;
               }
-              beginSerialEntry(circle, label);
+              if (getBuddies().length >= maxBuddiesAllowed()) {
+                if (msg) msg.textContent = isOpenToConnect()
+                  ? "Buddy-Limit erreicht."
+                  : "Buddy-Limit erreicht. Öffne Dich für mehr Plätze.";
+                return;
+              }
+              openDiscoverModal();
             });
           } else {
             circle.setAttribute("aria-label", "Leerer Buddy-Platz");
@@ -8586,6 +8714,13 @@ browsen</span>
           if (!p) return false;
           /* Fremde Trainer-Antworten an andere Nutzer ausblenden */
           if (coachId && p.author_id === coachId && p.reply_to_id !== account.id) return false;
+          /* Gerichtete Nachrichten nur für Absender und Empfänger */
+          if (p.reply_to_id) {
+            var toId = String(p.reply_to_id);
+            var fromId = String(p.author_id || "");
+            var me = String(account.id);
+            if (toId !== me && fromId !== me) return false;
+          }
           return true;
         });
         var missing = {};
@@ -10532,7 +10667,6 @@ browsen</span>
             }
 
             cell.appendChild(btn);
-            cell.appendChild(markBtn);
 
             var inviteRow = document.createElement("div");
             inviteRow.className = "home-cal__invite";
@@ -10591,6 +10725,7 @@ browsen</span>
             }
             inviteRow.appendChild(sq);
             cell.appendChild(inviteRow);
+            cell.appendChild(markBtn);
             root.appendChild(cell);
           });
 
