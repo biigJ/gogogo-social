@@ -1150,14 +1150,27 @@
     .discover-sheet { max-height: min(78vh, 560px); overflow: auto; }
     .discover-sheet .challenge-modal__title { display: none; }
     .discover-goal {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
       margin: 0 0 10px;
+      padding: 10px 12px;
+      border: 1.5px solid rgba(247, 245, 240, 0.45);
+      border-radius: var(--radius);
+      background: rgba(247, 245, 240, 0.1);
+      color: var(--ink-on-red);
+      font: inherit;
       font-size: 0.95rem;
-      font-weight: 500;
+      font-weight: 600;
       letter-spacing: -0.02em;
-      opacity: 0.9;
+      text-align: left;
+      cursor: pointer;
+      opacity: 1;
     }
-    .discover-goal::before {
-      content: none;
+    .discover-goal::after {
+      content: " ▾";
+      opacity: 0.7;
+      font-weight: 500;
     }
     .discover-search {
       width: 100%;
@@ -3877,7 +3890,7 @@ browsen</span>
   <div class="challenge-modal" id="discover-modal" hidden aria-hidden="true">
     <div class="challenge-modal__sheet discover-sheet" role="dialog" aria-modal="true" aria-labelledby="discover-goal">
       <p class="challenge-modal__title" id="discover-title" hidden>Suchen</p>
-      <p class="discover-goal" id="discover-goal"></p>
+      <button type="button" class="discover-goal" id="discover-goal" aria-label="Ziel wählen"></button>
       <input
         class="discover-search"
         id="discover-search"
@@ -4167,18 +4180,48 @@ browsen</span>
 
       function inviteDeclineKey(invite) {
         if (!invite) return "";
+        var date = String(invite.workout_date || "").slice(0, 10);
+        var from = String(invite.from_id || "");
+        var to = String(invite.to_id || "");
+        if (date && from) return date + "|" + from + "|" + to;
         if (invite.id) return String(invite.id);
-        return String(invite.workout_date || "").slice(0, 10) + "|" + String(invite.from_id || "");
+        return "";
+      }
+      function inviteDeclineKeys(invite) {
+        if (!invite) return [];
+        var keys = [];
+        var composite = inviteDeclineKey(invite);
+        if (composite) keys.push(composite);
+        if (invite.id) keys.push(String(invite.id));
+        if (invite.source_post_id) keys.push("post-" + invite.source_post_id);
+        var date = String(invite.workout_date || "").slice(0, 10);
+        var from = String(invite.from_id || "");
+        if (date && from) keys.push(date + "|" + from + "|");
+        return keys;
       }
       function isInviteDeclined(invite) {
-        var k = inviteDeclineKey(invite);
-        return !!(k && declinedInvites[k]);
+        var keys = inviteDeclineKeys(invite);
+        for (var i = 0; i < keys.length; i++) {
+          if (keys[i] && declinedInvites[keys[i]]) return true;
+        }
+        return false;
       }
       function markInviteDeclined(invite) {
-        var k = inviteDeclineKey(invite);
-        if (!k) return;
-        declinedInvites[k] = true;
+        inviteDeclineKeys(invite).forEach(function (k) {
+          if (k) declinedInvites[k] = true;
+        });
         saveDeclinedInvitesLocal();
+      }
+      function markOutboundDateDeclined(dateKey) {
+        var key = String(dateKey || "").slice(0, 10);
+        if (!key || !account || !account.id) return;
+        declinedInvites[key + "|" + String(account.id) + "|"] = true;
+        saveDeclinedInvitesLocal();
+      }
+      function isOutboundDateDeclined(dateKey) {
+        var key = String(dateKey || "").slice(0, 10);
+        if (!key || !account || !account.id) return false;
+        return !!declinedInvites[key + "|" + String(account.id) + "|"];
       }
 
       function stripInviteMarker(body) {
@@ -4250,6 +4293,7 @@ browsen</span>
       function outboundInvitesForDate(dateKey) {
         var mine = account && account.id ? String(account.id) : "";
         if (!mine) return [];
+        if (isOutboundDateDeclined(dateKey)) return [];
         return (workoutInvites || []).filter(function (inv) {
           if (!inv || String(inv.workout_date || "").slice(0, 10) !== dateKey) return false;
           if (String(inv.from_id) !== mine) return false;
@@ -4338,9 +4382,10 @@ browsen</span>
       }
 
       function handshakeIconHtml() {
+        /* Zwei ineinandergreifende Hände (Handshake), nicht Stop-Hand */
         return (
           '<svg class="home-cal__handshake-icon" viewBox="0 0 24 24" aria-hidden="true">' +
-          '<path fill="currentColor" d="M20.5 6.5c-.8 0-1.5.7-1.5 1.5V11h-1V5.5c0-.8-.7-1.5-1.5-1.5S15 4.7 15 5.5V11h-1V4.5c0-.8-.7-1.5-1.5-1.5S11 3.7 11 4.5v9.1l-2.4-3.1c-.5-.7-1.5-.8-2.1-.3-.7.5-.8 1.4-.3 2.1l4.9 6.4c.9 1.2 2.3 1.8 3.8 1.8H16c3.3 0 6-2.7 6-6V8c0-.8-.7-1.5-1.5-1.5zM7 13H2.5C1.7 13 1 13.7 1 14.5v2C1 18.4 2.6 20 4.5 20h1c.8 0 1.5-.7 1.5-1.5V13z"/>' +
+          '<path fill="currentColor" d="M12.2 8.1c.4-.4 1-.4 1.4 0l.9.9 1.3-1.3c.8-.8 2-.8 2.8 0l1.4 1.4c.8.8.8 2 0 2.8l-2.1 2.1c.2.5.3 1 .3 1.5 0 .8-.2 1.5-.6 2.1-.3.5-.9.6-1.3.3-.5-.3-.6-.9-.3-1.3.2-.3.3-.7.3-1.1 0-.6-.2-1.1-.6-1.5l-3.1-3.1-.9.9 2.2 2.2c.4.4.4 1 0 1.4-.4.4-1 .4-1.4 0l-2.9-2.9c-.4-.4-.4-1 0-1.4.4-.4 1-.4 1.4 0l.8.8.9-.9-1.5-1.5c-.4-.4-.4-1 0-1.4zm-5.3 3c.4-.4 1-.4 1.4 0l2 2-1.4 1.4-2-2c-.4-.4-.4-1 0-1.4zm1.9 5.1 1.6 1.6c.5.5 1.2.8 1.9.8h.5c.5 0 1-.2 1.4-.6l1.8-1.8c.4-.4 1-.4 1.4 0 .4.4.4 1 0 1.4l-1.8 1.8c-.8.8-1.8 1.2-2.9 1.2h-.7c-1.2 0-2.3-.5-3.1-1.3l-1.6-1.6c-.4-.4-.4-1 0-1.4.4-.5 1.1-.5 1.5-.1zM18.2 9.2l-1.4-1.4c-.3-.3-.7-.3-1 0L14.7 9l1.5 1.5 1.1-1.1c.2-.2.2-.6-.1-.8z"/>' +
           "</svg>"
         );
       }
@@ -4655,7 +4700,11 @@ browsen</span>
         if (cancelBtn) {
           var canWithdraw = !!opts.canWithdraw;
           cancelBtn.hidden = !canWithdraw;
-          cancelBtn.textContent = uiLang === "en" ? "Cancel invite" : "Einladung absagen";
+          if (opts.mode === "accepted") {
+            cancelBtn.textContent = uiLang === "en" ? "Cancel meetup" : "Absagen";
+          } else {
+            cancelBtn.textContent = uiLang === "en" ? "Cancel invite" : "Einladung absagen";
+          }
         }
         openInviteModal("invite-info-modal");
       }
@@ -4682,12 +4731,14 @@ browsen</span>
           if (String(inv.from_id) !== String(account.id)) return false;
           if (String(inv.workout_date || "").slice(0, 10) !== key) return false;
           var st = String(inv.status || "pending");
-          return st === "pending" || st === "accepted";
+          return st !== "declined";
         });
         for (var i = 0; i < mine.length; i++) {
           mine[i].status = "declined";
+          markInviteDeclined(mine[i]);
           await patchWorkoutInviteStatus(mine[i], "declined");
         }
+        markOutboundDateDeclined(key);
         if (outboundShares[key]) {
           delete outboundShares[key];
           saveOutboundSharesLocal();
@@ -4701,6 +4752,30 @@ browsen</span>
           try { window.__gogogoRenderWeek(); } catch (e2) {}
         }
         try { await refreshCommunityFeed(); } catch (e3) {}
+        try { await loadWorkoutInvites(); } catch (e4) {}
+      }
+
+      async function cancelAcceptedInvite(dateKey, accepted) {
+        if (!dateKey) return;
+        var key = String(dateKey).slice(0, 10);
+        var inv = accepted || acceptedInviteForDate(key);
+        if (!inv) {
+          if (acceptedInvites[key]) {
+            delete acceptedInvites[key];
+            saveAcceptedInvitesLocal();
+          }
+          if (typeof window.__gogogoRenderWeek === "function") {
+            try { window.__gogogoRenderWeek(); } catch (e0) {}
+          }
+          return;
+        }
+        var row = Object.assign({}, inv, {
+          workout_date: key,
+          from_id: inv.from_id,
+          to_id: account && account.id,
+          id: inv.id
+        });
+        await declineWorkoutInvite(row);
       }
 
       function openOutboundInviteInfo(dateKey, outbound) {
@@ -4715,7 +4790,7 @@ browsen</span>
           (workoutInvites || []).forEach(function (inv) {
             if (!inv || String(inv.from_id) !== String(account && account.id)) return;
             if (String(inv.workout_date || "").slice(0, 10) !== String(dateKey)) return;
-            if (String(inv.status || "") === "declined") return;
+            if (String(inv.status || "") === "declined" || isInviteDeclined(inv)) return;
             var n = inviteBuddyDisplayName(inv.to_id) || inv.to_name || "";
             if (n && names.indexOf(n) < 0) names.push(n);
           });
@@ -4723,13 +4798,15 @@ browsen</span>
         var when = formatInviteWhen(dateKey);
         var time = normalizeMeetTime(outbound.meet_time);
         var place = String(outbound.place || "").trim();
+        var label = String(outbound.label || "").trim() || "Workout";
         var who = names.length
           ? names.map(function (n) { return "@" + n; }).join(", ")
           : (uiLang === "en" ? "your buddies" : "Deine Buddies");
         var body = uiLang === "en"
-          ? ("You invited " + who + " for " + (outbound.label || "Workout") + " on " + when + ".")
-          : ("Du hast " + who + " zu " + (outbound.label || "Workout") + " am " + when + " eingeladen.");
+          ? ("You invited " + who + " on " + when + ".")
+          : ("Du hast " + who + " am " + when + " eingeladen.");
         var lines = [];
+        lines.push((uiLang === "en" ? "Workout: " : "Workout: ") + label);
         if (place) lines.push((uiLang === "en" ? "Place: " : "Ort: ") + place);
         if (time) lines.push((uiLang === "en" ? "Time: " : "Uhrzeit: ") + time + " Uhr");
         openInviteInfo({
@@ -4737,7 +4814,8 @@ browsen</span>
           body: body,
           meta: lines.join("\n"),
           canWithdraw: true,
-          dateKey: dateKey
+          dateKey: dateKey,
+          mode: "outbound"
         });
       }
 
@@ -4747,10 +4825,12 @@ browsen</span>
         var when = formatInviteWhen(dateKey);
         var time = normalizeMeetTime(accepted.meet_time);
         var place = String(accepted.place || "").trim();
+        var label = String(accepted.workout_label || "").trim() || "Workout";
         var body = uiLang === "en"
           ? (fromName + " invited you on " + when + ".")
           : (fromName + " hat Dich am " + when + " eingeladen.");
         var lines = [];
+        lines.push((uiLang === "en" ? "Workout: " : "Workout: ") + label);
         if (fromName) lines.push((uiLang === "en" ? "From: " : "Einlader: ") + fromName);
         if (place) lines.push((uiLang === "en" ? "Place: " : "Ort: ") + place);
         if (time) lines.push((uiLang === "en" ? "Time: " : "Uhrzeit: ") + time + " Uhr");
@@ -4758,7 +4838,10 @@ browsen</span>
           title: uiLang === "en" ? "Meetup" : "Treffen",
           body: body,
           meta: lines.join("\n"),
-          canWithdraw: false
+          canWithdraw: true,
+          dateKey: dateKey,
+          mode: "accepted",
+          accepted: accepted
         });
       }
 
@@ -4831,8 +4914,16 @@ browsen</span>
           infoCancel.addEventListener("click", function () {
             var info = pendingInviteInfo;
             var key = info && info.dateKey ? String(info.dateKey).slice(0, 10) : "";
+            var mode = info && info.mode;
+            var accepted = info && info.accepted;
             closeInviteInfo();
             if (!key) return;
+            if (mode === "accepted") {
+              cancelAcceptedInvite(key, accepted).catch(function (e) {
+                console.warn("Accepted invite cancel failed", e);
+              });
+              return;
+            }
             withdrawOutboundInvites(key).catch(function (e) {
               console.warn("Invite withdraw failed", e);
             });
@@ -4867,12 +4958,15 @@ browsen</span>
         try { postRows = await loadInvitesFromCommunityPosts(); } catch (ePosts) { postRows = []; }
         workoutInvites = applyLocalInviteStatuses(mergeWorkoutInviteLists(localKeep, tableRows, postRows));
         saveWorkoutInvitesLocal();
+        var rebuiltOutbound = {};
+        var keptAccepted = {};
         workoutInvites.forEach(function (inv) {
           if (!inv) return;
           var key = String(inv.workout_date || "").slice(0, 10);
           if (!key) return;
+          if (isInviteDeclined(inv) || String(inv.status || "") === "declined") return;
           if (String(inv.to_id) === String(account.id) && String(inv.status) === "accepted") {
-            acceptedInvites[key] = {
+            keptAccepted[key] = {
               id: inv.id,
               from_id: inv.from_id,
               from_name: inv.from_name || "",
@@ -4881,14 +4975,15 @@ browsen</span>
               meet_time: inv.meet_time || ""
             };
           }
-          if (String(inv.from_id) === String(account.id) && String(inv.status || "") !== "declined") {
-            var prev = outboundShares[key] || {};
+          if (String(inv.from_id) === String(account.id)) {
+            if (isOutboundDateDeclined(key)) return;
+            var prev = rebuiltOutbound[key] || {};
             var ids = Array.isArray(prev.buddy_ids) ? prev.buddy_ids.slice() : [];
             var names = Array.isArray(prev.buddy_names) ? prev.buddy_names.slice() : [];
-            if (inv.to_id && ids.indexOf(String(inv.to_id)) < 0) ids.push(String(inv.to_id));
+            if (inv.to_id && ids.map(String).indexOf(String(inv.to_id)) < 0) ids.push(String(inv.to_id));
             var toName = inviteBuddyDisplayName(inv.to_id) || inv.to_name || "";
             if (toName && names.indexOf(toName) < 0) names.push(toName);
-            outboundShares[key] = {
+            rebuiltOutbound[key] = {
               label: inv.workout_label || prev.label || "",
               buddy_ids: ids,
               buddy_names: names,
@@ -4896,6 +4991,14 @@ browsen</span>
               meet_time: inv.meet_time || prev.meet_time || ""
             };
           }
+        });
+        /* Nur aktive Outbounds behalten — abgesagte nicht aus Posts zurückherstellen */
+        outboundShares = rebuiltOutbound;
+        Object.keys(acceptedInvites || {}).forEach(function (k) {
+          if (!keptAccepted[k]) delete acceptedInvites[k];
+        });
+        Object.keys(keptAccepted).forEach(function (k) {
+          acceptedInvites[k] = keptAccepted[k];
         });
         saveAcceptedInvitesLocal();
         saveOutboundSharesLocal();
@@ -4934,6 +5037,10 @@ browsen</span>
         });
         workoutInvites = mergeWorkoutInviteLists(localRows, workoutInvites || []);
         saveWorkoutInvitesLocal();
+        if (declinedInvites[dateKey + "|" + String(account.id) + "|"]) {
+          delete declinedInvites[dateKey + "|" + String(account.id) + "|"];
+          saveDeclinedInvitesLocal();
+        }
         outboundShares[dateKey] = {
           label: label,
           buddy_ids: buddyIds.slice(),
@@ -5010,7 +5117,17 @@ browsen</span>
         var key = String(invite.workout_date || "").slice(0, 10);
         invite.status = "declined";
         markInviteDeclined(invite);
-        if (key && acceptedInvites[key] && String(acceptedInvites[key].id) === String(invite.id)) {
+        /* Alle lokalen Klone desselben Termins (uuid + post-*) mit markieren */
+        (workoutInvites || []).forEach(function (row) {
+          if (!row) return;
+          if (String(row.workout_date || "").slice(0, 10) !== key) return;
+          if (String(row.from_id) !== String(invite.from_id)) return;
+          if (String(row.to_id) !== String(invite.to_id || (account && account.id))) return;
+          row.status = "declined";
+          markInviteDeclined(row);
+        });
+        if (key && acceptedInvites[key] &&
+          (!acceptedInvites[key].from_id || String(acceptedInvites[key].from_id) === String(invite.from_id))) {
           delete acceptedInvites[key];
           saveAcceptedInvitesLocal();
         }
@@ -6627,6 +6744,7 @@ browsen</span>
       var planSharePlace = null;
       var planShareTime = "18:00";
       var discoverRowsCache = [];
+      var discoverGoalFilter = "";
 
       var KRAFT_PLAN_SYSTEMS = [
         { id: "full", label: "Ganzkörpertraining" },
@@ -6702,22 +6820,27 @@ browsen</span>
 
       function openPrefWheel(kind, selectedOpt) {
         prefWheelKind = kind;
-        var opts = kind === "goal" ? PROFILE_GOAL_OPTIONS
+        var opts = (kind === "goal" || kind === "discover-goal") ? PROFILE_GOAL_OPTIONS
           : kind === "lang" ? PROFILE_LANG_OPTIONS
           : kind === "city" ? PROFILE_CITY_OPTIONS
           : kind === "place" ? PROFILE_PLACE_OPTIONS
           : [];
         if (!opts.length) return;
-        var saved = kind === "goal" ? (account && account.training_goal)
+        var saved = kind === "discover-goal" ? discoverGoalFilter
+          : kind === "goal" ? (account && account.training_goal)
           : kind === "lang" ? (account && account.spoken_lang)
           : kind === "place" ? (account && account.workout_place)
           : (account && account.city_area);
         var current = selectedOpt != null ? selectedOpt : (saved || null);
-        if (current == null || opts.indexOf(current) < 0) current = opts[0];
+        if (current == null || opts.indexOf(current) < 0) {
+          current = (kind === "discover-goal" && account && account.training_goal && opts.indexOf(account.training_goal) >= 0)
+            ? account.training_goal
+            : opts[0];
+        }
         prefWheelDraft = current;
         var title = document.getElementById("pref-wheel-title");
         if (title) {
-          title.textContent = kind === "goal" ? "Ziel"
+          title.textContent = (kind === "goal" || kind === "discover-goal") ? "Ziel"
             : kind === "lang" ? "Sprache"
             : kind === "place" ? "Ort"
             : "Stadtteil";
@@ -6781,7 +6904,20 @@ browsen</span>
         var scroller = document.getElementById("pref-wheel-scroller");
         var nearest = nearestPrefWheelItem(scroller);
         if (nearest && nearest.dataset.value) prefWheelDraft = nearest.dataset.value;
-        if (!prefWheelKind || !prefWheelDraft || !account) {
+        if (!prefWheelKind || !prefWheelDraft) {
+          closePrefWheel();
+          return;
+        }
+        if (prefWheelKind === "discover-goal") {
+          discoverGoalFilter = prefWheelDraft;
+          closePrefWheel();
+          var goalEl = document.getElementById("discover-goal");
+          if (goalEl) goalEl.textContent = discoverGoalFilter;
+          var search = document.getElementById("discover-search");
+          renderDiscoverList(search ? search.value : "");
+          return;
+        }
+        if (!account) {
           closePrefWheel();
           return;
         }
@@ -6834,10 +6970,13 @@ browsen</span>
         var list = document.getElementById("discover-list");
         var search = document.getElementById("discover-search");
         if (!modal || !list) return;
+        if (!discoverGoalFilter) {
+          discoverGoalFilter = (account && account.training_goal) ? String(account.training_goal) : "";
+        }
         if (goalEl) {
-          goalEl.textContent = (account && account.training_goal)
-            ? String(account.training_goal)
-            : (uiLang === "en" ? "Goal still open" : "Ziel noch offen");
+          goalEl.textContent = discoverGoalFilter
+            ? discoverGoalFilter
+            : (uiLang === "en" ? "Choose goal" : "Ziel wählen");
         }
         if (search) {
           search.value = "";
@@ -6869,6 +7008,7 @@ browsen</span>
         if (!list) return;
         var q = String(query || "").trim().toLowerCase();
         var serialQ = normalizeBuddySerial(query);
+        var goalFilter = String(discoverGoalFilter || "").trim().toLowerCase();
         var buddyIds = {};
         getBuddies().forEach(function (b) {
           if (b && b.id) buddyIds[String(b.id)] = true;
@@ -6881,6 +7021,10 @@ browsen</span>
           if (!row || !row.id) return;
           if (String(row.id) === mine) return;
           if (buddyIds[String(row.id)]) return;
+          if (goalFilter) {
+            var rowGoal = String(row.training_goal || "").trim().toLowerCase();
+            if (rowGoal !== goalFilter) return;
+          }
           shown++;
           var el = document.createElement("div");
           el.className = "discover-row";
@@ -6949,8 +7093,47 @@ browsen</span>
         });
         if (!shown) {
           list.innerHTML = "<p style='opacity:0.85'>" +
-            (q ? (uiLang === "en" ? "No matches." : "Keine Treffer.") : (uiLang === "en" ? "No open profiles right now." : "Gerade keine offenen Profile.")) + "</p>";
+            (q || goalFilter
+              ? (uiLang === "en" ? "No matches." : "Keine Treffer.")
+              : (uiLang === "en" ? "No open profiles right now." : "Gerade keine offenen Profile.")) + "</p>";
         }
+      }
+
+      function resetCommunityComposerAfterModal() {
+        var search = document.getElementById("discover-search");
+        if (search) search.blur();
+        var active = document.activeElement;
+        if (active && active.blur) {
+          try { active.blur(); } catch (e0) {}
+        }
+        document.body.classList.remove("is-keyboard");
+        var composer = document.getElementById("community-composer");
+        if (composer) {
+          composer.style.bottom = "0px";
+          composer.style.paddingBottom = "";
+          composer.style.transform = "";
+          composer.style.top = "";
+        }
+        try {
+          if (typeof window.__gogogoPinCommunity === "function") window.__gogogoPinCommunity();
+        } catch (e1) {}
+        setTimeout(function () {
+          document.body.classList.remove("is-keyboard");
+          if (composer) {
+            composer.style.bottom = "0px";
+            composer.style.paddingBottom = "";
+          }
+          try {
+            if (typeof window.__gogogoPinCommunity === "function") window.__gogogoPinCommunity();
+          } catch (e2) {}
+        }, 80);
+        setTimeout(function () {
+          if (composer) {
+            composer.style.bottom = "0px";
+            composer.style.paddingBottom = "";
+          }
+          document.body.classList.remove("is-keyboard");
+        }, 360);
       }
 
       function closeDiscoverModal() {
@@ -6959,6 +7142,7 @@ browsen</span>
         modal.hidden = true;
         modal.classList.remove("is-open");
         modal.setAttribute("aria-hidden", "true");
+        resetCommunityComposerAfterModal();
       }
 
       async function addBuddyFromDiscover(row) {
@@ -7099,11 +7283,19 @@ browsen</span>
         var discoverBtn = document.getElementById("community-discover");
         var discoverClose = document.getElementById("discover-close");
         var discoverModal = document.getElementById("discover-modal");
+        var discoverGoalBtn = document.getElementById("discover-goal");
         if (discoverBtn) discoverBtn.addEventListener("click", function () { openDiscoverModal(); });
         if (discoverClose) discoverClose.addEventListener("click", closeDiscoverModal);
         if (discoverModal) discoverModal.addEventListener("click", function (e) {
           if (e.target === discoverModal) closeDiscoverModal();
         });
+        if (discoverGoalBtn) {
+          discoverGoalBtn.addEventListener("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openPrefWheel("discover-goal", discoverGoalFilter || (account && account.training_goal) || null);
+          });
+        }
 
         function syncPlanEditSaveBtn() {
           var saveBtn = document.getElementById("plan-edit-save");
