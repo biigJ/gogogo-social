@@ -1055,7 +1055,7 @@
       width: 100%;
       margin: 0;
       padding: 8px 14px;
-      border: 1px solid rgba(247, 245, 240, 0.55);
+      border: 0.5px solid rgba(247, 245, 240, 0.55);
       border-radius: var(--radius);
       background: var(--red);
       color: var(--ink-on-red);
@@ -1278,7 +1278,7 @@
       width: 100%;
       padding: 10px 12px;
       border-radius: var(--radius);
-      border: 1.5px solid rgba(247, 245, 240, 0.4);
+      border: 0.5px solid rgba(247, 245, 240, 0.4);
       background: transparent;
       color: var(--ink-on-red);
       font-weight: 600;
@@ -3233,7 +3233,8 @@ browsen</span>
         <div class="profile-prefs" id="profile-prefs" aria-label="Profil-Einstellungen">
           <button type="button" class="profile-pref" id="profile-pref-goal" data-pref="goal">Ziel wählen</button>
           <button type="button" class="profile-pref" id="profile-pref-lang" data-pref="lang">Sprache wählen</button>
-          <button type="button" class="profile-pref" id="profile-pref-city" data-pref="city">Ort wählen</button>
+          <button type="button" class="profile-pref" id="profile-pref-city" data-pref="city">Stadtteil wählen</button>
+          <button type="button" class="profile-pref" id="profile-pref-place" data-pref="place">Ort wählen</button>
           <button type="button" class="profile-pref profile-pref--connect" id="profile-pref-connect" data-pref="connect" aria-pressed="false">open to connect</button>
         </div>
         <div class="profile-serial" id="profile-serial-row" hidden>
@@ -6321,6 +6322,15 @@ browsen</span>
         "Deutsch", "Englisch", "Französisch", "Spanisch", "Türkisch", "Arabisch"
       ];
       var PROFILE_CITY_OPTIONS = [
+        "Berlin Kreuzberg",
+        "Berlin Prenzlauer Berg",
+        "Berlin Schöneberg",
+        "Berlin Charlottenburg",
+        "Berlin Mitte",
+        "Berlin Friedrichshain",
+        "Berlin Neukölln"
+      ];
+      var PROFILE_PLACE_OPTIONS = [
         "FF Schönhauser Allee",
         "Holmes Place Neue Welt",
         "Hagius Berlin",
@@ -6348,14 +6358,34 @@ browsen</span>
         { id: "pull", label: "Pull Day" }
       ];
 
+      function migrateCityPlacePrefs() {
+        if (!account) return;
+        var city = account.city_area ? String(account.city_area) : "";
+        if (city && PROFILE_PLACE_OPTIONS.indexOf(city) >= 0 && !account.workout_place) {
+          account.workout_place = city;
+          account.city_area = null;
+          try { saveAccount(); } catch (e0) {}
+          try {
+            patchAccount({
+              workout_place: account.workout_place,
+              city_area: null,
+              updated_at: new Date().toISOString()
+            }).catch(function () {});
+          } catch (e1) {}
+        }
+      }
+
       function renderProfilePrefs() {
+        migrateCityPlacePrefs();
         var goalBtn = document.getElementById("profile-pref-goal");
         var langBtn = document.getElementById("profile-pref-lang");
         var cityBtn = document.getElementById("profile-pref-city");
+        var placeBtn = document.getElementById("profile-pref-place");
         var connectBtn = document.getElementById("profile-pref-connect");
         if (goalBtn) goalBtn.textContent = (account && account.training_goal) || "Ziel wählen";
         if (langBtn) langBtn.textContent = (account && account.spoken_lang) || "Sprache wählen";
-        if (cityBtn) cityBtn.textContent = (account && account.city_area) || "Ort wählen";
+        if (cityBtn) cityBtn.textContent = (account && account.city_area) || "Stadtteil wählen";
+        if (placeBtn) placeBtn.textContent = (account && account.workout_place) || "Ort wählen";
         if (connectBtn) {
           var on = isOpenToConnect();
           connectBtn.classList.toggle("is-on", on);
@@ -6394,17 +6424,22 @@ browsen</span>
         var opts = kind === "goal" ? PROFILE_GOAL_OPTIONS
           : kind === "lang" ? PROFILE_LANG_OPTIONS
           : kind === "city" ? PROFILE_CITY_OPTIONS
+          : kind === "place" ? PROFILE_PLACE_OPTIONS
           : [];
         if (!opts.length) return;
         var saved = kind === "goal" ? (account && account.training_goal)
           : kind === "lang" ? (account && account.spoken_lang)
+          : kind === "place" ? (account && account.workout_place)
           : (account && account.city_area);
         var current = selectedOpt != null ? selectedOpt : (saved || null);
         if (current == null || opts.indexOf(current) < 0) current = opts[0];
         prefWheelDraft = current;
         var title = document.getElementById("pref-wheel-title");
         if (title) {
-          title.textContent = kind === "goal" ? "Ziel" : kind === "lang" ? "Sprache" : "Ort";
+          title.textContent = kind === "goal" ? "Ziel"
+            : kind === "lang" ? "Sprache"
+            : kind === "place" ? "Ort"
+            : "Stadtteil";
         }
         var scroller = document.getElementById("pref-wheel-scroller");
         if (!scroller) return;
@@ -6479,6 +6514,9 @@ browsen</span>
         } else if (prefWheelKind === "city") {
           account.city_area = prefWheelDraft;
           fields.city_area = prefWheelDraft;
+        } else if (prefWheelKind === "place") {
+          account.workout_place = prefWheelDraft;
+          fields.workout_place = prefWheelDraft;
         }
         saveAccount();
         closePrefWheel();
@@ -6523,7 +6561,7 @@ browsen</span>
         modal.setAttribute("aria-hidden", "false");
         try {
           var rows = await restGet(
-            "go_accounts?open_to_connect=eq.true&select=id,name,photo_url,training_goal,city_area,spoken_lang&order=name.asc&limit=80"
+            "go_accounts?open_to_connect=eq.true&select=id,name,photo_url,training_goal,city_area,workout_place,spoken_lang&order=name.asc&limit=80"
           );
           discoverRowsCache = rows || [];
           renderDiscoverList("");
@@ -6548,7 +6586,7 @@ browsen</span>
           if (!row || !row.id) return;
           if (String(row.id) === mine) return;
           if (buddyIds[String(row.id)]) return;
-          var hay = [row.name, row.training_goal, row.city_area, row.spoken_lang]
+          var hay = [row.name, row.training_goal, row.city_area, row.workout_place, row.spoken_lang]
             .filter(Boolean).join(" ").toLowerCase();
           if (q && hay.indexOf(q) === -1) return;
           shown++;
@@ -6563,7 +6601,7 @@ browsen</span>
           name.textContent = firstNameOf(row);
           var meta = document.createElement("div");
           meta.className = "discover-row__meta";
-          meta.textContent = [row.training_goal, row.city_area].filter(Boolean).join(" · ");
+          meta.textContent = [row.training_goal, row.city_area, row.workout_place].filter(Boolean).join(" · ");
           mid.appendChild(name);
           mid.appendChild(meta);
           var add = document.createElement("button");
@@ -6712,10 +6750,12 @@ browsen</span>
         var goalBtn = document.getElementById("profile-pref-goal");
         var langBtn = document.getElementById("profile-pref-lang");
         var cityBtn = document.getElementById("profile-pref-city");
+        var placeBtn = document.getElementById("profile-pref-place");
         var connectBtn = document.getElementById("profile-pref-connect");
         if (goalBtn) goalBtn.addEventListener("click", function () { openPrefWheel("goal"); });
         if (langBtn) langBtn.addEventListener("click", function () { openPrefWheel("lang"); });
         if (cityBtn) cityBtn.addEventListener("click", function () { openPrefWheel("city"); });
+        if (placeBtn) placeBtn.addEventListener("click", function () { openPrefWheel("place"); });
         if (connectBtn) connectBtn.addEventListener("click", function () { toggleOpenToConnect(); });
 
         var prefCancel = document.getElementById("pref-wheel-cancel");
@@ -6972,10 +7012,10 @@ browsen</span>
           var box = document.getElementById("plan-share-places");
           if (!box) return;
           box.innerHTML = "";
-          var current = planSharePlace || (account && account.city_area) || PROFILE_CITY_OPTIONS[0];
-          if (PROFILE_CITY_OPTIONS.indexOf(current) < 0) current = PROFILE_CITY_OPTIONS[0];
+          var current = planSharePlace || (account && account.workout_place) || PROFILE_PLACE_OPTIONS[0];
+          if (PROFILE_PLACE_OPTIONS.indexOf(current) < 0) current = PROFILE_PLACE_OPTIONS[0];
           planSharePlace = current;
-          PROFILE_CITY_OPTIONS.forEach(function (opt) {
+          PROFILE_PLACE_OPTIONS.forEach(function (opt) {
             var btn = document.createElement("button");
             btn.type = "button";
             btn.className = "plan-share-place" + (opt === current ? " is-on" : "");
@@ -7032,7 +7072,7 @@ browsen</span>
         }
         function openPlanShare(wd) {
           planShareWeekday = Number(wd);
-          planSharePlace = (account && account.city_area) || PROFILE_CITY_OPTIONS[0];
+          planSharePlace = (account && account.workout_place) || PROFILE_PLACE_OPTIONS[0];
           planShareTime = "18:00";
           var preview = document.getElementById("plan-share-preview");
           var list = document.getElementById("plan-share-buddies");
@@ -7075,7 +7115,7 @@ browsen</span>
           if (nearestTime && nearestTime.dataset.value) {
             planShareTime = normalizeMeetTime(nearestTime.dataset.value) || planShareTime;
           }
-          var place = String(planSharePlace || (account && account.city_area) || "").trim();
+          var place = String(planSharePlace || (account && account.workout_place) || "").trim();
           if (!place) {
             window.alert(t("Bitte einen Ort wählen.", "Please choose a place."));
             return;
@@ -7110,11 +7150,11 @@ browsen</span>
             });
           }
           await createWorkoutInvites(dateKey, label, buddyIds, { place: place, time: time });
-          if (account && place && account.city_area !== place) {
-            account.city_area = place;
+          if (account && place && account.workout_place !== place) {
+            account.workout_place = place;
             saveAccount();
             renderProfilePrefs();
-            try { await patchAccount({ city_area: place }); } catch (ePref) {}
+            try { await patchAccount({ workout_place: place }); } catch (ePref) {}
           }
           closePlanShare();
           if (typeof window.__gogogoRenderWeek === "function") {
@@ -9518,6 +9558,9 @@ browsen</span>
         }
         if (Object.prototype.hasOwnProperty.call(remote, "city_area")) {
           account.city_area = remote.city_area ? String(remote.city_area) : null;
+        }
+        if (Object.prototype.hasOwnProperty.call(remote, "workout_place")) {
+          account.workout_place = remote.workout_place ? String(remote.workout_place) : null;
         }
         if (Object.prototype.hasOwnProperty.call(remote, "open_to_connect")) {
           account.open_to_connect = !!remote.open_to_connect;

@@ -1,4 +1,4 @@
--- Profil-Präferenzen: Ziel, Sprache, Stadtteil, Open to Connect
+-- Profil-Präferenzen: Ziel, Sprache, Stadtteil, Ort, Open to Connect
 -- Im Supabase SQL Editor ausführen.
 
 alter table go_accounts
@@ -9,6 +9,9 @@ alter table go_accounts
 
 alter table go_accounts
   add column if not exists city_area text;
+
+alter table go_accounts
+  add column if not exists workout_place text;
 
 alter table go_accounts
   add column if not exists open_to_connect boolean not null default false;
