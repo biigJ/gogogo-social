@@ -6642,6 +6642,68 @@ browsen</span>
         saveDayEntriesLocal();
       }
 
+      function berlinDateKeyFromIso(iso) {
+        if (!iso) return "";
+        try {
+          return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+        } catch (e) {
+          return String(iso).slice(0, 10);
+        }
+      }
+
+      /* Nach Mitternacht: gestern ohne Bewertung → automatisch ✕. */
+      async function ensureMissedYesterdayMarked() {
+        if (!account || isAccountPaused()) return false;
+        if (isAdminImpersonation()) return false;
+        var today = berlinTodayKey();
+        var yesterday = shiftDateKey(today, -1);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(yesterday || ""))) return false;
+        if (account.created_at) {
+          var createdKey = berlinDateKeyFromIso(account.created_at);
+          if (createdKey && yesterday < createdKey) return false;
+        }
+        if (isDayCheckedOff(yesterday)) return false;
+        dayEntries[yesterday] = { score: null };
+        saveDayEntriesLocal();
+        if (hasCloudAccount()) {
+          try {
+            await restUpsertDayEntry({
+              account_id: account.id,
+              date: yesterday,
+              score: null,
+              updated_at: new Date().toISOString()
+            });
+          } catch (eUpsert) {}
+        }
+        return true;
+      }
+
+      function scheduleMissedDayWatch() {
+        if (window.__gogogoMissedDayWatch) return;
+        var lastKey = berlinTodayKey();
+        async function tick() {
+          var nowKey = berlinTodayKey();
+          if (nowKey === lastKey) return;
+          lastKey = nowKey;
+          try {
+            var changed = await ensureMissedYesterdayMarked();
+            if (changed) {
+              refreshCycleRays();
+              if (typeof window.__gogogoRenderWeek === "function") window.__gogogoRenderWeek();
+              fillProfilePanel();
+            }
+          } catch (eTick) {}
+        }
+        window.__gogogoMissedDayWatch = setInterval(function () {
+          if (document.hidden) return;
+          tick();
+        }, 30000);
+        document.addEventListener("visibilitychange", function () {
+          if (!document.hidden) tick();
+        });
+        window.addEventListener("focus", tick);
+      }
+
       function hasCloudAccount() {
         return !!(account && account.id && String(account.id).indexOf("local-") !== 0);
       }
@@ -6861,6 +6923,17 @@ browsen</span>
         if (langBtn) {
           langBtn.addEventListener("click", function () {
             applyUiLang(uiLang === "de" ? "en" : "de");
+          });
+        }
+        var websiteBtn = document.getElementById("profile-website-btn");
+        if (websiteBtn) {
+          websiteBtn.addEventListener("click", function () {
+            try {
+              sessionStorage.setItem(
+                "gogogo_profile_website_return",
+                JSON.stringify({ href: "/account/?goto=profile", at: Date.now() })
+              );
+            } catch (eWeb) {}
           });
         }
         if (changeCodeBtn) {
@@ -7922,9 +7995,11 @@ browsen</span>
 
         async function loadEntriesFromCloud() {
           if (!hasCloudAccount()) {
+            try { await ensureMissedYesterdayMarked(); } catch (eMiss0) {}
             refreshCycleRays();
             renderWeek();
             fillProfilePanel();
+            scheduleMissedDayWatch();
             return;
           }
           var rows = await restGet(
@@ -7942,12 +8017,14 @@ browsen</span>
           }
           dayEntries = next;
           saveDayEntriesLocal();
+          try { await ensureMissedYesterdayMarked(); } catch (eMiss1) {}
           if (selectedKey) {
             editingOpen = canRateCalendarDay(selectedKey) && !entryFor(selectedKey);
           }
           refreshCycleRays();
           renderWeek();
           fillProfilePanel();
+          scheduleMissedDayWatch();
         }
 
         dayEntriesReady = function () {

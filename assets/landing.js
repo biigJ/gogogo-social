@@ -339,4 +339,24 @@
       applyLang(next);
     });
   }
+
+  /* Zurück-X, wenn Nutzer:in aus dem Profil-Menü zur Website kommt. */
+  (function initProfileBack() {
+    var back = document.getElementById("lp-profile-back");
+    if (!back) return;
+    var payload = null;
+    try {
+      payload = JSON.parse(sessionStorage.getItem("gogogo_profile_website_return") || "null");
+    } catch (e) {
+      payload = null;
+    }
+    if (!payload || !payload.href) return;
+    back.hidden = false;
+    back.setAttribute("href", String(payload.href));
+    var nav = back.closest(".lp-nav");
+    if (nav) nav.classList.add("has-profile-back");
+    back.addEventListener("click", function () {
+      try { sessionStorage.removeItem("gogogo_profile_website_return"); } catch (e2) {}
+    });
+  })();
 })();
