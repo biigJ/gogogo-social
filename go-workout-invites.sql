@@ -59,3 +59,7 @@ create policy "go_workout_invites_delete_anon"
   on go_workout_invites for delete
   to anon, authenticated
   using (true);
+
+-- Together-Invites / Meet-Prefs (auch in go-account-meet-prefs.sql)
+alter table go_workout_invites add column if not exists invite_kind text default 'invite';
+alter table go_workout_invites add column if not exists their_label text;

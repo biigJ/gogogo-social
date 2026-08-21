@@ -14,6 +14,12 @@ alter table go_accounts
   add column if not exists workout_place text;
 
 alter table go_accounts
+  add column if not exists workout_places jsonb default '[]'::jsonb;
+
+alter table go_accounts
+  add column if not exists weekday_meet_prefs jsonb default '{}'::jsonb;
+
+alter table go_accounts
   add column if not exists open_to_connect boolean not null default false;
 
 create index if not exists go_accounts_open_connect_idx
