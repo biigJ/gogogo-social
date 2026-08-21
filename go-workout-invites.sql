@@ -1,5 +1,7 @@
 -- Buddy-Workout-Einladungen für Kalender-Vorschläge
--- Im Supabase SQL Editor ausführen.
+-- Im Supabase SQL Editor ausführen (optional).
+-- Ohne diese Tabelle: App liest Einladungen aus Community-Posts
+-- (reply_to + Wochentag-Zeile / Marker ⟦goinv:YYYY-MM-DD⟧).
 
 create table if not exists go_workout_invites (
   id uuid primary key default gen_random_uuid(),
