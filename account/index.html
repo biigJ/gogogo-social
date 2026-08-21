@@ -4732,13 +4732,21 @@ browsen</span>
         return getStaffCalendarMode() === "full";
       }
 
-      /* Nutzer: nur heute. Admin mit Profil-Override: alles. */
+      /* Nutzer: aktuelle Woche, Tag <= heute (Berlin). Zukunft und frühere Wochen: nein.
+       * Admin mit Profil-Override: alles. */
       function canRateCalendarDay(dateStr) {
         if (isAccountPaused()) return false;
         var key = String(dateStr || "").slice(0, 10);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
         if (getStaffCalendarMode() === "full") return true;
-        return key === berlinTodayKey();
+        var today = berlinTodayKey();
+        if (key > today) return false;
+        var todayDate = parseDateKey(today);
+        if (!todayDate) return key === today;
+        var monday = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
+        monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+        var weekStart = formatDateKey(monday);
+        return key >= weekStart && key <= today;
       }
 
       /* Text für einen Kalendertag:
@@ -6699,6 +6707,68 @@ browsen</span>
         saveDayEntriesLocal();
       }
 
+      function berlinDateKeyFromIso(iso) {
+        if (!iso) return "";
+        try {
+          return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+        } catch (e) {
+          return String(iso).slice(0, 10);
+        }
+      }
+
+      /* Nach Mitternacht: gestern ohne Bewertung → automatisch ✕. */
+      async function ensureMissedYesterdayMarked() {
+        if (!account || isAccountPaused()) return false;
+        if (isAdminImpersonation()) return false;
+        var today = berlinTodayKey();
+        var yesterday = shiftDateKey(today, -1);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(yesterday || ""))) return false;
+        if (account.created_at) {
+          var createdKey = berlinDateKeyFromIso(account.created_at);
+          if (createdKey && yesterday < createdKey) return false;
+        }
+        if (isDayCheckedOff(yesterday)) return false;
+        dayEntries[yesterday] = { score: null };
+        saveDayEntriesLocal();
+        if (hasCloudAccount()) {
+          try {
+            await restUpsertDayEntry({
+              account_id: account.id,
+              date: yesterday,
+              score: null,
+              updated_at: new Date().toISOString()
+            });
+          } catch (eUpsert) {}
+        }
+        return true;
+      }
+
+      function scheduleMissedDayWatch() {
+        if (window.__gogogoMissedDayWatch) return;
+        var lastKey = berlinTodayKey();
+        async function tick() {
+          var nowKey = berlinTodayKey();
+          if (nowKey === lastKey) return;
+          lastKey = nowKey;
+          try {
+            var changed = await ensureMissedYesterdayMarked();
+            if (changed) {
+              refreshCycleRays();
+              if (typeof window.__gogogoRenderWeek === "function") window.__gogogoRenderWeek();
+              fillProfilePanel();
+            }
+          } catch (eTick) {}
+        }
+        window.__gogogoMissedDayWatch = setInterval(function () {
+          if (document.hidden) return;
+          tick();
+        }, 30000);
+        document.addEventListener("visibilitychange", function () {
+          if (!document.hidden) tick();
+        });
+        window.addEventListener("focus", tick);
+      }
+
       function hasCloudAccount() {
         return !!(account && account.id && String(account.id).indexOf("local-") !== 0);
       }
@@ -6918,6 +6988,17 @@ browsen</span>
         if (langBtn) {
           langBtn.addEventListener("click", function () {
             applyUiLang(uiLang === "de" ? "en" : "de");
+          });
+        }
+        var websiteBtn = document.getElementById("profile-website-btn");
+        if (websiteBtn) {
+          websiteBtn.addEventListener("click", function () {
+            try {
+              sessionStorage.setItem(
+                "gogogo_profile_website_return",
+                JSON.stringify({ href: "/account/?goto=profile", at: Date.now() })
+              );
+            } catch (eWeb) {}
           });
         }
         if (changeCodeBtn) {
@@ -7739,16 +7820,20 @@ browsen</span>
 
         function renderWorkout(d) {
           var w = workoutFor(d);
+          var key = dateKey(d);
+          var canAct = canRateCalendarDay(key);
           titleEl.textContent = w.title || "";
-          line1El.textContent = w.line1 || "";
-          line1El.hidden = !w.line1;
+          var showStart = !!(w.line1 && canAct);
+          line1El.textContent = showStart ? w.line1 : "";
+          line1El.hidden = !showStart;
           line2El.textContent = "";
           while (line2El.firstChild) line2El.removeChild(line2El.firstChild);
           line2El.hidden = true;
           if (workoutBox) {
             var startTab = w.zirkel ? "intervall" : (w.trainingTab || "");
-            workoutBox.classList.toggle("is-zirkel", !!(w.zirkel || w.training));
-            if (w.zirkel || w.training) {
+            var canStart = !!(canAct && (w.zirkel || w.training));
+            workoutBox.classList.toggle("is-zirkel", canStart);
+            if (canStart) {
               workoutBox.setAttribute("role", "button");
               workoutBox.setAttribute("tabindex", "0");
               workoutBox.setAttribute("data-training-tab", startTab);
@@ -7766,7 +7851,7 @@ browsen</span>
               workoutBox.removeAttribute("aria-label");
             }
           }
-          syncCheckControls(dateKey(d));
+          syncCheckControls(key);
         }
 
         function syncCheckControls(key) {
@@ -7831,7 +7916,7 @@ browsen</span>
 
           if (isAccountPaused() || !canRateCalendarDay(selectedKey)) {
             editingOpen = false;
-          } else if (!entryFor(selectedKey) && selectedKey === todayKey) {
+          } else if (!entryFor(selectedKey)) {
             editingOpen = true;
           }
 
@@ -7861,7 +7946,7 @@ browsen</span>
             btn.innerHTML =
               "<span>" + names[i] + "</span><span class='home-cal__n'>" + d.getDate() + "</span>";
             btn.addEventListener("click", function () {
-              if (key === selectedKey && w && w.training && w.trainingTab) {
+              if (key === selectedKey && rateable && w && w.training && w.trainingTab) {
                 openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null);
                 return;
               }
@@ -7979,9 +8064,11 @@ browsen</span>
 
         async function loadEntriesFromCloud() {
           if (!hasCloudAccount()) {
+            try { await ensureMissedYesterdayMarked(); } catch (eMiss0) {}
             refreshCycleRays();
             renderWeek();
             fillProfilePanel();
+            scheduleMissedDayWatch();
             return;
           }
           var rows = await restGet(
@@ -7999,12 +8086,14 @@ browsen</span>
           }
           dayEntries = next;
           saveDayEntriesLocal();
+          try { await ensureMissedYesterdayMarked(); } catch (eMiss1) {}
           if (selectedKey) {
             editingOpen = canRateCalendarDay(selectedKey) && !entryFor(selectedKey);
           }
           refreshCycleRays();
           renderWeek();
           fillProfilePanel();
+          scheduleMissedDayWatch();
         }
 
         dayEntriesReady = function () {
