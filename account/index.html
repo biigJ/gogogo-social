@@ -6375,8 +6375,9 @@ browsen</span>
       }
 
       /*
-       * Live-Plan für heute und Zukunft (auch wenn heute schon bewertet).
-       * Nur Vergangenheit nutzt Historie — sonst verschwindet „starten“ nach dem Abhaken.
+       * Live-Plan für heute und Zukunft (Plan-Text bleibt sichtbar).
+       * Start-Kreis nur, solange der Tag noch nicht bewertet wurde.
+       * Nur Vergangenheit nutzt Historie für den Plan-Inhalt.
        */
       function zirkelWeekdayForDate(d) {
         var dateStr = formatDateKey(d);
@@ -6837,7 +6838,8 @@ browsen</span>
       }
 
       /* Text für einen Kalendertag:
-       * Heute/Zukunft: aktueller Plan (auch nach Bewertung startbar).
+       * Heute/Zukunft: aktueller Plan.
+       * Nach Bewertung: Plan bleibt sichtbar, aber nicht mehr startbar.
        * Vergangenheit: History. */
       function coachDayTextForDate(d) {
         if (isAccountPaused()) return "";
@@ -11434,20 +11436,27 @@ browsen</span>
           scoreFill.style.width = pct + "%";
         }
 
+        function isStartNowLine(line) {
+          return /^(jetzt starten|start now)$/i.test(String(line || "").trim());
+        }
+
         function renderWorkout(d) {
           var w = workoutFor(d);
           var key = dateKey(d);
           var canAct = canRateCalendarDay(key);
+          var entry = entryFor(key);
+          /* Bewertung = Training gemacht → kein Start-Kreis mehr. */
+          var alreadyDone = !!(entry && entry.score != null);
           titleEl.textContent = w.title || "";
-          var showStart = !!(w.line1 && canAct);
-          line1El.textContent = showStart ? w.line1 : "";
-          line1El.hidden = !showStart;
+          var canStart = !!(canAct && !alreadyDone && (w.zirkel || w.training));
+          var showLine1 = !!(w.line1 && (canStart || (alreadyDone && !isStartNowLine(w.line1))));
+          line1El.textContent = showLine1 ? w.line1 : "";
+          line1El.hidden = !showLine1;
           line2El.textContent = "";
           while (line2El.firstChild) line2El.removeChild(line2El.firstChild);
           line2El.hidden = true;
           if (workoutBox) {
             var startTab = w.zirkel ? "intervall" : (w.trainingTab || "");
-            var canStart = !!(canAct && (w.zirkel || w.training));
             workoutBox.classList.toggle("is-zirkel", canStart);
             if (canStart) {
               workoutBox.setAttribute("role", "button");
@@ -11551,7 +11560,8 @@ browsen</span>
             btn.setAttribute("aria-label", names[i] + " " + d.getDate());
             if (isAccountPaused()) btn.disabled = true;
             if (w && !w.rest) btn.classList.add("has-workout");
-            if (w && (w.zirkel || w.training)) btn.classList.add("is-zirkel");
+            var dayDone = !!(entryFor(key) && entryFor(key).score != null);
+            if (w && (w.zirkel || w.training) && !dayDone) btn.classList.add("is-zirkel");
             if (key === todayKey) btn.classList.add("is-today");
             if (key === selectedKey) {
               btn.classList.add("is-selected");
@@ -11562,7 +11572,9 @@ browsen</span>
             btn.innerHTML =
               "<span>" + names[i] + "</span><span class='home-cal__n'>" + d.getDate() + "</span>";
             btn.addEventListener("click", function () {
-              if (key === selectedKey && rateable && w && w.training && w.trainingTab) {
+              var dayEntry = entryFor(key);
+              var done = !!(dayEntry && dayEntry.score != null);
+              if (key === selectedKey && rateable && !done && w && w.training && w.trainingTab) {
                 openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null);
                 return;
               }
