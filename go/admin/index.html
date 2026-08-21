@@ -1167,6 +1167,14 @@
     }
     .list-item span {
       display: block; margin-top: 4px; font-size: 0.85rem; font-weight: 500; opacity: 0.8;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .list-item .list-item__trainer {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     /* Nach .list-item span: sonst bleibt der Punkt durch display:block immer sichtbar. */
     .list-item .list-item__msg-dot {
@@ -1195,51 +1203,53 @@
     .list-row.is-paused .list-item { opacity: 0.55; }
     .list-main {
       display: grid;
-      grid-template-columns: 1fr auto auto;
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 8px;
       align-items: stretch;
       min-width: 0;
     }
-    .list-challenge-euro,
-    .list-challenge-wheel {
-      width: 52px;
-      min-height: 52px;
+    .list-challenge {
+      width: 56px;
+      min-height: 64px;
       align-self: stretch;
       border-radius: var(--radius);
       border: 1.5px solid rgba(247, 245, 240, 0.55);
       background: rgba(10, 10, 10, 0.16);
       color: var(--ink-on-red);
-      display: inline-flex;
+      display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 4px;
       position: relative;
-      padding: 0;
+      padding: 8px 4px;
       font-weight: 700;
-      font-size: 1.15rem;
       line-height: 1;
       cursor: pointer;
     }
-    .list-challenge-euro.is-active {
+    .list-challenge.is-active {
       background: var(--paper);
       color: var(--red);
       border-color: var(--paper);
     }
-    .list-challenge-wheel {
-      cursor: default;
-      pointer-events: none;
+    .list-challenge__euro {
+      font-size: 1.15rem;
+      font-weight: 700;
+      line-height: 1;
     }
-    .list-challenge-wheel svg {
-      position: absolute;
-      inset: 5px;
-      width: calc(100% - 10px);
-      height: calc(100% - 10px);
-    }
-    .list-challenge-days {
-      position: relative;
-      z-index: 1;
-      font-size: 0.78rem;
+    .list-challenge__amount {
+      font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: -0.02em;
+      line-height: 1.1;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .list-challenge-euro,
+    .list-challenge-wheel {
+      display: none;
     }
     .list-actions {
       display: flex;
@@ -1426,6 +1436,7 @@
     }
     .menu-trainer-only { display: none; }
     body.is-trainer-mode .list-action.is-disabled,
+    body.is-trainer-mode .list-challenge.is-disabled,
     body.is-trainer-mode .list-challenge-euro.is-disabled,
     body.is-trainer-mode .list-challenge-wheel.is-disabled {
       opacity: 0.35;
@@ -5681,57 +5692,54 @@
           enterUserAccount(row.first_name, row.serial_number, row.code);
         });
 
-        var euroBtn = document.createElement("button");
-        euroBtn.type = "button";
-        euroBtn.className = "list-challenge-euro" + (row.challenge_active ? " is-active" : "");
-        euroBtn.textContent = "€";
-        euroBtn.setAttribute("aria-label", "Challenge für " + (row.first_name || "Nutzer"));
-        euroBtn.setAttribute("aria-pressed", row.challenge_active ? "true" : "false");
+        var challengeBtn = document.createElement("button");
+        challengeBtn.type = "button";
+        challengeBtn.className = "list-challenge" + (row.challenge_active ? " is-active" : "");
+        challengeBtn.setAttribute("aria-label", "Challenge für " + (row.first_name || "Nutzer"));
+        challengeBtn.setAttribute("aria-pressed", row.challenge_active ? "true" : "false");
+        var challengeEuro = document.createElement("span");
+        challengeEuro.className = "list-challenge__euro";
+        challengeEuro.textContent = "€";
+        var challengeAmount = document.createElement("span");
+        challengeAmount.className = "list-challenge__amount";
+        challengeBtn.appendChild(challengeEuro);
+        challengeBtn.appendChild(challengeAmount);
 
-        var wheel = document.createElement("div");
-        wheel.className = "list-challenge-wheel";
-        wheel.setAttribute("aria-label", "Verbleibende Challenge-Tage");
-        var wheelSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        wheelSvg.setAttribute("viewBox", "0 0 40 40");
-        var daysEl = document.createElement("span");
-        daysEl.className = "list-challenge-days";
         function refreshChallengeUi() {
           var active = !!row.challenge_active;
-          euroBtn.classList.toggle("is-active", active);
-          euroBtn.setAttribute("aria-pressed", active ? "true" : "false");
-          euroBtn.title = active && row.challenge_amount
+          challengeBtn.classList.toggle("is-active", active);
+          challengeBtn.setAttribute("aria-pressed", active ? "true" : "false");
+          challengeBtn.title = active && row.challenge_amount != null
             ? (row.challenge_amount + " €")
             : "Challenge-Einsatz setzen";
-          var rem = challengeRemainingDays(row.challenge_started_at, active);
-          daysEl.textContent = String(active ? rem : CHALLENGE_DAYS);
-          drawAdminChallengeWheel(wheelSvg, active ? rem : 0);
-          if (row.challenge_active && row.challenge_amount != null) {
-            stakeLine.textContent = String(row.challenge_amount) + "\u00a0€";
-            stakeLine.classList.add("is-on");
+          if (active && row.challenge_amount != null) {
+            challengeAmount.textContent = String(row.challenge_amount) + "\u00a0€";
+            stakeLine.textContent = "";
+            stakeLine.classList.remove("is-on");
           } else {
+            var rem = challengeRemainingDays(row.challenge_started_at, active);
+            challengeAmount.textContent = String(active ? rem : CHALLENGE_DAYS);
             stakeLine.textContent = "";
             stakeLine.classList.remove("is-on");
           }
         }
-        wheel.appendChild(wheelSvg);
-        wheel.appendChild(daysEl);
         refreshChallengeUi();
 
-        euroBtn.addEventListener("click", async function (e) {
+        challengeBtn.addEventListener("click", async function (e) {
           e.stopPropagation();
-          euroBtn.disabled = true;
+          challengeBtn.disabled = true;
           try {
             if (row.challenge_active) {
               var abort = await confirmChallengeAbort();
               if (!abort) {
-                euroBtn.disabled = false;
+                challengeBtn.disabled = false;
                 return;
               }
               await patchInviteChallenge(row, false, null);
             } else {
               var amount = await pickChallengeAmount(row);
               if (amount == null) {
-                euroBtn.disabled = false;
+                challengeBtn.disabled = false;
                 return;
               }
               await patchInviteChallenge(row, true, amount);
@@ -5746,17 +5754,15 @@
                 : (err && err.message ? err.message.slice(0, 120) : "Challenge speichern fehlgeschlagen.");
             document.getElementById("list-msg").classList.add("is-error");
           }
-          euroBtn.disabled = false;
+          challengeBtn.disabled = false;
         });
 
         main.appendChild(openBtn);
-        main.appendChild(euroBtn);
-        main.appendChild(wheel);
+        main.appendChild(challengeBtn);
 
         if (trainerAdminMode) {
-          euroBtn.classList.add("is-disabled");
-          euroBtn.disabled = true;
-          wheel.classList.add("is-disabled");
+          challengeBtn.classList.add("is-disabled");
+          challengeBtn.disabled = true;
         }
 
         var actions = document.createElement("div");
@@ -5787,7 +5793,7 @@
 
         function setBusy(on) {
           openBtn.disabled = on;
-          euroBtn.disabled = on;
+          challengeBtn.disabled = on;
           adminBtn.disabled = on;
           pauseBtn.disabled = on;
           delBtn.disabled = on;
@@ -5946,7 +5952,7 @@
             }
             try {
               var joschaRes = await fetch(
-                SUPABASE_URL + "/rest/v1/go_accounts?or=(phone.eq.coach,phone.eq.admin,name.ilike.joscha)&select=id,name,serial_number,invite_code,phone,is_trainer&order=created_at.asc&limit=10",
+                SUPABASE_URL + "/rest/v1/go_accounts?or=(phone.eq.coach,name.ilike.joscha)&select=id,name,serial_number,invite_code,phone,is_trainer&order=created_at.asc&limit=10",
                 { headers: apiHeaders() }
               );
               var joschaRows = joschaRes.ok ? await joschaRes.json() : [];
@@ -5955,8 +5961,8 @@
                 if (!acc) return;
                 var phone = String(acc.phone || "").toLowerCase();
                 var nm = String(acc.name || "").toLowerCase();
-                if (!(phone === "coach" || phone === "admin" || nm === "joscha")) return;
-                /* Admin-Joscha mit Seriennummer/Code bevorzugen (nicht nur Coach-Seed). */
+                /* Nur echter Joscha/Coach — phone=admin trifft viele Impersonation-Accounts. */
+                if (!(nm === "joscha" || phone === "coach")) return;
                 if (!joscha) {
                   joscha = acc;
                   return;
@@ -5964,9 +5970,7 @@
                 var hasCreds = !!(acc.serial_number && acc.invite_code);
                 var curHas = !!(joscha.serial_number && joscha.invite_code);
                 if (hasCreds && !curHas) joscha = acc;
-                else if (phone === "admin" && String(joscha.phone || "").toLowerCase() !== "admin" && (hasCreds || !curHas)) {
-                  joscha = acc;
-                }
+                else if (acc.is_trainer && !joscha.is_trainer) joscha = acc;
               });
               if (joscha) {
                 var joschaSerial = joscha.serial_number || "";
