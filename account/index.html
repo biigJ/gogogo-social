@@ -599,11 +599,25 @@
       cursor: pointer;
       border-radius: 2px;
       border-color: rgba(180, 180, 180, 0.9);
+      pointer-events: auto;
+      position: relative;
+      z-index: 2;
     }
     .home-cal__invite-sq.is-handshake {
       color: #F7F5F0;
-      filter: grayscale(1) brightness(3.4) contrast(1.15);
-      -webkit-filter: grayscale(1) brightness(3.4) contrast(1.15);
+      /* Emoji-Farbe ist plattformabhängig — Icon als SVG erzwingen */
+      filter: none;
+      -webkit-filter: none;
+    }
+    .home-cal__invite-sq.is-handshake .home-cal__handshake-icon {
+      display: block;
+      width: 58%;
+      height: 58%;
+      max-width: 22px;
+      max-height: 22px;
+      fill: #F7F5F0;
+      color: #F7F5F0;
+      pointer-events: none;
     }
     .home-cal__invite-sq.is-on {
       border-radius: 50%;
@@ -614,10 +628,17 @@
       font-weight: 700;
       letter-spacing: -0.04em;
       cursor: pointer;
+      pointer-events: auto;
+      position: relative;
+      z-index: 2;
     }
     .home-cal__invite-sq:disabled:not(.is-active):not(.is-on) {
       border-color: transparent;
       opacity: 0;
+      pointer-events: none;
+    }
+    .home-cal__mark:disabled,
+    .home-cal__mark[aria-hidden="true"] {
       pointer-events: none;
     }
     body.is-account-paused .home-cal,
@@ -4226,6 +4247,17 @@ browsen</span>
         });
       }
 
+      function outboundInvitesForDate(dateKey) {
+        var mine = account && account.id ? String(account.id) : "";
+        if (!mine) return [];
+        return (workoutInvites || []).filter(function (inv) {
+          if (!inv || String(inv.workout_date || "").slice(0, 10) !== dateKey) return false;
+          if (String(inv.from_id) !== mine) return false;
+          if (String(inv.status || "pending") === "declined" || isInviteDeclined(inv)) return false;
+          return true;
+        });
+      }
+
       function pendingIncomingInvites() {
         var mine = account && account.id ? String(account.id) : "";
         if (!mine) return [];
@@ -4248,7 +4280,69 @@ browsen</span>
       }
 
       function outboundShareForDate(dateKey) {
-        return outboundShares[dateKey] || null;
+        var key = String(dateKey || "").slice(0, 10);
+        var existing = outboundShares[key] || null;
+        var rows = outboundInvitesForDate(key);
+        if (!rows.length) {
+          if (existing && (
+            (Array.isArray(existing.buddy_ids) && existing.buddy_ids.length) ||
+            (Array.isArray(existing.buddy_names) && existing.buddy_names.length) ||
+            existing.label
+          )) {
+            return existing;
+          }
+          return existing;
+        }
+        var ids = Array.isArray(existing && existing.buddy_ids) ? existing.buddy_ids.slice() : [];
+        var names = Array.isArray(existing && existing.buddy_names) ? existing.buddy_names.slice() : [];
+        var label = (existing && existing.label) || "";
+        var place = (existing && existing.place) || "";
+        var meetTime = (existing && existing.meet_time) || "";
+        var changed = false;
+        rows.forEach(function (inv) {
+          if (inv.to_id && ids.map(String).indexOf(String(inv.to_id)) < 0) {
+            ids.push(String(inv.to_id));
+            changed = true;
+          }
+          var n = "";
+          try { n = inviteBuddyDisplayName(inv.to_id) || inv.to_name || ""; } catch (eN) { n = inv.to_name || ""; }
+          if (n && names.indexOf(n) < 0) {
+            names.push(n);
+            changed = true;
+          }
+          if (!label && inv.workout_label) {
+            label = inv.workout_label;
+            changed = true;
+          }
+          if (!place && inv.place) {
+            place = inv.place;
+            changed = true;
+          }
+          if (!meetTime && inv.meet_time) {
+            meetTime = inv.meet_time;
+            changed = true;
+          }
+        });
+        var merged = {
+          label: label || "Workout",
+          buddy_ids: ids,
+          buddy_names: names,
+          place: place || "",
+          meet_time: meetTime || ""
+        };
+        if (!existing || changed || !existing.label) {
+          outboundShares[key] = merged;
+          saveOutboundSharesLocal();
+        }
+        return outboundShares[key] || merged;
+      }
+
+      function handshakeIconHtml() {
+        return (
+          '<svg class="home-cal__handshake-icon" viewBox="0 0 24 24" aria-hidden="true">' +
+          '<path fill="currentColor" d="M12.9 17.6 9.7 20.8a2.5 2.5 0 0 1-3.5 0l-.7-.7 4.7-4.7.6.6c.5.5 1.2.7 1.9.5l.2-.1zm6.2-9.3-1.3-1.3a1.75 1.75 0 0 0-2.5 0l-.4.4 2.8 2.8.4-.4c.7-.7.7-1.8 0-2.5zm-3.2 1.1-2.8-2.8-1.2 1.2 2.8 2.8 1.2-1.2zm-2.1 2.1-2.8-2.8-1.1 1.1a1.75 1.75 0 0 0 0 2.5l.2.2 2.5-2.5 1.2 1.2-2.5 2.5.5.5c.7.7 1.8.7 2.5 0l2.3-2.3-2.8-2.4zm-6.5-.4 1.6-1.6-1.2-1.2-1.6 1.6c-.7.7-.7 1.8 0 2.5l.4.4 1.2-1.2-.4-.4a.75.75 0 0 1 0-1.1zM7.4 7.6l1.2 1.2 1.6-1.6a1.75 1.75 0 0 0 0-2.5L9 3.5a1.75 1.75 0 0 0-2.5 0L4.2 5.8c-.7.7-.7 1.8 0 2.5l1.2 1.2 1.2-1.2-1.2-1.2a.75.75 0 0 1 0-1.1L6.6 4.8c.3-.3.8-.3 1.1 0l1.2 1.2-1.5 1.6z"/>' +
+          "</svg>"
+        );
       }
 
       function formatInviteWhen(dateKey) {
@@ -10673,14 +10767,42 @@ browsen</span>
             var pendingInvites = invitesForDate(key).filter(function (inv) {
               return String(inv.status || "pending") === "pending";
             });
-            var accepted = acceptedInviteForDate(key);
+            var myOutboundRows = outboundInvitesForDate(key);
             var outbound = outboundShareForDate(key);
+            var hasOutbound = !!(
+              myOutboundRows.length ||
+              (outbound && (
+                (outbound.buddy_ids && outbound.buddy_ids.length) ||
+                (outbound.buddy_names && outbound.buddy_names.length) ||
+                outbound.label
+              ))
+            );
+            var accepted = (!hasOutbound) ? acceptedInviteForDate(key) : null;
             var sq = document.createElement("button");
             sq.type = "button";
             sq.className = "home-cal__invite-sq";
-            if (pendingInvites.length || accepted || (outbound && outbound.buddy_ids && outbound.buddy_ids.length)) {
+            if (hasOutbound || pendingInvites.length || accepted) {
               var acceptedTime = accepted ? normalizeMeetTime(accepted.meet_time) : "";
-              if (accepted) {
+              if (hasOutbound) {
+                sq.innerHTML = handshakeIconHtml();
+                sq.classList.add("is-active", "is-handshake");
+                sq.disabled = false;
+                sq.removeAttribute("aria-hidden");
+                sq.setAttribute("aria-label", t("Einladung ansehen", "View invite"));
+                sq.addEventListener("click", function (ev) {
+                  ev.preventDefault();
+                  ev.stopPropagation();
+                  selectDay(key, false);
+                  var share = outboundShareForDate(key) || outbound || {
+                    label: "Workout",
+                    buddy_ids: myOutboundRows.map(function (r) { return r.to_id; }).filter(Boolean),
+                    buddy_names: [],
+                    place: (myOutboundRows[0] && myOutboundRows[0].place) || "",
+                    meet_time: (myOutboundRows[0] && myOutboundRows[0].meet_time) || ""
+                  };
+                  openOutboundInviteInfo(key, share);
+                });
+              } else if (accepted) {
                 sq.textContent = acceptedTime || "✓";
                 sq.classList.add("is-on");
                 sq.disabled = false;
@@ -10696,26 +10818,16 @@ browsen</span>
                   selectDay(key, false);
                   openAcceptedInviteInfo(key, accepted);
                 });
-              } else if (pendingInvites.length) {
-                sq.textContent = "🤝";
+              } else {
+                sq.innerHTML = handshakeIconHtml();
                 sq.classList.add("is-active", "is-handshake");
+                sq.disabled = false;
                 sq.setAttribute("aria-label", t("Einladung zusagen oder absagen", "Accept or decline invite"));
                 sq.addEventListener("click", function (ev) {
                   ev.preventDefault();
                   ev.stopPropagation();
                   selectDay(key, false);
                   openInviteDecide(pendingInvites[0]);
-                });
-              } else {
-                sq.textContent = "🤝";
-                sq.classList.add("is-active", "is-handshake");
-                sq.disabled = false;
-                sq.setAttribute("aria-label", t("Einladung ansehen", "View invite"));
-                sq.addEventListener("click", function (ev) {
-                  ev.preventDefault();
-                  ev.stopPropagation();
-                  selectDay(key, false);
-                  openOutboundInviteInfo(key, outbound);
                 });
               }
             } else {
