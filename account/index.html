@@ -5889,38 +5889,91 @@ browsen</span>
       }
 
       async function loadBuddiesFromCloud() {
-        if (!hasCloudAccount()) return;
+        if (!hasCloudAccount()) return false;
         var rows = await restGet(
           "go_buddies?account_id=eq." + encodeURIComponent(account.id) +
           "&select=buddy_id&limit=8"
         );
-        if (!rows || !rows.length) return;
+        if (!rows || !rows.length) return false;
         var ids = [];
         for (var i = 0; i < rows.length; i++) {
-          if (rows[i] && rows[i].buddy_id) ids.push(rows[i].buddy_id);
+          if (rows[i] && rows[i].buddy_id) ids.push(String(rows[i].buddy_id));
         }
-        if (!ids.length) return;
+        if (!ids.length) return false;
         var inList = "(" + ids.join(",") + ")";
         var people = await restGet(
           "go_accounts?id=in." + inList +
-          "&select=id,name,serial_number,photo_url&limit=8"
+          "&select=id,name,serial_number,photo_url,updated_at&limit=8"
         );
-        if (!people || !people.length) return;
+        if (!people || !people.length) return false;
+        var byId = {};
+        for (var p = 0; p < people.length; p++) {
+          if (people[p] && people[p].id) byId[String(people[p].id)] = people[p];
+        }
         var next = [];
-        for (var j = 0; j < people.length && next.length < MAX_BUDDIES; j++) {
-          var remote = people[j];
+        var changed = false;
+        /* Reihenfolge der Cloud-Links beibehalten. */
+        for (var j = 0; j < ids.length && next.length < MAX_BUDDIES; j++) {
+          var remote = byId[ids[j]];
           if (!remote || !remote.name) continue;
-          next.push({
+          var entry = {
             id: remote.id || null,
             name: remote.name,
             serial_number: remote.serial_number || null,
             photo_url: remote.photo_url || null
-          });
+          };
+          next.push(entry);
         }
-        if (next.length) {
+        if (!next.length) return false;
+        var prev = getBuddies();
+        if (prev.length !== next.length) {
+          changed = true;
+        } else {
+          for (var k = 0; k < next.length; k++) {
+            var a = prev[k] || {};
+            var b = next[k] || {};
+            if (
+              String(a.id || "") !== String(b.id || "") ||
+              String(a.name || "") !== String(b.name || "") ||
+              String(a.photo_url || "") !== String(b.photo_url || "") ||
+              String(a.serial_number || "") !== String(b.serial_number || "")
+            ) {
+              changed = true;
+              break;
+            }
+          }
+        }
+        if (changed) {
           buddyList = next;
           saveBuddies();
         }
+        return changed;
+      }
+
+      /* Buddy-/Trainer-Fotos und Namen aus go_accounts nachziehen (Community + Poll). */
+      async function refreshLinkedProfilesFromCloud() {
+        if (!hasCloudAccount() || isAccountPaused()) return false;
+        var buddyChanged = false;
+        try {
+          buddyChanged = !!(await loadBuddiesFromCloud());
+        } catch (e0) {}
+        var trainerChanged = false;
+        var prevTrainerPhoto = trainerLink && trainerLink.photo_url;
+        var prevTrainerName = trainerLink && trainerLink.name;
+        try {
+          await loadTrainerFromCloud();
+          if (
+            String((trainerLink && trainerLink.photo_url) || "") !== String(prevTrainerPhoto || "") ||
+            String((trainerLink && trainerLink.name) || "") !== String(prevTrainerName || "")
+          ) {
+            trainerChanged = true;
+          }
+        } catch (e1) {}
+        if (buddyChanged || trainerChanged) {
+          fillProfilePanel();
+          renderBuddySlots();
+        }
+        return buddyChanged || trainerChanged;
       }
 
       var authorNameMapExtra = {};
@@ -6258,6 +6311,7 @@ browsen</span>
           var lockEl = document.getElementById("community-add-msg");
           if (lockEl) lockEl.textContent = buddySearchLockMessage();
         }
+        refreshLinkedProfilesFromCloud().catch(function () {});
         refreshCommunityFeed().catch(function () {});
       }
 
@@ -6343,11 +6397,13 @@ browsen</span>
           restoreShareModalAfterCamera();
           refreshAccountPausedStatus().catch(function () {});
           verifyAccountStillExists().catch(function () {});
+          refreshLinkedProfilesFromCloud().catch(function () {});
         }
       });
       window.addEventListener("pageshow", function () {
         restoreShareModalAfterCamera();
         verifyAccountStillExists().catch(function () {});
+        refreshLinkedProfilesFromCloud().catch(function () {});
       });
       window.addEventListener("focus", restoreShareModalAfterCamera);
 
@@ -6381,6 +6437,7 @@ browsen</span>
             if (document.hidden) return;
             if (isAccountPaused()) return;
             refreshCommunityFeed().catch(function () {});
+            refreshLinkedProfilesFromCloud().catch(function () {});
           }, 20000);
         }
         var waEl = document.getElementById("wa-chat");
