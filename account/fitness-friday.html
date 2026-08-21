@@ -1653,6 +1653,105 @@
     gap:8px;
   }
   .kraft-layout.is-running .kraft-save-wrap{ display:none; }
+  .kraft-named-list{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    margin-top:4px;
+  }
+  .kraft-named-empty{
+    font-size:12px;
+    opacity:0.75;
+    font-weight:500;
+  }
+  .kraft-named-item{
+    width:100%;
+    min-height:40px;
+    padding:8px 12px;
+    border:1.5px solid rgba(247,245,240,0.45);
+    border-radius:2px;
+    background:transparent;
+    color:var(--text);
+    font-family:var(--display);
+    font-size:13px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    text-align:left;
+    cursor:pointer;
+  }
+  .kraft-named-item.is-selected{
+    border-color:var(--text);
+    background:rgba(247,245,240,0.12);
+  }
+  .brand-prompt{
+    position:fixed;
+    inset:0;
+    z-index:120;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:24px 16px;
+    background:rgba(10,10,10,0.28);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+  }
+  .brand-prompt[hidden]{ display:none !important; }
+  .brand-prompt.is-open{ display:flex; }
+  .brand-prompt__sheet{
+    width:min(100%,340px);
+    background:var(--bg);
+    color:var(--text);
+    border-radius:22px;
+    padding:28px 22px 22px;
+    text-align:center;
+    box-shadow:0 18px 48px rgba(10,10,10,0.28);
+  }
+  .brand-prompt__title{
+    font-size:1.15rem;
+    font-weight:700;
+    letter-spacing:-0.03em;
+    line-height:1.3;
+    margin:0 0 14px;
+  }
+  .brand-prompt__input{
+    width:100%;
+    box-sizing:border-box;
+    min-height:48px;
+    padding:12px 14px;
+    border:1.5px solid rgba(247,245,240,0.55);
+    border-radius:12px;
+    background:rgba(247,245,240,0.12);
+    color:var(--text);
+    font-family:var(--display);
+    font-size:1rem;
+    font-weight:600;
+    letter-spacing:-0.02em;
+    outline:none;
+  }
+  .brand-prompt__input::placeholder{ color:rgba(247,245,240,0.55); }
+  .brand-prompt__actions{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin-top:18px;
+  }
+  .brand-prompt__btn{
+    min-height:48px;
+    border:0;
+    border-radius:12px;
+    font-family:var(--display);
+    font-weight:700;
+    font-size:0.95rem;
+    letter-spacing:-0.02em;
+    background:var(--text);
+    color:var(--on-accent);
+    cursor:pointer;
+  }
+  .brand-prompt__btn.is-ghost{
+    background:transparent;
+    color:var(--text);
+    border:1.5px solid rgba(247,245,240,0.55);
+  }
 </style>
 </head>
 <body>
@@ -1690,6 +1789,7 @@
             <div class="kraft-save-wrap">
               <button type="button" class="kraft-save-preset" id="kraftNewExercise" data-de="Neue Übung" data-en="New exercise">Neue Übung</button>
               <button type="button" class="kraft-save-preset" id="kraftSavePreset" data-de="Als Vorlage speichern" data-en="Save as template">Als Vorlage speichern</button>
+              <div class="kraft-named-list" id="kraftNamedList" aria-label="Eigene Vorlagen"></div>
             </div>
           </div>
         </div>
@@ -1914,6 +2014,16 @@
       <div class="abort-actions">
         <button type="button" class="abort-stay" id="deleteStayBtn">Behalten</button>
         <button type="button" class="abort-yes" id="deleteYesBtn">Löschen</button>
+      </div>
+    </div>
+  </div>
+  <div id="brand-prompt-modal" class="brand-prompt" hidden aria-hidden="true">
+    <div class="brand-prompt__sheet" role="dialog" aria-modal="true" aria-labelledby="brand-prompt-title">
+      <p class="brand-prompt__title" id="brand-prompt-title">Eingabe</p>
+      <input class="brand-prompt__input" id="brand-prompt-input" type="text" maxlength="80" autocomplete="off" />
+      <div class="brand-prompt__actions">
+        <button type="button" class="brand-prompt__btn is-ghost" id="brand-prompt-cancel">Abbrechen</button>
+        <button type="button" class="brand-prompt__btn" id="brand-prompt-ok">OK</button>
       </div>
     </div>
   </div>
@@ -2395,9 +2505,12 @@
   let kraftSelected = [];
   let kraftPresetMap = {};
   let kraftCustomMap = {};
+  let kraftNamedTemplates = {};
+  let kraftNamedSelectedId = '';
   let kraftGlobalMap = {};
   let kraftGlobalLoaded = false;
   let kraftNameOverrides = {};
+  let brandPromptResolver = null;
   let kraftHiddenBySystem = {};
   let kraftHiddenLoaded = false;
   let kraftPresetsLoaded = false;
@@ -4104,6 +4217,7 @@
       kraftPresetMap = {};
       kraftCustomMap = {};
     }
+    loadKraftNamedTemplates();
     kraftPresetsLoaded = true;
   }
 
@@ -4274,6 +4388,7 @@
     if (layout) layout.classList.toggle('is-running', kraftRunning);
     renderKraftSystems();
     renderKraftExercises();
+    renderKraftNamedList();
     updateKraftHub();
   }
 
@@ -4298,6 +4413,7 @@
     if (kraftRunning || !id) return;
     if (!force && id === kraftSystemId && kraftSelected.length) return;
     kraftSystemId = id;
+    kraftNamedSelectedId = '';
     applyKraftDefaults(id);
     refreshKraftChrome();
   }
@@ -4886,10 +5002,155 @@
     }
   }
 
-  async function saveOwnKraftPreset(){
+  function kraftNamedStorageKey(){
+    var aid = getGoAccountId() || 'local';
+    return 'gogogo_kraft_named_templates_' + aid;
+  }
+
+  function loadKraftNamedTemplates(){
+    kraftNamedTemplates = {};
+    try {
+      var raw = JSON.parse(localStorage.getItem(kraftNamedStorageKey()) || '{}') || {};
+      Object.keys(raw).forEach(function(sys){
+        kraftNamedTemplates[sys] = Array.isArray(raw[sys]) ? raw[sys] : [];
+      });
+    } catch (e) {
+      kraftNamedTemplates = {};
+    }
+  }
+
+  function saveKraftNamedTemplates(){
+    try {
+      localStorage.setItem(kraftNamedStorageKey(), JSON.stringify(kraftNamedTemplates || {}));
+    } catch (e) {}
+  }
+
+  function flashKraftSaveBtn(btn, doneLabel){
+    if (!btn) return;
+    btn.classList.add('is-saved');
+    btn.textContent = doneLabel || 'Gespeichert';
+    setTimeout(function(){
+      btn.classList.remove('is-saved');
+      btn.textContent = btn.getAttribute('data-de') || btn.textContent;
+    }, 1600);
+  }
+
+  function closeBrandPrompt(value){
+    var modal = document.getElementById('brand-prompt-modal');
+    var input = document.getElementById('brand-prompt-input');
+    if (modal) {
+      modal.classList.remove('is-open');
+      modal.setAttribute('hidden', '');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+    if (input) input.blur();
+    var resolve = brandPromptResolver;
+    brandPromptResolver = null;
+    if (resolve) resolve(value);
+  }
+
+  function openBrandPrompt(opts){
+    opts = opts || {};
+    return new Promise(function(resolve){
+      if (brandPromptResolver) closeBrandPrompt(null);
+      brandPromptResolver = resolve;
+      var modal = document.getElementById('brand-prompt-modal');
+      var title = document.getElementById('brand-prompt-title');
+      var input = document.getElementById('brand-prompt-input');
+      if (title) title.textContent = opts.title || 'Eingabe';
+      if (input) {
+        input.value = opts.value || '';
+        input.placeholder = opts.placeholder || '';
+      }
+      if (modal) {
+        modal.removeAttribute('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        modal.classList.add('is-open');
+      }
+      setTimeout(function(){
+        if (!input) return;
+        input.focus();
+        input.select();
+      }, 30);
+    });
+  }
+
+  (function bindBrandPrompt(){
+    var ok = document.getElementById('brand-prompt-ok');
+    var cancel = document.getElementById('brand-prompt-cancel');
+    var modal = document.getElementById('brand-prompt-modal');
+    var input = document.getElementById('brand-prompt-input');
+    if (ok) {
+      ok.addEventListener('click', function(){
+        var val = input ? String(input.value || '').trim() : '';
+        closeBrandPrompt(val || null);
+      });
+    }
+    if (cancel) cancel.addEventListener('click', function(){ closeBrandPrompt(null); });
+    if (modal) {
+      modal.addEventListener('click', function(e){
+        if (e.target === modal) closeBrandPrompt(null);
+      });
+    }
+    if (input) {
+      input.addEventListener('keydown', function(e){
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          var val = String(input.value || '').trim();
+          closeBrandPrompt(val || null);
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          closeBrandPrompt(null);
+        }
+      });
+    }
+  })();
+
+  function renderKraftNamedList(){
+    var list = document.getElementById('kraftNamedList');
+    if (!list) return;
+    if (!Object.keys(kraftNamedTemplates || {}).length) loadKraftNamedTemplates();
+    var rows = (kraftNamedTemplates[kraftSystemId] || []).slice();
+    list.innerHTML = '';
+    if (!rows.length) {
+      var empty = document.createElement('div');
+      empty.className = 'kraft-named-empty';
+      empty.textContent = 'Noch keine eigene Vorlage.';
+      list.appendChild(empty);
+      return;
+    }
+    rows.forEach(function(row){
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'kraft-named-item' + (String(kraftNamedSelectedId) === String(row.id) ? ' is-selected' : '');
+      btn.dataset.namedId = String(row.id);
+      btn.textContent = row.name || 'Vorlage';
+      list.appendChild(btn);
+    });
+  }
+
+  function applyKraftNamedTemplate(id){
+    if (kraftRunning || !kraftSystemId || !id) return;
+    var rows = kraftNamedTemplates[kraftSystemId] || [];
+    var row = null;
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i].id) === String(id)) { row = rows[i]; break; }
+    }
+    if (!row) return;
+    kraftNamedSelectedId = String(row.id);
+    kraftSelected = Array.isArray(row.exercise_ids) ? row.exercise_ids.map(String) : [];
+    if (Array.isArray(row.custom_exercises) && row.custom_exercises.length) {
+      kraftCustomMap[kraftSystemId] = row.custom_exercises.map(function(ex){
+        return { id: String(ex.id), name: String(ex.name || '') };
+      });
+    }
+    renderKraftExercises();
+    renderKraftNamedList();
+  }
+
+  async function persistKraftSelectionToCloud(){
     const aid = getGoAccountId();
-    if (!aid || !kraftSystemId || !kraftSelected.length) return;
-    const btn = document.getElementById('kraftSavePreset');
+    if (!aid || !kraftSystemId) return;
     const customs = (kraftCustomMap[kraftSystemId] || []).slice();
     const body = {
       account_id: aid,
@@ -4899,36 +5160,52 @@
       updated_at: new Date().toISOString()
     };
     try {
-      try {
-        await goRest('go_kraft_presets?on_conflict=account_id,system_id', {
-          method: 'POST',
-          prefer: 'resolution=merge-duplicates,return=minimal',
-          body: body
-        });
-      } catch (eCustom) {
-        if (!/custom_exercises/i.test(String(eCustom && eCustom.message))) throw eCustom;
-        var copy = {
+      await goRest('go_kraft_presets?on_conflict=account_id,system_id', {
+        method: 'POST',
+        prefer: 'resolution=merge-duplicates,return=minimal',
+        body: body
+      });
+    } catch (eCustom) {
+      if (!/custom_exercises/i.test(String(eCustom && eCustom.message))) throw eCustom;
+      await goRest('go_kraft_presets?on_conflict=account_id,system_id', {
+        method: 'POST',
+        prefer: 'resolution=merge-duplicates,return=minimal',
+        body: {
           account_id: aid,
           system_id: kraftSystemId,
           exercise_ids: kraftSelected.slice(),
           updated_at: body.updated_at
-        };
-        await goRest('go_kraft_presets?on_conflict=account_id,system_id', {
-          method: 'POST',
-          prefer: 'resolution=merge-duplicates,return=minimal',
-          body: copy
-        });
-      }
-      kraftPresetMap[kraftSystemId] = kraftSelected.slice();
+        }
+      });
+    }
+    kraftPresetMap[kraftSystemId] = kraftSelected.slice();
+  }
+
+  async function saveOwnKraftPreset(){
+    if (!kraftSystemId || !kraftSelected.length) return;
+    const btn = document.getElementById('kraftSavePreset');
+    var name = await openBrandPrompt({
+      title: 'Name der Vorlage',
+      placeholder: 'z. B. Beine schwer'
+    });
+    if (name == null) return;
+    name = String(name).trim();
+    if (!name) return;
+    if (!kraftNamedTemplates[kraftSystemId]) kraftNamedTemplates[kraftSystemId] = [];
+    var id = 'nt-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 5);
+    kraftNamedTemplates[kraftSystemId].push({
+      id: id,
+      name: name,
+      exercise_ids: kraftSelected.slice(),
+      custom_exercises: (kraftCustomMap[kraftSystemId] || []).slice()
+    });
+    kraftNamedSelectedId = id;
+    saveKraftNamedTemplates();
+    renderKraftNamedList();
+    flashKraftSaveBtn(btn, 'Gespeichert');
+    try {
+      await persistKraftSelectionToCloud();
       renderKraftExercises();
-      if (btn) {
-        btn.classList.add('is-saved');
-        btn.textContent = 'Gespeichert';
-        setTimeout(function(){
-          btn.classList.remove('is-saved');
-          btn.textContent = btn.getAttribute('data-de') || 'Als Vorlage speichern';
-        }, 1600);
-      }
     } catch (e) {
       console.warn('Kraft preset save failed', e);
     }
@@ -4941,7 +5218,10 @@
 
   async function createOwnKraftExercise(){
     if (kraftRunning || !kraftSystemId) return;
-    var name = window.prompt('Name der neuen Übung');
+    var name = await openBrandPrompt({
+      title: 'Name der neuen Übung',
+      placeholder: 'Übung'
+    });
     if (name == null) return;
     name = String(name).trim();
     if (!name) return;
@@ -4950,31 +5230,11 @@
     kraftCustomMap[kraftSystemId].push({ id: id, name: name });
     if (kraftSelected.indexOf(id) < 0) kraftSelected.push(id);
     renderKraftExercises();
-    const aid = getGoAccountId();
-    if (!aid) return;
-    const body = {
-      account_id: aid,
-      system_id: kraftSystemId,
-      exercise_ids: kraftSelected.slice(),
-      custom_exercises: kraftCustomMap[kraftSystemId].slice(),
-      updated_at: new Date().toISOString()
-    };
+    renderKraftNamedList();
+    const btn = document.getElementById('kraftNewExercise');
+    flashKraftSaveBtn(btn, 'Gespeichert');
     try {
-      await goRest('go_kraft_presets?on_conflict=account_id,system_id', {
-        method: 'POST',
-        prefer: 'resolution=merge-duplicates,return=minimal',
-        body: body
-      });
-      kraftPresetMap[kraftSystemId] = kraftSelected.slice();
-      const btn = document.getElementById('kraftNewExercise');
-      if (btn) {
-        btn.classList.add('is-saved');
-        btn.textContent = 'Gespeichert';
-        setTimeout(function(){
-          btn.classList.remove('is-saved');
-          btn.textContent = btn.getAttribute('data-de') || 'Neue Übung';
-        }, 1400);
-      }
+      await persistKraftSelectionToCloud();
     } catch (e) {
       console.warn('Kraft custom exercise save failed', e);
     }
@@ -5747,6 +6007,12 @@
         createOwnKraftExercise();
         return;
       }
+      const knamed = e.target.closest('.kraft-named-item');
+      if (knamed && knamed.dataset.namedId) {
+        e.preventDefault(); e.stopPropagation();
+        applyKraftNamedTemplate(knamed.dataset.namedId);
+        return;
+      }
       const aDel = e.target.closest('[data-ausdauer-del-log]');
       if (aDel) {
         e.preventDefault(); e.stopPropagation();
@@ -5941,6 +6207,7 @@
     });
     try { if (typeof renderKraftSystems === 'function') renderKraftSystems(); } catch(e){}
     try { if (typeof renderKraftExercises === 'function') renderKraftExercises(); } catch(e){}
+    try { if (typeof renderKraftNamedList === 'function') renderKraftNamedList(); } catch(e){}
     try { if (typeof refreshKraftChrome === 'function') refreshKraftChrome(); } catch(e){}
     try { if (typeof renderAusdauerTech === 'function') renderAusdauerTech(); } catch(e){}
     try { if (typeof renderAusdauerPresets === 'function') renderAusdauerPresets(); } catch(e){}

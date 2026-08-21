@@ -600,6 +600,11 @@
       border-radius: 2px;
       border-color: rgba(180, 180, 180, 0.9);
     }
+    .home-cal__invite-sq.is-handshake {
+      color: #F7F5F0;
+      filter: grayscale(1) brightness(3.4) contrast(1.15);
+      -webkit-filter: grayscale(1) brightness(3.4) contrast(1.15);
+    }
     .home-cal__invite-sq.is-on {
       border-radius: 50%;
       border-color: #F7F5F0;
@@ -608,6 +613,7 @@
       font-size: clamp(0.52rem, 2.2vw, 0.7rem);
       font-weight: 700;
       letter-spacing: -0.04em;
+      cursor: pointer;
     }
     .home-cal__invite-sq:disabled:not(.is-active):not(.is-on) {
       border-color: transparent;
@@ -3902,6 +3908,17 @@ browsen</span>
     </div>
   </div>
 
+  <div class="challenge-modal" id="invite-info-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="invite-info-title">
+      <p class="challenge-modal__title" id="invite-info-title">Einladung</p>
+      <p class="invite-decide__body" id="invite-info-body"></p>
+      <p class="invite-decide__meta" id="invite-info-meta"></p>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn" id="invite-info-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
   <div class="challenge-modal" id="buddy-action-modal" hidden aria-hidden="true">
     <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="buddy-action-title">
       <p class="challenge-modal__title" id="buddy-action-title">Buddy</p>
@@ -4506,6 +4523,92 @@ browsen</span>
         closeInviteModal("invite-decide-modal");
       }
 
+      function openInviteInfo(opts) {
+        opts = opts || {};
+        var title = document.getElementById("invite-info-title");
+        var body = document.getElementById("invite-info-body");
+        var meta = document.getElementById("invite-info-meta");
+        if (title) title.textContent = opts.title || (uiLang === "en" ? "Invite" : "Einladung");
+        if (body) {
+          body.textContent = opts.body || "";
+          body.hidden = !opts.body;
+        }
+        if (meta) {
+          meta.textContent = opts.meta || "";
+          meta.hidden = !opts.meta;
+        }
+        openInviteModal("invite-info-modal");
+      }
+
+      function closeInviteInfo() {
+        closeInviteModal("invite-info-modal");
+      }
+
+      function inviteBuddyDisplayName(bid) {
+        if (!bid) return "";
+        var buddy = typeof getBuddies === "function"
+          ? getBuddies().find(function (b) { return String(b.id) === String(bid); })
+          : null;
+        if (buddy) return firstNameOf(buddy);
+        return "";
+      }
+
+      function openOutboundInviteInfo(dateKey, outbound) {
+        if (!outbound) return;
+        var names = Array.isArray(outbound.buddy_names)
+          ? outbound.buddy_names.filter(Boolean)
+          : [];
+        if (!names.length && Array.isArray(outbound.buddy_ids)) {
+          names = outbound.buddy_ids.map(inviteBuddyDisplayName).filter(Boolean);
+        }
+        if (!names.length) {
+          (workoutInvites || []).forEach(function (inv) {
+            if (!inv || String(inv.from_id) !== String(account && account.id)) return;
+            if (String(inv.workout_date || "").slice(0, 10) !== String(dateKey)) return;
+            if (String(inv.status || "") === "declined") return;
+            var n = inviteBuddyDisplayName(inv.to_id) || inv.to_name || "";
+            if (n && names.indexOf(n) < 0) names.push(n);
+          });
+        }
+        var when = formatInviteWhen(dateKey);
+        var time = normalizeMeetTime(outbound.meet_time);
+        var place = String(outbound.place || "").trim();
+        var who = names.length
+          ? names.map(function (n) { return "@" + n; }).join(", ")
+          : (uiLang === "en" ? "your buddies" : "Deine Buddies");
+        var body = uiLang === "en"
+          ? ("You invited " + who + " for " + (outbound.label || "Workout") + " on " + when + ".")
+          : ("Du hast " + who + " zu " + (outbound.label || "Workout") + " am " + when + " eingeladen.");
+        var lines = [];
+        if (place) lines.push((uiLang === "en" ? "Place: " : "Ort: ") + place);
+        if (time) lines.push((uiLang === "en" ? "Time: " : "Uhrzeit: ") + time + " Uhr");
+        openInviteInfo({
+          title: uiLang === "en" ? "Your invite" : "Deine Einladung",
+          body: body,
+          meta: lines.join("\n")
+        });
+      }
+
+      function openAcceptedInviteInfo(dateKey, accepted) {
+        if (!accepted) return;
+        var fromName = accepted.from_name || "Buddy";
+        var when = formatInviteWhen(dateKey);
+        var time = normalizeMeetTime(accepted.meet_time);
+        var place = String(accepted.place || "").trim();
+        var body = uiLang === "en"
+          ? (fromName + " invited you on " + when + ".")
+          : (fromName + " hat Dich am " + when + " eingeladen.");
+        var lines = [];
+        if (fromName) lines.push((uiLang === "en" ? "From: " : "Einlader: ") + fromName);
+        if (place) lines.push((uiLang === "en" ? "Place: " : "Ort: ") + place);
+        if (time) lines.push((uiLang === "en" ? "Time: " : "Uhrzeit: ") + time + " Uhr");
+        openInviteInfo({
+          title: uiLang === "en" ? "Meetup" : "Treffen",
+          body: body,
+          meta: lines.join("\n")
+        });
+      }
+
       (function bindInviteDecideModal() {
         var noticeAccept = document.getElementById("invite-notice-accept");
         var noticeDecline = document.getElementById("invite-notice-decline");
@@ -4513,6 +4616,8 @@ browsen</span>
         var decideAccept = document.getElementById("invite-decide-accept");
         var decideDecline = document.getElementById("invite-decide-decline");
         var decideModal = document.getElementById("invite-decide-modal");
+        var infoOk = document.getElementById("invite-info-ok");
+        var infoModal = document.getElementById("invite-info-modal");
         if (noticeAccept) {
           noticeAccept.addEventListener("click", function () {
             var inv = pendingInviteNotice;
@@ -4567,6 +4672,12 @@ browsen</span>
             if (e.target === decideModal) closeInviteDecide();
           });
         }
+        if (infoOk) infoOk.addEventListener("click", closeInviteInfo);
+        if (infoModal) {
+          infoModal.addEventListener("click", function (e) {
+            if (e.target === infoModal) closeInviteInfo();
+          });
+        }
       })();
 
       async function loadWorkoutInvites() {
@@ -4607,9 +4718,15 @@ browsen</span>
           }
           if (String(inv.from_id) === String(account.id) && String(inv.status || "") !== "declined") {
             var prev = outboundShares[key] || {};
+            var ids = Array.isArray(prev.buddy_ids) ? prev.buddy_ids.slice() : [];
+            var names = Array.isArray(prev.buddy_names) ? prev.buddy_names.slice() : [];
+            if (inv.to_id && ids.indexOf(String(inv.to_id)) < 0) ids.push(String(inv.to_id));
+            var toName = inviteBuddyDisplayName(inv.to_id) || inv.to_name || "";
+            if (toName && names.indexOf(toName) < 0) names.push(toName);
             outboundShares[key] = {
               label: inv.workout_label || prev.label || "",
-              buddy_ids: prev.buddy_ids || [],
+              buddy_ids: ids,
+              buddy_names: names,
               place: inv.place || prev.place || "",
               meet_time: inv.meet_time || prev.meet_time || ""
             };
@@ -4655,6 +4772,7 @@ browsen</span>
         outboundShares[dateKey] = {
           label: label,
           buddy_ids: buddyIds.slice(),
+          buddy_names: buddyNames.slice(),
           place: place,
           meet_time: meetTime
         };
@@ -10431,16 +10549,22 @@ browsen</span>
               if (accepted) {
                 sq.textContent = acceptedTime || "✓";
                 sq.classList.add("is-on");
-                sq.disabled = true;
+                sq.disabled = false;
                 sq.setAttribute(
                   "aria-label",
                   acceptedTime
                     ? (t("Treffen um", "Meet at") + " " + acceptedTime)
                     : t("Einladung angenommen", "Invite accepted")
                 );
+                sq.addEventListener("click", function (ev) {
+                  ev.preventDefault();
+                  ev.stopPropagation();
+                  selectDay(key, false);
+                  openAcceptedInviteInfo(key, accepted);
+                });
               } else if (pendingInvites.length) {
                 sq.textContent = "🤝";
-                sq.classList.add("is-active");
+                sq.classList.add("is-active", "is-handshake");
                 sq.setAttribute("aria-label", t("Einladung zusagen oder absagen", "Accept or decline invite"));
                 sq.addEventListener("click", function (ev) {
                   ev.preventDefault();
@@ -10450,9 +10574,15 @@ browsen</span>
                 });
               } else {
                 sq.textContent = "🤝";
-                sq.classList.add("is-active");
-                sq.disabled = true;
-                sq.setAttribute("aria-label", t("Einladung gesendet", "Invite sent"));
+                sq.classList.add("is-active", "is-handshake");
+                sq.disabled = false;
+                sq.setAttribute("aria-label", t("Einladung ansehen", "View invite"));
+                sq.addEventListener("click", function (ev) {
+                  ev.preventDefault();
+                  ev.stopPropagation();
+                  selectDay(key, false);
+                  openOutboundInviteInfo(key, outbound);
+                });
               }
             } else {
               sq.textContent = "";
