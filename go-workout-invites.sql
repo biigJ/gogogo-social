@@ -2,6 +2,7 @@
 -- Im Supabase SQL Editor ausführen (optional).
 -- Ohne Tabelle: App liest Einladungen aus Community-Posts
 -- (reply_to + Marker ⟦goinv:YYYY-MM-DD|HH:MM|Ort⟧).
+-- Absagen/Ablehnungen: status cancelled|declined + Chat-Marker ⟦ix:DATE|c|d|x⟧.
 
 create table if not exists go_workout_invites (
   id uuid primary key default gen_random_uuid(),
@@ -12,14 +13,19 @@ create table if not exists go_workout_invites (
   from_name text,
   place text,
   meet_time text,
-  status text not null default 'pending'
-    check (status in ('pending', 'accepted', 'declined')),
+  status text not null default 'pending',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table go_workout_invites add column if not exists place text;
 alter table go_workout_invites add column if not exists meet_time text;
+
+-- Status: pending | accepted | declined | cancelled
+alter table go_workout_invites drop constraint if exists go_workout_invites_status_check;
+alter table go_workout_invites
+  add constraint go_workout_invites_status_check
+  check (status in ('pending', 'accepted', 'declined', 'cancelled'));
 
 create index if not exists go_workout_invites_to_date_idx
   on go_workout_invites (to_id, workout_date);

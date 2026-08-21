@@ -607,6 +607,12 @@
       color: #F7F5F0;
       font-size: clamp(0.85rem, 3.8vw, 1.05rem);
     }
+    .home-cal__invite-sq.is-cancel {
+      color: #F7F5F0;
+      font-size: clamp(0.85rem, 3.8vw, 1.05rem);
+      cursor: default;
+      pointer-events: none;
+    }
     .home-cal__invite-sq.is-on {
       border-radius: 2px;
       border-color: #F7F5F0;
@@ -4090,6 +4096,9 @@ browsen</span>
       var OUTBOUND_SHARES_KEY = "gogogo_outbound_shares";
       var INVITE_MARKER_RE = /⟦goinv:([^|⟧]+)\|([^|⟧]+)\|([^⟧]*)⟧/;
       var INVITE_MARKER_STRIP_RE = /\n?⟦goinv:[^⟧]*⟧/g;
+      /* Absage/Ablehnung im Chat: ⟦ix:YYYY-MM-DD|c|d|x⟧ (Parteien = author + reply_to). */
+      var INVITE_RESP_RE = /⟦ix:([^|⟧]+)\|([cdx])⟧/i;
+      var INVITE_RESP_STRIP_RE = /\n?⟦ix:[^⟧]*⟧/g;
       var BUDDIES_KEY = "gogogo_go_buddies";
       var BUDDY_SEARCH_FAILS_KEY = "gogogo_go_buddy_search_fails";
       var BUDDY_SEARCH_LOCK_KEY = "gogogo_go_buddy_search_lock_until";
@@ -4258,11 +4267,72 @@ browsen</span>
       }
 
       function stripInviteMarker(body) {
-        return String(body || "").replace(INVITE_MARKER_STRIP_RE, "").replace(/\s+$/g, "").trim();
+        return String(body || "")
+          .replace(INVITE_MARKER_STRIP_RE, "")
+          .replace(INVITE_RESP_STRIP_RE, "")
+          .replace(/\s+$/g, "")
+          .trim();
       }
       function inviteMarkerFor(dateKey, time, place) {
         return "⟦goinv:" + String(dateKey || "").slice(0, 10) + "|" +
           String(time || "") + "|" + encodeURIComponent(String(place || "")) + "⟧";
+      }
+      function inviteResponseMarker(dateKey, code) {
+        return "⟦ix:" + String(dateKey || "").slice(0, 10) + "|" + String(code || "c") + "⟧";
+      }
+      function inviteStatusRank(status) {
+        var st = String(status || "pending").toLowerCase();
+        if (st === "cancelled" || st === "declined") return 3;
+        if (st === "accepted") return 2;
+        return 1;
+      }
+      function isInviteClosedStatus(status) {
+        var st = String(status || "").toLowerCase();
+        return st === "declined" || st === "cancelled";
+      }
+      function invitePairKey(inv) {
+        if (!inv) return "";
+        return String(inv.from_id || "") + "|" +
+          String(inv.to_id || "") + "|" +
+          String(inv.workout_date || "").slice(0, 10);
+      }
+      function preferRealInviteId(a, b) {
+        function score(id) {
+          id = String(id || "");
+          if (!id) return 0;
+          if (id.indexOf("local-") === 0) return 1;
+          if (id.indexOf("post-") === 0 || id.indexOf("resp-") === 0) return 2;
+          return 3;
+        }
+        return score(a) >= score(b) ? a : b;
+      }
+      function mergeInviteRecords(a, b) {
+        if (!a) return b;
+        if (!b) return a;
+        var ra = inviteStatusRank(a.status);
+        var rb = inviteStatusRank(b.status);
+        var base = ra >= rb ? Object.assign({}, b, a) : Object.assign({}, a, b);
+        base.status = ra >= rb ? (a.status || base.status) : (b.status || base.status);
+        base.id = preferRealInviteId(a.id, b.id);
+        if (!base.workout_label) base.workout_label = a.workout_label || b.workout_label || "";
+        if (!base.place) base.place = a.place || b.place || "";
+        if (!base.meet_time) base.meet_time = a.meet_time || b.meet_time || "";
+        if (!base.from_name) base.from_name = a.from_name || b.from_name || "";
+        return base;
+      }
+      function consolidateWorkoutInvites(list) {
+        var byPair = {};
+        var orphans = [];
+        (list || []).forEach(function (inv) {
+          if (!inv) return;
+          var pk = invitePairKey(inv);
+          if (!pk || pk.split("|")[0] === "" || pk.split("|")[1] === "") {
+            orphans.push(inv);
+            return;
+          }
+          byPair[pk] = mergeInviteRecords(byPair[pk], inv);
+        });
+        return Object.keys(byPair).map(function (k) { return byPair[k]; }).concat(orphans);
       }
       function normalizeMeetTime(value) {
         var s = String(value || "").trim();
@@ -4318,7 +4388,7 @@ browsen</span>
         var mine = account && account.id ? String(account.id) : "";
         return (workoutInvites || []).filter(function (inv) {
           if (!inv || String(inv.workout_date || "").slice(0, 10) !== dateKey) return false;
-          if (String(inv.status || "pending") === "declined" || isInviteDeclined(inv)) return false;
+          if (isInviteClosedStatus(inv.status) || isInviteDeclined(inv)) return false;
           return String(inv.to_id) === mine;
         });
       }
@@ -4330,9 +4400,29 @@ browsen</span>
         return (workoutInvites || []).filter(function (inv) {
           if (!inv || String(inv.workout_date || "").slice(0, 10) !== dateKey) return false;
           if (String(inv.from_id) !== mine) return false;
-          if (String(inv.status || "pending") === "declined" || isInviteDeclined(inv)) return false;
+          if (isInviteClosedStatus(inv.status) || isInviteDeclined(inv)) return false;
           return true;
         });
+      }
+
+      /* Abgelehnte/abgesagte Einladung für Kalender-❌ (Brief weg). */
+      function closedInviteForDate(dateKey) {
+        var mine = account && account.id ? String(account.id) : "";
+        if (!mine || !dateKey) return null;
+        var key = String(dateKey).slice(0, 10);
+        var found = null;
+        (workoutInvites || []).forEach(function (inv) {
+          if (!inv || String(inv.workout_date || "").slice(0, 10) !== key) return;
+          if (String(inv.to_id) !== mine && String(inv.from_id) !== mine) return;
+          var closed = isInviteClosedStatus(inv.status) || isInviteDeclined(inv);
+          if (!closed) return;
+          found = inv;
+        });
+        if (found) return found;
+        if (isOutboundDateDeclined(key)) {
+          return { workout_date: key, status: "cancelled", from_id: mine, to_id: "" };
+        }
+        return null;
       }
 
       function pendingIncomingInvites() {
@@ -4340,7 +4430,7 @@ browsen</span>
         if (!mine) return [];
         return (workoutInvites || []).filter(function (inv) {
           if (!inv || String(inv.to_id) !== mine) return false;
-          if (isInviteDeclined(inv)) return false;
+          if (isInviteDeclined(inv) || isInviteClosedStatus(inv.status)) return false;
           return String(inv.status || "pending") === "pending";
         }).slice().sort(function (a, b) {
           return String(a.workout_date || "").localeCompare(String(b.workout_date || ""));
@@ -4446,11 +4536,10 @@ browsen</span>
               String(inv.workout_date || "").slice(0, 10);
             var key = id || fallback;
             if (!key) return;
-            var prev = map[key];
-            map[key] = prev ? Object.assign({}, prev, inv) : inv;
+            map[key] = mergeInviteRecords(map[key], inv);
           });
         });
-        return Object.keys(map).map(function (k) { return map[k]; });
+        return consolidateWorkoutInvites(Object.keys(map).map(function (k) { return map[k]; }));
       }
 
       function applyLocalInviteStatuses(list) {
@@ -4458,8 +4547,9 @@ browsen</span>
           if (!inv) return inv;
           var key = String(inv.workout_date || "").slice(0, 10);
           var copy = Object.assign({}, inv);
-          if (isInviteDeclined(copy)) copy.status = "declined";
-          else if (key && acceptedInvites[key] &&
+          if (isInviteDeclined(copy) || isInviteClosedStatus(copy.status)) {
+            if (!isInviteClosedStatus(copy.status)) copy.status = "declined";
+          } else if (key && acceptedInvites[key] &&
             (!acceptedInvites[key].from_id || String(acceptedInvites[key].from_id) === String(copy.from_id))) {
             copy.status = "accepted";
             if (!copy.meet_time && acceptedInvites[key].meet_time) copy.meet_time = acceptedInvites[key].meet_time;
@@ -4542,6 +4632,51 @@ browsen</span>
         };
       }
 
+      function parseInviteResponseFromPost(post) {
+        if (!post || !post.author_id || !post.reply_to_id) return null;
+        var bodyRaw = String(post.body || "");
+        var m = bodyRaw.match(INVITE_RESP_RE);
+        if (!m) return null;
+        var dateKey = String(m[1] || "").slice(0, 10);
+        var code = String(m[2] || "").toLowerCase();
+        if (!dateKey || !code) return null;
+        var author = String(post.author_id);
+        var other = String(post.reply_to_id);
+        var fromId = author;
+        var toId = other;
+        var status = "cancelled";
+        if (code === "d") {
+          /* Ablehnung: Einladung von reply_to an author */
+          fromId = other;
+          toId = author;
+          status = "declined";
+        } else if (code === "x") {
+          /* Absage durch Eingeladenen (angenommenes Treffen) */
+          fromId = other;
+          toId = author;
+          status = "cancelled";
+        } else {
+          /* c: Absage durch Einladenden */
+          fromId = author;
+          toId = other;
+          status = "cancelled";
+        }
+        return {
+          id: "resp-" + post.id,
+          from_id: fromId,
+          to_id: toId,
+          workout_date: dateKey,
+          workout_label: "",
+          from_name: "",
+          place: "",
+          meet_time: "",
+          status: status,
+          created_at: post.created_at || new Date().toISOString(),
+          source_post_id: post.id,
+          response_code: code
+        };
+      }
+
       async function loadInvitesFromCommunityPosts() {
         if (!account || !account.id || String(account.id).indexOf("local-") === 0) return [];
         var posts = [];
@@ -4590,10 +4725,25 @@ browsen</span>
             });
           } catch (e4) {}
         }
+        var closedByPair = {};
         var out = [];
         uniq.forEach(function (post) {
+          var resp = parseInviteResponseFromPost(post);
+          if (resp) {
+            var pk = invitePairKey(resp);
+            if (pk) closedByPair[pk] = mergeInviteRecords(closedByPair[pk], resp);
+            out.push(resp);
+            markInviteDeclined(resp);
+          }
+        });
+        uniq.forEach(function (post) {
           var inv = parseInviteFromCommunityPost(post, nameMap);
-          if (inv) out.push(inv);
+          if (!inv) return;
+          var pk = invitePairKey(inv);
+          if (pk && closedByPair[pk]) {
+            inv = mergeInviteRecords(inv, closedByPair[pk]);
+          }
+          out.push(inv);
         });
         return out;
       }
@@ -4747,6 +4897,46 @@ browsen</span>
         return "";
       }
 
+      async function postInviteResponseChat(invite, code) {
+        if (!account || !account.id || !invite) return null;
+        if (typeof createCommunityPost !== "function") return null;
+        if (String(account.id).indexOf("local-") === 0) return null;
+        var dateKey = String(invite.workout_date || "").slice(0, 10);
+        if (!dateKey) return null;
+        var when = formatInviteWhen(dateKey);
+        var label = String(invite.workout_label || "").trim() || "Workout";
+        var myName = firstNameOf(account);
+        var replyToId = null;
+        var otherName = "Buddy";
+        var kind = String(code || "c").toLowerCase();
+        if (kind === "d") {
+          replyToId = invite.from_id;
+          otherName = invite.from_name || inviteBuddyDisplayName(invite.from_id) || "Buddy";
+        } else if (kind === "x") {
+          replyToId = invite.from_id;
+          otherName = invite.from_name || inviteBuddyDisplayName(invite.from_id) || "Buddy";
+        } else {
+          replyToId = invite.to_id;
+          otherName = invite.to_name || inviteBuddyDisplayName(invite.to_id) || "Buddy";
+        }
+        if (!replyToId || String(replyToId) === String(account.id)) return null;
+        var line = kind === "d"
+          ? ("❌ " + myName + " lehnt ab: " + label + " am " + when)
+          : ("❌ Termin abgesagt: " + label + " am " + when);
+        var body = [line, "@" + otherName, inviteResponseMarker(dateKey, kind)].join("\n").slice(0, 144);
+        try {
+          return await createCommunityPost({
+            author_id: account.id,
+            kind: "reply",
+            body: body,
+            reply_to_id: replyToId
+          });
+        } catch (eChat) {
+          console.warn("Invite response chat failed", eChat);
+          return null;
+        }
+      }
+
       async function withdrawOutboundInvites(dateKey) {
         if (!account || !account.id || !dateKey) return;
         var key = String(dateKey).slice(0, 10);
@@ -4754,13 +4944,35 @@ browsen</span>
           if (!inv) return false;
           if (String(inv.from_id) !== String(account.id)) return false;
           if (String(inv.workout_date || "").slice(0, 10) !== key) return false;
-          var st = String(inv.status || "pending");
-          return st !== "declined";
+          return !isInviteClosedStatus(inv.status);
         });
+        var share = outboundShares[key] || outboundShareForDate(key) || null;
+        if (!mine.length && share && Array.isArray(share.buddy_ids)) {
+          share.buddy_ids.forEach(function (bid) {
+            if (!bid) return;
+            mine.push({
+              id: "local-cancel-" + key + "-" + bid,
+              from_id: account.id,
+              to_id: bid,
+              workout_date: key,
+              workout_label: share.label || "Workout",
+              from_name: firstNameOf(account),
+              place: share.place || "",
+              meet_time: share.meet_time || "",
+              status: "pending"
+            });
+          });
+        }
+        var notified = {};
         for (var i = 0; i < mine.length; i++) {
-          mine[i].status = "declined";
+          mine[i].status = "cancelled";
           markInviteDeclined(mine[i]);
-          await patchWorkoutInviteStatus(mine[i], "declined");
+          await patchWorkoutInviteStatus(mine[i], "cancelled");
+          var toKey = String(mine[i].to_id || "");
+          if (toKey && !notified[toKey]) {
+            notified[toKey] = true;
+            await postInviteResponseChat(mine[i], "c");
+          }
         }
         markOutboundDateDeclined(key);
         if (outboundShares[key]) {
@@ -4797,9 +5009,11 @@ browsen</span>
           workout_date: key,
           from_id: inv.from_id,
           to_id: account && account.id,
-          id: inv.id
+          id: inv.id,
+          workout_label: inv.workout_label || "",
+          from_name: inv.from_name || ""
         });
-        await declineWorkoutInvite(row);
+        await declineWorkoutInvite(row, { asCancel: true });
       }
 
       function openOutboundInviteInfo(dateKey, outbound) {
@@ -4814,7 +5028,7 @@ browsen</span>
           (workoutInvites || []).forEach(function (inv) {
             if (!inv || String(inv.from_id) !== String(account && account.id)) return;
             if (String(inv.workout_date || "").slice(0, 10) !== String(dateKey)) return;
-            if (String(inv.status || "") === "declined" || isInviteDeclined(inv)) return;
+            if (String(inv.status || "") === "declined" || isInviteClosedStatus(inv.status) || isInviteDeclined(inv)) return;
             var n = inviteBuddyDisplayName(inv.to_id) || inv.to_name || "";
             if (n && names.indexOf(n) < 0) names.push(n);
           });
@@ -4988,7 +5202,7 @@ browsen</span>
           if (!inv) return;
           var key = String(inv.workout_date || "").slice(0, 10);
           if (!key) return;
-          if (isInviteDeclined(inv) || String(inv.status || "") === "declined") return;
+          if (isInviteDeclined(inv) || isInviteClosedStatus(inv.status)) return;
           if (String(inv.to_id) === String(account.id) && String(inv.status) === "accepted") {
             keptAccepted[key] = {
               id: inv.id,
@@ -5095,9 +5309,43 @@ browsen</span>
 
       async function patchWorkoutInviteStatus(invite, status) {
         if (!invite || !invite.id) return;
-        if (String(invite.id).indexOf("local-") === 0 || String(invite.id).indexOf("post-") === 0) return;
+        if (String(invite.id).indexOf("local-") === 0 || String(invite.id).indexOf("post-") === 0 ||
+            String(invite.id).indexOf("resp-") === 0) {
+          /* Keine UUID — zusätzlich nach from/to/date patchen, falls DB-Zeile existiert. */
+          if (!invite.from_id || !invite.to_id || !invite.workout_date) return;
+          if (String(account && account.id || "").indexOf("local-") === 0) return;
+          try {
+            var q =
+              "go_workout_invites?from_id=eq." + encodeURIComponent(invite.from_id) +
+              "&to_id=eq." + encodeURIComponent(invite.to_id) +
+              "&workout_date=eq." + encodeURIComponent(String(invite.workout_date).slice(0, 10));
+            var res = await fetch(SUPABASE_URL + "/rest/v1/" + q, {
+              method: "PATCH",
+              headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY,
+                "Content-Type": "application/json",
+                Prefer: "return=minimal"
+              },
+              body: JSON.stringify({ status: status, updated_at: new Date().toISOString() })
+            });
+            if (!res.ok && status === "cancelled") {
+              await fetch(SUPABASE_URL + "/rest/v1/" + q, {
+                method: "PATCH",
+                headers: {
+                  apikey: SUPABASE_KEY,
+                  Authorization: "Bearer " + SUPABASE_KEY,
+                  "Content-Type": "application/json",
+                  Prefer: "return=minimal"
+                },
+                body: JSON.stringify({ status: "declined", updated_at: new Date().toISOString() })
+              });
+            }
+          } catch (e0) {}
+          return;
+        }
         try {
-          await fetch(SUPABASE_URL + "/rest/v1/go_workout_invites?id=eq." + encodeURIComponent(invite.id), {
+          var res2 = await fetch(SUPABASE_URL + "/rest/v1/go_workout_invites?id=eq." + encodeURIComponent(invite.id), {
             method: "PATCH",
             headers: {
               apikey: SUPABASE_KEY,
@@ -5107,6 +5355,18 @@ browsen</span>
             },
             body: JSON.stringify({ status: status, updated_at: new Date().toISOString() })
           });
+          if (!res2.ok && status === "cancelled") {
+            await fetch(SUPABASE_URL + "/rest/v1/go_workout_invites?id=eq." + encodeURIComponent(invite.id), {
+              method: "PATCH",
+              headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY,
+                "Content-Type": "application/json",
+                Prefer: "return=minimal"
+              },
+              body: JSON.stringify({ status: "declined", updated_at: new Date().toISOString() })
+            });
+          }
         } catch (e) {}
       }
 
@@ -5136,10 +5396,14 @@ browsen</span>
         }
       }
 
-      async function declineWorkoutInvite(invite) {
+      async function declineWorkoutInvite(invite, opts) {
         if (!invite) return;
+        opts = opts || {};
+        var asCancel = !!opts.asCancel;
         var key = String(invite.workout_date || "").slice(0, 10);
-        invite.status = "declined";
+        var nextStatus = asCancel ? "cancelled" : "declined";
+        var chatCode = asCancel ? "x" : "d";
+        invite.status = nextStatus;
         markInviteDeclined(invite);
         /* Alle lokalen Klone desselben Termins (uuid + post-*) mit markieren */
         (workoutInvites || []).forEach(function (row) {
@@ -5147,7 +5411,7 @@ browsen</span>
           if (String(row.workout_date || "").slice(0, 10) !== key) return;
           if (String(row.from_id) !== String(invite.from_id)) return;
           if (String(row.to_id) !== String(invite.to_id || (account && account.id))) return;
-          row.status = "declined";
+          row.status = nextStatus;
           markInviteDeclined(row);
         });
         if (key && acceptedInvites[key] &&
@@ -5156,10 +5420,12 @@ browsen</span>
           saveAcceptedInvitesLocal();
         }
         saveWorkoutInvitesLocal();
-        await patchWorkoutInviteStatus(invite, "declined");
+        await patchWorkoutInviteStatus(invite, nextStatus);
+        await postInviteResponseChat(invite, chatCode);
         if (typeof window.__gogogoRenderWeek === "function") {
           try { window.__gogogoRenderWeek(); } catch (e2) {}
         }
+        try { await refreshCommunityFeed(); } catch (e3) {}
       }
       var buddyList = [];
       try {
@@ -11173,6 +11439,11 @@ browsen</span>
                 selectDay(key, false);
                 openInviteDecide(pendingInvites[0]);
               });
+            } else if (closedInviteForDate(key)) {
+              sq.textContent = "❌";
+              sq.classList.add("is-cancel");
+              sq.disabled = true;
+              sq.setAttribute("aria-label", t("Einladung abgesagt", "Invite cancelled"));
             } else {
               sq.textContent = "";
               sq.classList.add("is-empty");
