@@ -972,6 +972,54 @@
       outline: none;
       border-color: var(--ink);
     }
+    .admin-mantras__actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 0 0 10px;
+    }
+    .admin-mantras__add {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 4px;
+      padding: 12px;
+      border: 1px solid rgba(247, 245, 240, 0.35);
+      border-radius: var(--radius);
+      text-align: left;
+    }
+    .admin-mantras__add[hidden] {
+      display: none !important;
+    }
+    .admin-mantras__add label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      opacity: 0.85;
+    }
+    .admin-mantras__add textarea,
+    .admin-mantras__add input {
+      width: 100%;
+      padding: 10px 12px;
+      background: var(--paper);
+      color: var(--ink);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      font: inherit;
+      font-size: 0.95rem;
+    }
+    .admin-mantras__add textarea {
+      min-height: 72px;
+      resize: vertical;
+    }
+    .admin-mantras__add textarea:focus,
+    .admin-mantras__add input:focus {
+      outline: none;
+      border-color: var(--ink);
+    }
+    .admin-mantras__add-ok {
+      justify-self: end;
+      min-width: 96px;
+    }
     h1 {
       font-weight: 700;
       font-size: clamp(28px, 8vw, 36px);
@@ -1640,7 +1688,17 @@
     <div class="panel" id="panel-mantras" hidden>
       <h1>Mantras</h1>
       <div class="admin-mantras__list" id="mantra-list"></div>
-      <button class="btn" type="button" id="mantra-save">Mantras speichern</button>
+      <div class="admin-mantras__actions">
+        <button class="btn" type="button" id="mantra-add">Hinzufügen</button>
+        <div class="admin-mantras__add" id="mantra-add-form" hidden>
+          <label for="mantra-add-body">1) Spruch</label>
+          <textarea id="mantra-add-body" maxlength="220" rows="3" placeholder="Spruch…"></textarea>
+          <label for="mantra-add-who">2) Zitierte Person</label>
+          <input id="mantra-add-who" type="text" maxlength="80" placeholder="Person…" autocomplete="off" />
+          <button class="btn admin-mantras__add-ok" type="button" id="mantra-add-ok">OK</button>
+        </div>
+        <button class="btn" type="button" id="mantra-save">Mantras speichern</button>
+      </div>
       <p class="msg" id="mantra-msg" role="status"></p>
     </div>
 
@@ -6288,31 +6346,108 @@
         return { body: body, attribution: who || null };
       }
 
+      function appendMantraEditorRow(list, slot, src) {
+        var rowEl = document.createElement("div");
+        rowEl.className = "admin-mantras__row";
+        rowEl.dataset.slot = String(slot);
+        var bodyLabel = document.createElement("label");
+        bodyLabel.setAttribute("for", "mantra-body-" + slot);
+        bodyLabel.textContent = "Mantra " + slot;
+        var body = document.createElement("textarea");
+        body.id = "mantra-body-" + slot;
+        body.maxLength = 320;
+        body.rows = 3;
+        body.placeholder = "Satz\nMensch";
+        body.value = formatMantraField(src || { body: "", attribution: "" });
+        rowEl.appendChild(bodyLabel);
+        rowEl.appendChild(body);
+        list.appendChild(rowEl);
+        return rowEl;
+      }
+
+      function nextMantraSlot(list) {
+        var max = 0;
+        if (list) {
+          list.querySelectorAll(".admin-mantras__row").forEach(function (row) {
+            var n = Number(row.dataset.slot);
+            if (n > max) max = n;
+          });
+        }
+        return Math.max(max + 1, 1);
+      }
+
+      function hideMantraAddForm() {
+        var form = document.getElementById("mantra-add-form");
+        var body = document.getElementById("mantra-add-body");
+        var who = document.getElementById("mantra-add-who");
+        if (form) form.hidden = true;
+        if (body) body.value = "";
+        if (who) who.value = "";
+      }
+
+      function showMantraAddForm() {
+        var form = document.getElementById("mantra-add-form");
+        var body = document.getElementById("mantra-add-body");
+        if (form) form.hidden = false;
+        if (body) {
+          setTimeout(function () { body.focus(); }, 40);
+        }
+      }
+
+      function confirmMantraAdd() {
+        var list = document.getElementById("mantra-list");
+        var bodyEl = document.getElementById("mantra-add-body");
+        var whoEl = document.getElementById("mantra-add-who");
+        var msg = document.getElementById("mantra-msg");
+        if (!list || !bodyEl) return;
+        var body = String(bodyEl.value || "").trim().slice(0, 220);
+        var who = whoEl ? String(whoEl.value || "").trim().slice(0, 80) : "";
+        if (!body) {
+          if (msg) {
+            msg.textContent = "Bitte einen Spruch eingeben.";
+            msg.classList.add("is-error");
+          }
+          bodyEl.focus();
+          return;
+        }
+        var slot = nextMantraSlot(list);
+        if (slot > 200) {
+          if (msg) {
+            msg.textContent = "Maximal 200 Mantras.";
+            msg.classList.add("is-error");
+          }
+          return;
+        }
+        appendMantraEditorRow(list, slot, { body: body, attribution: who || null });
+        hideMantraAddForm();
+        if (msg) {
+          msg.classList.remove("is-error");
+          msg.textContent = "Mantra " + slot + " hinzugefügt — bitte speichern.";
+        }
+        var row = list.querySelector('.admin-mantras__row[data-slot="' + slot + '"]');
+        if (row && row.scrollIntoView) {
+          row.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        }
+      }
+
       function renderMantraEditor(rows) {
         var list = document.getElementById("mantra-list");
         if (!list) return;
         list.innerHTML = "";
-        var bySlot = {};
-        (rows || []).forEach(function (row) {
-          if (row && row.slot) bySlot[Number(row.slot)] = row;
+        hideMantraAddForm();
+        var source = (rows && rows.length) ? rows.slice() : DEFAULT_MANTRAS.slice();
+        source.sort(function (a, b) {
+          return Number(a && a.slot) - Number(b && b.slot);
         });
-        for (var slot = 1; slot <= 20; slot++) {
-          var src = bySlot[slot] || DEFAULT_MANTRAS[slot - 1] || { body: "", attribution: "" };
-          var rowEl = document.createElement("div");
-          rowEl.className = "admin-mantras__row";
-          rowEl.dataset.slot = String(slot);
-          var bodyLabel = document.createElement("label");
-          bodyLabel.setAttribute("for", "mantra-body-" + slot);
-          bodyLabel.textContent = "Mantra " + slot;
-          var body = document.createElement("textarea");
-          body.id = "mantra-body-" + slot;
-          body.maxLength = 320;
-          body.rows = 3;
-          body.placeholder = "Satz\nMensch";
-          body.value = formatMantraField(src);
-          rowEl.appendChild(bodyLabel);
-          rowEl.appendChild(body);
-          list.appendChild(rowEl);
+        source.forEach(function (row) {
+          var slot = Number(row && row.slot);
+          if (!(slot >= 1)) return;
+          appendMantraEditorRow(list, slot, row);
+        });
+        if (!list.children.length) {
+          DEFAULT_MANTRAS.forEach(function (row) {
+            appendMantraEditorRow(list, row.slot, row);
+          });
         }
       }
 
@@ -6333,7 +6468,7 @@
         var rows = null;
         try {
           var res = await fetch(
-            SUPABASE_URL + "/rest/v1/go_mantras?select=slot,body,attribution&order=slot.asc&limit=20",
+            SUPABASE_URL + "/rest/v1/go_mantras?select=slot,body,attribution&order=slot.asc&limit=100",
             { headers: apiHeaders() }
           );
           if (res.ok) rows = await res.json();
@@ -6370,6 +6505,13 @@
             updated_at: new Date().toISOString()
           });
         }
+        if (!payload.length) {
+          if (msg) {
+            msg.textContent = "Keine Mantras zum Speichern.";
+            msg.classList.add("is-error");
+          }
+          return;
+        }
         if (msg) {
           msg.classList.remove("is-error");
           msg.textContent = "Speichere …";
@@ -6390,7 +6532,7 @@
             }
             return;
           }
-          if (msg) msg.textContent = "Gespeichert.";
+          if (msg) msg.textContent = payload.length + " Mantras gespeichert.";
         } catch (e) {
           if (msg) {
             msg.textContent = "Speichern fehlgeschlagen.";
@@ -6674,6 +6816,10 @@
 
       var mantraSave = document.getElementById("mantra-save");
       if (mantraSave) mantraSave.addEventListener("click", function () { saveMantras(); });
+      var mantraAdd = document.getElementById("mantra-add");
+      if (mantraAdd) mantraAdd.addEventListener("click", function () { showMantraAddForm(); });
+      var mantraAddOk = document.getElementById("mantra-add-ok");
+      if (mantraAddOk) mantraAddOk.addEventListener("click", function () { confirmMantraAdd(); });
 
       var trainerToggle = document.getElementById("trainer-toggle");
       if (trainerToggle) {

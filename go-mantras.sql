@@ -1,15 +1,19 @@
--- Mantras (20 Defaults) + persönliches Mantra pro Account
+-- Mantras (Defaults + weitere per Admin) + persönliches Mantra pro Account
 -- Im Supabase SQL Editor ausführen.
 
 alter table go_accounts
   add column if not exists mantra text;
 
 create table if not exists go_mantras (
-  slot smallint primary key check (slot >= 1 and slot <= 20),
+  slot smallint primary key,
   body text not null,
   attribution text,
   updated_at timestamptz not null default now()
 );
+
+alter table go_mantras drop constraint if exists go_mantras_slot_check;
+alter table go_mantras
+  add constraint go_mantras_slot_check check (slot >= 1 and slot <= 200);
 
 alter table go_mantras enable row level security;
 
