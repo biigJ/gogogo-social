@@ -610,8 +610,10 @@
     .home-cal__invite-sq.is-cancel {
       color: #F7F5F0;
       font-size: clamp(0.85rem, 3.8vw, 1.05rem);
-      cursor: default;
-      pointer-events: none;
+      cursor: pointer;
+      pointer-events: auto;
+      position: relative;
+      z-index: 2;
     }
     .home-cal__invite-sq.is-on {
       border-radius: 2px;
@@ -4093,6 +4095,7 @@ browsen</span>
       var WORKOUT_INVITES_KEY = "gogogo_workout_invites";
       var ACCEPTED_INVITES_KEY = "gogogo_accepted_invites";
       var DECLINED_INVITES_KEY = "gogogo_declined_invites";
+      var DISMISSED_CANCELLED_KEY = "gogogo_dismissed_cancelled_invites";
       var OUTBOUND_SHARES_KEY = "gogogo_outbound_shares";
       var INVITE_MARKER_RE = /⟦goinv:([^|⟧]+)\|([^|⟧]+)\|([^⟧]*)⟧/;
       var INVITE_MARKER_STRIP_RE = /\n?⟦goinv:[^⟧]*⟧/g;
@@ -4203,6 +4206,8 @@ browsen</span>
       try { acceptedInvites = JSON.parse(localStorage.getItem(ACCEPTED_INVITES_KEY) || "{}") || {}; } catch (eAcc) { acceptedInvites = {}; }
       var declinedInvites = {};
       try { declinedInvites = JSON.parse(localStorage.getItem(DECLINED_INVITES_KEY) || "{}") || {}; } catch (eDec) { declinedInvites = {}; }
+      var dismissedCancelledInvites = {};
+      try { dismissedCancelledInvites = JSON.parse(localStorage.getItem(DISMISSED_CANCELLED_KEY) || "{}") || {}; } catch (eDis) { dismissedCancelledInvites = {}; }
       var outboundShares = {};
       try { outboundShares = JSON.parse(localStorage.getItem(OUTBOUND_SHARES_KEY) || "{}") || {}; } catch (eOut) { outboundShares = {}; }
       var pendingInviteDecide = null;
@@ -4215,6 +4220,9 @@ browsen</span>
       }
       function saveDeclinedInvitesLocal() {
         try { localStorage.setItem(DECLINED_INVITES_KEY, JSON.stringify(declinedInvites)); } catch (e) {}
+      }
+      function saveDismissedCancelledLocal() {
+        try { localStorage.setItem(DISMISSED_CANCELLED_KEY, JSON.stringify(dismissedCancelledInvites)); } catch (e) {}
       }
       function saveOutboundSharesLocal() {
         try { localStorage.setItem(OUTBOUND_SHARES_KEY, JSON.stringify(outboundShares)); } catch (e) {}
@@ -4314,7 +4322,15 @@ browsen</span>
         var base = ra >= rb ? Object.assign({}, b, a) : Object.assign({}, a, b);
         base.status = ra >= rb ? (a.status || base.status) : (b.status || base.status);
         base.id = preferRealInviteId(a.id, b.id);
-        if (!base.workout_label) base.workout_label = a.workout_label || b.workout_label || "";
+        function labelScore(l) {
+          l = String(l || "").trim();
+          if (!l) return 0;
+          if (/^workout$/i.test(l)) return 1;
+          return 2;
+        }
+        var la = a.workout_label;
+        var lb = b.workout_label;
+        base.workout_label = labelScore(la) >= labelScore(lb) ? (la || lb || "") : (lb || la || "");
         if (!base.place) base.place = a.place || b.place || "";
         if (!base.meet_time) base.meet_time = a.meet_time || b.meet_time || "";
         if (!base.from_name) base.from_name = a.from_name || b.from_name || "";
@@ -4410,6 +4426,7 @@ browsen</span>
         var mine = account && account.id ? String(account.id) : "";
         if (!mine || !dateKey) return null;
         var key = String(dateKey).slice(0, 10);
+        if (dismissedCancelledInvites[key]) return null;
         var found = null;
         (workoutInvites || []).forEach(function (inv) {
           if (!inv || String(inv.workout_date || "").slice(0, 10) !== key) return;
@@ -4423,6 +4440,27 @@ browsen</span>
           return { workout_date: key, status: "cancelled", from_id: mine, to_id: "" };
         }
         return null;
+      }
+
+      function dismissClosedInvite(dateKey) {
+        var key = String(dateKey || "").slice(0, 10);
+        if (!key) return;
+        dismissedCancelledInvites[key] = true;
+        saveDismissedCancelledLocal();
+        if (typeof window.__gogogoRenderWeek === "function") {
+          try { window.__gogogoRenderWeek(); } catch (e0) {}
+        }
+      }
+
+      function openCancelledInviteNotice(dateKey) {
+        openInviteInfo({
+          title: uiLang === "en" ? "Cancelled" : "Abgesagt",
+          body: uiLang === "en" ? "This meetup was cancelled." : "Termin wurde abgesagt",
+          meta: "",
+          canWithdraw: false,
+          dateKey: dateKey,
+          mode: "cancelled-notice"
+        });
       }
 
       function pendingIncomingInvites() {
@@ -4582,7 +4620,10 @@ browsen</span>
         var first = lines[0] || "";
         var label = "";
         if (/lass uns/i.test(first)) {
-          label = "Workout";
+          /* Spezifisches Workout steht oft in Zeile 2 (nicht „Workout“ erzwingen). */
+          if (lines[1] && lines[1].charAt(0) !== "@" && !/^⟦/.test(lines[1])) {
+            label = lines[1];
+          }
           var tm = first.match(/um\s+(\d{1,2}:\d{2})\s*Uhr/i);
           if (tm && !meetTime) meetTime = normalizeMeetTime(tm[1]);
           var pl = first.match(/Uhr\s+(.+?)\s+treffen/i);
@@ -4609,7 +4650,7 @@ browsen</span>
           }
         }
         if (!dateKey) return null;
-        if (!label) label = place || "Workout";
+        if (!label) label = "";
         var toId = post.reply_to_id ? String(post.reply_to_id) : (mentionsMe ? mine : "");
         if (!fromMe) toId = mine;
         if (!toId && !fromMe) return null;
@@ -4682,14 +4723,14 @@ browsen</span>
         var posts = [];
         try {
           var toMe = await restGet(
-            "go_community_posts?reply_to_id.eq." + encodeURIComponent(account.id) +
+            "go_community_posts?reply_to_id=eq." + encodeURIComponent(account.id) +
             "&select=id,author_id,body,reply_to_id,created_at&order=created_at.desc&limit=80"
           );
           if (Array.isArray(toMe)) posts = posts.concat(toMe);
         } catch (e1) {}
         try {
           var fromMe = await restGet(
-            "go_community_posts?author_id.eq." + encodeURIComponent(account.id) +
+            "go_community_posts?author_id=eq." + encodeURIComponent(account.id) +
             "&select=id,author_id,body,reply_to_id,created_at&order=created_at.desc&limit=80"
           );
           if (Array.isArray(fromMe)) posts = posts.concat(fromMe);
@@ -5147,7 +5188,17 @@ browsen</span>
             if (e.target === decideModal) closeInviteDecide();
           });
         }
-        if (infoOk) infoOk.addEventListener("click", closeInviteInfo);
+        if (infoOk) {
+          infoOk.addEventListener("click", function () {
+            var info = pendingInviteInfo;
+            var key = info && info.dateKey ? String(info.dateKey).slice(0, 10) : "";
+            var mode = info && info.mode;
+            closeInviteInfo();
+            if (mode === "cancelled-notice" && key) {
+              dismissClosedInvite(key);
+            }
+          });
+        }
         if (infoCancel) {
           infoCancel.addEventListener("click", function () {
             var info = pendingInviteInfo;
@@ -5181,11 +5232,11 @@ browsen</span>
         if (String(account.id).indexOf("local-") !== 0) {
           try {
             var incoming = await restGet(
-              "go_workout_invites?to_id.eq." + encodeURIComponent(account.id) +
+              "go_workout_invites?to_id=eq." + encodeURIComponent(account.id) +
               "&select=*&order=created_at.desc&limit=120"
             );
             var outgoing = await restGet(
-              "go_workout_invites?from_id.eq." + encodeURIComponent(account.id) +
+              "go_workout_invites?from_id=eq." + encodeURIComponent(account.id) +
               "&select=*&order=created_at.desc&limit=120"
             );
             if (Array.isArray(incoming)) tableRows = tableRows.concat(incoming);
@@ -5375,11 +5426,24 @@ browsen</span>
         var key = String(invite.workout_date || "").slice(0, 10);
         if (!key) return;
         invite.status = "accepted";
+        var label = String(invite.workout_label || "").trim();
+        (workoutInvites || []).forEach(function (row) {
+          if (!row) return;
+          if (String(row.workout_date || "").slice(0, 10) !== key) return;
+          if (String(row.from_id) !== String(invite.from_id)) return;
+          if (String(row.to_id) !== String(invite.to_id || (account && account.id))) return;
+          var cand = String(row.workout_label || "").trim();
+          if (!cand) return;
+          if (!label || /^workout$/i.test(label)) label = cand;
+          else if (!/^workout$/i.test(cand) && cand.length > label.length) label = cand;
+        });
+        if (!label) label = t("Workout", "Workout");
+        invite.workout_label = label;
         acceptedInvites[key] = {
           id: invite.id,
           from_id: invite.from_id,
           from_name: invite.from_name || "",
-          workout_label: invite.workout_label || "",
+          workout_label: label,
           place: invite.place || "",
           meet_time: invite.meet_time || ""
         };
@@ -7400,14 +7464,23 @@ browsen</span>
           if (b && b.id) buddyIds[String(b.id)] = true;
         });
         var mine = account && account.id ? String(account.id) : "";
-        list.innerHTML = "";
         var shown = 0;
         var goalBlocked = 0;
+        var alreadyBuddy = false;
+        var isSelf = false;
 
-        function appendDiscoverRow(row) {
+        function appendDiscoverRow(row, opts) {
+          opts = opts || {};
           if (!row || !row.id) return;
-          if (String(row.id) === mine) return;
-          if (buddyIds[String(row.id)]) return;
+          if (String(row.id) === mine) {
+            isSelf = true;
+            return;
+          }
+          var isBuddy = !!buddyIds[String(row.id)];
+          if (isBuddy && !opts.allowBuddy) {
+            alreadyBuddy = true;
+            return;
+          }
           if (!discoverRowMatchesGoal(row)) {
             goalBlocked++;
             return;
@@ -7430,12 +7503,18 @@ browsen</span>
           var add = document.createElement("button");
           add.type = "button";
           add.className = "discover-row__add";
-          add.textContent = "+";
-          add.addEventListener("click", function () {
-            addBuddyFromDiscover(row).then(function () {
-              openDiscoverModal();
+          if (isBuddy) {
+            add.textContent = "✓";
+            add.disabled = true;
+            add.setAttribute("aria-label", uiLang === "en" ? "Already a buddy" : "Bereits Buddy");
+          } else {
+            add.textContent = "+";
+            add.addEventListener("click", function () {
+              addBuddyFromDiscover(row).then(function () {
+                openDiscoverModal();
+              });
             });
-          });
+          }
           el.appendChild(img);
           el.appendChild(mid);
           el.appendChild(add);
@@ -7443,6 +7522,12 @@ browsen</span>
         }
 
         function emptyMsg() {
+          if (isSelf) {
+            return uiLang === "en" ? "That’s your own profile number." : "Das ist Deine eigene Profilnummer.";
+          }
+          if (alreadyBuddy && !shown) {
+            return uiLang === "en" ? "Already in your buddy list." : "Bereits in Deiner Buddy-Liste.";
+          }
           if (goalBlocked && (serialQ.length === 8 || q)) {
             return uiLang === "en"
               ? "Found, but goal does not match the filter above. Choose “All” or the matching goal."
@@ -7457,7 +7542,7 @@ browsen</span>
           return uiLang === "en" ? "No open profiles right now." : "Gerade keine offenen Profile.";
         }
 
-        /* Exakte Profilnummer: immer per API suchen (nicht nur open_to_connect-Cache). */
+        /* Exakte Profilnummer: lookupAccountBySerial (Accounts + Invite-Codes). */
         if (serialQ.length === 8) {
           if (discoverSerialBusy) return;
           discoverSerialBusy = true;
@@ -7465,16 +7550,33 @@ browsen</span>
           try {
             var found = null;
             try {
-              var bySerial = await restGet(
-                "go_accounts?serial_number=eq." + encodeURIComponent(serialQ) +
-                "&select=id,name,photo_url,training_goal,city_area,workout_place,spoken_lang,serial_number&limit=1"
-              );
-              found = bySerial && bySerial[0] ? bySerial[0] : null;
+              var looked = await lookupAccountBySerial(serialQ);
+              found = looked && looked.account ? looked.account : null;
+              if (found && !found.training_goal) {
+                try {
+                  var rich = await restGet(
+                    "go_accounts?id=eq." + encodeURIComponent(found.id) +
+                    "&select=id,name,photo_url,training_goal,city_area,workout_place,spoken_lang,serial_number&limit=1"
+                  );
+                  if (rich && rich[0]) found = rich[0];
+                } catch (eRich) {}
+              }
             } catch (eSer) { found = null; }
+            if (!found) {
+              try {
+                var bySerial = await restGet(
+                  "go_accounts?serial_number=eq." + encodeURIComponent(serialQ) +
+                  "&select=id,name,photo_url,training_goal,city_area,workout_place,spoken_lang,serial_number&limit=3"
+                );
+                found = bySerial && bySerial[0] ? bySerial[0] : null;
+              } catch (eSer2) { found = null; }
+            }
             list.innerHTML = "";
             shown = 0;
             goalBlocked = 0;
-            if (found) appendDiscoverRow(found);
+            alreadyBuddy = false;
+            isSelf = false;
+            if (found) appendDiscoverRow(found, { allowBuddy: true });
             if (!shown) {
               list.innerHTML = "<p style='opacity:0.85'>" + emptyMsg() + "</p>";
             }
@@ -7483,6 +7585,8 @@ browsen</span>
           }
           return;
         }
+
+        list.innerHTML = "";
 
         /* Name-Suche: Cache + API-Lookup nach Vorname/Name, Ziel-Filter aus der Maske. */
         var matched = {};
@@ -8074,9 +8178,13 @@ browsen</span>
             : (profileWeekdays()[planShareWeekday] || t("heute", "today"));
           var meetLine = "Lass uns " + whenWord + " um " + time + " Uhr " + place + " treffen.";
           var marker = inviteMarkerFor(dateKey, time, place);
+          var shortLabel = String(label || "").trim().slice(0, 40);
           for (var bi = 0; bi < buddyIds.length; bi++) {
             var buddyRow = getBuddies().find(function (b) { return String(b.id) === String(buddyIds[bi]); });
-            var bodyParts = [meetLine, "@" + firstNameOf(buddyRow || { name: "Buddy" }), marker];
+            var bodyParts = [meetLine];
+            if (shortLabel) bodyParts.push(shortLabel);
+            bodyParts.push("@" + firstNameOf(buddyRow || { name: "Buddy" }));
+            bodyParts.push(marker);
             await createCommunityPost({
               author_id: account.id,
               kind: "text",
@@ -11084,14 +11192,20 @@ browsen</span>
           var accepted = acceptedInviteForDate(key);
           if (accepted && (accepted.workout_label || accepted.meet_time || accepted.place)) {
             var withName = accepted.from_name || "Buddy";
+            var specific = String(accepted.workout_label || "").trim();
+            if (!specific || /^workout$/i.test(specific)) {
+              specific = t("Workout", "Workout");
+            } else {
+              specific = localizePlanLabel(specific);
+            }
             var meetBits = [];
             if (accepted.meet_time) meetBits.push(normalizeMeetTime(accepted.meet_time) + " Uhr");
             if (accepted.place) meetBits.push(accepted.place);
             var line1 = meetBits.length
-              ? ("mit " + withName + " · " + meetBits.join(" · "))
-              : ("mit " + withName + " " + t("jetzt starten", "start now"));
+              ? meetBits.join(" · ")
+              : t("jetzt starten", "start now");
             return {
-              title: accepted.workout_label || t("Workout", "Workout"),
+              title: specific + " mit " + withName,
               line1: line1,
               line2: "",
               rest: false,
@@ -11441,9 +11555,15 @@ browsen</span>
               });
             } else if (closedInviteForDate(key)) {
               sq.textContent = "❌";
-              sq.classList.add("is-cancel");
-              sq.disabled = true;
+              sq.classList.add("is-active", "is-cancel");
+              sq.disabled = false;
               sq.setAttribute("aria-label", t("Einladung abgesagt", "Invite cancelled"));
+              sq.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                selectDay(key, false);
+                openCancelledInviteNotice(key);
+              });
             } else {
               sq.textContent = "";
               sq.classList.add("is-empty");
