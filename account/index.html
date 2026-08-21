@@ -8808,12 +8808,18 @@ browsen</span>
           if (!p) return false;
           /* Fremde Trainer-Antworten an andere Nutzer ausblenden */
           if (coachId && p.author_id === coachId && p.reply_to_id !== account.id) return false;
-          /* Gerichtete Nachrichten nur für Absender und Empfänger */
+          /* Gerichtete Nachrichten: Absender, Empfänger — oder Buddy-Gruppe (beide in meinen Buddies) */
           if (p.reply_to_id) {
             var toId = String(p.reply_to_id);
             var fromId = String(p.author_id || "");
             var me = String(account.id);
-            if (toId !== me && fromId !== me) return false;
+            if (toId === me || fromId === me) return true;
+            var buddySet = {};
+            getBuddies().forEach(function (b) {
+              if (b && b.id) buddySet[String(b.id)] = true;
+            });
+            if (buddySet[fromId] && buddySet[toId]) return true;
+            return false;
           }
           return true;
         });

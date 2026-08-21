@@ -564,6 +564,7 @@
   .interval-layout{
     flex:1; min-height:0;
     display:flex; flex-direction:column;
+    position:relative;
   }
   .interval-main{
     flex:1 1 auto;
@@ -882,14 +883,14 @@
   }
   .weight-overlay{
     position:absolute; inset:0;
-    z-index:42;
+    z-index:80;
     background:rgba(10,10,10,0.55);
     display:flex; align-items:center; justify-content:center;
     padding:16px;
   }
   .weight-overlay[hidden]{ display:none !important; }
   .weight-card{
-    width:min(100%, 280px);
+    width:min(100%, 300px);
     background:var(--bg);
     color:var(--text);
     border:2px solid var(--text);
@@ -904,31 +905,45 @@
     letter-spacing:-0.02em;
   }
   .weight-card .chip-wheel-frame{
-    height:140px;
+    height:160px;
     margin:0 auto 12px;
-    perspective: 420px;
+    perspective: none;
+    overflow:hidden;
   }
   .weight-card .chip-wheel-scroller{
-    transform-style: preserve-3d;
+    transform-style: flat;
+    height:100%;
+    overflow-y:auto;
+    scroll-snap-type:y mandatory;
+    -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    overscroll-behavior:contain;
   }
   .weight-card .chip-wheel-scroller .wheel-item{
-    transition: transform 0.22s ease, opacity 0.22s ease, font-size 0.22s ease;
-    transform: rotateX(28deg) scale(0.88);
-    opacity: 0.35;
+    height:44px !important;
+    min-height:44px;
+    font-size:1.05rem !important;
+    scroll-snap-align:center;
+    transform:none !important;
+    opacity:0.38;
+    transition: opacity 0.15s ease, font-size 0.15s ease, color 0.15s ease;
+    animation:none !important;
   }
   .weight-card .chip-wheel-scroller .wheel-item.is-selected{
-    transform: rotateX(0deg) scale(1.08);
-    opacity: 1;
-    animation: weight-wheel-spin 0.45s ease;
+    transform:none !important;
+    opacity:1;
+    color:var(--text);
+    font-weight:700;
+    font-size:1.2rem !important;
+    animation:none !important;
   }
   .weight-card .chip-wheel-scroller .wheel-item.is-near{
-    transform: rotateX(14deg) scale(0.96);
-    opacity: 0.7;
+    transform:none !important;
+    opacity:0.7;
   }
-  @keyframes weight-wheel-spin{
-    0%{ transform: rotateX(55deg) scale(0.7); opacity:0.2; }
-    55%{ transform: rotateX(-8deg) scale(1.12); opacity:1; }
-    100%{ transform: rotateX(0deg) scale(1.08); opacity:1; }
+  .weight-card .chip-wheel-scroller .wheel-pad{
+    height:58px !important;
+    flex-shrink:0;
   }
   .workout-pick__kg{
     font-size:0.72em;
@@ -3775,20 +3790,23 @@
     if (!scroller) return;
     const items = Array.prototype.slice.call(scroller.querySelectorAll('.wheel-item'));
     if (!items.length) return;
-    const mid = scroller.scrollTop + scroller.clientHeight / 2;
+    const rect = scroller.getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
     let best = null;
     let bestDist = Infinity;
     items.forEach(function(btn){
-      const d = Math.abs(btn.offsetTop + btn.offsetHeight / 2 - mid);
+      const ir = btn.getBoundingClientRect();
+      const d = Math.abs(ir.top + ir.height / 2 - mid);
       if (d < bestDist) {
         bestDist = d;
         best = btn;
       }
     });
     items.forEach(function(btn){
-      const d = Math.abs(btn.offsetTop + btn.offsetHeight / 2 - mid);
+      const ir = btn.getBoundingClientRect();
+      const d = Math.abs(ir.top + ir.height / 2 - mid);
       btn.classList.toggle('is-selected', btn === best);
-      btn.classList.toggle('is-near', btn !== best && d < btn.offsetHeight * 1.2);
+      btn.classList.toggle('is-near', btn !== best && d < btn.offsetHeight * 1.35);
       if (btn === best) weightPickDraft = Number(btn.dataset.kg);
     });
   }
@@ -3796,38 +3814,54 @@
   function buildWeightWheel(opts, current){
     const scroller = document.getElementById('weightWheelScroller');
     if (!scroller) return;
+    const want = Number(current);
     scroller.innerHTML = '';
     const pad = document.createElement('div');
     pad.className = 'wheel-pad';
-    pad.style.height = '42px';
     scroller.appendChild(pad);
     opts.forEach(function(kg){
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'wheel-item' + (kg === current ? ' is-selected' : '');
+      btn.className = 'wheel-item' + (Number(kg) === want ? ' is-selected' : '');
       btn.dataset.kg = String(kg);
       btn.textContent = kg + ' kg';
       btn.addEventListener('click', function(e){
+        e.preventDefault();
         e.stopPropagation();
-        weightPickDraft = kg;
-        buildWeightWheel(opts, kg);
+        weightPickDraft = Number(kg);
+        scroller.querySelectorAll('.wheel-item').forEach(function(el){
+          el.classList.toggle('is-selected', Number(el.dataset.kg) === weightPickDraft);
+          el.classList.remove('is-near');
+        });
+        btn.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        markWeightWheelNear(scroller);
       });
       scroller.appendChild(btn);
     });
     const pad2 = document.createElement('div');
     pad2.className = 'wheel-pad';
-    pad2.style.height = '42px';
     scroller.appendChild(pad2);
     if (!scroller._weightScrollBound) {
       scroller._weightScrollBound = true;
+      var weightScrollTimer = null;
       scroller.addEventListener('scroll', function(){
+        clearTimeout(weightScrollTimer);
         markWeightWheelNear(scroller);
+        weightScrollTimer = setTimeout(function(){
+          markWeightWheelNear(scroller);
+        }, 60);
       }, { passive: true });
     }
     requestAnimationFrame(function(){
-      const sel = scroller.querySelector('.wheel-item.is-selected');
-      if (sel) sel.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      markWeightWheelNear(scroller);
+      requestAnimationFrame(function(){
+        const sel = scroller.querySelector('.wheel-item.is-selected') ||
+          scroller.querySelector('.wheel-item[data-kg="' + want + '"]') ||
+          scroller.querySelector('.wheel-item');
+        if (sel) {
+          sel.scrollIntoView({ block: 'center', behavior: 'instant' in window ? 'instant' : 'auto' });
+        }
+        markWeightWheelNear(scroller);
+      });
     });
   }
 
@@ -3835,28 +3869,47 @@
     const opts = weightOptionsFor(exId);
     if (!opts || !opts.length) return;
     weightPickExId = exId;
-    weightPickDraft = exerciseWeights[exId] != null ? Number(exerciseWeights[exId]) : opts[1] || opts[0];
+    var saved = exerciseWeights[exId];
+    weightPickDraft = saved != null && opts.indexOf(Number(saved)) >= 0
+      ? Number(saved)
+      : (opts[1] != null ? opts[1] : opts[0]);
     const title = document.getElementById('weightOverlayTitle');
     const ex = exercises.find(function(e){ return e.id === exId; });
-    if (title) title.textContent = (ex ? ex.name : exId) + ' · kg';
+    var label = WORKOUT_SHORT_NAMES[exId] || (ex ? ex.name : exId);
+    if (title) title.textContent = label + ' · kg';
     buildWeightWheel(opts, weightPickDraft);
     const overlay = document.getElementById('weightOverlay');
-    if (overlay) overlay.hidden = false;
+    if (overlay) {
+      overlay.hidden = false;
+      overlay.setAttribute('aria-hidden', 'false');
+    }
   }
 
   function closeWeightPicker(){
     weightPickExId = null;
     weightPickDraft = null;
     const overlay = document.getElementById('weightOverlay');
-    if (overlay) overlay.hidden = true;
+    if (overlay) {
+      overlay.hidden = true;
+      overlay.setAttribute('aria-hidden', 'true');
+    }
   }
 
   function confirmWeightPicker(){
-    if (!weightPickExId || weightPickDraft == null) {
+    if (!weightPickExId) {
       closeWeightPicker();
       return;
     }
-    exerciseWeights[weightPickExId] = weightPickDraft;
+    const opts = weightOptionsFor(weightPickExId) || [];
+    var kg = weightPickDraft;
+    if (kg == null || opts.indexOf(Number(kg)) < 0) {
+      kg = opts[1] != null ? opts[1] : opts[0];
+    }
+    if (kg == null) {
+      closeWeightPicker();
+      return;
+    }
+    exerciseWeights[weightPickExId] = Number(kg);
     saveExerciseWeights();
     if (embedSelected.indexOf(weightPickExId) < 0) embedSelected.push(weightPickExId);
     closeWeightPicker();
@@ -3868,14 +3921,14 @@
     const i = embedSelected.indexOf(exId);
     if (i >= 0) {
       embedSelected.splice(i, 1);
-    } else {
-      embedSelected.push(exId);
-      if (weightOptionsFor(exId) && exerciseWeights[exId] == null) {
-        openWeightPicker(exId);
-        return;
-      }
+      refreshEmbedSetup(false);
+      return;
     }
+    embedSelected.push(exId);
     refreshEmbedSetup(false);
+    if (weightOptionsFor(exId)) {
+      openWeightPicker(exId);
+    }
   }
 
   function pairRowHtml(exId, pairIndex, isRun, amount){
