@@ -1337,11 +1337,43 @@
     }
     .community-slots {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
       gap: 8px;
       margin: 0;
       align-items: start;
       flex: 0 0 auto;
+      width: 100%;
+    }
+    .community-buddy-rail {
+      min-width: 0;
+      width: 100%;
+    }
+    .community-buddy-viewport {
+      overflow: hidden;
+      width: 100%;
+      touch-action: pan-y;
+      cursor: grab;
+    }
+    .community-buddy-viewport.is-dragging {
+      cursor: grabbing;
+    }
+    .community-buddy-track {
+      display: flex;
+      width: 100%;
+      will-change: transform;
+      transition: transform 0.42s cubic-bezier(0.22, 0.82, 0.18, 1);
+    }
+    .community-buddy-track.is-dragging {
+      transition: none;
+    }
+    .community-buddy-page {
+      flex: 0 0 100%;
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      align-items: start;
+      box-sizing: border-box;
     }
     .community-top {
       flex: 0 0 auto;
@@ -1358,6 +1390,9 @@
       flex-direction: column;
       align-items: center;
       min-width: 0;
+    }
+    .community-slot.is-coach {
+      width: 100%;
     }
     .community-circle {
       width: calc(132px * 0.6);
@@ -3651,6 +3686,16 @@ browsen</span>
       <div class="challenge-modal__actions">
         <button type="button" class="challenge-modal__btn is-ghost" id="plan-share-cancel">Abbrechen</button>
         <button type="button" class="challenge-modal__btn" id="plan-share-send">Posten</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="buddy-action-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="buddy-action-title">
+      <p class="challenge-modal__title" id="buddy-action-title">Buddy</p>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn is-ghost" id="buddy-action-remove">Entfernen</button>
+        <button type="button" class="challenge-modal__btn" id="buddy-action-message">Nachricht</button>
       </div>
     </div>
   </div>
@@ -6503,215 +6548,450 @@ browsen</span>
         refreshCommunityFeed().catch(function () {});
       }
 
+      var buddyCarouselPage = 0;
+      var buddyActionTarget = null;
+      var buddySwipeState = null;
+      var buddySwipeMoved = false;
+
+      function openBuddyActionModal(buddy) {
+        if (!buddy) return;
+        buddyActionTarget = buddy;
+        var title = document.getElementById("buddy-action-title");
+        if (title) title.textContent = firstNameOf(buddy);
+        openChallengeModal(document.getElementById("buddy-action-modal"));
+      }
+
+      function closeBuddyActionModal() {
+        buddyActionTarget = null;
+        closeChallengeModal(document.getElementById("buddy-action-modal"));
+      }
+
+      (function bindBuddyActionModal() {
+        var modal = document.getElementById("buddy-action-modal");
+        var removeBtn = document.getElementById("buddy-action-remove");
+        var messageBtn = document.getElementById("buddy-action-message");
+        if (removeBtn) {
+          removeBtn.addEventListener("click", function (ev) {
+            ev.preventDefault();
+            var buddy = buddyActionTarget;
+            closeBuddyActionModal();
+            if (buddy) removeBuddy(buddy);
+          });
+        }
+        if (messageBtn) {
+          messageBtn.addEventListener("click", function (ev) {
+            ev.preventDefault();
+            var buddy = buddyActionTarget;
+            closeBuddyActionModal();
+            if (!buddy) return;
+            replyTargetId = buddy.id || null;
+            if (typeof stopReplyPicking === "function") stopReplyPicking();
+            var pick = document.getElementById("community-reply-pick");
+            if (pick) pick.classList.remove("is-on");
+            var input = document.getElementById("community-reply-text");
+            if (input) {
+              input.placeholder = "Nachricht an " + firstNameOf(buddy) + "…";
+              input.focus();
+            }
+            var msg = document.getElementById("community-add-msg");
+            if (msg) msg.textContent = "Nachricht an " + firstNameOf(buddy);
+          });
+        }
+        if (modal) {
+          modal.addEventListener("click", function (e) {
+            if (e.target === modal) closeBuddyActionModal();
+          });
+        }
+      })();
+
+      function buddyCarouselPageCount(cellCount) {
+        return Math.max(1, Math.ceil(Math.max(cellCount, 1) / 3));
+      }
+
+      function applyBuddyCarouselTransform(track, page, dragPx, animate) {
+        if (!track) return;
+        var viewport = track.parentElement;
+        var w = viewport ? viewport.clientWidth : 0;
+        var x = (-page * w) + (dragPx || 0);
+        if (animate === false) track.classList.add("is-dragging");
+        else track.classList.remove("is-dragging");
+        track.style.transform = "translate3d(" + x + "px,0,0)";
+      }
+
+      function unbindBuddyCarouselSwipe() {
+        if (!buddySwipeState) return;
+        var s = buddySwipeState;
+        if (s.viewport) {
+          s.viewport.removeEventListener("touchstart", s.onStart);
+          s.viewport.removeEventListener("touchmove", s.onMove);
+          s.viewport.removeEventListener("touchend", s.onEnd);
+          s.viewport.removeEventListener("touchcancel", s.onEnd);
+          s.viewport.removeEventListener("mousedown", s.onStart);
+        }
+        window.removeEventListener("mousemove", s.onMove);
+        window.removeEventListener("mouseup", s.onEnd);
+        buddySwipeState = null;
+      }
+
+      function bindBuddyCarouselSwipe(viewport, track, pageCount) {
+        unbindBuddyCarouselSwipe();
+        if (!viewport || !track || pageCount < 2) return;
+        var startX = 0;
+        var startY = 0;
+        var dragX = 0;
+        var dragging = false;
+        var axis = null;
+        var width = 0;
+
+        function onStart(ev) {
+          if (ev.target && ev.target.closest && ev.target.closest("input,textarea,button.community-trainer-edit")) return;
+          var p = ev.touches ? ev.touches[0] : ev;
+          startX = p.clientX;
+          startY = p.clientY;
+          dragX = 0;
+          dragging = true;
+          axis = null;
+          buddySwipeMoved = false;
+          width = viewport.clientWidth || 1;
+          viewport.classList.add("is-dragging");
+          applyBuddyCarouselTransform(track, buddyCarouselPage, 0, false);
+        }
+        function onMove(ev) {
+          if (!dragging) return;
+          var p = ev.touches ? ev.touches[0] : ev;
+          if (!p) return;
+          var dx = p.clientX - startX;
+          var dy = p.clientY - startY;
+          if (!axis) {
+            if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+            axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+            if (axis === "y") {
+              dragging = false;
+              viewport.classList.remove("is-dragging");
+              applyBuddyCarouselTransform(track, buddyCarouselPage, 0, true);
+              return;
+            }
+          }
+          if (axis !== "x") return;
+          if (Math.abs(dx) > 10) buddySwipeMoved = true;
+          if (ev.cancelable) ev.preventDefault();
+          var atStart = buddyCarouselPage <= 0 && dx > 0;
+          var atEnd = buddyCarouselPage >= pageCount - 1 && dx < 0;
+          dragX = (atStart || atEnd) ? dx * 0.35 : dx;
+          applyBuddyCarouselTransform(track, buddyCarouselPage, dragX, false);
+        }
+        function onEnd() {
+          if (!dragging) {
+            viewport.classList.remove("is-dragging");
+            return;
+          }
+          var wasX = axis === "x";
+          dragging = false;
+          viewport.classList.remove("is-dragging");
+          if (wasX) {
+            var threshold = Math.max(42, width * 0.18);
+            if (dragX <= -threshold && buddyCarouselPage < pageCount - 1) {
+              buddyCarouselPage += 1;
+            } else if (dragX >= threshold && buddyCarouselPage > 0) {
+              buddyCarouselPage -= 1;
+            }
+            applyBuddyCarouselTransform(track, buddyCarouselPage, 0, true);
+          }
+          axis = null;
+          dragX = 0;
+        }
+
+        buddySwipeState = {
+          viewport: viewport,
+          onStart: onStart,
+          onMove: onMove,
+          onEnd: onEnd
+        };
+        viewport.addEventListener("touchstart", onStart, { passive: true });
+        viewport.addEventListener("touchmove", onMove, { passive: false });
+        viewport.addEventListener("touchend", onEnd);
+        viewport.addEventListener("touchcancel", onEnd);
+        viewport.addEventListener("mousedown", onStart);
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onEnd);
+      }
+
+      function buildBuddySlotEl(opts) {
+        var isCoachSlot = !!opts.isCoach;
+        var buddy = opts.buddy || null;
+        var isPlus = !!opts.isPlus;
+        var isEmpty = !!opts.isEmpty;
+        var slotIndex = opts.slotIndex != null ? opts.slotIndex : 0;
+        var locked = isBuddySearchLocked();
+        var fails = getBuddySearchFails();
+
+        var slot = document.createElement("div");
+        slot.className = "community-slot" + (isCoachSlot ? " is-coach" : "");
+        if (!isCoachSlot && buddy && buddyEditMode) slot.className += " is-wobbling";
+        slot.dataset.slot = String(slotIndex);
+
+        var role = document.createElement("p");
+        role.className = "community-role";
+        role.textContent = isCoachSlot ? "Trainer" : "\u00a0";
+
+        var circleIsBtn = !(buddy && !isCoachSlot && buddyEditMode);
+        var circle = document.createElement(circleIsBtn ? "button" : "div");
+        if (circleIsBtn) circle.type = "button";
+        circle.className = "community-circle";
+        circle.dataset.slot = String(slotIndex);
+        if (!circleIsBtn) circle.setAttribute("role", "group");
+
+        var meta = document.createElement("div");
+        meta.className = "community-slot__meta";
+        var label = document.createElement("p");
+        label.className = "community-firstname";
+        var failsEl = document.createElement("div");
+        failsEl.className = "community-fails";
+        failsEl.setAttribute("aria-hidden", "true");
+
+        if (isCoachSlot) {
+          if (trainerEditMode) {
+            beginTrainerSerialEntry(circle);
+            label.textContent = "\u00a0";
+            circle.setAttribute("aria-label", "Trainer-Nummer eingeben");
+            var saveTrainer = document.createElement("button");
+            saveTrainer.type = "button";
+            saveTrainer.className = "community-trainer-edit";
+            saveTrainer.innerHTML = trainerEditIcon(true);
+            saveTrainer.setAttribute("aria-label", "Trainer speichern");
+            saveTrainer.addEventListener("click", function (ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              if (trainerSerialBusy) return;
+              var serialInput = slot.querySelector(".community-circle__serial");
+              submitTrainerSerial(serialInput ? serialInput.value : "");
+            });
+            var saveRow = document.createElement("div");
+            saveRow.className = "community-firstname-row";
+            saveRow.appendChild(label);
+            saveRow.appendChild(saveTrainer);
+            meta.appendChild(saveRow);
+            meta.appendChild(failsEl);
+          } else {
+            var coach = getDisplayCoach();
+            if (coach.photo_url) {
+              var cimg = document.createElement("img");
+              cimg.src = coach.photo_url;
+              cimg.alt = "";
+              circle.appendChild(cimg);
+            }
+            label.textContent = firstNameOf(coach);
+            var editBtn = document.createElement("button");
+            editBtn.type = "button";
+            editBtn.className = "community-trainer-edit";
+            editBtn.innerHTML = trainerEditIcon(false);
+            editBtn.setAttribute("aria-label", "Trainer ändern");
+            editBtn.addEventListener("click", function (ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              if (trainerSerialBusy) return;
+              trainerEditMode = true;
+              renderBuddySlots();
+            });
+            var nameRow = document.createElement("div");
+            nameRow.className = "community-firstname-row";
+            nameRow.appendChild(label);
+            nameRow.appendChild(editBtn);
+            meta.appendChild(nameRow);
+            meta.appendChild(failsEl);
+            circle.setAttribute("aria-label", "Trainer " + firstNameOf(coach));
+            circle.dataset.replyTarget = "1";
+            circle.addEventListener("click", function () {
+              function selectCoach(coachId) {
+                if (!coachId) {
+                  var failMsg = document.getElementById("community-add-msg");
+                  if (failMsg) {
+                    failMsg.textContent =
+                      "Trainer nicht erreichbar. In Supabase go-trainer.sql ausführen.";
+                  }
+                  return;
+                }
+                replyTargetId = coachId;
+                stopReplyPicking();
+                var input = document.getElementById("community-reply-text");
+                var coachName = firstNameOf(getDisplayCoach());
+                if (input) {
+                  input.placeholder = "Nachricht an " + coachName + "…";
+                  input.focus();
+                }
+                var okMsg = document.getElementById("community-add-msg");
+                if (okMsg) okMsg.textContent = "Nachricht an " + coachName;
+              }
+              if (pickingReplyBuddy) {
+                ensureCoachAccount().then(selectCoach);
+                return;
+              }
+              pickingReplyBuddy = true;
+              var pick = document.getElementById("community-reply-pick");
+              if (pick) pick.classList.add("is-on");
+              ensureCoachAccount().then(selectCoach);
+            });
+          }
+        } else if (buddy) {
+          if (buddy.photo_url) {
+            var img = document.createElement("img");
+            img.src = buddy.photo_url;
+            img.alt = "";
+            circle.appendChild(img);
+          }
+          label.textContent = firstNameOf(buddy);
+          circle.setAttribute("aria-label", firstNameOf(buddy));
+          if (buddy.id) circle.dataset.replyTarget = "1";
+          if (buddyEditMode) {
+            var del = document.createElement("button");
+            del.type = "button";
+            del.className = "community-circle__delete";
+            del.setAttribute("aria-label", firstNameOf(buddy) + " entfernen");
+            del.innerHTML = buddyDeleteIcon();
+            del.addEventListener("click", function (ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              removeBuddy(buddy);
+            });
+            circle.appendChild(del);
+            circle.addEventListener("click", function (ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+            });
+          } else {
+            circle.addEventListener("click", function (ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              if (buddySwipeMoved) {
+                buddySwipeMoved = false;
+                return;
+              }
+              if (pickingReplyBuddy) {
+                replyTargetId = buddy.id || null;
+                stopReplyPicking();
+                var input = document.getElementById("community-reply-text");
+                if (input) {
+                  input.placeholder = "Nachricht an " + firstNameOf(buddy) + "…";
+                  input.focus();
+                }
+                var msg = document.getElementById("community-add-msg");
+                if (msg) msg.textContent = "Nachricht an " + firstNameOf(buddy);
+                return;
+              }
+              openBuddyActionModal(buddy);
+            });
+          }
+          meta.appendChild(label);
+          meta.appendChild(failsEl);
+        } else if (isPlus) {
+          if (!buddyEditMode) {
+            var plus = document.createElement("span");
+            plus.className = "community-circle__plus";
+            plus.textContent = "+";
+            circle.appendChild(plus);
+            circle.setAttribute("aria-label", locked ? "Buddy-Suche gesperrt" : "Buddy hinzufügen");
+            if (fails > 0) {
+              for (var fx = 0; fx < fails; fx++) {
+                var x = document.createElement("span");
+                x.textContent = "X";
+                failsEl.appendChild(x);
+              }
+            }
+            circle.addEventListener("click", function (ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              var msg = document.getElementById("community-add-msg");
+              if (isBuddySearchLocked()) {
+                if (msg) msg.textContent = buddySearchLockMessage();
+                return;
+              }
+              beginSerialEntry(circle, label);
+            });
+          } else {
+            circle.setAttribute("aria-label", "Leerer Buddy-Platz");
+            circle.disabled = true;
+          }
+          label.textContent = "\u00a0";
+          meta.appendChild(label);
+          meta.appendChild(failsEl);
+        } else {
+          circle.setAttribute("aria-label", "Leerer Buddy-Platz");
+          circle.disabled = true;
+          label.textContent = "\u00a0";
+          meta.appendChild(label);
+          meta.appendChild(failsEl);
+        }
+
+        slot.appendChild(role);
+        slot.appendChild(circle);
+        slot.appendChild(meta);
+        return slot;
+      }
+
       function renderBuddySlots() {
         var root = document.getElementById("community-slots");
         if (!root) return;
+        unbindBuddyCarouselSwipe();
         root.innerHTML = "";
         serialEntryActive = false;
         var buddyCap = maxBuddiesAllowed();
-        var slotCount = buddyCap + 1;
         var items = getBuddies().slice(0, buddyCap);
-        var fails = getBuddySearchFails();
-        var locked = isBuddySearchLocked();
-        for (var i = 0; i < slotCount; i++) {
-          (function (slotIndex) {
-            var isCoachSlot = slotIndex === slotCount - 1;
-            var buddy = isCoachSlot ? getDisplayCoach() : (items[slotIndex] || null);
-            var slot = document.createElement("div");
-            slot.className = "community-slot" + (isCoachSlot ? " is-coach" : "");
-            if (!isCoachSlot && buddy && buddyEditMode) slot.className += " is-wobbling";
-            slot.dataset.slot = String(slotIndex);
-
-            var role = document.createElement("p");
-            role.className = "community-role";
-            role.textContent = isCoachSlot ? "Trainer" : "\u00a0";
-
-            var circleIsBtn = !(buddy && !isCoachSlot && buddyEditMode);
-            var circle = document.createElement(circleIsBtn ? "button" : "div");
-            if (circleIsBtn) circle.type = "button";
-            circle.className = "community-circle";
-            circle.dataset.slot = String(slotIndex);
-            if (!circleIsBtn) circle.setAttribute("role", "group");
-
-            var meta = document.createElement("div");
-            meta.className = "community-slot__meta";
-            var label = document.createElement("p");
-            label.className = "community-firstname";
-            var failsEl = document.createElement("div");
-            failsEl.className = "community-fails";
-            failsEl.setAttribute("aria-hidden", "true");
-
-            if (isCoachSlot) {
-              if (trainerEditMode) {
-                beginTrainerSerialEntry(circle);
-                label.textContent = "\u00a0";
-                circle.setAttribute("aria-label", "Trainer-Nummer eingeben");
-                var saveTrainer = document.createElement("button");
-                saveTrainer.type = "button";
-                saveTrainer.className = "community-trainer-edit";
-                saveTrainer.innerHTML = trainerEditIcon(true);
-                saveTrainer.setAttribute("aria-label", "Trainer speichern");
-                saveTrainer.addEventListener("click", function (ev) {
-                  ev.preventDefault();
-                  ev.stopPropagation();
-                  if (trainerSerialBusy) return;
-                  var serialInput = slot.querySelector(".community-circle__serial");
-                  submitTrainerSerial(serialInput ? serialInput.value : "");
-                });
-                var saveRow = document.createElement("div");
-                saveRow.className = "community-firstname-row";
-                saveRow.appendChild(label);
-                saveRow.appendChild(saveTrainer);
-                meta.appendChild(saveRow);
-                meta.appendChild(failsEl);
-              } else {
-                var coach = getDisplayCoach();
-                if (coach.photo_url) {
-                  var cimg = document.createElement("img");
-                  cimg.src = coach.photo_url;
-                  cimg.alt = "";
-                  circle.appendChild(cimg);
-                }
-                label.textContent = firstNameOf(coach);
-                var editBtn = document.createElement("button");
-                editBtn.type = "button";
-                editBtn.className = "community-trainer-edit";
-                editBtn.innerHTML = trainerEditIcon(false);
-                editBtn.setAttribute("aria-label", "Trainer ändern");
-                editBtn.addEventListener("click", function (ev) {
-                  ev.preventDefault();
-                  ev.stopPropagation();
-                  if (trainerSerialBusy) return;
-                  trainerEditMode = true;
-                  renderBuddySlots();
-                });
-                var nameRow = document.createElement("div");
-                nameRow.className = "community-firstname-row";
-                nameRow.appendChild(label);
-                nameRow.appendChild(editBtn);
-                meta.appendChild(nameRow);
-                meta.appendChild(failsEl);
-                circle.setAttribute("aria-label", "Trainer " + firstNameOf(coach));
-                circle.dataset.replyTarget = "1";
-                circle.addEventListener("click", function () {
-                  function selectCoach(coachId) {
-                    if (!coachId) {
-                      var failMsg = document.getElementById("community-add-msg");
-                      if (failMsg) {
-                        failMsg.textContent =
-                          "Trainer nicht erreichbar. In Supabase go-trainer.sql ausführen.";
-                      }
-                      return;
-                    }
-                    replyTargetId = coachId;
-                    stopReplyPicking();
-                    var input = document.getElementById("community-reply-text");
-                    var coachName = firstNameOf(getDisplayCoach());
-                    if (input) {
-                      input.placeholder = "Nachricht an " + coachName + "…";
-                      input.focus();
-                    }
-                    var okMsg = document.getElementById("community-add-msg");
-                    if (okMsg) okMsg.textContent = "Nachricht an " + coachName;
-                  }
-                  if (pickingReplyBuddy) {
-                    ensureCoachAccount().then(selectCoach);
-                    return;
-                  }
-                  pickingReplyBuddy = true;
-                  var pick = document.getElementById("community-reply-pick");
-                  if (pick) pick.classList.add("is-on");
-                  ensureCoachAccount().then(selectCoach);
-                });
-              }
-            } else if (buddy) {
-              if (buddy.photo_url) {
-                var img = document.createElement("img");
-                img.src = buddy.photo_url;
-                img.alt = "";
-                circle.appendChild(img);
-              }
-              label.textContent = firstNameOf(buddy);
-              circle.setAttribute("aria-label", firstNameOf(buddy));
-              if (buddy.id) circle.dataset.replyTarget = "1";
-              if (buddyEditMode) {
-                var del = document.createElement("button");
-                del.type = "button";
-                del.className = "community-circle__delete";
-                del.setAttribute("aria-label", firstNameOf(buddy) + " entfernen");
-                del.innerHTML = buddyDeleteIcon();
-                del.addEventListener("click", function (ev) {
-                  ev.preventDefault();
-                  ev.stopPropagation();
-                  removeBuddy(buddy);
-                });
-                circle.appendChild(del);
-                circle.addEventListener("click", function (ev) {
-                  ev.preventDefault();
-                  ev.stopPropagation();
-                });
-              } else {
-                circle.addEventListener("click", function () {
-                  if (!pickingReplyBuddy) return;
-                  replyTargetId = buddy.id || null;
-                  stopReplyPicking();
-                  var input = document.getElementById("community-reply-text");
-                  if (input) {
-                    input.placeholder = "Nachricht an " + firstNameOf(buddy) + "…";
-                    input.focus();
-                  }
-                  var msg = document.getElementById("community-add-msg");
-                  if (msg) msg.textContent = "Nachricht an " + firstNameOf(buddy);
-                });
-                bindBuddyLongPress(slot, buddy);
-              }
-              meta.appendChild(label);
-              meta.appendChild(failsEl);
-            } else if (slotIndex === items.length) {
-              if (!buddyEditMode) {
-                var plus = document.createElement("span");
-                plus.className = "community-circle__plus";
-                plus.textContent = "+";
-                circle.appendChild(plus);
-                circle.setAttribute("aria-label", locked ? "Buddy-Suche gesperrt" : "Buddy hinzufügen");
-                if (fails > 0) {
-                  for (var fx = 0; fx < fails; fx++) {
-                    var x = document.createElement("span");
-                    x.textContent = "X";
-                    failsEl.appendChild(x);
-                  }
-                }
-                circle.addEventListener("click", function (ev) {
-                  ev.preventDefault();
-                  ev.stopPropagation();
-                  var msg = document.getElementById("community-add-msg");
-                  if (isBuddySearchLocked()) {
-                    if (msg) msg.textContent = buddySearchLockMessage();
-                    return;
-                  }
-                  beginSerialEntry(circle, label);
-                });
-              } else {
-                circle.setAttribute("aria-label", "Leerer Buddy-Platz");
-                circle.disabled = true;
-              }
-              label.textContent = "\u00a0";
-              meta.appendChild(label);
-              meta.appendChild(failsEl);
-            } else {
-              circle.setAttribute("aria-label", "Leerer Buddy-Platz");
-              circle.disabled = true;
-              label.textContent = "\u00a0";
-              meta.appendChild(label);
-              meta.appendChild(failsEl);
-            }
-
-            slot.appendChild(role);
-            slot.appendChild(circle);
-            slot.appendChild(meta);
-            root.appendChild(slot);
-          })(i);
+        var cells = items.map(function (b) { return { type: "buddy", buddy: b }; });
+        if (items.length < buddyCap && !buddyEditMode) {
+          cells.push({ type: "plus" });
         }
+        while (cells.length % 3 !== 0) {
+          cells.push({ type: "empty" });
+        }
+        if (!cells.length) {
+          cells = [{ type: "plus" }, { type: "empty" }, { type: "empty" }];
+        }
+
+        var pageCount = buddyCarouselPageCount(cells.length);
+        if (buddyCarouselPage >= pageCount) buddyCarouselPage = pageCount - 1;
+        if (buddyCarouselPage < 0) buddyCarouselPage = 0;
+
+        var rail = document.createElement("div");
+        rail.className = "community-buddy-rail";
+        var viewport = document.createElement("div");
+        viewport.className = "community-buddy-viewport";
+        viewport.setAttribute("aria-label", "Buddies");
+        var track = document.createElement("div");
+        track.className = "community-buddy-track";
+        track.id = "community-buddy-track";
+
+        for (var p = 0; p < pageCount; p++) {
+          var page = document.createElement("div");
+          page.className = "community-buddy-page";
+          for (var c = 0; c < 3; c++) {
+            var cell = cells[p * 3 + c];
+            if (!cell) cell = { type: "empty" };
+            page.appendChild(buildBuddySlotEl({
+              buddy: cell.type === "buddy" ? cell.buddy : null,
+              isPlus: cell.type === "plus",
+              isEmpty: cell.type === "empty",
+              slotIndex: p * 3 + c
+            }));
+          }
+          track.appendChild(page);
+        }
+        viewport.appendChild(track);
+        rail.appendChild(viewport);
+        root.appendChild(rail);
+
+        var coachSlot = buildBuddySlotEl({
+          isCoach: true,
+          slotIndex: 99
+        });
+        root.appendChild(coachSlot);
+
+        requestAnimationFrame(function () {
+          applyBuddyCarouselTransform(track, buddyCarouselPage, 0, false);
+          requestAnimationFrame(function () {
+            applyBuddyCarouselTransform(track, buddyCarouselPage, 0, true);
+          });
+        });
+        bindBuddyCarouselSwipe(viewport, track, pageCount);
       }
 
       var serialEntryActive = false;
