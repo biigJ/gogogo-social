@@ -379,12 +379,19 @@
       padding-bottom: calc(var(--header-h) + 56px + env(safe-area-inset-bottom, 0px));
     }
 
-    .hero { text-align: center; margin-bottom: 22px; }
+    .hero { text-align: center; margin-bottom: 12px; }
     .hero[hidden] { display: none !important; }
     .cycle-wrap {
-      position: relative; width: 240px; height: 240px; margin: 0 auto 20px;
+      position: relative;
+      width: calc(240px * 0.7);
+      height: calc(240px * 0.7);
+      margin: 0 auto 12px;
     }
-    .cycle { width: 240px; height: 240px; display: block; }
+    .cycle {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
     .cycle.is-spinning { animation: spin 120s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     @media (prefers-reduced-motion: reduce) { .cycle.is-spinning { animation: none; } }
@@ -563,31 +570,34 @@
     }
     .home-cal__invite {
       width: 100%;
-      min-height: 18px;
+      aspect-ratio: 1;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 3px;
       padding: 0;
       border: 0;
       background: transparent;
       color: var(--ink-on-red);
     }
-    .home-cal__invite[hidden] { display: none !important; }
     .home-cal__invite-sq {
-      width: 16px;
-      height: 16px;
-      border: 1px solid rgba(247, 245, 240, 0.75);
+      width: 100%;
+      height: 100%;
+      aspect-ratio: 1;
+      border: 1px solid rgba(247, 245, 240, 0.55);
       border-radius: 2px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 11px;
+      font-size: clamp(0.95rem, 4.2vw, 1.15rem);
       line-height: 1;
       padding: 0;
       background: transparent;
       color: inherit;
+      cursor: default;
+    }
+    .home-cal__invite-sq.is-active {
       cursor: pointer;
+      border-color: rgba(247, 245, 240, 0.85);
     }
     .home-cal__invite-sq.is-on {
       border-color: var(--ink-on-red);
@@ -2998,7 +3008,7 @@ browsen</span>
       <div class="wrap__scroll">
       <section class="hero" id="home-hero">
         <div class="cycle-wrap">
-          <svg class="cycle is-spinning" id="cycle" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
+          <svg class="cycle is-spinning" id="cycle" viewBox="0 0 240 240" aria-hidden="true"></svg>
           <button class="cycle-portrait" id="photo-btn" type="button" aria-label="Profil und Trainingsplan">
             <img id="photo-img" alt="" hidden />
             <span class="cycle-add" id="photo-plus"><img src="/assets/vitruvian.png" alt="" /></span>
@@ -9558,11 +9568,12 @@ browsen</span>
               return String(inv.status || "pending") === "pending";
             });
             var accepted = acceptedInviteForDate(key);
+            var sq = document.createElement("button");
+            sq.type = "button";
+            sq.className = "home-cal__invite-sq";
             if (pendingInvites.length || accepted) {
-              var sq = document.createElement("button");
-              sq.type = "button";
-              sq.className = "home-cal__invite-sq" + (accepted ? " is-on" : "");
               sq.textContent = "🤝";
+              sq.classList.add(accepted ? "is-on" : "is-active");
               sq.setAttribute(
                 "aria-label",
                 accepted
@@ -9580,10 +9591,12 @@ browsen</span>
                   });
                 });
               }
-              inviteRow.appendChild(sq);
             } else {
-              inviteRow.hidden = true;
+              sq.textContent = "";
+              sq.disabled = true;
+              sq.setAttribute("aria-hidden", "true");
             }
+            inviteRow.appendChild(sq);
             cell.appendChild(inviteRow);
             root.appendChild(cell);
           });
