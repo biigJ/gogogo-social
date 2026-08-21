@@ -2778,6 +2778,20 @@
         renderDayUnitLabels();
       }
 
+      /* Freitext wieder editierbar inkl. Tages-Platzhalter (wenn kein Zirkel/Kraft/Ausdauer). */
+      function openDayFreitext(wd, clearValue) {
+        var ta = document.getElementById(PLAN_DAY_FIELD_IDS[wd]);
+        if (!ta) return;
+        if (wd === getSelectedZirkelWeekday()) return;
+        var kBox = document.querySelector('.plan-kraft-check[data-wd="' + wd + '"]');
+        var aBox = document.querySelector('.plan-ausdauer-check[data-wd="' + wd + '"]');
+        if ((kBox && kBox.checked) || (aBox && aBox.checked)) return;
+        ta.disabled = false;
+        ta.readOnly = false;
+        ta.placeholder = (ZIRKEL_DAY_NAMES[wd] || "Tag") + "…";
+        if (clearValue) ta.value = "";
+      }
+
       function kraftSystemOptions() {
         var cat = kraftCat();
         return (cat.SYSTEMS || []).map(function (sys) {
@@ -2896,7 +2910,7 @@
         var wd = parseInt(box.getAttribute("data-wd"), 10);
         if (!(wd >= 0 && wd <= 6)) return;
         var zirkelWd = getSelectedZirkelWeekday();
-        if (box.checked && wd === zirkelWd) {
+        if (box.checked && zirkelWd != null && wd === zirkelWd) {
           box.checked = false;
           window.alert("Zirkeltraining ist an diesem Tag aktiv — Kraft/Ausdauer nicht möglich.");
           return;
@@ -2906,11 +2920,7 @@
         if (box.checked && other) other.checked = false;
         if (!box.checked) {
           clearDayTrainingUnit(wd);
-          var taOff = document.getElementById(PLAN_DAY_FIELD_IDS[wd]);
-          if (taOff && taOff.placeholder !== "Zirkeltraining") {
-            taOff.disabled = false;
-            taOff.placeholder = (ZIRKEL_DAY_NAMES[wd] || "Tag") + "…";
-          }
+          openDayFreitext(wd, true);
           return;
         }
         var opts = kind === "kraft" ? kraftSystemOptions() : ausdauerPresetOptions();
@@ -2964,8 +2974,8 @@
             ta.disabled = true;
             ta.placeholder = u.label;
             if (!String(ta.value || "").trim()) ta.value = u.label;
-          } else if (ta.placeholder && ta.placeholder !== "Zirkeltraining") {
-            if (!ta.value) ta.disabled = false;
+          } else {
+            openDayFreitext(idx, false);
           }
         });
         renderDayUnitLabels();
@@ -3200,7 +3210,7 @@
             if (n >= 0 && n <= 6) return n;
           }
         }
-        return zirkelUiWeekday >= 0 && zirkelUiWeekday <= 6 ? zirkelUiWeekday : DEFAULT_ZIRKEL_WD;
+        return zirkelUiWeekday >= 0 && zirkelUiWeekday <= 6 ? zirkelUiWeekday : null;
       }
 
       function resetZirkelTextStash() {
@@ -3211,18 +3221,19 @@
         });
       }
 
-      /* clearZirkelText: Freitext der Zirkel-Tagesbox leeren (nach Ja). */
+      /* clearZirkelText: Freitext der Zirkel-Tagesbox leeren (nach Ja).
+         wd null/-1 = kein Zirkeltag → alle Tagesfelder wieder freitextfähig. */
       function applyZirkelDayUi(wd, opts) {
-        var selected = wd >= 0 && wd <= 6 ? wd : DEFAULT_ZIRKEL_WD;
+        var selected = wd != null && wd >= 0 && wd <= 6 ? wd : null;
         var clearZirkelText = !opts || opts.clearZirkelText !== false;
         getZirkelChecks().forEach(function (box) {
           var n = parseInt(box.getAttribute("data-wd"), 10);
-          box.checked = n === selected;
+          box.checked = selected != null && n === selected;
         });
         PLAN_DAY_FIELD_IDS.forEach(function (id, idx) {
           var el = document.getElementById(id);
           if (!el) return;
-          var isZirkel = idx === selected;
+          var isZirkel = selected != null && idx === selected;
           el.disabled = isZirkel;
           if (isZirkel) {
             if (clearZirkelText) el.value = "";
@@ -3239,9 +3250,9 @@
         });
         document.querySelectorAll(".plan-kraft-check, .plan-ausdauer-check").forEach(function (box) {
           var n = parseInt(box.getAttribute("data-wd"), 10);
-          box.disabled = n === selected;
+          box.disabled = selected != null && n === selected;
         });
-        zirkelUiWeekday = selected;
+        zirkelUiWeekday = selected != null ? selected : -1;
         syncKindUiFromUnits();
       }
 
@@ -3250,11 +3261,20 @@
           box.addEventListener("change", async function () {
             var n = parseInt(box.getAttribute("data-wd"), 10);
             if (!(n >= 0 && n <= 6)) n = DEFAULT_ZIRKEL_WD;
-            var prev = zirkelUiWeekday >= 0 && zirkelUiWeekday <= 6 ? zirkelUiWeekday : DEFAULT_ZIRKEL_WD;
+            var prev = zirkelUiWeekday >= 0 && zirkelUiWeekday <= 6 ? zirkelUiWeekday : null;
 
-            /* Nur Abhaken rückgängig — immer genau ein Tag. */
+            /* Abhaken: Zirkel an diesem Tag entfernen → Freitext wieder offen. */
             if (!box.checked) {
-              applyZirkelDayUi(prev, { clearZirkelText: false });
+              if (prev === n) {
+                applyZirkelDayUi(null, { clearZirkelText: false });
+                var elOff = document.getElementById(PLAN_DAY_FIELD_IDS[n]);
+                if (elOff && Object.prototype.hasOwnProperty.call(zirkelTextStash, n) && !String(elOff.value || "").trim()) {
+                  elOff.value = zirkelTextStash[n] || "";
+                }
+                openDayFreitext(n, !String((elOff && elOff.value) || "").trim());
+              } else {
+                applyZirkelDayUi(prev, { clearZirkelText: false });
+              }
               return;
             }
             if (n === prev || zirkelConfirmBusy) {
@@ -3281,9 +3301,12 @@
             var newEl = document.getElementById(PLAN_DAY_FIELD_IDS[n]);
             if (newEl) zirkelTextStash[n] = String(newEl.value || "");
             applyZirkelDayUi(n, { clearZirkelText: true });
-            var prevEl = document.getElementById(PLAN_DAY_FIELD_IDS[prev]);
-            if (prevEl && Object.prototype.hasOwnProperty.call(zirkelTextStash, prev)) {
-              prevEl.value = zirkelTextStash[prev];
+            if (prev != null) {
+              var prevEl = document.getElementById(PLAN_DAY_FIELD_IDS[prev]);
+              if (prevEl && Object.prototype.hasOwnProperty.call(zirkelTextStash, prev)) {
+                prevEl.value = zirkelTextStash[prev];
+              }
+              openDayFreitext(prev, false);
             }
           });
         });
@@ -3893,8 +3916,8 @@
           var el = document.getElementById(pair[0]);
           if (el) el.value = row[pair[1]] != null ? String(row[pair[1]]) : "";
         });
-        var zw = row.zirkel_weekday != null ? Number(row.zirkel_weekday) : DEFAULT_ZIRKEL_WD;
-        if (!(zw >= 0 && zw <= 6)) zw = DEFAULT_ZIRKEL_WD;
+        var zw = row.zirkel_weekday != null ? Number(row.zirkel_weekday) : null;
+        if (!(zw >= 0 && zw <= 6)) zw = null;
         applyZirkelDayUi(zw, { clearZirkelText: true });
         applyKindChecks(".plan-kraft-check", parseWeekdayList(row.kraft_weekdays));
         applyKindChecks(".plan-ausdauer-check", parseWeekdayList(row.ausdauer_weekdays));
@@ -4384,10 +4407,10 @@
       }
 
       async function archiveZirkelChange(accountId, previous, payload) {
-        var oldWd = previous && previous.zirkel_weekday != null ? Number(previous.zirkel_weekday) : DEFAULT_ZIRKEL_WD;
-        var newWd = payload && payload.zirkel_weekday != null ? Number(payload.zirkel_weekday) : DEFAULT_ZIRKEL_WD;
-        if (!(oldWd >= 0 && oldWd <= 6)) oldWd = DEFAULT_ZIRKEL_WD;
-        if (!(newWd >= 0 && newWd <= 6)) newWd = DEFAULT_ZIRKEL_WD;
+        var oldRaw = previous && previous.zirkel_weekday != null ? Number(previous.zirkel_weekday) : null;
+        var newRaw = payload && payload.zirkel_weekday != null ? Number(payload.zirkel_weekday) : null;
+        var oldWd = oldRaw >= 0 && oldRaw <= 6 ? oldRaw : null;
+        var newWd = newRaw >= 0 && newRaw <= 6 ? newRaw : null;
         if (oldWd === newWd) return { ok: true, missing: false };
         if (!(await probeZirkelHistoryTable(true))) {
           return { ok: true, missing: true };
@@ -4395,18 +4418,21 @@
         var today = berlinTodayISO();
         var inserts = [];
         var hasHist = await zirkelHistoryExists(accountId);
-        if (!hasHist) {
+        if (!hasHist && oldWd != null) {
           inserts.push({
             account_id: accountId,
             zirkel_weekday: oldWd,
             effective_from: "2000-01-01"
           });
         }
-        inserts.push({
-          account_id: accountId,
-          zirkel_weekday: newWd,
-          effective_from: today
-        });
+        if (newWd != null) {
+          inserts.push({
+            account_id: accountId,
+            zirkel_weekday: newWd,
+            effective_from: today
+          });
+        }
+        if (!inserts.length) return { ok: true, missing: false };
         return await insertZirkelHistory(inserts);
       }
 
@@ -4425,12 +4451,14 @@
           payload[pair[1]] = el ? String(el.value || "").trim() || null : null;
         });
         var zirkelWd = getSelectedZirkelWeekday();
-        payload.zirkel_weekday = zirkelWd;
+        payload.zirkel_weekday = zirkelWd != null && zirkelWd >= 0 && zirkelWd <= 6 ? zirkelWd : null;
         payload.kraft_weekdays = getCheckedWeekdays(".plan-kraft-check");
         payload.ausdauer_weekdays = getCheckedWeekdays(".plan-ausdauer-check");
         payload.day_training_units = dayTrainingUnitsPayload();
-        var zirkelKey = DAY_PLAN_KEYS[zirkelWd];
-        if (zirkelKey) payload[zirkelKey] = null;
+        if (zirkelWd != null && zirkelWd >= 0 && zirkelWd <= 6) {
+          var zirkelKey = DAY_PLAN_KEYS[zirkelWd];
+          if (zirkelKey) payload[zirkelKey] = null;
+        }
         Object.keys(dayTrainingUnits).forEach(function (k) {
           var wdNum = Number(k);
           var dk = DAY_PLAN_KEYS[wdNum];

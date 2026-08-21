@@ -5878,9 +5878,10 @@ browsen</span>
 
       function zirkelWeekday() {
         if (!coachPlan) return DEFAULT_ZIRKEL_WD;
+        if (coachPlan.zirkel_weekday == null || coachPlan.zirkel_weekday === "") return -1;
         var n = Number(coachPlan.zirkel_weekday);
         if (n >= 0 && n <= 6) return n;
-        return DEFAULT_ZIRKEL_WD;
+        return -1;
       }
 
       function parseWeekdayList(raw) {
@@ -7081,8 +7082,9 @@ browsen</span>
         var list = document.getElementById("discover-list");
         var search = document.getElementById("discover-search");
         if (!modal || !list) return;
+        /* Standard: Alle — Profilnummer/Name nicht durch Ziel-Vorauswahl verstecken. */
         if (discoverGoalFilter == null) {
-          discoverGoalFilter = (account && account.training_goal) ? String(account.training_goal) : "";
+          discoverGoalFilter = "";
         }
         buildDiscoverGoalWheel();
         if (search) {
@@ -7110,6 +7112,17 @@ browsen</span>
 
       var discoverSerialBusy = false;
 
+      function discoverRowMatchesGoal(row) {
+        var goalFilter = String(discoverGoalFilter || "").trim().toLowerCase();
+        if (!goalFilter) return true;
+        var rowGoal = String(row && row.training_goal || "").trim().toLowerCase();
+        return rowGoal === goalFilter;
+      }
+
+      function discoverFirstName(row) {
+        return String(firstNameOf(row) || "").trim().toLowerCase();
+      }
+
       async function renderDiscoverList(query) {
         var list = document.getElementById("discover-list");
         if (!list) return;
@@ -7123,14 +7136,15 @@ browsen</span>
         var mine = account && account.id ? String(account.id) : "";
         list.innerHTML = "";
         var shown = 0;
+        var goalBlocked = 0;
 
         function appendDiscoverRow(row) {
           if (!row || !row.id) return;
           if (String(row.id) === mine) return;
           if (buddyIds[String(row.id)]) return;
-          if (goalFilter) {
-            var rowGoal = String(row.training_goal || "").trim().toLowerCase();
-            if (rowGoal !== goalFilter) return;
+          if (!discoverRowMatchesGoal(row)) {
+            goalBlocked++;
+            return;
           }
           shown++;
           var el = document.createElement("div");
@@ -7162,6 +7176,22 @@ browsen</span>
           list.appendChild(el);
         }
 
+        function emptyMsg() {
+          if (goalBlocked && (serialQ.length === 8 || q)) {
+            return uiLang === "en"
+              ? "Found, but goal does not match the filter above. Choose “All” or the matching goal."
+              : "Gefunden, aber Ziel passt nicht zum Filter oben. Wähle „Alle“ oder das passende Ziel.";
+          }
+          if (serialQ.length === 8) {
+            return uiLang === "en" ? "No profile with this number." : "Keine Profilnummer gefunden.";
+          }
+          if (q || goalFilter) {
+            return uiLang === "en" ? "No matches." : "Keine Treffer.";
+          }
+          return uiLang === "en" ? "No open profiles right now." : "Gerade keine offenen Profile.";
+        }
+
+        /* Exakte Profilnummer: immer per API suchen (nicht nur open_to_connect-Cache). */
         if (serialQ.length === 8) {
           if (discoverSerialBusy) return;
           discoverSerialBusy = true;
@@ -7177,11 +7207,10 @@ browsen</span>
             } catch (eSer) { found = null; }
             list.innerHTML = "";
             shown = 0;
+            goalBlocked = 0;
             if (found) appendDiscoverRow(found);
             if (!shown) {
-              list.innerHTML = "<p style='opacity:0.85'>" +
-                (uiLang === "en" ? "No profile with this number." : "Keine Profilnummer gefunden.") +
-                "</p>";
+              list.innerHTML = "<p style='opacity:0.85'>" + emptyMsg() + "</p>";
             }
           } finally {
             discoverSerialBusy = false;
@@ -7189,20 +7218,40 @@ browsen</span>
           return;
         }
 
-        (discoverRowsCache || []).forEach(function (row) {
+        /* Name-Suche: Cache + API-Lookup nach Vorname/Name, Ziel-Filter aus der Maske. */
+        var matched = {};
+        function consider(row) {
           if (!row || !row.id) return;
-          if (String(row.id) === mine) return;
-          if (buddyIds[String(row.id)]) return;
-          var hay = [row.name, row.training_goal, row.city_area, row.workout_place, row.spoken_lang, row.serial_number]
-            .filter(Boolean).join(" ").toLowerCase();
-          if (q && hay.indexOf(q) === -1) return;
-          appendDiscoverRow(row);
-        });
+          var id = String(row.id);
+          if (matched[id]) return;
+          matched[id] = true;
+          if (!q) {
+            appendDiscoverRow(row);
+            return;
+          }
+          var first = discoverFirstName(row);
+          var full = String(row.name || "").trim().toLowerCase();
+          var serial = normalizeBuddySerial(row.serial_number);
+          if (first.indexOf(q) === 0 || full.indexOf(q) !== -1 || (serial && serial.indexOf(serialQ) === 0)) {
+            appendDiscoverRow(row);
+          }
+        }
+
+        (discoverRowsCache || []).forEach(consider);
+
+        if (q && q.length >= 1) {
+          try {
+            var namePat = "%" + String(q).replace(/%/g, "") + "%";
+            var likeName = await restGet(
+              "go_accounts?name=ilike." + encodeURIComponent(namePat) +
+              "&select=id,name,photo_url,training_goal,city_area,workout_place,spoken_lang,serial_number&order=name.asc&limit=40"
+            );
+            (likeName || []).forEach(consider);
+          } catch (eName) {}
+        }
+
         if (!shown) {
-          list.innerHTML = "<p style='opacity:0.85'>" +
-            (q || goalFilter
-              ? (uiLang === "en" ? "No matches." : "Keine Treffer.")
-              : (uiLang === "en" ? "No open profiles right now." : "Gerade keine offenen Profile.")) + "</p>";
+          list.innerHTML = "<p style='opacity:0.85'>" + emptyMsg() + "</p>";
         }
       }
 
