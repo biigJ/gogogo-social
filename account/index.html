@@ -7457,6 +7457,22 @@ browsen</span>
         return raw && typeof raw === "object" ? raw : {};
       }
 
+      function meetPrefEffectiveFrom(row) {
+        if (!row || typeof row !== "object") return null;
+        var from = String(row.effective_from || "").slice(0, 10);
+        return /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : null;
+      }
+
+      /* Match/Ort-Zeit gilt nur ab effective_from und nicht in der Vergangenheit. */
+      function isMeetPrefActiveForDate(row, dateStr) {
+        var key = String(dateStr || "").slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+        var today = berlinTodayKey();
+        if (key < today) return false;
+        var from = meetPrefEffectiveFrom(row) || today;
+        return key >= from;
+      }
+
       function getWeekdayMeet(wd) {
         var prefs = getWeekdayMeetPrefs();
         var row = prefs[String(wd)] || prefs[wd] || null;
@@ -7472,6 +7488,21 @@ browsen</span>
         };
       }
 
+      function getWeekdayMeetForDate(wd, dateStr) {
+        var prefs = getWeekdayMeetPrefs();
+        var row = prefs[String(wd)] || prefs[wd] || null;
+        if (!row || typeof row !== "object") return null;
+        if (!isMeetPrefActiveForDate(row, dateStr)) return null;
+        var place = String(row.place || "").trim();
+        var time = normalizeMeetTime(row.time) || "";
+        if (!place || !time) return null;
+        return {
+          place: place,
+          time: time,
+          label: row.label ? String(row.label).trim() : ""
+        };
+      }
+
       function setWeekdayMeet(wd, place, time) {
         if (!account) return;
         var prefs = getWeekdayMeetPrefs();
@@ -7480,7 +7511,8 @@ browsen</span>
         prefs[String(wd)] = {
           place: String(place || "").trim(),
           time: normalizeMeetTime(time) || "18:00",
-          label: label || null
+          label: label || null,
+          effective_from: berlinTodayKey()
         };
         account.weekday_meet_prefs = prefs;
       }
@@ -7973,13 +8005,16 @@ browsen</span>
         };
       }
 
-      function buddyWeekdayMeet(buddyId, wd) {
+      function buddyWeekdayMeet(buddyId, wd, dateStr) {
         var info = buddyMeetPrefsFor(buddyId);
         var row = info.prefs[String(wd)] || info.prefs[wd] || null;
-        var place = row && row.place ? String(row.place).trim() : (info.places[0] || "");
-        var time = row && row.time ? (normalizeMeetTime(row.time) || "") : "";
-        var label = row && row.label ? String(row.label).trim() : "";
-        return { place: place, time: time || "18:00", label: label };
+        if (!row || typeof row !== "object") return null;
+        if (dateStr && !isMeetPrefActiveForDate(row, dateStr)) return null;
+        var place = row.place ? String(row.place).trim() : (info.places[0] || "");
+        var time = row.time ? (normalizeMeetTime(row.time) || "") : "";
+        var label = row.label ? String(row.label).trim() : "";
+        if (!place || !time) return null;
+        return { place: place, time: time, label: label };
       }
 
       function trainingLabelForWeekday(wd) {
@@ -7994,22 +8029,22 @@ browsen</span>
         return localizePlanLabel(text.split("\n")[0] || text);
       }
 
-      function collectWeekdayMatches(wd) {
-        var mine = getWeekdayMeet(wd);
-        if (!mine.place || !mine.time) return [];
+      function collectWeekdayMatches(wd, dateStr) {
+        var mine = getWeekdayMeetForDate(wd, dateStr);
+        if (!mine || !mine.place || !mine.time) return [];
         var out = [];
         var buddies = typeof getBuddies === "function" ? getBuddies() : [];
         buddies.forEach(function (b) {
           if (!b || !b.id || !isMutualBuddy(b.id)) return;
-          var theirs = buddyWeekdayMeet(b.id, wd);
-          if (!theirs.place || !placesMatch(theirs.place, mine.place)) return;
+          var theirs = buddyWeekdayMeet(b.id, wd, dateStr);
+          if (!theirs || !theirs.place || !placesMatch(theirs.place, mine.place)) return;
           if (!timesWithinMinutes(mine.time, theirs.time, 30)) return;
           out.push({
             buddy: b,
             place: mine.place,
             myTime: mine.time,
             theirTime: theirs.time,
-            myTraining: trainingLabelForWeekday(wd),
+            myTraining: mine.label || trainingLabelForWeekday(wd),
             theirTraining: theirs.label || t("Training", "Training")
           });
         });
@@ -8028,7 +8063,7 @@ browsen</span>
         days.forEach(function (d) {
           var wd = (d.getDay() + 6) % 7;
           var key = keyFn(d);
-          var matches = collectWeekdayMatches(wd);
+          var matches = collectWeekdayMatches(wd, key);
           var cell = document.createElement("div");
           cell.className = "home-cal__match-cell";
           var btn = document.createElement("button");
@@ -8121,7 +8156,7 @@ browsen</span>
         var dateKey = matchPeopleDayKey;
         if (!dateKey) return;
         var wd = (parseDateKey(dateKey).getDay() + 6) % 7;
-        var meet = getWeekdayMeet(wd);
+        var meet = getWeekdayMeetForDate(wd, dateKey) || getWeekdayMeet(wd);
         var myLabel = trainingLabelForWeekday(wd);
         for (var i = 0; i < selected.length; i++) {
           var row = selected[i];
