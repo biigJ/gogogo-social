@@ -4738,6 +4738,7 @@ browsen</span>
     <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="calendar-sync-title">
       <p class="challenge-modal__title" id="calendar-sync-title" data-de="Kalender-Sync" data-en="Calendar sync">Kalender-Sync</p>
       <p style="font-size:0.92rem;line-height:1.4;opacity:0.95;margin-bottom:10px" data-de="Einmal verbinden — danach aktualisiert sich Dein Kalender automatisch." data-en="Connect once — your calendar updates automatically afterwards.">Einmal verbinden — danach aktualisiert sich Dein Kalender automatisch.</p>
+      <p style="font-size:0.82rem;line-height:1.35;opacity:0.82;margin-bottom:10px" data-de="Google: Termine erscheinen nach einmaliger Bestätigung unter „Weitere Kalender“ (gogogo Wochenplan). Am Desktop: links + → Von URL." data-en="Google: events appear under Other calendars (gogogo weekly plan) after one confirmation. On desktop: + → From URL.">Google: Termine erscheinen nach einmaliger Bestätigung unter „Weitere Kalender“ (gogogo Wochenplan). Am Desktop: links + → Von URL.</p>
       <div class="profile-calendar-options" role="group" aria-label="Kalender">
         <button type="button" class="profile-calendar-opt" data-calendar-pick="google" data-de="Google Kalender" data-en="Google Calendar">Google Kalender</button>
         <button type="button" class="profile-calendar-opt" data-calendar-pick="apple" data-de="Apple Kalender" data-en="Apple Calendar">Apple Kalender</button>
@@ -8346,10 +8347,34 @@ browsen</span>
         window.location.href = base.replace(/^https:\/\//i, "webcal://");
       }
 
+      function copyCalendarFeedUrl(feedUrl) {
+        var base = String(feedUrl || "").split("?")[0];
+        if (!base) return Promise.resolve(false);
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(base).then(function () { return true; }).catch(function () { return false; });
+        }
+        try {
+          var ta = document.createElement("textarea");
+          ta.value = base;
+          ta.setAttribute("readonly", "");
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.select();
+          var ok = document.execCommand("copy");
+          document.body.removeChild(ta);
+          return Promise.resolve(!!ok);
+        } catch (eCopy) {
+          return Promise.resolve(false);
+        }
+      }
+
       function openGoogleCalendarSubscribe(feedUrl) {
         var base = String(feedUrl || "").split("?")[0];
-        var href = "https://calendar.google.com/calendar/r/settings/addbyurl?url=" + encodeURIComponent(base);
+        var webcal = base.replace(/^https:\/\//i, "webcal://");
+        var href = "https://calendar.google.com/calendar/r?cid=" + encodeURIComponent(webcal);
         window.open(href, "_blank", "noopener,noreferrer");
+        copyCalendarFeedUrl(base);
       }
 
       function openCalendarSyncModal() {
@@ -8437,15 +8462,25 @@ browsen</span>
           account.calendar_synced_at = new Date().toISOString();
           saveAccount();
           if (!opts.silent) {
-            if (provider === "apple") openAppleCalendarSubscribe(feedUrl);
-            else if (provider === "google") openGoogleCalendarSubscribe(feedUrl);
-            setCalendarSyncMsg(
-              t(
-                "Kalender geöffnet — bitte Abo bestätigen. Danach Sync automatisch.",
-                "Calendar opened — please confirm subscription. Sync is automatic afterwards."
-              ),
-              false
-            );
+            if (provider === "apple") {
+              openAppleCalendarSubscribe(feedUrl);
+              setCalendarSyncMsg(
+                t(
+                  "Apple Kalender geöffnet — bitte Abo bestätigen. Danach Sync automatisch.",
+                  "Apple Calendar opened — please confirm subscription. Sync is automatic afterwards."
+                ),
+                false
+              );
+            } else if (provider === "google") {
+              openGoogleCalendarSubscribe(feedUrl);
+              setCalendarSyncMsg(
+                t(
+                  "Google: Abo bestätigen (Dialog oder links + → Von URL). Link kopiert. Termine erscheinen unter „Weitere Kalender“ als gogogo Wochenplan.",
+                  "Google: confirm subscription (dialog or + → From URL). Link copied. Events appear under Other calendars as gogogo weekly plan."
+                ),
+                false
+              );
+            }
           }
         } catch (err) {
           setCalendarSyncMsg(
