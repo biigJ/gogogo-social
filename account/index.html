@@ -2910,6 +2910,17 @@
     .profile-plan__calendar .profile-plan__calendar-invite {
       font-size: 0.68rem;
       line-height: 1.25;
+      min-height: calc(1.25em * 4);
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    .profile-plan__calendar tr.profile-plan__calendar-invite-row td {
+      vertical-align: top;
+      height: calc(1.25em * 4 + 14px);
+    }
+    .profile-plan__calendar tr.profile-plan__calendar-invite-row td.profile-plan__calendar-label {
+      vertical-align: middle;
     }
     .profile-plan__calendar .profile-plan__calendar-invite.is-open {
       opacity: 0.72;
@@ -2929,12 +2940,18 @@
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      margin: 0 0 16px;
-      position: sticky;
-      top: 0;
-      z-index: 4;
-      padding: 8px 0 10px;
+      margin: 0;
+      position: fixed;
+      top: env(safe-area-inset-top, 0px);
+      left: 0;
+      right: 0;
+      z-index: 55;
+      padding: 8px 16px 10px;
       background: var(--red);
+      box-sizing: border-box;
+    }
+    body.is-book #panel-book {
+      padding-top: calc(52px + env(safe-area-inset-top, 0px));
     }
     .book-nav__btn {
       flex: 1 1 auto;
@@ -2957,8 +2974,106 @@
     #profile-change-code-modal .challenge-modal__sheet,
     #profile-change-name-modal .challenge-modal__sheet,
     #profile-change-phone-modal .challenge-modal__sheet,
-    #profile-calendar-settings-modal .challenge-modal__sheet {
+    #profile-calendar-settings-modal .challenge-modal__sheet,
+    #about-me-edit-modal .challenge-modal__sheet,
+    #about-me-read-modal .challenge-modal__sheet {
       text-align: left;
+    }
+    .profile-about {
+      margin-top: 18px;
+      color: var(--ink-on-red);
+    }
+    .profile-about__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0 0 10px;
+    }
+    .profile-about__title {
+      font-weight: 700;
+      font-size: clamp(1.05rem, 4.5vw, 1.25rem);
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin: 0;
+    }
+    .profile-about__edit {
+      width: 34px;
+      height: 34px;
+      border: 0;
+      border-radius: 50%;
+      background: rgba(247,245,240,0.16);
+      color: var(--ink-on-red);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .profile-about__edit svg { width: 16px; height: 16px; display: block; }
+    .profile-about__block + .profile-about__block { margin-top: 12px; }
+    .profile-about__label {
+      font-weight: 700;
+      font-size: 0.78rem;
+      letter-spacing: -0.02em;
+      margin: 0 0 4px;
+      opacity: 0.88;
+    }
+    .profile-about__text {
+      font-weight: 500;
+      font-size: 0.78rem;
+      letter-spacing: -0.02em;
+      line-height: 1.35;
+      margin: 0;
+      white-space: pre-wrap;
+      opacity: 0.92;
+    }
+    .profile-about__text.is-empty {
+      opacity: 0.55;
+      font-style: italic;
+    }
+    .about-me-field {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 12px;
+    }
+    .about-me-field label {
+      font-weight: 700;
+      font-size: 0.82rem;
+      letter-spacing: -0.02em;
+    }
+    .about-me-field textarea {
+      width: 100%;
+      min-height: 72px;
+      padding: 10px 12px;
+      border: 1.5px solid rgba(247,245,240,0.45);
+      border-radius: var(--radius);
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-weight: 500;
+      font-size: 0.88rem;
+      line-height: 1.35;
+      resize: vertical;
+    }
+    .about-me-read-block + .about-me-read-block { margin-top: 14px; }
+    .about-me-read-block h3 {
+      font-weight: 700;
+      font-size: 0.88rem;
+      margin: 0 0 6px;
+    }
+    .about-me-read-block p {
+      font-weight: 500;
+      font-size: 0.88rem;
+      line-height: 1.35;
+      margin: 0;
+      white-space: pre-wrap;
+    }
+    .community-post__body.is-about-share {
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
     .profile-plan__table-wrap {
       overflow-x: auto;
@@ -4014,6 +4129,15 @@ browsen</span>
           </div>
           <div id="profile-plan-days"></div>
         </section>
+        <section class="profile-about" id="profile-about-section" aria-label="Über mich">
+          <div class="profile-about__head">
+            <h2 class="profile-about__title" data-de="Über mich" data-en="About me">Über mich</h2>
+            <button type="button" class="profile-about__edit" id="profile-about-edit" aria-label="Über mich bearbeiten" data-aria-de="Über mich bearbeiten" data-aria-en="Edit about me">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 17.3V21h3.7L17.8 9.9l-3.7-3.7L3 17.3zm17.7-10.4c.4-.4.4-1 0-1.4l-2.2-2.2c-.4-.4-1-.4-1.4 0l-1.7 1.7 3.7 3.7 1.6-1.8z"/></svg>
+            </button>
+          </div>
+          <div id="profile-about-body"></div>
+        </section>
       </div>
 
       <div class="panel" id="panel-book" data-panel="book">
@@ -4766,8 +4890,52 @@ browsen</span>
     <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="buddy-action-title">
       <p class="challenge-modal__title" id="buddy-action-title">Buddy</p>
       <div class="challenge-modal__actions">
-        <button type="button" class="challenge-modal__btn is-ghost" id="buddy-action-remove">Entfernen</button>
-        <button type="button" class="challenge-modal__btn" id="buddy-action-message">Nachricht</button>
+        <button type="button" class="challenge-modal__btn" id="buddy-action-about" data-de="Über mich" data-en="About me">Über mich</button>
+        <button type="button" class="challenge-modal__btn" id="buddy-action-message" data-de="Nachricht" data-en="Message">Nachricht</button>
+        <button type="button" class="challenge-modal__btn is-ghost" id="buddy-action-remove" data-de="Entfernen" data-en="Remove">Entfernen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="about-me-edit-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="about-me-edit-title">
+      <p class="challenge-modal__title" id="about-me-edit-title" data-de="Über mich" data-en="About me">Über mich</p>
+      <div class="about-me-field">
+        <label for="about-me-life" data-de="Lebenssituation" data-en="Life situation">Lebenssituation</label>
+        <textarea id="about-me-life" rows="3" maxlength="600"></textarea>
+      </div>
+      <div class="about-me-field">
+        <label for="about-me-goal" data-de="Ziel" data-en="Goal">Ziel</label>
+        <textarea id="about-me-goal" rows="2" maxlength="400"></textarea>
+      </div>
+      <div class="about-me-field">
+        <label for="about-me-phase" data-de="Aktuelle Phase &amp; Schritte" data-en="Current phase &amp; steps">Aktuelle Phase &amp; Schritte</label>
+        <textarea id="about-me-phase" rows="3" maxlength="600"></textarea>
+      </div>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn is-ghost" id="about-me-edit-cancel" data-de="Abbrechen" data-en="Cancel">Abbrechen</button>
+        <button type="button" class="challenge-modal__btn" id="about-me-edit-ok" data-de="OK" data-en="OK">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="about-me-share-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="about-me-share-title">
+      <p class="challenge-modal__title" id="about-me-share-title" data-de="Unter Community teilen?" data-en="Share in community?">Unter Community teilen?</p>
+      <p style="font-size:0.92rem;line-height:1.4;opacity:0.95" data-de="Deine Buddies sehen dann: „Ich teile meine Ziele und mehr“ — klickbar zum Lesen." data-en="Your buddies will see: “I share my goals and more” — tap to read.">Deine Buddies sehen dann: „Ich teile meine Ziele und mehr“ — klickbar zum Lesen.</p>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn is-ghost" id="about-me-share-no" data-de="Nein" data-en="No">Nein</button>
+        <button type="button" class="challenge-modal__btn" id="about-me-share-yes" data-de="Ja" data-en="Yes">Ja</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="about-me-read-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="about-me-read-title">
+      <p class="challenge-modal__title" id="about-me-read-title">Über mich</p>
+      <div id="about-me-read-body"></div>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn" id="about-me-read-close" data-de="Schließen" data-en="Close">Schließen</button>
       </div>
     </div>
   </div>
@@ -4957,6 +5125,12 @@ browsen</span>
       var OUTBOUND_SHARES_KEY = "gogogo_outbound_shares";
       var INVITE_MARKER_RE = /⟦goinv:([^|⟧]+)\|([^|⟧]+)\|([^⟧]*)⟧/;
       var INVITE_MARKER_STRIP_RE = /\n?⟦goinv:[^⟧]*⟧/g;
+      var ABOUT_MARKER_RE = /⟦goabout:([^⟧]+)⟧/;
+      var ABOUT_MARKER_STRIP_RE = /\n?⟦goabout:[^⟧]*⟧/g;
+      var ABOUT_SHARE_TEXT_DE = "Ich teile meine Ziele und mehr";
+      var ABOUT_SHARE_TEXT_EN = "I share my goals and more";
+      var aboutMeDraft = null;
+      var aboutMeReadReturnEl = null;
       /* Absage/Ablehnung im Chat: ⟦ix:YYYY-MM-DD|c|d|x⟧ (Parteien = author + reply_to). */
       var INVITE_RESP_RE = /⟦ix:([^|⟧]+)\|([cdx])⟧/i;
       var INVITE_RESP_STRIP_RE = /\n?⟦ix:[^⟧]*⟧/g;
@@ -5136,9 +5310,270 @@ browsen</span>
         return String(body || "")
           .replace(INVITE_MARKER_STRIP_RE, "")
           .replace(INVITE_RESP_STRIP_RE, "")
+          .replace(ABOUT_MARKER_STRIP_RE, "")
           .replace(/\s+$/g, "")
           .trim();
       }
+
+      function aboutShareText() {
+        return t(ABOUT_SHARE_TEXT_DE, ABOUT_SHARE_TEXT_EN);
+      }
+
+      function aboutShareMarker(authorId) {
+        return "⟦goabout:" + String(authorId || "") + "⟧";
+      }
+
+      function isAboutSharePost(post) {
+        if (!post || !post.body) return false;
+        var clean = stripInviteMarker(post.body);
+        return clean === aboutShareText() || ABOUT_MARKER_RE.test(String(post.body || ""));
+      }
+
+      function aboutAuthorIdFromPost(post) {
+        if (!post) return null;
+        var m = String(post.body || "").match(ABOUT_MARKER_RE);
+        if (m && m[1]) return m[1];
+        return post.author_id || null;
+      }
+
+      function parseAboutMeRaw(raw) {
+        if (!raw) return {};
+        if (typeof raw === "string") {
+          try { raw = JSON.parse(raw); } catch (e) { return {}; }
+        }
+        return raw && typeof raw === "object" ? raw : {};
+      }
+
+      function getAboutMeData(fromAccount, fromCoachPlan) {
+        var am = parseAboutMeRaw(fromAccount && fromAccount.about_me);
+        var cp = fromCoachPlan || {};
+        return {
+          life_situation: String(am.life_situation || cp.life_situation || "").trim(),
+          goal: String(am.goal || cp.goal || "").trim(),
+          phase_steps: String(am.phase_steps || cp.phase_steps || "").trim()
+        };
+      }
+
+      function getOwnAboutMeData() {
+        return getAboutMeData(account, coachPlan);
+      }
+
+      var ABOUT_FIELDS = [
+        { key: "life_situation", labelDe: "Lebenssituation", labelEn: "Life situation", emptyDe: "Noch nichts eingetragen.", emptyEn: "Nothing entered yet." },
+        { key: "goal", labelDe: "Ziel", labelEn: "Goal", emptyDe: "Noch kein Ziel eingetragen.", emptyEn: "No goal entered yet." },
+        { key: "phase_steps", labelDe: "Aktuelle Phase & Schritte", labelEn: "Current phase & steps", emptyDe: "Noch keine Phase eingetragen.", emptyEn: "No phase entered yet." }
+      ];
+
+      function renderAboutMeSection() {
+        var root = document.getElementById("profile-about-body");
+        if (!root) return;
+        root.innerHTML = "";
+        var data = getOwnAboutMeData();
+        ABOUT_FIELDS.forEach(function (field) {
+          var block = document.createElement("div");
+          block.className = "profile-about__block";
+          var label = document.createElement("h3");
+          label.className = "profile-about__label";
+          label.textContent = t(field.labelDe, field.labelEn);
+          var text = document.createElement("p");
+          text.className = "profile-about__text";
+          var val = String(data[field.key] || "").trim();
+          if (!val) {
+            text.classList.add("is-empty");
+            text.textContent = t(field.emptyDe, field.emptyEn);
+          } else {
+            text.textContent = val;
+          }
+          block.appendChild(label);
+          block.appendChild(text);
+          root.appendChild(block);
+        });
+      }
+
+      async function fetchAboutMeForAccount(accountId) {
+        if (!accountId) return getAboutMeData(null, null);
+        var acc = null;
+        var plan = null;
+        try {
+          var accRows = await restGet(
+            "go_accounts?id=eq." + encodeURIComponent(accountId) +
+            "&select=id,name,about_me&limit=1"
+          );
+          acc = accRows && accRows[0] ? accRows[0] : null;
+        } catch (eAcc) {}
+        try {
+          var planRows = await restGet(
+            "go_coach_plans?account_id=eq." + encodeURIComponent(accountId) +
+            "&select=life_situation,goal,phase_steps&limit=1"
+          );
+          plan = planRows && planRows[0] ? planRows[0] : null;
+        } catch (ePlan) {}
+        return getAboutMeData(acc, plan);
+      }
+
+      function fillAboutMeReadBody(data, displayName) {
+        var root = document.getElementById("about-me-read-body");
+        var title = document.getElementById("about-me-read-title");
+        if (title) {
+          title.textContent = t("Über mich", "About me") +
+            (displayName ? " · " + firstNameOf({ name: displayName }) : "");
+        }
+        if (!root) return;
+        root.innerHTML = "";
+        data = data || {};
+        ABOUT_FIELDS.forEach(function (field) {
+          var val = String(data[field.key] || "").trim();
+          if (!val) return;
+          var block = document.createElement("div");
+          block.className = "about-me-read-block";
+          var h = document.createElement("h3");
+          h.textContent = t(field.labelDe, field.labelEn);
+          var p = document.createElement("p");
+          p.textContent = val;
+          block.appendChild(h);
+          block.appendChild(p);
+          root.appendChild(block);
+        });
+        if (!root.childElementCount) {
+          var empty = document.createElement("p");
+          empty.style.fontSize = "0.92rem";
+          empty.style.opacity = "0.9";
+          empty.textContent = t("Noch nichts geteilt.", "Nothing shared yet.");
+          root.appendChild(empty);
+        }
+      }
+
+      async function openAboutMeReadModal(accountId, displayName, returnEl) {
+        aboutMeReadReturnEl = returnEl || null;
+        var data = await fetchAboutMeForAccount(accountId);
+        fillAboutMeReadBody(data, displayName);
+        openChallengeModalById("about-me-read-modal");
+      }
+
+      function closeAboutMeReadModal() {
+        closeChallengeModalById("about-me-read-modal");
+        if (aboutMeReadReturnEl && typeof aboutMeReadReturnEl.focus === "function") {
+          try { aboutMeReadReturnEl.focus(); } catch (eFocus) {}
+        }
+        aboutMeReadReturnEl = null;
+      }
+
+      function openAboutMeEditModal() {
+        var data = getOwnAboutMeData();
+        var life = document.getElementById("about-me-life");
+        var goal = document.getElementById("about-me-goal");
+        var phase = document.getElementById("about-me-phase");
+        if (life) life.value = data.life_situation || "";
+        if (goal) goal.value = data.goal || "";
+        if (phase) phase.value = data.phase_steps || "";
+        openChallengeModalById("about-me-edit-modal");
+      }
+
+      async function saveAboutMeDraft(draft) {
+        if (!account) return;
+        account.about_me = {
+          life_situation: String(draft.life_situation || "").trim(),
+          goal: String(draft.goal || "").trim(),
+          phase_steps: String(draft.phase_steps || "").trim()
+        };
+        if (coachPlan) {
+          coachPlan.life_situation = account.about_me.life_situation;
+          coachPlan.goal = account.about_me.goal;
+          coachPlan.phase_steps = account.about_me.phase_steps;
+        }
+        saveAccount();
+        renderAboutMeSection();
+        if (hasCloudAccount()) {
+          try {
+            await patchAccount({
+              about_me: account.about_me,
+              updated_at: new Date().toISOString()
+            });
+          } catch (ePatch) {}
+          try {
+            await fetch(SUPABASE_URL + "/rest/v1/go_coach_plans?on_conflict=account_id", {
+              method: "POST",
+              headers: {
+                apikey: SUPABASE_KEY,
+                Authorization: "Bearer " + SUPABASE_KEY,
+                "Content-Type": "application/json",
+                Prefer: "resolution=merge-duplicates,return=minimal"
+              },
+              body: JSON.stringify({
+                account_id: account.id,
+                life_situation: account.about_me.life_situation || null,
+                goal: account.about_me.goal || null,
+                phase_steps: account.about_me.phase_steps || null,
+                updated_at: new Date().toISOString()
+              })
+            });
+          } catch (ePlan) {}
+        }
+      }
+
+      async function shareAboutMeToCommunity() {
+        if (!account || !account.id || !hasCloudAccount()) return;
+        var body = (aboutShareText() + "\n" + aboutShareMarker(account.id)).slice(0, 144);
+        try {
+          await createCommunityPost({
+            author_id: account.id,
+            kind: "text",
+            body: body,
+            photo_url: null,
+            reply_to_id: null
+          });
+          await refreshCommunityFeed();
+        } catch (eShare) {}
+      }
+
+      function promptAboutMeShare() {
+        openChallengeModalById("about-me-share-modal");
+      }
+
+      (function bindAboutMeModals() {
+        var editBtn = document.getElementById("profile-about-edit");
+        var editCancel = document.getElementById("about-me-edit-cancel");
+        var editOk = document.getElementById("about-me-edit-ok");
+        var shareNo = document.getElementById("about-me-share-no");
+        var shareYes = document.getElementById("about-me-share-yes");
+        var readClose = document.getElementById("about-me-read-close");
+        ["about-me-edit-modal", "about-me-share-modal"].forEach(function (id) {
+          var modal = document.getElementById(id);
+          if (!modal) return;
+          modal.addEventListener("click", function (e) {
+            if (e.target === modal) closeChallengeModalById(id);
+          });
+        });
+        var readModal = document.getElementById("about-me-read-modal");
+        if (readModal) {
+          readModal.addEventListener("click", function (e) {
+            if (e.target === readModal) closeAboutMeReadModal();
+          });
+        }
+        if (editBtn) editBtn.addEventListener("click", function () { openAboutMeEditModal(); });
+        if (editCancel) editCancel.addEventListener("click", function () { closeChallengeModalById("about-me-edit-modal"); });
+        if (editOk) {
+          editOk.addEventListener("click", async function () {
+            var draft = {
+              life_situation: document.getElementById("about-me-life") ? document.getElementById("about-me-life").value.trim() : "",
+              goal: document.getElementById("about-me-goal") ? document.getElementById("about-me-goal").value.trim() : "",
+              phase_steps: document.getElementById("about-me-phase") ? document.getElementById("about-me-phase").value.trim() : ""
+            };
+            closeChallengeModalById("about-me-edit-modal");
+            await saveAboutMeDraft(draft);
+            promptAboutMeShare();
+          });
+        }
+        if (shareNo) shareNo.addEventListener("click", function () { closeChallengeModalById("about-me-share-modal"); });
+        if (shareYes) {
+          shareYes.addEventListener("click", async function () {
+            closeChallengeModalById("about-me-share-modal");
+            await shareAboutMeToCommunity();
+          });
+        }
+        if (readClose) readClose.addEventListener("click", function () { closeAboutMeReadModal(); });
+      })();
+
       function inviteMarkerFor(dateKey, time, place) {
         return "⟦goinv:" + String(dateKey || "").slice(0, 10) + "|" +
           String(time || "") + "|" + encodeURIComponent(String(place || "")) + "⟧";
@@ -8150,8 +8585,9 @@ browsen</span>
         return { text: t("offen", "open"), open: true, names: [] };
       }
 
-      function appendCalendarRow(body, label, cells) {
+      function appendCalendarRow(body, label, cells, rowClass) {
         var tr = document.createElement("tr");
+        if (rowClass) tr.className = rowClass;
         var th = document.createElement("th");
         th.scope = "row";
         th.className = "profile-plan__calendar-label";
@@ -8189,7 +8625,6 @@ browsen</span>
         var tbody = document.createElement("tbody");
         table.appendChild(tbody);
 
-        var weekdayCells = [];
         var planCells = [];
         var placeCells = [];
         var timeCells = [];
@@ -8198,13 +8633,6 @@ browsen</span>
         for (var i = 0; i < profileWeekdays().length; i++) {
           var dayVal = coachDayText(i) || defaultDayPlan();
           var meet = getWeekdayMeet(i);
-          var dateKey = dateKeyForWeekdayIndex(i);
-          var dayParts = String(dateKey || "").split("-");
-          var dayNum = dayParts.length === 3 ? dayParts[2].replace(/^0/, "") : "";
-
-          var dayLabel = document.createElement("span");
-          dayLabel.textContent = profileWeekdays()[i] + (dayNum ? " · " + dayNum : "");
-          weekdayCells.push(dayLabel);
 
           var planEl = document.createElement("div");
           planEl.className = "profile-plan__calendar-plan";
@@ -8247,11 +8675,10 @@ browsen</span>
           inviteCells.push(inviteEl);
         }
 
-        appendCalendarRow(tbody, t("Wochentage", "Weekdays"), weekdayCells);
-        appendCalendarRow(tbody, t("Plan", "Plan"), planCells);
-        appendCalendarRow(tbody, t("Ort", "Place"), placeCells);
-        appendCalendarRow(tbody, t("Zeit", "Time"), timeCells);
-        appendCalendarRow(tbody, t("Einladung", "Invite"), inviteCells);
+        appendCalendarRow(tbody, t("Plan", "Plan"), planCells, "");
+        appendCalendarRow(tbody, t("Ort", "Place"), placeCells, "");
+        appendCalendarRow(tbody, t("Zeit", "Time"), timeCells, "");
+        appendCalendarRow(tbody, t("Einladung", "Invite"), inviteCells, "profile-plan__calendar-invite-row");
 
         wrap.appendChild(table);
         planRoot.appendChild(wrap);
@@ -8262,13 +8689,12 @@ browsen</span>
         var planRoot = document.getElementById("profile-plan-days");
         if (!planRoot) return;
         planRoot.innerHTML = "";
-        appendPlanText(planRoot, coachPlan && coachPlan.life_situation);
-        appendPlanText(planRoot, coachPlan && coachPlan.goal);
-        appendPlanText(planRoot, coachPlan && coachPlan.phase_steps);
-        if (isAccountPaused()) return;
-        if (getProfilePlanViewMode() === "calendar") renderProfilePlanCalendar(planRoot);
-        else renderProfilePlanList(planRoot);
-        updateProfilePlanSyncBtn();
+        if (!isAccountPaused()) {
+          if (getProfilePlanViewMode() === "calendar") renderProfilePlanCalendar(planRoot);
+          else renderProfilePlanList(planRoot);
+          updateProfilePlanSyncBtn();
+        }
+        renderAboutMeSection();
       }
 
       async function loadCoachPlan() {
@@ -8428,6 +8854,7 @@ browsen</span>
         renderProfileBooking();
         renderProfilePrefs();
         renderProfilePlan();
+        renderAboutMeSection();
         syncCommunityDiscoverBtn();
       }
 
@@ -11345,12 +11772,22 @@ browsen</span>
         var modal = document.getElementById("buddy-action-modal");
         var removeBtn = document.getElementById("buddy-action-remove");
         var messageBtn = document.getElementById("buddy-action-message");
+        var aboutBtn = document.getElementById("buddy-action-about");
         if (removeBtn) {
           removeBtn.addEventListener("click", function (ev) {
             ev.preventDefault();
             var buddy = buddyActionTarget;
             closeBuddyActionModal();
             if (buddy) removeBuddy(buddy);
+          });
+        }
+        if (aboutBtn) {
+          aboutBtn.addEventListener("click", function (ev) {
+            ev.preventDefault();
+            var buddy = buddyActionTarget;
+            closeBuddyActionModal();
+            if (!buddy || !buddy.id) return;
+            openAboutMeReadModal(buddy.id, buddy.name || firstNameOf(buddy), aboutBtn);
           });
         }
         if (messageBtn) {
@@ -12084,6 +12521,14 @@ browsen</span>
           var who = document.createElement("div");
           who.className = "community-post__who";
           who.textContent = mine ? t("Du", "You") : (firstNameOf({ name: names[post.author_id] || "Buddy" }));
+          if (!mine && post.author_id) {
+            who.style.cursor = "pointer";
+            who.setAttribute("role", "button");
+            who.tabIndex = 0;
+            who.addEventListener("click", function () {
+              openAboutMeReadModal(post.author_id, names[post.author_id] || "Buddy", who);
+            });
+          }
           if (post.reply_to_id && names[post.reply_to_id]) {
             who.textContent += " → " + firstNameOf({ name: names[post.reply_to_id] });
           } else if (post.reply_to_id && post.reply_to_id === account.id && !mine) {
@@ -12100,7 +12545,18 @@ browsen</span>
           if (post.body) {
             var body = document.createElement("p");
             body.className = "community-post__body";
-            body.textContent = stripInviteMarker(post.body);
+            var displayBody = stripInviteMarker(post.body);
+            body.textContent = displayBody;
+            if (isAboutSharePost(post)) {
+              body.classList.add("is-about-share");
+              body.setAttribute("role", "button");
+              body.tabIndex = 0;
+              var authorId = aboutAuthorIdFromPost(post);
+              var authorName = names[post.author_id] || "Buddy";
+              body.addEventListener("click", function () {
+                openAboutMeReadModal(authorId, authorName, body);
+              });
+            }
             el.appendChild(body);
           }
           feed.appendChild(el);
@@ -13542,6 +13998,13 @@ browsen</span>
         if (Object.prototype.hasOwnProperty.call(remote, "calendar_subscribed")) {
           account.calendar_subscribed = !!remote.calendar_subscribed;
         }
+        if (Object.prototype.hasOwnProperty.call(remote, "about_me")) {
+          var am = remote.about_me;
+          if (typeof am === "string") {
+            try { am = JSON.parse(am); } catch (eAm) { am = null; }
+          }
+          account.about_me = am && typeof am === "object" ? am : null;
+        }
         var localPhoto = account.photo_url;
         var remotePhoto = remote.photo_url;
         if (remotePhoto) account.photo_url = remotePhoto;
@@ -13799,6 +14262,7 @@ browsen</span>
         var onCommunity = id === "community";
         document.body.classList.toggle("is-profile", onProfile);
         document.body.classList.toggle("is-community", onCommunity);
+        document.body.classList.toggle("is-book", id === "book");
         document.documentElement.classList.toggle("is-community-lock", onCommunity);
         document.querySelectorAll(".nav-btn").forEach(function (btn) {
           var on = btn.getAttribute("data-goto") === id;
