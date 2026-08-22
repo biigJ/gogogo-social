@@ -2643,8 +2643,21 @@
       grid-template-columns: 1fr auto auto;
       align-items: center;
       gap: 10px;
-      margin-top: 8px;
-      margin-bottom: 4px;
+      margin: 0;
+    }
+    .day-rate-sub {
+      margin: 0 0 12px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      opacity: 0.88;
+      text-align: center;
+    }
+    .day-rate-check {
+      margin-bottom: 14px;
+    }
+    .day-rate-view {
+      width: 100%;
+      margin-top: 4px;
     }
     .home-check[hidden] {
       display: none !important;
@@ -3439,19 +3452,6 @@ browsen</span>
           </div>
           <div class="home-cal__matches" id="week-matches" aria-label="Ort-Matches"></div>
           <div class="home-cal__days" id="week" role="listbox" aria-label="Wochentage"></div>
-        </div>
-        <div class="home-check" id="home-check" hidden>
-          <div class="home-check__slider">
-            <div class="home-check__track">
-              <div class="home-check__fill" id="home-score-fill" aria-hidden="true"></div>
-              <input class="home-check__range" id="home-score" type="range" min="1" max="10" step="1" value="5" aria-label="Bewertung 1 bis 10" />
-            </div>
-            <div class="home-check__scale" aria-hidden="true">
-              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
-            </div>
-          </div>
-          <button class="home-check__btn" type="button" id="home-check-ok" aria-label="Tag bestätigen">✓</button>
-          <button class="home-check__btn" type="button" id="home-check-no" aria-label="Tag ohne Eintrag">✕</button>
         </div>
         <div class="home-workout" id="home-workout">
           <div class="home-workout__box" id="home-workout-box">
@@ -4292,13 +4292,24 @@ browsen</span>
     </div>
   </div>
 
-  <div class="challenge-modal" id="workout-rate-prompt-modal" hidden aria-hidden="true">
-    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="workout-rate-prompt-title">
-      <p class="challenge-modal__title" id="workout-rate-prompt-title" data-de="Wie war Dein Training." data-en="How was your training.">Wie war Dein Training.</p>
-      <p class="invite-decide__body" data-de="Bewerte es von 1-10." data-en="Rate it from 1-10.">Bewerte es von 1-10.</p>
-      <div class="challenge-modal__actions">
-        <button type="button" class="challenge-modal__btn" id="workout-rate-prompt-ok">OK</button>
+  <div class="challenge-modal" id="day-rate-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="day-rate-title">
+      <p class="challenge-modal__title" id="day-rate-title"></p>
+      <p class="day-rate-sub" data-de="Wie war die Bewegung" data-en="How was the movement">Wie war die Bewegung</p>
+      <div class="home-check day-rate-check" id="home-check">
+        <div class="home-check__slider">
+          <div class="home-check__track">
+            <div class="home-check__fill" id="home-score-fill" aria-hidden="true"></div>
+            <input class="home-check__range" id="home-score" type="range" min="1" max="10" step="1" value="5" aria-label="Bewertung 1 bis 10" />
+          </div>
+          <div class="home-check__scale" aria-hidden="true">
+            <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+          </div>
+        </div>
+        <button class="home-check__btn" type="button" id="home-check-ok" aria-label="Tag bestätigen">✓</button>
+        <button class="home-check__btn" type="button" id="home-check-no" aria-label="Tag ohne Eintrag">✕</button>
       </div>
+      <button type="button" class="challenge-modal__btn is-ghost day-rate-view" id="day-rate-view-unit" data-de="Einheit anschauen" data-en="View unit">Einheit anschauen</button>
     </div>
   </div>
 
@@ -12240,7 +12251,6 @@ browsen</span>
 
         var root = document.getElementById("week");
         var labelEl = document.getElementById("week-label");
-        var checkRow = document.getElementById("home-check");
         var scoreInput = document.getElementById("home-score");
         var scoreFill = document.getElementById("home-score-fill");
         var checkOk = document.getElementById("home-check-ok");
@@ -12251,7 +12261,7 @@ browsen</span>
         var workoutBox = document.getElementById("home-workout-box");
         var weekOffset = 0;
         var selectedKey = null;
-        var editingOpen = false;
+        var rateModalKey = null;
         var saving = false;
         var pendingRatePromptKey = null;
         var calInviteDateKey = null;
@@ -12336,14 +12346,46 @@ browsen</span>
           selectDay(key, false);
         }
 
+        function openDayRateModal(key) {
+          if (isAccountPaused()) return;
+          if (!key || !canRateCalendarDay(key)) return;
+          rateModalKey = key;
+          selectedKey = key;
+          var d = parseDateKey(key) || new Date();
+          var w = workoutFor(d);
+          var titleEl = document.getElementById("day-rate-title");
+          if (titleEl) titleEl.textContent = w.title || t("Training", "Training");
+          syncCheckControls(key);
+          openChallengeModalById("day-rate-modal");
+        }
+
+        function closeDayRateModal() {
+          rateModalKey = null;
+          closeChallengeModalById("day-rate-modal");
+        }
+
+        function viewUnitFromRateModal() {
+          var key = rateModalKey || selectedKey;
+          if (!key) return;
+          var d = parseDateKey(key) || new Date();
+          var w = workoutFor(d);
+          closeDayRateModal();
+          if (w && w.training && w.trainingTab) {
+            openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null);
+          } else if (w && w.zirkel) {
+            openTrainingFromCalendar("intervall", null);
+          } else if (w && w.trainingTab) {
+            openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null);
+          }
+        }
+
         function promptWorkoutRating(key) {
           key = String(key || berlinTodayKey()).slice(0, 10);
-          pendingRatePromptKey = key;
+          pendingRatePromptKey = null;
           weekOffset = 0;
           selectedKey = key;
-          editingOpen = true;
           renderWeek();
-          openChallengeModalById("workout-rate-prompt-modal");
+          openDayRateModal(key);
         }
 
         function startOfDay(d) {
@@ -12551,8 +12593,6 @@ browsen</span>
           updateScoreFill();
           checkOk.classList.toggle("is-active", !!(e && e.score != null));
           checkNo.classList.toggle("is-active", !!(e && e.score == null));
-          var show = rateable && (editingOpen || !e);
-          checkRow.hidden = !show;
           scoreInput.disabled = !rateable;
           checkOk.disabled = !rateable;
           checkNo.disabled = !rateable;
@@ -12561,9 +12601,10 @@ browsen</span>
         function selectDay(key, openEditor) {
           if (isAccountPaused()) return;
           selectedKey = key;
-          var rateable = canRateCalendarDay(key);
-          if (openEditor && rateable) editingOpen = true;
-          else editingOpen = rateable && !entryFor(key);
+          if (openEditor) {
+            openDayRateModal(key);
+            return;
+          }
           renderWeek();
         }
 
@@ -12601,9 +12642,7 @@ browsen</span>
           }
 
           if (isAccountPaused() || !canRateCalendarDay(selectedKey)) {
-            editingOpen = false;
-          } else if (!entryFor(selectedKey)) {
-            editingOpen = true;
+            /* no auto rating editor */
           }
 
           renderWeekMatches(days, dateKey);
@@ -12792,7 +12831,7 @@ browsen</span>
           checkNo.disabled = true;
           try {
             if (!setDayEntryLocal(key, score)) return;
-            editingOpen = false;
+            closeDayRateModal();
             refreshCycleRays();
             renderWeek();
             fillProfilePanel();
@@ -12852,9 +12891,6 @@ browsen</span>
           dayEntries = next;
           saveDayEntriesLocal();
           try { await ensureMissedYesterdayMarked(); } catch (eMiss1) {}
-          if (selectedKey) {
-            editingOpen = canRateCalendarDay(selectedKey) && !entryFor(selectedKey);
-          }
           refreshCycleRays();
           renderWeek();
           fillProfilePanel();
@@ -12870,29 +12906,31 @@ browsen</span>
 
         checkOk.addEventListener("click", function () {
           if (isAccountPaused()) return;
-          if (!selectedKey || !canRateCalendarDay(selectedKey)) return;
+          var key = rateModalKey || selectedKey;
+          if (!key || !canRateCalendarDay(key)) return;
           var val = parseInt(scoreInput.value, 10);
           if (!(val >= 1 && val <= 10)) val = 5;
-          persistEntry(selectedKey, val);
+          persistEntry(key, val);
         });
         checkNo.addEventListener("click", function () {
           if (isAccountPaused()) return;
-          if (!selectedKey || !canRateCalendarDay(selectedKey)) return;
-          persistEntry(selectedKey, null);
+          var key = rateModalKey || selectedKey;
+          if (!key || !canRateCalendarDay(key)) return;
+          persistEntry(key, null);
         });
 
         document.getElementById("week-prev").addEventListener("click", function () {
           if (isAccountPaused()) return;
           weekOffset -= 1;
           selectedKey = null;
-          editingOpen = false;
+          closeDayRateModal();
           renderWeek();
         });
         document.getElementById("week-next").addEventListener("click", function () {
           if (isAccountPaused()) return;
           weekOffset += 1;
           selectedKey = null;
-          editingOpen = false;
+          closeDayRateModal();
           renderWeek();
         });
         if (workoutBox) {
@@ -12933,7 +12971,7 @@ browsen</span>
         };
         onAccountPausedChange = function () {
           try {
-            editingOpen = false;
+            closeDayRateModal();
             renderWeek();
           } catch (e) {}
         };
@@ -12941,23 +12979,12 @@ browsen</span>
         window.__gogogoSelectDay = selectDay;
         window.__gogogoPromptWorkoutRating = promptWorkoutRating;
 
-        var workoutRatePromptOk = document.getElementById("workout-rate-prompt-ok");
-        var workoutRatePromptModal = document.getElementById("workout-rate-prompt-modal");
-        if (workoutRatePromptOk) {
-          workoutRatePromptOk.addEventListener("click", function () {
-            closeChallengeModalById("workout-rate-prompt-modal");
-            var key = pendingRatePromptKey || berlinTodayKey();
-            pendingRatePromptKey = null;
-            weekOffset = 0;
-            selectDay(key, true);
-          });
-        }
-        if (workoutRatePromptModal) {
-          workoutRatePromptModal.addEventListener("click", function (e) {
-            if (e.target === workoutRatePromptModal) {
-              closeChallengeModalById("workout-rate-prompt-modal");
-              pendingRatePromptKey = null;
-            }
+        var dayRateModal = document.getElementById("day-rate-modal");
+        var dayRateViewUnit = document.getElementById("day-rate-view-unit");
+        if (dayRateViewUnit) dayRateViewUnit.addEventListener("click", viewUnitFromRateModal);
+        if (dayRateModal) {
+          dayRateModal.addEventListener("click", function (e) {
+            if (e.target === dayRateModal) closeDayRateModal();
           });
         }
         var calBuddyInviteCancel = document.getElementById("cal-buddy-invite-cancel");

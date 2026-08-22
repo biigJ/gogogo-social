@@ -1298,6 +1298,85 @@
     color:var(--text-dim);
     font-weight:500;
   }
+  .history-sessions{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+    padding:2px 0 16px;
+  }
+  .history-session{
+    border:1px solid rgba(247,245,240,0.28);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+  .history-session-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    padding:10px 12px;
+    font-weight:700;
+    letter-spacing:-0.02em;
+    background:rgba(247,245,240,0.08);
+  }
+  .history-session-title{
+    min-width:0;
+    text-align:left;
+  }
+  .history-ex-list{
+    display:flex;
+    flex-direction:column;
+  }
+  .history-ex-row{
+    display:block;
+    width:100%;
+    text-align:left;
+    border:0;
+    border-top:1px solid rgba(247,245,240,0.16);
+    background:transparent;
+    color:inherit;
+    font:inherit;
+    padding:10px 12px;
+    cursor:pointer;
+    transition:transform 0.2s ease, background 0.2s ease;
+  }
+  .history-ex-row:first-child{ border-top:0; }
+  .history-ex-row.is-open{
+    transform:scale(1.02);
+    background:rgba(247,245,240,0.1);
+    z-index:1;
+    position:relative;
+  }
+  .history-ex-name{
+    display:block;
+    font-weight:700;
+    letter-spacing:-0.02em;
+  }
+  .history-ex-sets{
+    max-height:0;
+    overflow:hidden;
+    opacity:0;
+    transition:max-height 0.28s ease, opacity 0.22s ease, margin 0.22s ease;
+    margin-top:0;
+  }
+  .history-ex-row.is-open .history-ex-sets{
+    max-height:240px;
+    opacity:1;
+    margin-top:8px;
+  }
+  .history-set-line{
+    font-size:0.92rem;
+    font-weight:600;
+    opacity:0.9;
+    padding:2px 0;
+  }
+  .history-ausd-summary{
+    display:block;
+    font-size:0.88rem;
+    font-weight:600;
+    opacity:0.85;
+  }
+  }
   .history-date-head{
     display:flex; flex-direction:column; align-items:center; gap:4px;
   }
@@ -1822,6 +1901,7 @@
             </button>
           </div>
         </div>
+        <button type="button" class="history-open-btn" id="historyOpenBtnKraft" data-de="Vergangene Krafteinheit" data-en="Past strength session">Vergangene Krafteinheit</button>
       </div>
     </div>
     <div class="tab-panel" data-embed-panel="ausdauer">
@@ -1874,6 +1954,7 @@
             </button>
           </div>
         </div>
+        <button type="button" class="history-open-btn" id="historyOpenBtnAusdauer" data-de="Vergangene Ausdauereinheit" data-en="Past endurance session">Vergangene Ausdauereinheit</button>
       </div>
     </div>
     <div class="tab-panel is-active" data-embed-panel="info">
@@ -2008,6 +2089,7 @@
       <h2>Top!</h2>
       <p>Ist in der Datenbank gespeichert, beim nächsten Training steht es unten in der Infobox. Bewerte im Kalender wie gut es war.</p>
       <div class="abort-actions">
+        <button type="button" class="abort-stay" id="kraftFinishTableBtn" data-de="Tabelle" data-en="Table">Tabelle</button>
         <button type="button" class="abort-yes" id="kraftFinishOkBtn">OK</button>
       </div>
     </div>
@@ -4650,6 +4732,17 @@
     });
     if (!rows.length) return;
     try {
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        try {
+          await goRest(
+            'go_kraft_logs?account_id=eq.' + encodeURIComponent(aid) +
+            '&workout_date=eq.' + encodeURIComponent(today) +
+            '&exercise_id=eq.' + encodeURIComponent(row.exercise_id),
+            { method: 'DELETE', prefer: 'return=minimal' }
+          );
+        } catch (eDel) {}
+      }
       await goRest('go_kraft_logs', {
         method: 'POST',
         prefer: 'return=minimal',
@@ -5764,6 +5857,147 @@
   let pendingDeleteDate = null;
   let pendingDeleteWorkSec = null;
   let historyActiveGroupKey = null;
+  let historyMode = 'intervall';
+  let pendingHistoryDelete = null;
+
+  function kraftSystemLabel(systemId){
+    const cat = kraftCatalog();
+    const sys = cat.systemById ? cat.systemById(systemId) : null;
+    if (sys && sys.name) return sys.name;
+    const found = (cat.SYSTEMS || []).find(function(s){ return s.id === systemId; });
+    return found ? found.name : (systemId || 'Kraft');
+  }
+
+  function dedupeKraftLogs(rows){
+    const map = {};
+    (rows || []).forEach(function(row){
+      const date = String(row.workout_date || '').slice(0, 10);
+      const exId = String(row.exercise_id || '');
+      const sys = String(row.system_id || '');
+      const key = date + '|' + sys + '|' + exId;
+      const prev = map[key];
+      if (!prev || String(row.created_at || '').localeCompare(String(prev.created_at || '')) > 0) {
+        map[key] = row;
+      }
+    });
+    return Object.keys(map).map(function(k){ return map[k]; });
+  }
+
+  function buildKraftHistoryGroups(){
+    const clean = dedupeKraftLogs(kraftLogs);
+    const groupsMap = {};
+    clean.forEach(function(row){
+      const sid = String(row.system_id || 'full');
+      if (!groupsMap[sid]) {
+        groupsMap[sid] = {
+          key: sid,
+          label: kraftSystemLabel(sid),
+          dates: [],
+          dateSet: {},
+          logs: []
+        };
+      }
+      const date = String(row.workout_date || '').slice(0, 10);
+      if (date && !groupsMap[sid].dateSet[date]) {
+        groupsMap[sid].dateSet[date] = true;
+        groupsMap[sid].dates.push(date);
+      }
+      groupsMap[sid].logs.push(row);
+    });
+    const groups = Object.keys(groupsMap).map(function(k){ return groupsMap[k]; });
+    groups.forEach(function(g){
+      g.dates.sort().reverse();
+      delete g.dateSet;
+    });
+    groups.sort(function(a, b){ return a.label.localeCompare(b.label, 'de'); });
+    return groups;
+  }
+
+  function dedupeAusdauerLogs(rows){
+    const map = {};
+    (rows || []).forEach(function(row){
+      const date = String(row.workout_date || '').slice(0, 10);
+      const tech = String(row.technique || '');
+      const key = date + '|' + tech;
+      const prev = map[key];
+      if (!prev || String(row.created_at || '').localeCompare(String(prev.created_at || '')) > 0) {
+        map[key] = row;
+      }
+    });
+    return Object.keys(map).map(function(k){ return map[k]; });
+  }
+
+  function buildAusdauerHistoryGroups(){
+    const clean = dedupeAusdauerLogs(ausdauerLogs);
+    const groupsMap = {};
+    clean.forEach(function(row){
+      const tech = String(row.technique || 'run');
+      if (!groupsMap[tech]) {
+        const meta = ausdauerCat().techniqueById(tech);
+        groupsMap[tech] = {
+          key: tech,
+          label: (meta && meta.name) || tech,
+          dates: [],
+          dateSet: {},
+          logs: []
+        };
+      }
+      const date = String(row.workout_date || '').slice(0, 10);
+      if (date && !groupsMap[tech].dateSet[date]) {
+        groupsMap[tech].dateSet[date] = true;
+        groupsMap[tech].dates.push(date);
+      }
+      groupsMap[tech].logs.push(row);
+    });
+    const groups = Object.keys(groupsMap).map(function(k){ return groupsMap[k]; });
+    groups.forEach(function(g){
+      g.dates.sort().reverse();
+      delete g.dateSet;
+    });
+    groups.sort(function(a, b){ return a.label.localeCompare(b.label, 'de'); });
+    return groups;
+  }
+
+  function askDeleteHistorySession(mode, date, extra){
+    pendingHistoryDelete = { mode: mode, date: date, extra: extra || {} };
+    const overlay = document.getElementById('deleteOverlay');
+    const title = overlay ? overlay.querySelector('h2') : null;
+    const body = overlay ? overlay.querySelector('p') : null;
+    if (title) title.textContent = mode === 'kraft' ? 'Kraft-Einheit löschen?' : 'Ausdauer-Einheit löschen?';
+    if (body) body.textContent = 'Alle Werte dieses Datums werden entfernt.';
+    if (overlay) overlay.hidden = false;
+  }
+
+  async function confirmDeleteHistorySession(){
+    const pending = pendingHistoryDelete;
+    pendingHistoryDelete = null;
+    hideDeleteDialog();
+    const aid = getGoAccountId();
+    if (!pending || !pending.date || !aid) return;
+    try {
+      var path = '';
+      if (pending.mode === 'kraft') {
+        path = 'go_kraft_logs?account_id=eq.' + encodeURIComponent(aid) +
+          '&workout_date=eq.' + encodeURIComponent(pending.date);
+        if (pending.extra.systemId) {
+          path += '&system_id=eq.' + encodeURIComponent(pending.extra.systemId);
+        }
+      } else if (pending.mode === 'ausdauer') {
+        path = 'go_ausdauer_logs?account_id=eq.' + encodeURIComponent(aid) +
+          '&workout_date=eq.' + encodeURIComponent(pending.date);
+        if (pending.extra.technique) {
+          path += '&technique=eq.' + encodeURIComponent(pending.extra.technique);
+        }
+      }
+      if (!path) return;
+      await goRest(path, { method: 'DELETE', prefer: 'return=minimal' });
+      if (pending.mode === 'kraft') await loadKraftLogs();
+      else if (pending.mode === 'ausdauer') await loadAusdauerLogs();
+      renderHistoryTable();
+    } catch (e) {
+      console.warn('History delete failed', e);
+    }
+  }
 
   function askDeleteDate(date, workSec){
     pendingDeleteDate = date;
@@ -5775,11 +6009,22 @@
   function hideDeleteDialog(){
     pendingDeleteDate = null;
     pendingDeleteWorkSec = null;
+    pendingHistoryDelete = null;
     const overlay = document.getElementById('deleteOverlay');
-    if (overlay) overlay.hidden = true;
+    if (overlay) {
+      overlay.hidden = true;
+      const title = overlay.querySelector('h2');
+      const body = overlay.querySelector('p');
+      if (title) title.textContent = 'Zirkel löschen?';
+      if (body) body.textContent = 'Alle Werte dieses Datums werden entfernt.';
+    }
   }
 
   async function confirmDeleteDate(){
+    if (pendingHistoryDelete) {
+      await confirmDeleteHistorySession();
+      return;
+    }
     const date = pendingDeleteDate;
     const ws = pendingDeleteWorkSec;
     const aid = getGoAccountId();
@@ -5805,13 +6050,19 @@
     return p[2] + '.' + p[1];
   }
 
-  function openHistoryView(){
+  function openHistoryView(mode){
+    historyMode = mode || 'intervall';
     const view = document.getElementById('historyView');
     const nameEl = document.getElementById('historyName');
     if (nameEl) nameEl.textContent = getAthleteFirstName() || '';
     historyActiveGroupKey = null;
-    renderHistoryTable();
-    if (view) view.hidden = false;
+    const loadPromise = historyMode === 'kraft'
+      ? loadKraftLogs()
+      : (historyMode === 'ausdauer' ? loadAusdauerLogs() : loadIntervalLogs());
+    loadPromise.then(function(){
+      renderHistoryTable();
+      if (view) view.hidden = false;
+    });
   }
 
   function closeHistoryView(){
@@ -5819,7 +6070,120 @@
     if (view) view.hidden = true;
   }
 
-  function renderHistoryTable(){
+  function renderHistoryTabs(groups, active){
+    const tabsRail = document.getElementById('historyTabsRail');
+    const tabsEl = document.getElementById('historyTabs');
+    if (tabsEl) {
+      tabsEl.innerHTML = '';
+      groups.forEach(function(g){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'card-tab' + (g.key === active.key ? ' is-active' : '');
+        btn.setAttribute('role', 'tab');
+        btn.setAttribute('aria-selected', g.key === active.key ? 'true' : 'false');
+        btn.setAttribute('data-history-group', g.key);
+        btn.textContent = g.label;
+        tabsEl.appendChild(btn);
+      });
+    }
+    if (tabsRail) tabsRail.hidden = groups.length < 1;
+  }
+
+  function renderKraftHistoryTable(){
+    const wrap = document.getElementById('historyTableWrap');
+    const tabsRail = document.getElementById('historyTabsRail');
+    if (!wrap) return;
+    if (!kraftLogs.length) {
+      wrap.innerHTML = '<div class="history-empty">Noch keine gespeicherten Kraft-Einheiten.</div>';
+      if (tabsRail) tabsRail.hidden = true;
+      return;
+    }
+    const groups = buildKraftHistoryGroups();
+    if (!groups.length) {
+      wrap.innerHTML = '<div class="history-empty">Noch keine gespeicherten Kraft-Einheiten.</div>';
+      if (tabsRail) tabsRail.hidden = true;
+      return;
+    }
+    let active = groups.find(function(g){ return g.key === historyActiveGroupKey; });
+    if (!active) active = groups[0];
+    historyActiveGroupKey = active.key;
+    renderHistoryTabs(groups, active);
+    let html = '<div class="history-sessions">';
+    active.dates.forEach(function(date){
+      const sessionLogs = active.logs.filter(function(r){
+        return String(r.workout_date || '').slice(0, 10) === date;
+      });
+      html += '<div class="history-session">';
+      html += '<div class="history-session-head"><span class="history-session-title">' +
+        formatTableDate(date) + ' · ' + active.label + '</span>' +
+        '<button type="button" class="history-del" data-history-mode="kraft" data-date="' + date +
+        '" data-system-id="' + active.key + '" aria-label="Löschen">×</button></div>';
+      html += '<div class="history-ex-list">';
+      sessionLogs.forEach(function(log){
+        const sets = filledKraftSets(parseKraftCustom(log.sets));
+        html += '<button type="button" class="history-ex-row" data-log-id="' + (log.id || '') + '">';
+        html += '<span class="history-ex-name">' + (log.exercise_name || log.exercise_id || 'Übung') + '</span>';
+        html += '<div class="history-ex-sets">';
+        sets.forEach(function(set, idx){
+          const line = formatKraftSetLine(set, idx);
+          if (line) html += '<div class="history-set-line">' + line + '</div>';
+        });
+        if (!sets.length) html += '<div class="history-set-line">—</div>';
+        html += '</div></button>';
+      });
+      html += '</div></div>';
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+  }
+
+  function renderAusdauerHistoryTable(){
+    const wrap = document.getElementById('historyTableWrap');
+    const tabsRail = document.getElementById('historyTabsRail');
+    if (!wrap) return;
+    if (!ausdauerLogs.length) {
+      wrap.innerHTML = '<div class="history-empty">Noch keine gespeicherten Ausdauer-Einheiten.</div>';
+      if (tabsRail) tabsRail.hidden = true;
+      return;
+    }
+    const groups = buildAusdauerHistoryGroups();
+    if (!groups.length) {
+      wrap.innerHTML = '<div class="history-empty">Noch keine gespeicherten Ausdauer-Einheiten.</div>';
+      if (tabsRail) tabsRail.hidden = true;
+      return;
+    }
+    let active = groups.find(function(g){ return g.key === historyActiveGroupKey; });
+    if (!active) active = groups[0];
+    historyActiveGroupKey = active.key;
+    renderHistoryTabs(groups, active);
+    let html = '<div class="history-sessions">';
+    active.dates.forEach(function(date){
+      const sessionLogs = active.logs.filter(function(r){
+        return String(r.workout_date || '').slice(0, 10) === date;
+      });
+      sessionLogs.forEach(function(log){
+        html += '<div class="history-session">';
+        html += '<div class="history-session-head"><span class="history-session-title">' +
+          formatTableDate(date) + ' · ' + active.label + '</span>' +
+          '<button type="button" class="history-del" data-history-mode="ausdauer" data-date="' + date +
+          '" data-technique="' + active.key + '" aria-label="Löschen">×</button></div>';
+        html += '<button type="button" class="history-ex-row history-ausd-row">';
+        html += '<span class="history-ex-name">' + active.label + '</span>';
+        html += '<div class="history-ex-sets">';
+        html += '<div class="history-set-line">' + ausdauerCat().summarize(log) + '</div>';
+        if (log.duration_min != null) html += '<div class="history-set-line">Dauer: ' + log.duration_min + ' min</div>';
+        if (log.speed != null) html += '<div class="history-set-line">Tempo: ' + log.speed + '</div>';
+        if (log.distance_km != null) html += '<div class="history-set-line">Distanz: ' + log.distance_km + ' km</div>';
+        if (log.hr_avg != null) html += '<div class="history-set-line">HF: ' + log.hr_avg + '</div>';
+        if (log.incline != null) html += '<div class="history-set-line">Steigung: ' + log.incline + ' %</div>';
+        html += '</div></button></div>';
+      });
+    });
+    html += '</div>';
+    wrap.innerHTML = html;
+  }
+
+  function renderIntervalHistoryTable(){
     const wrap = document.getElementById('historyTableWrap');
     const tabsRail = document.getElementById('historyTabsRail');
     const tabsEl = document.getElementById('historyTabs');
@@ -5937,6 +6301,12 @@
     wrap.innerHTML = html;
   }
 
+  function renderHistoryTable(){
+    if (historyMode === 'kraft') return renderKraftHistoryTable();
+    if (historyMode === 'ausdauer') return renderAusdauerHistoryTable();
+    return renderIntervalHistoryTable();
+  }
+
   function bindEmbedShellEvents(){
     var root = document.getElementById('embedShell');
     if (!root || root.dataset.bound === '1') return;
@@ -5957,7 +6327,29 @@
       }
       if (e.target.closest('#historyOpenBtn')) {
         e.preventDefault(); e.stopPropagation();
-        loadIntervalLogs().then(openHistoryView);
+        openHistoryView('intervall');
+        return;
+      }
+      if (e.target.closest('#historyOpenBtnKraft')) {
+        e.preventDefault(); e.stopPropagation();
+        openHistoryView('kraft');
+        return;
+      }
+      if (e.target.closest('#historyOpenBtnAusdauer')) {
+        e.preventDefault(); e.stopPropagation();
+        openHistoryView('ausdauer');
+        return;
+      }
+      const histEx = e.target.closest('.history-ex-row');
+      if (histEx) {
+        e.preventDefault(); e.stopPropagation();
+        const session = histEx.closest('.history-session');
+        if (session) {
+          session.querySelectorAll('.history-ex-row.is-open').forEach(function(other){
+            if (other !== histEx) other.classList.remove('is-open');
+          });
+        }
+        histEx.classList.toggle('is-open');
         return;
       }
       if (e.target.closest('#weightOverlayCancel')) {
@@ -5990,7 +6382,13 @@
       const del = e.target.closest('.history-del');
       if (del && del.dataset.date) {
         e.preventDefault(); e.stopPropagation();
-        askDeleteDate(del.dataset.date, del.dataset.workSec);
+        if (del.dataset.historyMode === 'kraft') {
+          askDeleteHistorySession('kraft', del.dataset.date, { systemId: del.dataset.systemId || '' });
+        } else if (del.dataset.historyMode === 'ausdauer') {
+          askDeleteHistorySession('ausdauer', del.dataset.date, { technique: del.dataset.technique || '' });
+        } else {
+          askDeleteDate(del.dataset.date, del.dataset.workSec);
+        }
         return;
       }
       if (e.target.closest('#finishOkBtn')) {
@@ -6011,7 +6409,21 @@
       if (e.target.closest('#finishTableBtn')) {
         e.preventDefault(); e.stopPropagation();
         hideFinishDialog();
-        loadIntervalLogs().then(openHistoryView);
+        openHistoryView('intervall');
+        return;
+      }
+      if (e.target.closest('#kraftFinishTableBtn')) {
+        e.preventDefault(); e.stopPropagation();
+        const wasAusdauer = pendingAusdauerFinish;
+        hideKraftFinishDialog();
+        if (wasAusdauer) {
+          pendingAusdauerFinish = false;
+          endAusdauerSession();
+          openHistoryView('ausdauer');
+        } else {
+          endKraftSession();
+          openHistoryView('kraft');
+        }
         return;
       }
       if (e.target.closest('#deleteStayBtn')) {
