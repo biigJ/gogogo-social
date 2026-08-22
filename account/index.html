@@ -636,7 +636,7 @@
       grid-template-columns: 40px 1fr 40px;
       align-items: center;
       gap: 8px;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
     .home-cal__label {
       text-align: center;
@@ -676,8 +676,15 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
       min-width: 0;
+    }
+    .home-cal__match-slot {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 28px;
     }
     .home-cal__day {
       width: 100%;
@@ -3448,7 +3455,6 @@ browsen</span>
 
       <div class="panel is-active" id="panel-home" data-panel="home">
         <div class="home-cal">
-          <div class="home-cal__matches" id="week-matches" aria-label="Trainings-Matches"></div>
           <div class="home-cal__head">
             <button class="home-cal__nav home-cal__nav--prev" type="button" id="week-prev" aria-label="Vorherige Woche" data-aria-de="Vorherige Woche" data-aria-en="Previous week"></button>
             <h2 class="home-cal__label" id="week-label"></h2>
@@ -7499,6 +7505,7 @@ browsen</span>
       }
 
       var buddyMeetById = {};
+      var mutualBuddyIds = {};
       var placesCheckDraft = [];
       var weekdayMeetDraftWd = null;
       var weekdayMeetDraftPlace = null;
@@ -7872,11 +7879,80 @@ browsen</span>
             updated_at: new Date().toISOString()
           });
         } catch (e) {}
+        try { await loadBuddyMeetPrefsFromCloud(); } catch (eMeet4) {}
         if (typeof window.__gogogoRenderWeek === "function") {
           try { window.__gogogoRenderWeek(); } catch (e2) {}
         }
       }
 
+
+      function normalizePlaceName(place) {
+        return String(place || "").trim().toLowerCase();
+      }
+
+      function placesMatch(a, b) {
+        return normalizePlaceName(a) === normalizePlaceName(b) && !!normalizePlaceName(a);
+      }
+
+      function isMutualBuddy(buddyId) {
+        if (!buddyId) return false;
+        return !!mutualBuddyIds[String(buddyId)];
+      }
+
+      async function refreshMutualBuddyIds() {
+        mutualBuddyIds = {};
+        if (!hasCloudAccount()) return mutualBuddyIds;
+        try {
+          var outgoing = await restGet(
+            "go_buddies?account_id=eq." + encodeURIComponent(account.id) +
+            "&select=buddy_id&limit=20"
+          );
+          var incoming = await restGet(
+            "go_buddies?buddy_id=eq." + encodeURIComponent(account.id) +
+            "&select=account_id&limit=20"
+          );
+          var outSet = {};
+          (outgoing || []).forEach(function (row) {
+            if (row && row.buddy_id) outSet[String(row.buddy_id)] = true;
+          });
+          (incoming || []).forEach(function (row) {
+            if (row && row.account_id && outSet[String(row.account_id)]) {
+              mutualBuddyIds[String(row.account_id)] = true;
+            }
+          });
+        } catch (e) {}
+        return mutualBuddyIds;
+      }
+
+      async function loadBuddyMeetPrefsFromCloud() {
+        if (!hasCloudAccount()) return false;
+        await refreshMutualBuddyIds();
+        var ids = [];
+        getBuddies().forEach(function (b) {
+          if (b && b.id && isMutualBuddy(b.id)) ids.push(String(b.id));
+        });
+        if (!ids.length) return false;
+        var inList = "(" + ids.join(",") + ")";
+        var people = null;
+        try {
+          people = await restGet(
+            "go_accounts?id=in." + inList +
+            "&select=id,workout_place,workout_places,weekday_meet_prefs&limit=20"
+          );
+        } catch (e0) {
+          return false;
+        }
+        if (!people || !people.length) return false;
+        people.forEach(function (remote) {
+          if (!remote || !remote.id) return;
+          buddyMeetById[String(remote.id)] = {
+            workout_place: remote.workout_place || null,
+            workout_places: normalizePlaceList(remote.workout_places || remote.workout_place),
+            weekday_meet_prefs: remote.weekday_meet_prefs || {}
+          };
+        });
+        return true;
+      }
 
       function buddyMeetPrefsFor(buddyId) {
         var cached = buddyMeetById[String(buddyId)] || {};
@@ -7917,9 +7993,9 @@ browsen</span>
         var out = [];
         var buddies = typeof getBuddies === "function" ? getBuddies() : [];
         buddies.forEach(function (b) {
-          if (!b || !b.id) return;
+          if (!b || !b.id || !isMutualBuddy(b.id)) return;
           var theirs = buddyWeekdayMeet(b.id, wd);
-          if (!theirs.place || theirs.place !== mine.place) return;
+          if (!theirs.place || !placesMatch(theirs.place, mine.place)) return;
           if (!timesWithinMinutes(mine.time, theirs.time, 30)) return;
           out.push({
             buddy: b,
@@ -7937,32 +8013,23 @@ browsen</span>
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5z"/></svg>';
       }
 
-      function renderWeekMatches(days) {
-        var root = document.getElementById("week-matches");
-        if (!root) return;
-        root.innerHTML = "";
-        days.forEach(function (d) {
-          var wd = (d.getDay() + 6) % 7;
-          var key = formatDateKey(d);
-          var matches = collectWeekdayMatches(wd);
-          var cell = document.createElement("div");
-          cell.className = "home-cal__match-cell";
-          if (matches.length) {
-            var btn = document.createElement("button");
-            btn.type = "button";
-            btn.className = "home-cal__match-btn" + (matches.length > 1 ? " is-multi" : "");
-            if (matches.length > 1) btn.setAttribute("data-count", String(matches.length));
-            btn.innerHTML = personIconSvg();
-            btn.setAttribute("aria-label", uiLang === "en" ? "Matching buddies" : "Passende Buddies");
-            btn.addEventListener("click", function (ev) {
-              ev.preventDefault();
-              ev.stopPropagation();
-              openMatchPeopleModal(key, wd, matches);
-            });
-            cell.appendChild(btn);
-          }
-          root.appendChild(cell);
+      function buildWeekdayMatchBtn(dateKey, wd, matches) {
+        var slot = document.createElement("div");
+        slot.className = "home-cal__match-slot";
+        if (!matches || !matches.length) return slot;
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "home-cal__match-btn" + (matches.length > 1 ? " is-multi" : "");
+        if (matches.length > 1) btn.setAttribute("data-count", String(matches.length));
+        btn.innerHTML = personIconSvg();
+        btn.setAttribute("aria-label", uiLang === "en" ? "Matching buddies" : "Passende Buddies");
+        btn.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          openMatchPeopleModal(dateKey, wd, matches);
         });
+        slot.appendChild(btn);
+        return slot;
       }
 
       function openMatchPeopleModal(dateKey, wd, matches) {
@@ -10297,6 +10364,7 @@ browsen</span>
           buddyList = next;
           saveBuddies();
         }
+        try { await loadBuddyMeetPrefsFromCloud(); } catch (eMeet) {}
         return changed;
       }
 
@@ -10319,11 +10387,18 @@ browsen</span>
             trainerChanged = true;
           }
         } catch (e1) {}
+        var meetLoaded = false;
+        try { meetLoaded = !!(await loadBuddyMeetPrefsFromCloud()); } catch (eMeet2) {}
         if (buddyChanged || trainerChanged) {
           fillProfilePanel();
           renderBuddySlots();
         }
-        return buddyChanged || trainerChanged;
+        if (meetLoaded || buddyChanged || trainerChanged) {
+          if (typeof window.__gogogoRenderWeek === "function") {
+            try { window.__gogogoRenderWeek(); } catch (eRw) {}
+          }
+        }
+        return buddyChanged || trainerChanged || meetLoaded;
       }
 
       var authorNameMapExtra = {};
@@ -10798,9 +10873,13 @@ browsen</span>
           maybeShowGreeting();
         });
         ensureCoachAccount().catch(function () {});
-        loadBuddiesFromCloud().then(function () {
+        loadBuddiesFromCloud().then(async function () {
+          try { await loadBuddyMeetPrefsFromCloud(); } catch (eMeet3) {}
           fillProfilePanel();
           fillCommunityPanel();
+          if (typeof window.__gogogoRenderWeek === "function") {
+            try { window.__gogogoRenderWeek(); } catch (eRw2) {}
+          }
         }).catch(function () {
           fillCommunityPanel();
         });
@@ -12382,15 +12461,16 @@ browsen</span>
             editingOpen = true;
           }
 
-          renderWeekMatches(days);
-
           days.forEach(function (d, i) {
             var key = dateKey(d);
+            var wd = (d.getDay() + 6) % 7;
             var w = workoutFor(d);
             var mark = markFor(key);
             var rateable = canRateCalendarDay(key);
             var cell = document.createElement("div");
             cell.className = "home-cal__cell";
+
+            cell.appendChild(buildWeekdayMatchBtn(key, wd, collectWeekdayMatches(wd)));
 
             var btn = document.createElement("button");
             btn.type = "button";
