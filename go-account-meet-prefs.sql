@@ -10,6 +10,10 @@ alter table go_accounts
 alter table go_accounts
   add column if not exists weekday_meet_prefs jsonb default '{}'::jsonb;
 
+-- weekday_meet_prefs JSON pro Wochentag (Schlüssel "0"=Mo … "6"=So):
+-- { "place": "…", "time": "18:00", "label": "…", "effective_from": "YYYY-MM-DD" }
+-- Matches im Kalender nur wenn Kalendertag >= effective_from und nicht in der Vergangenheit.
+
 alter table go_workout_invites
   add column if not exists invite_kind text default 'invite';
 
