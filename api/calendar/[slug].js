@@ -2,11 +2,43 @@ const SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
 const CALENDAR_BUCKET = "go-calendars";
 
 function normalizeIcsForGoogle(body) {
-  var text = String(body || "");
-  if (!text) return text;
-  text = text.replace(/\u00b7/g, "-");
-  text = text.replace(/[\u2013\u2014]/g, "-");
-  text = text.replace(/\r?\n/g, "\r\n");
+  var raw = String(body || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  var unfolded = [];
+  raw.split("\n").forEach(function (line) {
+    if ((line.charAt(0) === " " || line.charAt(0) === "\t") && unfolded.length) {
+      unfolded[unfolded.length - 1] += line.slice(1);
+    } else {
+      unfolded.push(line);
+    }
+  });
+
+  var out = [];
+  var inTz = false;
+  unfolded.forEach(function (line) {
+    if (!line) return;
+    if (line === "BEGIN:VTIMEZONE") {
+      inTz = true;
+      return;
+    }
+    if (inTz) {
+      if (line === "END:VTIMEZONE") inTz = false;
+      return;
+    }
+    if (line.indexOf("X-WR-TIMEZONE:") === 0) return;
+    if (line.indexOf("STATUS:") === 0) return;
+    if (line.indexOf("TRANSP:") === 0) return;
+    if (line.indexOf("CREATED:") === 0) return;
+    if (line.indexOf("REFRESH-INTERVAL") === 0) return;
+    if (line.indexOf("X-PUBLISHED-TTL") === 0) return;
+    if (line.indexOf("X-LIC-LOCATION:") === 0) return;
+    line = line.replace(/^DTSTART;TZID=[^:]+:/, "DTSTART:");
+    line = line.replace(/^DTEND;TZID=[^:]+:/, "DTEND:");
+    if (line.indexOf("RRULE:") === 0) line = "RRULE:FREQ=WEEKLY";
+    line = line.replace(/\u00b7/g, " - ");
+    out.push(line);
+  });
+
+  var text = out.join("\r\n");
   if (!text.endsWith("\r\n")) text += "\r\n";
   return text;
 }
@@ -32,8 +64,7 @@ module.exports = async function handler(req, res) {
       res.status(502).send("Invalid calendar feed");
       return;
     }
-    res.setHeader("Content-Type", "text/calendar; charset=utf-8");
-    res.setHeader("Content-Disposition", 'inline; filename="gogogo-wochenplan.ics"');
+    res.setHeader("Content-Type", "text/calendar");
     res.setHeader("Cache-Control", "public, max-age=300");
     res.status(200).send(body);
   } catch (err) {

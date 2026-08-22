@@ -3039,6 +3039,12 @@
     .calendar-sync-guide__copy-msg.is-error {
       opacity: 1;
     }
+    .calendar-sync-guide__download {
+      width: 100%;
+      margin: 0 0 10px;
+      min-height: 42px;
+      font-size: 0.82rem;
+    }
     #profile-change-code-modal .challenge-modal__sheet,
     #profile-change-name-modal .challenge-modal__sheet,
     #profile-change-phone-modal .challenge-modal__sheet,
@@ -4848,6 +4854,7 @@ browsen</span>
           </button>
         </div>
         <p class="calendar-sync-guide__copy-msg" id="calendar-sync-guide-google-copy-msg" hidden></p>
+        <button type="button" class="challenge-modal__btn is-ghost calendar-sync-guide__download" id="calendar-sync-guide-google-download" data-de="Plan als .ics-Datei laden" data-en="Download plan as .ics file">Plan als .ics-Datei laden</button>
         <p class="calendar-sync-guide__note" id="calendar-sync-guide-google-note"></p>
       </div>
       <div class="challenge-modal__actions is-single">
@@ -8291,28 +8298,6 @@ browsen</span>
 
       var PROFILE_PLAN_VIEW_KEY = "gogogo_profile_plan_view";
       var ICS_WD_ANCHOR = ["20260105", "20260106", "20260107", "20260108", "20260109", "20260110", "20260111"];
-      var ICS_BYDAY = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
-      var ICS_TZ = "Europe/Berlin";
-      var ICS_VTIMEZONE = [
-        "BEGIN:VTIMEZONE",
-        "TZID:Europe/Berlin",
-        "X-LIC-LOCATION:Europe/Berlin",
-        "BEGIN:DAYLIGHT",
-        "TZOFFSETFROM:+0100",
-        "TZOFFSETTO:+0200",
-        "TZNAME:CEST",
-        "DTSTART:19700329T020000",
-        "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
-        "END:DAYLIGHT",
-        "BEGIN:STANDARD",
-        "TZOFFSETFROM:+0200",
-        "TZOFFSETTO:+0100",
-        "TZNAME:CET",
-        "DTSTART:19701025T030000",
-        "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
-        "END:STANDARD",
-        "END:VTIMEZONE"
-      ].join("\r\n");
       var CALENDAR_FEED_BUCKET = "go-calendars";
       var profilePlanToolbarBound = false;
       var calendarSettingsDraft = { provider: null, privacy: false };
@@ -8387,9 +8372,8 @@ browsen</span>
 
       function icsPlainText(text) {
         return String(text || "")
-          .replace(/\u00b7/g, "-")
-          .replace(/[\u2013\u2014]/g, "-")
-          .replace(/[^\x09\x0a\x0d\x20-\x7e]/g, "");
+          .replace(/\u00b7/g, " - ")
+          .replace(/\//g, "-");
       }
 
       function icsEscape(text) {
@@ -8424,12 +8408,10 @@ browsen</span>
         var lines = [
           "BEGIN:VCALENDAR",
           "VERSION:2.0",
-          "PRODID:-//gogogo//Wochenplan//DE",
+          "PRODID:-//gogogo.social//Wochenplan//DE",
           "CALSCALE:GREGORIAN",
           "METHOD:PUBLISH",
-          "X-WR-CALNAME:gogogo Wochenplan",
-          "X-WR-TIMEZONE:" + ICS_TZ,
-          ICS_VTIMEZONE
+          "X-WR-CALNAME:gogogo Wochenplan"
         ];
         var uidBase = String((account && account.id) || account.invite_code || "local").replace(/[^a-zA-Z0-9]/g, "");
         var stamp = icsStampNow();
@@ -8448,19 +8430,29 @@ browsen</span>
           lines.push("BEGIN:VEVENT");
           lines.push("UID:gogogo-plan-wd-" + i + "@" + uidBase + ".gogogo");
           lines.push("DTSTAMP:" + stamp);
-          lines.push("CREATED:" + stamp);
-          lines.push("DTSTART;TZID=" + ICS_TZ + ":" + dtStart);
-          lines.push("DTEND;TZID=" + ICS_TZ + ":" + dtEnd);
-          lines.push("RRULE:FREQ=WEEKLY;WKST=MO;BYDAY=" + ICS_BYDAY[i]);
+          lines.push("DTSTART:" + dtStart);
+          lines.push("DTEND:" + dtEnd);
+          lines.push("RRULE:FREQ=WEEKLY");
           lines.push("SUMMARY:" + icsEscape(summary));
           if (meet.place) lines.push("LOCATION:" + icsEscape(meet.place));
-          lines.push("DESCRIPTION:" + icsEscape(dayVal));
-          lines.push("STATUS:CONFIRMED");
-          lines.push("TRANSP:OPAQUE");
+          if (dayVal) lines.push("DESCRIPTION:" + icsEscape(dayVal));
           lines.push("END:VEVENT");
         }
         lines.push("END:VCALENDAR");
         return lines.join("\r\n");
+      }
+
+      function downloadCalendarFeedIcs() {
+        var ics = buildWeekPlanIcs();
+        var blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "gogogo-wochenplan.ics";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       }
 
       function getCalendarFeedOrigin() {
@@ -8633,7 +8625,9 @@ browsen</span>
         if (appleBlock) appleBlock.hidden = provider !== "apple";
         if (googleBlock) googleBlock.hidden = provider !== "google";
         var googleUrlElReset = document.getElementById("calendar-sync-guide-google-url-row");
+        var googleDownloadReset = document.getElementById("calendar-sync-guide-google-download");
         if (googleUrlElReset) googleUrlElReset.hidden = provider !== "google";
+        if (googleDownloadReset) googleDownloadReset.hidden = provider !== "google";
         setCalendarGuideCopyMsg("");
         if (provider !== "google") {
           var googleUrlInputReset = document.getElementById("calendar-sync-guide-google-url");
@@ -8671,8 +8665,8 @@ browsen</span>
           var googleNote = document.getElementById("calendar-sync-guide-google-note");
           if (googleNote) {
             googleNote.textContent = t(
-              "Haken „öffentlich“ ist optional. Termine erscheinen als gogogo Wochenplan.",
-              "Public checkbox is optional. Events appear as gogogo weekly plan."
+              "Falls URL fehlschlägt: .ics-Datei laden → Google Einstellungen → Importieren. Haken „öffentlich“ optional.",
+              "If URL fails: download .ics → Google Settings → Import. Public checkbox is optional."
             );
           }
         }
@@ -14156,10 +14150,17 @@ browsen</span>
         var calendarSyncGuideModal = document.getElementById("calendar-sync-guide-modal");
         var calendarSyncGuideOk = document.getElementById("calendar-sync-guide-ok");
         var calendarSyncGuideCopy = document.getElementById("calendar-sync-guide-google-copy");
+        var calendarSyncGuideDownload = document.getElementById("calendar-sync-guide-google-download");
         if (calendarSyncGuideCopy) {
           calendarSyncGuideCopy.addEventListener("click", function () {
             var pending = calendarSubscribePending;
             copyCalendarGuideUrl(pending ? pending.feedUrl : null);
+          });
+        }
+        if (calendarSyncGuideDownload) {
+          calendarSyncGuideDownload.addEventListener("click", function () {
+            downloadCalendarFeedIcs();
+            setCalendarGuideCopyMsg(t("Datei geladen — in Google importieren.", "File downloaded — import in Google."), false);
           });
         }
         if (calendarSyncGuideOk) {
