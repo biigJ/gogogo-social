@@ -748,6 +748,15 @@
     .home-cal__rate.is-rated {
       opacity: 0.92;
     }
+    .home-cal__rate.is-readonly {
+      cursor: default;
+      pointer-events: none;
+    }
+    .home-cal__rate.is-score {
+      font-size: calc(0.95rem * 2.2);
+      font-weight: 700;
+      line-height: 1;
+    }
     .home-cal__invite {
       width: 100%;
       min-height: calc(0.95rem * 1.8);
@@ -784,6 +793,17 @@
       font-size: clamp(0.52rem, 2.2vw, 0.7rem);
       font-weight: 700;
       letter-spacing: -0.04em;
+    }
+    .home-cal__heart.is-live {
+      color: #ff5a5a;
+      filter: drop-shadow(0 0 6px rgba(255, 90, 90, 0.55));
+      cursor: pointer;
+    }
+    .home-cal__heart.is-muted {
+      color: #F7F5F0;
+      cursor: default;
+      pointer-events: none;
+      opacity: 0.95;
     }
     .cal-buddy-invite-list {
       display: flex;
@@ -12263,12 +12283,12 @@ browsen</span>
         var selectedKey = null;
         var rateModalKey = null;
         var saving = false;
-        var pendingRatePromptKey = null;
         var calInviteDateKey = null;
         var calInviteSelectedIds = {};
 
         function openCalBuddyInvite(key) {
           if (isAccountPaused()) return;
+          if (!canInviteOnDay(key)) return;
           calInviteDateKey = key;
           calInviteSelectedIds = {};
           var list = document.getElementById("cal-buddy-invite-list");
@@ -12322,6 +12342,10 @@ browsen</span>
             closeCalBuddyInvite();
             return;
           }
+          if (!canInviteOnDay(calInviteDateKey)) {
+            closeCalBuddyInvite();
+            return;
+          }
           var buddyIds = Object.keys(calInviteSelectedIds).filter(function (id) {
             return calInviteSelectedIds[id];
           });
@@ -12346,9 +12370,26 @@ browsen</span>
           selectDay(key, false);
         }
 
+        function dayHasRating(key) {
+          return !!entryFor(key);
+        }
+        function isCalDayTodayOrFuture(key) {
+          return String(key || "").slice(0, 10) >= berlinTodayKey();
+        }
+        function canEditExistingRating() {
+          return getStaffCalendarMode() === "full";
+        }
+        function canInviteOnDay(key) {
+          if (isAccountPaused()) return false;
+          if (dayHasRating(key)) return false;
+          return isCalDayTodayOrFuture(key);
+        }
+
         function openDayRateModal(key) {
           if (isAccountPaused()) return;
-          if (!key || !canRateCalendarDay(key)) return;
+          if (!key) return;
+          if (dayHasRating(key) && !canEditExistingRating()) return;
+          if (!dayHasRating(key) && !canRateCalendarDay(key)) return;
           rateModalKey = key;
           selectedKey = key;
           var d = parseDateKey(key) || new Date();
@@ -12381,7 +12422,6 @@ browsen</span>
 
         function promptWorkoutRating(key) {
           key = String(key || berlinTodayKey()).slice(0, 10);
-          pendingRatePromptKey = null;
           weekOffset = 0;
           selectedKey = key;
           renderWeek();
@@ -12707,8 +12747,19 @@ browsen</span>
             heartBtn.type = "button";
             heartBtn.className = "home-cal__heart";
             var acceptedTime = accepted ? normalizeMeetTime(accepted.meet_time) : "";
-            if (hasOutbound) {
+            var ratedDay = dayHasRating(key);
+            var inviteable = canInviteOnDay(key);
+            if (ratedDay || !isCalDayTodayOrFuture(key)) {
+              heartBtn.textContent = "❍";
+              heartBtn.classList.add("is-muted");
+              heartBtn.disabled = true;
+              heartBtn.setAttribute(
+                "aria-label",
+                ratedDay ? t("Bewertet", "Rated") : t("Vergangen", "Past")
+              );
+            } else if (hasOutbound) {
               heartBtn.textContent = "❤️";
+              heartBtn.classList.add("is-live");
               heartBtn.setAttribute("aria-label", t("Einladung ansehen", "View invite"));
               heartBtn.addEventListener("click", function (ev) {
                 ev.preventDefault();
@@ -12758,8 +12809,9 @@ browsen</span>
                 selectDay(key, false);
                 openCancelledInviteNotice(key);
               });
-            } else {
+            } else if (inviteable) {
               heartBtn.textContent = "❤️";
+              heartBtn.classList.add("is-live");
               heartBtn.setAttribute("aria-label", t("Buddies einladen", "Invite buddies"));
               heartBtn.addEventListener("click", function (ev) {
                 ev.preventDefault();
@@ -12767,6 +12819,11 @@ browsen</span>
                 selectDay(key, false);
                 openCalBuddyInvite(key);
               });
+            } else {
+              heartBtn.textContent = "❍";
+              heartBtn.classList.add("is-muted");
+              heartBtn.disabled = true;
+              heartBtn.setAttribute("aria-hidden", "true");
             }
             inviteRow.appendChild(heartBtn);
             cell.appendChild(inviteRow);
@@ -12774,9 +12831,25 @@ browsen</span>
             var rateBtn = document.createElement("button");
             rateBtn.type = "button";
             rateBtn.className = "home-cal__rate";
-            if (rateable && !isAccountPaused()) {
+            var ratingMark = markFor(key);
+            if (dayEntry) {
+              rateBtn.textContent = ratingMark;
+              rateBtn.classList.add("is-score");
+              if (canEditExistingRating()) {
+                rateBtn.setAttribute("aria-label", t("Bewertung bearbeiten", "Edit rating"));
+                rateBtn.addEventListener("click", function (ev) {
+                  ev.stopPropagation();
+                  selectDay(key, true);
+                });
+              } else {
+                rateBtn.classList.add("is-readonly");
+                rateBtn.setAttribute(
+                  "aria-label",
+                  ratingMark === "✕" ? t("Eintrag", "Entry") : t("Bewertung", "Score") + " " + ratingMark
+                );
+              }
+            } else if (rateable && !isAccountPaused()) {
               rateBtn.textContent = "🗒️";
-              if (dayEntry) rateBtn.classList.add("is-rated");
               rateBtn.setAttribute("aria-label", t("Tag bewerten", "Rate day"));
               rateBtn.addEventListener("click", function (ev) {
                 ev.stopPropagation();
