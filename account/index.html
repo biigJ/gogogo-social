@@ -580,6 +580,10 @@
       flex-direction: column;
       margin-bottom: 10px;
     }
+    #places-check-main[hidden],
+    .places-check-body[hidden] {
+      display: none !important;
+    }
     .places-check-map {
       width: 100%;
       height: 140px;
@@ -670,14 +674,17 @@
       flex-direction: column;
       gap: 6px;
       flex: 1 1 auto;
-      min-height: 88px;
-      max-height: min(28vh, 220px);
+      min-height: 0;
+      max-height: min(36vh, 260px);
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
     }
     .places-check-add-result {
       width: 100%;
+      flex: 0 0 auto;
+      min-height: 44px;
+      box-sizing: border-box;
       text-align: left;
       padding: 10px 12px;
       border: 0.5px solid rgba(247, 245, 240, 0.4);
@@ -687,6 +694,7 @@
       font: inherit;
       font-weight: 600;
       font-size: 0.95rem;
+      line-height: 1.25;
       cursor: pointer;
       white-space: nowrap;
       overflow: hidden;
@@ -718,6 +726,11 @@
       flex-direction: column;
       gap: 8px;
       margin-top: 4px;
+      flex-shrink: 0;
+    }
+    .places-check-footer[hidden],
+    .places-check-footer .challenge-modal__actions[hidden] {
+      display: none !important;
     }
     .match-people-list {
       display: flex;
@@ -7953,14 +7966,18 @@ browsen</span>
         placesCheckAddMode = !!on;
         var main = document.getElementById("places-check-main");
         var addWrap = document.getElementById("places-check-add-wrap");
-        var addBtn = document.getElementById("places-check-add");
         var addMap = document.getElementById("places-check-add-map");
-        var footerActions = document.querySelector("#places-check-modal .places-check-footer .challenge-modal__actions");
+        var footer = document.querySelector("#places-check-modal .places-check-footer");
+        var title = document.getElementById("places-check-title");
         if (main) main.hidden = placesCheckAddMode;
         if (addWrap) addWrap.hidden = !placesCheckAddMode;
-        if (addBtn) addBtn.hidden = placesCheckAddMode;
-        if (footerActions) footerActions.hidden = placesCheckAddMode;
+        if (footer) footer.hidden = placesCheckAddMode;
         if (addMap && !placesCheckAddMode) addMap.hidden = true;
+        if (title) {
+          title.textContent = placesCheckAddMode
+            ? t("Ort hinzufügen", "Add place")
+            : t("Orte wählen", "Choose places");
+        }
       }
 
       function formatOsmPlaceLabel(row) {
