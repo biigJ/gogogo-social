@@ -2989,6 +2989,17 @@
       opacity: 0.82;
       margin: 0;
     }
+    .calendar-sync-guide__url {
+      font-size: 0.72rem;
+      line-height: 1.35;
+      word-break: break-all;
+      opacity: 0.88;
+      margin: 0 0 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(247,245,240,0.08);
+      border: 1px solid rgba(247,245,240,0.18);
+    }
     #profile-change-code-modal .challenge-modal__sheet,
     #profile-change-name-modal .challenge-modal__sheet,
     #profile-change-phone-modal .challenge-modal__sheet,
@@ -4776,6 +4787,7 @@ browsen</span>
       </div>
       <div class="calendar-sync-guide" id="calendar-sync-guide-google" hidden>
         <ol class="calendar-sync-guide__steps" id="calendar-sync-guide-google-steps"></ol>
+        <p class="calendar-sync-guide__url" id="calendar-sync-guide-google-url" hidden></p>
         <p class="calendar-sync-guide__note" id="calendar-sync-guide-google-note"></p>
       </div>
       <div class="challenge-modal__actions is-single">
@@ -5261,6 +5273,11 @@ browsen</span>
         GoAccountSession.persist();
       } else {
         try { account = JSON.parse(localStorage.getItem(ACCOUNT_KEY) || "null"); } catch (e) {}
+      }
+      if (account) {
+        try {
+          if (typeof migrateCalendarFeedUrlIfNeeded === "function") migrateCalendarFeedUrlIfNeeded();
+        } catch (eCalMig) {}
       }
       var accountPaused = false;
       var accountSessionBlocked = false;
@@ -8397,6 +8414,20 @@ browsen</span>
         return cacheBust ? url + "?v=" + Date.now() : url;
       }
 
+      function resolveCalendarFeedCopyUrl(feedUrl) {
+        return getCalendarFeedPublicUrl(getCalendarFeedPath(), false);
+      }
+
+      function migrateCalendarFeedUrlIfNeeded() {
+        if (!account) return;
+        var canonical = getCalendarFeedPublicUrl(getCalendarFeedPath(), false);
+        var stored = account.calendar_feed_url ? String(account.calendar_feed_url).split("?")[0] : "";
+        if (!stored || stored !== canonical) {
+          account.calendar_feed_url = canonical;
+          saveAccount();
+        }
+      }
+
       async function uploadCalendarFeed(ics) {
         var path = getCalendarFeedPath();
         var headers = {
@@ -8427,12 +8458,12 @@ browsen</span>
       }
 
       function openAppleCalendarSubscribe(feedUrl) {
-        var base = String(feedUrl || "").split("?")[0];
+        var base = resolveCalendarFeedCopyUrl(feedUrl);
         window.location.href = base.replace(/^https:\/\//i, "webcal://");
       }
 
       function copyCalendarFeedUrl(feedUrl) {
-        var base = String(feedUrl || "").split("?")[0];
+        var base = resolveCalendarFeedCopyUrl(feedUrl);
         if (!base) return Promise.resolve(false);
         if (navigator.clipboard && navigator.clipboard.writeText) {
           return navigator.clipboard.writeText(base).then(function () { return true; }).catch(function () { return false; });
@@ -8454,7 +8485,7 @@ browsen</span>
       }
 
       function openGoogleCalendarSubscribe(feedUrl) {
-        var base = String(feedUrl || "").split("?")[0];
+        var base = resolveCalendarFeedCopyUrl(feedUrl);
         copyCalendarFeedUrl(base).then(function () {
           window.open("https://calendar.google.com/calendar/r/settings/addbyurl", "_blank", "noopener,noreferrer");
         });
@@ -8473,7 +8504,7 @@ browsen</span>
       function openCalendarSyncGuideModal(provider, feedUrl) {
         var modal = document.getElementById("calendar-sync-guide-modal");
         if (!modal || (provider !== "apple" && provider !== "google")) return;
-        calendarSubscribePending = { provider: provider, feedUrl: feedUrl };
+        calendarSubscribePending = { provider: provider, feedUrl: resolveCalendarFeedCopyUrl(feedUrl) };
         var title = document.getElementById("calendar-sync-guide-title");
         var appleBlock = document.getElementById("calendar-sync-guide-apple");
         var googleBlock = document.getElementById("calendar-sync-guide-google");
@@ -8498,10 +8529,16 @@ browsen</span>
             );
           }
         } else {
+          var googleCopyUrl = resolveCalendarFeedCopyUrl(feedUrl);
+          var googleUrlEl = document.getElementById("calendar-sync-guide-google-url");
+          if (googleUrlEl) {
+            googleUrlEl.textContent = googleCopyUrl;
+            googleUrlEl.hidden = false;
+          }
           fillCalendarSyncGuideSteps(document.getElementById("calendar-sync-guide-google-steps"), [
-            t("Tippe unten auf OK.", "Tap OK below."),
-            t("Link wird kopiert — Google öffnet „Von URL“.", "Link is copied — Google opens From URL."),
-            t("Link einfügen → Kalender hinzufügen (Haken bei „öffentlich“ optional).", "Paste link → Add calendar (public checkbox is optional).")
+            t("Link ist kopiert (siehe unten).", "Link copied (see below)."),
+            t("Tippe OK — Google öffnet „Von URL“.", "Tap OK — Google opens From URL."),
+            t("Link einfügen → Kalender hinzufügen.", "Paste link → Add calendar.")
           ]);
           var googleNote = document.getElementById("calendar-sync-guide-google-note");
           if (googleNote) {
@@ -8611,10 +8648,11 @@ browsen</span>
         var ics = buildWeekPlanIcs();
         try {
           var feedUrl = await uploadCalendarFeed(ics);
-          account.calendar_feed_url = String(feedUrl || "").split("?")[0];
+          account.calendar_feed_url = resolveCalendarFeedCopyUrl(feedUrl);
           account.calendar_synced_at = new Date().toISOString();
           saveAccount();
           if (!opts.silent) {
+            if (provider === "google") copyCalendarFeedUrl(feedUrl);
             openCalendarSyncGuideModal(provider, feedUrl);
           }
         } catch (err) {
