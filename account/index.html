@@ -8405,10 +8405,9 @@ browsen</span>
 
       function openGoogleCalendarSubscribe(feedUrl) {
         var base = String(feedUrl || "").split("?")[0];
-        var webcal = base.replace(/^https:\/\//i, "webcal://");
-        var href = "https://calendar.google.com/calendar/r?cid=" + encodeURIComponent(webcal);
-        window.open(href, "_blank", "noopener,noreferrer");
-        copyCalendarFeedUrl(base);
+        copyCalendarFeedUrl(base).then(function () {
+          window.open("https://calendar.google.com/calendar/r/settings/addbyurl", "_blank", "noopener,noreferrer");
+        });
       }
 
       function fillCalendarSyncGuideSteps(listEl, steps) {
@@ -8451,14 +8450,14 @@ browsen</span>
         } else {
           fillCalendarSyncGuideSteps(document.getElementById("calendar-sync-guide-google-steps"), [
             t("Tippe unten auf OK.", "Tap OK below."),
-            t("Bestätige „Kalender hinzufügen“.", "Confirm Add calendar."),
-            t("Falls nötig: links + → Von URL — Link ist kopiert.", "If needed: + → From URL on the left — link is copied.")
+            t("Link wird kopiert — Google öffnet „Von URL“.", "Link is copied — Google opens From URL."),
+            t("Link einfügen → Kalender hinzufügen.", "Paste link → Add calendar.")
           ]);
           var googleNote = document.getElementById("calendar-sync-guide-google-note");
           if (googleNote) {
             googleNote.textContent = t(
-              "Termine erscheinen unter „Weitere Kalender“ als gogogo Wochenplan.",
-              "Events appear under Other calendars as gogogo weekly plan."
+              "Falls ein Fehler erscheint: Dialog schließen, links + → Von URL nutzen. Termine erscheinen als gogogo Wochenplan.",
+              "If an error appears: close the dialog, use + → From URL on the left. Events appear as gogogo weekly plan."
             );
           }
         }
