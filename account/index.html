@@ -8297,7 +8297,6 @@ browsen</span>
       }
 
       var PROFILE_PLAN_VIEW_KEY = "gogogo_profile_plan_view";
-      var ICS_EXPAND_WEEKS = 16;
       var CALENDAR_FEED_BUCKET = "go-calendars";
       var profilePlanToolbarBound = false;
       var calendarSettingsDraft = { provider: null, privacy: false };
@@ -8463,22 +8462,23 @@ browsen</span>
           var tp = time.split(":");
           var hh = String(tp[0] || "18").padStart(2, "0");
           var mm = String(tp[1] || "00").padStart(2, "0");
-          var firstDate = icsNextWeekdayYmd(i);
+          var anchor = icsNextWeekdayYmd(i);
+          var dtStart = anchor + "T" + hh + mm + "00";
+          var dtEnd = icsEventEnd(anchor, hh, mm);
           var summary = icsPlainText(profileWeekdays()[i] + " - " + String(dayVal).split("\n")[0].slice(0, 80));
-          for (var w = 0; w < ICS_EXPAND_WEEKS; w++) {
-            var anchor = icsAddDaysYmd(firstDate, w * 7);
-            var dtStart = anchor + "T" + hh + mm + "00";
-            var dtEnd = icsEventEnd(anchor, hh, mm);
-            lines.push("BEGIN:VEVENT");
-            lines.push("UID:gogogo-plan-wd-" + i + "-w" + w + "@" + uidBase + ".gogogo");
-            lines.push("DTSTAMP:" + stamp);
-            lines.push("DTSTART:" + dtStart);
-            lines.push("DTEND:" + dtEnd);
-            lines.push("SUMMARY:" + icsEscape(summary));
-            if (meet.place) lines.push("LOCATION:" + icsEscape(meet.place));
-            if (dayVal) lines.push("DESCRIPTION:" + icsEscape(dayVal));
-            lines.push("END:VEVENT");
-          }
+          lines.push("BEGIN:VEVENT");
+          lines.push("UID:gogogo-plan-wd-" + i + "@" + uidBase + ".gogogo");
+          lines.push("DTSTAMP:" + stamp);
+          lines.push("DTSTART:" + dtStart);
+          lines.push("DTEND:" + dtEnd);
+          lines.push("RRULE:FREQ=WEEKLY");
+          lines.push("STATUS:CONFIRMED");
+          lines.push("TRANSP:OPAQUE");
+          lines.push("SEQUENCE:0");
+          lines.push("SUMMARY:" + icsEscape(summary));
+          if (meet.place) lines.push("LOCATION:" + icsEscape(meet.place));
+          if (dayVal) lines.push("DESCRIPTION:" + icsEscape(dayVal));
+          lines.push("END:VEVENT");
         }
         lines.push("END:VCALENDAR");
         return lines.join("\r\n");
@@ -8519,13 +8519,20 @@ browsen</span>
         return cacheBust ? url + "?v=" + Date.now() : url;
       }
 
-      function resolveCalendarFeedCopyUrl(feedUrl) {
-        return getCalendarFeedPublicUrl(getCalendarFeedPath(), false);
+      function getCalendarFeedStorageUrl(path) {
+        return SUPABASE_URL + "/storage/v1/object/public/" + CALENDAR_FEED_BUCKET + "/" + path;
+      }
+
+      function resolveCalendarFeedCopyUrl(feedUrl, provider) {
+        var path = getCalendarFeedPath();
+        var p = provider || (account && account.calendar_provider) || null;
+        if (p === "google") return getCalendarFeedStorageUrl(path);
+        return getCalendarFeedPublicUrl(path, false);
       }
 
       function migrateCalendarFeedUrlIfNeeded() {
         if (!account) return;
-        var canonical = getCalendarFeedPublicUrl(getCalendarFeedPath(), false);
+        var canonical = resolveCalendarFeedCopyUrl(null, getCalendarProvider());
         var stored = account.calendar_feed_url ? String(account.calendar_feed_url).split("?")[0] : "";
         if (!stored || stored !== canonical) {
           account.calendar_feed_url = canonical;
@@ -8563,12 +8570,12 @@ browsen</span>
       }
 
       function openAppleCalendarSubscribe(feedUrl) {
-        var base = resolveCalendarFeedCopyUrl(feedUrl);
+        var base = resolveCalendarFeedCopyUrl(feedUrl, "apple");
         window.location.href = base.replace(/^https:\/\//i, "webcal://");
       }
 
-      function copyCalendarFeedUrl(feedUrl) {
-        var base = resolveCalendarFeedCopyUrl(feedUrl);
+      function copyCalendarFeedUrl(feedUrl, provider) {
+        var base = resolveCalendarFeedCopyUrl(feedUrl, provider);
         if (!base) return Promise.resolve(false);
         if (navigator.clipboard && navigator.clipboard.writeText) {
           return navigator.clipboard.writeText(base).then(function () { return true; }).catch(function () { return fallbackCopyText(base); });
@@ -8621,7 +8628,7 @@ browsen</span>
       }
 
       function copyCalendarGuideUrl(feedUrl) {
-        var base = resolveCalendarFeedCopyUrl(feedUrl);
+        var base = resolveCalendarFeedCopyUrl(feedUrl, "google");
         var input = document.getElementById("calendar-sync-guide-google-url");
         if (input) {
           input.value = base;
@@ -8660,7 +8667,7 @@ browsen</span>
       function openCalendarSyncGuideModal(provider, feedUrl) {
         var modal = document.getElementById("calendar-sync-guide-modal");
         if (!modal || (provider !== "apple" && provider !== "google")) return;
-        calendarSubscribePending = { provider: provider, feedUrl: resolveCalendarFeedCopyUrl(feedUrl) };
+        calendarSubscribePending = { provider: provider, feedUrl: resolveCalendarFeedCopyUrl(feedUrl, provider) };
         var title = document.getElementById("calendar-sync-guide-title");
         var appleBlock = document.getElementById("calendar-sync-guide-apple");
         var googleBlock = document.getElementById("calendar-sync-guide-google");
@@ -8694,21 +8701,21 @@ browsen</span>
             );
           }
         } else {
-          var googleCopyUrl = resolveCalendarFeedCopyUrl(feedUrl);
+          var googleCopyUrl = resolveCalendarFeedCopyUrl(feedUrl, "google");
           var googleUrlRow = document.getElementById("calendar-sync-guide-google-url-row");
           var googleUrlEl = document.getElementById("calendar-sync-guide-google-url");
           if (googleUrlRow) googleUrlRow.hidden = false;
           if (googleUrlEl) googleUrlEl.value = googleCopyUrl;
           fillCalendarSyncGuideSteps(document.getElementById("calendar-sync-guide-google-steps"), [
-            t("Kopiersymbol tippen — Link muss bis .ics gehen.", "Tap copy icon — link must end with .ics."),
-            t("OK → Google öffnet „Von URL“.", "OK → Google opens From URL."),
-            t("Einfügen → Kalender hinzufügen.", "Paste → Add calendar.")
+            t("Am PC: calendar.google.com (nicht Handy-App).", "On desktop: calendar.google.com (not phone app)."),
+            t("Kopiersymbol tippen — Link endet mit .ics", "Tap copy icon — link ends with .ics"),
+            t("OK → Von URL → einfügen → Kalender hinzufügen.", "OK → From URL → paste → Add calendar.")
           ]);
           var googleNote = document.getElementById("calendar-sync-guide-google-note");
           if (googleNote) {
             googleNote.textContent = t(
-              "Falls URL fehlschlägt: .ics-Datei laden → Google Einstellungen → Importieren. Haken „öffentlich“ optional.",
-              "If URL fails: download .ics → Google Settings → Import. Public checkbox is optional."
+              "Vorher Sync neu starten. Bei Fehler: Firefox nutzen oder .ics-Datei importieren.",
+              "Re-run sync first. On error: try Firefox or import the .ics file."
             );
           }
         }
@@ -8812,7 +8819,7 @@ browsen</span>
         var ics = buildWeekPlanIcs();
         try {
           var feedUrl = await uploadCalendarFeed(ics);
-          account.calendar_feed_url = resolveCalendarFeedCopyUrl(feedUrl);
+          account.calendar_feed_url = resolveCalendarFeedCopyUrl(feedUrl, provider);
           account.calendar_synced_at = new Date().toISOString();
           saveAccount();
           if (!opts.silent) {

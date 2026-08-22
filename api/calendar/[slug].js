@@ -1,6 +1,5 @@
 const SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
 const CALENDAR_BUCKET = "go-calendars";
-const EXPAND_WEEKS = 16;
 
 function icsAscii(text) {
   return String(text || "")
@@ -72,12 +71,6 @@ function nextFutureYmd(ymd) {
   return dateToYmd(eventDay);
 }
 
-function formatIcsDate(parsed) {
-  if (!parsed) return "";
-  if (parsed.time) return parsed.ymd + "T" + parsed.time;
-  return parsed.ymd;
-}
-
 function shiftIcsDateByDays(value, days) {
   var parsed = parseIcsDateValue(value);
   if (!parsed) return value;
@@ -89,23 +82,21 @@ function shiftIcsDateByDays(value, days) {
 function sanitizeLine(line) {
   if (!line) return null;
   if (line.indexOf("X-WR-TIMEZONE:") === 0) return null;
-  if (line.indexOf("STATUS:") === 0) return null;
-  if (line.indexOf("TRANSP:") === 0) return null;
-  if (line.indexOf("CREATED:") === 0) return null;
   if (line.indexOf("REFRESH-INTERVAL") === 0) return null;
   if (line.indexOf("X-PUBLISHED-TTL") === 0) return null;
   if (line.indexOf("X-LIC-LOCATION:") === 0) return null;
-  if (line.indexOf("RRULE:") === 0) return null;
 
   line = line.replace(/^DTSTART;TZID=[^:]+:/, "DTSTART:");
   line = line.replace(/^DTEND;TZID=[^:]+:/, "DTEND:");
   line = line.replace(/\u00b7/g, " - ");
+  if (line.indexOf("RRULE:") === 0) line = "RRULE:FREQ=WEEKLY";
 
   if (
     line.indexOf("SUMMARY:") === 0 ||
     line.indexOf("LOCATION:") === 0 ||
     line.indexOf("DESCRIPTION:") === 0 ||
-    line.indexOf("X-WR-CALNAME:") === 0
+    line.indexOf("X-WR-CALNAME:") === 0 ||
+    line.indexOf("CALNAME:") === 0
   ) {
     var idx = line.indexOf(":");
     return line.slice(0, idx + 1) + icsAscii(line.slice(idx + 1));
@@ -113,63 +104,58 @@ function sanitizeLine(line) {
   return line;
 }
 
-function expandWeeklyEvent(eventLines) {
+function normalizeEventLines(eventLines) {
   var props = {};
+  var out = [];
   eventLines.forEach(function (line) {
-    var idx = line.indexOf(":");
-    if (idx <= 0) return;
-    var key = line.slice(0, idx).split(";")[0];
-    props[key] = line;
+    var cleaned = sanitizeLine(line);
+    if (!cleaned) return;
+    var idx = cleaned.indexOf(":");
+    if (idx > 0) props[cleaned.slice(0, idx).split(";")[0]] = cleaned;
   });
 
-  var hasWeekly = eventLines.some(function (line) {
-    return line.indexOf("RRULE:") === 0 && /FREQ=WEEKLY/i.test(line);
-  });
-  if (!hasWeekly) {
-    return [eventLines.map(function (line) {
-      var cleaned = sanitizeLine(line);
-      return cleaned;
-    }).filter(Boolean)];
-  }
-
-  var dtStartLine = props.DTSTART || "";
-  var dtEndLine = props.DTEND || "";
-  var dtStartVal = dtStartLine.split(":").slice(1).join(":");
-  var dtEndVal = dtEndLine.split(":").slice(1).join(":");
+  var dtStartVal = props.DTSTART ? props.DTSTART.split(":").slice(1).join(":") : "";
+  var dtEndVal = props.DTEND ? props.DTEND.split(":").slice(1).join(":") : "";
   var startParsed = parseIcsDateValue(dtStartVal);
-  if (!startParsed) return [eventLines.map(sanitizeLine).filter(Boolean)];
-
-  var firstYmd = nextFutureYmd(startParsed.ymd);
-  var dayShift = Math.round((ymdToDate(firstYmd) - ymdToDate(startParsed.ymd)) / 86400000);
-  var uidLine = props.UID || "UID:generated@gogogo";
-  var uidVal = uidLine.split(":").slice(1).join(":").replace(/@.*$/, "");
-
-  var expanded = [];
-  for (var w = 0; w < EXPAND_WEEKS; w++) {
-    var weekShift = dayShift + w * 7;
-    var copy = [];
-    eventLines.forEach(function (line) {
-      if (line.indexOf("RRULE:") === 0) return;
-      if (line.indexOf("UID:") === 0) {
-        copy.push("UID:" + uidVal + "-w" + w + "@gogogo");
-        return;
-      }
-      if (line.indexOf("DTSTART:") === 0 || line.indexOf("DTSTART;") === 0) {
-        var key = line.slice(0, line.indexOf(":") + 1);
-        copy.push(key + shiftIcsDateByDays(dtStartVal, weekShift));
-        return;
-      }
-      if (line.indexOf("DTEND:") === 0 || line.indexOf("DTEND;") === 0) {
-        var endKey = line.slice(0, line.indexOf(":") + 1);
-        copy.push(endKey + shiftIcsDateByDays(dtEndVal, weekShift));
-        return;
-      }
-      var cleaned = sanitizeLine(line);
-      if (cleaned) copy.push(cleaned);
-    });
-    expanded.push(copy);
+  var dayShift = 0;
+  if (startParsed) {
+    var futureYmd = nextFutureYmd(startParsed.ymd);
+    dayShift = Math.round((ymdToDate(futureYmd) - ymdToDate(startParsed.ymd)) / 86400000);
   }
-  return expanded;
+
+  var hasStatus = false;
+  var hasTransp = false;
+  var hasSequence = false;
+  eventLines.forEach(function (line) {
+    if (line.indexOf("RRULE:") === 0 && !/FREQ=WEEKLY/i.test(line)) return;
+    if (line.indexOf("RRULE:") === 0) {
+      out.push("RRULE:FREQ=WEEKLY");
+      return;
+    }
+    if (line.indexOf("UID:") === 0 && line.indexOf("-w") !== -1) {
+      out.push("UID:" + line.split(":").slice(1).join(":").replace(/-w\d+@/, "@"));
+      return;
+    }
+    if (line.indexOf("DTSTART:") === 0 || line.indexOf("DTSTART;") === 0) {
+      out.push("DTSTART:" + shiftIcsDateByDays(dtStartVal, dayShift));
+      return;
+    }
+    if (line.indexOf("DTEND:") === 0 || line.indexOf("DTEND;") === 0) {
+      out.push("DTEND:" + shiftIcsDateByDays(dtEndVal, dayShift));
+      return;
+    }
+    var cleaned = sanitizeLine(line);
+    if (!cleaned) return;
+    if (cleaned.indexOf("STATUS:") === 0) hasStatus = true;
+    if (cleaned.indexOf("TRANSP:") === 0) hasTransp = true;
+    if (cleaned.indexOf("SEQUENCE:") === 0) hasSequence = true;
+    out.push(cleaned);
+  });
+
+  if (!hasStatus) out.push("STATUS:CONFIRMED");
+  if (!hasTransp) out.push("TRANSP:OPAQUE");
+  if (!hasSequence) out.push("SEQUENCE:0");
+  return out;
 }
 
 function normalizeIcsForGoogle(body) {
@@ -221,13 +207,12 @@ function normalizeIcsForGoogle(body) {
   }
 
   events.forEach(function (eventLines) {
-    expandWeeklyEvent(eventLines).forEach(function (expandedEvent) {
-      out.push("BEGIN:VEVENT");
-      expandedEvent.forEach(function (line) {
-        if (line) out.push(line);
-      });
-      out.push("END:VEVENT");
+    var normalized = normalizeEventLines(eventLines);
+    out.push("BEGIN:VEVENT");
+    normalized.forEach(function (line) {
+      if (line) out.push(line);
     });
+    out.push("END:VEVENT");
   });
 
   out.push("END:VCALENDAR");
