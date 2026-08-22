@@ -8212,6 +8212,27 @@ browsen</span>
       var PROFILE_PLAN_VIEW_KEY = "gogogo_profile_plan_view";
       var ICS_WD_ANCHOR = ["20260105", "20260106", "20260107", "20260108", "20260109", "20260110", "20260111"];
       var ICS_BYDAY = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
+      var ICS_TZ = "Europe/Berlin";
+      var ICS_VTIMEZONE = [
+        "BEGIN:VTIMEZONE",
+        "TZID:Europe/Berlin",
+        "X-LIC-LOCATION:Europe/Berlin",
+        "BEGIN:DAYLIGHT",
+        "TZOFFSETFROM:+0100",
+        "TZOFFSETTO:+0200",
+        "TZNAME:CEST",
+        "DTSTART:19700329T020000",
+        "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
+        "END:DAYLIGHT",
+        "BEGIN:STANDARD",
+        "TZOFFSETFROM:+0200",
+        "TZOFFSETTO:+0100",
+        "TZNAME:CET",
+        "DTSTART:19701025T030000",
+        "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
+        "END:STANDARD",
+        "END:VTIMEZONE"
+      ].join("\r\n");
       var CALENDAR_FEED_BUCKET = "go-calendars";
       var profilePlanToolbarBound = false;
       var calendarSettingsDraft = { provider: null, privacy: false };
@@ -8295,6 +8316,22 @@ browsen</span>
         return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
       }
 
+      function icsEventEnd(anchorDate, hh, mm) {
+        var hour = parseInt(hh, 10);
+        var minute = parseInt(mm, 10);
+        var endHour = hour + 1;
+        var endDate = anchorDate;
+        if (endHour >= 24) {
+          endHour -= 24;
+          var y = parseInt(anchorDate.slice(0, 4), 10);
+          var mo = parseInt(anchorDate.slice(4, 6), 10) - 1;
+          var d = parseInt(anchorDate.slice(6, 8), 10);
+          var next = new Date(Date.UTC(y, mo, d + 1));
+          endDate = String(next.getUTCFullYear()) + String(next.getUTCMonth() + 1).padStart(2, "0") + String(next.getUTCDate()).padStart(2, "0");
+        }
+        return endDate + "T" + String(endHour).padStart(2, "0") + String(minute).padStart(2, "0") + "00";
+      }
+
       function buildWeekPlanIcs() {
         var lines = [
           "BEGIN:VCALENDAR",
@@ -8302,11 +8339,12 @@ browsen</span>
           "PRODID:-//gogogo//Wochenplan//DE",
           "CALSCALE:GREGORIAN",
           "METHOD:PUBLISH",
-          "REFRESH-INTERVAL;VALUE=DURATION:PT1H",
-          "X-PUBLISHED-TTL:PT1H",
-          "X-WR-CALNAME:gogogo Wochenplan"
+          "X-WR-CALNAME:gogogo Wochenplan",
+          "X-WR-TIMEZONE:" + ICS_TZ,
+          ICS_VTIMEZONE
         ];
         var uidBase = String((account && account.id) || account.invite_code || "local").replace(/[^a-zA-Z0-9-]/g, "");
+        var stamp = icsStampNow();
         for (var i = 0; i < profileWeekdays().length; i++) {
           if (isAccountPaused()) break;
           var dayVal = coachDayText(i) || defaultDayPlan();
@@ -8315,23 +8353,33 @@ browsen</span>
           var tp = time.split(":");
           var hh = String(tp[0] || "18").padStart(2, "0");
           var mm = String(tp[1] || "00").padStart(2, "0");
-          var dtStart = ICS_WD_ANCHOR[i] + "T" + hh + mm + "00";
-          var endH = parseInt(hh, 10) + 1;
-          var dtEnd = ICS_WD_ANCHOR[i] + "T" + String(endH).padStart(2, "0") + mm + "00";
+          var anchor = ICS_WD_ANCHOR[i];
+          var dtStart = anchor + "T" + hh + mm + "00";
+          var dtEnd = icsEventEnd(anchor, hh, mm);
           var summary = profileWeekdays()[i] + " · " + String(dayVal).split("\n")[0].slice(0, 80);
           lines.push("BEGIN:VEVENT");
           lines.push("UID:gogogo-plan-wd-" + i + "@" + uidBase + ".gogogo");
-          lines.push("DTSTAMP:" + icsStampNow());
-          lines.push("DTSTART:" + dtStart);
-          lines.push("DTEND:" + dtEnd);
-          lines.push("RRULE:FREQ=WEEKLY;BYDAY=" + ICS_BYDAY[i]);
+          lines.push("DTSTAMP:" + stamp);
+          lines.push("CREATED:" + stamp);
+          lines.push("DTSTART;TZID=" + ICS_TZ + ":" + dtStart);
+          lines.push("DTEND;TZID=" + ICS_TZ + ":" + dtEnd);
+          lines.push("RRULE:FREQ=WEEKLY;WKST=MO;BYDAY=" + ICS_BYDAY[i]);
           lines.push("SUMMARY:" + icsEscape(summary));
           if (meet.place) lines.push("LOCATION:" + icsEscape(meet.place));
           lines.push("DESCRIPTION:" + icsEscape(dayVal));
+          lines.push("STATUS:CONFIRMED");
+          lines.push("TRANSP:OPAQUE");
           lines.push("END:VEVENT");
         }
         lines.push("END:VCALENDAR");
         return lines.join("\r\n");
+      }
+
+      function getCalendarFeedOrigin() {
+        if (typeof location !== "undefined" && location.origin && /^https?:/.test(location.origin)) {
+          return String(location.origin).replace(/\/$/, "");
+        }
+        return "https://gogogo.social";
       }
 
       function getCalendarFeedPath() {
@@ -8343,7 +8391,7 @@ browsen</span>
       }
 
       function getCalendarFeedPublicUrl(path, cacheBust) {
-        var url = SUPABASE_URL + "/storage/v1/object/public/" + CALENDAR_FEED_BUCKET + "/" + path;
+        var url = getCalendarFeedOrigin() + "/api/calendar/" + encodeURIComponent(path);
         return cacheBust ? url + "?v=" + Date.now() : url;
       }
 
@@ -8354,7 +8402,7 @@ browsen</span>
           Authorization: "Bearer " + SUPABASE_KEY,
           "Content-Type": "text/calendar; charset=utf-8",
           "x-upsert": "true",
-          "Cache-Control": "no-cache"
+          "Cache-Control": "public, max-age=300"
         };
         var up = await fetch(SUPABASE_URL + "/storage/v1/object/" + CALENDAR_FEED_BUCKET + "/" + path, {
           method: "POST",
@@ -8451,13 +8499,13 @@ browsen</span>
           fillCalendarSyncGuideSteps(document.getElementById("calendar-sync-guide-google-steps"), [
             t("Tippe unten auf OK.", "Tap OK below."),
             t("Link wird kopiert — Google öffnet „Von URL“.", "Link is copied — Google opens From URL."),
-            t("Link einfügen → Kalender hinzufügen.", "Paste link → Add calendar.")
+            t("Link einfügen → Kalender hinzufügen (Haken bei „öffentlich“ optional).", "Paste link → Add calendar (public checkbox is optional).")
           ]);
           var googleNote = document.getElementById("calendar-sync-guide-google-note");
           if (googleNote) {
             googleNote.textContent = t(
-              "Falls ein Fehler erscheint: Dialog schließen, links + → Von URL nutzen. Termine erscheinen als gogogo Wochenplan.",
-              "If an error appears: close the dialog, use + → From URL on the left. Events appear as gogogo weekly plan."
+              "Der Link beginnt mit gogogo.social/api/calendar/ — Termine erscheinen als gogogo Wochenplan.",
+              "The link starts with gogogo.social/api/calendar/ — events appear as gogogo weekly plan."
             );
           }
         }
