@@ -2989,24 +2989,62 @@
       opacity: 0.82;
       margin: 0;
     }
-    .calendar-sync-guide__url {
-      font-size: 0.72rem;
+    .calendar-sync-guide__url-row {
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+      margin: 0 0 8px;
+    }
+    .calendar-sync-guide__url-input {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 0.68rem;
       line-height: 1.35;
-      word-break: break-all;
-      opacity: 0.88;
-      margin: 0 0 10px;
       padding: 8px 10px;
       border-radius: 8px;
-      background: rgba(247,245,240,0.08);
       border: 1px solid rgba(247,245,240,0.18);
+      background: rgba(247,245,240,0.08);
+      color: var(--ink-on-red);
+      font-family: inherit;
+    }
+    .calendar-sync-guide__copy {
+      flex: 0 0 auto;
+      width: 42px;
+      min-height: 42px;
+      border-radius: 8px;
+      border: 1.5px solid rgba(247,245,240,0.55);
+      background: rgba(247,245,240,0.1);
+      color: var(--ink-on-red);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      cursor: pointer;
+    }
+    .calendar-sync-guide__copy svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+    }
+    .calendar-sync-guide__copy.is-done {
+      border-color: rgba(247,245,240,0.9);
+      background: rgba(247,245,240,0.18);
+    }
+    .calendar-sync-guide__copy-msg {
+      font-size: 0.78rem;
+      line-height: 1.3;
+      margin: 0 0 10px;
+      opacity: 0.92;
+    }
+    .calendar-sync-guide__copy-msg.is-error {
+      opacity: 1;
     }
     #profile-change-code-modal .challenge-modal__sheet,
     #profile-change-name-modal .challenge-modal__sheet,
     #profile-change-phone-modal .challenge-modal__sheet,
     #profile-calendar-settings-modal .challenge-modal__sheet,
     #calendar-sync-guide-modal .challenge-modal__sheet,
-    #about-me-edit-modal .challenge-modal__sheet,
-    #calendar-sync-guide-modal .challenge-modal__sheet {
+    #about-me-edit-modal .challenge-modal__sheet {
       text-align: left;
     }
     #about-me-read-modal .challenge-modal__sheet {
@@ -4803,7 +4841,13 @@ browsen</span>
       </div>
       <div class="calendar-sync-guide" id="calendar-sync-guide-google" hidden>
         <ol class="calendar-sync-guide__steps" id="calendar-sync-guide-google-steps"></ol>
-        <p class="calendar-sync-guide__url" id="calendar-sync-guide-google-url" hidden></p>
+        <div class="calendar-sync-guide__url-row" id="calendar-sync-guide-google-url-row" hidden>
+          <input type="text" readonly class="calendar-sync-guide__url-input" id="calendar-sync-guide-google-url" aria-label="Kalender-Link" />
+          <button type="button" class="calendar-sync-guide__copy" id="calendar-sync-guide-google-copy" aria-label="Link kopieren" data-aria-de="Link kopieren" data-aria-en="Copy link">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+          </button>
+        </div>
+        <p class="calendar-sync-guide__copy-msg" id="calendar-sync-guide-google-copy-msg" hidden></p>
         <p class="calendar-sync-guide__note" id="calendar-sync-guide-google-note"></p>
       </div>
       <div class="challenge-modal__actions is-single">
@@ -8341,8 +8385,15 @@ browsen</span>
         updateProfilePlanSyncBtn();
       }
 
-      function icsEscape(text) {
+      function icsPlainText(text) {
         return String(text || "")
+          .replace(/\u00b7/g, "-")
+          .replace(/[\u2013\u2014]/g, "-")
+          .replace(/[^\x09\x0a\x0d\x20-\x7e]/g, "");
+      }
+
+      function icsEscape(text) {
+        return icsPlainText(text)
           .replace(/\\/g, "\\\\")
           .replace(/;/g, "\\;")
           .replace(/,/g, "\\,")
@@ -8380,7 +8431,7 @@ browsen</span>
           "X-WR-TIMEZONE:" + ICS_TZ,
           ICS_VTIMEZONE
         ];
-        var uidBase = String((account && account.id) || account.invite_code || "local").replace(/[^a-zA-Z0-9-]/g, "");
+        var uidBase = String((account && account.id) || account.invite_code || "local").replace(/[^a-zA-Z0-9]/g, "");
         var stamp = icsStampNow();
         for (var i = 0; i < profileWeekdays().length; i++) {
           if (isAccountPaused()) break;
@@ -8393,7 +8444,7 @@ browsen</span>
           var anchor = ICS_WD_ANCHOR[i];
           var dtStart = anchor + "T" + hh + mm + "00";
           var dtEnd = icsEventEnd(anchor, hh, mm);
-          var summary = profileWeekdays()[i] + " · " + String(dayVal).split("\n")[0].slice(0, 80);
+          var summary = icsPlainText(profileWeekdays()[i] + " - " + String(dayVal).split("\n")[0].slice(0, 80));
           lines.push("BEGIN:VEVENT");
           lines.push("UID:gogogo-plan-wd-" + i + "@" + uidBase + ".gogogo");
           lines.push("DTSTAMP:" + stamp);
@@ -8430,7 +8481,7 @@ browsen</span>
       }
 
       function getCalendarFeedPublicUrl(path, cacheBust) {
-        var url = getCalendarFeedOrigin() + "/api/calendar/" + encodeURIComponent(path);
+        var url = getCalendarFeedOrigin() + "/api/calendar/" + path;
         return cacheBust ? url + "?v=" + Date.now() : url;
       }
 
@@ -8486,16 +8537,22 @@ browsen</span>
         var base = resolveCalendarFeedCopyUrl(feedUrl);
         if (!base) return Promise.resolve(false);
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          return navigator.clipboard.writeText(base).then(function () { return true; }).catch(function () { return false; });
+          return navigator.clipboard.writeText(base).then(function () { return true; }).catch(function () { return fallbackCopyText(base); });
         }
+        return fallbackCopyText(base);
+      }
+
+      function fallbackCopyText(text) {
         try {
           var ta = document.createElement("textarea");
-          ta.value = base;
+          ta.value = text;
           ta.setAttribute("readonly", "");
           ta.style.position = "fixed";
           ta.style.left = "-9999px";
           document.body.appendChild(ta);
+          ta.focus();
           ta.select();
+          ta.setSelectionRange(0, text.length);
           var ok = document.execCommand("copy");
           document.body.removeChild(ta);
           return Promise.resolve(!!ok);
@@ -8504,11 +8561,56 @@ browsen</span>
         }
       }
 
-      function openGoogleCalendarSubscribe(feedUrl) {
+      function setCalendarGuideCopyMsg(text, isError) {
+        var msg = document.getElementById("calendar-sync-guide-google-copy-msg");
+        if (!msg) return;
+        if (!text) {
+          msg.hidden = true;
+          msg.textContent = "";
+          msg.classList.remove("is-error");
+          return;
+        }
+        msg.hidden = false;
+        msg.textContent = text;
+        msg.classList.toggle("is-error", !!isError);
+      }
+
+      function flashCalendarGuideCopyButton(ok) {
+        var btn = document.getElementById("calendar-sync-guide-google-copy");
+        if (!btn) return;
+        btn.classList.toggle("is-done", !!ok);
+        if (ok) {
+          window.setTimeout(function () {
+            btn.classList.remove("is-done");
+          }, 1400);
+        }
+      }
+
+      function copyCalendarGuideUrl(feedUrl) {
         var base = resolveCalendarFeedCopyUrl(feedUrl);
-        copyCalendarFeedUrl(base).then(function () {
-          window.open("https://calendar.google.com/calendar/r/settings/addbyurl", "_blank", "noopener,noreferrer");
+        var input = document.getElementById("calendar-sync-guide-google-url");
+        if (input) {
+          input.value = base;
+          input.focus();
+          input.select();
+          try { input.setSelectionRange(0, base.length); } catch (eSel) {}
+        }
+        return copyCalendarFeedUrl(base).then(function (ok) {
+          if (ok) {
+            setCalendarGuideCopyMsg(t("Link kopiert.", "Link copied."), false);
+            flashCalendarGuideCopyButton(true);
+          } else {
+            setCalendarGuideCopyMsg(
+              t("Bitte Link markieren und manuell kopieren.", "Please select and copy the link manually."),
+              true
+            );
+          }
+          return ok;
         });
+      }
+
+      function openGoogleCalendarSubscribe(feedUrl) {
+        window.open("https://calendar.google.com/calendar/r/settings/addbyurl", "_blank", "noopener,noreferrer");
       }
 
       function fillCalendarSyncGuideSteps(listEl, steps) {
@@ -8530,10 +8632,12 @@ browsen</span>
         var googleBlock = document.getElementById("calendar-sync-guide-google");
         if (appleBlock) appleBlock.hidden = provider !== "apple";
         if (googleBlock) googleBlock.hidden = provider !== "google";
-        var googleUrlElReset = document.getElementById("calendar-sync-guide-google-url");
-        if (googleUrlElReset) {
-          googleUrlElReset.hidden = provider !== "google";
-          if (provider !== "google") googleUrlElReset.textContent = "";
+        var googleUrlElReset = document.getElementById("calendar-sync-guide-google-url-row");
+        if (googleUrlElReset) googleUrlElReset.hidden = provider !== "google";
+        setCalendarGuideCopyMsg("");
+        if (provider !== "google") {
+          var googleUrlInputReset = document.getElementById("calendar-sync-guide-google-url");
+          if (googleUrlInputReset) googleUrlInputReset.value = "";
         }
         if (title) {
           title.textContent = provider === "apple"
@@ -8555,21 +8659,20 @@ browsen</span>
           }
         } else {
           var googleCopyUrl = resolveCalendarFeedCopyUrl(feedUrl);
+          var googleUrlRow = document.getElementById("calendar-sync-guide-google-url-row");
           var googleUrlEl = document.getElementById("calendar-sync-guide-google-url");
-          if (googleUrlEl) {
-            googleUrlEl.textContent = googleCopyUrl;
-            googleUrlEl.hidden = false;
-          }
+          if (googleUrlRow) googleUrlRow.hidden = false;
+          if (googleUrlEl) googleUrlEl.value = googleCopyUrl;
           fillCalendarSyncGuideSteps(document.getElementById("calendar-sync-guide-google-steps"), [
-            t("Link ist kopiert (siehe unten).", "Link copied (see below)."),
-            t("Tippe OK — Google öffnet „Von URL“.", "Tap OK — Google opens From URL."),
-            t("Link einfügen → Kalender hinzufügen.", "Paste link → Add calendar.")
+            t("Kopiersymbol tippen — Link muss bis .ics gehen.", "Tap copy icon — link must end with .ics."),
+            t("OK → Google öffnet „Von URL“.", "OK → Google opens From URL."),
+            t("Einfügen → Kalender hinzufügen.", "Paste → Add calendar.")
           ]);
           var googleNote = document.getElementById("calendar-sync-guide-google-note");
           if (googleNote) {
             googleNote.textContent = t(
-              "Der Link beginnt mit www.gogogo.social/api/calendar/ — Termine erscheinen als gogogo Wochenplan.",
-              "The link starts with www.gogogo.social/api/calendar/ — events appear as gogogo weekly plan."
+              "Haken „öffentlich“ ist optional. Termine erscheinen als gogogo Wochenplan.",
+              "Public checkbox is optional. Events appear as gogogo weekly plan."
             );
           }
         }
@@ -8677,7 +8780,6 @@ browsen</span>
           account.calendar_synced_at = new Date().toISOString();
           saveAccount();
           if (!opts.silent) {
-            if (provider === "google") copyCalendarFeedUrl(feedUrl);
             openCalendarSyncGuideModal(provider, feedUrl);
           }
         } catch (err) {
@@ -14053,6 +14155,13 @@ browsen</span>
 
         var calendarSyncGuideModal = document.getElementById("calendar-sync-guide-modal");
         var calendarSyncGuideOk = document.getElementById("calendar-sync-guide-ok");
+        var calendarSyncGuideCopy = document.getElementById("calendar-sync-guide-google-copy");
+        if (calendarSyncGuideCopy) {
+          calendarSyncGuideCopy.addEventListener("click", function () {
+            var pending = calendarSubscribePending;
+            copyCalendarGuideUrl(pending ? pending.feedUrl : null);
+          });
+        }
         if (calendarSyncGuideOk) {
           calendarSyncGuideOk.addEventListener("click", function () {
             confirmCalendarSubscribe();
