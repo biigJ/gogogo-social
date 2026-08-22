@@ -2881,7 +2881,6 @@
       padding: 7px 5px;
       text-align: center;
       vertical-align: top;
-      border: 1px solid rgba(247,245,240,0.18);
       word-break: break-word;
     }
     .profile-plan__calendar .profile-plan__calendar-label {
@@ -2952,6 +2951,9 @@
     }
     body.is-book #panel-book {
       padding-top: calc(52px + env(safe-area-inset-top, 0px));
+    }
+    #panel-book [id^="book-section-"] {
+      scroll-margin-top: calc(54px + env(safe-area-inset-top, 0px) + 8px);
     }
     .book-nav__btn {
       flex: 1 1 auto;
@@ -8350,18 +8352,6 @@ browsen</span>
         window.open(href, "_blank", "noopener,noreferrer");
       }
 
-      function markCalendarSubscribed() {
-        if (!account || account.calendar_subscribed) return;
-        account.calendar_subscribed = true;
-        saveAccount();
-        if (accountHasCloudIdentity()) {
-          patchAccount({
-            calendar_subscribed: true,
-            updated_at: new Date().toISOString()
-          }).catch(function () {});
-        }
-      }
-
       function openCalendarSyncModal() {
         var modal = document.getElementById("calendar-sync-modal");
         if (!modal) return;
@@ -8398,18 +8388,24 @@ browsen</span>
 
       async function persistCalendarSettings(provider, privacyAccepted, runSync) {
         if (!account) return false;
-        account.calendar_provider = provider || null;
+        var prevProvider = getCalendarProvider();
+        var nextProvider = provider === "google" || provider === "apple" ? provider : null;
+        var providerChanged = prevProvider !== nextProvider;
+        account.calendar_provider = nextProvider;
         account.calendar_privacy_accepted = !!privacyAccepted;
+        if (providerChanged) account.calendar_subscribed = false;
         saveAccount();
         updateProfilePlanSyncBtn();
         var ok = true;
         if (accountHasCloudIdentity()) {
           try {
-            ok = await patchAccount({
+            var patch = {
               calendar_provider: account.calendar_provider,
               calendar_privacy_accepted: account.calendar_privacy_accepted,
               updated_at: new Date().toISOString()
-            });
+            };
+            if (providerChanged) patch.calendar_subscribed = false;
+            ok = await patchAccount(patch);
           } catch (eCal) {
             ok = false;
           }
@@ -8440,11 +8436,9 @@ browsen</span>
           account.calendar_feed_url = String(feedUrl || "").split("?")[0];
           account.calendar_synced_at = new Date().toISOString();
           saveAccount();
-          var needsSubscribe = !account.calendar_subscribed;
-          if (needsSubscribe && !opts.silent) {
+          if (!opts.silent) {
             if (provider === "apple") openAppleCalendarSubscribe(feedUrl);
             else if (provider === "google") openGoogleCalendarSubscribe(feedUrl);
-            markCalendarSubscribed();
             setCalendarSyncMsg(
               t(
                 "Kalender geöffnet — bitte Abo bestätigen. Danach Sync automatisch.",
@@ -8452,8 +8446,6 @@ browsen</span>
               ),
               false
             );
-          } else if (!opts.silent) {
-            setCalendarSyncMsg(t("Kalender synchronisiert.", "Calendar synced."), false);
           }
         } catch (err) {
           setCalendarSyncMsg(
@@ -13496,7 +13488,9 @@ browsen</span>
               return;
             }
             lastTarget = target;
-            el.scrollIntoView({ behavior: "smooth", block: "start" });
+            var scrollOffset = nav.getBoundingClientRect().bottom + 8;
+            var top = el.getBoundingClientRect().top + window.pageYOffset - scrollOffset;
+            window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
             btn.classList.add("is-active");
           });
         });
