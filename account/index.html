@@ -556,9 +556,21 @@
       text-align: left;
     }
     .places-check-sheet {
-      max-height: min(92vh, 720px);
+      max-height: min(calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 16px), 680px);
       display: flex;
       flex-direction: column;
+      overflow: hidden;
+    }
+    #places-check-modal {
+      align-items: flex-end;
+      padding-top: calc(8px + env(safe-area-inset-top, 0px));
+      padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    }
+    body.is-keyboard #places-check-modal {
+      padding-bottom: 6px;
+    }
+    #places-check-modal .places-check-sheet {
+      width: min(100%, 340px);
     }
     .places-check-body {
       flex: 1;
@@ -645,19 +657,23 @@
       flex-direction: column;
       gap: 8px;
       margin-bottom: 8px;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
     }
     .places-check-add-hint {
-      margin: 0;
-      font-size: 0.78rem;
-      opacity: 0.75;
-      line-height: 1.35;
+      display: none;
     }
     .places-check-add-results {
       display: flex;
       flex-direction: column;
       gap: 6px;
-      max-height: 22vh;
-      overflow: auto;
+      flex: 1 1 auto;
+      min-height: 88px;
+      max-height: min(28vh, 220px);
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
     }
     .places-check-add-result {
       width: 100%;
@@ -669,8 +685,11 @@
       color: inherit;
       font: inherit;
       font-weight: 600;
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .places-check-add-result.is-selected {
       border-color: var(--paper);
@@ -680,6 +699,18 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 8px;
+      flex-shrink: 0;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    body.is-keyboard .places-check-add-actions {
+      padding-bottom: 0;
+    }
+    #places-check-add-map {
+      height: 96px;
+      flex-shrink: 0;
+    }
+    #places-check-add-map[hidden] {
+      display: none !important;
     }
     .places-check-footer {
       display: flex;
@@ -4374,7 +4405,7 @@ browsen</span>
         <input class="places-check-search" id="places-check-add-search" type="search" autocomplete="off"
           placeholder="Neuen Ort suchen …" data-ph-de="Neuen Ort suchen …" data-ph-en="Search new place …" />
         <div class="places-check-add-results" id="places-check-add-results"></div>
-        <div class="places-check-map" id="places-check-add-map" aria-hidden="true"></div>
+        <div class="places-check-map" id="places-check-add-map" hidden aria-hidden="true"></div>
         <div class="places-check-add-actions">
           <button type="button" class="challenge-modal__btn is-ghost" id="places-check-add-back" data-de="Zurück" data-en="Back">Zurück</button>
           <button type="button" class="challenge-modal__btn" id="places-check-add-save" data-de="Ort speichern" data-en="Save place">Ort speichern</button>
@@ -7930,9 +7961,9 @@ browsen</span>
       }
 
       function formatOsmPlaceLabel(row) {
+        if (row && row.name && String(row.name).trim()) return String(row.name).trim();
         var bits = String(row.display_name || "").split(",").map(function (s) { return s.trim(); }).filter(Boolean);
-        if (bits.length >= 2) return bits[0] + ", " + bits[1];
-        return bits[0] || row.name || "Ort";
+        return bits[0] || "Ort";
       }
 
       async function searchBerlinMapPlaces(query) {
@@ -7969,12 +8000,15 @@ browsen</span>
           btn.type = "button";
           btn.className = "places-check-add-result" +
             (placesCheckAddDraft && placesCheckAddDraft.external_id === row.external_id ? " is-selected" : "");
-          btn.textContent = row.fullName || row.name;
+          btn.textContent = row.name;
+          btn.title = row.fullName || row.name;
           btn.addEventListener("click", function () {
             placesCheckAddDraft = row;
             box.querySelectorAll(".places-check-add-result").forEach(function (el) {
               el.classList.toggle("is-selected", el === btn);
             });
+            var addMap = document.getElementById("places-check-add-map");
+            if (addMap) addMap.hidden = false;
             initPlacesAddMap(row.lat, row.lng).catch(function () {});
           });
           box.appendChild(btn);
@@ -9328,8 +9362,9 @@ browsen</span>
             placesCheckAddDraft = null;
             if (placesAddSearch) placesAddSearch.value = "";
             renderPlacesAddResults([]);
+            var addMap = document.getElementById("places-check-add-map");
+            if (addMap) addMap.hidden = true;
             setPlacesCheckAddMode(true);
-            initPlacesAddMap().catch(function () {});
           });
           if (placesAddBack) placesAddBack.addEventListener("click", function () {
             setPlacesCheckAddMode(false);
@@ -13185,6 +13220,7 @@ browsen</span>
           } catch (eToday) {}
           var base = mondayOf(today);
           base.setDate(base.getDate() + weekOffset * 7);
+          var currentWeekMondayKey = dateKey(mondayOf(today));
           labelEl.textContent = monthLabelForWeek(base);
           root.innerHTML = "";
 
@@ -13227,8 +13263,11 @@ browsen</span>
             btn.setAttribute("aria-label", names[i] + " " + d.getDate());
             if (isAccountPaused()) btn.disabled = true;
             if (w && !w.rest) btn.classList.add("has-workout");
-            var ratedEntry = entryFor(key);
-            if (w && (w.zirkel || w.training) && !(ratedEntry && ratedEntry.score != null)) {
+            if (
+              w && (w.zirkel || w.training) &&
+              !(dayEntry && dayEntry.score != null) &&
+              key >= currentWeekMondayKey
+            ) {
               btn.classList.add("is-zirkel");
             }
             if (key === todayKey) btn.classList.add("is-today");
