@@ -7830,6 +7830,37 @@ browsen</span>
         return null;
       }
 
+      function getPlaceRecordByExternalId(externalId) {
+        var id = String(externalId || "").trim();
+        if (!id) return null;
+        for (var i = 0; i < globalWorkoutPlaces.length; i++) {
+          if (globalWorkoutPlaces[i].external_id === id) return globalWorkoutPlaces[i];
+        }
+        return null;
+      }
+
+      function resolveSavedPlaceName(saved, fallback) {
+        return String((saved && saved.name) || fallback || "").trim();
+      }
+
+      function dedupeGlobalWorkoutPlaces() {
+        var seenIds = {};
+        var seenNames = {};
+        var out = [];
+        globalWorkoutPlaces.forEach(function (row) {
+          if (!row || !row.name) return;
+          var nameKey = normalizePlaceNameKey(row.name);
+          var extId = String(row.external_id || "").trim();
+          if (extId && seenIds[extId]) return;
+          if (seenNames[nameKey]) return;
+          if (extId) seenIds[extId] = true;
+          seenNames[nameKey] = true;
+          out.push(row);
+        });
+        out.sort(function (a, b) { return String(a.name).localeCompare(String(b.name), "de"); });
+        globalWorkoutPlaces = out;
+      }
+
       function getSelectablePlaceNames() {
         var seen = {};
         var out = [];
@@ -7841,8 +7872,23 @@ browsen</span>
         }
         globalWorkoutPlaces.forEach(function (row) { push(row.name); });
         PROFILE_PLACE_OPTIONS.forEach(push);
+        getAccountPlaces().forEach(push);
+        var meetPrefs = getWeekdayMeetPrefs();
+        Object.keys(meetPrefs).forEach(function (wd) {
+          var row = meetPrefs[wd];
+          if (row && row.place) push(row.place);
+        });
         out.sort(function (a, b) { return a.localeCompare(b, "de"); });
         return out;
+      }
+
+      function buildPlacePickerOptions(preferredPlace) {
+        var saved = String(preferredPlace || "").trim();
+        var options = getSelectablePlaceNames().slice();
+        if (saved && options.indexOf(saved) < 0) options.unshift(saved);
+        var current = saved || options[0] || "";
+        if (current && options.indexOf(current) < 0) current = options[0] || "";
+        return { options: options, current: current };
       }
 
       async function loadGlobalWorkoutPlaces() {
@@ -7866,6 +7912,7 @@ browsen</span>
             return { id: null, name: n, lat: null, lng: null, external_id: "seed:" + n, map_source: "seed" };
           });
         }
+        dedupeGlobalWorkoutPlaces();
         globalPlacesLoaded = true;
       }
 
@@ -8065,56 +8112,56 @@ browsen</span>
 
       async function createGlobalWorkoutPlace(payload) {
         if (!payload || !payload.name) return null;
-        var dup = findDuplicatePlaceName(payload.name);
-        if (dup) {
-          window.alert(
-            t(
-              "Ort ähnelt bereits „" + dup.name + "“ (" + Math.round(dup.score * 100) + " %). Bitte diesen wählen.",
-              "Place is too similar to \"" + dup.name + "\" (" + Math.round(dup.score * 100) + "%). Please pick that one."
-            )
-          );
-          return null;
+        var placeName = String(payload.name).trim();
+        if (payload.external_id) {
+          var localExisting = getPlaceRecordByExternalId(payload.external_id);
+          if (localExisting) return localExisting;
         }
         if (payload.external_id && hasCloudAccount()) {
           try {
             var existing = await restGet(
               "go_workout_places?external_id=eq." + encodeURIComponent(payload.external_id) +
-              "&select=id,name&limit=1"
+              "&select=id,name,lat,lng,external_id,map_source&limit=1"
             );
             if (existing && existing.length) {
-              window.alert(
-                t("Dieser Ort ist bereits gespeichert: ", "This place is already saved: ") + existing[0].name
-              );
               await loadGlobalWorkoutPlaces();
               return existing[0];
             }
           } catch (eDup) {}
         }
+        var dup = findDuplicatePlaceName(placeName);
+        if (dup) {
+          var dupRow = getPlaceRecordByName(dup.name) || { name: dup.name };
+          window.alert(
+            t(
+              "Ort ähnelt bereits „" + dup.name + "“ (" + Math.round(dup.score * 100) + " %). Es wird der vorhandene Ort verwendet.",
+              "Place is too similar to \"" + dup.name + "\" (" + Math.round(dup.score * 100) + "%). Using the existing place."
+            )
+          );
+          return dupRow;
+        }
         if (!hasCloudAccount()) {
           if (payload.external_id) {
             for (var li = 0; li < globalWorkoutPlaces.length; li++) {
               if (globalWorkoutPlaces[li].external_id === payload.external_id) {
-                window.alert(
-                  t("Dieser Ort ist bereits gespeichert: ", "This place is already saved: ") +
-                  globalWorkoutPlaces[li].name
-                );
                 return globalWorkoutPlaces[li];
               }
             }
           }
-          globalWorkoutPlaces.push({
+          var localRow = {
             id: null,
-            name: payload.name,
+            name: placeName,
             lat: payload.lat,
             lng: payload.lng,
             external_id: payload.external_id || ("local:" + Date.now()),
             map_source: payload.map_source || "local"
-          });
-          globalWorkoutPlaces.sort(function (a, b) { return a.name.localeCompare(b.name, "de"); });
-          return { name: payload.name };
+          };
+          globalWorkoutPlaces.push(localRow);
+          dedupeGlobalWorkoutPlaces();
+          return localRow;
         }
         var row = await restInsert("go_workout_places", {
-          name: String(payload.name).trim(),
+          name: placeName,
           lat: payload.lat != null ? payload.lat : null,
           lng: payload.lng != null ? payload.lng : null,
           external_id: payload.external_id || null,
@@ -8122,7 +8169,12 @@ browsen</span>
           created_by: account && account.id ? account.id : null
         });
         await loadGlobalWorkoutPlaces();
-        return row;
+        if (row && row.name) return row;
+        if (payload.external_id) {
+          var afterInsert = getPlaceRecordByExternalId(payload.external_id);
+          if (afterInsert) return afterInsert;
+        }
+        return row || { name: placeName };
       }
 
       async function savePlacesCheckAddDraft() {
@@ -8132,8 +8184,10 @@ browsen</span>
         }
         var saved = await createGlobalWorkoutPlace(placesCheckAddDraft);
         if (!saved) return;
-        if (placesCheckDraft.indexOf(saved.name || placesCheckAddDraft.name) < 0) {
-          placesCheckDraft.push(saved.name || placesCheckAddDraft.name);
+        var canonical = resolveSavedPlaceName(saved, placesCheckAddDraft.name);
+        if (!canonical) return;
+        if (placesCheckDraft.indexOf(canonical) < 0) {
+          placesCheckDraft.push(canonical);
         }
         placesCheckAddDraft = null;
         var addSearch = document.getElementById("places-check-add-search");
@@ -8446,17 +8500,12 @@ browsen</span>
         var box = document.getElementById("weekday-meet-places");
         if (!box) return;
         box.innerHTML = "";
-        var saved = String(weekdayMeetDraftPlace || "").trim();
-        var options = getAccountPlaces().slice();
-        if (!options.length) options = getSelectablePlaceNames().slice();
-        if (saved && options.indexOf(saved) < 0) options.unshift(saved);
-        var current = saved || options[0] || "";
-        if (current && options.indexOf(current) < 0) current = options[0] || "";
-        weekdayMeetDraftPlace = current;
-        options.forEach(function (opt) {
+        var picked = buildPlacePickerOptions(weekdayMeetDraftPlace);
+        weekdayMeetDraftPlace = picked.current;
+        picked.options.forEach(function (opt) {
           var btn = document.createElement("button");
           btn.type = "button";
-          btn.className = "plan-share-place" + (opt === current ? " is-on" : "");
+          btn.className = "plan-share-place" + (opt === picked.current ? " is-on" : "");
           btn.textContent = opt;
           btn.addEventListener("click", function () {
             weekdayMeetDraftPlace = opt;
@@ -8485,9 +8534,7 @@ browsen</span>
           btn.textContent = opt + " Uhr";
           btn.addEventListener("click", function () {
             weekdayMeetDraftTime = opt;
-            scroller.querySelectorAll(".plan-share-time-item").forEach(function (el) {
-              el.classList.toggle("is-selected", el === btn);
-            });
+            markMeetTimeSelected(scroller, btn);
             btn.scrollIntoView({ block: "center", behavior: "smooth" });
           });
           scroller.appendChild(btn);
@@ -9762,15 +9809,12 @@ browsen</span>
           var box = document.getElementById("plan-share-places");
           if (!box) return;
           box.innerHTML = "";
-          var options = getAccountPlaces();
-          if (!options.length) options = getSelectablePlaceNames().slice();
-          var current = planSharePlace || options[0] || "";
-          if (options.indexOf(current) < 0) current = options[0];
-          planSharePlace = current;
-          options.forEach(function (opt) {
+          var picked = buildPlacePickerOptions(planSharePlace);
+          planSharePlace = picked.current;
+          picked.options.forEach(function (opt) {
             var btn = document.createElement("button");
             btn.type = "button";
-            btn.className = "plan-share-place" + (opt === current ? " is-on" : "");
+            btn.className = "plan-share-place" + (opt === picked.current ? " is-on" : "");
             btn.textContent = opt;
             btn.addEventListener("click", function () {
               planSharePlace = opt;
