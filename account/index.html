@@ -7641,6 +7641,33 @@ browsen</span>
         return raw && typeof raw === "object" ? raw : {};
       }
 
+      function mergeWeekdayMeetPrefs(localRaw, remoteRaw) {
+        var local = localRaw;
+        var remote = remoteRaw;
+        if (typeof local === "string") {
+          try { local = JSON.parse(local); } catch (e0) { local = {}; }
+        }
+        if (typeof remote === "string") {
+          try { remote = JSON.parse(remote); } catch (e1) { remote = {}; }
+        }
+        local = local && typeof local === "object" ? local : {};
+        remote = remote && typeof remote === "object" ? remote : {};
+        var out = JSON.parse(JSON.stringify(remote));
+        Object.keys(local).forEach(function (k) {
+          var l = local[k];
+          var r = remote[k];
+          if (!l || typeof l !== "object") return;
+          if (!r || typeof r !== "object") {
+            out[k] = l;
+            return;
+          }
+          var lFrom = meetPrefEffectiveFrom(l) || "";
+          var rFrom = meetPrefEffectiveFrom(r) || "";
+          if (lFrom >= rFrom) out[k] = l;
+        });
+        return out;
+      }
+
       function meetPrefEffectiveFrom(row) {
         if (!row || typeof row !== "object") return null;
         var from = String(row.effective_from || "").slice(0, 10);
@@ -7667,7 +7694,7 @@ browsen</span>
           };
         }
         return {
-          place: String(row.place || getAccountPlaces()[0] || account.workout_place || PROFILE_PLACE_OPTIONS[0] || "").trim(),
+          place: String(row.place || "").trim() || (getAccountPlaces()[0] || (account && account.workout_place) || PROFILE_PLACE_OPTIONS[0] || ""),
           time: normalizeMeetTime(row.time) || "18:00"
         };
       }
@@ -7689,11 +7716,12 @@ browsen</span>
 
       function setWeekdayMeet(wd, place, time) {
         if (!account) return;
-        var prefs = getWeekdayMeetPrefs();
+        var prefs = JSON.parse(JSON.stringify(getWeekdayMeetPrefs()));
         var label = "";
         try { label = trainingLabelForWeekday(Number(wd)); } catch (e0) { label = ""; }
+        var placeName = String(place || "").trim();
         prefs[String(wd)] = {
-          place: String(place || "").trim(),
+          place: placeName,
           time: normalizeMeetTime(time) || "18:00",
           label: label || null,
           effective_from: berlinTodayKey()
@@ -8385,14 +8413,45 @@ browsen</span>
         }
       }
 
+      function nearestMeetTimeItem(scroller) {
+        if (!scroller) return null;
+        var items = scroller.querySelectorAll(".plan-share-time-item");
+        if (!items.length) return null;
+        var mid = scroller.scrollTop + scroller.clientHeight / 2;
+        var best = items[0];
+        var bestDist = Infinity;
+        for (var i = 0; i < items.length; i++) {
+          var el = items[i];
+          var center = el.offsetTop + el.offsetHeight / 2;
+          var dist = Math.abs(center - mid);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = el;
+          }
+        }
+        return best;
+      }
+
+      function markMeetTimeSelected(scroller, btn) {
+        if (!scroller) return;
+        scroller.querySelectorAll(".plan-share-time-item").forEach(function (el) {
+          el.classList.toggle("is-selected", el === btn);
+        });
+        if (btn && btn.dataset.value) {
+          weekdayMeetDraftTime = normalizeMeetTime(btn.dataset.value) || weekdayMeetDraftTime;
+        }
+      }
+
       function fillWeekdayMeetPlaces() {
         var box = document.getElementById("weekday-meet-places");
         if (!box) return;
         box.innerHTML = "";
-        var options = getAccountPlaces();
+        var saved = String(weekdayMeetDraftPlace || "").trim();
+        var options = getAccountPlaces().slice();
         if (!options.length) options = getSelectablePlaceNames().slice();
-        var current = weekdayMeetDraftPlace || options[0];
-        if (options.indexOf(current) < 0) current = options[0];
+        if (saved && options.indexOf(saved) < 0) options.unshift(saved);
+        var current = saved || options[0] || "";
+        if (current && options.indexOf(current) < 0) current = options[0] || "";
         weekdayMeetDraftPlace = current;
         options.forEach(function (opt) {
           var btn = document.createElement("button");
@@ -8436,12 +8495,20 @@ browsen</span>
         var pad2 = document.createElement("div");
         pad2.style.height = "42px";
         scroller.appendChild(pad2);
+        if (!scroller._weekdayMeetTimeScrollBound) {
+          scroller._weekdayMeetTimeScrollBound = true;
+          scroller.addEventListener("scroll", function () {
+            markMeetTimeSelected(scroller, nearestMeetTimeItem(scroller));
+          }, { passive: true });
+        }
         requestAnimationFrame(function () {
-          var sel = scroller.querySelector('.plan-share-time-item[data-value="' + want + '"]');
+          var sel = scroller.querySelector('.plan-share-time-item[data-value="' + want + '"]') ||
+            scroller.querySelector(".plan-share-time-item.is-selected");
           if (sel) {
             var top = sel.offsetTop - (scroller.clientHeight / 2) + (sel.offsetHeight / 2);
             scroller.scrollTop = Math.max(0, top);
           }
+          markMeetTimeSelected(scroller, nearestMeetTimeItem(scroller) || sel);
         });
       }
 
@@ -8467,13 +8534,19 @@ browsen</span>
         }
         var scroller = document.getElementById("weekday-meet-time-scroller");
         if (scroller) {
+          markMeetTimeSelected(scroller, nearestMeetTimeItem(scroller));
           var sel = scroller.querySelector(".plan-share-time-item.is-selected");
           if (sel && sel.dataset.value) weekdayMeetDraftTime = sel.dataset.value;
+        }
+        if (!String(weekdayMeetDraftPlace || "").trim()) {
+          window.alert(t("Bitte Ort wählen.", "Please choose a place."));
+          return;
         }
         setWeekdayMeet(weekdayMeetDraftWd, weekdayMeetDraftPlace, weekdayMeetDraftTime);
         saveAccount();
         closeChallengeModalById("weekday-meet-modal");
         renderProfilePlan();
+        fillProfilePanel();
         try {
           await patchAccount({
             weekday_meet_prefs: account.weekday_meet_prefs || {},
@@ -12319,7 +12392,10 @@ browsen</span>
           if (typeof wmp === "string") {
             try { wmp = JSON.parse(wmp); } catch (eW) { wmp = {}; }
           }
-          account.weekday_meet_prefs = wmp && typeof wmp === "object" ? wmp : {};
+          account.weekday_meet_prefs = mergeWeekdayMeetPrefs(
+            account.weekday_meet_prefs || getWeekdayMeetPrefs(),
+            wmp && typeof wmp === "object" ? wmp : {}
+          );
         }
         if (Object.prototype.hasOwnProperty.call(remote, "open_to_connect")) {
           account.open_to_connect = !!remote.open_to_connect;
@@ -13306,10 +13382,6 @@ browsen</span>
               var done = dayHasRating(key);
               if (key === selectedKey && rateable && !done && w && w.training && w.trainingTab) {
                 openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null);
-                return;
-              }
-              if (key === selectedKey && rateable && !done && w && w.zirkel) {
-                openTrainingFromCalendar("intervall", null);
                 return;
               }
               selectDay(key, false);
