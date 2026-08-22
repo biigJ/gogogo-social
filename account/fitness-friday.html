@@ -4686,7 +4686,12 @@
     }
     if (window.parent !== window) {
       try {
-        window.parent.postMessage({ type: 'gogogo-training-goto', panel: 'home' }, '*');
+        window.parent.postMessage({
+          type: 'gogogo-training-goto',
+          panel: 'home',
+          finished: true,
+          dateKey: berlinTodayISO()
+        }, '*');
       } catch (e) {}
     }
   }
@@ -5991,6 +5996,16 @@
       if (e.target.closest('#finishOkBtn')) {
         e.preventDefault(); e.stopPropagation();
         hideFinishDialog();
+        if (window.parent !== window) {
+          try {
+            window.parent.postMessage({
+              type: 'gogogo-training-goto',
+              panel: 'home',
+              finished: true,
+              dateKey: berlinTodayISO()
+            }, '*');
+          } catch (err) {}
+        }
         return;
       }
       if (e.target.closest('#finishTableBtn')) {

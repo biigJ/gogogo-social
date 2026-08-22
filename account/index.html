@@ -726,32 +726,31 @@
       text-decoration: underline;
       text-underline-offset: 2px;
     }
-    .home-cal__mark {
+    .home-cal__rate {
       width: 100%;
-      min-height: calc(0.95rem * 2.2);
+      min-height: calc(0.95rem * 1.8);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       padding: 0;
       color: var(--ink-on-red);
-      font-size: calc(0.95rem * 2.2);
-      font-weight: 700;
+      font-size: clamp(0.95rem, 4.2vw, 1.15rem);
       line-height: 1;
       border: 0;
       background: transparent;
+      cursor: pointer;
     }
-    .home-cal__mark:disabled {
+    .home-cal__rate:disabled,
+    .home-cal__rate[aria-hidden="true"] {
       opacity: 0;
       pointer-events: none;
     }
-    .home-cal__mark.is-readonly {
-      opacity: 1;
-      pointer-events: none;
-      cursor: default;
+    .home-cal__rate.is-rated {
+      opacity: 0.92;
     }
     .home-cal__invite {
       width: 100%;
-      aspect-ratio: 1;
+      min-height: calc(0.95rem * 1.8);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -760,68 +759,39 @@
       background: transparent;
       color: var(--ink-on-red);
     }
-    .home-cal__invite-sq {
+    .home-cal__heart {
       width: 100%;
-      height: 100%;
-      aspect-ratio: 1;
-      border: 1.5px solid rgba(180, 180, 180, 0.85);
-      border-radius: 2px;
+      min-height: calc(0.95rem * 1.8);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       font-size: clamp(0.95rem, 4.2vw, 1.15rem);
       line-height: 1;
       padding: 0;
+      border: 0;
       background: transparent;
       color: inherit;
-      cursor: default;
-    }
-    .home-cal__invite-sq.is-active {
       cursor: pointer;
-      border-radius: 2px;
-      border-color: rgba(180, 180, 180, 0.9);
-      pointer-events: auto;
-      position: relative;
-      z-index: 2;
     }
-    .home-cal__invite-sq.is-mail {
-      color: #F7F5F0;
+    .home-cal__heart.is-mail {
       font-size: clamp(0.85rem, 3.8vw, 1.05rem);
     }
-    .home-cal__invite-sq.is-cancel {
-      color: #F7F5F0;
+    .home-cal__heart.is-cancel {
       font-size: clamp(0.85rem, 3.8vw, 1.05rem);
-      cursor: pointer;
-      pointer-events: auto;
-      position: relative;
-      z-index: 2;
     }
-    .home-cal__invite-sq.is-on {
-      border-radius: 2px;
-      border-color: #F7F5F0;
-      background: rgba(247, 245, 240, 0.22);
+    .home-cal__heart.is-time {
       color: #F7F5F0;
       font-size: clamp(0.52rem, 2.2vw, 0.7rem);
       font-weight: 700;
       letter-spacing: -0.04em;
-      cursor: pointer;
-      pointer-events: auto;
-      position: relative;
-      z-index: 2;
     }
-    .home-cal__invite-sq.is-empty {
-      border-color: rgba(180, 180, 180, 0.55);
-      opacity: 1;
-      pointer-events: none;
-    }
-    .home-cal__invite-sq.is-active.is-empty {
-      pointer-events: auto;
-      opacity: 1;
-      border-color: rgba(180, 180, 180, 0.9);
-    }
-    .home-cal__mark:disabled,
-    .home-cal__mark[aria-hidden="true"] {
-      pointer-events: none;
+    .cal-buddy-invite-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 0 0 12px;
+      max-height: 40vh;
+      overflow: auto;
     }
     body.is-account-paused .home-cal,
     body.is-account-paused .home-check {
@@ -2673,7 +2643,8 @@
       grid-template-columns: 1fr auto auto;
       align-items: center;
       gap: 10px;
-      margin-top: 12px;
+      margin-top: 8px;
+      margin-bottom: 4px;
     }
     .home-check[hidden] {
       display: none !important;
@@ -3469,24 +3440,24 @@ browsen</span>
           <div class="home-cal__matches" id="week-matches" aria-label="Ort-Matches"></div>
           <div class="home-cal__days" id="week" role="listbox" aria-label="Wochentage"></div>
         </div>
+        <div class="home-check" id="home-check" hidden>
+          <div class="home-check__slider">
+            <div class="home-check__track">
+              <div class="home-check__fill" id="home-score-fill" aria-hidden="true"></div>
+              <input class="home-check__range" id="home-score" type="range" min="1" max="10" step="1" value="5" aria-label="Bewertung 1 bis 10" />
+            </div>
+            <div class="home-check__scale" aria-hidden="true">
+              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+            </div>
+          </div>
+          <button class="home-check__btn" type="button" id="home-check-ok" aria-label="Tag bestätigen">✓</button>
+          <button class="home-check__btn" type="button" id="home-check-no" aria-label="Tag ohne Eintrag">✕</button>
+        </div>
         <div class="home-workout" id="home-workout">
           <div class="home-workout__box" id="home-workout-box">
             <h3 class="home-workout__title" id="home-workout-title"></h3>
             <p class="home-workout__line" id="home-workout-line1"></p>
             <p class="home-workout__line" id="home-workout-line2"></p>
-          </div>
-          <div class="home-check" id="home-check">
-            <div class="home-check__slider">
-              <div class="home-check__track">
-                <div class="home-check__fill" id="home-score-fill" aria-hidden="true"></div>
-                <input class="home-check__range" id="home-score" type="range" min="1" max="10" step="1" value="5" aria-label="Bewertung 1 bis 10" />
-              </div>
-              <div class="home-check__scale" aria-hidden="true">
-                <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
-              </div>
-            </div>
-            <button class="home-check__btn" type="button" id="home-check-ok" aria-label="Tag bestätigen">✓</button>
-            <button class="home-check__btn" type="button" id="home-check-no" aria-label="Tag ohne Eintrag">✕</button>
           </div>
         </div>
       </div>
@@ -4317,6 +4288,27 @@ browsen</span>
         <button type="button" class="challenge-modal__btn" id="together-choice-theirs">Training</button>
         <button type="button" class="challenge-modal__btn" id="together-choice-merge" data-de="Zusammenlegen" data-en="Combine">Zusammenlegen</button>
         <button type="button" class="challenge-modal__btn is-ghost" id="together-choice-decline" data-de="Ablehnen" data-en="Decline">Ablehnen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="workout-rate-prompt-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="workout-rate-prompt-title">
+      <p class="challenge-modal__title" id="workout-rate-prompt-title" data-de="Wie war Dein Training." data-en="How was your training.">Wie war Dein Training.</p>
+      <p class="invite-decide__body" data-de="Bewerte es von 1-10." data-en="Rate it from 1-10.">Bewerte es von 1-10.</p>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn" id="workout-rate-prompt-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="cal-buddy-invite-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="cal-buddy-invite-title">
+      <p class="challenge-modal__title" id="cal-buddy-invite-title" data-de="Lade Deine Buddies zu Deinem Workout ein" data-en="Invite your buddies to your workout">Lade Deine Buddies zu Deinem Workout ein</p>
+      <div class="cal-buddy-invite-list" id="cal-buddy-invite-list"></div>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn is-ghost" id="cal-buddy-invite-cancel" data-de="Abbrechen" data-en="Cancel">Abbrechen</button>
+        <button type="button" class="challenge-modal__btn" id="cal-buddy-invite-send" data-de="Einladen" data-en="Invite">Einladen</button>
       </div>
     </div>
   </div>
@@ -11944,6 +11936,9 @@ browsen</span>
         if (ev.data.type === "gogogo-training-goto") {
           document.body.classList.remove("is-training-workout");
           gotoPanel(ev.data.panel || "home");
+          if (ev.data.finished && typeof window.__gogogoPromptWorkoutRating === "function") {
+            window.__gogogoPromptWorkoutRating(ev.data.dateKey || "");
+          }
         }
       });
       var accountVideoControllers = [];
@@ -12258,6 +12253,98 @@ browsen</span>
         var selectedKey = null;
         var editingOpen = false;
         var saving = false;
+        var pendingRatePromptKey = null;
+        var calInviteDateKey = null;
+        var calInviteSelectedIds = {};
+
+        function openCalBuddyInvite(key) {
+          if (isAccountPaused()) return;
+          calInviteDateKey = key;
+          calInviteSelectedIds = {};
+          var list = document.getElementById("cal-buddy-invite-list");
+          if (!list) return;
+          list.innerHTML = "";
+          var buddies = typeof getBuddies === "function" ? getBuddies() : [];
+          if (!buddies.length) {
+            list.innerHTML = "<p style='opacity:0.8'>" + t("Keine Buddies zum Einladen.", "No buddies to invite.") + "</p>";
+          } else {
+            buddies.forEach(function (b) {
+              if (!b || !b.id) return;
+              var row = document.createElement("div");
+              row.className = "discover-row";
+              var img = document.createElement("img");
+              img.alt = "";
+              if (b.photo_url) img.src = b.photo_url;
+              var mid = document.createElement("div");
+              var name = document.createElement("div");
+              name.className = "discover-row__name";
+              name.textContent = firstNameOf(b);
+              mid.appendChild(name);
+              var add = document.createElement("button");
+              add.type = "button";
+              add.className = "discover-row__add";
+              add.textContent = "+";
+              add.setAttribute("aria-label", t("Auswählen", "Select"));
+              add.addEventListener("click", function () {
+                var on = !calInviteSelectedIds[b.id];
+                if (on) calInviteSelectedIds[b.id] = true;
+                else delete calInviteSelectedIds[b.id];
+                add.textContent = on ? "✓" : "+";
+                add.classList.toggle("is-on", on);
+              });
+              row.appendChild(img);
+              row.appendChild(mid);
+              row.appendChild(add);
+              list.appendChild(row);
+            });
+          }
+          openChallengeModalById("cal-buddy-invite-modal");
+        }
+
+        function closeCalBuddyInvite() {
+          calInviteDateKey = null;
+          calInviteSelectedIds = {};
+          closeChallengeModalById("cal-buddy-invite-modal");
+        }
+
+        async function sendCalBuddyInvite() {
+          if (!calInviteDateKey) {
+            closeCalBuddyInvite();
+            return;
+          }
+          var buddyIds = Object.keys(calInviteSelectedIds).filter(function (id) {
+            return calInviteSelectedIds[id];
+          });
+          if (!buddyIds.length) {
+            window.alert(t("Bitte mindestens einen Buddy auswählen.", "Please select at least one buddy."));
+            return;
+          }
+          var key = calInviteDateKey;
+          var d = parseDateKey(key) || new Date();
+          var wd = (d.getDay() + 6) % 7;
+          var meet = getWeekdayMeetForDate(wd, key) || getWeekdayMeet(wd);
+          var place = String(meet.place || (getAccountPlaces()[0]) || (account && account.workout_place) || "").trim();
+          if (!place) {
+            window.alert(t("Bitte zuerst einen Ort im Profil wählen.", "Please choose a place in your profile first."));
+            return;
+          }
+          var time = normalizeMeetTime(meet.time || "18:00") || "18:00";
+          var planText = coachDayTextForDate(d) || coachDayText(wd) || defaultDayPlan();
+          var label = String(planText).split(/\n/)[0].trim() || planText;
+          await createWorkoutInvites(key, label, buddyIds, { place: place, time: time });
+          closeCalBuddyInvite();
+          selectDay(key, false);
+        }
+
+        function promptWorkoutRating(key) {
+          key = String(key || berlinTodayKey()).slice(0, 10);
+          pendingRatePromptKey = key;
+          weekOffset = 0;
+          selectedKey = key;
+          editingOpen = true;
+          renderWeek();
+          openChallengeModalById("workout-rate-prompt-modal");
+        }
 
         function startOfDay(d) {
           return new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -12525,8 +12612,8 @@ browsen</span>
             var key = dateKey(d);
             var wd = (d.getDay() + 6) % 7;
             var w = workoutFor(d);
-            var mark = markFor(key);
             var rateable = canRateCalendarDay(key);
+            var dayEntry = entryFor(key);
             var cell = document.createElement("div");
             cell.className = "home-cal__cell";
 
@@ -12551,7 +12638,6 @@ browsen</span>
             btn.innerHTML =
               "<span>" + names[i] + "</span><span class='home-cal__n'>" + d.getDate() + "</span>";
             btn.addEventListener("click", function () {
-              var dayEntry = entryFor(key);
               var done = !!(dayEntry && dayEntry.score != null);
               if (key === selectedKey && rateable && !done && w && w.training && w.trainingTab) {
                 openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null);
@@ -12559,34 +12645,6 @@ browsen</span>
               }
               selectDay(key, false);
             });
-
-            var markBtn = document.createElement("button");
-            markBtn.type = "button";
-            markBtn.className = "home-cal__mark";
-            if (mark) {
-              markBtn.textContent = mark;
-              if (!rateable || isAccountPaused()) {
-                markBtn.classList.add("is-readonly");
-                markBtn.setAttribute("aria-disabled", "true");
-                markBtn.setAttribute(
-                  "aria-label",
-                  mark === "✕" ? t("Eintrag", "Entry") : t("Bewertung", "Score") + " " + mark
-                );
-              } else {
-                markBtn.setAttribute(
-                  "aria-label",
-                  mark === "✕" ? t("Eintrag bearbeiten", "Edit entry") : t("Bewertung", "Score") + " " + mark + " " + t("bearbeiten", "edit")
-                );
-                markBtn.addEventListener("click", function (ev) {
-                  ev.stopPropagation();
-                  selectDay(key, true);
-                });
-              }
-            } else {
-              markBtn.textContent = "";
-              markBtn.disabled = true;
-              markBtn.setAttribute("aria-hidden", "true");
-            }
 
             cell.appendChild(btn);
 
@@ -12606,16 +12664,14 @@ browsen</span>
               ))
             );
             var accepted = (!hasOutbound) ? acceptedInviteForDate(key) : null;
-            var sq = document.createElement("button");
-            sq.type = "button";
-            sq.className = "home-cal__invite-sq";
+            var heartBtn = document.createElement("button");
+            heartBtn.type = "button";
+            heartBtn.className = "home-cal__heart";
             var acceptedTime = accepted ? normalizeMeetTime(accepted.meet_time) : "";
             if (hasOutbound) {
-              sq.textContent = "";
-              sq.classList.add("is-active", "is-empty");
-              sq.disabled = false;
-              sq.setAttribute("aria-label", t("Einladung ansehen", "View invite"));
-              sq.addEventListener("click", function (ev) {
+              heartBtn.textContent = "❤️";
+              heartBtn.setAttribute("aria-label", t("Einladung ansehen", "View invite"));
+              heartBtn.addEventListener("click", function (ev) {
                 ev.preventDefault();
                 ev.stopPropagation();
                 selectDay(key, false);
@@ -12629,52 +12685,69 @@ browsen</span>
                 openOutboundInviteInfo(key, share);
               });
             } else if (accepted) {
-              sq.textContent = acceptedTime || "✓";
-              sq.classList.add("is-on");
-              sq.disabled = false;
-              sq.setAttribute(
+              heartBtn.textContent = acceptedTime || "✓";
+              heartBtn.classList.add("is-time");
+              heartBtn.setAttribute(
                 "aria-label",
                 acceptedTime
                   ? (t("Treffen um", "Meet at") + " " + acceptedTime)
                   : t("Einladung angenommen", "Invite accepted")
               );
-              sq.addEventListener("click", function (ev) {
+              heartBtn.addEventListener("click", function (ev) {
                 ev.preventDefault();
                 ev.stopPropagation();
                 selectDay(key, false);
                 openAcceptedInviteInfo(key, accepted);
               });
             } else if (pendingInvites.length) {
-              sq.textContent = "✉️";
-              sq.classList.add("is-active", "is-mail");
-              sq.disabled = false;
-              sq.setAttribute("aria-label", t("Einladung zusagen oder absagen", "Accept or decline invite"));
-              sq.addEventListener("click", function (ev) {
+              heartBtn.textContent = "✉️";
+              heartBtn.classList.add("is-mail");
+              heartBtn.setAttribute("aria-label", t("Einladung zusagen oder absagen", "Accept or decline invite"));
+              heartBtn.addEventListener("click", function (ev) {
                 ev.preventDefault();
                 ev.stopPropagation();
                 selectDay(key, false);
                 openInviteDecide(pendingInvites[0]);
               });
             } else if (closedInviteForDate(key)) {
-              sq.textContent = "❌";
-              sq.classList.add("is-active", "is-cancel");
-              sq.disabled = false;
-              sq.setAttribute("aria-label", t("Einladung abgesagt", "Invite cancelled"));
-              sq.addEventListener("click", function (ev) {
+              heartBtn.textContent = "❌";
+              heartBtn.classList.add("is-cancel");
+              heartBtn.setAttribute("aria-label", t("Einladung abgesagt", "Invite cancelled"));
+              heartBtn.addEventListener("click", function (ev) {
                 ev.preventDefault();
                 ev.stopPropagation();
                 selectDay(key, false);
                 openCancelledInviteNotice(key);
               });
             } else {
-              sq.textContent = "";
-              sq.classList.add("is-empty");
-              sq.disabled = true;
-              sq.setAttribute("aria-hidden", "true");
+              heartBtn.textContent = "❤️";
+              heartBtn.setAttribute("aria-label", t("Buddies einladen", "Invite buddies"));
+              heartBtn.addEventListener("click", function (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+                selectDay(key, false);
+                openCalBuddyInvite(key);
+              });
             }
-            inviteRow.appendChild(sq);
+            inviteRow.appendChild(heartBtn);
             cell.appendChild(inviteRow);
-            cell.appendChild(markBtn);
+
+            var rateBtn = document.createElement("button");
+            rateBtn.type = "button";
+            rateBtn.className = "home-cal__rate";
+            if (rateable && !isAccountPaused()) {
+              rateBtn.textContent = "🗒️";
+              if (dayEntry) rateBtn.classList.add("is-rated");
+              rateBtn.setAttribute("aria-label", t("Tag bewerten", "Rate day"));
+              rateBtn.addEventListener("click", function (ev) {
+                ev.stopPropagation();
+                selectDay(key, true);
+              });
+            } else {
+              rateBtn.disabled = true;
+              rateBtn.setAttribute("aria-hidden", "true");
+            }
+            cell.appendChild(rateBtn);
             root.appendChild(cell);
           });
 
@@ -12866,6 +12939,37 @@ browsen</span>
         };
         window.__gogogoRenderWeek = renderWeek;
         window.__gogogoSelectDay = selectDay;
+        window.__gogogoPromptWorkoutRating = promptWorkoutRating;
+
+        var workoutRatePromptOk = document.getElementById("workout-rate-prompt-ok");
+        var workoutRatePromptModal = document.getElementById("workout-rate-prompt-modal");
+        if (workoutRatePromptOk) {
+          workoutRatePromptOk.addEventListener("click", function () {
+            closeChallengeModalById("workout-rate-prompt-modal");
+            var key = pendingRatePromptKey || berlinTodayKey();
+            pendingRatePromptKey = null;
+            weekOffset = 0;
+            selectDay(key, true);
+          });
+        }
+        if (workoutRatePromptModal) {
+          workoutRatePromptModal.addEventListener("click", function (e) {
+            if (e.target === workoutRatePromptModal) {
+              closeChallengeModalById("workout-rate-prompt-modal");
+              pendingRatePromptKey = null;
+            }
+          });
+        }
+        var calBuddyInviteCancel = document.getElementById("cal-buddy-invite-cancel");
+        var calBuddyInviteSend = document.getElementById("cal-buddy-invite-send");
+        var calBuddyInviteModal = document.getElementById("cal-buddy-invite-modal");
+        if (calBuddyInviteCancel) calBuddyInviteCancel.addEventListener("click", closeCalBuddyInvite);
+        if (calBuddyInviteSend) calBuddyInviteSend.addEventListener("click", function () { sendCalBuddyInvite(); });
+        if (calBuddyInviteModal) {
+          calBuddyInviteModal.addEventListener("click", function (e) {
+            if (e.target === calBuddyInviteModal) closeCalBuddyInvite();
+          });
+        }
         /* Plan kann schon vor diesem Callback fertig geladen sein (Race mit showApp). */
         if (coachPlan || (coachDayHistory && coachDayHistory.length)) {
           onCoachPlanLoaded();
