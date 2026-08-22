@@ -3006,8 +3006,22 @@
     #profile-calendar-settings-modal .challenge-modal__sheet,
     #calendar-sync-guide-modal .challenge-modal__sheet,
     #about-me-edit-modal .challenge-modal__sheet,
-    #about-me-read-modal .challenge-modal__sheet {
+    #calendar-sync-guide-modal .challenge-modal__sheet {
       text-align: left;
+    }
+    #about-me-read-modal .challenge-modal__sheet {
+      text-align: center;
+    }
+    #buddy-action-modal .buddy-action-actions {
+      grid-template-columns: 1fr 1fr;
+      margin-top: 22px;
+      margin-bottom: 0;
+    }
+    #buddy-action-modal .buddy-action-actions__remove {
+      margin-top: 10px;
+    }
+    #buddy-action-modal .buddy-action-actions__remove .challenge-modal__btn {
+      width: 100%;
     }
     .profile-about {
       margin-top: 18px;
@@ -3092,6 +3106,7 @@
       font-weight: 700;
       font-size: 0.88rem;
       margin: 0 0 6px;
+      text-align: center;
     }
     .about-me-read-block p {
       font-weight: 500;
@@ -3099,6 +3114,7 @@
       line-height: 1.35;
       margin: 0;
       white-space: pre-wrap;
+      text-align: center;
     }
     .community-post__body.is-about-share {
       cursor: pointer;
@@ -4937,9 +4953,11 @@ browsen</span>
   <div class="challenge-modal" id="buddy-action-modal" hidden aria-hidden="true">
     <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="buddy-action-title">
       <p class="challenge-modal__title" id="buddy-action-title">Buddy</p>
-      <div class="challenge-modal__actions">
+      <div class="challenge-modal__actions buddy-action-actions">
         <button type="button" class="challenge-modal__btn" id="buddy-action-about" data-de="Über mich" data-en="About me">Über mich</button>
         <button type="button" class="challenge-modal__btn" id="buddy-action-message" data-de="Nachricht" data-en="Message">Nachricht</button>
+      </div>
+      <div class="challenge-modal__actions buddy-action-actions__remove is-single">
         <button type="button" class="challenge-modal__btn is-ghost" id="buddy-action-remove" data-de="Entfernen" data-en="Remove">Entfernen</button>
       </div>
     </div>
@@ -4982,7 +5000,7 @@ browsen</span>
     <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="about-me-read-title">
       <p class="challenge-modal__title" id="about-me-read-title">Über mich</p>
       <div id="about-me-read-body"></div>
-      <div class="challenge-modal__actions">
+      <div class="challenge-modal__actions is-single">
         <button type="button" class="challenge-modal__btn" id="about-me-read-close" data-de="Schließen" data-en="Close">Schließen</button>
       </div>
     </div>
@@ -5491,6 +5509,7 @@ browsen</span>
           var empty = document.createElement("p");
           empty.style.fontSize = "0.92rem";
           empty.style.opacity = "0.9";
+          empty.style.textAlign = "center";
           empty.textContent = t("Noch nichts geteilt.", "Nothing shared yet.");
           root.appendChild(empty);
         }
@@ -8304,6 +8323,7 @@ browsen</span>
       function bindProfilePlanToolbar() {
         if (profilePlanToolbarBound) return;
         profilePlanToolbarBound = true;
+        migrateCalendarFeedUrlIfNeeded();
         document.querySelectorAll(".profile-plan__view-btn").forEach(function (btn) {
           btn.addEventListener("click", function () {
             setProfilePlanViewMode(btn.getAttribute("data-plan-view"));
@@ -8510,6 +8530,11 @@ browsen</span>
         var googleBlock = document.getElementById("calendar-sync-guide-google");
         if (appleBlock) appleBlock.hidden = provider !== "apple";
         if (googleBlock) googleBlock.hidden = provider !== "google";
+        var googleUrlElReset = document.getElementById("calendar-sync-guide-google-url");
+        if (googleUrlElReset) {
+          googleUrlElReset.hidden = provider !== "google";
+          if (provider !== "google") googleUrlElReset.textContent = "";
+        }
         if (title) {
           title.textContent = provider === "apple"
             ? t("Apple Kalender verbinden", "Connect Apple Calendar")
