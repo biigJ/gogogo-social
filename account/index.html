@@ -2973,10 +2973,27 @@
       border-color: rgba(247,245,240,0.9);
       background: rgba(247,245,240,0.14);
     }
+    .calendar-sync-guide__steps {
+      margin: 0 0 12px;
+      padding-left: 1.2em;
+      font-size: 0.92rem;
+      line-height: 1.45;
+      opacity: 0.95;
+    }
+    .calendar-sync-guide__steps li + li {
+      margin-top: 6px;
+    }
+    .calendar-sync-guide__note {
+      font-size: 0.82rem;
+      line-height: 1.35;
+      opacity: 0.82;
+      margin: 0;
+    }
     #profile-change-code-modal .challenge-modal__sheet,
     #profile-change-name-modal .challenge-modal__sheet,
     #profile-change-phone-modal .challenge-modal__sheet,
     #profile-calendar-settings-modal .challenge-modal__sheet,
+    #calendar-sync-guide-modal .challenge-modal__sheet,
     #about-me-edit-modal .challenge-modal__sheet,
     #about-me-read-modal .challenge-modal__sheet {
       text-align: left;
@@ -4738,7 +4755,6 @@ browsen</span>
     <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="calendar-sync-title">
       <p class="challenge-modal__title" id="calendar-sync-title" data-de="Kalender-Sync" data-en="Calendar sync">Kalender-Sync</p>
       <p style="font-size:0.92rem;line-height:1.4;opacity:0.95;margin-bottom:10px" data-de="Einmal verbinden — danach aktualisiert sich Dein Kalender automatisch." data-en="Connect once — your calendar updates automatically afterwards.">Einmal verbinden — danach aktualisiert sich Dein Kalender automatisch.</p>
-      <p style="font-size:0.82rem;line-height:1.35;opacity:0.82;margin-bottom:10px" data-de="Google: Termine erscheinen nach einmaliger Bestätigung unter „Weitere Kalender“ (gogogo Wochenplan). Am Desktop: links + → Von URL." data-en="Google: events appear under Other calendars (gogogo weekly plan) after one confirmation. On desktop: + → From URL.">Google: Termine erscheinen nach einmaliger Bestätigung unter „Weitere Kalender“ (gogogo Wochenplan). Am Desktop: links + → Von URL.</p>
       <div class="profile-calendar-options" role="group" aria-label="Kalender">
         <button type="button" class="profile-calendar-opt" data-calendar-pick="google" data-de="Google Kalender" data-en="Google Calendar">Google Kalender</button>
         <button type="button" class="profile-calendar-opt" data-calendar-pick="apple" data-de="Apple Kalender" data-en="Apple Calendar">Apple Kalender</button>
@@ -4748,6 +4764,23 @@ browsen</span>
         <span data-de="Datenschutz: Wochenplan (Training, Ort, Zeit) darf für den Sync genutzt werden." data-en="Privacy: weekly plan (training, place, time) may be used for sync.">Datenschutz: Wochenplan (Training, Ort, Zeit) darf für den Sync genutzt werden.</span>
       </label>
       <p class="profile-settings-msg" id="calendar-sync-msg" hidden></p>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="calendar-sync-guide-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="calendar-sync-guide-title">
+      <p class="challenge-modal__title" id="calendar-sync-guide-title">Kalender verbinden</p>
+      <div class="calendar-sync-guide" id="calendar-sync-guide-apple" hidden>
+        <ol class="calendar-sync-guide__steps" id="calendar-sync-guide-apple-steps"></ol>
+        <p class="calendar-sync-guide__note" id="calendar-sync-guide-apple-note"></p>
+      </div>
+      <div class="calendar-sync-guide" id="calendar-sync-guide-google" hidden>
+        <ol class="calendar-sync-guide__steps" id="calendar-sync-guide-google-steps"></ol>
+        <p class="calendar-sync-guide__note" id="calendar-sync-guide-google-note"></p>
+      </div>
+      <div class="challenge-modal__actions is-single">
+        <button type="button" class="challenge-modal__btn" id="calendar-sync-guide-ok" data-de="OK" data-en="OK">OK</button>
+      </div>
     </div>
   </div>
 
@@ -8183,6 +8216,7 @@ browsen</span>
       var profilePlanToolbarBound = false;
       var calendarSettingsDraft = { provider: null, privacy: false };
       var calendarSyncDraft = { provider: null, privacy: false };
+      var calendarSubscribePending = null;
 
       function getProfilePlanViewMode() {
         try {
@@ -8377,6 +8411,76 @@ browsen</span>
         copyCalendarFeedUrl(base);
       }
 
+      function fillCalendarSyncGuideSteps(listEl, steps) {
+        if (!listEl) return;
+        listEl.innerHTML = "";
+        steps.forEach(function (step) {
+          var li = document.createElement("li");
+          li.textContent = step;
+          listEl.appendChild(li);
+        });
+      }
+
+      function openCalendarSyncGuideModal(provider, feedUrl) {
+        var modal = document.getElementById("calendar-sync-guide-modal");
+        if (!modal || (provider !== "apple" && provider !== "google")) return;
+        calendarSubscribePending = { provider: provider, feedUrl: feedUrl };
+        var title = document.getElementById("calendar-sync-guide-title");
+        var appleBlock = document.getElementById("calendar-sync-guide-apple");
+        var googleBlock = document.getElementById("calendar-sync-guide-google");
+        if (appleBlock) appleBlock.hidden = provider !== "apple";
+        if (googleBlock) googleBlock.hidden = provider !== "google";
+        if (title) {
+          title.textContent = provider === "apple"
+            ? t("Apple Kalender verbinden", "Connect Apple Calendar")
+            : t("Google Kalender verbinden", "Connect Google Calendar");
+        }
+        if (provider === "apple") {
+          fillCalendarSyncGuideSteps(document.getElementById("calendar-sync-guide-apple-steps"), [
+            t("Tippe unten auf OK.", "Tap OK below."),
+            t("Apple Kalender öffnet sich.", "Apple Calendar will open."),
+            t("Tippe auf „Abonnieren“.", "Tap Subscribe.")
+          ]);
+          var appleNote = document.getElementById("calendar-sync-guide-apple-note");
+          if (appleNote) {
+            appleNote.textContent = t(
+              "Danach aktualisiert sich Dein Wochenplan automatisch.",
+              "Your weekly plan will update automatically afterwards."
+            );
+          }
+        } else {
+          fillCalendarSyncGuideSteps(document.getElementById("calendar-sync-guide-google-steps"), [
+            t("Tippe unten auf OK.", "Tap OK below."),
+            t("Bestätige „Kalender hinzufügen“.", "Confirm Add calendar."),
+            t("Falls nötig: links + → Von URL — Link ist kopiert.", "If needed: + → From URL on the left — link is copied.")
+          ]);
+          var googleNote = document.getElementById("calendar-sync-guide-google-note");
+          if (googleNote) {
+            googleNote.textContent = t(
+              "Termine erscheinen unter „Weitere Kalender“ als gogogo Wochenplan.",
+              "Events appear under Other calendars as gogogo weekly plan."
+            );
+          }
+        }
+        openChallengeModal(modal);
+      }
+
+      function closeCalendarSyncGuideModal() {
+        var modal = document.getElementById("calendar-sync-guide-modal");
+        if (modal) closeChallengeModal(modal);
+        calendarSubscribePending = null;
+      }
+
+      function confirmCalendarSubscribe() {
+        var pending = calendarSubscribePending;
+        if (!pending) return;
+        calendarSubscribePending = null;
+        var modal = document.getElementById("calendar-sync-guide-modal");
+        if (modal) closeChallengeModal(modal);
+        if (pending.provider === "apple") openAppleCalendarSubscribe(pending.feedUrl);
+        else if (pending.provider === "google") openGoogleCalendarSubscribe(pending.feedUrl);
+      }
+
       function openCalendarSyncModal() {
         var modal = document.getElementById("calendar-sync-modal");
         if (!modal) return;
@@ -8462,25 +8566,7 @@ browsen</span>
           account.calendar_synced_at = new Date().toISOString();
           saveAccount();
           if (!opts.silent) {
-            if (provider === "apple") {
-              openAppleCalendarSubscribe(feedUrl);
-              setCalendarSyncMsg(
-                t(
-                  "Apple Kalender geöffnet — bitte Abo bestätigen. Danach Sync automatisch.",
-                  "Apple Calendar opened — please confirm subscription. Sync is automatic afterwards."
-                ),
-                false
-              );
-            } else if (provider === "google") {
-              openGoogleCalendarSubscribe(feedUrl);
-              setCalendarSyncMsg(
-                t(
-                  "Google: Abo bestätigen (Dialog oder links + → Von URL). Link kopiert. Termine erscheinen unter „Weitere Kalender“ als gogogo Wochenplan.",
-                  "Google: confirm subscription (dialog or + → From URL). Link copied. Events appear under Other calendars as gogogo weekly plan."
-                ),
-                false
-              );
-            }
+            openCalendarSyncGuideModal(provider, feedUrl);
           }
         } catch (err) {
           setCalendarSyncMsg(
@@ -13850,6 +13936,19 @@ browsen</span>
           });
           calendarSyncModal.addEventListener("click", function (e) {
             if (e.target === calendarSyncModal) closeCalendarSyncModal();
+          });
+        }
+
+        var calendarSyncGuideModal = document.getElementById("calendar-sync-guide-modal");
+        var calendarSyncGuideOk = document.getElementById("calendar-sync-guide-ok");
+        if (calendarSyncGuideOk) {
+          calendarSyncGuideOk.addEventListener("click", function () {
+            confirmCalendarSubscribe();
+          });
+        }
+        if (calendarSyncGuideModal) {
+          calendarSyncGuideModal.addEventListener("click", function (e) {
+            if (e.target === calendarSyncGuideModal) closeCalendarSyncGuideModal();
           });
         }
 
