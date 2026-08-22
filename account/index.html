@@ -464,15 +464,15 @@
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       gap: 6px;
-      align-items: end;
-      min-height: 28px;
-      margin-bottom: 8px;
+      align-items: center;
+      min-height: 30px;
+      margin: 0 0 6px;
     }
     .home-cal__match-cell {
       display: flex;
       align-items: center;
       justify-content: center;
-      min-height: 26px;
+      min-height: 28px;
       min-width: 0;
     }
     .home-cal__match-btn {
@@ -481,14 +481,25 @@
       padding: 0;
       border: 0;
       border-radius: 50%;
-      background: rgba(247, 245, 240, 0.18);
-      color: var(--ink-on-red);
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
+    }
+    .home-cal__match-btn.is-idle {
+      background: rgba(10, 10, 10, 0.22);
+      color: rgba(247, 245, 240, 0.38);
+      cursor: default;
+    }
+    .home-cal__match-btn.is-match {
+      background: var(--paper);
+      color: rgba(52, 34, 32, 0.62);
       cursor: pointer;
     }
-    .home-cal__match-btn[hidden] { display: none !important; }
+    .home-cal__match-btn.is-match:focus-visible {
+      outline: 2px solid rgba(247, 245, 240, 0.85);
+      outline-offset: 2px;
+    }
     .home-cal__match-btn svg {
       width: 15px;
       height: 15px;
@@ -636,7 +647,7 @@
       grid-template-columns: 40px 1fr 40px;
       align-items: center;
       gap: 8px;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
     .home-cal__label {
       text-align: center;
@@ -676,15 +687,8 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
+      gap: 6px;
       min-width: 0;
-    }
-    .home-cal__match-slot {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      min-height: 28px;
     }
     .home-cal__day {
       width: 100%;
@@ -3460,6 +3464,7 @@ browsen</span>
             <h2 class="home-cal__label" id="week-label"></h2>
             <button class="home-cal__nav home-cal__nav--next" type="button" id="week-next" aria-label="Nächste Woche" data-aria-de="Nächste Woche" data-aria-en="Next week"></button>
           </div>
+          <div class="home-cal__matches" id="week-matches" aria-label="Ort-Matches"></div>
           <div class="home-cal__days" id="week" role="listbox" aria-label="Wochentage"></div>
         </div>
         <div class="home-workout" id="home-workout">
@@ -8013,23 +8018,39 @@ browsen</span>
         return '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5z"/></svg>';
       }
 
-      function buildWeekdayMatchBtn(dateKey, wd, matches) {
-        var slot = document.createElement("div");
-        slot.className = "home-cal__match-slot";
-        if (!matches || !matches.length) return slot;
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "home-cal__match-btn" + (matches.length > 1 ? " is-multi" : "");
-        if (matches.length > 1) btn.setAttribute("data-count", String(matches.length));
-        btn.innerHTML = personIconSvg();
-        btn.setAttribute("aria-label", uiLang === "en" ? "Matching buddies" : "Passende Buddies");
-        btn.addEventListener("click", function (ev) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          openMatchPeopleModal(dateKey, wd, matches);
+      function renderWeekMatches(days, dateKeyFn) {
+        var root = document.getElementById("week-matches");
+        if (!root) return;
+        root.innerHTML = "";
+        var keyFn = typeof dateKeyFn === "function" ? dateKeyFn : formatDateKey;
+        days.forEach(function (d) {
+          var wd = (d.getDay() + 6) % 7;
+          var key = keyFn(d);
+          var matches = collectWeekdayMatches(wd);
+          var cell = document.createElement("div");
+          cell.className = "home-cal__match-cell";
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "home-cal__match-btn " + (matches.length ? "is-match" : "is-idle");
+          if (matches.length > 1) {
+            btn.classList.add("is-multi");
+            btn.setAttribute("data-count", String(matches.length));
+          }
+          btn.innerHTML = personIconSvg();
+          if (matches.length) {
+            btn.setAttribute("aria-label", uiLang === "en" ? "Matching buddies" : "Passende Buddies");
+            btn.addEventListener("click", function (ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              openMatchPeopleModal(key, wd, matches);
+            });
+          } else {
+            btn.disabled = true;
+            btn.setAttribute("aria-label", uiLang === "en" ? "No place match" : "Kein Ort-Match");
+          }
+          cell.appendChild(btn);
+          root.appendChild(cell);
         });
-        slot.appendChild(btn);
-        return slot;
       }
 
       function openMatchPeopleModal(dateKey, wd, matches) {
@@ -12461,6 +12482,8 @@ browsen</span>
             editingOpen = true;
           }
 
+          renderWeekMatches(days, dateKey);
+
           days.forEach(function (d, i) {
             var key = dateKey(d);
             var wd = (d.getDay() + 6) % 7;
@@ -12469,8 +12492,6 @@ browsen</span>
             var rateable = canRateCalendarDay(key);
             var cell = document.createElement("div");
             cell.className = "home-cal__cell";
-
-            cell.appendChild(buildWeekdayMatchBtn(key, wd, collectWeekdayMatches(wd)));
 
             var btn = document.createElement("button");
             btn.type = "button";
