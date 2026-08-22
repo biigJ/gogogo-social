@@ -8297,7 +8297,7 @@ browsen</span>
       }
 
       var PROFILE_PLAN_VIEW_KEY = "gogogo_profile_plan_view";
-      var ICS_WD_ANCHOR = ["20260105", "20260106", "20260107", "20260108", "20260109", "20260110", "20260111"];
+      var ICS_EXPAND_WEEKS = 16;
       var CALENDAR_FEED_BUCKET = "go-calendars";
       var profilePlanToolbarBound = false;
       var calendarSettingsDraft = { provider: null, privacy: false };
@@ -8370,10 +8370,23 @@ browsen</span>
         updateProfilePlanSyncBtn();
       }
 
-      function icsPlainText(text) {
+      function icsAscii(text) {
         return String(text || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/ä/g, "ae")
+          .replace(/ö/g, "oe")
+          .replace(/ü/g, "ue")
+          .replace(/Ä/g, "Ae")
+          .replace(/Ö/g, "Oe")
+          .replace(/Ü/g, "Ue")
+          .replace(/ß/g, "ss");
+      }
+
+      function icsPlainText(text) {
+        return icsAscii(String(text || "")
           .replace(/\u00b7/g, " - ")
-          .replace(/\//g, "-");
+          .replace(/\//g, "-"));
       }
 
       function icsEscape(text) {
@@ -8386,6 +8399,32 @@ browsen</span>
 
       function icsStampNow() {
         return new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+      }
+
+      function icsYmdFromDate(d) {
+        return String(d.getFullYear()) + String(d.getMonth() + 1).padStart(2, "0") + String(d.getDate()).padStart(2, "0");
+      }
+
+      function icsAddDaysYmd(ymd, days) {
+        var y = parseInt(ymd.slice(0, 4), 10);
+        var mo = parseInt(ymd.slice(4, 6), 10) - 1;
+        var d = parseInt(ymd.slice(6, 8), 10);
+        var dt = new Date(y, mo, d + days);
+        return icsYmdFromDate(dt);
+      }
+
+      function icsWeekdayJs(weekdayIndex) {
+        return weekdayIndex === 6 ? 0 : weekdayIndex + 1;
+      }
+
+      function icsNextWeekdayYmd(weekdayIndex) {
+        var target = icsWeekdayJs(weekdayIndex);
+        var now = new Date();
+        var d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        var diff = target - d.getDay();
+        if (diff < 0) diff += 7;
+        d.setDate(d.getDate() + diff);
+        return icsYmdFromDate(d);
       }
 
       function icsEventEnd(anchorDate, hh, mm) {
@@ -8411,6 +8450,7 @@ browsen</span>
           "PRODID:-//gogogo.social//Wochenplan//DE",
           "CALSCALE:GREGORIAN",
           "METHOD:PUBLISH",
+          "CALNAME:gogogo Wochenplan",
           "X-WR-CALNAME:gogogo Wochenplan"
         ];
         var uidBase = String((account && account.id) || account.invite_code || "local").replace(/[^a-zA-Z0-9]/g, "");
@@ -8423,20 +8463,22 @@ browsen</span>
           var tp = time.split(":");
           var hh = String(tp[0] || "18").padStart(2, "0");
           var mm = String(tp[1] || "00").padStart(2, "0");
-          var anchor = ICS_WD_ANCHOR[i];
-          var dtStart = anchor + "T" + hh + mm + "00";
-          var dtEnd = icsEventEnd(anchor, hh, mm);
+          var firstDate = icsNextWeekdayYmd(i);
           var summary = icsPlainText(profileWeekdays()[i] + " - " + String(dayVal).split("\n")[0].slice(0, 80));
-          lines.push("BEGIN:VEVENT");
-          lines.push("UID:gogogo-plan-wd-" + i + "@" + uidBase + ".gogogo");
-          lines.push("DTSTAMP:" + stamp);
-          lines.push("DTSTART:" + dtStart);
-          lines.push("DTEND:" + dtEnd);
-          lines.push("RRULE:FREQ=WEEKLY");
-          lines.push("SUMMARY:" + icsEscape(summary));
-          if (meet.place) lines.push("LOCATION:" + icsEscape(meet.place));
-          if (dayVal) lines.push("DESCRIPTION:" + icsEscape(dayVal));
-          lines.push("END:VEVENT");
+          for (var w = 0; w < ICS_EXPAND_WEEKS; w++) {
+            var anchor = icsAddDaysYmd(firstDate, w * 7);
+            var dtStart = anchor + "T" + hh + mm + "00";
+            var dtEnd = icsEventEnd(anchor, hh, mm);
+            lines.push("BEGIN:VEVENT");
+            lines.push("UID:gogogo-plan-wd-" + i + "-w" + w + "@" + uidBase + ".gogogo");
+            lines.push("DTSTAMP:" + stamp);
+            lines.push("DTSTART:" + dtStart);
+            lines.push("DTEND:" + dtEnd);
+            lines.push("SUMMARY:" + icsEscape(summary));
+            if (meet.place) lines.push("LOCATION:" + icsEscape(meet.place));
+            if (dayVal) lines.push("DESCRIPTION:" + icsEscape(dayVal));
+            lines.push("END:VEVENT");
+          }
         }
         lines.push("END:VCALENDAR");
         return lines.join("\r\n");
@@ -8473,7 +8515,7 @@ browsen</span>
       }
 
       function getCalendarFeedPublicUrl(path, cacheBust) {
-        var url = getCalendarFeedOrigin() + "/api/calendar/" + path;
+        var url = getCalendarFeedOrigin() + "/cal/" + path;
         return cacheBust ? url + "?v=" + Date.now() : url;
       }
 
