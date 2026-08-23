@@ -702,6 +702,27 @@
         return rows && rows[0] ? rows[0] : null;
       }
 
+      function namesMatch(a, b) {
+        return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+      }
+
+      async function lookupAccount(name, invite) {
+        if (!invite || !name) return null;
+        var rows = await restGet(
+          "go_accounts?invite_code=eq." + encodeURIComponent(invite) +
+          "&select=*&order=created_at.desc&limit=50"
+        );
+        if (!rows || !rows.length) return null;
+        var matches = rows.filter(function (r) {
+          return r && !r.deleted_at && namesMatch(r.name, name);
+        });
+        if (!matches.length) return null;
+        for (var i = 0; i < matches.length; i++) {
+          if (matches[i].photo_url) return matches[i];
+        }
+        return matches[0];
+      }
+
       // ── Submit ────────────────────────────────────────────────
       form.addEventListener("submit", async function (e) {
         e.preventDefault();
@@ -722,44 +743,57 @@
             submitBtn.disabled = false;
             return;
           }
+          if (invite.paused) {
+            msgEl.textContent = "Dieser Code ist pausiert.";
+            msgEl.classList.add("is-error");
+            submitBtn.disabled = false;
+            return;
+          }
+          if (invite.first_name && !namesMatch(invite.first_name, name)) {
+            msgEl.textContent = "Dieser Code ist einem anderen Namen zugeordnet.";
+            msgEl.classList.add("is-error");
+            submitBtn.disabled = false;
+            return;
+          }
 
           await resolveTrainerFromInvite(invite);
 
           var serial = invite.serial_number || null;
-
-          // Account anlegen
-          var accountPayload = {
-            name: name,
-            phone: phone,
-            invite_code: code,
-            serial_number: serial,
-            source: "invite",
-            created_at: now,
-            updated_at: now
-          };
-          if (resolvedTrainerId) accountPayload.trainer_id = resolvedTrainerId;
-
-          var accounts = null;
+          var accountRow = null;
           try {
-            accounts = await restInsert(
-              "go_accounts?on_conflict=invite_code",
-              accountPayload,
-              "resolution=merge-duplicates,return=representation"
-            );
-          } catch (err) {
+            accountRow = await lookupAccount(name, code);
+          } catch (eLook) {}
+
+          if (!accountRow) {
+            var accountPayload = {
+              name: name,
+              phone: phone,
+              invite_code: code,
+              serial_number: serial,
+              onboarding_completed: false,
+              created_at: now,
+              updated_at: now
+            };
+            if (resolvedTrainerId) accountPayload.trainer_id = resolvedTrainerId;
             try {
-              delete accountPayload.trainer_id;
-              accounts = await restInsert(
-                "go_accounts?on_conflict=invite_code",
-                accountPayload,
-                "resolution=merge-duplicates,return=representation"
-              );
-            } catch (err2) {
-              queueLead(accountPayload);
+              var inserted = await restInsert("go_accounts", accountPayload, "return=representation");
+              accountRow = inserted && inserted[0] ? inserted[0] : null;
+            } catch (errIns) {
+              try {
+                delete accountPayload.trainer_id;
+                var inserted2 = await restInsert("go_accounts", accountPayload, "return=representation");
+                accountRow = inserted2 && inserted2[0] ? inserted2[0] : null;
+              } catch (errIns2) {
+                queueLead(accountPayload);
+              }
             }
+          } else {
+            accountRow.phone = phone;
+            if (serial) accountRow.serial_number = serial;
+            if (resolvedTrainerId && !accountRow.trainer_id) accountRow.trainer_id = resolvedTrainerId;
           }
 
-          var accountId = accounts && accounts[0] ? accounts[0].id : null;
+          var accountId = accountRow && accountRow.id ? accountRow.id : null;
 
           // Lead speichern
           var leadPayload = {
@@ -802,8 +836,15 @@
           }
 
           // Account lokal speichern
-          var localAccount = { name: name, phone: phone, invite_code: code, serial_number: serial };
+          var localAccount = {
+            name: name,
+            phone: phone,
+            invite_code: code,
+            serial_number: serial,
+            onboarding_completed: false
+          };
           if (accountId) localAccount.id = accountId;
+          if (accountRow && accountRow.created_at) localAccount.created_at = accountRow.created_at;
           if (resolvedTrainerId) localAccount.trainer_id = resolvedTrainerId;
           try {
             if (window.GoAccountSession) GoAccountSession.save(localAccount);

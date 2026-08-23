@@ -2797,13 +2797,24 @@
           var wd = Number(k);
           if (!(wd >= 0 && wd <= 6)) return;
           var row = m[k];
-          if (!row || !row.kind) return;
-          out[wd] = {
-            kind: String(row.kind),
-            label: row.label != null ? String(row.label) : "",
-            systemId: row.systemId != null ? String(row.systemId) : "",
-            presetId: row.presetId != null ? String(row.presetId) : ""
-          };
+          if (!row) return;
+          if (row.workout && row.workout.kind) {
+            out[wd] = {
+              kind: String(row.workout.kind),
+              label: row.workout.label != null ? String(row.workout.label) : "",
+              systemId: row.workout.systemId != null ? String(row.workout.systemId) : "",
+              presetId: row.workout.presetId != null ? String(row.workout.presetId) : ""
+            };
+            return;
+          }
+          if (row.kind) {
+            out[wd] = {
+              kind: String(row.kind),
+              label: row.label != null ? String(row.label) : "",
+              systemId: row.systemId != null ? String(row.systemId) : "",
+              presetId: row.presetId != null ? String(row.presetId) : ""
+            };
+          }
         });
         return out;
       }
@@ -3046,10 +3057,18 @@
           var u = dayTrainingUnits[wd];
           if (!u || !u.kind) return;
           out[String(wd)] = {
-            kind: u.kind,
-            label: u.label || "",
-            systemId: u.systemId || null,
-            presetId: u.presetId || null
+            workout: {
+              kind: u.kind,
+              label: u.label || "",
+              systemId: u.systemId || null,
+              presetId: u.presetId || null
+            },
+            alternative: {
+              kind: "walk",
+              label: "Spaziergang",
+              systemId: null,
+              presetId: null
+            }
           };
         });
         return out;

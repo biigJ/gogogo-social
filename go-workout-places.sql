@@ -36,5 +36,8 @@ values
   ('Holmes Place Neue Welt', 52.5055, 13.4437, 'seed', 'seed:holmes-neue-welt'),
   ('Hagius Berlin', 52.4969, 13.4386, 'seed', 'seed:hagius-berlin'),
   ('Hasenheide Park', 52.4774, 13.4194, 'seed', 'seed:hasenheide'),
-  ('Tempelhofer Feld', 52.4734, 13.4039, 'seed', 'seed:tempelhofer-feld')
+  ('Tempelhofer Feld', 52.4734, 13.4039, 'seed', 'seed:tempelhofer-feld'),
+  ('Columbiabad Neukölln', 52.4830, 13.4310, 'seed', 'seed:columbiabad-neukoelln'),
+  ('Prinzenbad Kreuzberg', 52.4885, 13.4055, 'seed', 'seed:prinzenbad-kreuzberg'),
+  ('Schwimmbad Landsberger Allee', 52.5285, 13.4720, 'seed', 'seed:schwimmbad-landsberger')
 on conflict (external_id) do nothing;
