@@ -740,6 +740,23 @@
     cursor:default;
     opacity:0.38;
   }
+  .interval-ray-hub:not(:disabled):active{
+    transform:scale(0.96);
+    opacity:0.9;
+  }
+  .interval-ray-hub.is-running #kraftHubStart,
+  .interval-ray-hub.is-running #ausdauerHubStart,
+  .interval-ray-hub.is-running #rayHubStart{
+    display:none !important;
+  }
+  .interval-ray-hub.is-running #kraftHubDone,
+  .interval-ray-hub.is-running #ausdauerHubDone{
+    display:flex !important;
+  }
+  .interval-ray-hub:not(.is-running) #kraftHubDone,
+  .interval-ray-hub:not(.is-running) #ausdauerHubDone{
+    display:none !important;
+  }
   .ray-hub-start{
     display:flex; flex-direction:column; align-items:center; gap:0;
     pointer-events:none;
@@ -1936,6 +1953,10 @@
                   <label for="ausdauerDistance"><span data-de="Distanz" data-en="Distance">Distanz</span> <span class="unit">km</span></label>
                   <input id="ausdauerDistance" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0">
                 </div>
+                <div class="ausdauer-field">
+                  <label for="ausdauerHr"><span data-de="Ø Herzfrequenz" data-en="Avg heart rate">Ø Herzfrequenz</span> <span class="unit">bpm</span></label>
+                  <input id="ausdauerHr" type="number" inputmode="numeric" min="40" max="220" step="1" placeholder="0">
+                </div>
               </div>
               <button type="button" class="ausdauer-save-preset" id="ausdauerSavePreset" data-de="Als Vorlage speichern" data-en="Save as template">Als Vorlage speichern</button>
             </div>
@@ -2094,6 +2115,30 @@
       <div class="abort-actions">
         <button type="button" class="abort-stay" id="kraftFinishTableBtn" data-de="Tabelle" data-en="Table">Tabelle</button>
         <button type="button" class="abort-yes" id="kraftFinishOkBtn">OK</button>
+      </div>
+    </div>
+  </div>
+  <div class="abort-overlay" id="ausdauerFinishOverlay" hidden>
+    <div class="abort-card">
+      <h2 data-de="Ausdauer bewerten" data-en="Rate endurance">Ausdauer bewerten</h2>
+      <p data-de="Trage Deine Werte ein — Apple Health / Garmin kommen später als Import." data-en="Enter your values — Apple Health / Garmin import coming later.">Trage Deine Werte ein — Apple Health / Garmin kommen später als Import.</p>
+      <div class="ausdauer-fields" style="margin-top:12px;text-align:left">
+        <div class="ausdauer-field">
+          <label for="ausdauerFinishDistance"><span data-de="Distanz" data-en="Distance">Distanz</span> <span class="unit">km</span></label>
+          <input id="ausdauerFinishDistance" type="number" inputmode="decimal" min="0" step="0.1" placeholder="0">
+        </div>
+        <div class="ausdauer-field">
+          <label for="ausdauerFinishDuration"><span data-de="Zeit" data-en="Time">Zeit</span> <span class="unit">min</span></label>
+          <input id="ausdauerFinishDuration" type="number" inputmode="numeric" min="1" step="1" placeholder="45">
+        </div>
+        <div class="ausdauer-field">
+          <label for="ausdauerFinishHr"><span data-de="Ø Herzfrequenz" data-en="Avg heart rate">Ø Herzfrequenz</span> <span class="unit">bpm</span></label>
+          <input id="ausdauerFinishHr" type="number" inputmode="numeric" min="40" max="220" step="1" placeholder="0">
+        </div>
+      </div>
+      <div class="abort-actions">
+        <button type="button" class="abort-stay" id="ausdauerFinishCancel" data-de="Abbrechen" data-en="Cancel">Abbrechen</button>
+        <button type="button" class="abort-yes" id="ausdauerFinishSave" data-de="Speichern" data-en="Save">Speichern</button>
       </div>
     </div>
   </div>
@@ -3356,7 +3401,6 @@
       updatePlanScrollbar();
       await loadIntervalLogs();
       showFinishDialog();
-      notifyParentWorkoutFinished();
       return;
     }
     saveLogEntry();
@@ -3464,14 +3508,15 @@
     }
   }
 
-  function notifyParentWorkoutFinished(){
+  function notifyParentWorkoutFinished(unitChoice){
     if (!useParentTabs || window.parent === window) return;
     try {
       window.parent.postMessage({
         type: 'gogogo-training-goto',
         panel: 'home',
         finished: true,
-        dateKey: berlinTodayISO()
+        dateKey: berlinTodayISO(),
+        unitChoice: unitChoice || 'workout'
       }, '*');
     } catch (e) {}
   }
@@ -4521,6 +4566,7 @@
     const saveBtn = document.getElementById('kraftSavePreset');
     if (!hub) return;
     hub.disabled = kraftRunning ? false : kraftSelected.length === 0;
+    hub.classList.toggle('is-running', !!kraftRunning);
     if (start) start.hidden = kraftRunning;
     if (done) done.hidden = !kraftRunning;
     if (saveBtn) saveBtn.disabled = kraftRunning || kraftSelected.length === 0;
@@ -4783,18 +4829,12 @@
   async function finishKraftSession(){
     await saveKraftWorkout();
     showKraftFinishDialog();
-    notifyParentWorkoutFinished();
   }
 
   function goToCalendarAfterKraft(){
     hideKraftFinishDialog();
-    if (pendingAusdauerFinish) {
-      pendingAusdauerFinish = false;
-      endAusdauerSession();
-    } else {
-      endKraftSession();
-    }
-    notifyParentWorkoutFinished();
+    endKraftSession();
+    notifyParentWorkoutFinished('workout');
   }
 
   function updateKraftScrollbar(){
@@ -4886,6 +4926,7 @@
   let ausdauerActive = null;
   let ausdauerLogs = [];
   let pendingAusdauerFinish = false;
+  let ausdauerPendingFinish = null;
 
   function ausdauerCat(){
     return window.GOGOGO_AUSDAUER || { TECHNIQUES: [], techniqueById: function(){ return { id: 'run', name: 'Laufen', speedUnit: 'min/km', hasIncline: true }; }, summarize: function(){ return ''; } };
@@ -4899,7 +4940,7 @@
       incline: document.getElementById('ausdauerIncline').value,
       duration_min: document.getElementById('ausdauerDuration').value,
       speed: document.getElementById('ausdauerSpeed').value,
-      hr_avg: '',
+      hr_avg: document.getElementById('ausdauerHr') ? document.getElementById('ausdauerHr').value : '',
       distance_km: document.getElementById('ausdauerDistance').value
     };
   }
@@ -4911,10 +4952,12 @@
     const dur = document.getElementById('ausdauerDuration');
     const spd = document.getElementById('ausdauerSpeed');
     const dist = document.getElementById('ausdauerDistance');
+    const hr = document.getElementById('ausdauerHr');
     if (inc) inc.value = row.incline != null ? row.incline : '';
     if (dur) dur.value = row.duration_min != null ? row.duration_min : '';
     if (spd) spd.value = row.speed != null ? row.speed : '';
     if (dist) dist.value = row.distance_km != null ? row.distance_km : '';
+    if (hr) hr.value = row.hr_avg != null ? row.hr_avg : '';
     renderAusdauerTech();
   }
 
@@ -4973,6 +5016,7 @@
     if (!hub) return;
     const form = ausdauerCurrent();
     hub.disabled = ausdauerRunning ? false : !(form && form.technique);
+    hub.classList.toggle('is-running', !!ausdauerRunning);
     if (start) start.hidden = ausdauerRunning;
     if (done) done.hidden = !ausdauerRunning;
   }
@@ -5425,25 +5469,63 @@
     notifyParentTabState();
   }
 
-  async function finishAusdauerSession(){
+  function showAusdauerFinishDialog(snapshot){
+    const overlay = document.getElementById('ausdauerFinishOverlay');
+    if (!overlay) return;
+    const dist = document.getElementById('ausdauerFinishDistance');
+    const dur = document.getElementById('ausdauerFinishDuration');
+    const hr = document.getElementById('ausdauerFinishHr');
+    if (dist) dist.value = snapshot && snapshot.distance_km != null && snapshot.distance_km !== '' ? snapshot.distance_km : '';
+    if (dur) dur.value = snapshot && snapshot.duration_min != null && snapshot.duration_min !== '' ? snapshot.duration_min : '';
+    if (hr) hr.value = snapshot && snapshot.hr_avg != null && snapshot.hr_avg !== '' ? snapshot.hr_avg : '';
+    overlay.hidden = false;
+  }
+
+  function hideAusdauerFinishDialog(){
+    const overlay = document.getElementById('ausdauerFinishOverlay');
+    if (overlay) overlay.hidden = true;
+  }
+
+  async function saveAusdauerFinishDialog(){
     const aid = getGoAccountId();
-    const cur = ausdauerCurrent();
-    if (aid && cur && cur.technique) {
+    const base = ausdauerPendingFinish || ausdauerReadForm();
+    const dist = document.getElementById('ausdauerFinishDistance');
+    const dur = document.getElementById('ausdauerFinishDuration');
+    const hr = document.getElementById('ausdauerFinishHr');
+    const form = Object.assign({}, base, {
+      distance_km: dist ? dist.value : '',
+      duration_min: dur ? dur.value : '',
+      hr_avg: hr ? hr.value : ''
+    });
+    if (aid && form.technique) {
       try {
-        await postAusdauerRow('go_ausdauer_logs', ausdauerWriteBody(cur, {
+        await postAusdauerRow('go_ausdauer_logs', ausdauerWriteBody(form, {
           account_id: aid,
           workout_date: berlinTodayISO()
         }), 'return=minimal');
+        await loadAusdauerLogs();
+        refreshAusdauerChrome();
       } catch (e) {
         console.warn('Ausdauer log save failed', e);
       }
     }
-    showKraftFinishDialog();
-    pendingAusdauerFinish = true;
-    notifyParentWorkoutFinished();
+    ausdauerPendingFinish = null;
+    hideAusdauerFinishDialog();
+    notifyParentWorkoutFinished('workout');
+  }
+
+  async function finishAusdauerSession(){
+    const snapshot = ausdauerActive ? Object.assign({}, ausdauerActive) : Object.assign({}, ausdauerCurrent());
+    ausdauerPendingFinish = snapshot;
+    endAusdauerSession();
+    showAusdauerFinishDialog(snapshot);
   }
 
   async function enterAusdauerView(){
+    if (!ausdauerRunning) {
+      pendingAusdauerFinish = false;
+      ausdauerPendingFinish = null;
+    }
     document.getElementById('trainingBack').classList.toggle('is-visible', ausdauerRunning);
     await loadAusdauerPresets();
     refreshAusdauerChrome();
@@ -6400,10 +6482,21 @@
         }
         return;
       }
+      if (e.target.closest('#ausdauerFinishSave')) {
+        e.preventDefault(); e.stopPropagation();
+        saveAusdauerFinishDialog();
+        return;
+      }
+      if (e.target.closest('#ausdauerFinishCancel')) {
+        e.preventDefault(); e.stopPropagation();
+        ausdauerPendingFinish = null;
+        hideAusdauerFinishDialog();
+        return;
+      }
       if (e.target.closest('#finishOkBtn')) {
         e.preventDefault(); e.stopPropagation();
         hideFinishDialog();
-        notifyParentWorkoutFinished();
+        notifyParentWorkoutFinished('workout');
         return;
       }
       if (e.target.closest('#finishTableBtn')) {
@@ -6414,16 +6507,9 @@
       }
       if (e.target.closest('#kraftFinishTableBtn')) {
         e.preventDefault(); e.stopPropagation();
-        const wasAusdauer = pendingAusdauerFinish;
         hideKraftFinishDialog();
-        if (wasAusdauer) {
-          pendingAusdauerFinish = false;
-          endAusdauerSession();
-          openHistoryView('ausdauer');
-        } else {
-          endKraftSession();
-          openHistoryView('kraft');
-        }
+        endKraftSession();
+        openHistoryView('kraft');
         return;
       }
       if (e.target.closest('#deleteStayBtn')) {

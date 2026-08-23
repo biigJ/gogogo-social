@@ -3,7 +3,12 @@
 --
 -- score 1–10 = Häkchen gesetzt
 -- score null = explizit mit X markiert (kein Wert / Null)
+-- unit_done = Workout/Alternative abgeschlossen (auch ohne Bewertung)
 -- kein Eintrag = Tag unmarkiert
+
+alter table go_day_entries
+  add column if not exists unit_choice text check (unit_choice is null or unit_choice in ('workout', 'alternative')),
+  add column if not exists unit_done boolean not null default false;
 
 create table if not exists go_day_entries (
   id uuid primary key default gen_random_uuid(),

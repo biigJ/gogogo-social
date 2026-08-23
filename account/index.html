@@ -1099,12 +1099,31 @@
       outline-offset: 2px;
     }
     .profile-settings-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .profile-settings-menu__section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .profile-settings-menu__label {
+      margin: 0;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      opacity: 0.72;
+    }
+    .profile-settings-menu__grid {
       display: grid;
-      gap: 10px;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
     }
     .profile-settings-menu__btn {
       width: 100%;
-      min-height: 48px;
+      min-height: 44px;
       border: 1.5px solid rgba(247, 245, 240, 0.45);
       border-radius: var(--radius);
       background: transparent;
@@ -4227,8 +4246,13 @@
       box-shadow: 0 0 0 2px rgba(247,245,240,0.35);
     }
     .home-cal__unit-btn.is-done {
-      opacity: 0.55;
-      pointer-events: none;
+      border-color: var(--ink-on-red);
+      box-shadow: 0 0 0 2px rgba(247,245,240,0.55);
+      opacity: 0.92;
+    }
+    .home-cal__unit-btn:active:not(:disabled) {
+      transform: scale(0.94);
+      opacity: 0.88;
     }
     .home-cal__unit-btn.is-empty {
       visibility: hidden;
@@ -5137,16 +5161,31 @@ browsen</span>
     <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="profile-settings-title">
       <p class="challenge-modal__title" id="profile-settings-title" hidden>Menü</p>
       <div class="profile-settings-menu">
-        <button class="profile-settings-menu__btn" type="button" id="profile-change-name-btn" data-de="Vorname ändern" data-en="Change first name">Vorname ändern</button>
-        <button class="profile-settings-menu__btn" type="button" id="profile-change-phone-btn" data-de="Telefonnummer ändern" data-en="Change phone number">Telefonnummer ändern</button>
-        <button class="profile-settings-menu__btn" type="button" id="profile-calendar-settings-btn" data-de="Kalender-System" data-en="Calendar system">Kalender-System</button>
-        <button class="profile-settings-menu__btn" type="button" id="profile-change-code-btn" data-de="Code ändern" data-en="Change code">Code ändern</button>
-        <button class="profile-settings-menu__btn" type="button" id="profile-lang-btn" data-de="English" data-en="Deutsch">English</button>
-        <button class="profile-settings-menu__btn" type="button" id="profile-push-toggle-btn" data-de="Push: aus" data-en="Push: off">Push: aus</button>
-        <a class="profile-settings-menu__btn" href="/datenschutz/" data-de="Datenschutz" data-en="Privacy">Datenschutz</a>
-        <a class="profile-settings-menu__btn" href="/impressum/" data-de="Impressum" data-en="Legal notice">Impressum</a>
-        <a class="profile-settings-menu__btn" href="/kontakt/" data-de="Kontakt" data-en="Contact">Kontakt</a>
-        <a class="profile-settings-menu__btn" href="/?landing=1" id="profile-website-btn" data-de="Website" data-en="Website">Website</a>
+        <div class="profile-settings-menu__section">
+          <p class="profile-settings-menu__label" data-de="Profil" data-en="Profile">Profil</p>
+          <div class="profile-settings-menu__grid">
+            <button class="profile-settings-menu__btn" type="button" id="profile-change-name-btn" data-de="Vorname" data-en="First name">Vorname</button>
+            <button class="profile-settings-menu__btn" type="button" id="profile-change-phone-btn" data-de="Telefon" data-en="Phone">Telefon</button>
+            <button class="profile-settings-menu__btn" type="button" id="profile-change-code-btn" data-de="Code" data-en="Code">Code</button>
+            <button class="profile-settings-menu__btn" type="button" id="profile-lang-btn" data-de="English" data-en="Deutsch">English</button>
+          </div>
+        </div>
+        <div class="profile-settings-menu__section">
+          <p class="profile-settings-menu__label" data-de="App" data-en="App">App</p>
+          <div class="profile-settings-menu__grid">
+            <button class="profile-settings-menu__btn" type="button" id="profile-calendar-settings-btn" data-de="Kalender" data-en="Calendar">Kalender</button>
+            <button class="profile-settings-menu__btn" type="button" id="profile-push-toggle-btn" data-de="Push: aus" data-en="Push: off">Push: aus</button>
+          </div>
+        </div>
+        <div class="profile-settings-menu__section">
+          <p class="profile-settings-menu__label" data-de="Info" data-en="Info">Info</p>
+          <div class="profile-settings-menu__grid">
+            <a class="profile-settings-menu__btn" href="/datenschutz/" data-de="Datenschutz" data-en="Privacy">Datenschutz</a>
+            <a class="profile-settings-menu__btn" href="/impressum/" data-de="Impressum" data-en="Legal">Impressum</a>
+            <a class="profile-settings-menu__btn" href="/kontakt/" data-de="Kontakt" data-en="Contact">Kontakt</a>
+            <a class="profile-settings-menu__btn" href="/?landing=1" id="profile-website-btn" data-de="Website" data-en="Website">Website</a>
+          </div>
+        </div>
         <button class="profile-settings-menu__btn is-danger" type="button" id="profile-delete-account-btn" data-de="Account löschen" data-en="Delete account">Account löschen</button>
       </div>
     </div>
@@ -14768,14 +14807,49 @@ browsen</span>
         try { localStorage.setItem(DAY_ENTRIES_KEY, JSON.stringify(dayEntries)); } catch (e) {}
       }
 
-      function setDayEntryLocal(date, score, unitChoice) {
-        if (!canRateCalendarDay(date)) return false;
+      function setDayEntryLocal(date, score, unitChoice, unitDone) {
+        if (!canRateCalendarDay(date) && unitDone !== true) return false;
         var prev = dayEntries[date] || {};
         dayEntries[date] = {
-          score: score,
-          unit_choice: unitChoice != null ? unitChoice : (prev.unit_choice || null)
+          score: score != null ? score : (prev.score != null ? prev.score : null),
+          unit_choice: unitChoice != null ? unitChoice : (prev.unit_choice || null),
+          unit_done: unitDone === true ? true : (score != null ? true : !!prev.unit_done)
         };
         saveDayEntriesLocal();
+        return true;
+      }
+
+      async function markWorkoutUnitDone(date, unitChoice) {
+        if (!account || isAccountPaused()) return false;
+        var key = String(date || berlinTodayKey()).slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+        var slot = String(unitChoice || activeTrainingUnitChoice || "workout");
+        if (slot !== "workout" && slot !== "alternative") slot = "workout";
+        if (!setDayEntryLocal(key, null, slot, true)) {
+          var prev = dayEntries[key] || {};
+          dayEntries[key] = {
+            score: prev.score != null ? prev.score : null,
+            unit_choice: slot,
+            unit_done: true
+          };
+          saveDayEntriesLocal();
+        }
+        if (hasCloudAccount()) {
+          try {
+            var prevRow = dayEntries[key] || {};
+            await restUpsertDayEntry({
+              account_id: account.id,
+              date: key,
+              score: prevRow.score != null ? prevRow.score : null,
+              unit_choice: slot,
+              unit_done: true,
+              updated_at: new Date().toISOString()
+            });
+          } catch (eDone) {}
+        }
+        if (typeof window.__gogogoRenderWeek === "function") {
+          try { window.__gogogoRenderWeek(); } catch (eRwDone) {}
+        }
         return true;
       }
 
@@ -15841,12 +15915,17 @@ browsen</span>
         }
         if (ev.data.type === "gogogo-training-goto") {
           document.body.classList.remove("is-training-workout");
+          var finishKey = ev.data.dateKey || "";
+          if (ev.data.finished) {
+            if (typeof window.__gogogoMarkWorkoutUnitDone === "function") {
+              window.__gogogoMarkWorkoutUnitDone(finishKey, ev.data.unitChoice || "");
+            }
+          }
           gotoPanel(ev.data.panel || "home");
           if (ev.data.finished && typeof window.__gogogoPromptWorkoutRating === "function") {
-            var finishKey = ev.data.dateKey || "";
             window.setTimeout(function () {
               window.__gogogoPromptWorkoutRating(finishKey);
-            }, 100);
+            }, 120);
           }
         }
       });
@@ -15894,7 +15973,7 @@ browsen</span>
         }
         if (id !== "book") pauseAccountVideos();
         if (id === "training") {
-          var TRAINING_IFRAME_V = "20260823a";
+          var TRAINING_IFRAME_V = "20260823b";
           var wantTrainingSrc = "/account/fitness-friday.html?embed=1&parentTabs=1&v=" + TRAINING_IFRAME_V;
           if (!trainingFrame.src || String(trainingFrame.src).indexOf("v=" + TRAINING_IFRAME_V) === -1) {
             trainingFrame.src = wantTrainingSrc;
@@ -16530,15 +16609,20 @@ browsen</span>
           if (isAccountPaused()) return;
           selectDay(key, false);
           var entry = entryFor(key);
-          var rated = !!(entry && entry.score != null);
-          if (rated && !canEditExistingRating()) return;
+          var scored = !!(entry && entry.score != null);
+          var unitDone = !!(entry && entry.unit_done && String(entry.unit_choice || "") === slot);
+          if (scored && !canEditExistingRating()) return;
           pendingUnitChoice = slot;
           rememberTrainingContext(key, slot);
-          if (slot === "workout" && w && w.training && w.trainingTab && !rated) {
+          if (unitDone && !scored) {
+            openDayRateModal(key, { force: true });
+            return;
+          }
+          if (slot === "workout" && w && w.training && w.trainingTab && !scored && !unitDone) {
             openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null, key, slot);
             return;
           }
-          if (!rated && !canRateCalendarDay(key)) return;
+          if (!scored && !unitDone && !canRateCalendarDay(key)) return;
           openDayRateModal(key);
         }
 
@@ -16558,8 +16642,9 @@ browsen</span>
           }
           var entryCell = entryFor(key);
           var chosenCell = entryCell && entryCell.unit_choice ? String(entryCell.unit_choice) : null;
-          var ratedCell = dayHasRating(key);
-          if (ratedCell && chosenCell && chosenCell !== slot) {
+          var unitDoneCell = !!(entryCell && entryCell.unit_done && chosenCell);
+          var scoredCell = !!(entryCell && entryCell.score != null);
+          if (unitDoneCell && chosenCell !== slot) {
             btn.classList.add("is-empty");
             btn.disabled = true;
             btn.setAttribute("aria-hidden", "true");
@@ -16567,7 +16652,15 @@ browsen</span>
             rowEl.appendChild(btn);
             return;
           }
-          if (ratedCell && !chosenCell && slot === "alternative") {
+          if (scoredCell && chosenCell && chosenCell !== slot) {
+            btn.classList.add("is-empty");
+            btn.disabled = true;
+            btn.setAttribute("aria-hidden", "true");
+            btn.textContent = "·";
+            rowEl.appendChild(btn);
+            return;
+          }
+          if (scoredCell && !chosenCell && slot === "alternative") {
             btn.classList.add("is-empty");
             btn.disabled = true;
             btn.setAttribute("aria-hidden", "true");
@@ -16577,8 +16670,10 @@ browsen</span>
           }
           btn.textContent = unitEmojiFor(unit);
           btn.setAttribute("aria-label", localizePlanLabel(unit.label || "") + " — " + (names[wd] || ""));
-          if (ratedCell && chosenCell === slot) btn.classList.add("is-selected", "is-done");
-          if (key === selectedKey && pendingUnitChoice === slot) btn.classList.add("is-selected");
+          if ((unitDoneCell && chosenCell === slot) || (scoredCell && chosenCell === slot)) {
+            btn.classList.add("is-selected", "is-done");
+          }
+          if (key === selectedKey && pendingUnitChoice === slot && !unitDoneCell) btn.classList.add("is-selected");
           if (!isAccountPaused()) {
             btn.addEventListener("click", function (ev) {
               ev.preventDefault();
@@ -16848,7 +16943,7 @@ browsen</span>
           checkOk.disabled = true;
           checkNo.disabled = true;
           try {
-            if (!setDayEntryLocal(key, score, pendingUnitChoice || (entryFor(key) && entryFor(key).unit_choice))) return;
+            if (!setDayEntryLocal(key, score, pendingUnitChoice || (entryFor(key) && entryFor(key).unit_choice), score != null)) return;
             pendingUnitChoice = null;
             closeDayRateModal();
             refreshCycleRays();
@@ -16878,6 +16973,7 @@ browsen</span>
               };
               var uc = entryFor(key) && entryFor(key).unit_choice;
               if (uc) row.unit_choice = uc;
+              if (entryFor(key) && entryFor(key).unit_done) row.unit_done = true;
               await restUpsertDayEntry(row);
             }
           } finally {
@@ -16899,7 +16995,7 @@ browsen</span>
           }
           var rows = await restGet(
             "go_day_entries?account_id=eq." + encodeURIComponent(account.id) +
-            "&select=date,score,unit_choice&order=date.asc&limit=400"
+            "&select=date,score,unit_choice,unit_done&order=date.asc&limit=400"
           );
           /* Nur Cloud-Stand — verhindert lokale Fake-Einträge für andere Tage. */
           var next = {};
@@ -16909,7 +17005,8 @@ browsen</span>
               if (!row || !row.date) continue;
               next[row.date] = {
                 score: row.score == null ? null : Number(row.score),
-                unit_choice: row.unit_choice ? String(row.unit_choice) : null
+                unit_choice: row.unit_choice ? String(row.unit_choice) : null,
+                unit_done: !!row.unit_done
               };
             }
           }
@@ -17003,6 +17100,7 @@ browsen</span>
         window.__gogogoRenderWeek = renderWeek;
         window.__gogogoSelectDay = selectDay;
         window.__gogogoGetSelectedDayKey = function () { return selectedKey; };
+        window.__gogogoMarkWorkoutUnitDone = markWorkoutUnitDone;
         window.__gogogoPromptWorkoutRating = promptWorkoutRating;
 
         var dayRateModal = document.getElementById("day-rate-modal");

@@ -8,7 +8,8 @@ alter table go_accounts
   add column if not exists goal_score numeric(4,2);
 
 alter table go_day_entries
-  add column if not exists unit_choice text check (unit_choice is null or unit_choice in ('workout', 'alternative'));
+  add column if not exists unit_choice text check (unit_choice is null or unit_choice in ('workout', 'alternative')),
+  add column if not exists unit_done boolean not null default false;
 
 -- Ziel-Profile: optimale Wochenverteilung pro Trainingsziel
 create table if not exists go_training_goal_profiles (
