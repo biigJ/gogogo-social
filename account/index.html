@@ -3061,6 +3061,13 @@
       margin-top: 22px;
       margin-bottom: 0;
     }
+    #buddy-action-modal .buddy-action-actions__challenge {
+      margin-top: 10px;
+      margin-bottom: 0;
+    }
+    #buddy-action-modal .buddy-action-actions__challenge .challenge-modal__btn {
+      width: 100%;
+    }
     #buddy-action-modal .buddy-action-actions__remove {
       margin-top: 10px;
     }
@@ -4116,10 +4123,27 @@
       height: 0;
       border: 8px solid transparent;
     }
-    .app-tour__bubble.is-bottom::after {
+    .app-tour__bubble.is-top::after {
       top: -16px;
-      left: 24px;
+      left: var(--tour-arrow-left, 24px);
       border-bottom-color: var(--ink-on-red);
+    }
+    .app-tour__bubble.is-bottom::after {
+      bottom: -16px;
+      left: var(--tour-arrow-left, 24px);
+      border-top-color: var(--ink-on-red);
+    }
+    .app-tour__bubble.is-left::after {
+      left: -16px;
+      top: var(--tour-arrow-top, 50%);
+      transform: translateY(-50%);
+      border-right-color: var(--ink-on-red);
+    }
+    .app-tour__bubble.is-right::after {
+      right: -16px;
+      top: var(--tour-arrow-top, 50%);
+      transform: translateY(-50%);
+      border-left-color: var(--ink-on-red);
     }
     .app-tour__actions {
       display: flex;
@@ -4171,14 +4195,66 @@
     }
     .home-unit-pick.is-hidden { display: none; }
     .home-unit-pick__emoji { font-size: 1.35rem; line-height: 1; }
-    .home-cal__units {
+    .home-cal__unit-rows {
       display: flex;
       flex-direction: column;
-      gap: 1px;
-      font-size: 0.72rem;
+      gap: calc(4px * 1.3);
+      margin-top: calc(4px * 1.3);
+    }
+    .home-cal__unit-row {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: calc(6px * 1.3);
+      align-items: stretch;
+    }
+    .home-cal__unit-btn {
+      width: 100%;
+      min-height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1.5px solid rgba(247,245,240,0.22);
+      border-radius: 8px;
+      background: rgba(0,0,0,0.1);
+      color: inherit;
+      font-size: 1.05rem;
       line-height: 1;
-      margin-top: 2px;
-      opacity: 0.92;
+      padding: 4px 2px;
+      cursor: pointer;
+    }
+    .home-cal__unit-btn.is-selected {
+      border-color: var(--ink-on-red);
+      box-shadow: 0 0 0 2px rgba(247,245,240,0.35);
+    }
+    .home-cal__unit-btn.is-done {
+      opacity: 0.55;
+      pointer-events: none;
+    }
+    .home-cal__unit-btn.is-empty {
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .home-cal__extras {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: calc(6px * 1.3);
+      align-items: start;
+      margin-top: calc(2px * 1.3);
+    }
+    .home-cal__cell--extra {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: calc(4px * 1.3);
+      min-width: 0;
+    }
+    .home-cal__day.is-challenge {
+      animation: home-cal-challenge-blink 1.2s ease-in-out infinite;
+      border-color: rgba(247,245,240,0.85);
+    }
+    @keyframes home-cal-challenge-blink {
+      0%, 100% { box-shadow: 0 0 0 2px rgba(247,245,240,0.35); }
+      50% { box-shadow: 0 0 0 3px rgba(247,245,240,0.95); }
     }
     .profile-plan__unit-row {
       display: grid;
@@ -4189,6 +4265,11 @@
       margin-top: 4px;
     }
     .profile-plan__unit-emoji { font-size: 1rem; line-height: 1.2; }
+    .profile-plan__calendar-unit {
+      font-size: 0.78rem;
+      line-height: 1.25;
+      text-align: center;
+    }
     .profile-meta__goal-btn {
       border: 0;
       background: none;
@@ -4317,7 +4398,7 @@ browsen</span>
 
   <div class="app-tour" id="app-tour" hidden aria-hidden="true">
     <div class="app-tour__backdrop" id="app-tour-backdrop"></div>
-    <div class="app-tour__bubble is-bottom" id="app-tour-bubble" role="dialog">
+    <div class="app-tour__bubble" id="app-tour-bubble" role="dialog">
       <p id="app-tour-text"></p>
       <div class="app-tour__actions">
         <button type="button" class="app-tour__btn" id="app-tour-next" data-de="weiter" data-en="next">weiter</button>
@@ -4331,6 +4412,14 @@ browsen</span>
       <p class="challenge-modal__title" id="goal-score-title" data-de="Ziel-Bilanz" data-en="Goal balance">Ziel-Bilanz</p>
       <p id="goal-score-body" style="font-size:0.92rem;line-height:1.45"></p>
       <button type="button" class="challenge-modal__btn" id="goal-score-ok" data-de="OK" data-en="OK">OK</button>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="rpe-o-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="rpe-o-title">
+      <p class="challenge-modal__title" id="rpe-o-title" data-de="RPE-o" data-en="RPE-o">RPE-o</p>
+      <p id="rpe-o-body" style="font-size:0.92rem;line-height:1.45"></p>
+      <button type="button" class="challenge-modal__btn" id="rpe-o-ok" data-de="OK" data-en="OK">OK</button>
     </div>
   </div>
 
@@ -4356,7 +4445,10 @@ browsen</span>
     <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="buddy-challenge-popup-title">
       <p class="challenge-modal__title" id="buddy-challenge-popup-title" data-de="Neue Challenge" data-en="New challenge">Neue Challenge</p>
       <p id="buddy-challenge-popup-body" style="font-size:0.92rem;line-height:1.45"></p>
-      <button type="button" class="challenge-modal__btn" id="buddy-challenge-popup-ok" data-de="OK" data-en="OK">OK</button>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn is-ghost" id="buddy-challenge-popup-decline" data-de="Ablehnen" data-en="Decline">Ablehnen</button>
+        <button type="button" class="challenge-modal__btn" id="buddy-challenge-popup-accept" data-de="Annehmen" data-en="Accept">Annehmen</button>
+      </div>
     </div>
   </div>
 
@@ -4383,6 +4475,11 @@ browsen</span>
           </div>
           <div class="home-cal__matches" id="week-matches" aria-label="Ort-Matches"></div>
           <div class="home-cal__days" id="week" role="listbox" aria-label="Wochentage"></div>
+          <div class="home-cal__unit-rows">
+            <div class="home-cal__unit-row" id="week-units-workout" aria-label="Workout"></div>
+            <div class="home-cal__unit-row" id="week-units-alt" aria-label="Alternative"></div>
+          </div>
+          <div class="home-cal__extras" id="week-extras" aria-label="Einladung und Bewertung"></div>
         </div>
         <div class="home-workout" id="home-workout">
           <div class="home-workout__box" id="home-workout-box">
@@ -4428,8 +4525,8 @@ browsen</span>
               <span class="profile-meta__value" id="profile-streak">0 Tage</span>
             </div>
             <div class="profile-meta__row">
-              <span class="profile-meta__label" data-de="RPE" data-en="RPE">RPE</span>
-              <span class="profile-meta__value" id="profile-wert">0</span>
+              <span class="profile-meta__label" data-de="RPE-o" data-en="RPE-o">RPE-o</span>
+              <button type="button" class="profile-meta__value profile-meta__goal-btn" id="profile-wert-btn" aria-label="RPE-o Info">0</button>
             </div>
             <div class="profile-meta__row profile-meta__row--goal">
               <span class="profile-meta__label" data-de="Ziel" data-en="Goal">Ziel</span>
@@ -4856,7 +4953,6 @@ browsen</span>
                 <path fill="currentColor" d="M10.5 3a7.5 7.5 0 0 1 5.95 12.05l4.25 4.25-1.4 1.4-4.25-4.25A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z"/>
               </svg>
             </button>
-            <button type="button" class="community-challenge" id="community-challenge-btn" hidden data-de="Challenge" data-en="Challenge">Challenge</button>
             <a
               class="community-wa"
               id="community-wa"
@@ -5299,6 +5395,9 @@ browsen</span>
       <div class="challenge-modal__actions buddy-action-actions">
         <button type="button" class="challenge-modal__btn" id="buddy-action-about" data-de="Über mich" data-en="About me">Über mich</button>
         <button type="button" class="challenge-modal__btn" id="buddy-action-message" data-de="Nachricht" data-en="Message">Nachricht</button>
+      </div>
+      <div class="challenge-modal__actions buddy-action-actions__challenge is-single">
+        <button type="button" class="challenge-modal__btn" id="buddy-action-challenge" data-de="Challenge" data-en="Challenge">Challenge</button>
       </div>
       <div class="challenge-modal__actions buddy-action-actions__remove is-single">
         <button type="button" class="challenge-modal__btn is-ghost" id="buddy-action-remove" data-de="Entfernen" data-en="Remove">Entfernen</button>
@@ -9290,9 +9389,6 @@ browsen</span>
           dayLabel.textContent = profileWeekdays()[i];
           dayRow.appendChild(dayLabel);
           appendProfilePlanDayActions(dayRow, i, canSelfAssign);
-          var text = document.createElement("p");
-          text.className = "profile-plan__text";
-          text.textContent = dayVal;
           block.appendChild(dayRow);
           var unitsPair = dayUnitsFor(i);
           if (unitsPair && unitsPair.workout) {
@@ -9310,8 +9406,12 @@ browsen</span>
               urow.appendChild(ulab);
               block.appendChild(urow);
             });
+          } else {
+            var text = document.createElement("p");
+            text.className = "profile-plan__text";
+            text.textContent = dayVal;
+            block.appendChild(text);
           }
-          block.appendChild(text);
           planRoot.appendChild(block);
         }
       }
@@ -9422,6 +9522,8 @@ browsen</span>
         table.appendChild(tbody);
 
         var planCells = [];
+        var workoutCells = [];
+        var altCells = [];
         var placeCells = [];
         var timeCells = [];
         var inviteCells = [];
@@ -9429,12 +9531,33 @@ browsen</span>
         for (var i = 0; i < profileWeekdays().length; i++) {
           var dayVal = coachDayText(i) || defaultDayPlan();
           var meet = getWeekdayMeet(i);
+          var unitsPair = dayUnitsFor(i);
 
           var planEl = document.createElement("div");
           planEl.className = "profile-plan__calendar-plan";
           planEl.textContent = dayVal;
           planEl.title = dayVal;
           planCells.push(planEl);
+
+          var workoutEl = document.createElement("div");
+          workoutEl.className = "profile-plan__calendar-unit";
+          if (unitsPair && unitsPair.workout) {
+            workoutEl.textContent = unitEmojiFor(unitsPair.workout) + " " + localizePlanLabel(unitsPair.workout.label || "");
+            workoutEl.title = localizePlanLabel(unitsPair.workout.label || "");
+          } else {
+            workoutEl.textContent = "—";
+          }
+          workoutCells.push(workoutEl);
+
+          var altEl = document.createElement("div");
+          altEl.className = "profile-plan__calendar-unit";
+          if (unitsPair && unitsPair.alternative) {
+            altEl.textContent = unitEmojiFor(unitsPair.alternative) + " " + localizePlanLabel(unitsPair.alternative.label || "");
+            altEl.title = localizePlanLabel(unitsPair.alternative.label || "");
+          } else {
+            altEl.textContent = "—";
+          }
+          altCells.push(altEl);
 
           var placeBtn = document.createElement("button");
           placeBtn.type = "button";
@@ -9472,6 +9595,8 @@ browsen</span>
         }
 
         appendCalendarRow(tbody, t("Plan", "Plan"), planCells, "");
+        appendCalendarRow(tbody, t("Workout", "Workout"), workoutCells, "");
+        appendCalendarRow(tbody, t("Alternative", "Alternative"), altCells, "");
         appendCalendarRow(tbody, t("Ort", "Place"), placeCells, "");
         appendCalendarRow(tbody, t("Zeit", "Time"), timeCells, "");
         appendCalendarRow(tbody, t("Einladung", "Invite"), inviteCells, "profile-plan__calendar-invite-row");
@@ -9614,7 +9739,7 @@ browsen</span>
         var coachBadge = document.getElementById("profile-coach-badge");
         var trainerAdminBtn = document.getElementById("profile-trainer-admin");
         var streakEl = document.getElementById("profile-streak");
-        var wertEl = document.getElementById("profile-wert");
+        var wertEl = document.getElementById("profile-wert-btn");
         if (nameEl) nameEl.textContent = firstNameOf(account);
         if (buddiesEl) buddiesEl.textContent = String(getBuddies().length);
         if (coachEl) {
@@ -11056,8 +11181,68 @@ browsen</span>
       function syncCommunityDiscoverBtn() {
         var btn = document.getElementById("community-discover");
         if (btn) btn.hidden = !isOpenToConnect();
-        var chBtn = document.getElementById("community-challenge-btn");
-        if (chBtn) chBtn.hidden = !getBuddies().length;
+      }
+
+      var activeBuddyChallenges = [];
+      var pendingBuddyChallengeRow = null;
+      var buddyChallengeTarget = null;
+
+      function calendarStartOfDay(d) {
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      }
+
+      function challengeStartDate(ch) {
+        if (!ch) return null;
+        var raw = ch.accepted_at || ch.created_at;
+        if (!raw) return null;
+        var d = new Date(raw);
+        return isNaN(d.getTime()) ? null : calendarStartOfDay(d);
+      }
+
+      function challengeEndDate(ch) {
+        var start = challengeStartDate(ch);
+        if (!start) return null;
+        var days = parseInt(ch.days, 10) || 14;
+        var end = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+        end.setDate(end.getDate() + days - 1);
+        return end;
+      }
+
+      function isChallengeActiveRow(ch) {
+        if (!ch || String(ch.status || "") !== "accepted") return false;
+        var end = challengeEndDate(ch);
+        if (!end) return false;
+        var today = calendarStartOfDay(new Date());
+        return today <= end;
+      }
+
+      async function loadActiveBuddyChallenges() {
+        activeBuddyChallenges = [];
+        if (!hasCloudAccount() || !account || !account.id) return;
+        try {
+          var q =
+            "go_buddy_challenges?or=(from_account_id.eq." + encodeURIComponent(account.id) +
+            ",to_account_id.eq." + encodeURIComponent(account.id) +
+            ")&status=eq.accepted&order=created_at.desc&limit=20";
+          var rows = await restGet(q);
+          activeBuddyChallenges = (rows || []).filter(isChallengeActiveRow);
+        } catch (eLoadCh) {
+          activeBuddyChallenges = [];
+        }
+      }
+
+      function isCalendarDayChallengeActive(key) {
+        if (!activeBuddyChallenges.length || !key) return false;
+        var day = parseDateKey(key);
+        if (!day) return false;
+        day = calendarStartOfDay(day);
+        for (var i = 0; i < activeBuddyChallenges.length; i++) {
+          var ch = activeBuddyChallenges[i];
+          var start = challengeStartDate(ch);
+          var end = challengeEndDate(ch);
+          if (start && end && day >= start && day <= end) return true;
+        }
+        return false;
       }
 
       function getPushPrefs() {
@@ -11089,6 +11274,8 @@ browsen</span>
 
       async function checkPendingBuddyChallengePopup() {
         if (!hasCloudAccount() || needsOnboarding()) return;
+        var popupOpen = document.getElementById("buddy-challenge-popup");
+        if (popupOpen && !popupOpen.hidden) return;
         try {
           var rows = await restGet(
             "go_buddy_challenges?to_account_id=eq." + encodeURIComponent(account.id) +
@@ -11096,7 +11283,7 @@ browsen</span>
           );
           if (!rows || !rows[0]) return;
           var ch = rows[0];
-          if (ch.seen_at) return;
+          pendingBuddyChallengeRow = ch;
           var fromName = "?";
           try {
             var people = await restGet("go_accounts?id=eq." + encodeURIComponent(ch.from_account_id) + "&select=name&limit=1");
@@ -11108,6 +11295,13 @@ browsen</span>
             body.textContent = fromName + ": " + String(ch.message || "") + " (" + String(ch.days || 14) + " " + t("Tage", "days") + ")";
           }
           if (modal) openChallengeModal(modal);
+        } catch (eCh) {}
+      }
+
+      async function acceptPendingBuddyChallenge() {
+        var ch = pendingBuddyChallengeRow;
+        if (!ch || !ch.id) return;
+        try {
           await fetch(SUPABASE_URL + "/rest/v1/go_buddy_challenges?id=eq." + encodeURIComponent(ch.id), {
             method: "PATCH",
             headers: {
@@ -11116,15 +11310,47 @@ browsen</span>
               "Content-Type": "application/json",
               Prefer: "return=minimal"
             },
-            body: JSON.stringify({ seen_at: new Date().toISOString() })
+            body: JSON.stringify({
+              status: "accepted",
+              accepted_at: new Date().toISOString(),
+              seen_at: new Date().toISOString()
+            })
           });
-        } catch (eCh) {}
+          pendingBuddyChallengeRow = null;
+          closeChallengeModal(document.getElementById("buddy-challenge-popup"));
+          await loadActiveBuddyChallenges();
+          if (typeof window.__gogogoRenderWeek === "function") {
+            try { window.__gogogoRenderWeek(); } catch (eRw) {}
+          }
+        } catch (eAcc) {}
       }
 
-      function openBuddyChallengeModal() {
-        var buddies = getBuddies();
-        if (!buddies.length) {
-          window.alert(t("Zuerst einen Buddy hinzufügen.", "Add a buddy first."));
+      async function declinePendingBuddyChallenge() {
+        var ch = pendingBuddyChallengeRow;
+        if (!ch || !ch.id) return;
+        try {
+          await fetch(SUPABASE_URL + "/rest/v1/go_buddy_challenges?id=eq." + encodeURIComponent(ch.id), {
+            method: "PATCH",
+            headers: {
+              apikey: SUPABASE_KEY,
+              Authorization: "Bearer " + SUPABASE_KEY,
+              "Content-Type": "application/json",
+              Prefer: "return=minimal"
+            },
+            body: JSON.stringify({
+              status: "declined",
+              seen_at: new Date().toISOString()
+            })
+          });
+          pendingBuddyChallengeRow = null;
+          closeChallengeModal(document.getElementById("buddy-challenge-popup"));
+        } catch (eDec) {}
+      }
+
+      function openBuddyChallengeModal(buddy) {
+        buddyChallengeTarget = buddy || buddyActionTarget || null;
+        if (!buddyChallengeTarget || !buddyChallengeTarget.id) {
+          window.alert(t("Zuerst einen Buddy auswählen.", "Select a buddy first."));
           return;
         }
         var msg = document.getElementById("buddy-challenge-msg");
@@ -11143,8 +11369,9 @@ browsen</span>
           return;
         }
         var buddies = getBuddies();
-        if (!buddies.length || !hasCloudAccount()) return;
-        var target = buddies[0];
+        var target = buddyChallengeTarget;
+        if (!target || !target.id) target = buddies.length ? buddies[0] : null;
+        if (!target || !target.id || !hasCloudAccount()) return;
         try {
           await restInsert("go_buddy_challenges", {
             from_account_id: account.id,
@@ -12756,6 +12983,15 @@ browsen</span>
             if (msg) msg.textContent = "Nachricht an " + firstNameOf(buddy);
           });
         }
+        var challengeBtn = document.getElementById("buddy-action-challenge");
+        if (challengeBtn) {
+          challengeBtn.addEventListener("click", function (ev) {
+            ev.preventDefault();
+            var buddy = buddyActionTarget;
+            closeBuddyActionModal();
+            if (buddy) openBuddyChallengeModal(buddy);
+          });
+        }
         if (modal) {
           modal.addEventListener("click", function (e) {
             if (e.target === modal) closeBuddyActionModal();
@@ -13919,6 +14155,11 @@ browsen</span>
           fillProfilePanel();
           renderBuddySlots();
           maybeShowGreeting();
+          loadActiveBuddyChallenges().then(function () {
+            if (typeof window.__gogogoRenderWeek === "function") {
+              try { window.__gogogoRenderWeek(); } catch (eRw0) {}
+            }
+          }).catch(function () {});
           if (!needsOnboarding()) checkPendingBuddyChallengePopup().catch(function () {});
         }).catch(function () {
           maybeShowGreeting();
@@ -14145,21 +14386,65 @@ browsen</span>
       }
 
       var APP_TOUR_STEPS = [
-        { panel: "home", textDe: "Kalender: Workout oder Alternative wählen, bewerten, Buddies einladen.", textEn: "Calendar: pick workout or alternative, rate, invite buddies." },
-        { panel: "training", textDe: "Training: Kraft, Ausdauer und Intervalle — Deine Einheiten erfassen.", textEn: "Training: log strength, endurance and intervals." },
-        { panel: "community", textDe: "Community: Buddies, Feed und Challenges — hier bleibt Ihr in Kontakt.", textEn: "Community: buddies, feed and challenges — stay connected." },
-        { panel: "book", textDe: "Buch: Wissen rund um Bewegung, Ernährung und Regeneration.", textEn: "Book: knowledge on movement, nutrition and recovery." },
-        { panel: "profile", textDe: "Profil: Ziel, RPE, Wochenplan und Kalender-Sync einrichten.", textEn: "Profile: goal, RPE, weekly plan and calendar sync." }
+        { panel: "home", selector: ".home-cal__days", placement: "bottom", textDe: "Wochentage — tippe einen Tag, um ihn auszuwählen.", textEn: "Weekdays — tap a day to select it." },
+        { panel: "home", selector: "#week-units-workout", placement: "bottom", textDe: "Workout-Emoji: tippen zum Starten oder Bewerten.", textEn: "Workout emoji: tap to start or rate." },
+        { panel: "home", selector: "#week-units-alt", placement: "bottom", textDe: "Alternative: leichtere Option oder Spaziergang.", textEn: "Alternative: lighter option or walk." },
+        { panel: "home", selector: ".home-cal__extras", placement: "bottom", textDe: "Herz = Buddies einladen, Notiz = Tag bewerten.", textEn: "Heart = invite buddies, note = rate day." },
+        { panel: "training", selector: ".training-card-tabs", placement: "bottom", textDe: "Kraft, Ausdauer, Intervall — hier trainierst Du.", textEn: "Strength, endurance, intervals — train here." },
+        { panel: "community", selector: "#community-slots", placement: "bottom", textDe: "Deine Buddies — tippe auf ein Foto für Aktionen.", textEn: "Your buddies — tap a photo for actions." },
+        { panel: "community", selector: "#community-feed", placement: "top", textDe: "Feed: Nachrichten und Updates.", textEn: "Feed: messages and updates." },
+        { panel: "community", selector: "#community-composer", placement: "top", textDe: "Nachricht schreiben — @ für Empfänger.", textEn: "Write a message — @ to pick recipient." },
+        { panel: "book", selector: ".book-nav", placement: "bottom", textDe: "Wissen: About, Fakten, Videos.", textEn: "Knowledge: about, facts, videos." },
+        { panel: "profile", selector: "#profile-goal-score", placement: "bottom", textDe: "Ziel-Bilanz: Wochenplan vs. Tagesqualität.", textEn: "Goal balance: weekly plan vs. daily quality." },
+        { panel: "profile", selector: "#profile-plan-days", placement: "top", textDe: "Wochenplan mit Workout, Alternative, Ort und Zeit.", textEn: "Weekly plan with workout, alternative, place and time." }
       ];
       var appTourIndex = 0;
 
-      function positionTourBubble(panelName) {
+      function positionTourBubble(step) {
         var bubble = document.getElementById("app-tour-bubble");
-        var navBtn = document.querySelector('.nav__btn[data-goto="' + panelName + '"]');
-        if (!bubble || !navBtn) return;
-        var r = navBtn.getBoundingClientRect();
-        bubble.style.left = Math.max(8, Math.min(window.innerWidth - bubble.offsetWidth - 8, r.left + r.width / 2 - bubble.offsetWidth / 2)) + "px";
-        bubble.style.top = Math.max(8, r.top - bubble.offsetHeight - 12) + "px";
+        if (!bubble || !step) return;
+        var target = step.selector ? document.querySelector(step.selector) : null;
+        if (!target) {
+          target = document.querySelector('.nav-btn[data-goto="' + step.panel + '"]');
+        }
+        if (!target) return;
+        bubble.classList.remove("is-top", "is-bottom", "is-left", "is-right");
+        var rect = target.getBoundingClientRect();
+        var placement = step.placement || "bottom";
+        var gap = 12;
+        var bw = bubble.offsetWidth || 240;
+        var bh = bubble.offsetHeight || 120;
+        var left = 8;
+        var top = 8;
+        var arrowLeft = 24;
+        var arrowTop = "50%";
+        if (placement === "bottom") {
+          bubble.classList.add("is-top");
+          top = rect.bottom + gap;
+          left = rect.left + rect.width / 2 - bw / 2;
+          arrowLeft = rect.left + rect.width / 2 - left - 8;
+        } else if (placement === "top") {
+          bubble.classList.add("is-bottom");
+          top = rect.top - bh - gap;
+          left = rect.left + rect.width / 2 - bw / 2;
+          arrowLeft = rect.left + rect.width / 2 - left - 8;
+        } else if (placement === "left") {
+          bubble.classList.add("is-right");
+          top = rect.top + rect.height / 2 - bh / 2;
+          left = rect.left - bw - gap;
+          arrowTop = (rect.top + rect.height / 2 - top - 8) + "px";
+        } else {
+          bubble.classList.add("is-left");
+          top = rect.top + rect.height / 2 - bh / 2;
+          left = rect.right + gap;
+          arrowTop = (rect.top + rect.height / 2 - top - 8) + "px";
+        }
+        left = Math.max(8, Math.min(window.innerWidth - bw - 8, left));
+        top = Math.max(8, Math.min(window.innerHeight - bh - 8, top));
+        bubble.style.left = left + "px";
+        bubble.style.top = top + "px";
+        bubble.style.setProperty("--tour-arrow-left", Math.max(12, Math.min(bw - 28, arrowLeft)) + "px");
+        bubble.style.setProperty("--tour-arrow-top", arrowTop);
       }
 
       function startAppTour() {
@@ -14189,7 +14474,7 @@ browsen</span>
         if (typeof gotoPanel === "function") gotoPanel(step.panel);
         var textEl = document.getElementById("app-tour-text");
         if (textEl) textEl.textContent = uiLang === "en" ? step.textEn : step.textDe;
-        window.setTimeout(function () { positionTourBubble(step.panel); }, 120);
+        window.setTimeout(function () { positionTourBubble(step); }, 160);
       }
 
       function maybeShowOnboarding() {
@@ -14286,8 +14571,8 @@ browsen</span>
             var modal = document.getElementById("goal-score-modal");
             if (body) {
               body.textContent = t(
-                "Ziel-Bilanz = 55 % Wochenverteilung (Kraft/Ausdauer/HIIT/Ruhe passend zu Deinem Ziel) + 45 % Tagesqualität (RPE 1–5 eher schwach, 6–10 eher gut).",
-                "Goal balance = 55% weekly distribution (strength/endurance/HIIT/rest vs your goal) + 45% daily quality (RPE 1–5 weaker, 6–10 stronger)."
+                "Ziel-Bilanz = 55 % Wochenverteilung (Kraft/Ausdauer/HIIT/Ruhe passend zu Deinem Ziel) + 45 % Tagesqualität (RPE-o 1–5 eher schwach, 6–10 eher gut).",
+                "Goal balance = 55% weekly distribution (strength/endurance/HIIT/rest vs your goal) + 45% daily quality (RPE-o 1–5 weaker, 6–10 stronger)."
               );
             }
             if (modal) openChallengeModal(modal);
@@ -14297,6 +14582,27 @@ browsen</span>
         if (goalOk) {
           goalOk.addEventListener("click", function () {
             var modal = document.getElementById("goal-score-modal");
+            if (modal) closeChallengeModal(modal);
+          });
+        }
+        var rpeBtn = document.getElementById("profile-wert-btn");
+        if (rpeBtn) {
+          rpeBtn.addEventListener("click", function () {
+            var body = document.getElementById("rpe-o-body");
+            var modal = document.getElementById("rpe-o-modal");
+            if (body) {
+              body.textContent = t(
+                "RPE-o = Dein durchschnittlicher Belastungswert der letzten 28 bewerteten Tage (1 = sehr leicht, 10 = maximal). Er fließt in die Ziel-Bilanz ein.",
+                "RPE-o = your average effort score over the last 28 rated days (1 = very easy, 10 = maximal). It feeds into your goal balance."
+              );
+            }
+            if (modal) openChallengeModal(modal);
+          });
+        }
+        var rpeOk = document.getElementById("rpe-o-ok");
+        if (rpeOk) {
+          rpeOk.addEventListener("click", function () {
+            var modal = document.getElementById("rpe-o-modal");
             if (modal) closeChallengeModal(modal);
           });
         }
@@ -14790,8 +15096,6 @@ browsen</span>
           });
           renderPushToggleBtn();
         }
-        var communityChallengeBtn = document.getElementById("community-challenge-btn");
-        if (communityChallengeBtn) communityChallengeBtn.addEventListener("click", openBuddyChallengeModal);
         var buddyChallengeSend = document.getElementById("buddy-challenge-send");
         if (buddyChallengeSend) buddyChallengeSend.addEventListener("click", function () { sendBuddyChallenge(); });
         var buddyChallengeCancel = document.getElementById("buddy-challenge-cancel");
@@ -14800,10 +15104,16 @@ browsen</span>
             closeChallengeModal(document.getElementById("buddy-challenge-modal"));
           });
         }
-        var buddyChallengePopupOk = document.getElementById("buddy-challenge-popup-ok");
-        if (buddyChallengePopupOk) {
-          buddyChallengePopupOk.addEventListener("click", function () {
-            closeChallengeModal(document.getElementById("buddy-challenge-popup"));
+        var buddyChallengePopupAccept = document.getElementById("buddy-challenge-popup-accept");
+        if (buddyChallengePopupAccept) {
+          buddyChallengePopupAccept.addEventListener("click", function () {
+            acceptPendingBuddyChallenge();
+          });
+        }
+        var buddyChallengePopupDecline = document.getElementById("buddy-challenge-popup-decline");
+        if (buddyChallengePopupDecline) {
+          buddyChallengePopupDecline.addEventListener("click", function () {
+            declinePendingBuddyChallenge();
           });
         }
         var websiteBtn = document.getElementById("profile-website-btn");
@@ -15587,6 +15897,7 @@ browsen</span>
           setFeedSeenNow();
           updateCommunityNavDot();
           fillCommunityPanel();
+          if (!needsOnboarding()) checkPendingBuddyChallengePopup().catch(function () {});
           requestAnimationFrame(function () {
             var ev = new Event("resize");
             window.dispatchEvent(ev);
@@ -16151,61 +16462,20 @@ browsen</span>
           titleEl.textContent = w.title || "";
           if (unitsEl) {
             unitsEl.innerHTML = "";
-            if (pair && pair.workout) {
-              unitsEl.hidden = false;
-              ["workout", "alternative"].forEach(function (slot) {
-                var unit = pair[slot];
-                if (!unit) return;
-                var hide = checkedOff && chosen && chosen !== slot;
-                if (checkedOff && !chosen && slot === "alternative") hide = true;
-                var btn = document.createElement("button");
-                btn.type = "button";
-                btn.className = "home-unit-pick";
-                if (hide) btn.classList.add("is-hidden");
-                if (checkedOff && chosen === slot) btn.classList.add("is-selected", "is-done");
-                btn.innerHTML = "<span class='home-unit-pick__emoji'>" + unitEmojiFor(unit) + "</span><span>" + localizePlanLabel(unit.label || "") + "</span>";
-                btn.addEventListener("click", function () {
-                  if (checkedOff && !canEditExistingRating()) return;
-                  pendingUnitChoice = slot;
-                  if (slot === "workout" && w && w.training && w.trainingTab && !checkedOff) {
-                    openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null);
-                    return;
-                  }
-                  openDayRateModal(key);
-                });
-                unitsEl.appendChild(btn);
-              });
-            } else {
-              unitsEl.hidden = true;
-            }
+            unitsEl.hidden = true;
           }
-          var canStart = !!(canAct && !checkedOff && (w.zirkel || w.training) && (!pair || !pair.alternative || pendingUnitChoice === "workout" || chosen === "workout"));
-          var showLine1 = !!(w.line1 && (canStart || (checkedOff && !isStartNowLine(w.line1))));
+          var showLine1 = !!(w.line1 && (checkedOff && !isStartNowLine(w.line1)));
           line1El.textContent = showLine1 ? w.line1 : "";
           line1El.hidden = !showLine1;
-          line2El.textContent = "";
-          while (line2El.firstChild) line2El.removeChild(line2El.firstChild);
-          line2El.hidden = true;
+          line2El.textContent = w.line2 || "";
+          line2El.hidden = !w.line2;
           if (workoutBox) {
-            var startTab = w.zirkel ? "intervall" : (w.trainingTab || "");
-            workoutBox.classList.toggle("is-zirkel", canStart);
-            if (canStart) {
-              workoutBox.setAttribute("role", "button");
-              workoutBox.setAttribute("tabindex", "0");
-              workoutBox.setAttribute("data-training-tab", startTab);
-              if (w.trainingPreset) {
-                workoutBox.setAttribute("data-training-preset", JSON.stringify(w.trainingPreset));
-              } else {
-                workoutBox.removeAttribute("data-training-preset");
-              }
-              workoutBox.setAttribute("aria-label", (w.title || "Training") + " " + t("jetzt starten", "start now"));
-            } else {
-              workoutBox.removeAttribute("role");
-              workoutBox.removeAttribute("tabindex");
-              workoutBox.removeAttribute("data-training-tab");
-              workoutBox.removeAttribute("data-training-preset");
-              workoutBox.removeAttribute("aria-label");
-            }
+            workoutBox.classList.remove("is-zirkel");
+            workoutBox.removeAttribute("role");
+            workoutBox.removeAttribute("tabindex");
+            workoutBox.removeAttribute("data-training-tab");
+            workoutBox.removeAttribute("data-training-preset");
+            workoutBox.removeAttribute("aria-label");
           }
           syncCheckControls(key);
         }
@@ -16236,6 +16506,69 @@ browsen</span>
           renderWeek();
         }
 
+        function handleCalendarUnitClick(key, slot, w) {
+          if (isAccountPaused()) return;
+          selectDay(key, false);
+          var rated = dayHasRating(key);
+          if (rated && !canEditExistingRating()) return;
+          pendingUnitChoice = slot;
+          if (slot === "workout" && w && w.training && w.trainingTab && !rated) {
+            openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null);
+            return;
+          }
+          if (!rated && !canRateCalendarDay(key)) return;
+          openDayRateModal(key);
+        }
+
+        function appendCalendarUnitButton(rowEl, key, wd, slot, w) {
+          var pairCell = dayUnitsFor(wd);
+          var unit = pairCell ? pairCell[slot] : null;
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "home-cal__unit-btn";
+          if (!unit) {
+            btn.classList.add("is-empty");
+            btn.disabled = true;
+            btn.setAttribute("aria-hidden", "true");
+            btn.textContent = "·";
+            rowEl.appendChild(btn);
+            return;
+          }
+          var entryCell = entryFor(key);
+          var chosenCell = entryCell && entryCell.unit_choice ? String(entryCell.unit_choice) : null;
+          var ratedCell = dayHasRating(key);
+          if (ratedCell && chosenCell && chosenCell !== slot) {
+            btn.classList.add("is-empty");
+            btn.disabled = true;
+            btn.setAttribute("aria-hidden", "true");
+            btn.textContent = "·";
+            rowEl.appendChild(btn);
+            return;
+          }
+          if (ratedCell && !chosenCell && slot === "alternative") {
+            btn.classList.add("is-empty");
+            btn.disabled = true;
+            btn.setAttribute("aria-hidden", "true");
+            btn.textContent = "·";
+            rowEl.appendChild(btn);
+            return;
+          }
+          btn.textContent = unitEmojiFor(unit);
+          btn.setAttribute("aria-label", localizePlanLabel(unit.label || "") + " — " + (names[wd] || ""));
+          if (ratedCell && chosenCell === slot) btn.classList.add("is-selected", "is-done");
+          if (key === selectedKey && pendingUnitChoice === slot) btn.classList.add("is-selected");
+          if (!isAccountPaused()) {
+            btn.addEventListener("click", function (ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              handleCalendarUnitClick(key, slot, w);
+            });
+          } else {
+            btn.disabled = true;
+          }
+          rowEl.appendChild(btn);
+        }
+
         function renderWeek() {
           names = dayNames();
           WEEKDAY_WORKOUTS = weekdayWorkouts();
@@ -16252,6 +16585,12 @@ browsen</span>
           var currentWeekMondayKey = dateKey(mondayOf(today));
           labelEl.textContent = monthLabelForWeek(base);
           root.innerHTML = "";
+          var workoutRow = document.getElementById("week-units-workout");
+          var altRow = document.getElementById("week-units-alt");
+          var extrasRow = document.getElementById("week-extras");
+          if (workoutRow) workoutRow.innerHTML = "";
+          if (altRow) altRow.innerHTML = "";
+          if (extrasRow) extrasRow.innerHTML = "";
 
           var days = [];
           for (var i = 0; i < 7; i++) {
@@ -16270,10 +16609,6 @@ browsen</span>
             }
           }
 
-          if (isAccountPaused() || !canRateCalendarDay(selectedKey)) {
-            /* no auto rating editor */
-          }
-
           renderWeekMatches(days, dateKey);
 
           days.forEach(function (d, i) {
@@ -16283,7 +16618,7 @@ browsen</span>
             var rateable = canRateCalendarDay(key);
             var dayEntry = entryFor(key);
             var cell = document.createElement("div");
-            cell.className = "home-cal__cell";
+            cell.className = "home-cal__cell home-cal__cell--day";
 
             var btn = document.createElement("button");
             btn.type = "button";
@@ -16292,14 +16627,8 @@ browsen</span>
             btn.setAttribute("aria-label", names[i] + " " + d.getDate());
             if (isAccountPaused()) btn.disabled = true;
             if (w && !w.rest) btn.classList.add("has-workout");
-            if (
-              w && (w.zirkel || w.training) &&
-              !dayHasRating(key) &&
-              key >= currentWeekMondayKey
-            ) {
-              btn.classList.add("is-zirkel");
-            }
             if (key === todayKey) btn.classList.add("is-today");
+            if (isCalendarDayChallengeActive(key)) btn.classList.add("is-challenge");
             if (key === selectedKey) {
               btn.classList.add("is-selected");
               btn.setAttribute("aria-selected", "true");
@@ -16308,34 +16637,18 @@ browsen</span>
             }
             btn.innerHTML =
               "<span>" + names[i] + "</span><span class='home-cal__n'>" + d.getDate() + "</span>";
-            var pairCell = dayUnitsFor(wd);
-            if (pairCell && pairCell.workout) {
-              var unitsWrap = document.createElement("div");
-              unitsWrap.className = "home-cal__units";
-              var entryCell = entryFor(key);
-              var chosenCell = entryCell && entryCell.unit_choice ? String(entryCell.unit_choice) : null;
-              var ratedCell = dayHasRating(key);
-              ["workout", "alternative"].forEach(function (slot) {
-                if (ratedCell && chosenCell && chosenCell !== slot) return;
-                if (ratedCell && !chosenCell && slot === "alternative") return;
-                var u = pairCell[slot];
-                if (!u) return;
-                var em = document.createElement("span");
-                em.textContent = unitEmojiFor(u);
-                unitsWrap.appendChild(em);
-              });
-              if (unitsWrap.childNodes.length) btn.appendChild(unitsWrap);
-            }
             btn.addEventListener("click", function () {
-              var done = dayHasRating(key);
-              if (key === selectedKey && rateable && !done && w && w.training && w.trainingTab) {
-                openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null);
-                return;
-              }
               selectDay(key, false);
             });
 
             cell.appendChild(btn);
+            root.appendChild(cell);
+
+            if (workoutRow) appendCalendarUnitButton(workoutRow, key, wd, "workout", w);
+            if (altRow) appendCalendarUnitButton(altRow, key, wd, "alternative", w);
+
+            var extraCell = document.createElement("div");
+            extraCell.className = "home-cal__cell home-cal__cell--extra";
 
             var inviteRow = document.createElement("div");
             inviteRow.className = "home-cal__invite";
@@ -16436,7 +16749,7 @@ browsen</span>
               heartBtn.setAttribute("aria-hidden", "true");
             }
             inviteRow.appendChild(heartBtn);
-            cell.appendChild(inviteRow);
+            extraCell.appendChild(inviteRow);
 
             var rateBtn = document.createElement("button");
             rateBtn.type = "button";
@@ -16469,8 +16782,8 @@ browsen</span>
               rateBtn.disabled = true;
               rateBtn.setAttribute("aria-hidden", "true");
             }
-            cell.appendChild(rateBtn);
-            root.appendChild(cell);
+            extraCell.appendChild(rateBtn);
+            if (extrasRow) extrasRow.appendChild(extraCell);
           });
 
           var selected = days.find(function (d) { return dateKey(d) === selectedKey; }) || days[0];

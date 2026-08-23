@@ -39,8 +39,12 @@ create table if not exists go_buddy_challenges (
   message text not null default '',
   status text not null default 'pending' check (status in ('pending', 'accepted', 'declined', 'done')),
   created_at timestamptz not null default now(),
-  seen_at timestamptz
+  seen_at timestamptz,
+  accepted_at timestamptz
 );
+
+alter table go_buddy_challenges
+  add column if not exists accepted_at timestamptz;
 
 create index if not exists go_buddy_challenges_to_idx
   on go_buddy_challenges (to_account_id, status, created_at desc);
