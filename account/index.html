@@ -2099,10 +2099,13 @@
       overflow: hidden !important;
       display: flex;
       flex-direction: column;
-      padding-bottom: calc(var(--community-composer-h, 58px) + 14px);
+      padding-bottom: calc(var(--header-h, 58px) + env(safe-area-inset-bottom, 0px) + 14px);
       overscroll-behavior: none;
       /* Safe-Area bleibt — Kopf darf nicht unter die Notch rutschen */
       padding-top: env(safe-area-inset-top, 0px);
+    }
+    body.is-community.is-community-chat-open .wrap__scroll {
+      padding-bottom: calc(var(--community-composer-h, 58px) + 14px);
     }
     body.is-community #panel-community.is-active {
       display: flex;
@@ -2157,8 +2160,158 @@
     .community-post.is-mine .community-post__photo {
       margin-left: auto;
     }
-    .community-post.is-buddy .community-post__photo {
-      margin-right: auto;
+    .community-feed .community-post__photo {
+      width: 100%;
+      max-width: 100%;
+      max-height: 240px;
+      border-radius: 10px;
+    }
+    .community-top__tools {
+      position: absolute;
+      right: 0;
+      top: 0;
+      display: flex;
+      gap: 6px;
+      z-index: 2;
+    }
+    .community-top {
+      position: relative;
+    }
+    .community-day {
+      flex: 0 0 auto;
+      width: 100%;
+      margin: 0 0 8px;
+    }
+    .community-day__head {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 0 0 8px;
+    }
+    .community-day__cal {
+      flex: 0 0 auto;
+      min-width: 52px;
+      padding: 6px 8px;
+      border: 1px solid rgba(247, 245, 240, 0.55);
+      border-radius: 8px;
+      background: rgba(247, 245, 240, 0.08);
+      color: var(--ink-on-red);
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      text-align: center;
+    }
+    .community-day__plan {
+      margin: 0;
+      flex: 1;
+      font-size: 0.92rem;
+      font-weight: 600;
+      line-height: 1.35;
+      letter-spacing: -0.02em;
+      color: var(--ink-on-red);
+    }
+    .community-day__actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin: 0 0 10px;
+    }
+    .community-day__act {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid rgba(247, 245, 240, 0.35);
+      background: rgba(247, 245, 240, 0.1);
+      color: var(--ink-on-red);
+      font-size: 1rem;
+      line-height: 1;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .community-day__act.is-spacer {
+      flex: 1;
+      visibility: hidden;
+      pointer-events: none;
+      border: 0;
+      background: transparent;
+    }
+    .community-day__hero {
+      width: calc(100% + 2 * var(--pad));
+      margin-left: calc(-1 * var(--pad));
+      margin-right: calc(-1 * var(--pad));
+      overflow: hidden;
+      background: rgba(52, 34, 32, 0.2);
+    }
+    .community-day__photo {
+      display: block;
+      width: 100%;
+      height: auto;
+      min-height: 180px;
+      max-height: 42vh;
+      object-fit: cover;
+      object-position: center;
+    }
+    .community-chat {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      margin-top: 6px;
+    }
+    .community-chat__toggle {
+      align-self: flex-end;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 0 6px;
+      padding: 4px 2px;
+      border: 0;
+      background: transparent;
+      color: var(--ink-on-red);
+      font: inherit;
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .community-chat__arrow {
+      display: inline-block;
+      transition: transform 0.2s ease;
+      font-size: 0.72rem;
+    }
+    .community-chat__toggle.is-open .community-chat__arrow {
+      transform: rotate(180deg);
+    }
+    .community-chat__body {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .community-chat__body[hidden] {
+      display: none !important;
+    }
+    .community-feed__day {
+      margin: 0 0 10px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: rgba(247, 245, 240, 0.72);
+    }
+    .community-feed .community-post {
+      max-width: 100%;
+      align-self: stretch;
+    }
+    .community-feed .community-post.is-mine,
+    .community-feed .community-post.is-buddy {
+      text-align: left;
+      align-self: stretch;
     }
     .community-composer {
       display: grid;
@@ -2170,9 +2323,16 @@
       border-top: 1px solid rgba(247, 245, 240, 0.35);
     }
     body.is-community .site-chrome:not(.site-chrome--top) {
+      display: block;
+    }
+    body.is-community.is-community-chat-open .site-chrome:not(.site-chrome--top) {
       display: none;
     }
     body.is-community .community-composer {
+      display: none;
+    }
+    body.is-community.is-community-chat-open .community-composer {
+      display: grid;
       position: fixed;
       left: 0;
       right: 0;
@@ -4963,44 +5123,57 @@ browsen</span>
 
       <div class="panel" id="panel-community" data-panel="community">
         <div class="community-shell">
-          <div class="community-head">
-            <button class="community-back" type="button" id="community-back" aria-label="Zurück"></button>
-            <h1 class="profile-name" data-de="Meine Buddies" data-en="My Buddies">Meine Buddies</h1>
-            <button
-              class="community-discover"
-              type="button"
-              id="community-discover"
-              aria-label="Buddies suchen"
-              hidden
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path fill="currentColor" d="M10.5 3a7.5 7.5 0 0 1 5.95 12.05l4.25 4.25-1.4 1.4-4.25-4.25A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z"/>
-              </svg>
-            </button>
-            <a
-              class="community-wa"
-              id="community-wa"
-              href="#"
-              target="_blank"
-              rel="noopener"
-              aria-label="WhatsApp-Gruppe öffnen"
-              hidden
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="currentColor"
-                  d="M12.04 2c-5.46 0-9.91 4.43-9.91 9.9 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 1.8c2.16 0 4.19.84 5.72 2.37a8.07 8.07 0 0 1 2.38 5.73c0 4.47-3.64 8.1-8.1 8.1-1.42 0-2.8-.37-4.01-1.07l-.29-.17-3.12.82.83-3.04-.19-.31a8.08 8.08 0 0 1-1.24-4.33c0-4.47 3.64-8.1 8.12-8.1zm4.66 10.35c-.2-.1-1.18-.58-1.36-.65-.18-.07-.32-.1-.45.1-.13.2-.51.65-.63.78-.12.13-.23.15-.43.05-.2-.1-.84-.31-1.6-.99-.59-.52-.99-1.17-1.1-1.37-.12-.2-.01-.3.09-.4.09-.09.2-.23.3-.35.1-.12.13-.2.2-.33.07-.13.03-.25-.02-.35-.05-.1-.45-1.08-.62-1.48-.16-.39-.33-.33-.45-.34h-.38c-.13 0-.35.05-.53.25-.18.2-.7.68-.7 1.66s.72 1.92.82 2.05c.1.13 1.41 2.15 3.42 3.02.48.21.85.33 1.14.42.48.15.92.13 1.26.08.39-.06 1.18-.48 1.35-.95.17-.47.17-.87.12-.95-.05-.08-.18-.13-.38-.23z"
-                />
-              </svg>
-            </a>
-          </div>
           <div class="community-top">
+            <div class="community-top__tools">
+              <button
+                class="community-discover"
+                type="button"
+                id="community-discover"
+                aria-label="Buddies suchen"
+                hidden
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M10.5 3a7.5 7.5 0 0 1 5.95 12.05l4.25 4.25-1.4 1.4-4.25-4.25A7.5 7.5 0 1 1 10.5 3zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11z"/>
+                </svg>
+              </button>
+              <a
+                class="community-wa"
+                id="community-wa"
+                href="#"
+                target="_blank"
+                rel="noopener"
+                aria-label="WhatsApp-Gruppe öffnen"
+                hidden
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M12.04 2c-5.46 0-9.91 4.43-9.91 9.9 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21h.01c5.46 0 9.9-4.44 9.9-9.9 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 1.8c2.16 0 4.19.84 5.72 2.37a8.07 8.07 0 0 1 2.38 5.73c0 4.47-3.64 8.1-8.1 8.1-1.42 0-2.8-.37-4.01-1.07l-.29-.17-3.12.82.83-3.04-.19-.31a8.08 8.08 0 0 1-1.24-4.33c0-4.47 3.64-8.1 8.12-8.1zm4.66 10.35c-.2-.1-1.18-.58-1.36-.65-.18-.07-.32-.1-.45.1-.13.2-.51.65-.63.78-.12.13-.23.15-.43.05-.2-.1-.84-.31-1.6-.99-.59-.52-.99-1.17-1.1-1.37-.12-.2-.01-.3.09-.4.09-.09.2-.23.3-.35.1-.12.13-.2.2-.33.07-.13.03-.25-.02-.35-.05-.1-.45-1.08-.62-1.48-.16-.39-.33-.33-.45-.34h-.38c-.13 0-.35.05-.53.25-.18.2-.7.68-.7 1.66s.72 1.92.82 2.05c.1.13 1.41 2.15 3.42 3.02.48.21.85.33 1.14.42.48.15.92.13 1.26.08.39-.06 1.18-.48 1.35-.95.17-.47.17-.87.12-.95-.05-.08-.18-.13-.38-.23z"/>
+                </svg>
+              </a>
+            </div>
             <div class="community-slots" id="community-slots" aria-label="Buddy-Plätze"></div>
             <hr class="community-rule" />
             <p class="community-add-msg" id="community-add-msg" aria-live="polite"></p>
           </div>
-          <div class="community-feed" id="community-feed" aria-live="polite"></div>
-          <form class="community-composer" id="community-composer">
+          <div class="community-day" id="community-day">
+            <div class="community-day__head">
+              <button class="community-day__cal" type="button" id="community-day-cal" aria-label="Tag wählen"></button>
+              <p class="community-day__plan" id="community-day-plan"></p>
+            </div>
+            <div class="community-day__actions" id="community-day-actions" aria-label="Tagesaktionen"></div>
+            <div class="community-day__hero" id="community-day-hero">
+              <img class="community-day__photo" id="community-day-photo" alt="" />
+            </div>
+          </div>
+          <div class="community-chat">
+            <button class="community-chat__toggle" type="button" id="community-chat-toggle" aria-expanded="false" aria-controls="community-chat-body">
+              <span data-de="Chat" data-en="Chat">Chat</span>
+              <span class="community-chat__arrow" aria-hidden="true">▼</span>
+            </button>
+            <div class="community-chat__body" id="community-chat-body" hidden>
+              <div class="community-feed" id="community-feed" aria-live="polite"></div>
+            </div>
+          </div>
+          <form class="community-composer" id="community-composer" hidden>
             <button class="community-composer__pick" id="community-reply-pick" type="button" aria-label="Empfänger wählen">@</button>
             <textarea
               class="community-composer__field"
@@ -5089,12 +5262,12 @@ browsen</span>
             <button class="nav-btn" type="button" data-goto="profile" aria-label="Profil" data-aria-de="Profil" data-aria-en="Profile">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 11.2a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2ZM5.6 19.2c0-2.7 2.4-4.6 4.8-4.6h3.2c2.4 0 4.8 1.9 4.8 4.6v1.3H5.6v-1.3Z"/></svg>
             </button>
-            <button class="nav-btn is-active" type="button" data-goto="home" aria-label="Home" data-aria-de="Home" data-aria-en="Home" aria-current="page">
-              <svg id="nav-cycle" viewBox="0 0 24 24" aria-hidden="true" fill="none"></svg>
-            </button>
             <button class="nav-btn" type="button" data-goto="community" aria-label="Community" data-aria-de="Community" data-aria-en="Community">
               <span class="nav-btn__dot" aria-hidden="true"></span>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8.2 11.2a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2Zm7.6 0a3.1 3.1 0 1 0 0-6.2 3.1 3.1 0 0 0 0 6.2ZM3.4 19.2c0-2.7 2.4-4.6 4.8-4.6h.4c1 .4 2.1.6 3.2.6s2.2-.2 3.2-.6h.4c2.4 0 4.8 1.9 4.8 4.6v1.3H3.4v-1.3Z"/></svg>
+              <svg id="nav-cycle" viewBox="0 0 24 24" aria-hidden="true" fill="none"></svg>
+            </button>
+            <button class="nav-btn is-active" type="button" data-goto="home" aria-label="Kalender" data-aria-de="Kalender" data-aria-en="Calendar" aria-current="page">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3.5" width="8" height="17" rx="1.75" fill="currentColor"/></svg>
             </button>
             <button class="nav-btn" type="button" data-goto="book" aria-label="Wissen" data-aria-de="Wissen" data-aria-en="Ideas">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm-2.5 12.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5h5c.28 0 .5.22.5.5s-.22.5-.5.5h-5z"/></svg>
@@ -12578,6 +12751,8 @@ browsen</span>
       var communityPosts = [];
       var replyTargetId = null;
       var pickingReplyBuddy = false;
+      var communityViewDateKey = "";
+      var communityChatOpen = false;
 
       function trainerEditIcon(isCheck) {
         if (isCheck) {
@@ -13760,14 +13935,214 @@ browsen</span>
         return map;
       }
 
+      function ensureCommunityViewDate() {
+        if (!communityViewDateKey) communityViewDateKey = berlinTodayKey();
+        return communityViewDateKey;
+      }
+
+      function communityDayShortLabel(key) {
+        var d = parseDateKey(key);
+        if (!d) return String(key || "");
+        var names = uiLang === "en"
+          ? ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+          : ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+        return names[d.getDay()] + " " + d.getDate();
+      }
+
+      function communityDayLongLabel(key) {
+        var d = parseDateKey(key);
+        if (!d) return String(key || "");
+        try {
+          return d.toLocaleDateString(uiLang === "en" ? "en-US" : "de-DE", {
+            weekday: "long",
+            day: "numeric",
+            month: "long"
+          });
+        } catch (e) {
+          return communityDayShortLabel(key);
+        }
+      }
+
+      function communityPlanLineForDate(key) {
+        var d = parseDateKey(key) || new Date();
+        var wd = (d.getDay() + 6) % 7;
+        var accepted = acceptedInviteForDate(key);
+        if (accepted && (accepted.workout_label || accepted.meet_time || accepted.place)) {
+          var bits = [];
+          if (accepted.workout_label) bits.push(localizePlanLabel(String(accepted.workout_label).trim()));
+          if (accepted.meet_time) bits.push(String(accepted.meet_time).trim());
+          if (accepted.place) bits.push(String(accepted.place).trim());
+          if (bits.length) return bits.join(", ");
+        }
+        var raw = coachDayTextForDate(d) || coachDayText(wd) || defaultDayPlan();
+        var first = String(raw || "").split(/\n/)[0].trim();
+        return first || t("Ruhetag", "Rest day");
+      }
+
+      function placeCoordsForName(placeName) {
+        var key = normalizePlaceNameKey(placeName);
+        if (!key) return null;
+        for (var i = 0; i < globalWorkoutPlaces.length; i++) {
+          var p = globalWorkoutPlaces[i];
+          if (!p || !p.name) continue;
+          if (normalizePlaceNameKey(p.name) === key) return p;
+        }
+        return null;
+      }
+
+      function workoutPlacePhotoUrl(placeName) {
+        var p = placeCoordsForName(placeName);
+        if (p && p.lat != null && p.lng != null) {
+          return "https://staticmap.openstreetmap.de/staticmap.php?center=" +
+            encodeURIComponent(p.lat + "," + p.lng) +
+            "&zoom=16&size=800x450&maptype=mapnik&markers=" +
+            encodeURIComponent(p.lat + "," + p.lng + ",red");
+        }
+        return "https://staticmap.openstreetmap.de/staticmap.php?center=52.52,13.405&zoom=12&size=800x450&maptype=mapnik";
+      }
+
+      function communityPlaceForDate(key) {
+        var d = parseDateKey(key) || new Date();
+        var wd = (d.getDay() + 6) % 7;
+        var accepted = acceptedInviteForDate(key);
+        if (accepted && accepted.place) return String(accepted.place).trim();
+        var meet = getWeekdayMeetForDate(wd, key) || getWeekdayMeet(wd);
+        if (meet && meet.place) return String(meet.place).trim();
+        var places = getAccountPlaces();
+        if (places && places.length) return String(places[0]).trim();
+        return account && account.workout_place ? String(account.workout_place).trim() : "";
+      }
+
+      function latestPhotoPostForDay(key) {
+        var best = null;
+        var bestMs = 0;
+        for (var i = 0; i < communityPosts.length; i++) {
+          var p = communityPosts[i];
+          if (!p || !p.photo_url) continue;
+          if (berlinDateKeyFromIso(p.created_at) !== key) continue;
+          var ms = postTimeMs(p.created_at);
+          if (ms >= bestMs) {
+            bestMs = ms;
+            best = p;
+          }
+        }
+        return best;
+      }
+
+      function setCommunityChatOpen(open) {
+        communityChatOpen = !!open;
+        document.body.classList.toggle("is-community-chat-open", communityChatOpen);
+        var composer = document.getElementById("community-composer");
+        var body = document.getElementById("community-chat-body");
+        var toggle = document.getElementById("community-chat-toggle");
+        if (composer) composer.hidden = !communityChatOpen;
+        if (body) body.hidden = !communityChatOpen;
+        if (toggle) {
+          toggle.classList.toggle("is-open", communityChatOpen);
+          toggle.setAttribute("aria-expanded", communityChatOpen ? "true" : "false");
+        }
+        renderCommunityFeed();
+        if (typeof window.__gogogoSyncCommunityComposer === "function") {
+          window.__gogogoSyncCommunityComposer();
+        }
+      }
+      window.__gogogoSetCommunityDay = function (key) {
+        if (key) communityViewDateKey = String(key).slice(0, 10);
+        renderCommunityDayPanel();
+        if (communityChatOpen) renderCommunityFeed();
+      };
+
+      function renderCommunityDayPanel() {
+        var key = ensureCommunityViewDate();
+        var calBtn = document.getElementById("community-day-cal");
+        var planEl = document.getElementById("community-day-plan");
+        var photoEl = document.getElementById("community-day-photo");
+        var actionsEl = document.getElementById("community-day-actions");
+        if (calBtn) calBtn.textContent = communityDayShortLabel(key);
+        if (planEl) planEl.textContent = communityPlanLineForDate(key);
+        if (photoEl) {
+          var post = latestPhotoPostForDay(key);
+          if (post && post.photo_url) {
+            photoEl.src = post.photo_url;
+            photoEl.alt = t("Workout-Foto", "Workout photo");
+          } else {
+            photoEl.src = workoutPlacePhotoUrl(communityPlaceForDate(key));
+            photoEl.alt = communityPlaceForDate(key) || t("Ort", "Place");
+          }
+        }
+        if (actionsEl) {
+          actionsEl.innerHTML = "";
+          var d = parseDateKey(key) || new Date();
+          var wd = (d.getDay() + 6) % 7;
+          var pair = dayUnitsFor(wd);
+          function addAct(label, emoji, handler) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "community-day__act";
+            btn.textContent = emoji;
+            btn.setAttribute("aria-label", label);
+            btn.addEventListener("click", handler);
+            actionsEl.appendChild(btn);
+          }
+          if (pair && pair.workout) {
+            addAct(localizePlanLabel(pair.workout.label || "Workout"), unitEmojiFor(pair.workout), function () {
+              gotoPanel("home");
+              if (typeof window.__gogogoSelectDay === "function") {
+                window.__gogogoSelectDay(key, false);
+              }
+            });
+          }
+          if (pair && pair.alternative) {
+            addAct(localizePlanLabel(pair.alternative.label || "Alternative"), unitEmojiFor(pair.alternative), function () {
+              gotoPanel("home");
+              if (typeof window.__gogogoSelectDay === "function") {
+                window.__gogogoSelectDay(key, false);
+              }
+            });
+          }
+          addAct(t("Kalender", "Calendar"), "🗒️", function () {
+            gotoPanel("home");
+            if (typeof window.__gogogoSelectDay === "function") {
+              window.__gogogoSelectDay(key, true);
+            }
+          });
+          var spacer = document.createElement("span");
+          spacer.className = "community-day__act is-spacer";
+          actionsEl.appendChild(spacer);
+          addAct(t("Teilen", "Share"), "❤️", function () {
+            openShareModal();
+          });
+          addAct(t("Profil", "Profile"), "👤", function () {
+            gotoPanel("profile");
+          });
+        }
+      }
+
       function renderCommunityFeed() {
         var feed = document.getElementById("community-feed");
         if (!feed) return;
         feed.innerHTML = "";
+        renderCommunityDayPanel();
+        if (!communityChatOpen) return;
         var names = authorNameMap();
-        var posts = communityPosts.slice().sort(function (a, b) {
-          return String(b.created_at || "").localeCompare(String(a.created_at || ""));
+        var viewKey = ensureCommunityViewDate();
+        var posts = communityPosts.slice().filter(function (p) {
+          return p && berlinDateKeyFromIso(p.created_at) === viewKey;
+        }).sort(function (a, b) {
+          return postTimeMs(a.created_at) - postTimeMs(b.created_at);
         });
+        var dayHead = document.createElement("div");
+        dayHead.className = "community-feed__day";
+        dayHead.textContent = communityDayLongLabel(viewKey);
+        feed.appendChild(dayHead);
+        if (!posts.length) {
+          var empty = document.createElement("p");
+          empty.className = "community-post__body";
+          empty.style.opacity = "0.72";
+          empty.textContent = t("Noch keine Beiträge an diesem Tag.", "No posts on this day yet.");
+          feed.appendChild(empty);
+          return;
+        }
         for (var i = 0; i < posts.length; i++) {
           var post = posts[i];
           if (!post) continue;
@@ -13776,19 +14151,30 @@ browsen</span>
           el.className = "community-post " + (mine ? "is-mine" : "is-buddy");
           var who = document.createElement("div");
           who.className = "community-post__who";
-          who.textContent = mine ? t("Du", "You") : (firstNameOf({ name: names[post.author_id] || "Buddy" }));
+          var timeStr = "";
+          try {
+            timeStr = new Date(post.created_at).toLocaleTimeString(uiLang === "en" ? "en-US" : "de-DE", {
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "Europe/Berlin"
+            });
+          } catch (eTime) {}
+          who.textContent = (mine ? t("Du", "You") : firstNameOf({ name: names[post.author_id] || "Buddy" })) +
+            (timeStr ? " · " + timeStr : "");
           if (!mine && post.author_id) {
             who.style.cursor = "pointer";
             who.setAttribute("role", "button");
             who.tabIndex = 0;
-            who.addEventListener("click", function () {
-              openAboutMeReadModal(post.author_id, names[post.author_id] || "Buddy", who);
-            });
+            (function (authorId, authorName) {
+              who.addEventListener("click", function () {
+                openAboutMeReadModal(authorId, authorName, who);
+              });
+            })(post.author_id, names[post.author_id] || "Buddy");
           }
           if (post.reply_to_id && names[post.reply_to_id]) {
             who.textContent += " → " + firstNameOf({ name: names[post.reply_to_id] });
           } else if (post.reply_to_id && post.reply_to_id === account.id && !mine) {
-            who.textContent += " → Dich";
+            who.textContent += " → " + t("Dich", "You");
           }
           el.appendChild(who);
           if (post.photo_url) {
@@ -13817,7 +14203,7 @@ browsen</span>
           }
           feed.appendChild(el);
         }
-        feed.scrollTop = 0;
+        feed.scrollTop = feed.scrollHeight;
       }
 
       function getFeedSeenAt() {
@@ -14103,9 +14489,11 @@ browsen</span>
       }
 
       function fillCommunityPanel() {
+        ensureCommunityViewDate();
         syncCommunityWhatsApp();
         syncCommunityDiscoverBtn();
         renderBuddySlots();
+        renderCommunityDayPanel();
         if (isBuddySearchLocked()) {
           var lockEl = document.getElementById("community-add-msg");
           if (lockEl) lockEl.textContent = buddySearchLockMessage();
@@ -14466,8 +14854,8 @@ browsen</span>
         { panel: "home", selector: ".home-cal__extras", placement: "bottom", textDe: "Herz = Buddies einladen, Notiz = Tag bewerten.", textEn: "Heart = invite buddies, note = rate day." },
         { panel: "training", selector: ".training-card-tabs", placement: "bottom", textDe: "Kraft, Ausdauer, Intervall — hier trainierst Du.", textEn: "Strength, endurance, intervals — train here." },
         { panel: "community", selector: "#community-slots", placement: "bottom", textDe: "Deine Buddies — tippe auf ein Foto für Aktionen.", textEn: "Your buddies — tap a photo for actions." },
-        { panel: "community", selector: "#community-feed", placement: "top", textDe: "Feed: Nachrichten und Updates.", textEn: "Feed: messages and updates." },
-        { panel: "community", selector: "#community-composer", placement: "top", textDe: "Nachricht schreiben — @ für Empfänger.", textEn: "Write a message — @ to pick recipient." },
+        { panel: "community", selector: "#community-day-hero", placement: "bottom", textDe: "Tagesfoto — Workout oder Ort.", textEn: "Day photo — workout or place." },
+        { panel: "community", selector: "#community-chat-toggle", placement: "top", textDe: "Chat aufklappen — unten erscheint die Eingabe statt des Menüs.", textEn: "Expand chat — input replaces the menu at the bottom." },
         { panel: "book", selector: ".book-nav", placement: "bottom", textDe: "Wissen: About, Fakten, Videos.", textEn: "Knowledge: about, facts, videos." },
         { panel: "profile", selector: "#profile-goal-score", placement: "bottom", textDe: "Ziel-Bilanz: Wochenplan vs. Tagesqualität.", textEn: "Goal balance: weekly plan vs. daily quality." },
         { panel: "profile", selector: "#profile-plan-days", placement: "top", textDe: "Wochenplan mit Workout, Alternative, Ort und Zeit.", textEn: "Weekly plan with workout, alternative, place and time." }
@@ -16059,6 +16447,7 @@ browsen</span>
         }
         if (onCommunity) {
           /* Sofort als gelesen markieren — Punkt weg, bis eine neue Nachricht an dich kommt. */
+          ensureCommunityViewDate();
           setFeedSeenNow();
           updateCommunityNavDot();
           fillCommunityPanel();
@@ -16068,6 +16457,7 @@ browsen</span>
             window.dispatchEvent(ev);
           });
         } else {
+          setCommunityChatOpen(false);
           var appEl = document.getElementById("app");
           if (appEl) {
             appEl.style.transform = "";
@@ -17257,7 +17647,8 @@ browsen</span>
         var replyText = document.getElementById("community-reply-text");
         var replySend = document.getElementById("community-reply-send");
         var msg = document.getElementById("community-add-msg");
-        var communityBack = document.getElementById("community-back");
+        var chatToggle = document.getElementById("community-chat-toggle");
+        var dayCalBtn = document.getElementById("community-day-cal");
 
         function pinCommunityViewport() {
           if (!document.body.classList.contains("is-community")) return;
@@ -17283,7 +17674,16 @@ browsen</span>
 
         function syncCommunityComposerChrome() {
           if (!composer) return;
+          if (!document.body.classList.contains("is-community")) return;
           pinCommunityViewport();
+          if (!communityChatOpen) {
+            composer.style.bottom = "";
+            composer.style.paddingBottom = "";
+            if (!(replyText && document.activeElement === replyText)) {
+              document.body.classList.remove("is-keyboard");
+            }
+            return;
+          }
           var kb = 0;
           if (window.visualViewport) {
             kb = Math.max(
@@ -17398,12 +17798,20 @@ browsen</span>
         }
         window.addEventListener("resize", syncCommunityComposerChrome);
         window.__gogogoPinCommunity = pinCommunityViewport;
+        window.__gogogoSyncCommunityComposer = syncCommunityComposerChrome;
         syncCommunityComposerChrome();
 
-        if (communityBack) {
-          communityBack.addEventListener("click", function () {
-            stopCommunityPinLoop();
+        if (chatToggle) {
+          chatToggle.addEventListener("click", function () {
+            setCommunityChatOpen(!communityChatOpen);
+          });
+        }
+        if (dayCalBtn) {
+          dayCalBtn.addEventListener("click", function () {
             gotoPanel("home");
+            if (typeof window.__gogogoSelectDay === "function") {
+              window.__gogogoSelectDay(ensureCommunityViewDate(), false);
+            }
           });
         }
 
