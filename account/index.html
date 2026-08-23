@@ -1484,6 +1484,10 @@
       font-size: 1.05rem;
     }
     .pref-wheel-item.is-selected { opacity: 1; }
+    .pref-wheel-item.is-checked::before {
+      content: "✓ ";
+      font-weight: 700;
+    }
     .discover-sheet { max-height: min(78vh, 560px); overflow: auto; }
     .discover-sheet .challenge-modal__title { display: none; }
     .discover-goal-label {
@@ -2918,6 +2922,15 @@
       background: transparent;
       color: var(--ink-on-red);
       border: 1.5px solid rgba(247, 245, 240, 0.55);
+    }
+    .challenge-modal__btn--full {
+      width: 100%;
+      display: block;
+      margin-top: 18px;
+    }
+    #goal-score-modal .challenge-modal__actions,
+    #rpe-o-modal .challenge-modal__actions {
+      display: block;
     }
     #invite-notice-modal {
       z-index: 95;
@@ -4627,15 +4640,26 @@ browsen</span>
     <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="goal-score-title">
       <p class="challenge-modal__title" id="goal-score-title" data-de="Ziel-Bilanz" data-en="Goal balance">Ziel-Bilanz</p>
       <p id="goal-score-body" style="font-size:0.92rem;line-height:1.45"></p>
-      <button type="button" class="challenge-modal__btn" id="goal-score-ok" data-de="OK" data-en="OK">OK</button>
+      <button type="button" class="challenge-modal__btn challenge-modal__btn--full" id="goal-score-ok" data-de="OK" data-en="OK">OK</button>
     </div>
   </div>
 
   <div class="challenge-modal" id="rpe-o-modal" hidden aria-hidden="true">
     <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="rpe-o-title">
-      <p class="challenge-modal__title" id="rpe-o-title" data-de="RPE-o" data-en="RPE-o">RPE-o</p>
+      <p class="challenge-modal__title" id="rpe-o-title" data-de="RPE-ø" data-en="RPE-ø">RPE-ø</p>
       <p id="rpe-o-body" style="font-size:0.92rem;line-height:1.45"></p>
-      <button type="button" class="challenge-modal__btn" id="rpe-o-ok" data-de="OK" data-en="OK">OK</button>
+      <button type="button" class="challenge-modal__btn challenge-modal__btn--full" id="rpe-o-ok" data-de="OK" data-en="OK">OK</button>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="unit-choice-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="unit-choice-title">
+      <p class="challenge-modal__title" id="unit-choice-title" data-de="Was bewertest Du?" data-en="What are you rating?">Was bewertest Du?</p>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn" id="unit-choice-workout" data-de="Workout" data-en="Workout">Workout</button>
+        <button type="button" class="challenge-modal__btn" id="unit-choice-alternative" data-de="Alternative" data-en="Alternative">Alternative</button>
+      </div>
+      <button type="button" class="challenge-modal__btn is-ghost challenge-modal__btn--full" id="unit-choice-cancel" data-de="Abbrechen" data-en="Cancel" style="margin-top:10px">Abbrechen</button>
     </div>
   </div>
 
@@ -4741,8 +4765,8 @@ browsen</span>
               <span class="profile-meta__value" id="profile-streak">0 Tage</span>
             </div>
             <div class="profile-meta__row">
-              <span class="profile-meta__label" data-de="RPE-o" data-en="RPE-o">RPE-o</span>
-              <button type="button" class="profile-meta__value profile-meta__goal-btn" id="profile-wert-btn" aria-label="RPE-o Info">0</button>
+              <span class="profile-meta__label" data-de="RPE-ø" data-en="RPE-ø">RPE-ø</span>
+              <button type="button" class="profile-meta__value profile-meta__goal-btn" id="profile-wert-btn" aria-label="RPE-ø Info">0</button>
             </div>
             <div class="profile-meta__row profile-meta__row--goal">
               <span class="profile-meta__label" data-de="Ziel" data-en="Goal">Ziel</span>
@@ -5289,11 +5313,7 @@ browsen</span>
             </button>
             <button class="nav-btn is-active" type="button" data-goto="home" aria-label="Kalender" data-aria-de="Kalender" data-aria-en="Calendar" aria-current="page">
               <svg class="nav-cal-sheet" viewBox="0 0 24 24" aria-hidden="true" fill="none">
-                <rect x="6.5" y="4.5" width="11" height="15" rx="1.5" stroke="currentColor" stroke-width="1.55"/>
-                <line x1="6.5" y1="9" x2="17.5" y2="9" stroke="currentColor" stroke-width="1.35"/>
-                <circle cx="9" cy="6.8" r="0.85" fill="currentColor"/>
-                <circle cx="15" cy="6.8" r="0.85" fill="currentColor"/>
-                <path d="M9.2 12.2h5.6M9.2 15h3.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                <rect x="8.25" y="3.75" width="7.5" height="16.5" rx="1.35" stroke="currentColor" stroke-width="1.65"/>
               </svg>
             </button>
             <button class="nav-btn" type="button" data-goto="book" aria-label="Wissen" data-aria-de="Wissen" data-aria-en="Ideas">
@@ -5578,6 +5598,8 @@ browsen</span>
       </div>
       <p class="plan-edit-tpl-hint" id="plan-edit-tpl-hint" hidden>Vorlage wählen</p>
       <div class="plan-edit-templates" id="plan-edit-templates" hidden></div>
+      <p class="plan-edit-tpl-hint" id="plan-edit-alt-hint" data-de="Alternative" data-en="Alternative">Alternative</p>
+      <div class="plan-edit-options" id="plan-edit-alt-options"></div>
       <div class="challenge-modal__actions">
         <button type="button" class="challenge-modal__btn is-ghost" id="plan-edit-cancel">Abbrechen</button>
         <button type="button" class="challenge-modal__btn" id="plan-edit-save" disabled>Speichern</button>
@@ -8312,18 +8334,6 @@ browsen</span>
         return pair ? pair.workout : null;
       }
 
-      function unitEmojiFor(u) {
-        if (!u) return "🏋️‍♀️";
-        if (u.emoji) return u.emoji;
-        var k = String(u.kind || "");
-        if (k === "kraft") return "🏋️‍♀️";
-        if (k === "ausdauer") return "🏃";
-        if (k === "swim") return "🏊";
-        if (k === "walk") return "🚶‍♂️";
-        if (k === "zirkel") return "🔥";
-        return "🏋️‍♀️";
-      }
-
       function normalizeTrainingUnit(row) {
         if (!row || !row.kind) return null;
         return {
@@ -8331,7 +8341,8 @@ browsen</span>
           label: row.label != null ? String(row.label) : "",
           systemId: row.systemId != null ? String(row.systemId) : "",
           presetId: row.presetId != null ? String(row.presetId) : "",
-          emoji: row.emoji != null ? String(row.emoji) : unitEmojiFor(row)
+          emoji: row.emoji != null ? String(row.emoji) : unitEmojiFor(row),
+          source: row.source != null ? String(row.source) : ""
         };
       }
 
@@ -8343,8 +8354,61 @@ browsen</span>
           label: t("Spaziergang", "Walk"),
           systemId: "",
           presetId: "",
-          emoji: "🚶‍♂️"
+          emoji: "🚶‍♂️",
+          source: (workout && workout.source) || ""
         };
+      }
+
+      var ALTERNATIVE_UNIT_OPTIONS = [
+        { kind: "walk", labelDe: "Spaziergang", labelEn: "Walk", emoji: "🚶‍♂️" },
+        { kind: "bike", labelDe: "Fahrradfahren", labelEn: "Cycling", emoji: "🚴" },
+        { kind: "jog", labelDe: "locker Joggen", labelEn: "Easy jog", emoji: "🏃" },
+        { kind: "bodyweight", labelDe: "Bodyweight 20 min.", labelEn: "Bodyweight 20 min.", emoji: "🤸" },
+        { kind: "team", labelDe: "Mannschaftssport", labelEn: "Team sport", emoji: "⚽" },
+        { kind: "swim", labelDe: "Schwimmen", labelEn: "Swimming", emoji: "🏊" },
+        { kind: "yoga", labelDe: "Yoga / Mobility", labelEn: "Yoga / Mobility", emoji: "🧘" }
+      ];
+
+      function alternativeUnitFromOption(opt, source) {
+        if (!opt) return defaultAlternativeUnit(null);
+        return {
+          kind: opt.kind,
+          label: t(opt.labelDe, opt.labelEn),
+          systemId: "",
+          presetId: "",
+          emoji: opt.emoji,
+          source: source || ""
+        };
+      }
+
+      function matchAlternativeOption(unit) {
+        if (!unit) return ALTERNATIVE_UNIT_OPTIONS[0];
+        var kind = String(unit.kind || "");
+        var label = String(unit.label || "").toLowerCase();
+        for (var i = 0; i < ALTERNATIVE_UNIT_OPTIONS.length; i++) {
+          var opt = ALTERNATIVE_UNIT_OPTIONS[i];
+          if (opt.kind === kind) return opt;
+          if (label && (label.indexOf(String(opt.labelDe).toLowerCase()) >= 0 ||
+              label.indexOf(String(opt.labelEn).toLowerCase()) >= 0)) return opt;
+        }
+        return ALTERNATIVE_UNIT_OPTIONS[0];
+      }
+
+      function unitEmojiFor(u) {
+        if (!u) return "🏋️‍♀️";
+        if (u.emoji) return u.emoji;
+        var k = String(u.kind || "");
+        if (k === "kraft") return "🏋️‍♀️";
+        if (k === "ausdauer") return "🏃";
+        if (k === "swim") return "🏊";
+        if (k === "walk") return "🚶‍♂️";
+        if (k === "bike") return "🚴";
+        if (k === "jog") return "🏃";
+        if (k === "bodyweight") return "🤸";
+        if (k === "team") return "⚽";
+        if (k === "yoga") return "🧘";
+        if (k === "zirkel") return "🔥";
+        return "🏋️‍♀️";
       }
 
       function dayUnitsFor(wd) {
@@ -8357,11 +8421,14 @@ browsen</span>
           var row = map[String(wd)] || map[wd];
           if (row && row.workout) {
             var workout = normalizeTrainingUnit(row.workout);
+            if (workout && row.source && !workout.source) workout.source = String(row.source);
             var alternative = normalizeTrainingUnit(row.alternative) || defaultAlternativeUnit(workout);
+            if (alternative && row.source && !alternative.source) alternative.source = String(row.source);
             if (workout) return { workout: workout, alternative: alternative };
           }
           if (row && row.kind) {
             var w = normalizeTrainingUnit(row);
+            if (w && row.source && !w.source) w.source = String(row.source);
             return { workout: w, alternative: defaultAlternativeUnit(w) };
           }
         }
@@ -8379,6 +8446,39 @@ browsen</span>
         }
         unit = normalizeTrainingUnit(unit);
         return unit ? { workout: unit, alternative: defaultAlternativeUnit(unit) } : null;
+      }
+
+      function weekdayPlanSource(wd) {
+        if (!coachPlan) return "";
+        var map = coachPlan.day_training_units;
+        if (typeof map === "string") {
+          try { map = JSON.parse(map); } catch (e0) { map = null; }
+        }
+        if (map && typeof map === "object") {
+          var row = map[String(wd)] || map[wd];
+          if (row) {
+            if (row.source) return String(row.source);
+            if (row.workout && row.workout.source) return String(row.workout.source);
+          }
+        }
+        return "";
+      }
+
+      /* Trainer-Plan sperrt den Stift; Nutzer-Zuweisungen bleiben editierbar. */
+      function isTrainerLockedWeekday(wd) {
+        var src = weekdayPlanSource(wd);
+        if (src === "user") return false;
+        if (src === "trainer") return true;
+        var key = COACH_DAY_KEYS[wd];
+        if (!key) return false;
+        for (var i = 0; i < (coachDayHistory || []).length; i++) {
+          var h = coachDayHistory[i];
+          if (!h || h.day_key !== key) continue;
+          var from = String(h.effective_from || "").slice(0, 10);
+          if (!from || from === "2000-01-01") continue;
+          if (h.body && !isDefaultDayPlanText(h.body)) return true;
+        }
+        return false;
       }
 
       function getAccountSpokenLangs() {
@@ -9620,7 +9720,7 @@ browsen</span>
       function renderProfilePlanList(planRoot) {
         for (var i = 0; i < profileWeekdays().length; i++) {
           var dayVal = coachDayText(i) || defaultDayPlan();
-          var canSelfAssign = !coachDayText(i) || isDefaultDayPlanText(dayVal);
+          var canSelfAssign = !isTrainerLockedWeekday(i);
           var block = document.createElement("div");
           block.className = "profile-plan__block";
           var dayRow = document.createElement("div");
@@ -10671,6 +10771,7 @@ browsen</span>
       var planEditWeekday = null;
       var planEditKind = null;
       var planEditTemplate = null;
+      var planEditAltKind = "walk";
       var planShareWeekday = null;
       var planSharePlace = null;
       var planShareTime = "18:00";
@@ -10800,7 +10901,8 @@ browsen</span>
           var selected = kind === "lang"
             ? langSelected.indexOf(opt) !== -1
             : opt === current;
-          btn.className = "pref-wheel-item" + (selected ? " is-selected" : "");
+          btn.className = "pref-wheel-item" + (selected ? " is-selected" : "") +
+            (kind === "lang" && selected ? " is-checked" : "");
           btn.textContent = opt;
           btn.dataset.value = opt;
           btn.addEventListener("click", function () {
@@ -10810,7 +10912,9 @@ browsen</span>
               if (ix === -1) list.push(opt);
               else list.splice(ix, 1);
               prefWheelDraft = list;
-              btn.classList.toggle("is-selected", list.indexOf(opt) !== -1);
+              var on = list.indexOf(opt) !== -1;
+              btn.classList.toggle("is-selected", on);
+              btn.classList.toggle("is-checked", on);
               return;
             }
             prefWheelDraft = opt;
@@ -10825,6 +10929,7 @@ browsen</span>
         if (!scroller._prefScrollBound) {
           scroller._prefScrollBound = true;
           scroller.addEventListener("scroll", function () {
+            if (prefWheelKind === "lang") return;
             markPrefWheelSelected(scroller, nearestPrefWheelItem(scroller));
           }, { passive: true });
         }
@@ -10840,7 +10945,9 @@ browsen</span>
             var top = sel.offsetTop - (scroller.clientHeight / 2) + (sel.offsetHeight / 2);
             scroller.scrollTop = Math.max(0, top);
           }
-          markPrefWheelSelected(scroller, nearestPrefWheelItem(scroller) || sel);
+          if (kind !== "lang") {
+            markPrefWheelSelected(scroller, nearestPrefWheelItem(scroller) || sel);
+          }
         });
       }
 
@@ -10857,8 +10964,10 @@ browsen</span>
 
       async function confirmPrefWheel() {
         var scroller = document.getElementById("pref-wheel-scroller");
-        var nearest = nearestPrefWheelItem(scroller);
-        if (nearest && nearest.dataset.value) prefWheelDraft = nearest.dataset.value;
+        if (prefWheelKind !== "lang") {
+          var nearest = nearestPrefWheelItem(scroller);
+          if (nearest && nearest.dataset.value) prefWheelDraft = nearest.dataset.value;
+        }
         if (!prefWheelKind) {
           closePrefWheel();
           return;
@@ -10866,8 +10975,8 @@ browsen</span>
         if (prefWheelKind === "lang") {
           if (!Array.isArray(prefWheelDraft)) prefWheelDraft = getAccountSpokenLangs();
         } else if (!prefWheelDraft) {
-          var nearest = nearestPrefWheelItem(scroller);
-          if (nearest && nearest.dataset.value) prefWheelDraft = nearest.dataset.value;
+          var nearest2 = nearestPrefWheelItem(scroller);
+          if (nearest2 && nearest2.dataset.value) prefWheelDraft = nearest2.dataset.value;
         }
         if (!account) {
           closePrefWheel();
@@ -12323,6 +12432,26 @@ browsen</span>
           saveBtn.disabled = !ready;
         }
 
+        function renderPlanEditAltOptions() {
+          var wrap = document.getElementById("plan-edit-alt-options");
+          if (!wrap) return;
+          wrap.innerHTML = "";
+          ALTERNATIVE_UNIT_OPTIONS.forEach(function (opt) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "plan-edit-opt" + (opt.kind === planEditAltKind ? " is-on" : "");
+            btn.dataset.altKind = opt.kind;
+            btn.textContent = (opt.emoji ? opt.emoji + " " : "") + t(opt.labelDe, opt.labelEn);
+            btn.addEventListener("click", function () {
+              planEditAltKind = opt.kind;
+              wrap.querySelectorAll(".plan-edit-opt").forEach(function (el) {
+                el.classList.toggle("is-on", el === btn);
+              });
+            });
+            wrap.appendChild(btn);
+          });
+        }
+
         function hidePlanEditTemplates() {
           planEditTemplate = null;
           var wrap = document.getElementById("plan-edit-templates");
@@ -12421,10 +12550,13 @@ browsen</span>
           planEditWeekday = Number(wd);
           planEditKind = null;
           planEditTemplate = null;
-          document.querySelectorAll(".plan-edit-opt").forEach(function (btn) {
+          var existing = dayUnitsFor(planEditWeekday);
+          planEditAltKind = matchAlternativeOption(existing && existing.alternative).kind;
+          document.querySelectorAll("#plan-edit-options .plan-edit-opt").forEach(function (btn) {
             btn.classList.remove("is-on");
           });
           hidePlanEditTemplates();
+          renderPlanEditAltOptions();
           var title = document.getElementById("plan-edit-title");
           if (title) title.textContent = "Training · " + profileWeekdays()[planEditWeekday];
           openChallengeModal("plan-edit-modal");
@@ -12434,6 +12566,7 @@ browsen</span>
           planEditWeekday = null;
           planEditKind = null;
           planEditTemplate = null;
+          planEditAltKind = "walk";
           hidePlanEditTemplates();
           closeChallengeModal("plan-edit-modal");
         }
@@ -12458,27 +12591,56 @@ browsen</span>
           delete units[String(planEditWeekday)];
           var dayKey = COACH_DAY_KEYS[planEditWeekday];
           var label = "";
+          var workoutUnit = null;
+          var altOpt = null;
+          for (var ai = 0; ai < ALTERNATIVE_UNIT_OPTIONS.length; ai++) {
+            if (ALTERNATIVE_UNIT_OPTIONS[ai].kind === planEditAltKind) {
+              altOpt = ALTERNATIVE_UNIT_OPTIONS[ai];
+              break;
+            }
+          }
+          var altUnit = alternativeUnitFromOption(altOpt || ALTERNATIVE_UNIT_OPTIONS[0], "user");
           if (planEditKind === "kraft") {
             kraft.push(planEditWeekday);
             label = (planEditTemplate && planEditTemplate.label) || "Kraft";
-            units[String(planEditWeekday)] = {
+            workoutUnit = {
               kind: "kraft",
               label: label,
-              systemId: (planEditTemplate && planEditTemplate.systemId) || planEditTemplate.id || ""
+              systemId: (planEditTemplate && planEditTemplate.systemId) || planEditTemplate.id || "",
+              emoji: "🏋️‍♀️",
+              source: "user"
             };
           } else if (planEditKind === "ausdauer") {
             ausd.push(planEditWeekday);
             label = (planEditTemplate && planEditTemplate.label) || "Ausdauer";
-            units[String(planEditWeekday)] = {
+            workoutUnit = {
               kind: "ausdauer",
               label: label,
-              presetId: (planEditTemplate && planEditTemplate.presetId) || planEditTemplate.id || ""
+              presetId: (planEditTemplate && planEditTemplate.presetId) || planEditTemplate.id || "",
+              emoji: "🏃",
+              source: "user"
             };
           } else if (planEditKind === "zirkel") {
             zirkel = planEditWeekday;
             label = "Zirkeltraining";
+            workoutUnit = {
+              kind: "zirkel",
+              label: label,
+              systemId: "",
+              presetId: "",
+              emoji: "🔥",
+              source: "user"
+            };
           } else {
             label = defaultDayPlan();
+            workoutUnit = null;
+          }
+          if (workoutUnit) {
+            units[String(planEditWeekday)] = {
+              source: "user",
+              workout: workoutUnit,
+              alternative: altUnit
+            };
           }
           kraft.sort(function (a, b) { return a - b; });
           ausd.sort(function (a, b) { return a - b; });
@@ -12519,6 +12681,9 @@ browsen</span>
           renderProfilePlan();
           maybeAutoSyncCalendar();
           if (typeof renderWeek === "function") renderWeek();
+          if (typeof window.__gogogoRenderWeek === "function") {
+            try { window.__gogogoRenderWeek(); } catch (eRw) {}
+          }
         }
 
         function nearestPlanShareTimeItem(scroller) {
@@ -12724,10 +12889,10 @@ browsen</span>
             openPlanShare(share.getAttribute("data-plan-share"));
             return;
           }
-          var opt = e.target.closest(".plan-edit-opt");
+          var opt = e.target.closest("#plan-edit-options .plan-edit-opt");
           if (opt) {
             planEditKind = opt.getAttribute("data-kind");
-            document.querySelectorAll(".plan-edit-opt").forEach(function (b) {
+            document.querySelectorAll("#plan-edit-options .plan-edit-opt").forEach(function (b) {
               b.classList.toggle("is-on", b === opt);
             });
             if (planEditKind === "kraft" || planEditKind === "ausdauer") {
@@ -14236,8 +14401,6 @@ browsen</span>
         var scoredCell = !!(entryCell && entryCell.score != null);
         function addUnitAct(unit, slot) {
           if (!unit) return;
-          if (scoredCell && chosenCell && chosenCell !== slot) return;
-          if (scoredCell && !chosenCell && slot === "alternative") return;
           var btn = document.createElement("button");
           btn.type = "button";
           btn.className = "community-day-card__act";
@@ -15306,8 +15469,8 @@ browsen</span>
             var modal = document.getElementById("goal-score-modal");
             if (body) {
               body.textContent = t(
-                "Ziel-Bilanz = 55 % Wochenverteilung (Kraft/Ausdauer/HIIT/Ruhe passend zu Deinem Ziel) + 45 % Tagesqualität (RPE-o 1–5 eher schwach, 6–10 eher gut).",
-                "Goal balance = 55% weekly distribution (strength/endurance/HIIT/rest vs your goal) + 45% daily quality (RPE-o 1–5 weaker, 6–10 stronger)."
+                "Ziel-Bilanz = 55 % Wochenverteilung (Kraft/Ausdauer/HIIT/Ruhe passend zu Deinem Ziel) + 45 % Tagesqualität (RPE-ø 1–5 eher schwach, 6–10 eher gut).",
+                "Goal balance = 55% weekly distribution (strength/endurance/HIIT/rest vs your goal) + 45% daily quality (RPE-ø 1–5 weaker, 6–10 stronger)."
               );
             }
             if (modal) openChallengeModal(modal);
@@ -15327,8 +15490,8 @@ browsen</span>
             var modal = document.getElementById("rpe-o-modal");
             if (body) {
               body.textContent = t(
-                "RPE-o = Dein durchschnittlicher Belastungswert der letzten 28 bewerteten Tage (1 = sehr leicht, 10 = maximal). Er fließt in die Ziel-Bilanz ein.",
-                "RPE-o = your average effort score over the last 28 rated days (1 = very easy, 10 = maximal). It feeds into your goal balance."
+                "RPE-ø = Dein durchschnittlicher Belastungswert der letzten 28 bewerteten Tage (1 = sehr leicht, 10 = maximal). Er fließt in die Ziel-Bilanz ein.",
+                "RPE-ø = your average effort score over the last 28 rated days (1 = very easy, 10 = maximal). It feeds into your goal balance."
               );
             }
             if (modal) openChallengeModal(modal);
@@ -16979,6 +17142,8 @@ browsen</span>
         var selectedKey = null;
         var rateModalKey = null;
         var pendingUnitChoice = null;
+        var pendingRateKey = null;
+        var pendingRateScore = undefined;
         var saving = false;
         var calInviteDateKey = null;
         var calInviteSelectedIds = {};
@@ -17380,30 +17545,7 @@ browsen</span>
           var chosenCell = entryCell && entryCell.unit_choice ? String(entryCell.unit_choice) : null;
           var unitDoneCell = !!(entryCell && entryCell.unit_done && chosenCell);
           var scoredCell = !!(entryCell && entryCell.score != null);
-          if (unitDoneCell && chosenCell !== slot) {
-            btn.classList.add("is-empty");
-            btn.disabled = true;
-            btn.setAttribute("aria-hidden", "true");
-            btn.textContent = "·";
-            rowEl.appendChild(btn);
-            return;
-          }
-          if (scoredCell && chosenCell && chosenCell !== slot) {
-            btn.classList.add("is-empty");
-            btn.disabled = true;
-            btn.setAttribute("aria-hidden", "true");
-            btn.textContent = "·";
-            rowEl.appendChild(btn);
-            return;
-          }
-          if (scoredCell && !chosenCell && slot === "alternative") {
-            btn.classList.add("is-empty");
-            btn.disabled = true;
-            btn.setAttribute("aria-hidden", "true");
-            btn.textContent = "·";
-            rowEl.appendChild(btn);
-            return;
-          }
+          /* Beide Emojis bleiben sichtbar — Auswahl nur markieren, nie ausblenden. */
           btn.textContent = unitEmojiFor(unit);
           btn.setAttribute("aria-label", localizePlanLabel(unit.label || "") + " — " + (names[wd] || ""));
           if ((unitDoneCell && chosenCell === slot) || (scoredCell && chosenCell === slot)) {
@@ -17675,11 +17817,27 @@ browsen</span>
           if (isAccountPaused()) return;
           if (!canRateCalendarDay(key)) return;
           if (saving) return;
+          var existingChoice = entryFor(key) && entryFor(key).unit_choice;
+          var choice = pendingUnitChoice || existingChoice || null;
+          var pair = null;
+          try {
+            var d0 = parseDateKey(key) || new Date();
+            pair = dayUnitsFor((d0.getDay() + 6) % 7);
+          } catch (ePair) {}
+          if (!choice && pair && pair.workout && pair.alternative) {
+            pendingRateScore = score;
+            pendingRateKey = key;
+            openChallengeModalById("unit-choice-modal");
+            return;
+          }
+          if (!choice) choice = "workout";
+          pendingUnitChoice = choice;
           saving = true;
           checkOk.disabled = true;
           checkNo.disabled = true;
           try {
-            if (!setDayEntryLocal(key, score, pendingUnitChoice || (entryFor(key) && entryFor(key).unit_choice), score != null)) return;
+            var markDone = score != null || !!choice;
+            if (!setDayEntryLocal(key, score, choice, markDone)) return;
             pendingUnitChoice = null;
             closeDayRateModal();
             refreshCycleRays();
@@ -17774,6 +17932,29 @@ browsen</span>
           if (!key || !canRateCalendarDay(key)) return;
           persistEntry(key, null);
         });
+
+        (function bindUnitChoiceModal() {
+          var workoutBtn = document.getElementById("unit-choice-workout");
+          var altBtn = document.getElementById("unit-choice-alternative");
+          var cancelBtn = document.getElementById("unit-choice-cancel");
+          function finishChoice(slot) {
+            closeChallengeModalById("unit-choice-modal");
+            if (!slot || pendingRateKey == null) {
+              pendingRateKey = null;
+              pendingRateScore = undefined;
+              return;
+            }
+            pendingUnitChoice = slot;
+            var key = pendingRateKey;
+            var score = pendingRateScore;
+            pendingRateKey = null;
+            pendingRateScore = undefined;
+            persistEntry(key, score);
+          }
+          if (workoutBtn) workoutBtn.addEventListener("click", function () { finishChoice("workout"); });
+          if (altBtn) altBtn.addEventListener("click", function () { finishChoice("alternative"); });
+          if (cancelBtn) cancelBtn.addEventListener("click", function () { finishChoice(null); });
+        })();
 
         document.getElementById("week-prev").addEventListener("click", function () {
           if (isAccountPaused()) return;
