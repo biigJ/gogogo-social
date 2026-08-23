@@ -5783,6 +5783,8 @@ browsen</span>
       var onAccountPausedChange = null;
       var dayEntries = {};
       try { dayEntries = JSON.parse(localStorage.getItem(DAY_ENTRIES_KEY) || "{}") || {}; } catch (e2) { dayEntries = {}; }
+      /* null = unbekannt; false = Spalten unit_choice/unit_done fehlen in Supabase. */
+      var dayEntryExtendedColumns = null;
       var workoutInvites = [];
       try { workoutInvites = JSON.parse(localStorage.getItem(WORKOUT_INVITES_KEY) || "[]") || []; } catch (eInv) { workoutInvites = []; }
       if (!Array.isArray(workoutInvites)) workoutInvites = [];
@@ -14821,8 +14823,44 @@ browsen</span>
         try { return await res.json(); } catch (e) { return null; }
       }
 
+      async function probeDayEntryExtendedColumns() {
+        if (dayEntryExtendedColumns != null) return dayEntryExtendedColumns;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_day_entries?select=unit_choice&limit=0",
+            { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY } }
+          );
+          dayEntryExtendedColumns = res.ok;
+        } catch (eProbe) {
+          dayEntryExtendedColumns = false;
+        }
+        return dayEntryExtendedColumns;
+      }
+
+      function normalizeCloudDayEntry(row, extended) {
+        if (!row || !row.date) return null;
+        var score = row.score == null ? null : Number(row.score);
+        var unitChoice = extended && row.unit_choice ? String(row.unit_choice) : null;
+        var unitDone = extended ? !!row.unit_done : false;
+        if (!extended && score != null) {
+          unitChoice = "workout";
+          unitDone = true;
+        }
+        return { score: score, unit_choice: unitChoice, unit_done: unitDone };
+      }
+
       async function restUpsertDayEntry(row) {
         if (!row || !row.date) return false;
+        var payload = {
+          account_id: row.account_id,
+          date: row.date,
+          score: row.score == null ? null : row.score,
+          updated_at: row.updated_at || new Date().toISOString()
+        };
+        if (await probeDayEntryExtendedColumns()) {
+          if (row.unit_choice != null) payload.unit_choice = row.unit_choice;
+          if (row.unit_done === true) payload.unit_done = true;
+        }
         var res = await fetch(SUPABASE_URL + "/rest/v1/go_day_entries?on_conflict=account_id,date", {
           method: "POST",
           headers: {
@@ -14831,7 +14869,7 @@ browsen</span>
             "Content-Type": "application/json",
             Prefer: "resolution=merge-duplicates,return=minimal"
           },
-          body: JSON.stringify(row)
+          body: JSON.stringify(payload)
         });
         return res.ok;
       }
@@ -17026,21 +17064,19 @@ browsen</span>
             scheduleMissedDayWatch();
             return;
           }
+          var extended = await probeDayEntryExtendedColumns();
+          var selectCols = extended ? "date,score,unit_choice,unit_done" : "date,score";
           var rows = await restGet(
             "go_day_entries?account_id=eq." + encodeURIComponent(account.id) +
-            "&select=date,score,unit_choice,unit_done&order=date.asc&limit=400"
+            "&select=" + selectCols + "&order=date.asc&limit=400"
           );
           /* Nur Cloud-Stand — verhindert lokale Fake-Einträge für andere Tage. */
           var next = {};
           if (rows && rows.length) {
             for (var i = 0; i < rows.length; i++) {
-              var row = rows[i];
-              if (!row || !row.date) continue;
-              next[row.date] = {
-                score: row.score == null ? null : Number(row.score),
-                unit_choice: row.unit_choice ? String(row.unit_choice) : null,
-                unit_done: !!row.unit_done
-              };
+              var normalized = normalizeCloudDayEntry(rows[i], extended);
+              if (!normalized) continue;
+              next[rows[i].date] = normalized;
             }
           }
           dayEntries = next;
