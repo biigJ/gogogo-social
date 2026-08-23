@@ -31,6 +31,12 @@ values
   ('general', 'Allgemein fit', 'General fitness', 2, 2, 1, 2, 'Ausgewogene Mischung')
 on conflict (id) do nothing;
 
+alter table go_training_goal_profiles enable row level security;
+
+drop policy if exists "go_training_goal_profiles_select_anon" on go_training_goal_profiles;
+create policy "go_training_goal_profiles_select_anon"
+  on go_training_goal_profiles for select to anon, authenticated using (true);
+
 -- Buddy-/Trainer-Challenges
 create table if not exists go_buddy_challenges (
   id uuid primary key default gen_random_uuid(),
