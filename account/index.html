@@ -2151,7 +2151,11 @@
       width: min(42vw, 132px);
       max-height: 176px;
       object-fit: cover;
-      border-radius: var(--radius);
+      object-position: center center;
+      border: 0;
+      border-radius: 0;
+      outline: none;
+      box-shadow: none;
       margin-top: 4px;
     }
     .community-post.is-mine .community-post__photo {
@@ -2161,7 +2165,8 @@
       width: 100%;
       max-width: 100%;
       max-height: 240px;
-      border-radius: 10px;
+      border-radius: 0;
+      object-position: center center;
     }
     .community-toolbar {
       display: flex;
@@ -2298,8 +2303,11 @@
     }
     .community-day-card__photo-wrap {
       position: relative;
-      width: calc(100% + 2 * var(--pad));
-      margin: 0 calc(-1 * var(--pad)) 4px;
+      width: 100%;
+      margin: 0 0 4px;
+      overflow: hidden;
+      border: 0;
+      border-radius: 0;
     }
     .community-day-card__photo-wrap .community-day-card__photo {
       width: 100%;
@@ -2325,12 +2333,16 @@
     }
     .community-day-card__photo {
       display: block;
-      width: calc(100% + 2 * var(--pad));
-      margin: 0 calc(-1 * var(--pad)) 4px;
+      width: 100%;
+      margin: 0;
       max-height: 42vh;
       min-height: 160px;
       object-fit: cover;
-      object-position: center;
+      object-position: center center;
+      border: 0;
+      border-radius: 0;
+      outline: none;
+      box-shadow: none;
       background: rgba(52, 34, 32, 0.2);
     }
     .community-day-card__posts {
@@ -13449,18 +13461,8 @@ browsen</span>
             ev.preventDefault();
             var buddy = buddyActionTarget;
             closeBuddyActionModal();
-            if (!buddy) return;
-            replyTargetId = buddy.id || null;
-            if (typeof stopReplyPicking === "function") stopReplyPicking();
-            var pick = document.getElementById("community-reply-pick");
-            if (pick) pick.classList.remove("is-on");
-            var input = document.getElementById("community-reply-text");
-            if (input) {
-              input.placeholder = "Nachricht an " + firstNameOf(buddy) + "…";
-              input.focus();
-            }
-            var msg = document.getElementById("community-add-msg");
-            if (msg) msg.textContent = "Nachricht an " + firstNameOf(buddy);
+            if (!buddy || !buddy.id) return;
+            openCommunityReplyTo(buddy.id, firstNameOf(buddy));
           });
         }
         var challengeBtn = document.getElementById("buddy-action-challenge");
@@ -13694,24 +13696,12 @@ browsen</span>
                   }
                   return;
                 }
-                replyTargetId = coachId;
-                stopReplyPicking();
-                var input = document.getElementById("community-reply-text");
-                var coachName = firstNameOf(getDisplayCoach());
-                if (input) {
-                  input.placeholder = "Nachricht an " + coachName + "…";
-                  input.focus();
-                }
-                var okMsg = document.getElementById("community-add-msg");
-                if (okMsg) okMsg.textContent = "Nachricht an " + coachName;
+                openCommunityReplyTo(coachId, firstNameOf(getDisplayCoach()));
               }
               if (pickingReplyBuddy) {
                 ensureCoachAccount().then(selectCoach);
                 return;
               }
-              pickingReplyBuddy = true;
-              var pick = document.getElementById("community-reply-pick");
-              if (pick) pick.classList.add("is-on");
               ensureCoachAccount().then(selectCoach);
             });
           }
@@ -13750,17 +13740,10 @@ browsen</span>
                 return;
               }
               if (pickingReplyBuddy) {
-                replyTargetId = buddy.id || null;
-                stopReplyPicking();
-                var input = document.getElementById("community-reply-text");
-                if (input) {
-                  input.placeholder = "Nachricht an " + firstNameOf(buddy) + "…";
-                  input.focus();
-                }
-                var msg = document.getElementById("community-add-msg");
-                if (msg) msg.textContent = "Nachricht an " + firstNameOf(buddy);
+                openCommunityReplyTo(buddy.id, firstNameOf(buddy));
                 return;
               }
+              ensureTodayCommunityChatOpen();
               openBuddyActionModal(buddy);
             });
           }
@@ -14269,16 +14252,78 @@ browsen</span>
         return !!communityOpenDayKeys[String(key || "").slice(0, 10)];
       }
 
+      function resetCommunityComposerLayout() {
+        var composer = document.getElementById("community-composer");
+        if (composer) {
+          composer.style.bottom = "";
+          composer.style.paddingBottom = "";
+          composer.style.top = "";
+          composer.style.transform = "";
+        }
+        document.body.classList.remove("is-keyboard");
+        document.documentElement.style.removeProperty("--community-composer-h");
+        var replyText = document.getElementById("community-reply-text");
+        if (replyText && document.activeElement === replyText) {
+          try { replyText.blur(); } catch (e0) {}
+        }
+      }
+
       function syncCommunityChatChrome() {
         /* Composer nur wenn der Chat von HEUTE offen ist — Vortage sind nur lesbar. */
         var writable = isTodayCommunityChatOpen();
         document.body.classList.toggle("is-community-chat-open", writable);
         var composer = document.getElementById("community-composer");
         if (composer) composer.hidden = !writable;
+        if (!writable) {
+          resetCommunityComposerLayout();
+          stopReplyPicking();
+        }
         renderCommunityFeed();
         if (typeof window.__gogogoSyncCommunityComposer === "function") {
           window.__gogogoSyncCommunityComposer();
         }
+      }
+
+      function ensureTodayCommunityChatOpen() {
+        var today = berlinTodayKey();
+        communityViewDateKey = today;
+        communityComposerDayKey = today;
+        if (!communityOpenDayKeys[today]) {
+          communityOpenDayKeys[today] = true;
+          syncCommunityChatChrome();
+        } else {
+          document.body.classList.add("is-community-chat-open");
+          var composer = document.getElementById("community-composer");
+          if (composer) composer.hidden = false;
+          if (typeof window.__gogogoSyncCommunityComposer === "function") {
+            window.__gogogoSyncCommunityComposer();
+          }
+        }
+        return today;
+      }
+
+      function openCommunityReplyTo(targetId, displayName) {
+        if (!targetId || isAccountPaused()) return;
+        ensureTodayCommunityChatOpen();
+        replyTargetId = targetId;
+        stopReplyPicking();
+        var pick = document.getElementById("community-reply-pick");
+        if (pick) pick.classList.remove("is-on");
+        var input = document.getElementById("community-reply-text");
+        var name = String(displayName || "").trim() || "Buddy";
+        if (input) {
+          input.placeholder = "Nachricht an " + name + "…";
+          setTimeout(function () {
+            try { input.focus({ preventScroll: true }); } catch (e1) {
+              try { input.focus(); } catch (e2) {}
+            }
+            if (typeof window.__gogogoSyncCommunityComposer === "function") {
+              window.__gogogoSyncCommunityComposer();
+            }
+          }, 40);
+        }
+        var msg = document.getElementById("community-add-msg");
+        if (msg) msg.textContent = "Nachricht an " + name;
       }
 
       function toggleCommunityDayChat(key) {
@@ -14311,6 +14356,9 @@ browsen</span>
         document.body.classList.remove("is-community-chat-open");
         var composer = document.getElementById("community-composer");
         if (composer) composer.hidden = true;
+        resetCommunityComposerLayout();
+        stopReplyPicking();
+        replyTargetId = null;
       }
 
       window.__gogogoSetCommunityDay = function (key) {
@@ -14531,8 +14579,6 @@ browsen</span>
           ? window.__gogogoWorkoutForDateKey(key) : null;
         var entryCell = communityEntryForDate(key);
         var chosenCell = entryCell && entryCell.unit_choice ? String(entryCell.unit_choice) : null;
-        var unitDoneCell = !!(entryCell && entryCell.unit_done && chosenCell);
-        var scoredCell = !!(entryCell && entryCell.score != null);
         /* Gewähltes Emoji bleibt mit weißer Umrandung; das andere verschwindet. */
         var lockChoice = !!chosenCell;
         function addUnitAct(unit, slot) {
@@ -18358,19 +18404,13 @@ browsen</span>
           if (!document.body.classList.contains("is-community")) return;
           pinCommunityViewport();
           if (!isTodayCommunityChatOpen()) {
-            composer.style.bottom = "";
-            composer.style.paddingBottom = "";
-            if (!(replyText && document.activeElement === replyText)) {
-              document.body.classList.remove("is-keyboard");
-            }
+            resetCommunityComposerLayout();
             return;
           }
           var kb = 0;
           if (window.visualViewport) {
-            kb = Math.max(
-              0,
-              window.innerHeight - window.visualViewport.height - (window.visualViewport.offsetTop || 0)
-            );
+            var vv = window.visualViewport;
+            kb = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0));
           }
           if (kb > 8) {
             composer.style.bottom = kb + "px";
@@ -18379,6 +18419,8 @@ browsen</span>
           } else {
             composer.style.bottom = "0px";
             composer.style.paddingBottom = "";
+            composer.style.top = "";
+            composer.style.transform = "";
             if (!(replyText && document.activeElement === replyText)) {
               document.body.classList.remove("is-keyboard");
             }
@@ -18442,7 +18484,25 @@ browsen</span>
               pinCommunityViewport();
               syncCommunityComposerChrome();
             }, 320);
-            setTimeout(pinCommunityViewport, 600);
+            setTimeout(function () {
+              pinCommunityViewport();
+              if (!isTodayCommunityChatOpen()) {
+                resetCommunityComposerLayout();
+              } else if (window.visualViewport) {
+                var vv = window.visualViewport;
+                var kb = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0));
+                if (kb <= 8) {
+                  composer.style.bottom = "0px";
+                  composer.style.paddingBottom = "";
+                  composer.style.top = "";
+                  composer.style.transform = "";
+                  document.body.classList.remove("is-keyboard");
+                }
+              } else {
+                composer.style.bottom = "0px";
+                document.body.classList.remove("is-keyboard");
+              }
+            }, 600);
           });
           if (replySend) replySend.disabled = true;
           resizeReplyField();
