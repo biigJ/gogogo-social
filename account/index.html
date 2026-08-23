@@ -11318,10 +11318,17 @@ browsen</span>
         try {
           var rows = await restGet(
             "go_buddy_challenges?to_account_id=eq." + encodeURIComponent(account.id) +
-            "&status=eq.pending&order=created_at.desc&limit=1"
+            "&status=eq.pending&order=created_at.desc&limit=5"
           );
-          if (!rows || !rows[0]) return;
-          var ch = rows[0];
+          if (!rows || !rows.length) return;
+          var ch = null;
+          for (var ci = 0; ci < rows.length; ci++) {
+            if (rows[ci] && String(rows[ci].status || "") === "pending") {
+              ch = rows[ci];
+              break;
+            }
+          }
+          if (!ch) return;
           pendingBuddyChallengeRow = ch;
           var fromName = "?";
           try {
@@ -11411,23 +11418,48 @@ browsen</span>
         var target = buddyChallengeTarget;
         if (!target || !target.id) target = buddies.length ? buddies[0] : null;
         if (!target || !target.id || !hasCloudAccount()) return;
+        var targetId = String(target.id);
+        var feedBody = "🏁 Challenge (" + days + "d): " + text;
+        if (feedBody.length > 144) feedBody = feedBody.slice(0, 141) + "…";
+        if (msg) { msg.hidden = true; msg.textContent = ""; msg.classList.remove("is-error"); }
         try {
-          await restInsert("go_buddy_challenges", {
+          var chRow = await restInsert("go_buddy_challenges", {
             from_account_id: account.id,
-            to_account_id: target.id,
+            to_account_id: targetId,
             days: days,
             message: text,
             status: "pending"
           });
-          await createCommunityPost({
+          if (!chRow) {
+            if (msg) {
+              msg.hidden = false;
+              msg.textContent = t(
+                "Challenge konnte nicht gespeichert werden. Bitte go-account-features-v2.sql in Supabase ausführen.",
+                "Could not save challenge. Please run go-account-features-v2.sql in Supabase."
+              );
+              msg.classList.add("is-error");
+            }
+            return;
+          }
+          var postRow = await createCommunityPost({
             author_id: account.id,
             kind: "text",
-            body: "🏁 Challenge (" + days + "d): " + text,
+            body: feedBody,
             photo_url: null,
-            reply_to_id: null
+            reply_to_id: targetId
           });
+          if (!postRow) {
+            if (msg) {
+              msg.hidden = false;
+              msg.textContent = t("Challenge gespeichert, Feed-Nachricht fehlgeschlagen.", "Challenge saved, feed message failed.");
+              msg.classList.add("is-error");
+            }
+            return;
+          }
           closeChallengeModal(document.getElementById("buddy-challenge-modal"));
+          buddyChallengeTarget = null;
           if (textEl) textEl.value = "";
+          await refreshCommunityFeed();
         } catch (eSend) {
           if (msg) { msg.hidden = false; msg.textContent = t("Senden fehlgeschlagen.", "Send failed."); msg.classList.add("is-error"); }
         }
@@ -13899,6 +13931,7 @@ browsen</span>
         }
         updateCommunityNavDot();
         loadWorkoutInvites().catch(function () {});
+        if (!needsOnboarding()) checkPendingBuddyChallengePopup().catch(function () {});
       }
 
       async function createCommunityPost(payload) {
