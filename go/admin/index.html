@@ -2798,12 +2798,22 @@
           if (!(wd >= 0 && wd <= 6)) return;
           var row = m[k];
           if (!row) return;
+          var alt = null;
+          if (row.alternative && row.alternative.kind) {
+            alt = {
+              kind: String(row.alternative.kind),
+              label: row.alternative.label != null ? String(row.alternative.label) : "Spaziergang",
+              emoji: row.alternative.emoji != null ? String(row.alternative.emoji) : "",
+              source: row.alternative.source != null ? String(row.alternative.source) : "trainer"
+            };
+          }
           if (row.workout && row.workout.kind) {
             out[wd] = {
               kind: String(row.workout.kind),
               label: row.workout.label != null ? String(row.workout.label) : "",
               systemId: row.workout.systemId != null ? String(row.workout.systemId) : "",
-              presetId: row.workout.presetId != null ? String(row.workout.presetId) : ""
+              presetId: row.workout.presetId != null ? String(row.workout.presetId) : "",
+              alternative: alt || defaultAdminAlternative()
             };
             return;
           }
@@ -2812,11 +2822,38 @@
               kind: String(row.kind),
               label: row.label != null ? String(row.label) : "",
               systemId: row.systemId != null ? String(row.systemId) : "",
-              presetId: row.presetId != null ? String(row.presetId) : ""
+              presetId: row.presetId != null ? String(row.presetId) : "",
+              alternative: alt || defaultAdminAlternative()
             };
           }
         });
         return out;
+      }
+
+      var ADMIN_ALT_OPTIONS = [
+        { kind: "walk", label: "Spaziergang", emoji: "🚶‍♂️" },
+        { kind: "bike", label: "Fahrradfahren", emoji: "🚴" },
+        { kind: "jog", label: "locker Joggen", emoji: "🏃" },
+        { kind: "bodyweight", label: "Bodyweight 20 min.", emoji: "🤸" },
+        { kind: "team", label: "Mannschaftssport", emoji: "⚽" },
+        { kind: "swim", label: "Schwimmen", emoji: "🏊" },
+        { kind: "yoga", label: "Yoga / Mobility", emoji: "🧘" }
+      ];
+
+      function defaultAdminAlternative() {
+        return { kind: "walk", label: "Spaziergang", emoji: "🚶‍♂️", source: "trainer" };
+      }
+
+      function adminAlternativeOptions() {
+        return ADMIN_ALT_OPTIONS.map(function (opt) {
+          return {
+            id: opt.kind,
+            kind: opt.kind,
+            label: (opt.emoji ? opt.emoji + " " : "") + opt.label,
+            plainLabel: opt.label,
+            emoji: opt.emoji
+          };
+        });
       }
 
       function ensureDayUnitLabel(wd) {
@@ -2838,7 +2875,16 @@
           var span = ensureDayUnitLabel(wd);
           if (!span) continue;
           var u = dayTrainingUnits[wd];
-          span.textContent = u && u.label ? u.label : "";
+          if (!u || !u.label) {
+            span.textContent = "";
+            span.removeAttribute("title");
+            span.style.cursor = "";
+            continue;
+          }
+          var alt = u.alternative || defaultAdminAlternative();
+          span.textContent = u.label + " · Alt: " + (alt.label || "Spaziergang");
+          span.title = "Tippen: Alternative ändern";
+          span.style.cursor = "pointer";
         }
       }
 
@@ -3008,11 +3054,33 @@
           box.checked = false;
           return;
         }
+        var altOpts = adminAlternativeOptions();
+        var altPicked = await pickUnitWheel(
+          "Alternative · " + (ZIRKEL_DAY_NAMES[wd] || "Tag"),
+          altOpts
+        );
+        var alt = defaultAdminAlternative();
+        if (altPicked) {
+          alt = {
+            kind: altPicked.kind || altPicked.id || "walk",
+            label: altPicked.plainLabel || String(altPicked.label || "").replace(/^[^\s]+\s/, "") || "Spaziergang",
+            emoji: altPicked.emoji || "",
+            source: "trainer"
+          };
+          for (var ai = 0; ai < ADMIN_ALT_OPTIONS.length; ai++) {
+            if (ADMIN_ALT_OPTIONS[ai].kind === alt.kind) {
+              alt.label = ADMIN_ALT_OPTIONS[ai].label;
+              alt.emoji = ADMIN_ALT_OPTIONS[ai].emoji;
+              break;
+            }
+          }
+        }
         dayTrainingUnits[wd] = {
           kind: kind,
           label: picked.label,
           systemId: picked.systemId || "",
-          presetId: picked.presetId || ""
+          presetId: picked.presetId || "",
+          alternative: alt
         };
         renderDayUnitLabels();
         var ta = document.getElementById(PLAN_DAY_FIELD_IDS[wd]);
@@ -3029,6 +3097,31 @@
         });
         document.querySelectorAll(".plan-ausdauer-check").forEach(function (box) {
           box.addEventListener("change", function () { onKindCheckChange(box, "ausdauer"); });
+        });
+        document.querySelectorAll(".admin-plan__block").forEach(function (block) {
+          block.addEventListener("click", function (ev) {
+            var span = ev.target.closest(".plan-unit-label");
+            if (!span) return;
+            var wd = parseInt(span.getAttribute("data-wd"), 10);
+            if (!(wd >= 0 && wd <= 6)) return;
+            if (!dayTrainingUnits[wd]) return;
+            ev.preventDefault();
+            pickUnitWheel("Alternative · " + (ZIRKEL_DAY_NAMES[wd] || "Tag"), adminAlternativeOptions())
+              .then(function (altPicked) {
+                if (!altPicked || !dayTrainingUnits[wd]) return;
+                var alt = defaultAdminAlternative();
+                alt.kind = altPicked.kind || altPicked.id || "walk";
+                for (var ai = 0; ai < ADMIN_ALT_OPTIONS.length; ai++) {
+                  if (ADMIN_ALT_OPTIONS[ai].kind === alt.kind) {
+                    alt.label = ADMIN_ALT_OPTIONS[ai].label;
+                    alt.emoji = ADMIN_ALT_OPTIONS[ai].emoji;
+                    break;
+                  }
+                }
+                dayTrainingUnits[wd].alternative = alt;
+                renderDayUnitLabels();
+              });
+          });
         });
       }
 
@@ -3056,6 +3149,7 @@
           var wd = Number(k);
           var u = dayTrainingUnits[wd];
           if (!u || !u.kind) return;
+          var alt = u.alternative || defaultAdminAlternative();
           out[String(wd)] = {
             source: "trainer",
             workout: {
@@ -3066,8 +3160,9 @@
               source: "trainer"
             },
             alternative: {
-              kind: "walk",
-              label: "Spaziergang",
+              kind: alt.kind || "walk",
+              label: alt.label || "Spaziergang",
+              emoji: alt.emoji || "",
               systemId: null,
               presetId: null,
               source: "trainer"

@@ -8452,17 +8452,20 @@ browsen</span>
 
       function unitEmojiFor(u) {
         if (!u) return "🏋️‍♀️";
-        if (u.emoji) return u.emoji;
         var k = String(u.kind || "");
+        var label = String(u.label || "").toLowerCase();
+        /* Ausdauer-Technik aus Label/Kind — Schwimmen nicht als Laufen zeigen. */
+        if (k === "swim" || /schwimm|swim/.test(label)) return "🏊";
+        if (k === "bike" || /rennrad|fahrrad|cycling|\bbike\b|indoor[-\s]?bike/.test(label)) return "🚴";
+        if (/ruder|rowing|\brow\b/.test(label)) return "🚣";
+        if (k === "walk" || /spazier|walk/.test(label)) return "🚶‍♂️";
+        if (k === "jog" || /joggen|jogging/.test(label)) return "🏃";
+        if (k === "bodyweight" || /bodyweight|körpergewicht/.test(label)) return "🤸";
+        if (k === "team" || /mannschaft|team sport|fußball|fussball/.test(label)) return "⚽";
+        if (k === "yoga" || /yoga|mobility/.test(label)) return "🧘";
+        if (u.emoji) return u.emoji;
         if (k === "kraft") return "🏋️‍♀️";
         if (k === "ausdauer") return "🏃";
-        if (k === "swim") return "🏊";
-        if (k === "walk") return "🚶‍♂️";
-        if (k === "bike") return "🚴";
-        if (k === "jog") return "🏃";
-        if (k === "bodyweight") return "🤸";
-        if (k === "team") return "⚽";
-        if (k === "yoga") return "🧘";
         if (k === "zirkel") return "🔥";
         return "🏋️‍♀️";
       }
@@ -9779,6 +9782,15 @@ browsen</span>
           editBtn.dataset.planEdit = String(i);
           editBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 17.3V21h3.7L17.8 9.9l-3.7-3.7L3 17.3zm17.7-10.4c.4-.4.4-1 0-1.4l-2.2-2.2c-.4-.4-1-.4-1.4 0l-1.7 1.7 3.7 3.7 1.6-1.8z"/></svg>';
           dayRow.appendChild(editBtn);
+        } else if (dayUnitsFor(i) && dayUnitsFor(i).workout) {
+          /* Trainer hat Workout gesetzt — Nutzer darf die Alternative wählen. */
+          var altBtn = document.createElement("button");
+          altBtn.type = "button";
+          altBtn.className = "profile-plan__icon";
+          altBtn.setAttribute("aria-label", t("Alternative wählen", "Choose alternative"));
+          altBtn.dataset.planEditAlt = String(i);
+          altBtn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 17.3V21h3.7L17.8 9.9l-3.7-3.7L3 17.3zm17.7-10.4c.4-.4.4-1 0-1.4l-2.2-2.2c-.4-.4-1-.4-1.4 0l-1.7 1.7 3.7 3.7 1.6-1.8z"/></svg>';
+          dayRow.appendChild(altBtn);
         }
         var shareBtn = document.createElement("button");
         shareBtn.type = "button";
@@ -10844,6 +10856,7 @@ browsen</span>
       var planEditKind = null;
       var planEditTemplate = null;
       var planEditAltKind = "walk";
+      var planEditAltOnly = false;
       var planShareWeekday = null;
       var planSharePlace = null;
       var planShareTime = "18:00";
@@ -12501,6 +12514,10 @@ browsen</span>
         function syncPlanEditSaveBtn() {
           var saveBtn = document.getElementById("plan-edit-save");
           if (!saveBtn) return;
+          if (planEditAltOnly) {
+            saveBtn.disabled = false;
+            return;
+          }
           var ready = !!planEditKind;
           if (planEditKind === "kraft" || planEditKind === "ausdauer") {
             ready = !!(planEditTemplate && planEditTemplate.id);
@@ -12622,7 +12639,9 @@ browsen</span>
           hidePlanEditTemplates();
         }
 
-        function openPlanEdit(wd) {
+        function openPlanEdit(wd, opts) {
+          opts = opts || {};
+          planEditAltOnly = !!opts.altOnly;
           planEditWeekday = Number(wd);
           planEditKind = null;
           planEditTemplate = null;
@@ -12633,8 +12652,14 @@ browsen</span>
           });
           hidePlanEditTemplates();
           renderPlanEditAltOptions();
+          var kindWrap = document.getElementById("plan-edit-options");
+          if (kindWrap) kindWrap.hidden = planEditAltOnly;
           var title = document.getElementById("plan-edit-title");
-          if (title) title.textContent = "Training · " + profileWeekdays()[planEditWeekday];
+          if (title) {
+            title.textContent = planEditAltOnly
+              ? (t("Alternative", "Alternative") + " · " + profileWeekdays()[planEditWeekday])
+              : ("Training · " + profileWeekdays()[planEditWeekday]);
+          }
           openChallengeModal("plan-edit-modal");
           syncPlanEditSaveBtn();
         }
@@ -12643,16 +12668,25 @@ browsen</span>
           planEditKind = null;
           planEditTemplate = null;
           planEditAltKind = "walk";
+          planEditAltOnly = false;
+          var kindWrap = document.getElementById("plan-edit-options");
+          if (kindWrap) kindWrap.hidden = false;
           hidePlanEditTemplates();
           closeChallengeModal("plan-edit-modal");
         }
         async function savePlanEdit() {
-          if (planEditWeekday == null || !planEditKind || !hasCloudAccount()) {
+          if (planEditWeekday == null || !hasCloudAccount()) {
             closePlanEdit();
             return;
           }
-          if ((planEditKind === "kraft" || planEditKind === "ausdauer") && !(planEditTemplate && planEditTemplate.id)) {
-            return;
+          if (!planEditAltOnly) {
+            if (!planEditKind) {
+              closePlanEdit();
+              return;
+            }
+            if ((planEditKind === "kraft" || planEditKind === "ausdauer") && !(planEditTemplate && planEditTemplate.id)) {
+              return;
+            }
           }
           if (!coachPlan) coachPlan = { account_id: account.id };
           var kraft = parseWeekdayList(coachPlan.kraft_weekdays).filter(function (d) { return d !== planEditWeekday; });
@@ -12664,10 +12698,7 @@ browsen</span>
             try { units = JSON.parse(units); } catch (e0) { units = {}; }
           }
           if (!units || typeof units !== "object") units = {};
-          delete units[String(planEditWeekday)];
           var dayKey = COACH_DAY_KEYS[planEditWeekday];
-          var label = "";
-          var workoutUnit = null;
           var altOpt = null;
           for (var ai = 0; ai < ALTERNATIVE_UNIT_OPTIONS.length; ai++) {
             if (ALTERNATIVE_UNIT_OPTIONS[ai].kind === planEditAltKind) {
@@ -12676,6 +12707,68 @@ browsen</span>
             }
           }
           var altUnit = alternativeUnitFromOption(altOpt || ALTERNATIVE_UNIT_OPTIONS[0], "user");
+
+          if (planEditAltOnly) {
+            var prevRow = units[String(planEditWeekday)] || {};
+            var existingPair = dayUnitsFor(planEditWeekday);
+            var workoutKeep = prevRow.workout
+              ? normalizeTrainingUnit(prevRow.workout)
+              : (existingPair && existingPair.workout ? existingPair.workout : null);
+            if (!workoutKeep) {
+              closePlanEdit();
+              return;
+            }
+            if (!workoutKeep.source) workoutKeep.source = prevRow.source || "trainer";
+            units[String(planEditWeekday)] = {
+              source: prevRow.source || workoutKeep.source || "trainer",
+              workout: workoutKeep,
+              alternative: altUnit
+            };
+            coachPlan.day_training_units = units;
+            coachPlan.account_id = account.id;
+            coachPlan.updated_at = new Date().toISOString();
+            try {
+              await fetch(SUPABASE_URL + "/rest/v1/go_coach_plans?on_conflict=account_id", {
+                method: "POST",
+                headers: {
+                  apikey: SUPABASE_KEY,
+                  Authorization: "Bearer " + SUPABASE_KEY,
+                  "Content-Type": "application/json",
+                  Prefer: "resolution=merge-duplicates,return=representation"
+                },
+                body: JSON.stringify({
+                  account_id: account.id,
+                  kraft_weekdays: coachPlan.kraft_weekdays || kraft,
+                  ausdauer_weekdays: coachPlan.ausdauer_weekdays || ausd,
+                  zirkel_weekday: coachPlan.zirkel_weekday != null ? coachPlan.zirkel_weekday : zirkel,
+                  day_training_units: units,
+                  day_mo: coachPlan.day_mo || null,
+                  day_di: coachPlan.day_di || null,
+                  day_mi: coachPlan.day_mi || null,
+                  day_do: coachPlan.day_do || null,
+                  day_fr: coachPlan.day_fr || null,
+                  day_sa: coachPlan.day_sa || null,
+                  day_so: coachPlan.day_so || null,
+                  updated_at: coachPlan.updated_at
+                })
+              });
+            } catch (eSaveAlt) {}
+            closePlanEdit();
+            renderProfilePlan();
+            maybeAutoSyncCalendar();
+            if (typeof renderWeek === "function") renderWeek();
+            if (typeof window.__gogogoRenderWeek === "function") {
+              try { window.__gogogoRenderWeek(); } catch (eRwAlt) {}
+            }
+            if (typeof window.__gogogoRenderCommunityFeed === "function") {
+              try { window.__gogogoRenderCommunityFeed(); } catch (eCommAlt) {}
+            }
+            return;
+          }
+
+          delete units[String(planEditWeekday)];
+          var label = "";
+          var workoutUnit = null;
           if (planEditKind === "kraft") {
             kraft.push(planEditWeekday);
             label = (planEditTemplate && planEditTemplate.label) || "Kraft";
@@ -12683,7 +12776,7 @@ browsen</span>
               kind: "kraft",
               label: label,
               systemId: (planEditTemplate && planEditTemplate.systemId) || planEditTemplate.id || "",
-              emoji: "🏋️‍♀️",
+              emoji: unitEmojiFor({ kind: "kraft", label: label }),
               source: "user"
             };
           } else if (planEditKind === "ausdauer") {
@@ -12693,7 +12786,7 @@ browsen</span>
               kind: "ausdauer",
               label: label,
               presetId: (planEditTemplate && planEditTemplate.presetId) || planEditTemplate.id || "",
-              emoji: "🏃",
+              emoji: unitEmojiFor({ kind: "ausdauer", label: label }),
               source: "user"
             };
           } else if (planEditKind === "zirkel") {
@@ -12759,6 +12852,9 @@ browsen</span>
           if (typeof renderWeek === "function") renderWeek();
           if (typeof window.__gogogoRenderWeek === "function") {
             try { window.__gogogoRenderWeek(); } catch (eRw) {}
+          }
+          if (typeof window.__gogogoRenderCommunityFeed === "function") {
+            try { window.__gogogoRenderCommunityFeed(); } catch (eComm) {}
           }
         }
 
@@ -12947,6 +13043,12 @@ browsen</span>
         }
 
         document.addEventListener("click", function (e) {
+          var editAlt = e.target.closest("[data-plan-edit-alt]");
+          if (editAlt) {
+            e.preventDefault();
+            openPlanEdit(editAlt.getAttribute("data-plan-edit-alt"), { altOnly: true });
+            return;
+          }
           var edit = e.target.closest("[data-plan-edit]");
           if (edit) {
             e.preventDefault();
