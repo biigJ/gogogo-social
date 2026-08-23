@@ -799,10 +799,11 @@
     }
     .home-cal__label {
       text-align: center;
-      font-size: 1.25rem;
+      font-size: 1.05rem;
       font-weight: 700;
       letter-spacing: -0.03em;
-      line-height: 1.15;
+      line-height: 1.2;
+      white-space: nowrap;
     }
     .home-cal__nav {
       width: 40px;
@@ -811,6 +812,10 @@
       align-items: center;
       justify-content: center;
       color: var(--ink-on-red);
+    }
+    .home-cal__nav:disabled {
+      opacity: 0.28;
+      pointer-events: none;
     }
     .home-cal__nav::before {
       content: "";
@@ -9095,12 +9100,20 @@ browsen</span>
       }
 
       /* Nutzer: aktuelle Woche, Tag <= heute (Berlin). Zukunft und frühere Wochen: nein.
-       * Admin mit Profil-Override: alles. */
+       * Vor Anmeldung: nein. Admin mit Profil-Override: alles. */
+      function accountStartDateKey() {
+        if (!account || !account.created_at) return null;
+        var k = berlinDateKeyFromIso(account.created_at);
+        return /^\d{4}-\d{2}-\d{2}$/.test(String(k || "")) ? k : null;
+      }
+
       function canRateCalendarDay(dateStr) {
         if (isAccountPaused()) return false;
         var key = String(dateStr || "").slice(0, 10);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
         if (getStaffCalendarMode() === "full") return true;
+        var startKey = accountStartDateKey();
+        if (startKey && key < startKey) return false;
         var today = berlinTodayKey();
         if (key > today) return false;
         var todayDate = parseDateKey(today);
@@ -9109,6 +9122,14 @@ browsen</span>
         monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
         var weekStart = formatDateKey(monday);
         return key >= weekStart && key <= today;
+      }
+
+      /* Eintrag ohne unit_choice (Legacy) → Workout als Standardwahl. */
+      function resolvedUnitChoice(entry) {
+        if (!entry) return null;
+        var c = entry.unit_choice != null ? String(entry.unit_choice) : "";
+        if (c === "workout" || c === "alternative") return c;
+        return "workout";
       }
 
       /* Text für einen Kalendertag:
@@ -14582,9 +14603,9 @@ browsen</span>
         var w = typeof window.__gogogoWorkoutForDateKey === "function"
           ? window.__gogogoWorkoutForDateKey(key) : null;
         var entryCell = communityEntryForDate(key);
-        var chosenCell = entryCell && entryCell.unit_choice ? String(entryCell.unit_choice) : null;
+        var chosenCell = entryCell ? resolvedUnitChoice(entryCell) : null;
         /* Gewähltes Emoji bleibt mit weißer Umrandung; das andere verschwindet. */
-        var lockChoice = !!chosenCell;
+        var lockChoice = !!entryCell;
         function addUnitAct(unit, slot) {
           if (!unit) return;
           if (lockChoice && chosenCell !== slot) return;
@@ -14801,7 +14822,11 @@ browsen</span>
         Object.keys(dayEntries || {}).forEach(function (dk) {
           if (dk) keys[dk] = true;
         });
-        return Object.keys(keys).sort(function (a, b) { return b.localeCompare(a); });
+        var startKey = accountStartDateKey();
+        return Object.keys(keys).filter(function (k) {
+          if (startKey && k < startKey) return false;
+          return true;
+        }).sort(function (a, b) { return b.localeCompare(a); });
       }
 
       function dayPhotoUrlForKey(key) {
@@ -15912,8 +15937,12 @@ browsen</span>
         var score = row.score == null ? null : Number(row.score);
         var unitChoice = extended && row.unit_choice ? String(row.unit_choice) : null;
         var unitDone = extended ? !!row.unit_done : false;
-        if (!extended && score != null) {
+        /* Legacy-Einträge ohne unit_choice: Workout war die Standardwahl. */
+        if (!unitChoice || (unitChoice !== "workout" && unitChoice !== "alternative")) {
           unitChoice = "workout";
+        }
+        if (!unitDone && (score != null || row.score == null)) {
+          /* Bewertet oder ✕ → Einheit gilt als abgeschlossen für die Anzeige. */
           unitDone = true;
         }
         return { score: score, unit_choice: unitChoice, unit_done: unitDone };
@@ -16023,7 +16052,7 @@ browsen</span>
           if (createdKey && yesterday < createdKey) return false;
         }
         if (isDayCheckedOff(yesterday)) return false;
-        dayEntries[yesterday] = { score: null };
+        dayEntries[yesterday] = { score: null, unit_choice: "workout", unit_done: true };
         saveDayEntriesLocal();
         if (hasCloudAccount()) {
           try {
@@ -16031,6 +16060,8 @@ browsen</span>
               account_id: account.id,
               date: yesterday,
               score: null,
+              unit_choice: "workout",
+              unit_done: true,
               updated_at: new Date().toISOString()
             });
           } catch (eUpsert) {}
@@ -17672,7 +17703,36 @@ browsen</span>
         function monthLabelForWeek(monday) {
           var mid = new Date(monday);
           mid.setDate(monday.getDate() + 3);
-          return mid.toLocaleDateString(uiLang === "en" ? "en-US" : "de-DE", { month: "long", year: "numeric" });
+          var monthYear = mid.toLocaleDateString(uiLang === "en" ? "en-US" : "de-DE", {
+            month: "long",
+            year: "numeric"
+          });
+          var kw = isoWeekNumber(mid);
+          var kwLabel = uiLang === "en" ? ("CW " + kw) : ("KW " + kw);
+          return kwLabel + " " + monthYear;
+        }
+        function isoWeekNumber(d) {
+          var date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+          var dayNum = date.getUTCDay() || 7;
+          date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+          var yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+          return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+        }
+        function minCalendarWeekOffset() {
+          var startKey = accountStartDateKey();
+          if (!startKey) return -520;
+          var todayKey = berlinTodayKey();
+          var today = parseDateKey(todayKey) || new Date();
+          var start = parseDateKey(startKey);
+          if (!start) return -520;
+          var mondayToday = mondayOf(startOfDay(today));
+          var mondayStart = mondayOf(startOfDay(start));
+          var diffMs = mondayStart.getTime() - mondayToday.getTime();
+          return Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
+        }
+        function clampWeekOffset() {
+          var minOff = minCalendarWeekOffset();
+          if (weekOffset < minOff) weekOffset = minOff;
         }
         function entryFor(key) {
           return dayEntries[key] || null;
@@ -17783,10 +17843,9 @@ browsen</span>
           btn.type = "button";
           btn.className = "home-cal__unit-btn";
           var entryCell = entryFor(key);
-          var chosenCell = entryCell && entryCell.unit_choice ? String(entryCell.unit_choice) : null;
+          var chosenCell = entryCell ? resolvedUnitChoice(entryCell) : null;
           var unitDoneCell = !!(entryCell && entryCell.unit_done && chosenCell);
-          var scoredCell = !!(entryCell && entryCell.score != null);
-          var lockChoice = !!chosenCell;
+          var lockChoice = !!entryCell;
           if (!unit || (lockChoice && chosenCell !== slot)) {
             btn.classList.add("is-empty");
             btn.disabled = true;
@@ -17817,6 +17876,7 @@ browsen</span>
         function renderWeek() {
           names = dayNames();
           WEEKDAY_WORKOUTS = weekdayWorkouts();
+          clampWeekOffset();
           var todayKey = berlinTodayKey();
           var today = startOfDay(new Date());
           try {
@@ -17829,6 +17889,17 @@ browsen</span>
           base.setDate(base.getDate() + weekOffset * 7);
           var currentWeekMondayKey = dateKey(mondayOf(today));
           labelEl.textContent = monthLabelForWeek(base);
+          var prevBtn = document.getElementById("week-prev");
+          var nextBtn = document.getElementById("week-next");
+          var minOff = minCalendarWeekOffset();
+          if (prevBtn) {
+            prevBtn.disabled = isAccountPaused() || weekOffset <= minOff;
+            prevBtn.setAttribute("aria-disabled", prevBtn.disabled ? "true" : "false");
+          }
+          if (nextBtn) {
+            nextBtn.disabled = isAccountPaused();
+            nextBtn.setAttribute("aria-disabled", nextBtn.disabled ? "true" : "false");
+          }
           root.innerHTML = "";
           var workoutRow = document.getElementById("week-units-workout");
           var altRow = document.getElementById("week-units-alt");
@@ -18155,15 +18226,34 @@ browsen</span>
           );
           /* Nur Cloud-Stand — verhindert lokale Fake-Einträge für andere Tage. */
           var next = {};
+          var startKey = accountStartDateKey();
+          var backfill = [];
           if (rows && rows.length) {
             for (var i = 0; i < rows.length; i++) {
+              var rowDate = rows[i] && rows[i].date ? String(rows[i].date).slice(0, 10) : "";
+              if (startKey && rowDate && rowDate < startKey) continue;
               var normalized = normalizeCloudDayEntry(rows[i], extended);
               if (!normalized) continue;
               next[rows[i].date] = normalized;
+              if (extended && (!rows[i].unit_choice || rows[i].unit_done !== true)) {
+                backfill.push({
+                  account_id: account.id,
+                  date: rows[i].date,
+                  score: normalized.score,
+                  unit_choice: normalized.unit_choice,
+                  unit_done: true,
+                  updated_at: new Date().toISOString()
+                });
+              }
             }
           }
           dayEntries = next;
           saveDayEntriesLocal();
+          if (backfill.length) {
+            backfill.forEach(function (row) {
+              restUpsertDayEntry(row).catch(function () {});
+            });
+          }
           try { await ensureMissedYesterdayMarked(); } catch (eMiss1) {}
           refreshCycleRays();
           renderWeek();
@@ -18221,7 +18311,9 @@ browsen</span>
 
         document.getElementById("week-prev").addEventListener("click", function () {
           if (isAccountPaused()) return;
+          if (weekOffset <= minCalendarWeekOffset()) return;
           weekOffset -= 1;
+          clampWeekOffset();
           selectedKey = null;
           closeDayRateModal();
           renderWeek();
