@@ -3356,6 +3356,7 @@
       updatePlanScrollbar();
       await loadIntervalLogs();
       showFinishDialog();
+      notifyParentWorkoutFinished();
       return;
     }
     saveLogEntry();
@@ -3461,6 +3462,18 @@
     if (window.parent !== window) {
       window.parent.postMessage({ type: 'gogogo-training-workout', active: !!active }, '*');
     }
+  }
+
+  function notifyParentWorkoutFinished(){
+    if (!useParentTabs || window.parent === window) return;
+    try {
+      window.parent.postMessage({
+        type: 'gogogo-training-goto',
+        panel: 'home',
+        finished: true,
+        dateKey: berlinTodayISO()
+      }, '*');
+    } catch (e) {}
   }
 
   async function goRest(path, opts){
@@ -4770,6 +4783,7 @@
   async function finishKraftSession(){
     await saveKraftWorkout();
     showKraftFinishDialog();
+    notifyParentWorkoutFinished();
   }
 
   function goToCalendarAfterKraft(){
@@ -4780,16 +4794,7 @@
     } else {
       endKraftSession();
     }
-    if (window.parent !== window) {
-      try {
-        window.parent.postMessage({
-          type: 'gogogo-training-goto',
-          panel: 'home',
-          finished: true,
-          dateKey: berlinTodayISO()
-        }, '*');
-      } catch (e) {}
-    }
+    notifyParentWorkoutFinished();
   }
 
   function updateKraftScrollbar(){
@@ -5435,6 +5440,7 @@
     }
     showKraftFinishDialog();
     pendingAusdauerFinish = true;
+    notifyParentWorkoutFinished();
   }
 
   async function enterAusdauerView(){
@@ -6397,16 +6403,7 @@
       if (e.target.closest('#finishOkBtn')) {
         e.preventDefault(); e.stopPropagation();
         hideFinishDialog();
-        if (window.parent !== window) {
-          try {
-            window.parent.postMessage({
-              type: 'gogogo-training-goto',
-              panel: 'home',
-              finished: true,
-              dateKey: berlinTodayISO()
-            }, '*');
-          } catch (err) {}
-        }
+        notifyParentWorkoutFinished();
         return;
       }
       if (e.target.closest('#finishTableBtn')) {

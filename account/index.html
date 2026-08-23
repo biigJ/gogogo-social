@@ -15729,8 +15729,20 @@ browsen</span>
         }, 80);
       }
 
-      function openTrainingFromCalendar(tab, preset) {
+      var activeTrainingDayKey = null;
+      var activeTrainingUnitChoice = null;
+
+      function rememberTrainingContext(dayKey, unitChoice) {
+        activeTrainingDayKey = dayKey ? String(dayKey).slice(0, 10) : null;
+        if (unitChoice) activeTrainingUnitChoice = String(unitChoice);
+      }
+
+      function openTrainingFromCalendar(tab, preset, dayKey, unitChoice) {
         if (!tab) return;
+        rememberTrainingContext(
+          dayKey || activeTrainingDayKey || (typeof window.__gogogoGetSelectedDayKey === "function" ? window.__gogogoGetSelectedDayKey() : "") || berlinTodayKey(),
+          unitChoice || activeTrainingUnitChoice || "workout"
+        );
         pendingTrainingPreset = preset || null;
         trainingActiveTab = tab;
         gotoPanel("training");
@@ -15831,7 +15843,10 @@ browsen</span>
           document.body.classList.remove("is-training-workout");
           gotoPanel(ev.data.panel || "home");
           if (ev.data.finished && typeof window.__gogogoPromptWorkoutRating === "function") {
-            window.__gogogoPromptWorkoutRating(ev.data.dateKey || "");
+            var finishKey = ev.data.dateKey || "";
+            window.setTimeout(function () {
+              window.__gogogoPromptWorkoutRating(finishKey);
+            }, 100);
           }
         }
       });
@@ -16252,11 +16267,15 @@ browsen</span>
           return isCalDayTodayOrFuture(key);
         }
 
-        function openDayRateModal(key) {
+        function openDayRateModal(key, opts) {
+          opts = opts || {};
           if (isAccountPaused()) return;
           if (!key) return;
-          if (dayHasRating(key) && !canEditExistingRating()) return;
-          if (!dayHasRating(key) && !canRateCalendarDay(key)) return;
+          var entry = entryFor(key);
+          if (entry && entry.score != null && !canEditExistingRating()) return;
+          if (!opts.force) {
+            if (!entry && !canRateCalendarDay(key)) return;
+          }
           rateModalKey = key;
           selectedKey = key;
           var d = parseDateKey(key) || new Date();
@@ -16288,11 +16307,12 @@ browsen</span>
         }
 
         function promptWorkoutRating(key) {
-          key = String(key || berlinTodayKey()).slice(0, 10);
+          key = String(key || activeTrainingDayKey || berlinTodayKey()).slice(0, 10);
+          if (activeTrainingUnitChoice) pendingUnitChoice = activeTrainingUnitChoice;
           weekOffset = 0;
           selectedKey = key;
           renderWeek();
-          openDayRateModal(key);
+          openDayRateModal(key, { force: true });
         }
 
         function startOfDay(d) {
@@ -16509,11 +16529,13 @@ browsen</span>
         function handleCalendarUnitClick(key, slot, w) {
           if (isAccountPaused()) return;
           selectDay(key, false);
-          var rated = dayHasRating(key);
+          var entry = entryFor(key);
+          var rated = !!(entry && entry.score != null);
           if (rated && !canEditExistingRating()) return;
           pendingUnitChoice = slot;
+          rememberTrainingContext(key, slot);
           if (slot === "workout" && w && w.training && w.trainingTab && !rated) {
-            openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null);
+            openTrainingFromCalendar(w.trainingTab, w.trainingPreset || null, key, slot);
             return;
           }
           if (!rated && !canRateCalendarDay(key)) return;
@@ -16980,6 +17002,7 @@ browsen</span>
         };
         window.__gogogoRenderWeek = renderWeek;
         window.__gogogoSelectDay = selectDay;
+        window.__gogogoGetSelectedDayKey = function () { return selectedKey; };
         window.__gogogoPromptWorkoutRating = promptWorkoutRating;
 
         var dayRateModal = document.getElementById("day-rate-modal");
