@@ -14763,7 +14763,8 @@ browsen</span>
             }
             return true;
           }).sort(function (a, b) {
-            return postTimeMs(a.created_at) - postTimeMs(b.created_at);
+            /* Neueste Zeile oben */
+            return postTimeMs(b.created_at) - postTimeMs(a.created_at);
           });
           for (var i = 0; i < posts.length; i++) {
             appendCommunityPostEl(postsWrap, posts[i], names);
@@ -18403,6 +18404,23 @@ browsen</span>
           }
         }
 
+        function dockCommunityComposer() {
+          if (!composer) return;
+          composer.style.bottom = "0px";
+          composer.style.paddingBottom = "";
+          composer.style.top = "";
+          composer.style.transform = "";
+          document.body.classList.remove("is-keyboard");
+        }
+
+        function communityKeyboardLiftPx() {
+          /* Nur bei Fokus messen — sonst bleibt ein Rest-Offset von iOS/Viewport stehen. */
+          if (!(replyText && document.activeElement === replyText)) return 0;
+          if (!window.visualViewport) return 0;
+          var vv = window.visualViewport;
+          return Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0));
+        }
+
         function syncCommunityComposerChrome() {
           if (!composer) return;
           if (!document.body.classList.contains("is-community")) return;
@@ -18411,23 +18429,14 @@ browsen</span>
             resetCommunityComposerLayout();
             return;
           }
-          var kb = 0;
-          if (window.visualViewport) {
-            var vv = window.visualViewport;
-            kb = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0));
-          }
-          if (kb > 8) {
+          var focused = !!(replyText && document.activeElement === replyText);
+          var kb = focused ? communityKeyboardLiftPx() : 0;
+          if (focused && kb > 8) {
             composer.style.bottom = kb + "px";
             composer.style.paddingBottom = "8px";
             document.body.classList.add("is-keyboard");
           } else {
-            composer.style.bottom = "0px";
-            composer.style.paddingBottom = "";
-            composer.style.top = "";
-            composer.style.transform = "";
-            if (!(replyText && document.activeElement === replyText)) {
-              document.body.classList.remove("is-keyboard");
-            }
+            dockCommunityComposer();
           }
           var h = Math.ceil(composer.getBoundingClientRect().height || 58);
           document.documentElement.style.setProperty("--community-composer-h", h + "px");
@@ -18453,6 +18462,9 @@ browsen</span>
           var ticks = 0;
           communityPinTimer = setInterval(function () {
             pinCommunityViewport();
+            if (replyText && document.activeElement === replyText) {
+              syncCommunityComposerChrome();
+            }
             ticks += 1;
             if (ticks > 40) stopCommunityPinLoop();
           }, 50);
@@ -18480,32 +18492,22 @@ browsen</span>
           });
           replyText.addEventListener("blur", function () {
             stopCommunityPinLoop();
+            /* Sofort andocken — kein „mittig stehen bleiben“ nach Tastatur. */
+            dockCommunityComposer();
             setTimeout(function () {
               pinCommunityViewport();
+              dockCommunityComposer();
               syncCommunityComposerChrome();
             }, 50);
             setTimeout(function () {
               pinCommunityViewport();
+              dockCommunityComposer();
               syncCommunityComposerChrome();
             }, 320);
             setTimeout(function () {
               pinCommunityViewport();
-              if (!isTodayCommunityChatOpen()) {
-                resetCommunityComposerLayout();
-              } else if (window.visualViewport) {
-                var vv = window.visualViewport;
-                var kb = Math.max(0, window.innerHeight - vv.height - (vv.offsetTop || 0));
-                if (kb <= 8) {
-                  composer.style.bottom = "0px";
-                  composer.style.paddingBottom = "";
-                  composer.style.top = "";
-                  composer.style.transform = "";
-                  document.body.classList.remove("is-keyboard");
-                }
-              } else {
-                composer.style.bottom = "0px";
-                document.body.classList.remove("is-keyboard");
-              }
+              if (!isTodayCommunityChatOpen()) resetCommunityComposerLayout();
+              else dockCommunityComposer();
             }, 600);
           });
           if (replySend) replySend.disabled = true;
@@ -18535,13 +18537,30 @@ browsen</span>
         }, true);
 
         if (window.visualViewport) {
-          window.visualViewport.addEventListener("resize", syncCommunityComposerChrome);
+          window.visualViewport.addEventListener("resize", function () {
+            if (replyText && document.activeElement === replyText) {
+              syncCommunityComposerChrome();
+            } else {
+              dockCommunityComposer();
+            }
+          });
           window.visualViewport.addEventListener("scroll", function () {
             pinCommunityViewport();
-            syncCommunityComposerChrome();
+            /* Scroll-Offset darf Composer nicht mittig schieben — nur bei Tastatur-Fokus. */
+            if (replyText && document.activeElement === replyText) {
+              syncCommunityComposerChrome();
+            } else if (isTodayCommunityChatOpen()) {
+              dockCommunityComposer();
+            }
           });
         }
-        window.addEventListener("resize", syncCommunityComposerChrome);
+        window.addEventListener("resize", function () {
+          if (replyText && document.activeElement === replyText) {
+            syncCommunityComposerChrome();
+          } else if (isTodayCommunityChatOpen()) {
+            dockCommunityComposer();
+          }
+        });
         window.__gogogoPinCommunity = pinCommunityViewport;
         window.__gogogoSyncCommunityComposer = syncCommunityComposerChrome;
         syncCommunityComposerChrome();
