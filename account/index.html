@@ -2166,13 +2166,23 @@
       max-height: 240px;
       border-radius: 10px;
     }
-    .community-top__tools {
-      position: absolute;
-      right: 0;
-      top: 0;
+    .community-toolbar {
       display: flex;
-      gap: 6px;
-      z-index: 2;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 8px;
+      min-height: 40px;
+      flex: 0 0 auto;
+    }
+    .community-toolbar .community-discover,
+    .community-toolbar .community-wa {
+      position: static;
+      transform: none;
+      flex: 0 0 auto;
+    }
+    .community-top__tools {
+      display: none;
     }
     .community-top {
       position: relative;
@@ -2240,6 +2250,20 @@
       border: 0;
       background: transparent;
     }
+    .community-day__act.is-done {
+      box-shadow: inset 0 0 0 2px rgba(247, 245, 240, 0.95);
+    }
+    .community-day__act.is-selected {
+      background: rgba(247, 245, 240, 0.24);
+    }
+    .community-feed__day-photo {
+      display: block;
+      width: calc(100% + 2 * var(--pad));
+      margin: 0 calc(-1 * var(--pad)) 8px;
+      max-height: 220px;
+      object-fit: cover;
+      object-position: center;
+    }
     .community-day__hero {
       width: calc(100% + 2 * var(--pad));
       margin-left: calc(-1 * var(--pad));
@@ -2262,6 +2286,14 @@
       display: flex;
       flex-direction: column;
       margin-top: 6px;
+    }
+    body.is-community.is-community-chat-open .community-chat {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+    }
+    body.is-community.is-community-chat-open .community-day__hero {
+      display: none;
     }
     .community-chat__toggle {
       align-self: flex-end;
@@ -5124,7 +5156,7 @@ browsen</span>
       <div class="panel" id="panel-community" data-panel="community">
         <div class="community-shell">
           <div class="community-top">
-            <div class="community-top__tools">
+            <div class="community-toolbar" aria-label="Community-Aktionen">
               <button
                 class="community-discover"
                 type="button"
@@ -5150,6 +5182,7 @@ browsen</span>
                 </svg>
               </a>
             </div>
+            <div class="community-top__tools" hidden aria-hidden="true"></div>
             <div class="community-slots" id="community-slots" aria-label="Buddy-Plätze"></div>
             <hr class="community-rule" />
             <p class="community-add-msg" id="community-add-msg" aria-live="polite"></p>
@@ -5267,7 +5300,13 @@ browsen</span>
               <svg id="nav-cycle" viewBox="0 0 24 24" aria-hidden="true" fill="none"></svg>
             </button>
             <button class="nav-btn is-active" type="button" data-goto="home" aria-label="Kalender" data-aria-de="Kalender" data-aria-en="Calendar" aria-current="page">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3.5" width="8" height="17" rx="1.75" fill="currentColor"/></svg>
+              <svg class="nav-cal-sheet" viewBox="0 0 24 24" aria-hidden="true" fill="none">
+                <rect x="6.5" y="4.5" width="11" height="15" rx="1.5" stroke="currentColor" stroke-width="1.55"/>
+                <line x1="6.5" y1="9" x2="17.5" y2="9" stroke="currentColor" stroke-width="1.35"/>
+                <circle cx="9" cy="6.8" r="0.85" fill="currentColor"/>
+                <circle cx="15" cy="6.8" r="0.85" fill="currentColor"/>
+                <path d="M9.2 12.2h5.6M9.2 15h3.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
             </button>
             <button class="nav-btn" type="button" data-goto="book" aria-label="Wissen" data-aria-de="Wissen" data-aria-en="Ideas">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm-2.5 12.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5h5c.28 0 .5.22.5.5s-.22.5-.5.5h-5z"/></svg>
@@ -14075,6 +14114,36 @@ browsen</span>
           var d = parseDateKey(key) || new Date();
           var wd = (d.getDay() + 6) % 7;
           var pair = dayUnitsFor(wd);
+          var entryCell = typeof window.__gogogoEntryForDateKey === "function"
+            ? window.__gogogoEntryForDateKey(key) : null;
+          var chosenCell = entryCell && entryCell.unit_choice ? String(entryCell.unit_choice) : null;
+          var unitDoneCell = !!(entryCell && entryCell.unit_done && chosenCell);
+          var scoredCell = !!(entryCell && entryCell.score != null);
+          function addUnitAct(unit, slot) {
+            if (!unit) return;
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "community-day__act";
+            btn.textContent = unitEmojiFor(unit);
+            btn.setAttribute("aria-label", localizePlanLabel(unit.label || slot));
+            if (unitDoneCell && chosenCell === slot) btn.classList.add("is-done");
+            if ((unitDoneCell && chosenCell === slot) || (scoredCell && chosenCell === slot)) {
+              btn.classList.add("is-selected", "is-done");
+            }
+            if (scoredCell && chosenCell && chosenCell !== slot) return;
+            if (scoredCell && !chosenCell && slot === "alternative") return;
+            btn.addEventListener("click", function () {
+              communityViewDateKey = key;
+              var w = typeof window.__gogogoWorkoutForDateKey === "function"
+                ? window.__gogogoWorkoutForDateKey(key) : null;
+              if (typeof window.__gogogoHandleCalendarUnitClick === "function") {
+                window.__gogogoHandleCalendarUnitClick(key, slot, w);
+              }
+            });
+            actionsEl.appendChild(btn);
+          }
+          if (pair && pair.workout) addUnitAct(pair.workout, "workout");
+          if (pair && pair.alternative) addUnitAct(pair.alternative, "alternative");
           function addAct(label, emoji, handler) {
             var btn = document.createElement("button");
             btn.type = "button";
@@ -14083,22 +14152,6 @@ browsen</span>
             btn.setAttribute("aria-label", label);
             btn.addEventListener("click", handler);
             actionsEl.appendChild(btn);
-          }
-          if (pair && pair.workout) {
-            addAct(localizePlanLabel(pair.workout.label || "Workout"), unitEmojiFor(pair.workout), function () {
-              gotoPanel("home");
-              if (typeof window.__gogogoSelectDay === "function") {
-                window.__gogogoSelectDay(key, false);
-              }
-            });
-          }
-          if (pair && pair.alternative) {
-            addAct(localizePlanLabel(pair.alternative.label || "Alternative"), unitEmojiFor(pair.alternative), function () {
-              gotoPanel("home");
-              if (typeof window.__gogogoSelectDay === "function") {
-                window.__gogogoSelectDay(key, false);
-              }
-            });
           }
           addAct(t("Kalender", "Calendar"), "🗒️", function () {
             gotoPanel("home");
@@ -14118,6 +14171,83 @@ browsen</span>
         }
       }
 
+      function sortedCommunityDayKeys() {
+        var keys = {};
+        for (var i = 0; i < communityPosts.length; i++) {
+          var p = communityPosts[i];
+          if (!p || !p.created_at) continue;
+          var dk = berlinDateKeyFromIso(p.created_at);
+          if (dk) keys[dk] = true;
+        }
+        return Object.keys(keys).sort(function (a, b) { return b.localeCompare(a); });
+      }
+
+      function dayPhotoUrlForKey(key) {
+        var post = latestPhotoPostForDay(key);
+        if (post && post.photo_url) return post.photo_url;
+        return workoutPlacePhotoUrl(communityPlaceForDate(key));
+      }
+
+      function appendCommunityPostEl(feed, post, names) {
+        if (!post || !feed) return;
+        var mine = post.author_id === account.id;
+        var el = document.createElement("article");
+        el.className = "community-post " + (mine ? "is-mine" : "is-buddy");
+        var who = document.createElement("div");
+        who.className = "community-post__who";
+        var timeStr = "";
+        try {
+          timeStr = new Date(post.created_at).toLocaleTimeString(uiLang === "en" ? "en-US" : "de-DE", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Europe/Berlin"
+          });
+        } catch (eTime) {}
+        who.textContent = (mine ? t("Du", "You") : firstNameOf({ name: names[post.author_id] || "Buddy" })) +
+          (timeStr ? " · " + timeStr : "");
+        if (!mine && post.author_id) {
+          who.style.cursor = "pointer";
+          who.setAttribute("role", "button");
+          who.tabIndex = 0;
+          (function (authorId, authorName) {
+            who.addEventListener("click", function () {
+              openAboutMeReadModal(authorId, authorName, who);
+            });
+          })(post.author_id, names[post.author_id] || "Buddy");
+        }
+        if (post.reply_to_id && names[post.reply_to_id]) {
+          who.textContent += " → " + firstNameOf({ name: names[post.reply_to_id] });
+        } else if (post.reply_to_id && post.reply_to_id === account.id && !mine) {
+          who.textContent += " → " + t("Dich", "You");
+        }
+        el.appendChild(who);
+        if (post.photo_url) {
+          var img = document.createElement("img");
+          img.className = "community-post__photo";
+          img.src = post.photo_url;
+          img.alt = "";
+          el.appendChild(img);
+        }
+        if (post.body) {
+          var body = document.createElement("p");
+          body.className = "community-post__body";
+          var displayBody = stripInviteMarker(post.body);
+          body.textContent = displayBody;
+          if (isAboutSharePost(post)) {
+            body.classList.add("is-about-share");
+            body.setAttribute("role", "button");
+            body.tabIndex = 0;
+            var authorId = aboutAuthorIdFromPost(post);
+            var authorName = names[post.author_id] || "Buddy";
+            body.addEventListener("click", function () {
+              openAboutMeReadModal(authorId, authorName, body);
+            });
+          }
+          el.appendChild(body);
+        }
+        feed.appendChild(el);
+      }
+
       function renderCommunityFeed() {
         var feed = document.getElementById("community-feed");
         if (!feed) return;
@@ -14125,85 +14255,47 @@ browsen</span>
         renderCommunityDayPanel();
         if (!communityChatOpen) return;
         var names = authorNameMap();
-        var viewKey = ensureCommunityViewDate();
-        var posts = communityPosts.slice().filter(function (p) {
-          return p && berlinDateKeyFromIso(p.created_at) === viewKey;
-        }).sort(function (a, b) {
-          return postTimeMs(a.created_at) - postTimeMs(b.created_at);
-        });
-        var dayHead = document.createElement("div");
-        dayHead.className = "community-feed__day";
-        dayHead.textContent = communityDayLongLabel(viewKey);
-        feed.appendChild(dayHead);
-        if (!posts.length) {
+        var dayKeys = sortedCommunityDayKeys();
+        if (!dayKeys.length) {
           var empty = document.createElement("p");
           empty.className = "community-post__body";
           empty.style.opacity = "0.72";
-          empty.textContent = t("Noch keine Beiträge an diesem Tag.", "No posts on this day yet.");
+          empty.textContent = t("Noch keine Beiträge.", "No posts yet.");
           feed.appendChild(empty);
           return;
         }
-        for (var i = 0; i < posts.length; i++) {
-          var post = posts[i];
-          if (!post) continue;
-          var mine = post.author_id === account.id;
-          var el = document.createElement("article");
-          el.className = "community-post " + (mine ? "is-mine" : "is-buddy");
-          var who = document.createElement("div");
-          who.className = "community-post__who";
-          var timeStr = "";
-          try {
-            timeStr = new Date(post.created_at).toLocaleTimeString(uiLang === "en" ? "en-US" : "de-DE", {
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Europe/Berlin"
-            });
-          } catch (eTime) {}
-          who.textContent = (mine ? t("Du", "You") : firstNameOf({ name: names[post.author_id] || "Buddy" })) +
-            (timeStr ? " · " + timeStr : "");
-          if (!mine && post.author_id) {
-            who.style.cursor = "pointer";
-            who.setAttribute("role", "button");
-            who.tabIndex = 0;
-            (function (authorId, authorName) {
-              who.addEventListener("click", function () {
-                openAboutMeReadModal(authorId, authorName, who);
-              });
-            })(post.author_id, names[post.author_id] || "Buddy");
+        for (var d = 0; d < dayKeys.length; d++) {
+          var dayKey = dayKeys[d];
+          var dayHead = document.createElement("div");
+          dayHead.className = "community-feed__day";
+          dayHead.textContent = communityDayLongLabel(dayKey);
+          feed.appendChild(dayHead);
+          var planLine = document.createElement("p");
+          planLine.className = "community-post__body";
+          planLine.style.opacity = "0.85";
+          planLine.style.margin = "0 0 6px";
+          planLine.textContent = communityPlanLineForDate(dayKey);
+          feed.appendChild(planLine);
+          var hero = document.createElement("img");
+          hero.className = "community-feed__day-photo";
+          hero.src = dayPhotoUrlForKey(dayKey);
+          hero.alt = communityPlaceForDate(dayKey) || t("Tagesfoto", "Day photo");
+          feed.appendChild(hero);
+          var posts = communityPosts.slice().filter(function (p) {
+            return p && berlinDateKeyFromIso(p.created_at) === dayKey;
+          }).sort(function (a, b) {
+            return postTimeMs(a.created_at) - postTimeMs(b.created_at);
+          });
+          for (var i = 0; i < posts.length; i++) {
+            appendCommunityPostEl(feed, posts[i], names);
           }
-          if (post.reply_to_id && names[post.reply_to_id]) {
-            who.textContent += " → " + firstNameOf({ name: names[post.reply_to_id] });
-          } else if (post.reply_to_id && post.reply_to_id === account.id && !mine) {
-            who.textContent += " → " + t("Dich", "You");
+          if (d < dayKeys.length - 1) {
+            var rule = document.createElement("hr");
+            rule.className = "community-rule";
+            rule.style.margin = "12px 0";
+            feed.appendChild(rule);
           }
-          el.appendChild(who);
-          if (post.photo_url) {
-            var img = document.createElement("img");
-            img.className = "community-post__photo";
-            img.src = post.photo_url;
-            img.alt = "";
-            el.appendChild(img);
-          }
-          if (post.body) {
-            var body = document.createElement("p");
-            body.className = "community-post__body";
-            var displayBody = stripInviteMarker(post.body);
-            body.textContent = displayBody;
-            if (isAboutSharePost(post)) {
-              body.classList.add("is-about-share");
-              body.setAttribute("role", "button");
-              body.tabIndex = 0;
-              var authorId = aboutAuthorIdFromPost(post);
-              var authorName = names[post.author_id] || "Buddy";
-              body.addEventListener("click", function () {
-                openAboutMeReadModal(authorId, authorName, body);
-              });
-            }
-            el.appendChild(body);
-          }
-          feed.appendChild(el);
         }
-        feed.scrollTop = feed.scrollHeight;
       }
 
       function getFeedSeenAt() {
@@ -17561,6 +17653,14 @@ browsen</span>
         window.__gogogoGetSelectedDayKey = function () { return selectedKey; };
         window.__gogogoMarkWorkoutUnitDone = markWorkoutUnitDone;
         window.__gogogoPromptWorkoutRating = promptWorkoutRating;
+        window.__gogogoHandleCalendarUnitClick = handleCalendarUnitClick;
+        window.__gogogoWorkoutForDateKey = function (key) {
+          var d = parseDateKey(key) || new Date();
+          return workoutFor(d);
+        };
+        window.__gogogoEntryForDateKey = function (key) {
+          return entryFor(key);
+        };
 
         var dayRateModal = document.getElementById("day-rate-modal");
         var dayRateViewUnit = document.getElementById("day-rate-view-unit");
