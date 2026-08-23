@@ -8494,6 +8494,16 @@ browsen</span>
         var unit = null;
         if (isZirkelWeekday(wd)) {
           unit = { kind: "zirkel", label: t("Zirkeltraining", "Circuit training"), systemId: "", presetId: "" };
+          if (map && typeof map === "object") {
+            var zRow = map[String(wd)] || map[wd];
+            if (zRow && zRow.alternative) {
+              var zAlt = normalizeTrainingUnit(zRow.alternative);
+              if (zAlt) {
+                unit = normalizeTrainingUnit(unit);
+                return { workout: unit, alternative: zAlt };
+              }
+            }
+          }
         } else {
           var kraft = isKraftWeekday(wd);
           var ausd = isAusdauerWeekday(wd);
@@ -8528,6 +8538,9 @@ browsen</span>
         var src = weekdayPlanSource(wd);
         if (src === "user") return false;
         if (src === "trainer") return true;
+        if (isZirkelWeekday(wd) && coachPlan && coachPlan.zirkel_weekday != null) {
+          if (Number(coachPlan.zirkel_weekday) === wd) return true;
+        }
         var key = COACH_DAY_KEYS[wd];
         if (!key) return false;
         for (var i = 0; i < (coachDayHistory || []).length; i++) {

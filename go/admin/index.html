@@ -413,6 +413,128 @@
       margin-top: 0;
     }
     .plan-unit-label:empty { display: none; }
+    .plan-alt-section {
+      margin: 6px 0 4px;
+    }
+    .plan-alt-section[hidden] { display: none; }
+    .plan-alt-label {
+      display: block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      opacity: 0.85;
+      margin: 0 0 6px;
+      color: var(--ink-on-red);
+    }
+    .plan-alt-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .plan-alt-opt {
+      min-height: 34px;
+      padding: 4px 8px;
+      border: 1.5px solid rgba(247, 245, 240, 0.45);
+      background: transparent;
+      color: var(--ink-on-red);
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      border-radius: var(--radius);
+      cursor: pointer;
+    }
+    .plan-alt-opt.is-on {
+      background: rgba(247, 245, 240, 0.18);
+      border-color: rgba(247, 245, 240, 0.9);
+    }
+    .admin-day-card {
+      flex: 0 0 auto;
+      width: 100%;
+      margin: 0 0 22px;
+    }
+    .admin-day-card__head {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 0 0 8px;
+    }
+    .admin-day-card__cal {
+      flex: 0 0 auto;
+      min-width: 52px;
+      padding: 6px 8px;
+      border: 1px solid rgba(247, 245, 240, 0.55);
+      border-radius: 8px;
+      background: rgba(247, 245, 240, 0.08);
+      color: var(--ink-on-red);
+      font: inherit;
+      font-size: 0.82rem;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      text-align: center;
+    }
+    .admin-day-card__text { flex: 1; min-width: 0; }
+    .admin-day-card__workout {
+      margin: 0;
+      font-size: 0.92rem;
+      font-weight: 600;
+      line-height: 1.3;
+      letter-spacing: -0.02em;
+      color: var(--ink-on-red);
+    }
+    .admin-day-card__meta {
+      margin: 2px 0 0;
+      font-size: 0.78rem;
+      font-weight: 500;
+      line-height: 1.3;
+      color: rgba(247, 245, 240, 0.78);
+    }
+    .admin-day-card__photo-wrap {
+      position: relative;
+      width: 100%;
+      margin: 0 0 4px;
+      overflow: hidden;
+    }
+    .admin-day-card__photo {
+      display: block;
+      width: 100%;
+      max-height: 36vh;
+      min-height: 120px;
+      object-fit: cover;
+      background: rgba(52, 34, 32, 0.2);
+    }
+    .admin-day-card__posts {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 0 0 4px;
+    }
+    .admin-day-card__chat-toggle {
+      align-self: flex-end;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin: 4px 0 0;
+      padding: 4px 2px;
+      border: 0;
+      background: transparent;
+      color: var(--ink-on-red);
+      font: inherit;
+      font-size: 0.88rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      cursor: pointer;
+    }
+    .admin-day-card__chat-arrow {
+      display: inline-block;
+      transition: transform 0.2s ease;
+      font-size: calc(0.72rem * 1.8);
+      line-height: 1;
+    }
+    .admin-day-card__chat-toggle.is-open .admin-day-card__chat-arrow {
+      transform: rotate(180deg);
+    }
     .admin-plan__dayhead label[for] {
       margin-bottom: 0;
     }
@@ -2044,6 +2166,9 @@
       var lastQr = null;
       var activeAccount = null;
       var activeAccountIds = [];
+      var adminMirroredPosts = [];
+      var adminOpenDayKeys = {};
+      var adminFeedMeta = { nameById: {}, coachId: null, primaryId: null };
       var pendingAdminInvite = null;
       var cyclePortrait = document.getElementById("cycle-portrait");
       var cyclePortraitImg = document.getElementById("cycle-portrait-img");
@@ -2870,6 +2995,87 @@
         return span;
       }
 
+      function ensurePlanAltSection(wd) {
+        var block = document.querySelector('.admin-plan__block[data-plan-day="' + wd + '"]');
+        if (!block) return null;
+        var section = block.querySelector('.plan-alt-section[data-wd="' + wd + '"]');
+        if (!section) {
+          section = document.createElement("div");
+          section.className = "plan-alt-section";
+          section.setAttribute("data-wd", String(wd));
+          section.hidden = true;
+          var label = document.createElement("span");
+          label.className = "plan-alt-label";
+          label.textContent = "Alternative";
+          var opts = document.createElement("div");
+          opts.className = "plan-alt-options";
+          section.appendChild(label);
+          section.appendChild(opts);
+          var head = block.querySelector(".admin-plan__dayhead");
+          if (head) head.insertAdjacentElement("afterend", section);
+          else block.prepend(section);
+        }
+        return section;
+      }
+
+      function dayHasAssignedWorkout(wd) {
+        var u = dayTrainingUnits[wd];
+        return !!(u && u.label);
+      }
+
+      function getDayAlternative(wd) {
+        var u = dayTrainingUnits[wd];
+        if (u && u.alternative) return u.alternative;
+        if (dayHasAssignedWorkout(wd)) return defaultAdminAlternative();
+        return null;
+      }
+
+      function setDayAlternative(wd, kind) {
+        if (!dayTrainingUnits[wd]) return;
+        var alt = defaultAdminAlternative();
+        for (var i = 0; i < ADMIN_ALT_OPTIONS.length; i++) {
+          if (ADMIN_ALT_OPTIONS[i].kind === kind) {
+            alt = {
+              kind: ADMIN_ALT_OPTIONS[i].kind,
+              label: ADMIN_ALT_OPTIONS[i].label,
+              emoji: ADMIN_ALT_OPTIONS[i].emoji,
+              source: "trainer"
+            };
+            break;
+          }
+        }
+        dayTrainingUnits[wd].alternative = alt;
+        renderPlanAltOptions();
+        renderDayUnitLabels();
+      }
+
+      function renderPlanAltOptions() {
+        for (var wd = 0; wd <= 6; wd++) {
+          ensurePlanAltSection(wd);
+          var section = document.querySelector('.plan-alt-section[data-wd="' + wd + '"]');
+          if (!section) continue;
+          var optsWrap = section.querySelector(".plan-alt-options");
+          if (!optsWrap) continue;
+          var hasWorkout = dayHasAssignedWorkout(wd);
+          section.hidden = !hasWorkout;
+          if (!hasWorkout) {
+            optsWrap.innerHTML = "";
+            continue;
+          }
+          var currentKind = (getDayAlternative(wd) || defaultAdminAlternative()).kind || "walk";
+          optsWrap.innerHTML = "";
+          ADMIN_ALT_OPTIONS.forEach(function (opt) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "plan-alt-opt" + (opt.kind === currentKind ? " is-on" : "");
+            btn.setAttribute("data-wd", String(wd));
+            btn.setAttribute("data-alt-kind", opt.kind);
+            btn.textContent = (opt.emoji ? opt.emoji + " " : "") + opt.label;
+            optsWrap.appendChild(btn);
+          });
+        }
+      }
+
       function renderDayUnitLabels() {
         for (var wd = 0; wd <= 6; wd++) {
           var span = ensureDayUnitLabel(wd);
@@ -2877,15 +3083,11 @@
           var u = dayTrainingUnits[wd];
           if (!u || !u.label) {
             span.textContent = "";
-            span.removeAttribute("title");
-            span.style.cursor = "";
             continue;
           }
-          var alt = u.alternative || defaultAdminAlternative();
-          span.textContent = u.label + " · Alt: " + (alt.label || "Spaziergang");
-          span.title = "Tippen: Alternative ändern";
-          span.style.cursor = "pointer";
+          span.textContent = u.label;
         }
+        renderPlanAltOptions();
       }
 
       function clearDayTrainingUnit(wd) {
@@ -3054,33 +3256,13 @@
           box.checked = false;
           return;
         }
-        var altOpts = adminAlternativeOptions();
-        var altPicked = await pickUnitWheel(
-          "Alternative · " + (ZIRKEL_DAY_NAMES[wd] || "Tag"),
-          altOpts
-        );
-        var alt = defaultAdminAlternative();
-        if (altPicked) {
-          alt = {
-            kind: altPicked.kind || altPicked.id || "walk",
-            label: altPicked.plainLabel || String(altPicked.label || "").replace(/^[^\s]+\s/, "") || "Spaziergang",
-            emoji: altPicked.emoji || "",
-            source: "trainer"
-          };
-          for (var ai = 0; ai < ADMIN_ALT_OPTIONS.length; ai++) {
-            if (ADMIN_ALT_OPTIONS[ai].kind === alt.kind) {
-              alt.label = ADMIN_ALT_OPTIONS[ai].label;
-              alt.emoji = ADMIN_ALT_OPTIONS[ai].emoji;
-              break;
-            }
-          }
-        }
+        var prevAlt = (dayTrainingUnits[wd] && dayTrainingUnits[wd].alternative) || defaultAdminAlternative();
         dayTrainingUnits[wd] = {
           kind: kind,
           label: picked.label,
           systemId: picked.systemId || "",
           presetId: picked.presetId || "",
-          alternative: alt
+          alternative: prevAlt
         };
         renderDayUnitLabels();
         var ta = document.getElementById(PLAN_DAY_FIELD_IDS[wd]);
@@ -3098,31 +3280,19 @@
         document.querySelectorAll(".plan-ausdauer-check").forEach(function (box) {
           box.addEventListener("change", function () { onKindCheckChange(box, "ausdauer"); });
         });
-        document.querySelectorAll(".admin-plan__block").forEach(function (block) {
-          block.addEventListener("click", function (ev) {
-            var span = ev.target.closest(".plan-unit-label");
-            if (!span) return;
-            var wd = parseInt(span.getAttribute("data-wd"), 10);
-            if (!(wd >= 0 && wd <= 6)) return;
-            if (!dayTrainingUnits[wd]) return;
+        var planRoot = document.getElementById("admin-plan");
+        if (planRoot) {
+          planRoot.addEventListener("click", function (ev) {
+            var btn = ev.target.closest(".plan-alt-opt");
+            if (!btn) return;
             ev.preventDefault();
-            pickUnitWheel("Alternative · " + (ZIRKEL_DAY_NAMES[wd] || "Tag"), adminAlternativeOptions())
-              .then(function (altPicked) {
-                if (!altPicked || !dayTrainingUnits[wd]) return;
-                var alt = defaultAdminAlternative();
-                alt.kind = altPicked.kind || altPicked.id || "walk";
-                for (var ai = 0; ai < ADMIN_ALT_OPTIONS.length; ai++) {
-                  if (ADMIN_ALT_OPTIONS[ai].kind === alt.kind) {
-                    alt.label = ADMIN_ALT_OPTIONS[ai].label;
-                    alt.emoji = ADMIN_ALT_OPTIONS[ai].emoji;
-                    break;
-                  }
-                }
-                dayTrainingUnits[wd].alternative = alt;
-                renderDayUnitLabels();
-              });
+            var wd = parseInt(btn.getAttribute("data-wd"), 10);
+            var kind = btn.getAttribute("data-alt-kind");
+            if (!(wd >= 0 && wd <= 6) || !kind) return;
+            setDayAlternative(wd, kind);
           });
-        });
+        }
+        for (var wd = 0; wd <= 6; wd++) ensurePlanAltSection(wd);
       }
 
       function syncKindUiFromUnits() {
@@ -3413,12 +3583,22 @@
           if (isZirkel) {
             if (clearZirkelText) el.value = "";
             el.placeholder = "Zirkeltraining";
-            delete dayTrainingUnits[idx];
+            var prevAlt = (dayTrainingUnits[idx] && dayTrainingUnits[idx].alternative) || defaultAdminAlternative();
+            dayTrainingUnits[idx] = {
+              kind: "zirkel",
+              label: "Zirkeltraining",
+              systemId: "",
+              presetId: "",
+              alternative: prevAlt
+            };
             var kBox = document.querySelector('.plan-kraft-check[data-wd="' + idx + '"]');
             var aBox = document.querySelector('.plan-ausdauer-check[data-wd="' + idx + '"]');
             if (kBox) kBox.checked = false;
             if (aBox) aBox.checked = false;
           } else if (el.placeholder === "Zirkeltraining") {
+            if (dayTrainingUnits[idx] && dayTrainingUnits[idx].kind === "zirkel") {
+              delete dayTrainingUnits[idx];
+            }
             var labels = ["Montag…", "Dienstag…", "Mittwoch…", "Donnerstag…", "Freitag…", "Samstag…", "Sonntag…"];
             el.placeholder = labels[idx] || "";
           }
@@ -4097,6 +4277,15 @@
         applyKindChecks(".plan-kraft-check", parseWeekdayList(row.kraft_weekdays));
         applyKindChecks(".plan-ausdauer-check", parseWeekdayList(row.ausdauer_weekdays));
         dayTrainingUnits = parseDayTrainingUnits(row.day_training_units);
+        if (zw != null && !dayTrainingUnits[zw]) {
+          dayTrainingUnits[zw] = {
+            kind: "zirkel",
+            label: "Zirkeltraining",
+            systemId: "",
+            presetId: "",
+            alternative: defaultAdminAlternative()
+          };
+        }
         syncKindUiFromUnits();
         resetZirkelTextStash();
       }
@@ -4812,10 +5001,240 @@
         }
       }
 
+      function berlinDateKeyFromIso(iso) {
+        if (!iso) return "";
+        try {
+          return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+        } catch (e) {
+          return String(iso).slice(0, 10);
+        }
+      }
+
+      function berlinTodayKeyAdmin() {
+        try {
+          return new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+        } catch (e) {
+          var d = new Date();
+          return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+        }
+      }
+
+      function adminParseDateKey(key) {
+        if (!key || !/^\d{4}-\d{2}-\d{2}$/.test(String(key))) return null;
+        var p = String(key).split("-");
+        return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+      }
+
+      function adminDayShortLabel(key) {
+        var d = adminParseDateKey(key);
+        if (!d) return String(key || "");
+        var names = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+        return names[d.getDay()] + " " + d.getDate();
+      }
+
+      function adminWeekdayFromDateKey(key) {
+        var d = adminParseDateKey(key);
+        if (!d) return null;
+        return (d.getDay() + 6) % 7;
+      }
+
+      function adminWorkoutLinesForDate(key) {
+        var wd = adminWeekdayFromDateKey(key);
+        if (wd == null) return { title: "—", meta: "" };
+        var u = dayTrainingUnits[wd];
+        if (u && u.label) {
+          var alt = u.alternative || defaultAdminAlternative();
+          var altTxt = (alt.emoji ? alt.emoji + " " : "") + (alt.label || "Spaziergang");
+          return { title: u.label, meta: "Alt: " + altTxt };
+        }
+        var ta = PLAN_DAY_FIELD_IDS[wd] ? document.getElementById(PLAN_DAY_FIELD_IDS[wd]) : null;
+        var txt = ta ? String(ta.value || "").trim() : "";
+        return { title: txt || "—", meta: "" };
+      }
+
+      function adminPostTimeMs(value) {
+        var t = Date.parse(String(value || ""));
+        return isNaN(t) ? 0 : t;
+      }
+
+      function adminLatestPhotoPostForDay(posts, key) {
+        var best = null;
+        var bestMs = 0;
+        (posts || []).forEach(function (p) {
+          if (!p || !p.photo_url) return;
+          if (berlinDateKeyFromIso(p.created_at) !== key) return;
+          var ms = adminPostTimeMs(p.created_at);
+          if (ms >= bestMs) {
+            bestMs = ms;
+            best = p;
+          }
+        });
+        return best;
+      }
+
+      function adminFeedDayKeys(posts) {
+        var keys = {};
+        var today = berlinTodayKeyAdmin();
+        keys[today] = true;
+        (posts || []).forEach(function (p) {
+          if (!p || !p.created_at) return;
+          var dk = berlinDateKeyFromIso(p.created_at);
+          if (dk) keys[dk] = true;
+        });
+        return Object.keys(keys).sort(function (a, b) { return b.localeCompare(a); });
+      }
+
+      function isAdminDayChatOpen(key) {
+        return !!adminOpenDayKeys[key];
+      }
+
+      function toggleAdminDayChat(key) {
+        if (adminOpenDayKeys[key]) delete adminOpenDayKeys[key];
+        else adminOpenDayKeys[key] = true;
+        renderAdminDayFeed();
+      }
+
+      function adminFirstName(id) {
+        var n = adminFeedMeta.nameById[String(id)] || "";
+        return String(n).trim().split(/\s+/)[0] || "Nutzer";
+      }
+
+      function appendAdminPostEl(wrap, post) {
+        if (!post || !wrap) return;
+        var coachId = adminFeedMeta.coachId;
+        var primary = adminFeedMeta.primaryId;
+        var mine = !!(coachId && String(post.author_id) === coachId);
+        var el = document.createElement("article");
+        el.className = "admin-post" + (mine ? " is-mine" : "");
+        var who = document.createElement("div");
+        who.className = "admin-post__who";
+        var timeStr = "";
+        try {
+          timeStr = new Date(post.created_at).toLocaleTimeString("de-DE", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Europe/Berlin"
+          });
+        } catch (eTime) {}
+        who.textContent = (mine ? "Du (Trainer)" : adminFirstName(post.author_id)) +
+          (timeStr ? " · " + timeStr : "");
+        if (post.reply_to_id) {
+          who.textContent += " → " + (String(post.reply_to_id) === String(primary)
+            ? adminFirstName(primary)
+            : adminFirstName(post.reply_to_id));
+        }
+        el.appendChild(who);
+        if (post.photo_url) {
+          var img = document.createElement("img");
+          img.className = "admin-post__photo";
+          img.src = post.photo_url;
+          img.alt = "";
+          el.appendChild(img);
+        }
+        if (post.body) {
+          var body = document.createElement("p");
+          body.className = "admin-post__body";
+          body.textContent = post.body;
+          el.appendChild(body);
+        }
+        wrap.appendChild(el);
+      }
+
+      function appendAdminDayCard(feed, key, posts) {
+        var card = document.createElement("article");
+        card.className = "admin-day-card";
+        card.setAttribute("data-day", key);
+        var chatOpen = isAdminDayChatOpen(key);
+        var lines = adminWorkoutLinesForDate(key);
+
+        var head = document.createElement("div");
+        head.className = "admin-day-card__head";
+        var cal = document.createElement("span");
+        cal.className = "admin-day-card__cal";
+        cal.textContent = adminDayShortLabel(key);
+        var textWrap = document.createElement("div");
+        textWrap.className = "admin-day-card__text";
+        var workout = document.createElement("p");
+        workout.className = "admin-day-card__workout";
+        workout.textContent = lines.title;
+        var meta = document.createElement("p");
+        meta.className = "admin-day-card__meta";
+        meta.textContent = lines.meta;
+        textWrap.appendChild(workout);
+        if (lines.meta) textWrap.appendChild(meta);
+        head.appendChild(cal);
+        head.appendChild(textWrap);
+        card.appendChild(head);
+
+        var dayHeroPost = adminLatestPhotoPostForDay(posts, key);
+        if (dayHeroPost && dayHeroPost.photo_url) {
+          var photoWrap = document.createElement("div");
+          photoWrap.className = "admin-day-card__photo-wrap";
+          var photo = document.createElement("img");
+          photo.className = "admin-day-card__photo";
+          photo.src = dayHeroPost.photo_url;
+          photo.alt = "Tagesfoto";
+          photoWrap.appendChild(photo);
+          card.appendChild(photoWrap);
+        }
+
+        var chatToggle = document.createElement("button");
+        chatToggle.type = "button";
+        chatToggle.className = "admin-day-card__chat-toggle" + (chatOpen ? " is-open" : "");
+        chatToggle.setAttribute("aria-expanded", chatOpen ? "true" : "false");
+        chatToggle.innerHTML =
+          '<span>Chat</span><span class="admin-day-card__chat-arrow" aria-hidden="true">▼</span>';
+        chatToggle.addEventListener("click", function () {
+          toggleAdminDayChat(key);
+        });
+        card.appendChild(chatToggle);
+
+        if (chatOpen) {
+          var postsWrap = document.createElement("div");
+          postsWrap.className = "admin-day-card__posts";
+          var heroId = dayHeroPost && dayHeroPost.id ? String(dayHeroPost.id) : "";
+          var heroUrl = dayHeroPost && dayHeroPost.photo_url ? String(dayHeroPost.photo_url) : "";
+          var dayPosts = (posts || []).filter(function (p) {
+            if (!p || berlinDateKeyFromIso(p.created_at) !== key) return false;
+            if (heroId && p.id && String(p.id) === heroId) return false;
+            if (heroUrl && p.photo_url && String(p.photo_url) === heroUrl && !String(p.body || "").trim()) {
+              return false;
+            }
+            return true;
+          }).sort(function (a, b) {
+            return adminPostTimeMs(b.created_at) - adminPostTimeMs(a.created_at);
+          });
+          for (var i = 0; i < dayPosts.length; i++) {
+            appendAdminPostEl(postsWrap, dayPosts[i]);
+          }
+          card.appendChild(postsWrap);
+        }
+        feed.appendChild(card);
+      }
+
+      function renderAdminDayFeed() {
+        var feed = document.getElementById("admin-feed");
+        if (!feed) return;
+        feed.innerHTML = "";
+        var posts = adminMirroredPosts || [];
+        if (!posts.length) {
+          feed.innerHTML = '<p class="empty">Noch kein Community-Verlauf.</p>';
+          return;
+        }
+        var dayKeys = adminFeedDayKeys(posts);
+        if (!dayKeys.length) dayKeys = [berlinTodayKeyAdmin()];
+        for (var d = 0; d < dayKeys.length; d++) {
+          appendAdminDayCard(feed, dayKeys[d], posts);
+        }
+        feed.scrollTop = 0;
+      }
+
       async function renderMirroredFeed(account) {
         var feed = document.getElementById("admin-feed");
         if (!feed) return;
         feed.innerHTML = "";
+        adminMirroredPosts = [];
+        adminOpenDayKeys = {};
         var ids = (activeAccountIds && activeAccountIds.length)
           ? activeAccountIds.slice().map(String)
           : (account && account.id && String(account.id).indexOf("local-") !== 0 ? [String(account.id)] : []);
@@ -4827,8 +5246,6 @@
           var coach = await resolveCoachAccount();
           var coachId = coach && coach.id ? String(coach.id) : null;
           var buddyIds = await loadUserBuddyIds(ids[0]);
-          /* Wie Account-Community: Coach NICHT in author_id — sonst sieht jeder Admin
-             alle Trainer-Nachrichten. Trainer nur via reply_to an diesen Nutzer. */
           var authorIds = [];
           var seenAuth = {};
           ids.concat(buddyIds || []).forEach(function (id) {
@@ -4853,11 +5270,8 @@
             var isUser = ids.indexOf(author) >= 0;
             var replyToUser = !!(replyTo && ids.indexOf(replyTo) >= 0);
             var inCircle = authorIds.indexOf(author) >= 0;
-            /* Trainer nur an diesen Nutzer */
             if (coachId && author === coachId) return replyToUser;
-            /* Gerichtete Nachricht: nur wenn dieser Nutzer Absender oder Empfänger ist */
             if (replyTo) return isUser || replyToUser;
-            /* Sonstige Aktivität (z. B. Check-in): Nutzer oder seine Buddies */
             return inCircle;
           });
           if (!rows.length) {
@@ -4890,39 +5304,9 @@
               if (p && p.id && p.name) nameById[String(p.id)] = p.name;
             });
           } catch (eNames) {}
-          var primary = ids[0];
-          function firstName(id) {
-            var n = nameById[String(id)] || "";
-            return String(n).trim().split(/\s+/)[0] || "Nutzer";
-          }
-          rows.forEach(function (post) {
-            if (!post) return;
-            var mine = !!(coachId && String(post.author_id) === coachId);
-            var el = document.createElement("article");
-            el.className = "admin-post" + (mine ? " is-mine" : "");
-            var who = document.createElement("div");
-            who.className = "admin-post__who";
-            who.textContent = mine ? "Du (Trainer)" : firstName(post.author_id);
-            if (post.reply_to_id) {
-              who.textContent += " → " + (String(post.reply_to_id) === String(primary) ? firstName(primary) : firstName(post.reply_to_id));
-            }
-            el.appendChild(who);
-            if (post.photo_url) {
-              var img = document.createElement("img");
-              img.className = "admin-post__photo";
-              img.src = post.photo_url;
-              img.alt = "";
-              el.appendChild(img);
-            }
-            if (post.body) {
-              var body = document.createElement("p");
-              body.className = "admin-post__body";
-              body.textContent = post.body;
-              el.appendChild(body);
-            }
-            feed.appendChild(el);
-          });
-          feed.scrollTop = 0;
+          adminMirroredPosts = rows;
+          adminFeedMeta = { nameById: nameById, coachId: coachId, primaryId: ids[0] };
+          renderAdminDayFeed();
         } catch (e) {
           feed.innerHTML = '<p class="empty">Feed nicht geladen.</p>';
         }
