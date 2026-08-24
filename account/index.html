@@ -4178,8 +4178,26 @@
       overflow: auto;
       -webkit-overflow-scrolling: touch;
     }
+    .app-greeting__dither {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background-color: var(--red);
+      background-size: cover;
+      background-position: center;
+      opacity: 0.42;
+      pointer-events: none;
+    }
+    .app-greeting__dither::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(199, 65, 59, 0.55) 0%, rgba(199, 65, 59, 0.82) 100%);
+    }
     .app-greeting.is-open { display: flex; }
     .app-greeting__inner {
+      position: relative;
+      z-index: 1;
       width: min(100%, 440px);
       margin: 0 auto;
       min-height: 100%;
@@ -4197,92 +4215,59 @@
       max-width: 15.4em;
       margin: 0 0 10px;
     }
-    .app-greeting__lede {
-      font-size: clamp(0.92rem, 3.4vw, 1.02rem);
-      font-weight: 500;
-      letter-spacing: -0.02em;
-      line-height: 1.4;
-      opacity: 0.95;
-      max-width: 19.6em;
-      margin: 0 0 8px;
-    }
-    .app-greeting__ctas {
-      position: relative;
-      width: min(100%, 400px);
-      height: min(56vh, 460px);
-      flex: 1 1 auto;
-      margin: 6px auto 8px;
-    }
-    .app-greeting__cta {
-      position: absolute;
-      width: 153px;
-      height: 153px;
-      padding: 0;
-      border: 0;
-      border-radius: 50%;
-      background: transparent;
-      color: var(--ink-on-red);
-      cursor: pointer;
-      display: grid;
-      place-items: center;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .app-greeting__cta:nth-child(1) {
-      left: 0%;
-      top: 0%;
-      width: 164px;
-      height: 164px;
-    }
-    .app-greeting__cta:nth-child(2) {
-      right: -2%;
-      top: 8%;
-      left: auto;
-      width: 174px;
-      height: 174px;
-    }
-    .app-greeting__cta:nth-child(3) {
-      left: 4%;
-      top: 36%;
-      width: 168px;
-      height: 168px;
-    }
-    .app-greeting__cta:nth-child(4) {
-      right: 2%;
-      top: 42%;
-      left: auto;
-      width: 160px;
-      height: 160px;
-    }
-    .app-greeting__cta:nth-child(5) {
-      left: 28%;
-      top: 68%;
-      width: 156px;
-      height: 156px;
-    }
-    .app-greeting__cta-rays {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-    .app-greeting__cta-label {
-      position: relative;
-      z-index: 1;
-      display: block;
-      width: 58%;
-      max-width: 5.2em;
-      font: inherit;
-      font-size: clamp(0.78rem, 3vw, 0.92rem);
+    .app-greeting__slogan {
+      font-family: "Space Grotesk", system-ui, sans-serif;
+      font-size: clamp(1.05rem, 4.2vw, 1.35rem);
       font-weight: 700;
       letter-spacing: -0.03em;
       line-height: 1.15;
-      text-align: center;
-      white-space: pre-line;
-      pointer-events: none;
+      margin: 0 0 16px;
+      max-width: 16em;
     }
-    .app-greeting__cta:active .app-greeting__cta-rays {
-      opacity: 0.85;
+    .app-greeting__wheel {
+      position: relative;
+      width: min(calc(100vw - 36px), 400px);
+      aspect-ratio: 1 / 1;
+      flex: 1 1 auto;
+      max-height: min(52vh, 400px);
+      margin: 4px auto 10px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .app-greeting__wheel:focus-visible {
+      outline: 2px solid var(--ink-on-red);
+      outline-offset: 4px;
+    }
+    .app-greeting__wheel-rays {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .app-greeting__wheel-rays.is-spinning {
+      animation: greeting-cycle-spin 120s linear infinite;
+    }
+    @keyframes greeting-cycle-spin {
+      to { transform: rotate(360deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .app-greeting__wheel-rays.is-spinning { animation: none; }
+    }
+    .app-greeting__wheel-label {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 68%;
+      font-family: "Space Grotesk", system-ui, sans-serif;
+      font-size: clamp(1.05rem, 4.5vw, 1.55rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.12;
+      pointer-events: none;
     }
     .app-greeting__mantra {
       margin-top: auto;
@@ -4659,35 +4644,14 @@
   </div>
 
   <div class="app-greeting" id="app-greeting" hidden aria-hidden="true">
+    <div class="app-greeting__dither" id="greeting-dither" aria-hidden="true"></div>
     <div class="app-greeting__inner">
       <p class="app-greeting__hello" id="greeting-hello"></p>
-      <p class="app-greeting__lede" id="greeting-lede"></p>
-      <div class="app-greeting__ctas" id="greeting-ctas">
-        <button class="app-greeting__cta" type="button" data-greeting-goto="home" aria-label="Beweg Dich">
-          <svg class="app-greeting__cta-rays" viewBox="0 0 120 120" aria-hidden="true"></svg>
-          <span class="app-greeting__cta-label" data-de="Beweg Dich" data-en="Move">Beweg Dich</span>
-        </button>
-        <button class="app-greeting__cta" type="button" data-greeting-goto="community" aria-label="Schreib Deinem Trainer">
-          <svg class="app-greeting__cta-rays" viewBox="0 0 120 120" aria-hidden="true"></svg>
-          <span class="app-greeting__cta-label" data-de="Schreib Deinem&#10;Trainer" data-en="Message your&#10;trainer">Schreib Deinem
-Trainer</span>
-        </button>
-        <button class="app-greeting__cta" type="button" data-greeting-goto="profile" aria-label="Deine Challenge">
-          <svg class="app-greeting__cta-rays" viewBox="0 0 120 120" aria-hidden="true"></svg>
-          <span class="app-greeting__cta-label" data-de="Deine&#10;Challenge" data-en="Your&#10;Challenge">Deine
-Challenge</span>
-        </button>
-        <button class="app-greeting__cta" type="button" data-greeting-goto="profile" aria-label="PT buchen">
-          <svg class="app-greeting__cta-rays" viewBox="0 0 120 120" aria-hidden="true"></svg>
-          <span class="app-greeting__cta-label" data-de="PT&#10;buchen" data-en="Book&#10;PT">PT
-buchen</span>
-        </button>
-        <button class="app-greeting__cta" type="button" data-greeting-goto="training" aria-label="einfach browsen">
-          <svg class="app-greeting__cta-rays" viewBox="0 0 120 120" aria-hidden="true"></svg>
-          <span class="app-greeting__cta-label" data-de="einfach&#10;browsen" data-en="just&#10;browse">einfach
-browsen</span>
-        </button>
-      </div>
+      <p class="app-greeting__slogan" id="greeting-slogan" data-de="Los geht's — Bewegung und Verbindung." data-en="Let's go — movement and connection.">Los geht's — Bewegung und Verbindung.</p>
+      <button class="app-greeting__wheel" type="button" id="greeting-wheel" data-greeting-goto="community" aria-label="Zur Community" data-aria-de="Zur Community" data-aria-en="Open community">
+        <svg class="app-greeting__wheel-rays is-spinning" id="greeting-wheel-rays" viewBox="0 0 240 240" aria-hidden="true"></svg>
+        <span class="app-greeting__wheel-label" data-de="Challenge Deinen Bewegungsmangel" data-en="Challenge your lack of movement">Challenge Deinen Bewegungsmangel</span>
+      </button>
       <p class="app-greeting__mantra" id="greeting-mantra"></p>
     </div>
   </div>
@@ -10030,12 +9994,9 @@ browsen</span>
 
           var altEl = document.createElement("div");
           altEl.className = "profile-plan__calendar-unit";
-          if (unitsPair && unitsPair.alternative) {
-            altEl.textContent = unitEmojiFor(unitsPair.alternative) + " " + localizePlanLabel(unitsPair.alternative.label || "");
-            altEl.title = localizePlanLabel(unitsPair.alternative.label || "");
-          } else {
-            altEl.textContent = "—";
-          }
+          var altUnit = (unitsPair && unitsPair.alternative) || defaultAlternativeUnit(unitsPair && unitsPair.workout);
+          altEl.textContent = unitEmojiFor(altUnit) + " " + localizePlanLabel(altUnit.label || "");
+          altEl.title = localizePlanLabel(altUnit.label || "");
           altCells.push(altEl);
 
           var placeBtn = document.createElement("button");
@@ -12722,7 +12683,10 @@ browsen</span>
           planEditKind = null;
           planEditTemplate = null;
           var existing = dayUnitsFor(planEditWeekday);
-          planEditAltKind = matchAlternativeOption(existing && existing.alternative).kind;
+          planEditAltKind = "walk";
+          if (existing && existing.alternative) {
+            planEditAltKind = matchAlternativeOption(existing.alternative).kind;
+          }
           document.querySelectorAll("#plan-edit-options .plan-edit-opt").forEach(function (btn) {
             btn.classList.remove("is-on");
           });
@@ -15605,6 +15569,7 @@ browsen</span>
           verifyAccountStillExists().catch(function () {});
           refreshLinkedProfilesFromCloud().catch(function () {});
           loadWorkoutInvites().catch(function () {});
+          maybeShowGreetingOnResume();
         }
       });
       window.addEventListener("pageshow", function () {
@@ -15612,6 +15577,7 @@ browsen</span>
         verifyAccountStillExists().catch(function () {});
         refreshLinkedProfilesFromCloud().catch(function () {});
         loadWorkoutInvites().catch(function () {});
+        maybeShowGreetingOnResume();
       });
       window.addEventListener("focus", restoreShareModalAfterCamera);
 
@@ -15687,22 +15653,54 @@ browsen</span>
         return list[(new Date()).getDay()] || t("heute", "today");
       }
 
-      function drawGreetingCtaRays() {
-        var root = document.getElementById("greeting-ctas");
-        if (!root) return;
-        var svgs = root.querySelectorAll(".app-greeting__cta-rays");
-        /* Strahlen 0.7× der alten Länge (24 → ~16.8), Hub größer für Text */
-        for (var i = 0; i < svgs.length; i++) {
-          drawCycle(svgs[i], {
-            cx: 60,
-            cy: 60,
-            inner: 35.2,
-            outer: 52,
-            count: 20,
-            stroke: "rgba(247,245,240,0.92)",
-            strokeWidth: "2.2"
-          });
+      function drawGreetingWheel() {
+        var svg = document.getElementById("greeting-wheel-rays");
+        if (!svg || typeof drawCycle !== "function") return;
+        var count = 28;
+        var pool = [];
+        for (var i = 0; i < count; i++) pool.push(i);
+        for (var r = pool.length - 1; r > 0; r--) {
+          var j = Math.floor(Math.random() * (r + 1));
+          var tmp = pool[r];
+          pool[r] = pool[j];
+          pool[j] = tmp;
         }
+        var litCount = 16 + Math.floor(Math.random() * 6);
+        var filled = {};
+        for (var k = 0; k < litCount; k++) filled[pool[k]] = true;
+        drawCycle(svg, {
+          cx: 120,
+          cy: 120,
+          inner: 90,
+          outer: 112,
+          count: count,
+          gray: "rgba(247,245,240,0.28)",
+          lit: "#F7F5F0",
+          filled: filled,
+          strokeWidth: "3"
+        });
+      }
+
+      var GREETING_DITHER_IMAGES = [
+        "/assets/go/gogogo-dithering/gogogo-dither-Patch-1.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-Bikes.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-Patch3.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-RS.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-biigJ_1.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-biigJ_2.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-biigJ_3.png"
+      ];
+
+      function applyGreetingDither() {
+        var el = document.getElementById("greeting-dither");
+        if (!el || !GREETING_DITHER_IMAGES.length) return;
+        var pick = GREETING_DITHER_IMAGES[Math.floor(Math.random() * GREETING_DITHER_IMAGES.length)];
+        el.style.backgroundImage = "url(" + pick + ")";
+      }
+
+      function refreshAppLanding() {
+        applyGreetingDither();
+        drawGreetingWheel();
       }
 
       function updateGreetingMantra() {
@@ -15713,23 +15711,14 @@ browsen</span>
 
       function fillGreetingCopy() {
         var hello = document.getElementById("greeting-hello");
-        var lede = document.getElementById("greeting-lede");
         var first = firstNameOf(account);
-        var trainer = firstNameOf(getDisplayCoach());
         if (hello) {
           hello.textContent = uiLang === "en"
             ? ("Hi " + first + ", how are you today on " + weekdayDeToday() + "?")
             : ("Hallo " + first + ", wie geht es Dir, heute am " + weekdayDeToday() + "?");
         }
-        if (lede) {
-          lede.textContent = uiLang === "en"
-            ? ("I am not an AI — I am your direct line to " + trainer +
-              ". Why? Because two things are essential for a fulfilled life. Movement and connection.")
-            : ("Ich bin keine KI sondern Dein direkter Draht zu " + trainer +
-              ". Warum? Weil zwei Dinge essenziell für ein zufriedenes Leben sind. Bewegung und Verbindung.");
-        }
         updateGreetingMantra();
-        drawGreetingCtaRays();
+        refreshAppLanding();
       }
 
       function hideGreeting() {
@@ -15740,7 +15729,28 @@ browsen</span>
           el.setAttribute("aria-hidden", "true");
         }
         document.body.classList.remove("is-greeting");
-        try { sessionStorage.setItem(GREETING_SEEN_KEY, "1"); } catch (e) {}
+      }
+
+      function canShowAppLanding() {
+        if (accountSessionBlocked || !account) return false;
+        if (!isAppTourDone() || needsOnboarding()) return false;
+        if (getStaffCalendarMode()) return false;
+        var tour = document.getElementById("app-tour");
+        if (tour && tour.classList.contains("is-open")) return false;
+        var onboarding = document.getElementById("app-onboarding");
+        if (onboarding && onboarding.classList.contains("is-open")) return false;
+        var deep = "";
+        try {
+          deep = String(new URLSearchParams(location.search || "").get("goto") || "").trim();
+        } catch (eDeep) {}
+        return !deep;
+      }
+
+      function maybeShowGreetingOnResume() {
+        if (!canShowAppLanding()) return;
+        var el = document.getElementById("app-greeting");
+        if (el && el.classList.contains("is-open")) return;
+        maybeShowGreeting();
       }
 
       function needsOnboarding() {
@@ -15781,7 +15791,6 @@ browsen</span>
         account.onboarding_completed = true;
         saveAccount();
         hideOnboarding();
-        try { sessionStorage.setItem(GREETING_SEEN_KEY, "1"); } catch (e0) {}
         if (hasCloudAccount()) {
           try {
             await fetch(SUPABASE_URL + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(account.id), {
@@ -15803,7 +15812,10 @@ browsen</span>
           } catch (ePatch) {}
         }
         if (opts.startTour) startAppTour();
-        else checkPendingBuddyChallengePopup();
+        else {
+          checkPendingBuddyChallengePopup();
+          maybeShowGreeting();
+        }
       }
 
       function renderOnboardingPlaces() {
@@ -15951,6 +15963,7 @@ browsen</span>
           window.setTimeout(function () { showOnboarding(); }, 120);
         } else {
           checkPendingBuddyChallengePopup();
+          maybeShowGreeting();
         }
       }
 
@@ -16016,9 +16029,6 @@ browsen</span>
           hideGreeting();
           return;
         }
-        var seen = false;
-        try { seen = sessionStorage.getItem(GREETING_SEEN_KEY) === "1"; } catch (e1) {}
-        if (seen) return;
         fillGreetingCopy();
         var el = document.getElementById("app-greeting");
         if (!el) return;
@@ -18252,6 +18262,9 @@ browsen</span>
         function appendCalendarUnitButton(rowEl, key, wd, slot, w) {
           var pairCell = dayUnitsFor(wd);
           var unit = pairCell ? pairCell[slot] : null;
+          if (slot === "alternative") {
+            unit = unit || defaultAlternativeUnit(pairCell && pairCell.workout);
+          }
           var btn = document.createElement("button");
           btn.type = "button";
           btn.className = "home-cal__unit-btn";
