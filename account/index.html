@@ -4256,23 +4256,23 @@
       white-space: pre-line;
       pointer-events: none;
     }
-    .app-greeting__slogan {
+    .app-greeting__mantra {
       flex: 1 1 auto;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-family: "Space Grotesk", system-ui, sans-serif;
+      font-family: "Instrument Serif", "Times New Roman", serif;
       font-size: clamp(1.05rem, 4.2vw, 1.35rem);
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.2;
+      font-weight: 400;
+      font-style: italic;
+      letter-spacing: -0.01em;
+      line-height: 1.35;
+      white-space: pre-line;
       margin: 0;
       padding: 8px 8px 0;
-      max-width: 16em;
+      max-width: 18em;
       min-height: 0;
-    }
-    .app-greeting__mantra {
-      display: none;
+      opacity: 0.95;
     }
     body.is-greeting .site-chrome,
     body.is-greeting .site-chrome--top {
@@ -4641,8 +4641,7 @@
         <svg class="app-greeting__wheel-rays is-spinning" id="greeting-wheel-rays" viewBox="0 0 240 240" aria-hidden="true"></svg>
         <span class="app-greeting__wheel-label" id="greeting-hello"></span>
       </button>
-      <p class="app-greeting__slogan" id="greeting-slogan" data-de="Los geht's — Bewegung und Verbindung." data-en="Let's go — movement and connection.">Los geht's — Bewegung und Verbindung.</p>
-      <p class="app-greeting__mantra" id="greeting-mantra" hidden></p>
+      <p class="app-greeting__mantra" id="greeting-mantra"></p>
     </div>
   </div>
 
@@ -8763,6 +8762,7 @@
         mantraRotateIndex = Math.floor(Date.now() / 8000) % pool.length;
         var bio = document.getElementById("profile-bio");
         if (bio && !mantraEditMode) bio.textContent = getRotatingMantraText();
+        updateGreetingMantra();
         mantraRotateTimer = setInterval(function () {
           if (getOwnMantraText() || mantraEditMode) {
             stopMantraRotation();
@@ -8773,6 +8773,7 @@
           mantraRotateIndex = (mantraRotateIndex + 1) % poolNow.length;
           var el = document.getElementById("profile-bio");
           if (el) el.textContent = getRotatingMantraText();
+          updateGreetingMantra();
         }, 8000);
       }
 
@@ -15696,7 +15697,9 @@
       function updateGreetingMantra() {
         var el = document.getElementById("greeting-mantra");
         if (!el) return;
-        el.textContent = getOwnMantraText() || getRotatingMantraText() || "";
+        var text = getOwnMantraText() || getRotatingMantraText() || "";
+        el.textContent = text;
+        el.hidden = !text;
       }
 
       function fillGreetingCopy() {
