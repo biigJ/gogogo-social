@@ -4198,25 +4198,36 @@
       display: flex;
       flex-direction: column;
     }
+    /*
+      Layout: Rädchen sitzt bei 40 % von oben (d.h. ~10 % über Mitte).
+      Mantra füllt den Raum darunter bis zum unteren Rand.
+      Wir teilen den Innenraum in 2 Teile:
+        - oberer Spacer:  flex 0.4
+        - Rädchen:        flex 0 (feste Größe)
+        - unterer Bereich (Mantra): flex 0.6
+    */
     .app-greeting__inner {
       position: relative;
       z-index: 1;
       width: min(100%, 440px);
       flex: 1 1 auto;
-      height: 100%;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
     }
+    .app-greeting__spacer {
+      flex: 0.8;
+      min-height: 0;
+    }
     .app-greeting__wheel {
       position: relative;
-      width: min(calc(100vw - 36px), calc(100svh - 220px), 400px);
+      /* Rädchen: so groß wie möglich, ohne Mantra zu verdrängen.
+         Breite: Viewport minus Ränder, Höhe: max 58 svh so dass Mantra Platz hat */
+      width: min(calc(100vw - 36px), 58svh, 400px);
       aspect-ratio: 1 / 1;
       flex: 0 0 auto;
-      max-height: 62svh;
-      margin: 0 auto;
       padding: 0;
       border: 0;
       background: transparent;
@@ -4247,17 +4258,19 @@
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      width: 72%;
+      /* Innendurchmesser des Rädchens ≈ 75 % des SVG (Strahlen bei ~75 %) */
+      width: 62%;
       font-family: "Space Grotesk", system-ui, sans-serif;
-      font-size: clamp(0.86rem, 3.5vw, 1.12rem);
-      font-weight: 600;
+      /* 2× größer als vorher: war 0.86–1.12 rem → jetzt 1.72–2.24 rem */
+      font-size: clamp(1.05rem, 5.5vw, 1.65rem);
+      font-weight: 700;
       letter-spacing: -0.03em;
-      line-height: 1.28;
+      line-height: 1.22;
       white-space: pre-line;
       pointer-events: none;
     }
     .app-greeting__mantra {
-      flex: 1 1 auto;
+      flex: 1.2;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -4637,6 +4650,7 @@
   <div class="app-greeting" id="app-greeting" hidden aria-hidden="true">
     <div class="app-greeting__dither" id="greeting-dither" aria-hidden="true"></div>
     <div class="app-greeting__inner">
+      <div class="app-greeting__spacer" aria-hidden="true"></div>
       <button class="app-greeting__wheel" type="button" id="greeting-wheel" data-greeting-goto="community" aria-label="Zur Community" data-aria-de="Zur Community" data-aria-en="Open community">
         <svg class="app-greeting__wheel-rays is-spinning" id="greeting-wheel-rays" viewBox="0 0 240 240" aria-hidden="true"></svg>
         <span class="app-greeting__wheel-label" id="greeting-hello"></span>
@@ -15709,8 +15723,8 @@
         var day = weekdayDeToday();
         if (hello) {
           hello.textContent = uiLang === "en"
-            ? ("Hi " + first + ", how are you today on " + day + "?\nThis is not an AI but the direct line to " + trainer + " and movement buddies.")
-            : ("Hallo " + first + ", wie geht's dir heute am " + day + "?\nDies ist keine KI sondern der direkte Draht zu " + trainer + " und Bewegungsbuddies.");
+            ? ("Hi " + first + ",\nwow are you today\non " + day + "?\n\nNot an AI —\nyour direct line\nto " + trainer + " &\nmovement buddies.")
+            : ("Hallo " + first + ",\nwie geht's dir\nheute am " + day + "?\n\nKeine KI —\ndein direkter Draht\nzu " + trainer + "\nund Bewegungsbuddies.");
         }
         updateGreetingMantra();
         refreshAppLanding();
