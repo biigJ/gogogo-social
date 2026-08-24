@@ -4172,18 +4172,18 @@
       background: var(--red);
       color: var(--ink-on-red);
       padding:
-        calc(20px + env(safe-area-inset-top, 0px))
+        calc(16px + env(safe-area-inset-top, 0px))
         18px
-        calc(20px + env(safe-area-inset-bottom, 0px));
-      overflow: auto;
-      -webkit-overflow-scrolling: touch;
+        calc(16px + env(safe-area-inset-bottom, 0px));
+      overflow: hidden;
     }
     .app-greeting__dither {
       position: absolute;
       inset: 0;
       z-index: 0;
       background-color: var(--red);
-      background-size: cover;
+      background-size: auto 100%;
+      background-repeat: no-repeat;
       background-position: center;
       opacity: 0.42;
       pointer-events: none;
@@ -4194,43 +4194,29 @@
       inset: 0;
       background: linear-gradient(180deg, rgba(199, 65, 59, 0.55) 0%, rgba(199, 65, 59, 0.82) 100%);
     }
-    .app-greeting.is-open { display: flex; }
+    .app-greeting.is-open {
+      display: flex;
+      flex-direction: column;
+    }
     .app-greeting__inner {
       position: relative;
       z-index: 1;
       width: min(100%, 440px);
+      flex: 1 1 auto;
+      height: 100%;
       margin: 0 auto;
-      min-height: 100%;
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      padding-top: 8px;
-    }
-    .app-greeting__hello {
-      font-size: clamp(1.2rem, 4.6vw, 1.55rem);
-      font-weight: 700;
-      letter-spacing: -0.04em;
-      line-height: 1.25;
-      max-width: 15.4em;
-      margin: 0 0 10px;
-    }
-    .app-greeting__slogan {
-      font-family: "Space Grotesk", system-ui, sans-serif;
-      font-size: clamp(1.05rem, 4.2vw, 1.35rem);
-      font-weight: 700;
-      letter-spacing: -0.03em;
-      line-height: 1.15;
-      margin: 0 0 16px;
-      max-width: 16em;
     }
     .app-greeting__wheel {
       position: relative;
-      width: min(calc(100vw - 36px), 400px);
+      width: min(calc(100vw - 36px), calc(100svh - 220px), 400px);
       aspect-ratio: 1 / 1;
-      flex: 1 1 auto;
-      max-height: min(52vh, 400px);
-      margin: 4px auto 10px;
+      flex: 0 0 auto;
+      max-height: 62svh;
+      margin: 0 auto;
       padding: 0;
       border: 0;
       background: transparent;
@@ -4261,27 +4247,32 @@
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
-      width: 68%;
+      width: 72%;
       font-family: "Space Grotesk", system-ui, sans-serif;
-      font-size: clamp(1.05rem, 4.5vw, 1.55rem);
-      font-weight: 700;
+      font-size: clamp(0.86rem, 3.5vw, 1.12rem);
+      font-weight: 600;
       letter-spacing: -0.03em;
-      line-height: 1.12;
+      line-height: 1.28;
+      white-space: pre-line;
       pointer-events: none;
     }
+    .app-greeting__slogan {
+      flex: 1 1 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: "Space Grotesk", system-ui, sans-serif;
+      font-size: clamp(1.05rem, 4.2vw, 1.35rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.2;
+      margin: 0;
+      padding: 8px 8px 0;
+      max-width: 16em;
+      min-height: 0;
+    }
     .app-greeting__mantra {
-      margin-top: auto;
-      padding: 12px 8px 4px;
-      font-family: "Instrument Serif", "Times New Roman", serif;
-      font-size: clamp(1.05rem, 4vw, 1.25rem);
-      font-weight: 400;
-      font-style: italic;
-      letter-spacing: -0.01em;
-      line-height: 1.35;
-      white-space: pre-line;
-      opacity: 0.95;
-      max-width: 22em;
-      text-align: center;
+      display: none;
     }
     body.is-greeting .site-chrome,
     body.is-greeting .site-chrome--top {
@@ -4646,13 +4637,12 @@
   <div class="app-greeting" id="app-greeting" hidden aria-hidden="true">
     <div class="app-greeting__dither" id="greeting-dither" aria-hidden="true"></div>
     <div class="app-greeting__inner">
-      <p class="app-greeting__hello" id="greeting-hello"></p>
-      <p class="app-greeting__slogan" id="greeting-slogan" data-de="Los geht's — Bewegung und Verbindung." data-en="Let's go — movement and connection.">Los geht's — Bewegung und Verbindung.</p>
       <button class="app-greeting__wheel" type="button" id="greeting-wheel" data-greeting-goto="community" aria-label="Zur Community" data-aria-de="Zur Community" data-aria-en="Open community">
         <svg class="app-greeting__wheel-rays is-spinning" id="greeting-wheel-rays" viewBox="0 0 240 240" aria-hidden="true"></svg>
-        <span class="app-greeting__wheel-label" data-de="Challenge Deinen Bewegungsmangel" data-en="Challenge your lack of movement">Challenge Deinen Bewegungsmangel</span>
+        <span class="app-greeting__wheel-label" id="greeting-hello"></span>
       </button>
-      <p class="app-greeting__mantra" id="greeting-mantra"></p>
+      <p class="app-greeting__slogan" id="greeting-slogan" data-de="Los geht's — Bewegung und Verbindung." data-en="Let's go — movement and connection.">Los geht's — Bewegung und Verbindung.</p>
+      <p class="app-greeting__mantra" id="greeting-mantra" hidden></p>
     </div>
   </div>
 
@@ -15712,10 +15702,12 @@
       function fillGreetingCopy() {
         var hello = document.getElementById("greeting-hello");
         var first = firstNameOf(account);
+        var trainer = firstNameOf(getDisplayCoach());
+        var day = weekdayDeToday();
         if (hello) {
           hello.textContent = uiLang === "en"
-            ? ("Hi " + first + ", how are you today on " + weekdayDeToday() + "?")
-            : ("Hallo " + first + ", wie geht es Dir, heute am " + weekdayDeToday() + "?");
+            ? ("Hi " + first + ", how are you today on " + day + "?\nThis is not an AI but the direct line to " + trainer + " and movement buddies.")
+            : ("Hallo " + first + ", wie geht's dir heute am " + day + "?\nDies ist keine KI sondern der direkte Draht zu " + trainer + " und Bewegungsbuddies.");
         }
         updateGreetingMantra();
         refreshAppLanding();
