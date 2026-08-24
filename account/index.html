@@ -1098,11 +1098,32 @@
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
+    .profile-referral {
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 36px;
+      height: 36px;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--ink-on-red);
+      opacity: 0.92;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .profile-referral svg,
     .profile-settings svg {
       width: 1.2rem;
       height: 1.2rem;
       display: block;
     }
+    .profile-referral:focus-visible,
     .profile-settings:focus-visible {
       outline: 1px solid rgba(247, 245, 240, 0.85);
       outline-offset: 2px;
@@ -4799,6 +4820,9 @@ browsen</span>
           </svg>
         </div>
         <div class="profile-name-row">
+          <button class="profile-referral" id="profile-refer-btn" type="button" aria-label="Freund einladen" data-aria-de="Freund einladen" data-aria-en="Invite friend">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4Zm-9 0c2.21 0 4-1.79 4-4S8.21 4 6 4 2 5.79 2 8s1.79 4 4 4Zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4Zm9 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45v2h6v-2c0-2.66-5.33-4-8-4Z"/></svg>
+          </button>
           <h1 class="profile-name" id="profile-name"></h1>
           <button class="profile-settings" id="profile-settings-btn" type="button" aria-label="Menü" aria-haspopup="dialog" aria-expanded="false">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 7h16v1.8H4V7Zm0 4.1h16v1.8H4v-1.8Zm0 4.1h16V17H4v-1.8Z"/></svg>
@@ -5450,6 +5474,7 @@ browsen</span>
           <p class="profile-settings-menu__label" data-de="App" data-en="App">App</p>
           <div class="profile-settings-menu__grid">
             <button class="profile-settings-menu__btn" type="button" id="profile-calendar-settings-btn" data-de="Kalender" data-en="Calendar">Kalender</button>
+            <button class="profile-settings-menu__btn" type="button" id="profile-app-tour-btn" data-de="App Tour" data-en="App tour">App Tour</button>
             <button class="profile-settings-menu__btn" type="button" id="profile-push-toggle-btn" data-de="Push: aus" data-en="Push: off">Push: aus</button>
           </div>
         </div>
@@ -5500,6 +5525,20 @@ browsen</span>
       <div class="challenge-modal__actions">
         <button type="button" class="challenge-modal__btn is-ghost" id="profile-change-phone-cancel" data-de="Abbrechen" data-en="Cancel">Abbrechen</button>
         <button type="button" class="challenge-modal__btn" id="profile-change-phone-save" data-de="Speichern" data-en="Save">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="challenge-modal" id="profile-refer-modal" hidden aria-hidden="true">
+    <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="profile-refer-title">
+      <p class="challenge-modal__title" id="profile-refer-title" data-de="Freund einladen" data-en="Invite friend">Freund einladen</p>
+      <p style="font-size:0.92rem;line-height:1.4;margin-bottom:8px" data-de="Vorname und Mobilnummer — wir schicken den Einladungscode per SMS." data-en="First name and mobile — we'll send the invite code via SMS.">Vorname und Mobilnummer — wir schicken den Einladungscode per SMS.</p>
+      <input class="profile-settings-field" id="profile-refer-name" type="text" autocomplete="given-name" maxlength="40" placeholder="Vorname" aria-label="Vorname" style="letter-spacing:normal;text-align:left" />
+      <input class="profile-settings-field" id="profile-refer-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" placeholder="+491701234567" aria-label="Mobilnummer" style="letter-spacing:normal;text-align:left;margin-top:8px" />
+      <p class="profile-settings-msg" id="profile-refer-msg" hidden></p>
+      <div class="challenge-modal__actions">
+        <button type="button" class="challenge-modal__btn is-ghost" id="profile-refer-cancel" data-de="Abbrechen" data-en="Cancel">Abbrechen</button>
+        <button type="button" class="challenge-modal__btn" id="profile-refer-send" data-de="Einladen" data-en="Invite">Einladen</button>
       </div>
     </div>
   </div>
@@ -7675,10 +7714,8 @@ browsen</span>
       var buddyEditMode = false;
       var buddyLongPressTimer = null;
       var CHALLENGE_DAYS = 28;
-      var DEFAULT_DAY_PLAN_DE =
-        "Beweg dich ausreichend. Ein Spaziergang am Morgen und noch einmal frische Luft am Abend reichen für die Baseline.";
-      var DEFAULT_DAY_PLAN_EN =
-        "Move enough. A morning walk and fresh air again in the evening cover the baseline.";
+      var DEFAULT_DAY_PLAN_DE = "kein Workout eingerichtet";
+      var DEFAULT_DAY_PLAN_EN = "No workout set up";
       function defaultDayPlan() {
         return t(DEFAULT_DAY_PLAN_DE, DEFAULT_DAY_PLAN_EN);
       }
@@ -7688,8 +7725,12 @@ browsen</span>
           !s ||
           s === DEFAULT_DAY_PLAN_DE ||
           s === DEFAULT_DAY_PLAN_EN ||
+          /kein workout eingerichtet/i.test(s) ||
+          /no workout set up/i.test(s) ||
           /Spaziergang am Morgen/i.test(s) ||
-          /morning walk/i.test(s)
+          /morning walk/i.test(s) ||
+          /Beweg dich ausreichend/i.test(s) ||
+          /Move enough/i.test(s)
         );
       }
       function localizePlanLabel(label) {
@@ -13500,6 +13541,77 @@ browsen</span>
         }
       }
 
+      function randomDigitCode(len) {
+        var out = "";
+        for (var i = 0; i < len; i++) out += String(Math.floor(Math.random() * 10));
+        return out;
+      }
+
+      function buddyInviteLink(code, fromName) {
+        var base = (location.origin || "https://www.gogogo.social") + "/buddy/?c=" + encodeURIComponent(code);
+        if (fromName) base += "&from=" + encodeURIComponent(fromName);
+        return base;
+      }
+
+      function buddyInviteSmsText(inviteeName, inviterName, code, link) {
+        return "Hallo " + inviteeName + ", " + inviterName +
+          " hat Dich zu gogogo.social eingeladen. Dein Einladungscode ist Dein Passwort: " + code +
+          ". Gib es nicht weiter. Hier der Link zum Anmelden: " + link;
+      }
+
+      async function sendBuddyReferral(inviteeName, inviteePhone) {
+        if (!hasCloudAccount()) {
+          window.alert(t("Bitte zuerst online anmelden.", "Please sign in online first."));
+          return false;
+        }
+        inviteeName = String(inviteeName || "").trim();
+        inviteePhone = String(inviteePhone || "").trim();
+        if (!inviteeName || !inviteePhone) return false;
+        var inviterName = firstNameOf(account);
+        var code = randomDigitCode(4);
+        var serial = randomDigitCode(8);
+        var trainerId = await ensureCoachAccount();
+        var payload = {
+          first_name: inviteeName,
+          serial_number: serial,
+          code: code
+        };
+        if (trainerId) payload.trainer_id = trainerId;
+        payload.invited_by_account_id = account.id;
+        payload.invite_source = "buddy";
+        var row = await restInsert("go_invite_codes", payload);
+        if (!row) {
+          var fallback = {
+            first_name: inviteeName,
+            serial_number: serial,
+            code: code
+          };
+          if (trainerId) fallback.trainer_id = trainerId;
+          row = await restInsert("go_invite_codes", fallback);
+        }
+        if (!row) {
+          window.alert(t("Einladung speichern fehlgeschlagen.", "Could not save invite."));
+          return false;
+        }
+        var link = buddyInviteLink(code, inviterName);
+        var smsBody = buddyInviteSmsText(inviteeName, inviterName, code, link);
+        var phoneDigits = inviteePhone.replace(/[^\d+]/g, "");
+        try {
+          await restInsert("go_wa_jobs", {
+            account_id: account.id,
+            name: inviteeName,
+            phone: inviteePhone,
+            invite_code: code,
+            trainer_id: trainerId || null,
+            status: "pending",
+            note: "buddy_invite_sms:" + smsBody
+          });
+        } catch (eJob) {}
+        var smsUrl = "sms:" + encodeURIComponent(phoneDigits) + "?body=" + encodeURIComponent(smsBody);
+        window.location.href = smsUrl;
+        return true;
+      }
+
       async function restDelete(path) {
         var res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
           method: "DELETE",
@@ -15523,7 +15635,7 @@ browsen</span>
         loadTrainerFromCloud().then(function () {
           fillProfilePanel();
           renderBuddySlots();
-          maybeShowGreeting();
+          maybeShowFirstRunExperience();
           loadActiveBuddyChallenges().then(function () {
             if (typeof window.__gogogoRenderWeek === "function") {
               try { window.__gogogoRenderWeek(); } catch (eRw0) {}
@@ -15531,7 +15643,7 @@ browsen</span>
           }).catch(function () {});
           if (!needsOnboarding()) checkPendingBuddyChallengePopup().catch(function () {});
         }).catch(function () {
-          maybeShowGreeting();
+          maybeShowFirstRunExperience();
           if (!needsOnboarding()) checkPendingBuddyChallengePopup().catch(function () {});
         });
         ensureCoachAccount().catch(function () {});
@@ -15562,10 +15674,11 @@ browsen</span>
           waEl.href = waHref;
         }
         syncCommunityWhatsApp();
-        maybeShowGreeting();
+        maybeShowFirstRunExperience();
       }
 
       var GREETING_SEEN_KEY = "gogogo_greeting_seen_v1";
+      var APP_TOUR_DONE_KEY = "gogogo_app_tour_done";
       var WEEKDAY_DE = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
       var WEEKDAY_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -15833,8 +15946,12 @@ browsen</span>
           tour.hidden = true;
           tour.setAttribute("aria-hidden", "true");
         }
-        try { localStorage.setItem("gogogo_app_tour_done", "1"); } catch (e) {}
-        checkPendingBuddyChallengePopup();
+        try { localStorage.setItem(APP_TOUR_DONE_KEY, "1"); } catch (e) {}
+        if (needsOnboarding()) {
+          window.setTimeout(function () { showOnboarding(); }, 120);
+        } else {
+          checkPendingBuddyChallengePopup();
+        }
       }
 
       function showAppTourStep() {
@@ -15850,6 +15967,38 @@ browsen</span>
         if (!needsOnboarding()) return false;
         showOnboarding();
         return true;
+      }
+
+      function isAppTourDone() {
+        try { return localStorage.getItem(APP_TOUR_DONE_KEY) === "1"; } catch (e) { return false; }
+      }
+
+      function maybeShowFirstRunExperience() {
+        if (accountSessionBlocked || !account) return;
+        if (getStaffCalendarMode()) {
+          hideGreeting();
+          return;
+        }
+        var deep = "";
+        try {
+          deep = String(new URLSearchParams(location.search || "").get("goto") || "").trim();
+        } catch (e0) {}
+        if (deep) {
+          hideGreeting();
+          return;
+        }
+        if (!isAppTourDone()) {
+          hideGreeting();
+          hideOnboarding();
+          window.setTimeout(function () { startAppTour(); }, 280);
+          return;
+        }
+        if (needsOnboarding()) {
+          hideGreeting();
+          showOnboarding();
+          return;
+        }
+        maybeShowGreeting();
       }
 
       function maybeShowGreeting() {
@@ -16538,6 +16687,70 @@ browsen</span>
           });
         }
         var pushBtn = document.getElementById("profile-push-toggle-btn");
+        var appTourBtn = document.getElementById("profile-app-tour-btn");
+        if (appTourBtn) {
+          appTourBtn.addEventListener("click", function () {
+            closeSettingsMenu();
+            window.setTimeout(function () {
+              try { localStorage.removeItem(APP_TOUR_DONE_KEY); } catch (eTour) {}
+              startAppTour();
+            }, 120);
+          });
+        }
+        var referBtn = document.getElementById("profile-refer-btn");
+        var referModal = document.getElementById("profile-refer-modal");
+        var referName = document.getElementById("profile-refer-name");
+        var referPhone = document.getElementById("profile-refer-phone");
+        var referSend = document.getElementById("profile-refer-send");
+        var referCancel = document.getElementById("profile-refer-cancel");
+        var referMsg = document.getElementById("profile-refer-msg");
+        function setReferMsg(text, isError) {
+          if (!referMsg) return;
+          if (!text) {
+            referMsg.hidden = true;
+            referMsg.textContent = "";
+            referMsg.classList.remove("is-error");
+            return;
+          }
+          referMsg.hidden = false;
+          referMsg.textContent = text;
+          referMsg.classList.toggle("is-error", !!isError);
+        }
+        if (referBtn && referModal) {
+          referBtn.addEventListener("click", function () {
+            setReferMsg("");
+            if (referName) referName.value = "";
+            if (referPhone) referPhone.value = "";
+            openChallengeModal(referModal);
+          });
+        }
+        if (referCancel && referModal) {
+          referCancel.addEventListener("click", function () {
+            closeChallengeModal(referModal);
+          });
+        }
+        if (referModal) {
+          referModal.addEventListener("click", function (e) {
+            if (e.target === referModal) closeChallengeModal(referModal);
+          });
+        }
+        if (referSend) {
+          referSend.addEventListener("click", async function () {
+            setReferMsg(t("Sende …", "Sending …"), false);
+            referSend.disabled = true;
+            var ok = await sendBuddyReferral(
+              referName ? referName.value : "",
+              referPhone ? referPhone.value : ""
+            );
+            referSend.disabled = false;
+            if (ok) {
+              closeChallengeModal(referModal);
+              setReferMsg("");
+            } else {
+              setReferMsg(t("Bitte Vorname und Mobilnummer prüfen.", "Please check first name and mobile."), true);
+            }
+          });
+        }
         if (pushBtn) {
           pushBtn.addEventListener("click", function () {
             var prefs = getPushPrefs();
@@ -18329,7 +18542,7 @@ browsen</span>
           var planText = rawCoach || defaultDayPlan();
           var isPlaceholder = isDefaultDayPlanText(planText) || !rawCoach;
           var firstLine = isPlaceholder
-            ? t("allgemeine Bewegung", "general movement")
+            ? defaultDayPlan()
             : (splitPlanLines(planText).title || String(planText || "").split(/\n/)[0] || "Training");
           firstLine = localizePlanLabel(String(firstLine).trim());
           var rating = "Rating " + String(score) + "/10";

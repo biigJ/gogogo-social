@@ -58,6 +58,26 @@
       min-height: 100svh;
       touch-action: manipulation;
       overscroll-behavior-x: none;
+      position: relative;
+    }
+
+    .hero-dither {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-color: var(--red);
+      background-size: cover;
+      background-position: center;
+      opacity: 0.42;
+      pointer-events: none;
+      transition: background-image 800ms ease;
+    }
+
+    .hero-dither::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(199, 65, 59, 0.55) 0%, rgba(199, 65, 59, 0.82) 100%);
     }
 
     button, input { font: inherit; color: inherit; }
@@ -71,12 +91,38 @@
     }
 
     .wrap {
+      position: relative;
+      z-index: 1;
       width: min(100%, var(--max));
       margin: 0 auto;
       padding: calc(28px + env(safe-area-inset-top)) var(--pad) calc(40px + env(safe-area-inset-bottom));
     }
 
     .hero { text-align: center; margin-bottom: 28px; }
+
+    .hero__slogan {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: clamp(1.15rem, 4.8vw, 1.5rem);
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin: 0 0 18px;
+      color: var(--ink-on-red);
+    }
+
+    .hero-wheel-link {
+      display: block;
+      width: 100%;
+      margin: 0 auto;
+      text-decoration: none;
+      color: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .hero-wheel-link:focus-visible {
+      outline: 2px solid var(--paper);
+      outline-offset: 4px;
+    }
 
     .cycle-wrap {
       position: relative;
@@ -85,10 +131,38 @@
       margin: 0 auto 28px;
     }
 
+    .cycle-wrap--hero {
+      width: min(calc(100vw - 2 * var(--pad)), var(--max));
+      height: auto;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+    }
+
     .cycle {
       width: 240px;
       height: 240px;
       display: block;
+    }
+
+    .cycle-wrap--hero .cycle {
+      width: 100%;
+      height: 100%;
+    }
+
+    .hero-wheel__label {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 68%;
+      text-align: center;
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: clamp(1.05rem, 4.5vw, 1.55rem);
+      letter-spacing: -0.03em;
+      line-height: 1.12;
+      color: var(--ink-on-red);
+      pointer-events: none;
     }
 
     .cycle.is-spinning {
@@ -124,15 +198,6 @@
       filter: invert(1);
       mix-blend-mode: screen;
       opacity: 0.75;
-    }
-
-    .hero__title {
-      font-family: var(--display);
-      font-weight: 700;
-      font-size: clamp(28px, 8vw, 36px);
-      letter-spacing: -0.03em;
-      line-height: 1.1;
-      color: var(--ink-on-red);
     }
 
     .form-block {
@@ -517,21 +582,16 @@
   </style>
 </head>
 <body>
+  <div class="hero-dither" id="hero-dither" aria-hidden="true"></div>
   <div class="wrap">
     <section class="hero" aria-label="Einstieg">
-      <div class="cycle-wrap">
-        <svg class="cycle is-spinning" id="cycle-hero" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
-        <div class="cycle-portrait">
-          <img
-            src="/assets/vitruvian.png"
-            alt=""
-            width="200"
-            height="200"
-            decoding="async"
-          />
+      <p class="hero__slogan">Los geht's — Bewegung und Verbindung.</p>
+      <a class="hero-wheel-link" href="/account/?goto=community" aria-label="Zur Community">
+        <div class="cycle-wrap cycle-wrap--hero">
+          <svg class="cycle is-spinning" id="cycle-hero" viewBox="0 0 240 240" aria-hidden="true"></svg>
+          <span class="hero-wheel__label">Challenge Deinen Bewegungsmangel</span>
         </div>
-      </div>
-      <h1 class="hero__title">Challenge Deinen Bewegungsmangel</h1>
+      </a>
     </section>
 
     <section class="deleted-gate" id="deleted-gate" aria-live="polite" hidden>
@@ -781,6 +841,31 @@
           svg.appendChild(line);
         }
       }
+
+      var DITHER_IMAGES = [
+        "/assets/go/gogogo-dithering/gogogo-dither-Patch-1.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-Bikes.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-Patch3.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-RS.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-biigJ_1.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-biigJ_2.png",
+        "/assets/go/gogogo-dithering/gogogo-dither-biigJ_3.png"
+      ];
+
+      function pickRandomDither() {
+        return DITHER_IMAGES[Math.floor(Math.random() * DITHER_IMAGES.length)];
+      }
+
+      function applyHeroDither() {
+        var el = document.getElementById("hero-dither");
+        if (!el) return;
+        el.style.backgroundImage = "url(" + pickRandomDither() + ")";
+      }
+
+      applyHeroDither();
+      window.setInterval(function () {
+        applyHeroDither();
+      }, 12000);
 
       drawCycle(document.getElementById("cycle-hero"), false);
       drawCycle(document.getElementById("cycle-done"), true);

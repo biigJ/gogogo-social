@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#C7413B" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>gogogo · Buddy-Einladung</title>
+  <meta name="description" content="Dein Buddy hat Dich eingeladen." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/assets/go-orient-lock.css" />
+  <script src="/assets/go-orient-lock.js" defer></script>
+  <script src="/assets/go-account-session.js"></script>
+  <script>
+    document.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --red: #C7413B;
+      --paper: #F7F5F0;
+      --black: #0A0A0A;
+      --ink: rgba(52, 34, 32, 0.9);
+      --ink-on-red: rgba(247, 245, 240, 0.9);
+      --btn-ink: rgba(170, 58, 52, 0.9);
+      --placeholder: rgba(110, 88, 84, 0.9);
+      --white: #ffffff;
+      --max: 420px;
+      --pad: 24px;
+      --radius: 2px;
+      --font: "Inter", system-ui, sans-serif;
+      --display: "Space Grotesk", system-ui, sans-serif;
+      --mono: "IBM Plex Mono", ui-monospace, monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; touch-action: manipulation; }
+
+    body {
+      font-family: var(--font);
+      font-weight: 400;
+      color: var(--ink-on-red);
+      background: var(--red);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.45;
+      min-height: 100svh;
+      touch-action: manipulation;
+      overscroll-behavior-x: none;
+    }
+
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; border: 0; background: none; }
+    a { color: inherit; text-decoration: none; }
+    img { display: block; max-width: 100%; }
+
+    :focus-visible {
+      outline: 2px solid var(--paper);
+      outline-offset: 2px;
+    }
+
+    .wrap {
+      width: min(100%, var(--max));
+      margin: 0 auto;
+      padding: calc(36px + env(safe-area-inset-top)) var(--pad) calc(40px + env(safe-area-inset-bottom));
+    }
+
+    /* ── Rädchen ── */
+    .hero {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .cycle-wrap {
+      position: relative;
+      width: 240px;
+      height: 240px;
+      margin: 0 auto 22px;
+    }
+
+    .cycle {
+      width: 240px;
+      height: 240px;
+      display: block;
+    }
+
+    .cycle-portrait {
+      position: absolute;
+      inset: 50%;
+      width: 132px;
+      height: 132px;
+      margin: -66px 0 0 -66px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--red);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cycle-portrait img {
+      width: 88%;
+      height: 88%;
+      object-fit: contain;
+      filter: invert(1);
+      mix-blend-mode: screen;
+      opacity: 0.75;
+    }
+
+    .hero__invite {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: clamp(1.05rem, 4.5vw, 1.25rem);
+      letter-spacing: -0.025em;
+      line-height: 1.25;
+      color: var(--ink-on-red);
+    }
+
+    /* ── Formular ── */
+    .field {
+      display: block;
+      width: 100%;
+      margin-bottom: 12px;
+      padding: 14px 14px;
+      background: var(--paper);
+      color: var(--ink);
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      font-family: var(--display);
+      font-size: 16px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+    }
+
+    .field::placeholder { color: var(--placeholder); }
+
+    .field:focus {
+      outline: none;
+      border-color: var(--ink);
+    }
+
+    .notice {
+      display: block;
+      margin: 14px 0 8px;
+      padding: 12px 14px;
+      border: 1px solid rgba(247, 245, 240, 0.4);
+      border-radius: var(--radius);
+      font-family: var(--display);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.4;
+      color: var(--ink-on-red);
+      text-decoration: none;
+    }
+
+    .notice p + p { margin-top: 8px; }
+
+    .check {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-family: var(--display);
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      line-height: 1.35;
+      margin: 10px 0;
+      color: var(--ink-on-red);
+    }
+
+    .check input {
+      margin-top: 3px;
+      accent-color: var(--ink-on-red);
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+    }
+
+    .check a { text-decoration: underline; }
+
+    .check + .btn { margin-top: 10px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 56px;
+      background: var(--paper);
+      color: var(--btn-ink);
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: -0.03em;
+      border-radius: var(--radius);
+      text-decoration: none;
+      transition: transform 0.08s ease, filter 0.08s ease;
+    }
+
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn:hover:not(:disabled) { opacity: 0.92; }
+    .btn:active:not(:disabled) { transform: scale(0.97); filter: brightness(1.08); }
+
+    .form-msg {
+      min-height: 1.2em;
+      margin-top: 12px;
+      font-family: var(--display);
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--ink-on-red);
+    }
+
+    .form-msg.is-error { text-decoration: underline; }
+
+    /* ── WhatsApp-Hinweis-Overlay ── */
+    .wa-hint-overlay {
+      position: fixed; inset: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px 16px;
+      background: rgba(10, 10, 10, 0.55);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      opacity: 0;
+      transition: opacity 220ms ease;
+    }
+    .wa-hint-overlay.is-visible { opacity: 1; }
+    .wa-hint-overlay[hidden] { display: none !important; }
+    .wa-hint-sheet {
+      width: min(100%, 360px);
+      background: var(--red);
+      border-radius: 22px;
+      padding: 28px 22px 24px;
+      text-align: center;
+    }
+    .wa-hint-icon { font-size: 2.4rem; margin-bottom: 14px; }
+    .wa-hint-title {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 1.35rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 10px;
+      color: var(--ink-on-red);
+    }
+    .wa-hint-body {
+      font-family: var(--display);
+      font-weight: 500;
+      font-size: 0.9rem;
+      letter-spacing: -0.02em;
+      line-height: 1.45;
+      margin-bottom: 22px;
+      color: var(--ink-on-red);
+      opacity: 0.92;
+    }
+    .wa-hint-cta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 52px;
+      background: var(--paper);
+      color: var(--btn-ink);
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 1rem;
+      letter-spacing: -0.03em;
+      border-radius: var(--radius);
+      border: 0;
+      cursor: pointer;
+    }
+    .wa-hint-cta:hover { opacity: 0.92; }
+    .wa-hint-actions {
+      display: grid;
+      gap: 10px;
+      width: 100%;
+    }
+    .wa-hint-lang {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 44px;
+      background: transparent;
+      color: var(--ink-on-red);
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 0.92rem;
+      letter-spacing: -0.03em;
+      border-radius: var(--radius);
+      border: 1.5px solid rgba(247, 245, 240, 0.5);
+      cursor: pointer;
+    }
+    .wa-hint-lang:hover { background: rgba(247, 245, 240, 0.1); }
+    .wa-hint-countdown {
+      display: block;
+      margin-top: 12px;
+      font-family: var(--display);
+      font-size: 0.75rem;
+      font-weight: 500;
+      opacity: 0.65;
+      letter-spacing: -0.01em;
+    }
+
+    /* ── Success ── */
+    .success {
+      text-align: center;
+      display: none;
+      color: var(--ink-on-red);
+    }
+
+    .success.is-visible { display: block; }
+
+    .success__title {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 28px;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin: 8px 0 14px;
+    }
+
+    .success__text {
+      font-family: var(--display);
+      font-weight: 500;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+      line-height: 1.45;
+      margin-bottom: 28px;
+    }
+
+    .success__alt {
+      display: inline-block;
+      margin-top: 18px;
+      font-family: var(--display);
+      font-size: 0.78rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      text-decoration: underline;
+      background: none;
+      border: 0;
+      color: var(--ink-on-red);
+      cursor: pointer;
+    }
+
+    .success__note {
+      margin-top: 14px;
+      font-family: var(--display);
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      min-height: 1.2em;
+    }
+
+    /* ── Footer ── */
+    .foot {
+      text-align: center;
+      font-family: var(--display);
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: -0.02em;
+      color: var(--ink-on-red);
+      padding-top: 32px;
+    }
+
+    .foot a:hover { text-decoration: underline; }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .flow-out { transition: opacity 300ms ease; }
+    .flow-out.is-hidden {
+      opacity: 0;
+      pointer-events: none;
+      height: 0;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+
+    <section class="hero" aria-label="Einladung">
+      <div class="cycle-wrap">
+        <svg class="cycle" id="cycle-hero" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
+        <div class="cycle-portrait">
+          <img src="/assets/vitruvian.png" alt="" width="200" height="200" decoding="async" />
+        </div>
+      </div>
+      <p class="hero__invite" id="hero-invite">Dein Buddy hat Dich eingeladen.</p>
+    </section>
+
+    <div class="flow-out" id="flow-main">
+      <form id="invite-form" novalidate>
+        <label class="visually-hidden" for="inv-name">Vorname</label>
+        <input
+          class="field"
+          id="inv-name"
+          name="given-name"
+          type="text"
+          autocomplete="given-name"
+          autocapitalize="words"
+          enterkeyhint="next"
+          placeholder="Vorname"
+          required
+        />
+
+        <label class="visually-hidden" for="inv-phone">Mobilnummer</label>
+        <input
+          class="field"
+          id="inv-phone"
+          name="tel"
+          type="tel"
+          autocomplete="tel"
+          inputmode="tel"
+          enterkeyhint="next"
+          placeholder="Mobilnummer"
+          required
+        />
+
+        <label class="visually-hidden" for="inv-code">Dein vierstelliger Einladungscode</label>
+        <input
+          class="field"
+          id="inv-code"
+          name="invite"
+          type="text"
+          inputmode="numeric"
+          maxlength="4"
+          autocomplete="off"
+          enterkeyhint="done"
+          placeholder="Dein vierstelliger Einladungscode"
+          required
+        />
+
+        <a class="notice" id="legal-notice" href="/datenschutz/#beta" target="_blank" rel="noopener">
+          <p>
+            <strong>Beta-Version.</strong> gogogo.social und alle Subpages inklusive Account sind in der Erprobung.
+            Es gibt noch keine Zwei-Schritte-Verifizierung über Telefonnummer und IP-Adresse.
+            Der Admin kann theoretisch in Accounts gehen und deren Funktionen nutzen.
+          </p>
+          <p>Mit Klick in diesen Kasten gelangst Du auf die Datenschutzhinweise</p>
+        </a>
+
+        <label class="check">
+          <input type="checkbox" id="inv-privacy" required />
+          <span>Ich habe die Datenschutzhinweise gelesen und akzeptiere sie.</span>
+        </label>
+
+        <label class="check">
+          <input type="checkbox" id="inv-beta" required />
+          <span>Ich habe den Beta-Hinweis gelesen und akzeptiere, dass der Admin aktuell theoretisch auf Accounts zugreifen kann.</span>
+        </label>
+
+        <label class="check">
+          <input type="checkbox" id="inv-whatsapp" required />
+          <span>Ich bin einverstanden, dass meine Telefonnummer direkt an WhatsApp weitergeleitet wird und der Admin mich über WhatsApp kontaktieren darf. Ich werde einer WhatsApp-Gruppe hinzugefügt, um täglich zur Bewegung erinnert zu werden.</span>
+        </label>
+
+        <button class="btn" id="inv-submit" type="submit" disabled>Los geht's</button>
+        <p class="form-msg" id="inv-msg" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+
+    <div class="wa-hint-overlay" id="wa-hint-overlay" hidden aria-modal="true" role="dialog" aria-labelledby="wa-hint-title">
+      <div class="wa-hint-sheet">
+        <div class="wa-hint-icon" aria-hidden="true">📲</div>
+        <h2 class="wa-hint-title" id="wa-hint-title">Gleich weiter!</h2>
+        <p class="wa-hint-body" id="wa-hint-body">
+          Dein Buddy wartet in der Community. Du wirst jetzt auf die App weitergeleitet.
+          Für optimale Nutzung: Teilen &gt; Zum Home-Bildschirm und dann über den Button des Smartphones öffnen.
+        </p>
+        <div class="wa-hint-actions">
+          <button class="wa-hint-cta" type="button" id="wa-hint-go">Zur App</button>
+          <button class="wa-hint-lang" type="button" id="wa-hint-lang">English</button>
+        </div>
+        <span class="wa-hint-countdown" id="wa-hint-countdown"></span>
+      </div>
+    </div>
+
+    <section class="success" id="flow-success" aria-live="polite">
+      <div class="cycle-wrap" style="margin-bottom:20px">
+        <svg class="cycle" id="cycle-done" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
+        <div class="cycle-portrait">
+          <img src="/assets/vitruvian.png" alt="" width="200" height="200" decoding="async" />
+        </div>
+      </div>
+      <h2 class="success__title" id="success-title">Stark.</h2>
+      <p class="success__text" id="success-text">
+        Ein Tap noch, dann seid ihr verbunden.<br />
+        Dein Buddy freut sich auf Dich in der Community.
+      </p>
+      <a class="btn" id="wa-btn" href="#" target="_blank" rel="noopener">Weiter auf WhatsApp</a>
+      <button class="success__alt" type="button" id="no-wa">Lieber ohne WhatsApp? Dein Buddy wartet in der App.</button>
+      <p class="success__note" id="no-wa-note"></p>
+    </section>
+
+    <footer class="foot">
+      <a href="/impressum/">Impressum</a>
+      ·
+      <a href="/datenschutz/">Datenschutz</a>
+      ·
+      <a href="/kontakt/">Kontakt</a>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      var WHATSAPP_NUMBER = "+491747015500";
+      var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
+      var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
+      var QUEUE_KEY = "gogogo_go_leads_queue";
+      var SESSION_KEY = "gogogo_invite_draft";
+      var resolvedTrainerWa = WHATSAPP_NUMBER;
+      var resolvedTrainerId = null;
+
+      var params = new URLSearchParams(window.location.search);
+      var inviteFromQr = (params.get("c") || "").trim();
+      var buddyFrom = (params.get("from") || "").trim();
+      var hasCodeParam = params.has("c") && inviteFromQr.length > 0;
+
+      var form = document.getElementById("invite-form");
+      var nameInput = document.getElementById("inv-name");
+      var phoneInput = document.getElementById("inv-phone");
+      var codeInput = document.getElementById("inv-code");
+      var privacy = document.getElementById("inv-privacy");
+      var beta = document.getElementById("inv-beta");
+      var whatsappConsent = document.getElementById("inv-whatsapp");
+      var submitBtn = document.getElementById("inv-submit");
+      var msgEl = document.getElementById("inv-msg");
+      var flowMain = document.getElementById("flow-main");
+      var flowSuccess = document.getElementById("flow-success");
+      var successTitle = document.getElementById("success-title");
+      var waBtn = document.getElementById("wa-btn");
+      var noWa = document.getElementById("no-wa");
+      var noWaNote = document.getElementById("no-wa-note");
+
+      if (hasCodeParam) codeInput.value = inviteFromQr;
+      if (buddyFrom) {
+        var heroInvite = document.getElementById("hero-invite");
+        if (heroInvite) heroInvite.textContent = "Dein Buddy " + buddyFrom + " hat Dich eingeladen.";
+      }
+
+      // ── Rädchen ──────────────────────────────────────────────
+      function drawCycle(svg, fillAll) {
+        var ns = "http://www.w3.org/2000/svg";
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+        var cx = 120, cy = 120, inner = 90, outer = 112, count = 28;
+        var lit = {};
+        if (!fillAll) {
+          var pool = [];
+          for (var i = 0; i < count; i++) pool.push(i);
+          for (var r = pool.length - 1; r > 0; r--) {
+            var j = Math.floor(Math.random() * (r + 1));
+            var t = pool[r]; pool[r] = pool[j]; pool[j] = t;
+          }
+          var n = 16 + Math.floor(Math.random() * 6);
+          for (var k = 0; k < n; k++) lit[pool[k]] = true;
+        }
+        for (var s = 0; s < count; s++) {
+          var a = ((s / count) * Math.PI * 2) - Math.PI / 2;
+          var line = document.createElementNS(ns, "line");
+          line.setAttribute("x1", (cx + Math.cos(a) * inner).toFixed(2));
+          line.setAttribute("y1", (cy + Math.sin(a) * inner).toFixed(2));
+          line.setAttribute("x2", (cx + Math.cos(a) * outer).toFixed(2));
+          line.setAttribute("y2", (cy + Math.sin(a) * outer).toFixed(2));
+          var on = fillAll || lit[s];
+          line.setAttribute("stroke", on ? "#F7F5F0" : "rgba(247,245,240,0.28)");
+          line.setAttribute("stroke-width", "3");
+          line.setAttribute("stroke-linecap", "round");
+          svg.appendChild(line);
+        }
+      }
+
+      drawCycle(document.getElementById("cycle-hero"), false);
+      drawCycle(document.getElementById("cycle-done"), true);
+
+      // ── Draft ─────────────────────────────────────────────────
+      function saveDraft() {
+        try {
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+            name: nameInput.value,
+            phone: phoneInput.value,
+            code: codeInput.value
+          }));
+        } catch (e) {}
+      }
+
+      function restoreDraft() {
+        try {
+          var raw = sessionStorage.getItem(SESSION_KEY);
+          if (!raw) return;
+          var d = JSON.parse(raw);
+          if (d.name) nameInput.value = d.name;
+          if (d.phone) phoneInput.value = d.phone;
+          if (d.code && !hasCodeParam) codeInput.value = d.code;
+        } catch (e) {}
+      }
+
+      restoreDraft();
+
+      // ── Validierung ───────────────────────────────────────────
+      function updateSubmit() {
+        submitBtn.disabled = !(
+          nameInput.value.trim() &&
+          phoneInput.value.trim() &&
+          codeInput.value.trim() &&
+          privacy.checked &&
+          beta.checked &&
+          whatsappConsent.checked
+        );
+      }
+
+      [nameInput, phoneInput, codeInput, privacy, beta, whatsappConsent].forEach(function (el) {
+        el.addEventListener("input", function () { updateSubmit(); saveDraft(); });
+        el.addEventListener("change", function () { updateSubmit(); saveDraft(); });
+      });
+
+      // ── WhatsApp ──────────────────────────────────────────────
+      function waMessage(name) {
+        return "Hi, ich bin " + name + ". Ich mache bei der 4 Wochen Buddy-Challenge mit.";
+      }
+
+      function waLink(name, phone) {
+        var n = String(phone || resolvedTrainerWa || WHATSAPP_NUMBER).replace(/\D/g, "");
+        return "https://wa.me/" + n + "?text=" + encodeURIComponent(waMessage(name));
+      }
+
+      async function resolveTrainerFromInvite(invite) {
+        resolvedTrainerWa = WHATSAPP_NUMBER;
+        resolvedTrainerId = null;
+        if (!invite) return;
+        var tid = invite.trainer_id || null;
+        if (!tid) return;
+        try {
+          var rows = await restGet(
+            "go_accounts?id=eq." + encodeURIComponent(tid) +
+            "&select=id,whatsapp_phone,is_trainer&limit=1"
+          );
+          if (rows && rows[0]) {
+            resolvedTrainerId = rows[0].id || tid;
+            if (rows[0].whatsapp_phone) resolvedTrainerWa = String(rows[0].whatsapp_phone);
+          }
+        } catch (e) {}
+      }
+
+      // ── Queue ─────────────────────────────────────────────────
+      function queueLead(payload) {
+        try {
+          var q = JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
+          q.push(payload);
+          localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+        } catch (e) {}
+      }
+
+      // ── Supabase ──────────────────────────────────────────────
+      async function restInsert(table, payload, prefer) {
+        var res = await fetch(SUPABASE_URL + "/rest/v1/" + table, {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY,
+            "Content-Type": "application/json",
+            Prefer: prefer || "return=representation"
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          var body = "";
+          try { body = await res.text(); } catch (e) {}
+          throw new Error(body || ("HTTP " + res.status));
+        }
+        if ((prefer || "").indexOf("representation") >= 0) {
+          try { return await res.json(); } catch (e) { return null; }
+        }
+        return null;
+      }
+
+      async function restGet(path) {
+        var res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: "Bearer " + SUPABASE_KEY
+          }
+        });
+        if (!res.ok) return null;
+        try { return await res.json(); } catch (e) { return null; }
+      }
+
+      async function lookupInvite(code) {
+        if (!code) return null;
+        var rows = await restGet("go_invite_codes?code=eq." + encodeURIComponent(code) + "&select=*&limit=1");
+        return rows && rows[0] ? rows[0] : null;
+      }
+
+      function namesMatch(a, b) {
+        return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+      }
+
+      async function lookupAccount(name, invite) {
+        if (!invite || !name) return null;
+        var rows = await restGet(
+          "go_accounts?invite_code=eq." + encodeURIComponent(invite) +
+          "&select=*&order=created_at.desc&limit=50"
+        );
+        if (!rows || !rows.length) return null;
+        var matches = rows.filter(function (r) {
+          return r && !r.deleted_at && namesMatch(r.name, name);
+        });
+        if (!matches.length) return null;
+        for (var i = 0; i < matches.length; i++) {
+          if (matches[i].photo_url) return matches[i];
+        }
+        return matches[0];
+      }
+
+      // ── Submit ────────────────────────────────────────────────
+      form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        submitBtn.disabled = true;
+        msgEl.textContent = "Einen Moment …";
+        msgEl.classList.remove("is-error");
+
+        var name = nameInput.value.trim();
+        var phone = phoneInput.value.trim();
+        var code = codeInput.value.trim();
+        var now = new Date().toISOString();
+
+        try {
+          var invite = await lookupInvite(code);
+          if (!invite) {
+            msgEl.textContent = "Einladungscode nicht gefunden. Bitte prüfe die vier Ziffern.";
+            msgEl.classList.add("is-error");
+            submitBtn.disabled = false;
+            return;
+          }
+          if (invite.paused) {
+            msgEl.textContent = "Dieser Code ist pausiert.";
+            msgEl.classList.add("is-error");
+            submitBtn.disabled = false;
+            return;
+          }
+          if (invite.first_name && !namesMatch(invite.first_name, name)) {
+            msgEl.textContent = "Dieser Code ist einem anderen Namen zugeordnet.";
+            msgEl.classList.add("is-error");
+            submitBtn.disabled = false;
+            return;
+          }
+
+          await resolveTrainerFromInvite(invite);
+
+          var serial = invite.serial_number || null;
+          var accountRow = null;
+          try {
+            accountRow = await lookupAccount(name, code);
+          } catch (eLook) {}
+
+          if (!accountRow) {
+            var accountPayload = {
+              name: name,
+              phone: phone,
+              invite_code: code,
+              serial_number: serial,
+              onboarding_completed: false,
+              created_at: now,
+              updated_at: now
+            };
+            if (resolvedTrainerId) accountPayload.trainer_id = resolvedTrainerId;
+            try {
+              var inserted = await restInsert("go_accounts", accountPayload, "return=representation");
+              accountRow = inserted && inserted[0] ? inserted[0] : null;
+            } catch (errIns) {
+              try {
+                delete accountPayload.trainer_id;
+                var inserted2 = await restInsert("go_accounts", accountPayload, "return=representation");
+                accountRow = inserted2 && inserted2[0] ? inserted2[0] : null;
+              } catch (errIns2) {
+                queueLead(accountPayload);
+              }
+            }
+          } else {
+            accountRow.phone = phone;
+            if (serial) accountRow.serial_number = serial;
+            if (resolvedTrainerId && !accountRow.trainer_id) accountRow.trainer_id = resolvedTrainerId;
+          }
+
+          var accountId = accountRow && accountRow.id ? accountRow.id : null;
+
+          // Lead speichern
+          var leadPayload = {
+            name: name,
+            phone: phone,
+            invite_code: code,
+            serial_number: serial,
+            source: "invite",
+            created_at: now
+          };
+
+          try {
+            await restInsert("go_leads", leadPayload, "return=minimal");
+          } catch (err) {
+            queueLead(leadPayload);
+          }
+
+          // Job: Trainer per WhatsApp benachrichtigen (Worker/API braucht notify_phone)
+          try {
+            await restInsert("go_wa_jobs", {
+              account_id: accountId,
+              name: name,
+              phone: phone,
+              invite_code: code,
+              notify_phone: resolvedTrainerWa,
+              trainer_id: resolvedTrainerId,
+              status: "pending",
+              note: "Neuer Nutzer über Invite — Trainer benachrichtigen"
+            }, "return=minimal");
+          } catch (errWa) {
+            try {
+              await restInsert("go_wa_jobs", {
+                account_id: accountId,
+                name: name,
+                phone: phone,
+                invite_code: code,
+                status: "pending"
+              }, "return=minimal");
+            } catch (errWa2) {}
+          }
+
+          // Account lokal speichern
+          var localAccount = {
+            name: name,
+            phone: phone,
+            invite_code: code,
+            serial_number: serial,
+            onboarding_completed: false
+          };
+          if (accountId) localAccount.id = accountId;
+          if (accountRow && accountRow.created_at) localAccount.created_at = accountRow.created_at;
+          if (resolvedTrainerId) localAccount.trainer_id = resolvedTrainerId;
+          try {
+            if (window.GoAccountSession) GoAccountSession.save(localAccount);
+            else localStorage.setItem("gogogo_go_account", JSON.stringify(localAccount));
+          } catch (e) {}
+          try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+
+          if (waBtn) waBtn.href = waLink(name, resolvedTrainerWa);
+
+          msgEl.textContent = "";
+          flowMain.classList.add("is-hidden");
+          showWaHint();
+
+        } catch (err) {
+          msgEl.textContent = "Etwas ist schief gelaufen. Bitte versuche es noch einmal.";
+          msgEl.classList.add("is-error");
+          submitBtn.disabled = false;
+        }
+      });
+
+      // ── Ohne WhatsApp ─────────────────────────────────────────
+      if (noWa) {
+        noWa.addEventListener("click", function () {
+          noWaNote.textContent = "Erledigt. Dein Buddy freut sich auf Dich.";
+          noWa.hidden = true;
+        });
+      }
+
+      function showWaHint() {
+        var overlay = document.getElementById("wa-hint-overlay");
+        var body = document.getElementById("wa-hint-body");
+        var title = document.getElementById("wa-hint-title");
+        var cta = document.getElementById("wa-hint-go");
+        var langBtn = document.getElementById("wa-hint-lang");
+        var countdown = document.getElementById("wa-hint-countdown");
+        if (!overlay) { window.location.href = "/account/?goto=community"; return; }
+        var hintLang = "de";
+        var copy = {
+          de: {
+            title: "Gleich weiter!",
+            body:
+              "Willkommen bei gogogo.social — Dein Buddy wartet in der Community. Du wirst jetzt auf die App weitergeleitet.<br /><br />" +
+              "Für optimale Nutzung: Teilen &gt; Zum Home-Bildschirm und dann über den Button des Smartphones öffnen.",
+            cta: "Zur App",
+            lang: "English",
+            wait: function (n) { return "Weiter in " + n + " …"; }
+          },
+          en: {
+            title: "Almost there!",
+            body:
+              "Welcome to gogogo.social — your buddy is waiting in the community. You are being redirected to the app now.<br /><br />" +
+              "For the best experience: Share &gt; Add to Home Screen, then open via the phone button.",
+            cta: "Open app",
+            lang: "Deutsch",
+            wait: function (n) { return "Continue in " + n + " …"; }
+          }
+        };
+        function paint() {
+          var c = copy[hintLang] || copy.de;
+          if (title) title.textContent = c.title;
+          if (body) body.innerHTML = c.body;
+          if (cta) cta.textContent = c.cta;
+          if (langBtn) langBtn.textContent = c.lang;
+        }
+        paint();
+        overlay.hidden = false;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () { overlay.classList.add("is-visible"); });
+        });
+        var secs = 8;
+        var timer = null;
+        function tick() {
+          var c = copy[hintLang] || copy.de;
+          if (countdown) countdown.textContent = c.wait(secs);
+          if (secs <= 0) { go(); return; }
+          secs--;
+          timer = setTimeout(tick, 1000);
+        }
+        function go() {
+          if (timer) clearTimeout(timer);
+          window.location.href = "/account/?goto=community";
+        }
+        tick();
+        if (langBtn) {
+          langBtn.onclick = function () {
+            hintLang = hintLang === "de" ? "en" : "de";
+            paint();
+            var c = copy[hintLang] || copy.de;
+            if (countdown) countdown.textContent = c.wait(Math.max(secs, 0));
+          };
+        }
+        if (cta) cta.addEventListener("click", go);
+        overlay.addEventListener("click", function (e) {
+          if (e.target === overlay) go();
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
