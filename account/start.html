@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#C7413B" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>gogogo · Start</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script src="/assets/go-account-session.js"></script>
+  <style>
+    :root {
+      --red: #C7413B;
+      --paper: #F7F5F0;
+      --ink-on-red: rgba(247, 245, 240, 0.92);
+      --muted: rgba(247, 245, 240, 0.68);
+      --line: rgba(247, 245, 240, 0.2);
+      --display: "Space Grotesk", system-ui, sans-serif;
+      --serif: "Instrument Serif", Georgia, serif;
+      --safe-t: env(safe-area-inset-top, 0px);
+      --safe-b: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; }
+    body {
+      font-family: var(--display);
+      color: var(--ink-on-red);
+      background: var(--red);
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap {
+      width: min(420px, 100%);
+      margin: 0 auto;
+      min-height: 100dvh;
+      padding: calc(20px + var(--safe-t)) 28px calc(28px + var(--safe-b));
+      display: flex;
+      flex-direction: column;
+    }
+    .brand {
+      font-family: var(--serif);
+      font-size: clamp(2.4rem, 10vw, 3rem);
+      line-height: 0.95;
+      letter-spacing: -0.03em;
+      margin: 4px 0 8px;
+    }
+    .lede {
+      margin: 0 0 22px;
+      font-size: 0.98rem;
+      line-height: 1.4;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .steps { display: flex; gap: 6px; margin-bottom: 22px; }
+    .steps i {
+      flex: 1;
+      height: 3px;
+      border-radius: 99px;
+      background: rgba(247, 245, 240, 0.18);
+      font-style: normal;
+    }
+    .steps i.on { background: var(--paper); }
+    .panel { display: none; animation: rise 0.32s ease both; }
+    .panel.active { display: block; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: none; }
+    }
+    h1 {
+      font-family: var(--serif);
+      font-size: 1.7rem;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      margin: 0 0 8px;
+      line-height: 1.15;
+    }
+    .hint {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.4;
+      font-weight: 500;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border: 1.5px solid rgba(247, 245, 240, 0.35);
+      background: transparent;
+      color: var(--ink-on-red);
+      border-radius: 999px;
+      padding: 11px 14px;
+      font: inherit;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .chip.on {
+      background: var(--paper);
+      border-color: var(--paper);
+      color: var(--red);
+    }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 7px;
+      font-weight: 600;
+    }
+    .field input {
+      width: 100%;
+      border: 1.5px solid rgba(247, 245, 240, 0.35);
+      border-radius: 12px;
+      padding: 13px 14px;
+      font: inherit;
+      font-weight: 600;
+      background: transparent;
+      color: var(--ink-on-red);
+    }
+    .field input::placeholder { color: rgba(247, 245, 240, 0.45); }
+    .suggest { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .suggest button {
+      border: 0;
+      background: rgba(247, 245, 240, 0.12);
+      color: var(--ink-on-red);
+      border-radius: 999px;
+      padding: 7px 11px;
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .day-times { display: grid; gap: 0; }
+    .day-time {
+      display: grid;
+      grid-template-columns: 2.4rem 1fr auto;
+      gap: 8px 10px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .day-time:first-child { border-top: 1px solid var(--line); }
+    .day-time__wd {
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      opacity: 0.7;
+      font-weight: 700;
+    }
+    .day-time__label { font-size: 0.95rem; font-weight: 600; }
+    .day-time input[type="time"] {
+      border: 1.5px solid rgba(247, 245, 240, 0.35);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--ink-on-red);
+      font: inherit;
+      font-weight: 700;
+      padding: 8px 10px;
+      min-width: 6.5rem;
+    }
+    .plan-row {
+      display: grid;
+      grid-template-columns: 2.4rem 1fr auto;
+      gap: 4px 10px;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .plan-row:first-child { border-top: 1px solid var(--line); }
+    .plan-row__wd {
+      font-size: 0.72rem;
+      letter-spacing: 0.06em;
+      opacity: 0.65;
+      font-weight: 700;
+      padding-top: 3px;
+    }
+    .plan-row__act { font-size: 1rem; font-weight: 600; letter-spacing: -0.02em; }
+    .plan-row__place {
+      grid-column: 2;
+      font-size: 0.75rem;
+      opacity: 0.7;
+      margin-top: -2px;
+    }
+    .plan-row__time {
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding-top: 2px;
+    }
+    .trainer {
+      margin: 18px 0 4px;
+      font-size: 0.92rem;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+    .trainer strong { color: var(--ink-on-red); font-weight: 700; }
+    .actions {
+      display: grid;
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .btn {
+      width: 100%;
+      min-height: 52px;
+      border: 0;
+      border-radius: 14px;
+      padding: 14px 16px;
+      font: inherit;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      cursor: pointer;
+      background: var(--paper);
+      color: var(--red);
+    }
+    .btn.is-ghost {
+      background: transparent;
+      color: var(--ink-on-red);
+      border: 1.5px solid rgba(247, 245, 240, 0.4);
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .err {
+      min-height: 1.2em;
+      margin-top: 10px;
+      font-size: 0.88rem;
+      color: #ffe2c4;
+      font-weight: 600;
+    }
+    .foot {
+      margin-top: auto;
+      padding-top: 28px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+      font-weight: 500;
+    }
+    .foot a { color: var(--paper); font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">gogogo</div>
+    <p class="lede">Wann und Wo stehen fest — bevor du dich anmeldest.</p>
+    <div class="steps" id="steps" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
+
+    <section class="panel active" id="step-1">
+      <h1>Wo stehst du?</h1>
+      <p class="hint">Eine kurze Einordnung. Der Plan kommt danach.</p>
+      <div class="chips" id="level-chips">
+        <button type="button" class="chip" data-level="beginner">Ich fange an</button>
+        <button type="button" class="chip" data-level="irregular">Ich trainiere unregelmäßig</button>
+        <button type="button" class="chip" data-level="regular">Ich trainiere regelmäßig</button>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn" id="to-2" disabled>Weiter</button>
+      </div>
+    </section>
+
+    <section class="panel" id="step-2">
+      <h1>An welchen Tagen?</h1>
+      <p class="hint">Mehrfachauswahl. Später in der App jederzeit änderbar.</p>
+      <div class="chips" id="day-chips">
+        <button type="button" class="chip" data-wd="0">Mo</button>
+        <button type="button" class="chip" data-wd="1">Di</button>
+        <button type="button" class="chip" data-wd="2">Mi</button>
+        <button type="button" class="chip" data-wd="3">Do</button>
+        <button type="button" class="chip" data-wd="4">Fr</button>
+        <button type="button" class="chip" data-wd="5">Sa</button>
+        <button type="button" class="chip" data-wd="6">So</button>
+      </div>
+      <div class="err" id="day-err"></div>
+      <div class="actions">
+        <button type="button" class="btn is-ghost" data-back="1">Zurück</button>
+        <button type="button" class="btn" id="to-3" disabled>Weiter</button>
+      </div>
+    </section>
+
+    <section class="panel" id="step-3">
+      <h1>Ort</h1>
+      <p class="hint">Ein Ort für den Start. Pro Tag anpassbar, sobald du in der App bist.</p>
+      <div class="field">
+        <label for="place">Trainingsort</label>
+        <input id="place" type="text" placeholder="z. B. FF Schönhauser Allee" autocomplete="off" />
+        <div class="suggest" id="place-suggest"></div>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn is-ghost" data-back="2">Zurück</button>
+        <button type="button" class="btn" id="to-4">Weiter</button>
+      </div>
+    </section>
+
+    <section class="panel" id="step-4">
+      <h1>Uhrzeit je Tag</h1>
+      <p class="hint">Standard 18:00 — tippe zum Anpassen.</p>
+      <div class="day-times" id="day-times"></div>
+      <div class="actions">
+        <button type="button" class="btn is-ghost" data-back="3">Zurück</button>
+        <button type="button" class="btn" id="to-plan">Plan anzeigen</button>
+      </div>
+    </section>
+
+    <section class="panel" id="step-plan">
+      <h1>Steht.</h1>
+      <p class="hint">Dein Wochenplan — ohne Anmeldung. Kalender und Feinschliff folgen danach.</p>
+      <div id="plan-list"></div>
+      <p class="trainer"><strong>Joscha</strong> ist dein Trainer. Er sieht den Plan und antwortet selbst.</p>
+      <div class="actions">
+        <button type="button" class="btn" id="to-reg">In meinen Kalender legen</button>
+        <button type="button" class="btn is-ghost" id="plan-ics">Plan als .ics laden</button>
+        <button type="button" class="btn is-ghost" data-back="4">Anpassen</button>
+      </div>
+    </section>
+
+    <section class="panel" id="step-reg">
+      <h1>Fast geschafft</h1>
+      <p class="hint">Zwei Angaben. Danach wandert der Plan in die App.</p>
+      <div class="field">
+        <label for="reg-name">Name</label>
+        <input id="reg-name" type="text" autocomplete="name" />
+      </div>
+      <div class="field">
+        <label for="reg-contact">Handynummer oder E-Mail</label>
+        <input id="reg-contact" type="text" autocomplete="tel" placeholder="+49 … oder name@…" />
+      </div>
+      <div class="err" id="reg-err"></div>
+      <div class="actions">
+        <button type="button" class="btn is-ghost" data-back="plan">Zurück</button>
+        <button type="button" class="btn" id="reg-submit">Weiter in die App</button>
+      </div>
+    </section>
+
+    <p class="foot">Schon dabei? <a href="/account/">Zur App</a></p>
+  </div>
+
+  <script>
+    (function () {
+      var WD = ["MO", "DI", "MI", "DO", "FR", "SA", "SO"];
+      var WD_LONG = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+      var PLACES = [
+        "FF Schönhauser Allee",
+        "Hasenheide",
+        "Tempelhofer Feld",
+        "Zuhause",
+        "Anderer Ort"
+      ];
+      var state = {
+        level: "",
+        days: [],
+        place: "",
+        times: {},
+        sessions: []
+      };
+
+      function $(id) { return document.getElementById(id); }
+
+      function showStep(id) {
+        ["1", "2", "3", "4", "plan", "reg"].forEach(function (key) {
+          var el = $("step-" + key);
+          if (el) el.classList.toggle("active", key === String(id));
+        });
+        var map = { "1": 1, "2": 2, "3": 3, "4": 4, plan: 4, reg: 4 };
+        var n = map[String(id)] || 1;
+        var dots = $("steps").children;
+        for (var i = 0; i < dots.length; i++) dots[i].classList.toggle("on", i < n);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      function sortedDays() {
+        return state.days.slice().sort(function (a, b) { return a - b; });
+      }
+
+      function buildSessions() {
+        var days = sortedDays();
+        var place = state.place || "Ort offen";
+        var n = days.length;
+        var roles = [];
+        for (var i = 0; i < n; i++) roles.push("walk");
+
+        function setRole(idx, role) {
+          if (idx >= 0 && idx < n) roles[idx] = role;
+        }
+        function findWeekend() {
+          for (var i = 0; i < n; i++) if (days[i] >= 5) return i;
+          return n ? n - 1 : -1;
+        }
+        function canPlaceStrength(idx) {
+          for (var i = 0; i < n; i++) {
+            if (roles[i] !== "kraft") continue;
+            if (Math.abs(days[i] - days[idx]) <= 1) return false;
+          }
+          return true;
+        }
+        function canPlaceIntense(idx) {
+          for (var i = 0; i < n; i++) {
+            if (roles[i] !== "kraft") continue;
+            if (Math.abs(days[i] - days[idx]) <= 1) return false;
+          }
+          return true;
+        }
+
+        var longIdx = findWeekend();
+        if (longIdx >= 0) setRole(longIdx, "long");
+
+        var kraftNeed = Math.min(2, Math.max(0, n - (longIdx >= 0 ? 1 : 0)));
+        for (var pass = 0; pass < 2 && kraftNeed > 0; pass++) {
+          for (var k = 0; k < n && kraftNeed > 0; k++) {
+            if (roles[k] !== "walk") continue;
+            if (!canPlaceStrength(k)) continue;
+            setRole(k, "kraft");
+            kraftNeed -= 1;
+          }
+        }
+        while (kraftNeed > 0) {
+          var placed = false;
+          for (var k2 = 0; k2 < n; k2++) {
+            if (roles[k2] !== "walk") continue;
+            setRole(k2, "kraft");
+            kraftNeed -= 1;
+            placed = true;
+            break;
+          }
+          if (!placed) break;
+        }
+
+        var intenseSet = false;
+        for (var t = 0; t < n; t++) {
+          if (roles[t] !== "walk") continue;
+          if (!canPlaceIntense(t)) continue;
+          setRole(t, "intense");
+          intenseSet = true;
+          break;
+        }
+        if (!intenseSet) {
+          for (var t2 = 0; t2 < n; t2++) {
+            if (roles[t2] !== "walk") continue;
+            setRole(t2, "intense");
+            break;
+          }
+        }
+
+        var catalog = {
+          kraft: { kind: "kraft", label: "Kraft · Ganzkörper", emoji: "🏋️" },
+          intense: { kind: "hiit", label: "Intensiv · HIIT 20–30 min", emoji: "⚡" },
+          long: { kind: "endurance", label: "Lang · locker 45–90 min", emoji: "🚶" },
+          walk: { kind: "walk", label: "Spaziergang · Mobility", emoji: "🚶‍♂️" }
+        };
+
+        state.sessions = days.map(function (wd, idx) {
+          var role = roles[idx] || "walk";
+          var meta = catalog[role] || catalog.walk;
+          return {
+            weekday: wd,
+            place: place,
+            time: state.times[String(wd)] || "18:00",
+            kind: meta.kind,
+            label: meta.label,
+            emoji: meta.emoji
+          };
+        });
+        return state.sessions;
+      }
+
+      function saveDraft() {
+        var draft = {
+          level: state.level,
+          place: state.place,
+          days: state.sessions.map(function (s) {
+            return {
+              weekday: s.weekday,
+              place: s.place,
+              time: s.time,
+              kind: s.kind,
+              label: s.label,
+              emoji: s.emoji
+            };
+          }),
+          origin: "qr",
+          createdAt: Date.now()
+        };
+        try {
+          sessionStorage.setItem("gogogo_draft_plan", JSON.stringify(draft));
+        } catch (e) {}
+        return draft;
+      }
+
+      function renderDayTimes() {
+        var box = $("day-times");
+        box.innerHTML = "";
+        sortedDays().forEach(function (wd) {
+          if (!state.times[String(wd)]) state.times[String(wd)] = "18:00";
+          var row = document.createElement("div");
+          row.className = "day-time";
+          row.innerHTML =
+            '<span class="day-time__wd"></span>' +
+            '<span class="day-time__label"></span>' +
+            '<input type="time" />';
+          row.querySelector(".day-time__wd").textContent = WD[wd];
+          row.querySelector(".day-time__label").textContent = WD_LONG[wd];
+          var input = row.querySelector("input");
+          input.value = state.times[String(wd)];
+          input.addEventListener("change", function () {
+            state.times[String(wd)] = input.value || "18:00";
+          });
+          box.appendChild(row);
+        });
+      }
+
+      function renderPlan() {
+        buildSessions();
+        var list = $("plan-list");
+        list.innerHTML = "";
+        state.sessions.forEach(function (s) {
+          var row = document.createElement("div");
+          row.className = "plan-row";
+          row.innerHTML =
+            '<span class="plan-row__wd"></span>' +
+            '<span class="plan-row__act"></span>' +
+            '<span class="plan-row__time"></span>' +
+            '<span class="plan-row__place"></span>';
+          row.querySelector(".plan-row__wd").textContent = WD[s.weekday];
+          row.querySelector(".plan-row__act").textContent = s.label;
+          row.querySelector(".plan-row__time").textContent = s.time;
+          row.querySelector(".plan-row__place").textContent = s.place;
+          list.appendChild(row);
+        });
+        saveDraft();
+      }
+
+      function buildIcs() {
+        var lines = [
+          "BEGIN:VCALENDAR",
+          "VERSION:2.0",
+          "PRODID:-//gogogo//start//DE",
+          "CALSCALE:GREGORIAN",
+          "METHOD:PUBLISH"
+        ];
+        var now = new Date();
+        function fmt(d) {
+          return d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+        }
+        state.sessions.forEach(function (s, idx) {
+          var start = new Date(now);
+          var jsDay = (s.weekday + 1) % 7;
+          var diff = (jsDay - start.getDay() + 7) % 7;
+          if (diff === 0) diff = 7;
+          start.setDate(start.getDate() + diff);
+          var hm = String(s.time || "18:00").split(":");
+          start.setHours(Number(hm[0]) || 18, Number(hm[1]) || 0, 0, 0);
+          var end = new Date(start.getTime() + 60 * 60 * 1000);
+          lines.push(
+            "BEGIN:VEVENT",
+            "UID:gogogo-start-" + idx + "-" + Date.now() + "@gogogo",
+            "DTSTAMP:" + fmt(now),
+            "DTSTART:" + fmt(start),
+            "DTEND:" + fmt(end),
+            "SUMMARY:" + String(s.label || "Training").replace(/,/g, "\\,"),
+            "LOCATION:" + String(s.place || "").replace(/,/g, "\\,"),
+            "RRULE:FREQ=WEEKLY",
+            "END:VEVENT"
+          );
+        });
+        lines.push("END:VCALENDAR");
+        return lines.join("\r\n");
+      }
+
+      document.querySelectorAll("#level-chips .chip").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          document.querySelectorAll("#level-chips .chip").forEach(function (b) { b.classList.remove("on"); });
+          btn.classList.add("on");
+          state.level = btn.getAttribute("data-level");
+          $("to-2").disabled = false;
+        });
+      });
+
+      document.querySelectorAll("#day-chips .chip").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var wd = Number(btn.getAttribute("data-wd"));
+          var i = state.days.indexOf(wd);
+          if (i >= 0) {
+            state.days.splice(i, 1);
+            btn.classList.remove("on");
+            delete state.times[String(wd)];
+          } else {
+            state.days.push(wd);
+            btn.classList.add("on");
+            state.times[String(wd)] = state.times[String(wd)] || "18:00";
+          }
+          $("to-3").disabled = state.days.length < 1;
+          $("day-err").textContent = state.days.length ? "" : "Mindestens einen Tag wählen.";
+        });
+      });
+
+      PLACES.forEach(function (p) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = p;
+        b.addEventListener("click", function () {
+          $("place").value = p === "Anderer Ort" ? "" : p;
+          if (p === "Anderer Ort") $("place").focus();
+        });
+        $("place-suggest").appendChild(b);
+      });
+
+      $("to-2").addEventListener("click", function () { showStep(2); });
+      $("to-3").addEventListener("click", function () {
+        if (!state.days.length) return;
+        showStep(3);
+      });
+      $("to-4").addEventListener("click", function () {
+        state.place = ($("place").value || "").trim();
+        if (!state.place) {
+          state.place = "Ort offen";
+          $("place").value = state.place;
+        }
+        renderDayTimes();
+        showStep(4);
+      });
+      $("to-plan").addEventListener("click", function () {
+        sortedDays().forEach(function (wd) {
+          if (!state.times[String(wd)]) state.times[String(wd)] = "18:00";
+        });
+        renderPlan();
+        showStep("plan");
+      });
+      $("to-reg").addEventListener("click", function () {
+        saveDraft();
+        showStep("reg");
+      });
+      $("plan-ics").addEventListener("click", function () {
+        if (!state.sessions.length) buildSessions();
+        var blob = new Blob([buildIcs()], { type: "text/calendar;charset=utf-8" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "gogogo-wochenplan.ics";
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 800);
+      });
+
+      document.querySelectorAll("[data-back]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          showStep(btn.getAttribute("data-back"));
+        });
+      });
+
+      $("reg-submit").addEventListener("click", function () {
+        var name = ($("reg-name").value || "").trim();
+        var contact = ($("reg-contact").value || "").trim();
+        var err = $("reg-err");
+        err.textContent = "";
+        if (!name || !contact) {
+          err.textContent = "Name und Handynummer oder E-Mail reichen.";
+          return;
+        }
+        var draft = saveDraft();
+        var isEmail = contact.indexOf("@") !== -1;
+        var account = {
+          id: "local-" + Date.now(),
+          name: name,
+          phone: isEmail ? null : contact,
+          email: isEmail ? contact : null,
+          origin: "qr",
+          onboarding_completed: true,
+          created_at: new Date().toISOString()
+        };
+        try {
+          if (window.GoAccountSession && typeof GoAccountSession.save === "function") {
+            GoAccountSession.save(account);
+          } else {
+            localStorage.setItem("gogogo_go_account", JSON.stringify(account));
+          }
+        } catch (e0) {}
+        try {
+          sessionStorage.setItem("gogogo_draft_plan", JSON.stringify(draft));
+          sessionStorage.setItem("gogogo_from_start", "1");
+        } catch (e1) {}
+        window.location.href = "/account/?from=start";
+      });
+
+      showStep(1);
+    })();
+  </script>
+</body>
+</html>
