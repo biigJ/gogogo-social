@@ -96,6 +96,8 @@
     load: loadAccount,
     save: saveAccount,
     clear: clearAccount,
-    persist: requestPersist
+    persist: requestPersist,
+    get: loadAccount,
+    set: saveAccount
   };
 })(window);
