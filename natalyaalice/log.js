@@ -5,17 +5,131 @@
   root.NatalyaLog = api;
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   var EXERCISES = [
-    { id: "squat", name: "Kniebeuge", kind: "reps", weight: true, step: 2.5, group: "Gewicht" },
-    { id: "hipthrust", name: "Hip Thrust", kind: "reps", weight: true, step: 2.5, group: "Gewicht" },
-    { id: "rdl", name: "Rumänisches Kreuzheben", kind: "reps", weight: true, step: 2.5, group: "Gewicht" },
-    { id: "row", name: "Rudern", kind: "reps", weight: true, step: 2.5, group: "Gewicht" },
-    { id: "press", name: "Schulterdrücken", kind: "reps", weight: true, step: 2.5, group: "Gewicht" },
-    { id: "lunge", name: "Ausfallschritte", kind: "reps", weight: false, note: "pro Seite", group: "Wiederholungen" },
-    { id: "pushup", name: "Liegestütze", kind: "reps", weight: false, group: "Wiederholungen" },
-    { id: "plank", name: "Unterarmstütz", kind: "check", note: "30–40 Sekunden", group: "Abhaken" },
-    { id: "mobility", name: "Mobilisation", kind: "check", group: "Abhaken" },
-    { id: "stretch", name: "Dehnen", kind: "check", group: "Abhaken" }
+    {
+      id: "child",
+      name: "Kindhaltung mit Strecken",
+      short: "Kind",
+      kind: "check",
+      cue: "Po zu Fersen, Arme weit vor.",
+      note: "1 Durchgang",
+      group: "Aufwärmen"
+    },
+    {
+      id: "catcow",
+      name: "Katze-Kuh",
+      short: "Katze",
+      kind: "check",
+      cue: "Rücken abwechselnd rund und hohl. Mit Ein- und Ausatmen.",
+      note: "1 Durchgang",
+      group: "Aufwärmen"
+    },
+    {
+      id: "downdog",
+      name: "Herabschauender Hund",
+      short: "Hund",
+      kind: "check",
+      cue: "Po hoch, Fersen Richtung Boden. Arme durchstrecken und Oberkörper öffnen.",
+      note: "1 Durchgang",
+      group: "Aufwärmen"
+    },
+    {
+      id: "wgs",
+      name: "Große Ganzkörperdehnung",
+      short: "Dehnung",
+      kind: "check",
+      cue: "Ausfallschritt, Arm zur Decke drehen.",
+      note: "1 Durchgang je Seite",
+      group: "Aufwärmen"
+    },
+    {
+      id: "hang",
+      name: "Hängen mit Schulterblatt-Heben",
+      short: "Hängen",
+      kind: "reps",
+      cue: "Gestreckt hängen, Schultern runterziehen.",
+      note: "3 × 5 · letzter Satz so lange wie möglich hängen",
+      group: "Hauptteil"
+    },
+    {
+      id: "split",
+      name: "Bulgarische Kniebeuge",
+      short: "Bulgarisch",
+      kind: "reps",
+      weight: true,
+      step: 1,
+      startKg: 6,
+      cue: "Hinterer Fuß erhöht, tief beugen.",
+      note: "3 × ca. 10 je Bein",
+      group: "Hauptteil"
+    },
+    {
+      id: "sldl",
+      name: "Einbeiniges Kreuzheben",
+      short: "Kreuzheben",
+      kind: "reps",
+      weight: true,
+      step: 1,
+      startKg: 6,
+      cue: "Hüfte nach hinten, Rücken gerade.",
+      note: "3 × ca. 10 je Bein",
+      group: "Hauptteil"
+    },
+    {
+      id: "slhip",
+      name: "Einbeiniges Hüftheben",
+      short: "Hüftheben",
+      kind: "reps",
+      cue: "Schultern auf Box, Po hoch. Freies Bein gestreckt.",
+      note: "3 × ca. 10 je Bein",
+      group: "Hauptteil"
+    },
+    {
+      id: "lateral",
+      name: "Vorgebeugtes Seitheben",
+      short: "Seitheben",
+      kind: "reps",
+      weight: true,
+      step: 1,
+      startKg: 3,
+      cue: "Stirn auf Stuhllehne, Arme seitlich.",
+      note: "3 × ca. 10",
+      group: "Hauptteil"
+    },
+    {
+      id: "press",
+      name: "Schulterdrücken im Sitz",
+      short: "Schulter",
+      kind: "reps",
+      weight: true,
+      step: 1,
+      startKg: 3,
+      cue: "Vorne auf Stuhlkante, Bauch fest.",
+      note: "3 × ca. 15",
+      group: "Hauptteil"
+    },
+    {
+      id: "pushup",
+      name: "Liegestütze auf Knien",
+      short: "Liegestütz",
+      kind: "reps",
+      cue: "Körper gerade von Knie bis Kopf.",
+      note: "5 × ca. 5",
+      group: "Hauptteil"
+    },
+    {
+      id: "crunch",
+      name: "Umgekehrte Crunches",
+      short: "Crunches",
+      kind: "reps",
+      cue: "Rückenlage, Hände hinten abstützen. Bein strecken, dann Knie Richtung Brust ziehen.",
+      note: "2 × ca. 15",
+      group: "Hauptteil"
+    }
   ];
+
+  var GROUP_HINTS = {
+    "Aufwärmen": "Jede Übung ca. 10–20 Sekunden, ruhig atmen."
+  };
 
   function exerciseById(id) {
     for (var i = 0; i < EXERCISES.length; i++) {
@@ -87,7 +201,7 @@
     return isFinite(n) ? n : null;
   }
 
-  function suggestionKg(logs, exerciseId, date) {
+  function lastLoggedKg(logs, exerciseId, date) {
     var best = null;
     (logs || []).forEach(function (row) {
       if (!row || row.exercise_id !== exerciseId) return;
@@ -97,6 +211,24 @@
       if (!best || row.workout_date > best.workout_date) best = row;
     });
     return best ? numberOrNull(best.weight_kg) : null;
+  }
+
+  function suggestionKg(logs, exerciseId, date) {
+    var last = lastLoggedKg(logs, exerciseId, date);
+    if (last != null) return last;
+    var ex = exerciseById(exerciseId);
+    return ex && ex.startKg != null ? Number(ex.startKg) : null;
+  }
+
+  function weightSource(logs, exerciseId, date) {
+    if (lastLoggedKg(logs, exerciseId, date) != null) return "last";
+    var ex = exerciseById(exerciseId);
+    if (ex && ex.startKg != null) return "plan";
+    return "";
+  }
+
+  function groupHint(group) {
+    return GROUP_HINTS[group] || "";
   }
 
   function payloadFromDraft(ex, draft, suggestion) {
@@ -273,6 +405,8 @@
     formatDate: formatDate,
     berlinToday: berlinToday,
     suggestionKg: suggestionKg,
+    weightSource: weightSource,
+    groupHint: groupHint,
     payloadFromDraft: payloadFromDraft,
     projectLogs: projectLogs,
     historyDates: historyDates,

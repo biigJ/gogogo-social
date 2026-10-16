@@ -125,7 +125,13 @@
       letter-spacing: 0.16em;
       text-transform: uppercase;
       color: var(--dim);
-      margin: 20px 0 8px;
+      margin: 22px 0 4px;
+    }
+    .group-hint {
+      color: var(--dim);
+      font-size: 13px;
+      line-height: 1.35;
+      margin: 0 0 10px;
     }
     .item {
       background: var(--panel);
@@ -138,7 +144,7 @@
     .check-btn {
       width: 100%;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 12px;
       text-align: left;
       min-height: 44px;
@@ -146,6 +152,7 @@
     .mark {
       width: 28px;
       height: 28px;
+      margin-top: 1px;
       border-radius: 999px;
       border: 1.5px solid var(--ink);
       display: grid;
@@ -156,12 +163,21 @@
     .is-done .mark { background: var(--ink); }
     .is-done .mark svg { opacity: 1; }
     .name {
+      display: block;
       font-family: var(--display);
       font-weight: 600;
       font-size: 18px;
       letter-spacing: -0.02em;
+      line-height: 1.25;
     }
-    .note { color: var(--dim); font-weight: 400; font-size: 13px; margin-left: 6px; }
+    .cue, .note {
+      display: block;
+      color: var(--dim);
+      font-weight: 400;
+      font-size: 13px;
+      line-height: 1.35;
+      margin-top: 3px;
+    }
     .stat {
       color: var(--dim);
       font-size: 13px;
@@ -395,16 +411,35 @@
           if (ex.weight) {
             var input = item.querySelector("[data-kg]");
             var hint = item.querySelector("[data-kghint]");
-            var suggestion = !draft[ex.id].kgTouched && Log.suggestionKg(serverLogs, ex.id, date) != null;
+            var source = draft[ex.id].kgTouched ? "" : Log.weightSource(serverLogs, ex.id, date);
             if (input && document.activeElement !== input) {
               var kg = shownKg(ex);
               input.value = kg == null ? "" : Log.formatNumber(kg);
-              input.classList.toggle("is-suggestion", suggestion && kg != null);
+              input.classList.toggle("is-suggestion", !!source && kg != null);
             }
-            if (hint) hint.textContent = suggestion ? "zuletzt" : "";
+            if (hint) hint.textContent = source === "last" ? "zuletzt" : "";
           }
         });
         renderHistory();
+      }
+
+      function fillCopy(parent, ex) {
+        var nameEl = document.createElement("span");
+        nameEl.className = "name";
+        nameEl.textContent = ex.name;
+        parent.appendChild(nameEl);
+        if (ex.cue) {
+          var cue = document.createElement("span");
+          cue.className = "cue";
+          cue.textContent = ex.cue;
+          parent.appendChild(cue);
+        }
+        if (ex.note) {
+          var note = document.createElement("span");
+          note.className = "note";
+          note.textContent = ex.note;
+          parent.appendChild(note);
+        }
       }
 
       function renderList() {
@@ -417,6 +452,13 @@
             heading.className = "group";
             heading.textContent = group;
             listEl.appendChild(heading);
+            var blurb = Log.groupHint(group);
+            if (blurb) {
+              var blurbEl = document.createElement("p");
+              blurbEl.className = "group-hint";
+              blurbEl.textContent = blurb;
+              listEl.appendChild(blurbEl);
+            }
           }
           var item = document.createElement("article");
           item.className = "item";
@@ -431,35 +473,18 @@
             var mark = document.createElement("span");
             mark.className = "mark";
             mark.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7.2 5.2 10.5 12 3.5" fill="none" stroke="#C7413B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-            var copy = document.createElement("span");
+            var copy = document.createElement("div");
             copy.className = "check-copy";
-            var name = document.createElement("span");
-            name.className = "name";
-            name.textContent = ex.name;
-            if (ex.note) {
-              var note = document.createElement("span");
-              note.className = "note";
-              note.textContent = ex.note;
-              name.appendChild(note);
-            }
+            fillCopy(copy, ex);
             var stat = document.createElement("p");
             stat.className = "stat";
             stat.dataset.stat = ex.id;
-            copy.appendChild(name);
             copy.appendChild(stat);
             btn.appendChild(mark);
             btn.appendChild(copy);
             item.appendChild(btn);
           } else {
-            var nameEl = document.createElement("p");
-            nameEl.className = "name";
-            nameEl.textContent = ex.name;
-            if (ex.note) {
-              var noteEl = document.createElement("span");
-              noteEl.className = "note";
-              noteEl.textContent = ex.note;
-              nameEl.appendChild(noteEl);
-            }
+            fillCopy(item, ex);
             var statEl = document.createElement("p");
             statEl.className = "stat";
             statEl.dataset.stat = ex.id;
@@ -517,7 +542,6 @@
               controls.appendChild(kg);
             }
 
-            item.appendChild(nameEl);
             item.appendChild(statEl);
             item.appendChild(controls);
           }
@@ -548,7 +572,8 @@
         headRow.appendChild(dateTh);
         Log.EXERCISES.forEach(function (ex) {
           var th = document.createElement("th");
-          th.textContent = ex.name;
+          th.textContent = ex.short || ex.name;
+          th.title = ex.name;
           headRow.appendChild(th);
         });
         thead.appendChild(headRow);
