@@ -45,8 +45,9 @@
     main {
       width: min(100%, 480px);
       margin: 0 auto;
-      padding: calc(28px + env(safe-area-inset-top)) 18px calc(36px + env(safe-area-inset-bottom));
+      padding: calc(18px + env(safe-area-inset-top)) 16px calc(36px + env(safe-area-inset-bottom));
     }
+    body.wheel-open main { padding-bottom: calc(250px + env(safe-area-inset-bottom)); }
     .brand {
       font-family: var(--display);
       font-weight: 700;
@@ -62,12 +63,21 @@
       line-height: 1;
       margin-top: 6px;
     }
+    .sticky-bar {
+      position: sticky;
+      top: env(safe-area-inset-top);
+      z-index: 20;
+      background: var(--bg);
+      margin: 18px -16px 0;
+      padding: 8px 16px 8px;
+      border-bottom: 1px solid transparent;
+    }
+    .sticky-bar.is-stuck { border-bottom-color: var(--line); }
     .date-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      margin-top: 22px;
     }
     .date-row label {
       font-family: var(--display);
@@ -185,44 +195,147 @@
       min-height: 1.15em;
     }
     .check-copy { flex: 1; }
-    .controls {
+    .sets {
       display: flex;
-      flex-wrap: wrap;
+      flex-direction: column;
       gap: 8px;
       margin-top: 12px;
-      align-items: center;
     }
-    .reps, .kg {
+    .set-row {
       display: flex;
       align-items: center;
       gap: 6px;
+      min-width: 0;
+    }
+    .set-check {
+      flex: 0 0 36px;
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+    }
+    .set-check .mark { margin-top: 0; }
+    .set-check.is-on .mark { background: var(--ink); }
+    .set-check.is-on .mark svg { opacity: 1; }
+    .reps, .kg {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
       background: rgba(0, 0, 0, 0.12);
       border-radius: 12px;
       padding: 4px;
-      min-height: 48px;
+      min-height: 44px;
     }
+    .reps { flex: 1 1 88px; min-width: 0; }
+    .kg-wrap { flex: 1 1 auto; min-width: 0; }
+    .kg { width: 100%; }
+    .step.plus { margin-left: auto; }
     .reps input, .kg input {
-      width: 64px;
+      width: 2.2ch;
+      min-width: 2.2ch;
+      flex: 0 0 2.2ch;
       background: transparent;
       border: 0;
       text-align: center;
       font-family: var(--display);
       font-weight: 700;
-      font-size: 20px;
-      padding: 6px 0;
+      font-size: 18px;
+      font-variant-numeric: tabular-nums;
+      padding: 4px 0;
     }
-    .kg input { width: 76px; }
+    .reps input { caret-color: transparent; cursor: pointer; }
+    .kg input { width: 3.4ch; min-width: 3.4ch; flex: 0 0 3.4ch; }
     .kg input.is-suggestion { color: var(--dim); }
-    .unit { color: var(--dim); font-size: 13px; padding-right: 8px; }
+    .unit { color: var(--dim); font-size: 12px; padding-right: 4px; flex: none; }
+    .kg-hint { display: block; min-height: 0; color: var(--dim); font-size: 11px; text-align: center; line-height: 1.2; }
+    .kg-hint:empty { display: none; }
     .step {
-      width: 44px;
-      height: 40px;
+      width: 32px;
+      height: 34px;
+      flex: 0 0 32px;
       border-radius: 10px;
       font-family: var(--display);
       font-weight: 700;
-      font-size: 22px;
+      font-size: 20px;
       line-height: 1;
     }
+    .wheel {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 40;
+      background: #a5332e;
+      border-top: 1px solid var(--line);
+      padding: 8px 16px calc(10px + env(safe-area-inset-bottom));
+    }
+    .wheel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .wheel-head span {
+      font-family: var(--display);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+    }
+    .wheel-head button {
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: var(--ink);
+      color: var(--bg);
+      font-family: var(--display);
+      font-weight: 700;
+    }
+    .wheel-frame { position: relative; height: 176px; }
+    .wheel-frame::before,
+    .wheel-frame::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 58px;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .wheel-frame::before { top: 0; background: linear-gradient(#a5332e, rgba(165, 51, 46, 0)); }
+    .wheel-frame::after { bottom: 0; background: linear-gradient(rgba(165, 51, 46, 0), #a5332e); }
+    .wheel-mark {
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      top: 66px;
+      height: 44px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      pointer-events: none;
+    }
+    .wheel-col {
+      height: 176px;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      padding: 66px 0;
+      scrollbar-width: none;
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+    .wheel-col::-webkit-scrollbar { display: none; }
+    .wheel-item {
+      height: 44px;
+      scroll-snap-align: center;
+      display: grid;
+      place-items: center;
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 20px;
+      color: var(--dim);
+      font-variant-numeric: tabular-nums;
+    }
+    .wheel-item.is-on { color: var(--ink); font-size: 28px; font-weight: 700; }
     .step.minus { color: var(--ink); }
     .step.plus { background: var(--ink); color: var(--bg); }
     .hint { color: var(--dim); font-size: 13px; margin: 8px 0 12px; }
@@ -280,13 +393,15 @@
     <p class="brand">gogogo</p>
     <h1>Natalya</h1>
 
-    <div class="date-row">
-      <label for="date">Datum</label>
-      <input id="date" type="date" />
-    </div>
-    <div class="meta">
-      <p id="progress"></p>
-      <p id="status" role="status" aria-live="polite"></p>
+    <div class="sticky-bar" id="sticky-bar">
+      <div class="date-row">
+        <label for="date">Datum</label>
+        <input id="date" type="date" />
+      </div>
+      <div class="meta">
+        <p id="progress"></p>
+        <p id="status" role="status" aria-live="polite"></p>
+      </div>
     </div>
 
     <div class="tabs" role="tablist" aria-label="Ansicht">
@@ -305,6 +420,16 @@
 
     <p class="banner" id="banner" hidden></p>
   </main>
+  <div class="wheel" id="wheel" hidden>
+    <div class="wheel-head">
+      <span id="wheel-label">Wiederholungen</span>
+      <button type="button" id="wheel-done">Fertig</button>
+    </div>
+    <div class="wheel-frame">
+      <div class="wheel-mark"></div>
+      <div class="wheel-col" id="wheel-col"></div>
+    </div>
+  </div>
 
   <script src="/natalyaalice/log.js"></script>
   <script>
@@ -387,38 +512,56 @@
         return Log.projectLogs(serverLogs, date, draft);
       }
 
-      function shownKg(ex) {
-        var d = draft[ex.id];
-        if (d.kgTouched) return d.kg;
+      var CHECK_SVG = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7.2 5.2 10.5 12 3.5" fill="none" stroke="#C7413B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      var WHEEL_MAX = 30;
+      var WHEEL_ITEM = 44;
+      var wheelInput = null;
+      var wheelLock = false;
+      var wheelUser = false;
+
+      function historyKg(ex) {
         return Log.suggestionKg(serverLogs, ex.id, date);
       }
 
       function paintMeta() {
         var logs = viewLogs();
-        var n = Log.doneCount(logs, date);
-        progressEl.textContent = n + " von " + Log.EXERCISES.length;
+        progressEl.textContent = Log.doneCount(logs, date) + " von " + Log.EXERCISES.length;
         Log.EXERCISES.forEach(function (ex) {
           var stat = document.querySelector('[data-stat="' + ex.id + '"]');
           if (stat) stat.textContent = Log.statLine(ex, Log.statsFor(logs, ex));
           var item = document.querySelector('[data-item="' + ex.id + '"]');
           if (!item) return;
-          var row = Log.rowOn(logs, date, ex.id);
-          item.classList.toggle("is-done", !!row);
+          item.classList.toggle("is-done", Log.exerciseComplete(logs, date, ex));
           if (ex.kind === "check") {
             var btn = item.querySelector("[data-check]");
-            if (btn) btn.setAttribute("aria-pressed", row && row.done ? "true" : "false");
+            if (btn) btn.setAttribute("aria-pressed", draft[ex.id].done ? "true" : "false");
+            return;
           }
-          if (ex.weight) {
-            var input = item.querySelector("[data-kg]");
-            var hint = item.querySelector("[data-kghint]");
-            var source = draft[ex.id].kgTouched ? "" : Log.weightSource(serverLogs, ex.id, date);
-            if (input && document.activeElement !== input) {
-              var kg = shownKg(ex);
+          syncSets(ex);
+          var history = historyKg(ex);
+          item.querySelectorAll("[data-reps]").forEach(function (input) {
+            var idx = Number(input.dataset.idx);
+            var set = draft[ex.id].sets[idx];
+            if (input !== wheelInput) input.value = set && set.reps ? set.reps : "";
+          });
+          item.querySelectorAll("[data-set-check]").forEach(function (button) {
+            var idx = Number(button.dataset.idx);
+            var on = !!(draft[ex.id].sets[idx] && draft[ex.id].sets[idx].done);
+            button.classList.toggle("is-on", on);
+            button.setAttribute("aria-pressed", on ? "true" : "false");
+          });
+          item.querySelectorAll("[data-kg]").forEach(function (input) {
+            var idx = Number(input.dataset.idx);
+            var set = draft[ex.id].sets[idx];
+            var kg = Log.displayKg(ex, draft[ex.id].sets, idx, history);
+            var source = set && set.kgTouched ? "" : (idx === 0 ? Log.weightSource(serverLogs, ex.id, date) : "");
+            if (document.activeElement !== input) {
               input.value = kg == null ? "" : Log.formatNumber(kg);
               input.classList.toggle("is-suggestion", !!source && kg != null);
             }
+            var hint = item.querySelector('[data-kghint="' + ex.id + "-" + idx + '"]');
             if (hint) hint.textContent = source === "last" ? "zuletzt" : "";
-          }
+          });
         });
         renderHistory();
       }
@@ -472,7 +615,7 @@
             btn.setAttribute("aria-pressed", "false");
             var mark = document.createElement("span");
             mark.className = "mark";
-            mark.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7.2 5.2 10.5 12 3.5" fill="none" stroke="#C7413B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            mark.innerHTML = CHECK_SVG;
             var copy = document.createElement("div");
             copy.className = "check-copy";
             fillCopy(copy, ex);
@@ -489,61 +632,11 @@
             statEl.className = "stat";
             statEl.dataset.stat = ex.id;
             var controls = document.createElement("div");
-            controls.className = "controls";
-
-            var reps = document.createElement("label");
-            reps.className = "reps";
-            var repsInput = document.createElement("input");
-            repsInput.dataset.reps = ex.id;
-            repsInput.inputMode = "numeric";
-            repsInput.autocomplete = "off";
-            repsInput.setAttribute("aria-label", ex.name + " Wiederholungen");
-            repsInput.value = draft[ex.id].reps;
-            var repsUnit = document.createElement("span");
-            repsUnit.className = "unit";
-            repsUnit.textContent = "Wdh";
-            reps.appendChild(repsInput);
-            reps.appendChild(repsUnit);
-            controls.appendChild(reps);
-
-            if (ex.weight) {
-              var kg = document.createElement("div");
-              kg.className = "kg";
-              var minus = document.createElement("button");
-              minus.type = "button";
-              minus.className = "step minus";
-              minus.dataset.act = "minus";
-              minus.dataset.id = ex.id;
-              minus.setAttribute("aria-label", ex.name + " Gewicht senken");
-              minus.textContent = "−";
-              var kgInput = document.createElement("input");
-              kgInput.dataset.kg = ex.id;
-              kgInput.inputMode = "decimal";
-              kgInput.autocomplete = "off";
-              kgInput.setAttribute("aria-label", ex.name + " Gewicht in Kilogramm");
-              var hint = document.createElement("span");
-              hint.className = "unit";
-              hint.dataset.kghint = ex.id;
-              var unit = document.createElement("span");
-              unit.className = "unit";
-              unit.textContent = "kg";
-              var plus = document.createElement("button");
-              plus.type = "button";
-              plus.className = "step plus";
-              plus.dataset.act = "plus";
-              plus.dataset.id = ex.id;
-              plus.setAttribute("aria-label", ex.name + " Gewicht erhöhen");
-              plus.textContent = "+";
-              kg.appendChild(minus);
-              kg.appendChild(kgInput);
-              kg.appendChild(hint);
-              kg.appendChild(unit);
-              kg.appendChild(plus);
-              controls.appendChild(kg);
-            }
-
+            controls.className = "sets";
+            controls.dataset.sets = ex.id;
             item.appendChild(statEl);
             item.appendChild(controls);
+            renderSetRows(ex, controls);
           }
 
           listEl.appendChild(item);
@@ -591,7 +684,7 @@
           tr.appendChild(td);
           Log.EXERCISES.forEach(function (ex) {
             var cell = document.createElement("td");
-            cell.textContent = Log.cellText(ex, Log.rowOn(logs, iso, ex.id));
+            cell.textContent = Log.cellText(ex, Log.rowsFor(logs, iso, ex));
             tr.appendChild(cell);
           });
           tbody.appendChild(tr);
@@ -627,30 +720,138 @@
         timers[ex.id] = setTimeout(function () { saveExercise(ex); }, wait);
       }
 
+      function renderSetRows(ex, box) {
+        var count = Log.visibleSetCount(ex, draft[ex.id].sets);
+        var previousWheel = wheelInput;
+        box.textContent = "";
+        for (var i = 0; i < count; i++) box.appendChild(buildSetRow(ex, i));
+        if (previousWheel && previousWheel.dataset.id === ex.id) {
+          var still = box.querySelector('[data-reps][data-idx="' + previousWheel.dataset.idx + '"]');
+          wheelInput = still;
+          if (!still) closeWheel();
+        }
+      }
+
+      function syncSets(ex) {
+        var box = document.querySelector('[data-sets="' + ex.id + '"]');
+        if (!box) return;
+        var want = Log.visibleSetCount(ex, draft[ex.id].sets);
+        if (box.querySelectorAll(".set-row").length !== want) renderSetRows(ex, box);
+      }
+
+      function buildSetRow(ex, index) {
+        var row = document.createElement("div");
+        row.className = "set-row";
+        var check = document.createElement("button");
+        check.type = "button";
+        check.className = "set-check";
+        check.dataset.setCheck = ex.id;
+        check.dataset.id = ex.id;
+        check.dataset.idx = String(index);
+        check.setAttribute("aria-label", ex.name + " Satz " + (index + 1) + " erledigt");
+        var mark = document.createElement("span");
+        mark.className = "mark";
+        mark.innerHTML = CHECK_SVG;
+        check.appendChild(mark);
+
+        var reps = document.createElement("label");
+        reps.className = "reps";
+        var repsInput = document.createElement("input");
+        repsInput.dataset.reps = ex.id;
+        repsInput.dataset.id = ex.id;
+        repsInput.dataset.idx = String(index);
+        repsInput.readOnly = true;
+        repsInput.inputMode = "none";
+        repsInput.autocomplete = "off";
+        repsInput.tabIndex = -1;
+        repsInput.setAttribute("aria-label", ex.name + " Satz " + (index + 1) + " Wiederholungen");
+        var repsUnit = document.createElement("span");
+        repsUnit.className = "unit";
+        repsUnit.textContent = "Wdh";
+        reps.appendChild(repsInput);
+        reps.appendChild(repsUnit);
+        row.appendChild(check);
+        row.appendChild(reps);
+
+        if (ex.weight) {
+          var wrap = document.createElement("div");
+          wrap.className = "kg-wrap";
+          var kg = document.createElement("div");
+          kg.className = "kg";
+          var minus = document.createElement("button");
+          minus.type = "button";
+          minus.className = "step minus";
+          minus.dataset.act = "minus";
+          minus.dataset.id = ex.id;
+          minus.dataset.idx = String(index);
+          minus.setAttribute("aria-label", ex.name + " Gewicht senken");
+          minus.textContent = "−";
+          var kgInput = document.createElement("input");
+          kgInput.dataset.kg = ex.id;
+          kgInput.dataset.id = ex.id;
+          kgInput.dataset.idx = String(index);
+          kgInput.inputMode = "decimal";
+          kgInput.autocomplete = "off";
+          kgInput.setAttribute("aria-label", ex.name + " Gewicht in Kilogramm");
+          var unit = document.createElement("span");
+          unit.className = "unit";
+          unit.textContent = "kg";
+          var plus = document.createElement("button");
+          plus.type = "button";
+          plus.className = "step plus";
+          plus.dataset.act = "plus";
+          plus.dataset.id = ex.id;
+          plus.dataset.idx = String(index);
+          plus.setAttribute("aria-label", ex.name + " Gewicht erhöhen");
+          plus.textContent = "+";
+          kg.appendChild(minus);
+          kg.appendChild(kgInput);
+          kg.appendChild(unit);
+          kg.appendChild(plus);
+          var hint = document.createElement("span");
+          hint.className = "kg-hint";
+          hint.dataset.kghint = ex.id + "-" + index;
+          wrap.appendChild(kg);
+          wrap.appendChild(hint);
+          row.appendChild(wrap);
+        }
+        return row;
+      }
+
       function saveExercise(ex) {
         var gen = ++generation;
         var when = date;
-        var body = Log.payloadFromDraft(ex, draft[ex.id], Log.suggestionKg(serverLogs, ex.id, when));
+        var plans = Log.payloadsFor(ex, draft[ex.id], serverLogs, when);
         setStatus("Speichert …", false);
         tail = tail.then(function () {
-          var request = !body
-            ? rest(
-              "go_natalya_logs?workout_date=eq." + encodeURIComponent(when) + "&exercise_id=eq." + encodeURIComponent(ex.id),
-              { method: "DELETE", prefer: "return=minimal" }
-            )
-            : rest("go_natalya_logs?on_conflict=workout_date,exercise_id", {
-              method: "POST",
-              prefer: "resolution=merge-duplicates,return=minimal",
-              body: {
-                workout_date: when,
-                exercise_id: ex.id,
-                reps: body.reps,
-                weight_kg: body.weight_kg,
-                done: body.done,
-                updated_at: new Date().toISOString()
+          var chain = Promise.resolve();
+          plans.forEach(function (plan) {
+            chain = chain.then(function () {
+              var exists = serverLogs.some(function (row) {
+                return row.workout_date === when && row.exercise_id === plan.storageId;
+              });
+              if (!plan.body) {
+                if (!exists) return null;
+                return rest(
+                  "go_natalya_logs?workout_date=eq." + encodeURIComponent(when) + "&exercise_id=eq." + encodeURIComponent(plan.storageId),
+                  { method: "DELETE", prefer: "return=minimal" }
+                );
               }
+              return rest("go_natalya_logs?on_conflict=workout_date,exercise_id", {
+                method: "POST",
+                prefer: "resolution=merge-duplicates,return=minimal",
+                body: {
+                  workout_date: when,
+                  exercise_id: plan.storageId,
+                  reps: plan.body.reps,
+                  weight_kg: plan.body.weight_kg,
+                  done: plan.body.done,
+                  updated_at: new Date().toISOString()
+                }
+              });
             });
-          return request.then(function () {
+          });
+          return chain.then(function () {
             return rest("go_natalya_logs?select=workout_date,exercise_id,reps,weight_kg,done&order=workout_date.desc");
           }).then(function (rows) {
             if (gen !== generation) return;
@@ -695,8 +896,86 @@
         if (!workout) renderHistory();
       }
 
+      var wheel = document.getElementById("wheel");
+      var wheelCol = document.getElementById("wheel-col");
+      var wheelLabel = document.getElementById("wheel-label");
+      var stickyBar = document.getElementById("sticky-bar");
+
+      function buildWheel() {
+        if (wheelCol.childElementCount) return;
+        for (var n = 1; n <= WHEEL_MAX; n++) {
+          var item = document.createElement("div");
+          item.className = "wheel-item";
+          item.dataset.n = String(n);
+          item.textContent = String(n);
+          wheelCol.appendChild(item);
+        }
+      }
+
+      function highlightWheel(n) {
+        wheelCol.querySelectorAll(".wheel-item").forEach(function (item) {
+          item.classList.toggle("is-on", Number(item.dataset.n) === n);
+        });
+      }
+
+      function wheelValue() {
+        var n = Math.round(wheelCol.scrollTop / WHEEL_ITEM) + 1;
+        if (n < 1) n = 1;
+        if (n > WHEEL_MAX) n = WHEEL_MAX;
+        return n;
+      }
+
+      function applyWheel(n) {
+        if (!wheelInput) return;
+        var ex = Log.exerciseById(wheelInput.dataset.id);
+        var idx = Number(wheelInput.dataset.idx);
+        if (!ex || !draft[ex.id].sets[idx]) return;
+        highlightWheel(n);
+        draft[ex.id].sets[idx].reps = String(n);
+        wheelInput.value = String(n);
+        scheduleSave(ex, false);
+      }
+
+      function keepFieldVisible(input) {
+        var top = wheel.getBoundingClientRect().top;
+        var rect = input.getBoundingClientRect();
+        if (rect.bottom > top - 12) window.scrollBy(0, rect.bottom - (top - 16));
+      }
+
+      function openWheel(input) {
+        if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+        buildWheel();
+        wheelInput = input;
+        var ex = Log.exerciseById(input.dataset.id);
+        var idx = Number(input.dataset.idx);
+        wheelLabel.textContent = (ex ? ex.name : "Wiederholungen") + " · Satz " + (idx + 1);
+        wheel.hidden = false;
+        document.body.classList.add("wheel-open");
+        wheelUser = false;
+        var current = parseInt(input.value, 10);
+        var n = current >= 1 && current <= WHEEL_MAX ? current : 10;
+        wheelLock = true;
+        wheelCol.scrollTop = (n - 1) * WHEEL_ITEM;
+        highlightWheel(n);
+        window.setTimeout(function () { wheelLock = false; keepFieldVisible(input); }, 60);
+      }
+
+      function closeWheel() {
+        wheel.hidden = true;
+        wheelInput = null;
+        document.body.classList.remove("wheel-open");
+      }
+
+      wheelCol.addEventListener("pointerdown", function () { wheelUser = true; });
+      wheelCol.addEventListener("scroll", function () {
+        if (wheelLock || !wheelUser || wheel.hidden) return;
+        applyWheel(wheelValue());
+      });
+      document.getElementById("wheel-done").addEventListener("click", function () { closeWheel(); });
+
       dateInput.addEventListener("change", function () {
         clearTimers();
+        closeWheel();
         date = dateInput.value || Log.berlinToday();
         dateInput.value = date;
         draft = Log.draftFromLogs(serverLogs, date);
@@ -704,9 +983,26 @@
       });
 
       workoutTab.addEventListener("click", function () { showTab("workout"); });
-      historyTab.addEventListener("click", function () { showTab("history"); });
+      historyTab.addEventListener("click", function () { closeWheel(); showTab("history"); });
+
+      listEl.addEventListener("pointerdown", function (event) {
+        var reps = event.target.closest("[data-reps], .reps");
+        if (!reps) return;
+        event.preventDefault();
+        var input = reps.dataset.reps ? reps : reps.querySelector("[data-reps]");
+        if (input) openWheel(input);
+      });
 
       listEl.addEventListener("click", function (event) {
+        var reps = event.target.closest("[data-reps], .reps");
+        if (reps) {
+          var input = reps.dataset.reps ? reps : reps.querySelector("[data-reps]");
+          if (input) {
+            event.preventDefault();
+            openWheel(input);
+          }
+          return;
+        }
         var check = event.target.closest("[data-check]");
         if (check) {
           var ex = Log.exerciseById(check.dataset.check);
@@ -715,46 +1011,71 @@
           scheduleSave(ex, true);
           return;
         }
+        var setCheck = event.target.closest("[data-set-check]");
+        if (setCheck) {
+          var exercise = Log.exerciseById(setCheck.dataset.id);
+          var idx = Number(setCheck.dataset.idx);
+          var set = draft[exercise.id].sets[idx];
+          set.done = !set.done;
+          if (!set.done) {
+            for (var j = idx + 1; j < draft[exercise.id].sets.length; j++) {
+              draft[exercise.id].sets[j] = { reps: "", kg: null, kgTouched: false, done: false };
+            }
+          }
+          paintMeta();
+          scheduleSave(exercise, true);
+          return;
+        }
         var step = event.target.closest("[data-act]");
         if (!step) return;
-        var exercise = Log.exerciseById(step.dataset.id);
-        var current = shownKg(exercise);
-        var delta = step.dataset.act === "plus" ? exercise.step : -exercise.step;
+        var weighted = Log.exerciseById(step.dataset.id);
+        var setIdx = Number(step.dataset.idx);
+        var current = Log.displayKg(weighted, draft[weighted.id].sets, setIdx, historyKg(weighted));
+        var delta = step.dataset.act === "plus" ? weighted.step : -weighted.step;
         var next = current == null && delta < 0 ? null : Log.addKg(current == null ? 0 : current, delta);
-        if (current == null && delta > 0) next = exercise.step;
-        draft[exercise.id].kg = next;
-        draft[exercise.id].kgTouched = next != null;
+        if (current == null && delta > 0) next = weighted.step;
+        draft[weighted.id].sets[setIdx].kg = next;
+        draft[weighted.id].sets[setIdx].kgTouched = next != null;
         paintMeta();
-        scheduleSave(exercise, true);
+        scheduleSave(weighted, true);
       });
 
       listEl.addEventListener("input", function (event) {
-        var reps = event.target.closest("[data-reps]");
-        if (reps) {
-          var ex = Log.exerciseById(reps.dataset.reps);
-          draft[ex.id].reps = reps.value;
-          paintMeta();
-          scheduleSave(ex, false);
-          return;
-        }
         var kg = event.target.closest("[data-kg]");
         if (!kg) return;
-        var exercise = Log.exerciseById(kg.dataset.kg);
+        var exercise = Log.exerciseById(kg.dataset.id);
+        var idx = Number(kg.dataset.idx);
         var raw = kg.value.trim();
         var parsed = Log.parseKg(raw);
-        draft[exercise.id].kgTouched = true;
+        draft[exercise.id].sets[idx].kgTouched = true;
         kg.classList.remove("is-suggestion");
-        var hint = document.querySelector('[data-kghint="' + exercise.id + '"]');
+        var hint = document.querySelector('[data-kghint="' + exercise.id + "-" + idx + '"]');
         if (hint) hint.textContent = "";
         if (raw && parsed == null) return;
-        draft[exercise.id].kg = parsed;
+        draft[exercise.id].sets[idx].kg = parsed;
         paintMeta();
         scheduleSave(exercise, false);
       });
 
+      document.addEventListener("click", function (event) {
+        if (wheel.hidden) return;
+        if (event.target.closest("#wheel") || event.target.closest("[data-reps], .reps")) return;
+        closeWheel();
+      });
+
+      if ("IntersectionObserver" in window) {
+        var sentinel = document.createElement("div");
+        sentinel.style.height = "1px";
+        stickyBar.parentNode.insertBefore(sentinel, stickyBar);
+        new IntersectionObserver(function (entries) {
+          stickyBar.classList.toggle("is-stuck", !entries[0].isIntersecting);
+        }, { threshold: 0 }).observe(sentinel);
+      }
+
       historyEl.addEventListener("click", function (event) {
         var open = event.target.closest("[data-open]");
         if (!open) return;
+        closeWheel();
         date = open.dataset.open;
         dateInput.value = date;
         draft = Log.draftFromLogs(serverLogs, date);

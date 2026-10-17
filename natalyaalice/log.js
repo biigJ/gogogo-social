@@ -48,6 +48,7 @@
       kind: "reps",
       cue: "Gestreckt hängen, Schultern runterziehen.",
       note: "3 × 5 · letzter Satz so lange wie möglich hängen",
+      sets: 3,
       group: "Hauptteil"
     },
     {
@@ -60,6 +61,7 @@
       startKg: 6,
       cue: "Hinterer Fuß erhöht, tief beugen.",
       note: "3 × ca. 10 je Bein",
+      sets: 3,
       group: "Hauptteil"
     },
     {
@@ -72,6 +74,7 @@
       startKg: 6,
       cue: "Hüfte nach hinten, Rücken gerade.",
       note: "3 × ca. 10 je Bein",
+      sets: 3,
       group: "Hauptteil"
     },
     {
@@ -81,6 +84,7 @@
       kind: "reps",
       cue: "Schultern auf Box, Po hoch. Freies Bein gestreckt.",
       note: "3 × ca. 10 je Bein",
+      sets: 3,
       group: "Hauptteil"
     },
     {
@@ -93,6 +97,7 @@
       startKg: 3,
       cue: "Stirn auf Stuhllehne, Arme seitlich.",
       note: "3 × ca. 10",
+      sets: 3,
       group: "Hauptteil"
     },
     {
@@ -105,6 +110,7 @@
       startKg: 3,
       cue: "Vorne auf Stuhlkante, Bauch fest.",
       note: "3 × ca. 15",
+      sets: 3,
       group: "Hauptteil"
     },
     {
@@ -114,6 +120,7 @@
       kind: "reps",
       cue: "Körper gerade von Knie bis Kopf.",
       note: "5 × ca. 5",
+      sets: 5,
       group: "Hauptteil"
     },
     {
@@ -123,6 +130,7 @@
       kind: "reps",
       cue: "Rückenlage, Hände hinten abstützen. Bein strecken, dann Knie Richtung Brust ziehen.",
       note: "2 × ca. 15",
+      sets: 2,
       group: "Hauptteil"
     }
   ];
@@ -201,34 +209,103 @@
     return isFinite(n) ? n : null;
   }
 
+  function baseId(exerciseId) {
+    var id = String(exerciseId || "");
+    var hash = id.lastIndexOf("#");
+    return hash === -1 ? id : id.slice(0, hash);
+  }
+
+  function setIndex(exerciseId) {
+    var id = String(exerciseId || "");
+    var hash = id.lastIndexOf("#");
+    if (hash === -1) return 0;
+    var n = parseInt(id.slice(hash + 1), 10);
+    return n > 0 ? n - 1 : 0;
+  }
+
+  function setCount(ex) {
+    if (!ex || ex.kind !== "reps") return 1;
+    var n = parseInt(ex.sets, 10);
+    return n > 0 ? n : 1;
+  }
+
+  function storageId(ex, index) {
+    return index === 0 ? ex.id : ex.id + "#" + (index + 1);
+  }
+
+  function blankSet() {
+    return { reps: "", kg: null, kgTouched: false, done: false };
+  }
+
+  function visibleSetCount(ex, sets) {
+    var max = setCount(ex);
+    var n = 1;
+    var list = sets || [];
+    for (var i = 0; i < max - 1; i++) {
+      if (!list[i] || !list[i].done) break;
+      n += 1;
+    }
+    return n;
+  }
+
   function lastLoggedKg(logs, exerciseId, date) {
-    var best = null;
+    var base = baseId(exerciseId);
+    var bestDate = null;
+    var bestIndex = -1;
+    var bestKg = null;
     (logs || []).forEach(function (row) {
-      if (!row || row.exercise_id !== exerciseId) return;
+      if (!row || baseId(row.exercise_id) !== base) return;
       if (row.workout_date >= date) return;
       var kg = numberOrNull(row.weight_kg);
       if (kg == null) return;
-      if (!best || row.workout_date > best.workout_date) best = row;
+      var idx = setIndex(row.exercise_id);
+      if (bestDate == null || row.workout_date > bestDate || (row.workout_date === bestDate && idx >= bestIndex)) {
+        bestDate = row.workout_date;
+        bestIndex = idx;
+        bestKg = kg;
+      }
     });
-    return best ? numberOrNull(best.weight_kg) : null;
+    return bestKg;
   }
 
   function suggestionKg(logs, exerciseId, date) {
     var last = lastLoggedKg(logs, exerciseId, date);
     if (last != null) return last;
-    var ex = exerciseById(exerciseId);
+    var ex = exerciseById(baseId(exerciseId));
     return ex && ex.startKg != null ? Number(ex.startKg) : null;
   }
 
   function weightSource(logs, exerciseId, date) {
     if (lastLoggedKg(logs, exerciseId, date) != null) return "last";
-    var ex = exerciseById(exerciseId);
+    var ex = exerciseById(baseId(exerciseId));
     if (ex && ex.startKg != null) return "plan";
     return "";
   }
 
+  function displayKg(ex, sets, index, historyKg) {
+    var list = sets || [];
+    var set = list[index];
+    if (set && set.kgTouched) return set.kg;
+    for (var i = index - 1; i >= 0; i--) {
+      if (list[i] && list[i].kg != null) return list[i].kg;
+    }
+    return historyKg == null ? null : historyKg;
+  }
+
   function groupHint(group) {
     return GROUP_HINTS[group] || "";
+  }
+
+  function payloadForSet(ex, set, suggestion) {
+    if (!ex || !set) return null;
+    var reps = parseReps(set.reps);
+    var kg = null;
+    if (ex.weight) {
+      if (set.kgTouched) kg = set.kg == null ? null : roundKg(set.kg);
+      else if ((reps != null || set.done) && suggestion != null) kg = roundKg(suggestion);
+    }
+    if (!set.done && reps == null && kg == null) return null;
+    return { reps: reps, weight_kg: kg, done: !!set.done };
   }
 
   function payloadFromDraft(ex, draft, suggestion) {
@@ -236,14 +313,25 @@
     if (ex.kind === "check") {
       return draft.done ? { reps: null, weight_kg: null, done: true } : null;
     }
-    var reps = parseReps(draft.reps);
-    var kg = null;
-    if (ex.weight) {
-      if (draft.kgTouched) kg = draft.kg == null ? null : roundKg(draft.kg);
-      else if (reps != null && suggestion != null) kg = roundKg(suggestion);
+    return payloadForSet(ex, (draft.sets || [])[0], suggestion);
+  }
+
+  function payloadsFor(ex, draft, logs, date) {
+    if (!ex || !draft) return [];
+    if (ex.kind === "check") {
+      return [{ storageId: ex.id, body: payloadFromDraft(ex, draft, null) }];
     }
-    if (reps == null && kg == null) return null;
-    return { reps: reps, weight_kg: kg, done: true };
+    var history = suggestionKg(logs, ex.id, date);
+    var out = [];
+    var max = setCount(ex);
+    for (var i = 0; i < max; i++) {
+      var set = (draft.sets || [])[i] || blankSet();
+      out.push({
+        storageId: storageId(ex, i),
+        body: payloadForSet(ex, set, displayKg(ex, draft.sets, i, history))
+      });
+    }
+    return out;
   }
 
   function projectLogs(logs, date, drafts) {
@@ -253,14 +341,15 @@
     EXERCISES.forEach(function (ex) {
       var draft = drafts && drafts[ex.id];
       if (!draft) return;
-      var body = payloadFromDraft(ex, draft, suggestionKg(logs, ex.id, date));
-      if (!body) return;
-      next.push({
-        workout_date: date,
-        exercise_id: ex.id,
-        reps: body.reps,
-        weight_kg: body.weight_kg,
-        done: body.done
+      payloadsFor(ex, draft, logs, date).forEach(function (plan) {
+        if (!plan.body) return;
+        next.push({
+          workout_date: date,
+          exercise_id: plan.storageId,
+          reps: plan.body.reps,
+          weight_kg: plan.body.weight_kg,
+          done: plan.body.done
+        });
       });
     });
     return next;
@@ -289,7 +378,7 @@
     var bestKgReps = null;
     var checks = 0;
     (logs || []).forEach(function (row) {
-      if (!row || row.exercise_id !== ex.id) return;
+      if (!row || baseId(row.exercise_id) !== ex.id) return;
       var r = numberOrNull(row.reps);
       var kg = numberOrNull(row.weight_kg);
       if (r != null) reps.push(r);
@@ -322,15 +411,35 @@
     };
   }
 
-  function cellText(ex, row) {
-    if (!row) return "–";
-    if (ex.kind === "check") return row.done ? "✓" : "–";
+  function setText(ex, row) {
+    if (!row) return "";
     var reps = numberOrNull(row.reps);
     var kg = numberOrNull(row.weight_kg);
-    if (ex.weight && kg != null && reps != null) return String(reps) + " × " + formatNumber(kg);
+    if (ex.weight && kg != null && reps != null) return String(reps) + "×" + formatNumber(kg);
     if (ex.weight && kg != null) return formatKg(kg);
     if (reps != null) return String(reps);
-    return "–";
+    if (row.done) return "✓";
+    return "";
+  }
+
+  function rowsFor(logs, date, ex) {
+    var found = [];
+    (logs || []).forEach(function (row) {
+      if (row && row.workout_date === date && baseId(row.exercise_id) === ex.id) found.push(row);
+    });
+    found.sort(function (a, b) { return setIndex(a.exercise_id) - setIndex(b.exercise_id); });
+    return found;
+  }
+
+  function cellText(ex, rows) {
+    var list = !rows ? [] : (Array.isArray(rows) ? rows : [rows]);
+    if (ex.kind === "check") return list[0] && list[0].done ? "✓" : "–";
+    var parts = [];
+    list.forEach(function (row) {
+      var text = setText(ex, row);
+      if (text) parts.push(text);
+    });
+    return parts.length ? parts.join(" · ") : "–";
   }
 
   function avgText(ex, stats, logs) {
@@ -375,21 +484,48 @@
   function draftFromLogs(logs, date) {
     var draft = {};
     EXERCISES.forEach(function (ex) {
-      var row = rowOn(logs, date, ex.id);
-      draft[ex.id] = {
-        reps: row && row.reps != null && row.reps !== "" ? String(parseInt(row.reps, 10)) : "",
-        kg: row && numberOrNull(row.weight_kg) != null ? numberOrNull(row.weight_kg) : null,
-        kgTouched: !!(row && numberOrNull(row.weight_kg) != null),
-        done: !!(row && row.done)
-      };
+      if (ex.kind === "check") {
+        var row = rowOn(logs, date, ex.id);
+        draft[ex.id] = { done: !!(row && row.done), sets: [] };
+        return;
+      }
+      var sets = [];
+      var max = setCount(ex);
+      for (var i = 0; i < max; i++) {
+        var setRow = rowOn(logs, date, storageId(ex, i));
+        sets.push({
+          reps: setRow && setRow.reps != null && setRow.reps !== "" ? String(parseInt(setRow.reps, 10)) : "",
+          kg: setRow && numberOrNull(setRow.weight_kg) != null ? numberOrNull(setRow.weight_kg) : null,
+          kgTouched: !!(setRow && numberOrNull(setRow.weight_kg) != null),
+          done: !!(setRow && setRow.done)
+        });
+      }
+      draft[ex.id] = { done: false, sets: sets };
     });
     return draft;
+  }
+
+  function exerciseComplete(logs, date, ex) {
+    if (ex.kind === "check") {
+      var row = rowOn(logs, date, ex.id);
+      return !!(row && row.done);
+    }
+    var max = setCount(ex);
+    for (var i = 0; i < max; i++) {
+      var setRow = rowOn(logs, date, storageId(ex, i));
+      if (!setRow || !setRow.done) return false;
+    }
+    return true;
   }
 
   function doneCount(logs, date) {
     var n = 0;
     EXERCISES.forEach(function (ex) {
-      if (rowOn(logs, date, ex.id)) n += 1;
+      if (ex.kind === "check") {
+        if (exerciseComplete(logs, date, ex)) n += 1;
+        return;
+      }
+      if (rowsFor(logs, date, ex).length) n += 1;
     });
     return n;
   }
@@ -404,10 +540,17 @@
     formatKg: formatKg,
     formatDate: formatDate,
     berlinToday: berlinToday,
+    setCount: setCount,
+    storageId: storageId,
+    visibleSetCount: visibleSetCount,
+    displayKg: displayKg,
     suggestionKg: suggestionKg,
     weightSource: weightSource,
     groupHint: groupHint,
     payloadFromDraft: payloadFromDraft,
+    payloadsFor: payloadsFor,
+    rowsFor: rowsFor,
+    exerciseComplete: exerciseComplete,
     projectLogs: projectLogs,
     historyDates: historyDates,
     rowOn: rowOn,
