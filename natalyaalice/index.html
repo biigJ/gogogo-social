@@ -517,7 +517,8 @@
       var WHEEL_ITEM = 44;
       var wheelInput = null;
       var wheelLock = false;
-      var wheelUser = false;
+      var wheelTouched = false;
+      var wheelSettleTimer = 0;
 
       function historyKg(ex) {
         return Log.suggestionKg(serverLogs, ex.id, date);
@@ -942,6 +943,12 @@
         if (rect.bottom > top - 12) window.scrollBy(0, rect.bottom - (top - 16));
       }
 
+      function settleWheel() {
+        wheelLock = true;
+        window.clearTimeout(wheelSettleTimer);
+        wheelSettleTimer = window.setTimeout(function () { wheelLock = false; }, 200);
+      }
+
       function openWheel(input) {
         if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
         buildWheel();
@@ -951,31 +958,60 @@
         wheelLabel.textContent = (ex ? ex.name : "Wiederholungen") + " · Satz " + (idx + 1);
         wheel.hidden = false;
         document.body.classList.add("wheel-open");
-        wheelUser = false;
+        wheelTouched = false;
         var current = parseInt(input.value, 10);
         var n = current >= 1 && current <= WHEEL_MAX ? current : 10;
-        wheelLock = true;
+        settleWheel();
         wheelCol.scrollTop = (n - 1) * WHEEL_ITEM;
         highlightWheel(n);
-        window.setTimeout(function () { wheelLock = false; keepFieldVisible(input); }, 60);
+        window.setTimeout(function () { keepFieldVisible(input); }, 60);
       }
 
       function closeWheel() {
         wheel.hidden = true;
         wheelInput = null;
+        wheelTouched = false;
         document.body.classList.remove("wheel-open");
       }
 
-      wheelCol.addEventListener("pointerdown", function () { wheelUser = true; });
+      function finishWheel() {
+        if (!wheel.hidden && wheelTouched) applyWheel(wheelValue());
+        closeWheel();
+      }
+
+      wheel.addEventListener("pointerdown", function (event) {
+        if (event.target.closest("#wheel-done")) return;
+        wheelTouched = true;
+      });
+      wheel.addEventListener("wheel", function () { wheelTouched = true; });
+      wheelCol.addEventListener("click", function (event) {
+        var item = event.target.closest(".wheel-item");
+        if (!item) return;
+        var n = Number(item.dataset.n);
+        if (!n) return;
+        wheelTouched = true;
+        settleWheel();
+        wheelCol.scrollTop = (n - 1) * WHEEL_ITEM;
+        applyWheel(n);
+      });
       wheelCol.addEventListener("scroll", function () {
-        if (wheelLock || !wheelUser || wheel.hidden) return;
+        if (wheel.hidden) return;
+        if (wheelLock && !wheelTouched) {
+          settleWheel();
+          highlightWheel(wheelValue());
+          return;
+        }
+        wheelTouched = true;
         applyWheel(wheelValue());
       });
-      document.getElementById("wheel-done").addEventListener("click", function () { closeWheel(); });
+      document.getElementById("wheel-done").addEventListener("click", function () { finishWheel(); });
 
       dateInput.addEventListener("change", function () {
-        clearTimers();
+        var pendingWheel = !wheel.hidden && wheelTouched && wheelInput ? Log.exerciseById(wheelInput.dataset.id) : null;
+        if (pendingWheel) applyWheel(wheelValue());
         closeWheel();
+        clearTimers();
+        if (pendingWheel) saveExercise(pendingWheel);
         date = dateInput.value || Log.berlinToday();
         dateInput.value = date;
         draft = Log.draftFromLogs(serverLogs, date);
@@ -983,7 +1019,7 @@
       });
 
       workoutTab.addEventListener("click", function () { showTab("workout"); });
-      historyTab.addEventListener("click", function () { closeWheel(); showTab("history"); });
+      historyTab.addEventListener("click", function () { finishWheel(); showTab("history"); });
 
       listEl.addEventListener("pointerdown", function (event) {
         var reps = event.target.closest("[data-reps], .reps");
@@ -1060,7 +1096,7 @@
       document.addEventListener("click", function (event) {
         if (wheel.hidden) return;
         if (event.target.closest("#wheel") || event.target.closest("[data-reps], .reps")) return;
-        closeWheel();
+        finishWheel();
       });
 
       if ("IntersectionObserver" in window) {
@@ -1075,7 +1111,7 @@
       historyEl.addEventListener("click", function (event) {
         var open = event.target.closest("[data-open]");
         if (!open) return;
-        closeWheel();
+        finishWheel();
         date = open.dataset.open;
         dateInput.value = date;
         draft = Log.draftFromLogs(serverLogs, date);
