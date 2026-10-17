@@ -473,6 +473,7 @@
       color: #2A2118;
       text-align: center;
       overflow: hidden;
+      cursor: pointer;
     }
     .photo p {
       font-family: "Playfair Display", serif;
@@ -687,11 +688,11 @@
 <body class="is-home">
   <section id="welcome" class="welcome">
     <h1 class="welcome-title">gogogo Natalya!</h1>
-    <label class="photo" id="photo">
+    <div class="photo" id="photo" role="button" tabindex="0">
       <input id="photo-file" type="file" accept="image/*" />
       <p id="photo-copy">Lade Dein Motivationsbild hoch. Dich selbst, ein Vorbild, ein Ort. Egal, was Deine eigene Motivation ausmacht.</p>
       <img id="photo-img" alt="" hidden />
-    </label>
+    </div>
     <p class="tip">Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.</p>
     <div class="days" id="days"></div>
     <button type="button" id="routine-start" class="routine-start">Start der 12 Wochenroutine</button>
@@ -708,8 +709,7 @@
   <div class="sand-modal" id="days-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="days-title">
       <h2 class="ask" id="days-title"></h2>
-      <p class="ask-error" id="days-error" hidden></p>
-      <button type="button" id="days-ok">ja passt</button>
+      <button type="button" id="days-ok">Zweiten Tag festlegen</button>
     </div>
   </div>
   <div class="sand-modal" id="start-modal" hidden>
@@ -717,6 +717,14 @@
       <h2 class="ask" id="start-title">Hast Du die Workouts so verteilt, dass sie an Wochentagen sind, an denen Du grundsätzlich dafür Zeit hast?</h2>
       <p class="ask-error" id="start-error" hidden></p>
       <button type="button" id="start-ok">Ja passt</button>
+      <button type="button" class="sand-quiet" id="start-pick">Tage auswählen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="photo-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="photo-title">
+      <h2 class="ask" id="photo-title">Motivationsbild</h2>
+      <button type="button" id="photo-replace">Neues Bild</button>
+      <button type="button" class="sand-quiet" id="photo-remove">Entfernen</button>
     </div>
   </div>
   <div class="sand-modal" id="end-modal" hidden>
@@ -1751,18 +1759,10 @@
         mon: "Montag", tue: "Dienstag", wed: "Mittwoch", thu: "Donnerstag",
         fri: "Freitag", sat: "Samstag", sun: "Sonntag"
       };
-      var pendingDays = null;
+      var pendingDay = null;
+      var firstDay = null;
       var routineTouched = false;
       var ROUTINE_ID = "natalya";
-
-      function workoutQuestion(days) {
-        var ordered = DAY_KEYS.filter(function (key) { return days.indexOf(key) >= 0; });
-        if (ordered.length === 1) return "1 Workout am " + DAY_NAMES[ordered[0]] + "?";
-        if (ordered.length === 2) {
-          return "2 Workouts am " + DAY_NAMES[ordered[0]] + " und " + DAY_NAMES[ordered[1]] + "?";
-        }
-        return "0 Workouts?";
-      }
 
       function routineMissing(err) {
         var msg = String((err && err.message) || err || "");
@@ -1832,12 +1832,18 @@
         var selected = planDays();
         var moved = shiftTarget();
         var shifted = shiftActive(today);
+        var picking = !!firstDay;
+        var todayKey = DAY_KEYS[weekdayIndex(today)];
+        var todayPlanned = !picking && selected.indexOf(todayKey) >= 0;
         var box = document.getElementById("days");
         box.textContent = "";
+        document.querySelector(".tip").textContent = picking
+          ? "Zweiten Tag festlegen."
+          : "Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.";
         for (var i = 0; i < 7; i++) {
           var iso = addDays(today, i);
           var key = DAY_KEYS[weekdayIndex(iso)];
-          var on = selected.indexOf(key) >= 0;
+          var on = picking ? key === firstDay : selected.indexOf(key) >= 0;
           var isSource = shifted && shiftFrom() === iso;
           var isTarget = shifted && moved === iso;
           var brown = on && !isSource && !isTarget;
@@ -1877,26 +1883,43 @@
           weeks.appendChild(mark);
         }
         var shiftBtn = document.getElementById("go-shift");
-        shiftBtn.textContent = shifted ? "Nicht verschieben" : "Schieben";
-        shiftBtn.disabled = false;
-        document.getElementById("go-today").disabled = shifted;
-        document.getElementById("go-short").disabled = shifted;
+        shiftBtn.textContent = shifted && !picking ? "Nicht verschieben" : "Schieben";
+        shiftBtn.disabled = picking || (!shifted && !todayPlanned);
+        document.getElementById("go-today").disabled = picking || shifted || !todayPlanned;
+        document.getElementById("go-short").disabled = picking || shifted || !todayPlanned;
         paintPhoto();
       }
 
-      function togglePlanDay(key) {
+      function choosePlanDay(key) {
         if (!document.getElementById("days-modal").hidden) return;
-        var days = planDays().slice();
-        var index = days.indexOf(key);
-        if (index >= 0) days.splice(index, 1);
-        else {
-          days.push(key);
-          if (days.length > 2) days.shift();
+        if (firstDay) {
+          if (key === firstDay) return;
+          commitPlanDays([firstDay, key]);
+          return;
         }
-        pendingDays = days;
-        document.getElementById("days-title").textContent = workoutQuestion(days);
-        document.getElementById("days-error").hidden = true;
+        pendingDay = key;
+        document.getElementById("days-title").textContent = "Workout-Tag 1 am " + DAY_NAMES[key] + ".";
         document.getElementById("days-modal").hidden = false;
+      }
+
+      function commitPlanDays(days) {
+        saveRoutine(days, routineStart()).then(function () {
+          routineTouched = true;
+          writeStore(HOME_DAYS, days);
+          showRoutineNote("");
+          firstDay = null;
+          pendingDay = null;
+          paintWelcome();
+        }).catch(function (err) {
+          showRoutineNote(routineErrorText(err));
+          if (routineMissing(err)) {
+            routineTouched = true;
+            writeStore(HOME_DAYS, days);
+            firstDay = null;
+            pendingDay = null;
+            paintWelcome();
+          }
+        });
       }
 
       function setHome(on) {
@@ -1910,7 +1933,8 @@
 
       function enterWorkout(short) {
         var today = Log.berlinToday();
-        if (shiftActive(today)) return;
+        var todayKey = DAY_KEYS[weekdayIndex(today)];
+        if (firstDay || shiftActive(today) || planDays().indexOf(todayKey) < 0) return;
         shortMode = !!short;
         document.getElementById("short-modal").hidden = true;
         var when = shiftFrom() === today ? addDays(today, 1) : today;
@@ -1973,38 +1997,25 @@
       }
 
       function closeDaysPrompt() {
-        pendingDays = null;
+        pendingDay = null;
         document.getElementById("days-modal").hidden = true;
+      }
+
+      function hasPhoto() {
+        try { return !!localStorage.getItem(HOME_PHOTO); } catch (e) { return false; }
       }
 
       document.getElementById("days").addEventListener("click", function (event) {
         var day = event.target.closest("[data-day]");
         if (!day) return;
-        togglePlanDay(day.dataset.day);
+        choosePlanDay(day.dataset.day);
       });
       document.getElementById("days-ok").addEventListener("click", function () {
-        if (!pendingDays) return;
-        var days = pendingDays.slice();
-        var button = this;
-        button.disabled = true;
-        saveRoutine(days, routineStart()).then(function () {
-          routineTouched = true;
-          writeStore(HOME_DAYS, days);
-          showRoutineNote("");
-          closeDaysPrompt();
-          paintWelcome();
-        }).catch(function (err) {
-          var error = document.getElementById("days-error");
-          error.hidden = false;
-          error.textContent = routineErrorText(err);
-          if (routineMissing(err)) {
-            routineTouched = true;
-            writeStore(HOME_DAYS, days);
-            showRoutineNote(routineErrorText(err));
-            closeDaysPrompt();
-            paintWelcome();
-          }
-        }).then(function () { button.disabled = false; });
+        if (!pendingDay) return;
+        firstDay = pendingDay;
+        pendingDay = null;
+        document.getElementById("days-modal").hidden = true;
+        paintWelcome();
       });
       document.getElementById("days-modal").addEventListener("click", function (event) {
         if (event.target.id === "days-modal") closeDaysPrompt();
@@ -2040,13 +2051,19 @@
           }
         }).then(function () { button.disabled = false; });
       });
+      document.getElementById("start-pick").addEventListener("click", function () {
+        document.getElementById("start-modal").hidden = true;
+      });
       document.getElementById("start-modal").addEventListener("click", function (event) {
         if (event.target.id === "start-modal") event.currentTarget.hidden = true;
       });
       document.getElementById("go-today").addEventListener("click", function () { enterWorkout(false); });
       document.getElementById("go-shift").addEventListener("click", function () {
         var today = Log.berlinToday();
-        writeStore(HOME_SHIFT, shiftActive(today) ? "" : today);
+        var todayKey = DAY_KEYS[weekdayIndex(today)];
+        if (firstDay) return;
+        if (shiftActive(today)) writeStore(HOME_SHIFT, "");
+        else if (planDays().indexOf(todayKey) >= 0) writeStore(HOME_SHIFT, today);
         paintWelcome();
       });
       document.getElementById("end-cancel").addEventListener("click", function () {
@@ -2077,7 +2094,9 @@
         if (event.target.id === "end-modal") event.currentTarget.hidden = true;
       });
       document.getElementById("go-short").addEventListener("click", function () {
-        if (shiftActive(Log.berlinToday())) return;
+        var today = Log.berlinToday();
+        var todayKey = DAY_KEYS[weekdayIndex(today)];
+        if (firstDay || shiftActive(today) || planDays().indexOf(todayKey) < 0) return;
         document.getElementById("short-modal").hidden = false;
       });
       document.getElementById("short-go").addEventListener("click", function () { enterWorkout(true); });
@@ -2092,6 +2111,26 @@
         paintWelcome();
       });
       document.getElementById("short-finish").addEventListener("click", finishShort);
+      document.getElementById("photo").addEventListener("click", function (event) {
+        if (event.target.id === "photo-file") return;
+        if (hasPhoto()) {
+          document.getElementById("photo-modal").hidden = false;
+          return;
+        }
+        document.getElementById("photo-file").click();
+      });
+      document.getElementById("photo-replace").addEventListener("click", function () {
+        document.getElementById("photo-modal").hidden = true;
+        document.getElementById("photo-file").click();
+      });
+      document.getElementById("photo-remove").addEventListener("click", function () {
+        try { localStorage.removeItem(HOME_PHOTO); } catch (e) {}
+        document.getElementById("photo-modal").hidden = true;
+        paintPhoto();
+      });
+      document.getElementById("photo-modal").addEventListener("click", function (event) {
+        if (event.target.id === "photo-modal") event.currentTarget.hidden = true;
+      });
       document.getElementById("photo-file").addEventListener("change", function (event) {
         storePhoto(event.target.files && event.target.files[0]);
         event.target.value = "";
