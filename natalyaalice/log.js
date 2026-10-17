@@ -518,6 +518,30 @@
     return true;
   }
 
+  function summaryText(logs, date) {
+    var lines = ["Natalya", formatDate(date), ""];
+    EXERCISES.forEach(function (ex) {
+      if (ex.group !== "Hauptteil") return;
+      var rows = rowsFor(logs, date, ex);
+      var parts = [];
+      rows.forEach(function (row) {
+        var reps = numberOrNull(row.reps);
+        var kg = numberOrNull(row.weight_kg);
+        if (reps == null && kg == null && !row.done) return;
+        var bit = "Satz " + (setIndex(row.exercise_id) + 1);
+        if (reps != null) bit += ": " + reps + " Wdh";
+        else bit += ": erledigt";
+        if (kg != null) bit += ", " + formatNumber(kg) + " kg";
+        parts.push(bit);
+      });
+      if (!parts.length) return;
+      lines.push(ex.name);
+      parts.forEach(function (part) { lines.push(part); });
+      lines.push("");
+    });
+    return lines.join("\n").replace(/\n+$/, "") + "\n";
+  }
+
   function doneCount(logs, date) {
     var n = 0;
     EXERCISES.forEach(function (ex) {
@@ -556,6 +580,7 @@
     rowOn: rowOn,
     statsFor: statsFor,
     cellText: cellText,
+    summaryText: summaryText,
     avgText: avgText,
     bestText: bestText,
     statLine: statLine,
