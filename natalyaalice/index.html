@@ -521,6 +521,14 @@
       border-bottom: 1px solid #2A2118;
       box-shadow: none;
     }
+    .day.is-moved {
+      background: #C7413B;
+      color: #F6F1E8;
+      border-radius: 10px;
+      border-bottom-color: transparent;
+      margin: 3px 0;
+      padding: 5px 10px;
+    }
     .tip {
       margin: 16px 0 8px;
       font-family: "Playfair Display", serif;
@@ -543,34 +551,40 @@
       line-height: 1.35;
       color: #2A2118;
     }
-    .routine-start.is-started { cursor: default; }
-    .routine-end {
-      margin-top: 10px;
-      color: rgba(42, 33, 24, 0.72);
-      font-size: 13px;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
+    .routine-start { cursor: pointer; }
     .weeks {
       display: grid;
       grid-template-columns: repeat(12, 1fr);
-      gap: 5px;
+      gap: 4px;
       margin-top: 12px;
     }
     .week-box {
-      height: 16px;
-      border-radius: 999px;
+      aspect-ratio: 1;
+      border-radius: 50%;
       border: 1.5px solid rgba(42, 33, 24, 0.28);
       background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Inter, system-ui, sans-serif;
+      font-size: clamp(8px, 2.4vw, 11px);
+      font-weight: 600;
+      line-height: 1;
+      color: #2A2118;
     }
-    .week-box.is-full { background: #2A2118; border-color: #2A2118; }
+    .week-box.is-full {
+      background: #2A2118;
+      border-color: #2A2118;
+      color: #F6F1E8;
+    }
+    .routine-note {
+      margin-top: 10px;
+      font-size: 13px;
+      line-height: 1.4;
+      color: #C7413B;
+    }
+    .routine-note[hidden] { display: none; }
     .dock { margin-top: 28px; }
-    .shift-hint {
-      margin-bottom: 8px;
-      text-align: center;
-      font-family: "Playfair Display", serif;
-      font-size: 18px;
-    }
     .go-primary, .go-quiet, .sand-card button {
       font-family: Inter, system-ui, sans-serif;
       font-weight: 600;
@@ -583,6 +597,7 @@
       color: #F6F1E8;
       font-size: 16px;
     }
+    .go-primary:disabled { opacity: 0.4; }
     .go-row { display: flex; gap: 8px; margin-top: 8px; }
     .go-quiet {
       flex: 1;
@@ -618,6 +633,9 @@
       font-weight: 600;
       line-height: 1.15;
     }
+    .sand-card h2.ask { font-size: 22px; line-height: 1.25; }
+    .sand-card .ask-error { margin-top: 10px; color: #C7413B; line-height: 1.4; }
+    .sand-card .ask-error[hidden] { display: none; }
     .sand-card p { margin-top: 10px; line-height: 1.45; }
     .sand-card button {
       width: 100%;
@@ -671,16 +689,15 @@
     <h1 class="welcome-title">gogogo Natalya!</h1>
     <label class="photo" id="photo">
       <input id="photo-file" type="file" accept="image/*" />
-      <p id="photo-copy">Lade Dein Motivationsbild hoch. Dich selbst, ein Vorbild, ein Ort. Egal, was Deine eigene Motivations ausmacht.</p>
+      <p id="photo-copy">Lade Dein Motivationsbild hoch. Dich selbst, ein Vorbild, ein Ort. Egal, was Deine eigene Motivation ausmacht.</p>
       <img id="photo-img" alt="" hidden />
     </label>
     <p class="tip">Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.</p>
     <div class="days" id="days"></div>
     <button type="button" id="routine-start" class="routine-start">Start der 12 Wochenroutine</button>
     <div class="weeks" id="weeks"></div>
-    <button type="button" id="routine-end" class="routine-end" hidden>Challenge beenden</button>
+    <p class="routine-note" id="routine-note" hidden></p>
     <div class="dock">
-      <p class="shift-hint" id="shift-hint" hidden>Verschoben um einen Tag!</p>
       <button type="button" class="go-primary" id="go-today">Heutiges Workout</button>
       <div class="go-row">
         <button type="button" class="go-quiet" id="go-shift">Schieben</button>
@@ -688,6 +705,20 @@
       </div>
     </div>
   </section>
+  <div class="sand-modal" id="days-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="days-title">
+      <h2 class="ask" id="days-title"></h2>
+      <p class="ask-error" id="days-error" hidden></p>
+      <button type="button" id="days-ok">ja passt</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="start-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="start-title">
+      <h2 class="ask" id="start-title">Hast Du die Workouts so verteilt, dass sie an Wochentagen sind, an denen Du grundsätzlich dafür Zeit hast?</h2>
+      <p class="ask-error" id="start-error" hidden></p>
+      <button type="button" id="start-ok">Ja passt</button>
+    </div>
+  </div>
   <div class="sand-modal" id="end-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="end-title">
       <h2 id="end-title">Challenge beenden?</h2>
@@ -1716,28 +1747,109 @@
         return !!target && target >= today;
       }
 
+      var DAY_NAMES = {
+        mon: "Montag", tue: "Dienstag", wed: "Mittwoch", thu: "Donnerstag",
+        fri: "Freitag", sat: "Samstag", sun: "Sonntag"
+      };
+      var pendingDays = null;
+      var routineTouched = false;
+      var ROUTINE_ID = "natalya";
+
+      function workoutQuestion(days) {
+        var ordered = DAY_KEYS.filter(function (key) { return days.indexOf(key) >= 0; });
+        if (ordered.length === 1) return "1 Workout am " + DAY_NAMES[ordered[0]] + "?";
+        if (ordered.length === 2) {
+          return "2 Workouts am " + DAY_NAMES[ordered[0]] + " und " + DAY_NAMES[ordered[1]] + "?";
+        }
+        return "0 Workouts?";
+      }
+
+      function routineMissing(err) {
+        var msg = String((err && err.message) || err || "");
+        return /PGRST205|schema cache|does not exist|Could not find the table/i.test(msg);
+      }
+
+      function routineErrorText(err) {
+        var msg = String((err && err.message) || err || "");
+        if (routineMissing(err)) {
+          return "Die Tabelle fehlt noch. Einmal go-natalya-routine.sql im Supabase SQL Editor ausführen.";
+        }
+        if (/Failed to fetch|NetworkError|Load failed|name not resolved/i.test(msg)) {
+          return "Supabase ist gerade nicht erreichbar.";
+        }
+        return "Die Routine konnte nicht gespeichert werden.";
+      }
+
+      function showRoutineNote(text) {
+        var note = document.getElementById("routine-note");
+        if (!text) {
+          note.hidden = true;
+          note.textContent = "";
+          return;
+        }
+        note.hidden = false;
+        note.textContent = text;
+      }
+
+      function saveRoutine(days, started) {
+        return rest("go_natalya_routine?on_conflict=id", {
+          method: "POST",
+          prefer: "resolution=merge-duplicates,return=minimal",
+          body: {
+            id: ROUTINE_ID,
+            name: "Natalya",
+            days: days,
+            started_on: started || null,
+            updated_at: new Date().toISOString()
+          }
+        });
+      }
+
+      function deleteRoutine() {
+        return rest("go_natalya_routine?id=eq." + ROUTINE_ID, {
+          method: "DELETE",
+          prefer: "return=minimal"
+        });
+      }
+
+      function loadRoutine() {
+        return rest("go_natalya_routine?id=eq." + ROUTINE_ID + "&select=name,days,started_on")
+          .then(function (rows) {
+            if (routineTouched || !rows || !rows.length) return;
+            var row = rows[0];
+            if (Array.isArray(row.days)) {
+              var days = row.days.filter(function (key) { return DAY_KEYS.indexOf(key) >= 0; }).slice(0, 2);
+              writeStore(HOME_DAYS, days);
+            }
+            writeStore(HOME_START, typeof row.started_on === "string" ? row.started_on : "");
+            paintWelcome();
+          })
+          .catch(function () {});
+      }
+
       function paintWelcome() {
         var today = Log.berlinToday();
         var selected = planDays();
         var moved = shiftTarget();
+        var shifted = shiftActive(today);
         var box = document.getElementById("days");
         box.textContent = "";
         for (var i = 0; i < 7; i++) {
           var iso = addDays(today, i);
           var key = DAY_KEYS[weekdayIndex(iso)];
           var on = selected.indexOf(key) >= 0;
-          var isSource = shiftFrom() === iso;
-          var isTarget = moved === iso;
-          var brown = !isSource && (on || isTarget);
+          var isSource = shifted && shiftFrom() === iso;
+          var isTarget = shifted && moved === iso;
+          var brown = on && !isSource && !isTarget;
           var button = document.createElement("button");
           button.type = "button";
-          button.className = "day" + (brown ? " is-on" : "") + (isSource ? " is-line" : "");
+          button.className = "day" + (brown ? " is-on" : "") + (isTarget ? " is-moved" : "") + (isSource ? " is-line" : "");
           button.dataset.day = key;
-          button.setAttribute("aria-pressed", brown ? "true" : "false");
+          button.setAttribute("aria-pressed", (brown || isTarget) ? "true" : "false");
           var name = document.createElement("span");
           name.textContent = formatLong(iso);
           button.appendChild(name);
-          if (brown) {
+          if (brown || isTarget) {
             var side = document.createElement("span");
             side.className = "day-side";
             var emoji = document.createElement("span");
@@ -1752,34 +1864,39 @@
         var start = routineStart();
         var startBtn = document.getElementById("routine-start");
         var weeks = document.getElementById("weeks");
-        var endBtn = document.getElementById("routine-end");
-        startBtn.classList.toggle("is-started", !!start);
-        startBtn.textContent = start ? "Deine Routine läuft." : "Start der 12 Wochenroutine";
-        endBtn.hidden = !start;
+        startBtn.textContent = start ? "Deine Routine läuft. Challenge beenden." : "Start der 12 Wochenroutine";
         weeks.textContent = "";
-        var origin = start ? mondayOf(start) : mondayOf(today);
+        var origin = mondayOf(today);
         for (var w = 0; w < 12; w++) {
           var weekMonday = addDays(origin, w * 7);
+          var kw = isoWeek(weekMonday);
           var mark = document.createElement("div");
           mark.className = "week-box" + (start && weekFinished(weekMonday) ? " is-full" : "");
-          mark.title = start ? "KW " + isoWeek(weekMonday) : "";
+          mark.textContent = String(kw);
+          mark.title = "KW " + kw;
           weeks.appendChild(mark);
         }
-        document.getElementById("shift-hint").hidden = shiftFrom() !== today;
-        document.getElementById("go-shift").disabled = shiftActive(today);
+        var shiftBtn = document.getElementById("go-shift");
+        shiftBtn.textContent = shifted ? "Nicht verschieben" : "Schieben";
+        shiftBtn.disabled = false;
+        document.getElementById("go-today").disabled = shifted;
+        document.getElementById("go-short").disabled = shifted;
         paintPhoto();
       }
 
       function togglePlanDay(key) {
-        var days = planDays();
+        if (!document.getElementById("days-modal").hidden) return;
+        var days = planDays().slice();
         var index = days.indexOf(key);
         if (index >= 0) days.splice(index, 1);
         else {
           days.push(key);
           if (days.length > 2) days.shift();
         }
-        writeStore(HOME_DAYS, days);
-        paintWelcome();
+        pendingDays = days;
+        document.getElementById("days-title").textContent = workoutQuestion(days);
+        document.getElementById("days-error").hidden = true;
+        document.getElementById("days-modal").hidden = false;
       }
 
       function setHome(on) {
@@ -1792,9 +1909,10 @@
       }
 
       function enterWorkout(short) {
+        var today = Log.berlinToday();
+        if (shiftActive(today)) return;
         shortMode = !!short;
         document.getElementById("short-modal").hidden = true;
-        var today = Log.berlinToday();
         var when = shiftFrom() === today ? addDays(today, 1) : today;
         setHome(false);
         document.getElementById("short-banner").hidden = !shortMode;
@@ -1854,39 +1972,112 @@
         reader.readAsDataURL(file);
       }
 
+      function closeDaysPrompt() {
+        pendingDays = null;
+        document.getElementById("days-modal").hidden = true;
+      }
+
       document.getElementById("days").addEventListener("click", function (event) {
         var day = event.target.closest("[data-day]");
         if (!day) return;
         togglePlanDay(day.dataset.day);
       });
+      document.getElementById("days-ok").addEventListener("click", function () {
+        if (!pendingDays) return;
+        var days = pendingDays.slice();
+        var button = this;
+        button.disabled = true;
+        saveRoutine(days, routineStart()).then(function () {
+          routineTouched = true;
+          writeStore(HOME_DAYS, days);
+          showRoutineNote("");
+          closeDaysPrompt();
+          paintWelcome();
+        }).catch(function (err) {
+          var error = document.getElementById("days-error");
+          error.hidden = false;
+          error.textContent = routineErrorText(err);
+          if (routineMissing(err)) {
+            routineTouched = true;
+            writeStore(HOME_DAYS, days);
+            showRoutineNote(routineErrorText(err));
+            closeDaysPrompt();
+            paintWelcome();
+          }
+        }).then(function () { button.disabled = false; });
+      });
+      document.getElementById("days-modal").addEventListener("click", function (event) {
+        if (event.target.id === "days-modal") closeDaysPrompt();
+      });
       document.getElementById("routine-start").addEventListener("click", function () {
-        if (routineStart()) return;
-        writeStore(HOME_START, Log.berlinToday());
-        paintWelcome();
+        if (routineStart()) {
+          document.getElementById("end-modal").hidden = false;
+          return;
+        }
+        document.getElementById("start-error").hidden = true;
+        document.getElementById("start-modal").hidden = false;
+      });
+      document.getElementById("start-ok").addEventListener("click", function () {
+        var button = this;
+        var today = Log.berlinToday();
+        button.disabled = true;
+        saveRoutine(planDays(), today).then(function () {
+          routineTouched = true;
+          writeStore(HOME_START, today);
+          showRoutineNote("");
+          document.getElementById("start-modal").hidden = true;
+          paintWelcome();
+        }).catch(function (err) {
+          var error = document.getElementById("start-error");
+          error.hidden = false;
+          error.textContent = routineErrorText(err);
+          if (routineMissing(err)) {
+            routineTouched = true;
+            writeStore(HOME_START, today);
+            showRoutineNote(routineErrorText(err));
+            document.getElementById("start-modal").hidden = true;
+            paintWelcome();
+          }
+        }).then(function () { button.disabled = false; });
+      });
+      document.getElementById("start-modal").addEventListener("click", function (event) {
+        if (event.target.id === "start-modal") event.currentTarget.hidden = true;
       });
       document.getElementById("go-today").addEventListener("click", function () { enterWorkout(false); });
       document.getElementById("go-shift").addEventListener("click", function () {
         var today = Log.berlinToday();
-        if (shiftActive(today)) return;
-        writeStore(HOME_SHIFT, today);
+        writeStore(HOME_SHIFT, shiftActive(today) ? "" : today);
         paintWelcome();
-      });
-      document.getElementById("routine-end").addEventListener("click", function () {
-        if (!routineStart()) return;
-        document.getElementById("end-modal").hidden = false;
       });
       document.getElementById("end-cancel").addEventListener("click", function () {
         document.getElementById("end-modal").hidden = true;
       });
       document.getElementById("end-confirm").addEventListener("click", function () {
-        writeStore(HOME_START, "");
-        document.getElementById("end-modal").hidden = true;
-        paintWelcome();
+        var button = this;
+        button.disabled = true;
+        deleteRoutine().then(function () {
+          routineTouched = true;
+          writeStore(HOME_START, "");
+          showRoutineNote("");
+          document.getElementById("end-modal").hidden = true;
+          paintWelcome();
+        }).catch(function (err) {
+          if (routineMissing(err)) {
+            routineTouched = true;
+            writeStore(HOME_START, "");
+            showRoutineNote(routineErrorText(err));
+            document.getElementById("end-modal").hidden = true;
+            paintWelcome();
+            return;
+          }
+          showRoutineNote(routineErrorText(err));
+        }).then(function () { button.disabled = false; });
       });
       document.getElementById("end-modal").addEventListener("click", function (event) {
         if (event.target.id === "end-modal") event.currentTarget.hidden = true;
       });
       document.getElementById("go-short").addEventListener("click", function () {
+        if (shiftActive(Log.berlinToday())) return;
         document.getElementById("short-modal").hidden = false;
       });
       document.getElementById("short-go").addEventListener("click", function () { enterWorkout(true); });
@@ -1907,6 +2098,7 @@
       });
 
       paintWelcome();
+      loadRoutine();
       load();
     })();
   </script>
