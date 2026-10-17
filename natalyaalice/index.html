@@ -741,13 +741,125 @@
       border-radius: 16px;
       background: #E4DDD0;
     }
+    .diary-photo-btn { display: block; width: 100%; padding: 0; background: none; }
     .diary-photo.is-empty {
+      display: block;
+      background: #E4DDD0;
+    }
+    .diary-status {
+      display: block;
+      width: 100%;
+      min-height: 32px;
+      margin-top: 8px;
+      padding: 0;
+      text-align: left;
+      background: none;
+      color: #2A2118;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    .diary-note {
+      display: flex;
+      align-items: baseline;
+      margin-top: 6px;
+      background: none;
+    }
+    .diary-blink {
+      flex: none;
+      width: 0.62em;
+      color: #2A2118;
+      font-size: 16px;
+      line-height: 1.3;
+      animation: diary-blink 1s steps(1) infinite;
+    }
+    .diary-note.is-focus .diary-blink,
+    .diary-note.is-filled .diary-blink { display: none; }
+    .diary-note input {
+      flex: 1;
+      min-width: 0;
+      border: 0;
+      background: transparent;
+      color: #2A2118;
+      font: inherit;
+      font-size: 16px;
+      line-height: 1.3;
+      padding: 0;
+      caret-color: #2A2118;
+    }
+    .diary-note input:focus { outline: none; }
+    .diary-note input::placeholder { color: #2A2118; opacity: 1; }
+    @keyframes diary-blink { 50% { opacity: 0; } }
+    .move-wheel {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 80;
+      background: #F3EEE4;
+      color: #2A2118;
+      border-top: 1px solid rgba(42, 33, 24, 0.18);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .move-wheel[hidden] { display: none; }
+    .move-wheel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      font-family: "Playfair Display", serif;
+      font-size: 16px;
+    }
+    .move-wheel-head button {
+      min-height: 36px;
+      padding: 0 14px;
+      border-radius: 999px;
+      background: #2A2118;
+      color: #F6F1E8;
+      font-weight: 600;
+    }
+    .move-wheel-frame { position: relative; height: 176px; }
+    .move-wheel-frame::before,
+    .move-wheel-frame::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 58px;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .move-wheel-frame::before { top: 0; background: linear-gradient(#F3EEE4, rgba(243, 238, 228, 0)); }
+    .move-wheel-frame::after { bottom: 0; background: linear-gradient(rgba(243, 238, 228, 0), #F3EEE4); }
+    .move-wheel-mark {
+      position: absolute;
+      left: 20px;
+      right: 20px;
+      top: 66px;
+      height: 44px;
+      border-top: 1px solid rgba(42, 33, 24, 0.28);
+      border-bottom: 1px solid rgba(42, 33, 24, 0.28);
+      pointer-events: none;
+    }
+    .move-wheel-col {
+      height: 176px;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      padding: 66px 0;
+      scrollbar-width: none;
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+    }
+    .move-wheel-item {
+      height: 44px;
+      scroll-snap-align: center;
       display: grid;
       place-items: center;
-      color: rgba(42, 33, 24, 0.55);
-      font-family: "Playfair Display", serif;
-      font-size: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      color: rgba(42, 33, 24, 0.45);
     }
+    .move-wheel-item.is-on { color: #2A2118; font-size: 18px; }
     .orient-lock {
       display: none;
       position: fixed;
@@ -798,7 +910,18 @@
     <h1>Tagebuch</h1>
     <button type="button" id="diary-back" class="diary-back">Zur Übersicht</button>
     <div id="diary-list"></div>
+    <input id="diary-photo-file" type="file" accept="image/*" hidden />
   </section>
+  <div class="move-wheel" id="move-wheel" hidden>
+    <div class="move-wheel-head">
+      <span>Bewegt</span>
+      <button type="button" id="move-wheel-done">Fertig</button>
+    </div>
+    <div class="move-wheel-frame">
+      <div class="move-wheel-mark"></div>
+      <div class="move-wheel-col" id="move-wheel-col"></div>
+    </div>
+  </div>
   <div class="sand-modal" id="days-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="days-title">
       <h2 class="ask" id="days-title"></h2>
@@ -1369,6 +1492,7 @@
             showBanner("");
             renderList();
             paintWelcome();
+            if (!document.getElementById("diary").hidden) openDiary();
           })
           .catch(function (err) {
             serverLogs = [];
@@ -1742,6 +1866,9 @@
       var HOME_SHORT = "natalya_short_done";
       var HOME_SHORT_SESSION = "natalya_short_session";
       var HOME_PHOTOS = "natalya_workout_photos";
+      var HOME_DIARY = "natalya_diary";
+      var HOME_DIARY_FROM = "natalya_diary_from";
+      var MOVES = [">5.000 Schritte", ">10.000 Schritte", "Laufen", "Fahrradfahren", "Sport", "Wandern", "Schwimmen"];
       var welcomeEl = document.getElementById("welcome");
       var mainEl = document.querySelector("main");
       var shortMode = false;
@@ -2048,6 +2175,7 @@
       }
 
       function setHome(on) {
+        finishMoveWheel(false);
         document.body.classList.toggle("is-home", on);
         document.body.classList.remove("is-diary");
         welcomeEl.hidden = !on;
@@ -2156,30 +2284,98 @@
         return map;
       }
 
-      function storeWorkoutPhoto(file) {
+      function storeWorkoutPhoto(file, iso) {
+        var when = iso || date;
         compressPhoto(file, function (url) {
           var map = workoutPhotoMap();
-          map[date] = url;
+          map[when] = url;
           writeStore(HOME_PHOTOS, map);
-          document.getElementById("done-photo-note").hidden = false;
+          if (!doneModal.hidden) document.getElementById("done-photo-note").hidden = false;
+          if (!document.getElementById("diary").hidden) openDiary();
         });
+      }
+
+      function diaryMap() {
+        var map = readStore(HOME_DIARY, {});
+        if (!map || typeof map !== "object" || Array.isArray(map)) return {};
+        return map;
+      }
+
+      function diaryEntry(iso) {
+        var row = diaryMap()[iso];
+        if (!row || typeof row !== "object") return { note: "", move: "" };
+        return {
+          note: String(row.note || "").slice(0, 200),
+          move: String(row.move || "")
+        };
+      }
+
+      function saveDiaryEntry(iso, entry) {
+        var map = diaryMap();
+        map[iso] = {
+          note: String(entry.note || "").slice(0, 200),
+          move: entry.move || ""
+        };
+        writeStore(HOME_DIARY, map);
+      }
+
+      function ensureDiaryFrom() {
+        var stored = readStore(HOME_DIARY_FROM, "");
+        var today = Log.berlinToday();
+        if (typeof stored !== "string" || !stored) {
+          writeStore(HOME_DIARY_FROM, today);
+          return today;
+        }
+        return stored;
+      }
+
+      function dayFullyDone(iso) {
+        return Log.EXERCISES.every(function (ex) {
+          return Log.exerciseComplete(serverLogs, iso, ex);
+        });
+      }
+
+      function diaryStatus(iso) {
+        var chosen = diaryEntry(iso).move;
+        if (MOVES.indexOf(chosen) >= 0) return chosen;
+        if (dayFullyDone(iso)) return "Workout erledigt";
+        if (shortDone().indexOf(iso) >= 0) return "Workout Kurzform";
+        return "";
       }
 
       function diaryDates() {
-        var seen = {};
-        var photos = workoutPhotoMap();
-        Object.keys(photos).forEach(function (iso) { if (photos[iso]) seen[iso] = true; });
-        shortDone().forEach(function (iso) { if (iso) seen[iso] = true; });
-        Log.historyDates(serverLogs).forEach(function (iso) {
-          var finished = Log.EXERCISES.every(function (ex) {
-            return Log.exerciseComplete(serverLogs, iso, ex);
-          });
-          if (finished) seen[iso] = true;
-        });
-        return Object.keys(seen).sort(function (a, b) { return a < b ? 1 : a > b ? -1 : 0; });
+        var today = Log.berlinToday();
+        var from = ensureDiaryFrom();
+        var start = routineStart();
+        if (start && start < from) from = start;
+        function consider(iso) {
+          if (iso && iso < from && iso <= today) from = iso;
+        }
+        Object.keys(workoutPhotoMap()).forEach(consider);
+        Object.keys(diaryMap()).forEach(consider);
+        shortDone().forEach(consider);
+        Log.historyDates(serverLogs).forEach(consider);
+        var dates = [];
+        var cursor = today;
+        var guard = 0;
+        while (cursor >= from && guard < 140) {
+          dates.push(cursor);
+          cursor = addDays(cursor, -1);
+          guard += 1;
+        }
+        return dates;
       }
 
+      var diaryPhotoDate = "";
+      var moveDate = "";
+      var moveButton = null;
+      var moveTouched = false;
+      var moveLock = false;
+      var moveLockTimer = 0;
+      var MOVE_ITEM = 44;
+
       function openDiary() {
+        finishMoveWheel(false);
         document.body.classList.remove("is-home");
         document.body.classList.add("is-diary");
         welcomeEl.hidden = true;
@@ -2191,34 +2387,146 @@
         var photos = workoutPhotoMap();
         var dates = diaryDates();
         list.textContent = "";
-        if (!dates.length) {
-          var empty = document.createElement("p");
-          empty.className = "diary-empty";
-          empty.textContent = "Noch kein Workout-Foto.";
-          list.appendChild(empty);
-        }
         dates.forEach(function (iso) {
+          if (!diaryMap()[iso]) saveDiaryEntry(iso, { note: "", move: "" });
+          var entry = diaryEntry(iso);
           var card = document.createElement("article");
           card.className = "diary-card";
           var when = document.createElement("p");
           when.className = "diary-date";
           when.textContent = formatLong(iso);
           card.appendChild(when);
+
+          var photoBtn = document.createElement("button");
+          photoBtn.type = "button";
+          photoBtn.className = "diary-photo-btn";
+          photoBtn.setAttribute("aria-label", "Foto machen oder hochladen");
           if (photos[iso]) {
             var img = document.createElement("img");
             img.className = "diary-photo";
             img.alt = "";
             img.src = photos[iso];
-            card.appendChild(img);
+            photoBtn.appendChild(img);
           } else {
             var frame = document.createElement("div");
             frame.className = "diary-photo is-empty";
-            frame.textContent = "Noch kein Foto.";
-            card.appendChild(frame);
+            photoBtn.appendChild(frame);
           }
+          photoBtn.addEventListener("click", function () {
+            diaryPhotoDate = iso;
+            document.getElementById("diary-photo-file").click();
+          });
+          card.appendChild(photoBtn);
+
+          var status = document.createElement("button");
+          status.type = "button";
+          status.className = "diary-status";
+          status.textContent = diaryStatus(iso);
+          status.setAttribute("aria-label", status.textContent || "Bewegung wählen");
+          status.addEventListener("click", function (event) {
+            event.stopPropagation();
+            openMoveWheel(iso, status);
+          });
+          card.appendChild(status);
+
+          var note = document.createElement("label");
+          note.className = "diary-note" + (entry.note ? " is-filled" : "");
+          var blink = document.createElement("span");
+          blink.className = "diary-blink";
+          blink.setAttribute("aria-hidden", "true");
+          blink.textContent = "_";
+          var input = document.createElement("input");
+          input.type = "text";
+          input.maxLength = 200;
+          input.value = entry.note;
+          input.placeholder = entry.note ? "" : "Wie hast Du Dich heute bewegt?";
+          input.setAttribute("aria-label", "Wie hast Du Dich heute bewegt?");
+          input.addEventListener("focus", function () {
+            note.classList.add("is-focus");
+            input.placeholder = "";
+          });
+          input.addEventListener("blur", function () {
+            note.classList.remove("is-focus");
+            if (!input.value) input.placeholder = "Wie hast Du Dich heute bewegt?";
+          });
+          input.addEventListener("input", function () {
+            if (input.value.length > 200) input.value = input.value.slice(0, 200);
+            note.classList.toggle("is-filled", !!input.value);
+            var next = diaryEntry(iso);
+            next.note = input.value;
+            saveDiaryEntry(iso, next);
+          });
+          note.appendChild(blink);
+          note.appendChild(input);
+          card.appendChild(note);
           list.appendChild(card);
         });
         window.scrollTo(0, 0);
+      }
+
+      function moveIndex() {
+        var col = document.getElementById("move-wheel-col");
+        var n = Math.round(col.scrollTop / MOVE_ITEM);
+        if (n < 0) n = 0;
+        if (n > MOVES.length - 1) n = MOVES.length - 1;
+        return n;
+      }
+
+      function highlightMove(index) {
+        document.querySelectorAll(".move-wheel-item").forEach(function (item) {
+          item.classList.toggle("is-on", Number(item.dataset.index) === index);
+        });
+      }
+
+      function settleMove() {
+        moveLock = true;
+        window.clearTimeout(moveLockTimer);
+        moveLockTimer = window.setTimeout(function () { moveLock = false; }, 200);
+      }
+
+      function applyMove(index) {
+        if (!moveDate || !moveTouched) return;
+        var label = MOVES[index];
+        var entry = diaryEntry(moveDate);
+        entry.move = label;
+        saveDiaryEntry(moveDate, entry);
+        if (moveButton) {
+          moveButton.textContent = label;
+          moveButton.setAttribute("aria-label", label);
+        }
+      }
+
+      function openMoveWheel(iso, button) {
+        var wheel = document.getElementById("move-wheel");
+        var col = document.getElementById("move-wheel-col");
+        moveDate = iso;
+        moveButton = button;
+        moveTouched = false;
+        if (!col.childElementCount) {
+          MOVES.forEach(function (label, index) {
+            var item = document.createElement("div");
+            item.className = "move-wheel-item";
+            item.dataset.index = String(index);
+            item.textContent = label;
+            col.appendChild(item);
+          });
+        }
+        var current = MOVES.indexOf(diaryEntry(iso).move);
+        if (current < 0) current = 0;
+        wheel.hidden = false;
+        settleMove();
+        col.scrollTop = current * MOVE_ITEM;
+        highlightMove(current);
+      }
+
+      function finishMoveWheel(commit) {
+        var wheel = document.getElementById("move-wheel");
+        if (!wheel || wheel.hidden) return;
+        if (commit !== false && moveTouched) applyMove(moveIndex());
+        wheel.hidden = true;
+        moveTouched = false;
+        moveDate = "";
+        moveButton = null;
       }
 
       function sendSummary() {
@@ -2395,18 +2703,55 @@
         storeWorkoutPhoto(event.target.files && event.target.files[0]);
         event.target.value = "";
       });
+      document.getElementById("diary-photo-file").addEventListener("change", function (event) {
+        storeWorkoutPhoto(event.target.files && event.target.files[0], diaryPhotoDate);
+        event.target.value = "";
+      });
+      document.getElementById("move-wheel-col").addEventListener("scroll", function () {
+        if (document.getElementById("move-wheel").hidden) return;
+        highlightMove(moveIndex());
+        if (!moveTouched) return;
+        applyMove(moveIndex());
+      });
+      document.getElementById("move-wheel-col").addEventListener("click", function (event) {
+        var item = event.target.closest(".move-wheel-item");
+        if (!item) return;
+        var index = Number(item.dataset.index);
+        moveTouched = true;
+        settleMove();
+        document.getElementById("move-wheel-col").scrollTop = index * MOVE_ITEM;
+        highlightMove(index);
+        applyMove(index);
+      });
+      document.getElementById("move-wheel").addEventListener("pointerdown", function (event) {
+        if (event.target.closest("#move-wheel-done")) return;
+        moveTouched = true;
+      });
+      document.getElementById("move-wheel").addEventListener("wheel", function () { moveTouched = true; });
+      document.getElementById("move-wheel-done").addEventListener("click", function (event) {
+        event.stopPropagation();
+        finishMoveWheel(true);
+      });
+      document.addEventListener("click", function (event) {
+        var wheel = document.getElementById("move-wheel");
+        if (!wheel || wheel.hidden) return;
+        if (event.target.closest("#move-wheel") || event.target.closest(".diary-status")) return;
+        finishMoveWheel(true);
+      });
       document.getElementById("wa-send").addEventListener("click", sendSummary);
       document.getElementById("wa-modal").addEventListener("click", function (event) {
         if (event.target.id === "wa-modal") event.currentTarget.hidden = true;
       });
       document.getElementById("tagebuch").addEventListener("click", openDiary);
       document.getElementById("diary-back").addEventListener("click", function () {
+        finishMoveWheel(false);
         setHome(true);
         paintWelcome();
       });
       tryLockPortrait();
       window.addEventListener("orientationchange", tryLockPortrait);
 
+      ensureDiaryFrom();
       paintWelcome();
       loadRoutine();
       load();
