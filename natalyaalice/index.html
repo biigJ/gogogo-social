@@ -386,6 +386,63 @@
       font-size: 14px;
       margin-top: 16px;
     }
+    .reset {
+      width: 100%;
+      margin-top: 18px;
+      min-height: 48px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: grid;
+      align-items: end;
+      justify-items: center;
+      padding: 16px;
+      background: rgba(20, 8, 6, 0.55);
+    }
+    .modal[hidden] { display: none; }
+    .modal-card {
+      width: min(100%, 420px);
+      background: #a5332e;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+    }
+    .modal-card h2 {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 28px;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+    }
+    .modal-card p {
+      margin-top: 10px;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    .modal-actions button {
+      flex: 1;
+      min-height: 48px;
+      border-radius: 999px;
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .modal-actions .quiet { border: 1px solid var(--line); }
+    .modal-actions .primary { background: var(--ink); color: var(--bg); }
   </style>
 </head>
 <body>
@@ -411,6 +468,7 @@
 
     <section id="panel-workout" role="tabpanel" aria-labelledby="tab-workout">
       <div id="list"></div>
+      <button type="button" id="reset-workout" class="reset">Alles Löschen und Neustart</button>
     </section>
 
     <section id="panel-history" role="tabpanel" aria-labelledby="tab-history" hidden>
@@ -420,6 +478,25 @@
 
     <p class="banner" id="banner" hidden></p>
   </main>
+  <div class="modal" id="done-modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="done-title">
+      <h2 id="done-title">Hey Natalya, Superwoman.</h2>
+      <p>Wunderbar! Gut gemacht. Gute Erholung und schick das gerne Deinem Trainer. Oder genieß es für Dich ;) ... Bis zum nächsten Mal hier im Trainingsplan.</p>
+      <div class="modal-actions">
+        <button type="button" class="primary" id="done-ok">Bis zum nächsten Mal</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="reset-modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reset-title">
+      <h2 id="reset-title">Wirklich alles löschen?</h2>
+      <p id="reset-copy">Alle Haken, Wiederholungen und Gewichte von diesem Tag werden gelöscht. Danach ist das Workout wieder leer. Andere Tage im Verlauf bleiben erhalten.</p>
+      <div class="modal-actions">
+        <button type="button" class="quiet" id="reset-cancel">Abbrechen</button>
+        <button type="button" class="primary" id="reset-confirm">Alles löschen</button>
+      </div>
+    </div>
+  </div>
   <div class="wheel" id="wheel" hidden>
     <div class="wheel-head">
       <span id="wheel-label">Wiederholungen</span>
@@ -445,6 +522,7 @@
       var date = Log.berlinToday();
       var draft = Log.draftFromLogs([], date);
       var generation = 0;
+      var celebratedDate = "";
       var timers = {};
       var tail = Promise.resolve();
 
@@ -1012,6 +1090,8 @@
         closeWheel();
         clearTimers();
         if (pendingWheel) saveExercise(pendingWheel);
+        closeDone();
+        closeReset();
         date = dateInput.value || Log.berlinToday();
         dateInput.value = date;
         draft = Log.draftFromLogs(serverLogs, date);
@@ -1021,22 +1101,41 @@
       workoutTab.addEventListener("click", function () { showTab("workout"); });
       historyTab.addEventListener("click", function () { finishWheel(); showTab("history"); });
 
+      var tap = null;
+      var TAP_MOVE = 12;
+      var TAP_MS = 500;
+
       listEl.addEventListener("pointerdown", function (event) {
         var reps = event.target.closest("[data-reps], .reps");
         if (!reps) return;
-        event.preventDefault();
+        if (event.pointerType === "mouse" && event.button !== 0) return;
         var input = reps.dataset.reps ? reps : reps.querySelector("[data-reps]");
-        if (input) openWheel(input);
+        if (input) input.blur();
+        tap = { id: event.pointerId, x: event.clientX, y: event.clientY, t: Date.now(), input: input, moved: false };
+      });
+
+      document.addEventListener("pointermove", function (event) {
+        if (!tap || event.pointerId !== tap.id) return;
+        if (Math.abs(event.clientX - tap.x) > TAP_MOVE || Math.abs(event.clientY - tap.y) > TAP_MOVE) tap.moved = true;
+      });
+
+      document.addEventListener("pointerup", function (event) {
+        if (!tap || event.pointerId !== tap.id) return;
+        var info = tap;
+        tap = null;
+        if (!info.input || info.moved || Date.now() - info.t > TAP_MS) return;
+        event.preventDefault();
+        openWheel(info.input);
+      });
+
+      document.addEventListener("pointercancel", function (event) {
+        if (tap && event.pointerId === tap.id) tap = null;
       });
 
       listEl.addEventListener("click", function (event) {
         var reps = event.target.closest("[data-reps], .reps");
         if (reps) {
-          var input = reps.dataset.reps ? reps : reps.querySelector("[data-reps]");
-          if (input) {
-            event.preventDefault();
-            openWheel(input);
-          }
+          event.preventDefault();
           return;
         }
         var check = event.target.closest("[data-check]");
@@ -1045,6 +1144,7 @@
           draft[ex.id].done = !draft[ex.id].done;
           paintMeta();
           scheduleSave(ex, true);
+          noteProgress();
           return;
         }
         var setCheck = event.target.closest("[data-set-check]");
@@ -1060,6 +1160,7 @@
           }
           paintMeta();
           scheduleSave(exercise, true);
+          noteProgress();
           return;
         }
         var step = event.target.closest("[data-act]");
@@ -1108,10 +1209,101 @@
         }, { threshold: 0 }).observe(sentinel);
       }
 
+      var doneModal = document.getElementById("done-modal");
+      var resetModal = document.getElementById("reset-modal");
+
+      function workoutComplete() {
+        var logs = viewLogs();
+        return Log.EXERCISES.every(function (ex) {
+          return Log.exerciseComplete(logs, date, ex);
+        });
+      }
+
+      function noteProgress() {
+        if (!workoutComplete()) {
+          celebratedDate = "";
+          return;
+        }
+        if (celebratedDate === date) return;
+        celebratedDate = date;
+        finishWheel();
+        resetModal.hidden = true;
+        doneModal.hidden = false;
+        document.getElementById("done-ok").focus();
+      }
+
+      function closeDone() {
+        doneModal.hidden = true;
+      }
+
+      function askReset() {
+        finishWheel();
+        doneModal.hidden = true;
+        document.getElementById("reset-copy").textContent = "Alle Haken, Wiederholungen und Gewichte vom " + Log.formatDate(date) + " werden gelöscht. Danach ist das Workout wieder leer. Andere Tage im Verlauf bleiben erhalten.";
+        resetModal.hidden = false;
+        document.getElementById("reset-cancel").focus();
+      }
+
+      function closeReset() {
+        resetModal.hidden = true;
+      }
+
+      function resetWorkout() {
+        var when = date;
+        var gen = ++generation;
+        clearTimers();
+        closeWheel();
+        closeReset();
+        closeDone();
+        celebratedDate = "";
+        serverLogs = serverLogs.filter(function (row) { return row.workout_date !== when; });
+        draft = Log.draftFromLogs(serverLogs, when);
+        renderList();
+        setStatus("Löscht …", false);
+        tail = tail.then(function () {
+          return rest("go_natalya_logs?workout_date=eq." + encodeURIComponent(when), {
+            method: "DELETE",
+            prefer: "return=minimal"
+          });
+        }).then(function () {
+          return rest("go_natalya_logs?select=workout_date,exercise_id,reps,weight_kg,done&order=workout_date.desc");
+        }).then(function (rows) {
+          if (gen !== generation) return;
+          serverLogs = rows || [];
+          if (date === when) {
+            draft = Log.draftFromLogs(serverLogs, date);
+            renderList();
+          }
+          showBanner("");
+          setStatus("Neu gestartet", false);
+        }).catch(function (err) {
+          if (gen !== generation) return;
+          setStatus(explainError(err), true);
+          load();
+        });
+      }
+
+      document.getElementById("done-ok").addEventListener("click", closeDone);
+      doneModal.addEventListener("click", function (event) {
+        if (event.target === doneModal) closeDone();
+      });
+      document.getElementById("reset-workout").addEventListener("click", askReset);
+      document.getElementById("reset-cancel").addEventListener("click", closeReset);
+      document.getElementById("reset-confirm").addEventListener("click", resetWorkout);
+      resetModal.addEventListener("click", function (event) {
+        if (event.target === resetModal) closeReset();
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") return;
+        if (!resetModal.hidden) closeReset();
+        else if (!doneModal.hidden) closeDone();
+      });
+
       historyEl.addEventListener("click", function (event) {
         var open = event.target.closest("[data-open]");
         if (!open) return;
         finishWheel();
+        closeDone();
         date = open.dataset.open;
         dateInput.value = date;
         draft = Log.draftFromLogs(serverLogs, date);
