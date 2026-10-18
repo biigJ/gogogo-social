@@ -1,0 +1,3243 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#C7413B" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="gogogo" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>gogogo</title>
+  <link rel="manifest" href="/plan/manifest.webmanifest" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #C7413B;
+      --ink: #F7F5F0;
+      --dim: rgba(247, 245, 240, 0.78);
+      --faint: rgba(247, 245, 240, 0.55);
+      --line: rgba(247, 245, 240, 0.28);
+      --panel: rgba(247, 245, 240, 0.10);
+      --panel-2: rgba(247, 245, 240, 0.18);
+      --display: "Space Grotesk", system-ui, sans-serif;
+      --body: "Inter", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    html { background: var(--bg); }
+    body {
+      min-height: 100svh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--body);
+      font-size: 16px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+    button, input { font: inherit; color: inherit; }
+    button { cursor: pointer; border: 0; background: none; }
+    :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    main {
+      width: min(100%, 480px);
+      margin: 0 auto;
+      padding: calc(18px + env(safe-area-inset-top)) 16px calc(36px + env(safe-area-inset-bottom));
+    }
+    body.wheel-open main { padding-bottom: calc(250px + env(safe-area-inset-bottom)); }
+    .brand {
+      font-family: var(--display);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      font-size: 13px;
+      text-transform: lowercase;
+    }
+    h1 {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 42px;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin-top: 6px;
+    }
+    .sticky-bar {
+      position: sticky;
+      top: env(safe-area-inset-top);
+      z-index: 20;
+      background: var(--bg);
+      margin: 18px -16px 0;
+      padding: 8px 16px 8px;
+      border-bottom: 1px solid transparent;
+    }
+    .sticky-bar.is-stuck { border-bottom-color: var(--line); }
+    .date-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .date-row label {
+      font-family: var(--display);
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+    .date-row input {
+      background: transparent;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      color: var(--ink);
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 16px;
+      padding: 8px 0;
+      color-scheme: dark;
+      min-height: 44px;
+    }
+    .meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+      min-height: 1.3em;
+      font-size: 13px;
+      color: var(--dim);
+    }
+    .meta .err { color: #fff; }
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 16px 0 8px;
+    }
+    .tabs button {
+      min-height: 44px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--dim);
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .tabs button.is-active {
+      background: var(--ink);
+      color: var(--bg);
+      border-color: var(--ink);
+    }
+    .group {
+      font-family: var(--display);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin: 22px 0 4px;
+    }
+    .group-hint {
+      color: var(--dim);
+      font-size: 13px;
+      line-height: 1.35;
+      margin: 0 0 10px;
+    }
+    .item {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 8px;
+    }
+    .item.is-done { background: var(--panel-2); }
+    .check-btn {
+      width: 100%;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      text-align: left;
+      min-height: 44px;
+    }
+    .mark {
+      width: 28px;
+      height: 28px;
+      margin-top: 1px;
+      border-radius: 999px;
+      border: 1.5px solid var(--ink);
+      display: grid;
+      place-items: center;
+      flex: none;
+    }
+    .mark svg { opacity: 0; }
+    .is-done .mark { background: var(--ink); }
+    .is-done .mark svg { opacity: 1; }
+    .name {
+      display: block;
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+    }
+    .cue, .note {
+      display: block;
+      color: var(--dim);
+      font-weight: 400;
+      font-size: 13px;
+      line-height: 1.35;
+      margin-top: 3px;
+    }
+    .stat {
+      color: var(--dim);
+      font-size: 13px;
+      margin-top: 4px;
+      min-height: 1.15em;
+    }
+    .check-copy { flex: 1; }
+    .sets {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .set-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .set-check {
+      flex: 0 0 36px;
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+    }
+    .set-check .mark { margin-top: 0; }
+    .set-check.is-on .mark { background: var(--ink); }
+    .set-check.is-on .mark svg { opacity: 1; }
+    .reps, .kg {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+      background: rgba(0, 0, 0, 0.12);
+      border-radius: 12px;
+      padding: 4px;
+      min-height: 44px;
+    }
+    .reps { flex: 1 1 88px; min-width: 0; }
+    .kg-wrap { flex: 1 1 auto; min-width: 0; }
+    .kg { width: 100%; }
+    .step.plus { margin-left: auto; }
+    .reps input, .kg input {
+      width: 2.2ch;
+      min-width: 2.2ch;
+      flex: 0 0 2.2ch;
+      background: transparent;
+      border: 0;
+      text-align: center;
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 18px;
+      font-variant-numeric: tabular-nums;
+      padding: 4px 0;
+    }
+    .reps input { caret-color: transparent; cursor: pointer; }
+    .kg input { width: 3.4ch; min-width: 3.4ch; flex: 0 0 3.4ch; }
+    .kg input.is-suggestion { color: var(--dim); }
+    .unit { color: var(--dim); font-size: 12px; padding-right: 4px; flex: none; }
+    .kg-hint { display: block; min-height: 0; color: var(--dim); font-size: 11px; text-align: center; line-height: 1.2; }
+    .kg-hint:empty { display: none; }
+    .step {
+      width: 32px;
+      height: 34px;
+      flex: 0 0 32px;
+      border-radius: 10px;
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 20px;
+      line-height: 1;
+    }
+    .wheel {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 40;
+      background: #a5332e;
+      border-top: 1px solid var(--line);
+      padding: 8px 16px calc(10px + env(safe-area-inset-bottom));
+    }
+    .wheel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .wheel-head span {
+      font-family: var(--display);
+      font-size: 13px;
+      letter-spacing: 0.04em;
+    }
+    .wheel-head button {
+      min-height: 36px;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: var(--ink);
+      color: var(--bg);
+      font-family: var(--display);
+      font-weight: 700;
+    }
+    .wheel-frame { position: relative; height: 176px; }
+    .wheel-frame::before,
+    .wheel-frame::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 58px;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .wheel-frame::before { top: 0; background: linear-gradient(#a5332e, rgba(165, 51, 46, 0)); }
+    .wheel-frame::after { bottom: 0; background: linear-gradient(rgba(165, 51, 46, 0), #a5332e); }
+    .wheel-mark {
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      top: 66px;
+      height: 44px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      pointer-events: none;
+    }
+    .wheel-col {
+      height: 176px;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      padding: 66px 0;
+      scrollbar-width: none;
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+    .wheel-col::-webkit-scrollbar { display: none; }
+    .wheel-item {
+      height: 44px;
+      scroll-snap-align: center;
+      display: grid;
+      place-items: center;
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 20px;
+      color: var(--dim);
+      font-variant-numeric: tabular-nums;
+    }
+    .wheel-item.is-on { color: var(--ink); font-size: 28px; font-weight: 700; }
+    .step.minus { color: var(--ink); }
+    .step.plus { background: var(--ink); color: var(--bg); }
+    .hint { color: var(--dim); font-size: 13px; margin: 8px 0 12px; }
+    .table-scroll {
+      overflow-x: auto;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+    }
+    table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+    th, td {
+      padding: 10px 12px;
+      white-space: nowrap;
+      font-size: 13px;
+      text-align: center;
+      border-bottom: 1px solid var(--line);
+      font-variant-numeric: tabular-nums;
+    }
+    th {
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: var(--dim);
+    }
+    th:first-child, td:first-child {
+      position: sticky;
+      left: 0;
+      text-align: left;
+      background: #c7413b;
+      z-index: 1;
+      box-shadow: 8px 0 12px -12px rgba(0, 0, 0, 0.45);
+    }
+    tbody td:first-child button {
+      font-family: var(--display);
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      min-height: 32px;
+    }
+    tfoot td { font-family: var(--display); font-weight: 700; }
+    .empty { color: var(--dim); padding: 8px 0 16px; }
+    .banner {
+      background: #1a1a1a;
+      color: var(--ink);
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 14px;
+      margin-top: 16px;
+    }
+    .reset {
+      width: 100%;
+      margin-top: 18px;
+      min-height: 48px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      font-family: var(--display);
+      font-weight: 600;
+      font-size: 15px;
+    }
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: grid;
+      align-items: end;
+      justify-items: center;
+      padding: 16px;
+      background: rgba(20, 8, 6, 0.55);
+    }
+    .modal[hidden] { display: none; }
+    #done-modal { align-items: center; }
+    .modal-card {
+      width: min(100%, 420px);
+      background: #a5332e;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 22px 18px calc(18px + env(safe-area-inset-bottom));
+      box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+    }
+    #done-modal .modal-card { padding-bottom: 18px; }
+    .modal-card h2 {
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 28px;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+    }
+    .modal-card p {
+      margin-top: 10px;
+      font-size: 16px;
+      line-height: 1.45;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 18px;
+    }
+    .modal-actions button {
+      flex: 1;
+      min-height: 48px;
+      border-radius: 999px;
+      font-family: var(--display);
+      font-weight: 700;
+      font-size: 15px;
+    }
+    .modal-actions .quiet { border: 1px solid var(--line); }
+    .modal-actions .primary { background: var(--ink); color: var(--bg); }
+    body.is-home, body.is-diary { background: #F3EEE4; color: #2A2118; }
+    body.is-home :focus-visible, body.is-diary :focus-visible { outline-color: #2A2118; }
+    .welcome {
+      width: min(100%, 440px);
+      margin: 0 auto;
+      padding: calc(16px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom));
+      color: #2A2118;
+      font-family: Inter, system-ui, sans-serif;
+    }
+    .welcome[hidden] { display: none; }
+    .welcome-title {
+      font-family: "Playfair Display", serif;
+      font-weight: 600;
+      font-size: 34px;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      text-align: center;
+    }
+    .photo {
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 100%;
+      min-height: 220px;
+      margin: 18px 0 8px;
+      padding: 28px 22px;
+      background: #E4DDD0;
+      color: #2A2118;
+      text-align: center;
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .photo p {
+      font-family: "Playfair Display", serif;
+      font-size: 10px;
+      line-height: 1.35;
+      max-width: 36em;
+    }
+    .photo img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .photo input { display: none; }
+    .days { margin-top: 14px; }
+    .day {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      text-align: left;
+      padding: 5px 2px;
+      border-bottom: 1px solid rgba(42, 33, 24, 0.2);
+      color: #2A2118;
+      font-size: 14px;
+      line-height: 1.2;
+    }
+    .day:disabled { cursor: default; }
+    .day.is-on {
+      background: #2A2118;
+      color: #F6F1E8;
+      border-radius: 10px;
+      border-bottom-color: transparent;
+      margin: 3px 0;
+      padding: 5px 10px;
+    }
+    .day-side { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; }
+    .day-mark { font-size: 14px; line-height: 1; }
+    .day.is-line {
+      background: transparent;
+      color: #2A2118;
+      border-radius: 0;
+      margin: 0;
+      padding: 5px 2px;
+      border-bottom: 1px solid #2A2118;
+      box-shadow: none;
+    }
+    .day.is-moved {
+      background: #C7413B;
+      color: #F6F1E8;
+      border-radius: 10px;
+      border-bottom-color: transparent;
+      margin: 3px 0;
+      padding: 5px 10px;
+    }
+    .tip {
+      margin: 16px 0 8px;
+      font-family: "Playfair Display", serif;
+      font-size: 10px;
+      line-height: 1.35;
+      color: #2A2118;
+    }
+    .routine-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 16px;
+      align-items: stretch;
+    }
+    .routine-start {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 52px;
+      height: 100%;
+      padding: 10px 8px;
+      border: 1.5px solid #2A2118;
+      border-radius: 12px;
+      text-align: center;
+      font-family: "Playfair Display", serif;
+      font-weight: 500;
+      font-size: 10px;
+      line-height: 1.35;
+      color: #2A2118;
+    }
+    .routine-start { cursor: pointer; }
+    .weeks {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 4px;
+      margin-top: 12px;
+    }
+    .week-box {
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 1.5px solid rgba(42, 33, 24, 0.28);
+      background: transparent;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Inter, system-ui, sans-serif;
+      font-size: clamp(8px, 2.4vw, 11px);
+      font-weight: 600;
+      line-height: 1;
+      color: #2A2118;
+    }
+    .week-box.is-full {
+      background: #2A2118;
+      border-color: #2A2118;
+      color: #F6F1E8;
+    }
+    .routine-note {
+      margin-top: 10px;
+      font-size: 13px;
+      line-height: 1.4;
+      color: #C7413B;
+    }
+    .routine-note[hidden] { display: none; }
+    .dock { margin-top: 28px; }
+    .go-primary, .go-quiet, .sand-card button {
+      font-family: Inter, system-ui, sans-serif;
+      font-weight: 600;
+    }
+    .go-primary {
+      width: 100%;
+      min-height: 54px;
+      border-radius: 999px;
+      background: #2A2118;
+      color: #F6F1E8;
+      font-size: 16px;
+    }
+    .go-primary.is-due { background: #C7413B; color: #F6F1E8; }
+    .go-primary:disabled { opacity: 0.4; }
+    .go-row { display: flex; gap: 8px; margin-top: 8px; }
+    .go-quiet {
+      flex: 1;
+      min-height: 48px;
+      border-radius: 999px;
+      border: 1.5px solid #2A2118;
+      color: #2A2118;
+      background: transparent;
+      font-size: 14px;
+    }
+    .go-quiet:disabled { opacity: 0.4; }
+    .sand-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 70;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(42, 33, 24, 0.35);
+    }
+    .sand-modal[hidden] { display: none; }
+    .sand-card {
+      width: min(100%, 380px);
+      background: #F3EEE4;
+      color: #2A2118;
+      border-radius: 20px;
+      padding: 22px 18px;
+      text-align: center;
+    }
+    .sand-card h2 {
+      font-family: "Playfair Display", serif;
+      font-size: 26px;
+      font-weight: 600;
+      line-height: 1.15;
+    }
+    .sand-card h2.ask { font-size: 22px; line-height: 1.25; }
+    .sand-card .ask-error { margin-top: 10px; color: #C7413B; line-height: 1.4; }
+    .sand-card .ask-error[hidden] { display: none; }
+    .sand-card p { margin-top: 10px; line-height: 1.45; }
+    .sand-card button {
+      width: 100%;
+      margin-top: 18px;
+      min-height: 50px;
+      border-radius: 999px;
+      background: #2A2118;
+      color: #F6F1E8;
+    }
+    .sand-actions { display: flex; gap: 8px; }
+    .sand-actions button { margin-top: 18px; }
+    .sand-card .sand-quiet {
+      background: transparent;
+      color: #2A2118;
+      border: 1.5px solid #2A2118;
+    }
+    #diary-menu .sand-card,
+    #diary-share .sand-card { padding-top: 16px; padding-bottom: 16px; }
+    #diary-menu .sand-card button,
+    #diary-share .sand-card button { margin-top: 10px; }
+    #diary-menu .sand-card button:first-of-type,
+    #diary-share .sand-card button:first-of-type { margin-top: 0; }
+    #diary-share button:disabled { opacity: 0.4; }
+    .home-btn {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      margin: 0 0 2px -8px;
+      color: inherit;
+    }
+    .home-btn svg { display: block; }
+    .short-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 14px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+    }
+    .short-banner[hidden] { display: none; }
+    .short-banner p { font-size: 14px; line-height: 1.35; }
+    .short-banner button {
+      flex: none;
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 999px;
+      background: var(--ink);
+      color: var(--bg);
+      font-family: var(--display);
+      font-weight: 700;
+    }
+    .short-banner button:disabled { opacity: 0.45; }
+    .diary { 
+      width: min(100%, 440px);
+      margin: 0 auto;
+      padding: calc(16px + env(safe-area-inset-top)) 20px calc(28px + env(safe-area-inset-bottom));
+      color: #2A2118;
+      font-family: Inter, system-ui, sans-serif;
+    }
+    .diary[hidden] { display: none; }
+    .diary h1 {
+      font-family: "Playfair Display", serif;
+      font-weight: 600;
+      font-size: 34px;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      text-align: center;
+      color: #2A2118;
+    }
+    .diary-bar,
+    .plan-bar {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr) 44px;
+      align-items: center;
+      min-height: 44px;
+    }
+    .diary-bar h1,
+    .plan-bar h1 {
+      grid-column: 2;
+      margin: 0;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      text-align: center;
+    }
+    .diary-bar .home-btn,
+    .plan-bar .home-btn { margin: 0; }
+    .diary-bar .home-btn { color: #2A2118; }
+    .plan-bar h1 {
+      font-size: 30px;
+      letter-spacing: -0.04em;
+    }
+    .diary-empty {
+      margin-top: 28px;
+      text-align: center;
+      font-family: "Playfair Display", serif;
+      font-size: 16px;
+    }
+    .diary-card { margin-top: 22px; }
+    .diary-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-height: 44px;
+    }
+    .diary-date {
+      font-family: "Playfair Display", serif;
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .diary-more {
+      flex: none;
+      min-width: 44px;
+      min-height: 44px;
+      margin-right: -10px;
+      padding: 0 4px;
+      color: #2A2118;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      line-height: 1;
+      text-align: right;
+    }
+    .diary-photo {
+      display: block;
+      width: 100%;
+      margin-top: 8px;
+      aspect-ratio: 4 / 5;
+      object-fit: cover;
+      border-radius: 0;
+      background: #E4DDD0;
+    }
+    .diary-photo-btn { display: block; width: 100%; padding: 0; background: none; }
+    .diary-photo.is-empty {
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      text-align: center;
+      background: #E4DDD0;
+      color: #2A2118;
+      font-family: "Playfair Display", serif;
+      font-size: 16px;
+      line-height: 1.3;
+    }
+    .diary-status {
+      display: block;
+      width: 100%;
+      min-height: 40px;
+      margin-top: 8px;
+      padding: 8px 10px;
+      text-align: left;
+      background: none;
+      color: #2A2118;
+      border: 1px solid #2A2118;
+      border-radius: 0;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+    .diary-note {
+      display: flex;
+      align-items: flex-start;
+      margin-top: 6px;
+      background: none;
+    }
+    .diary-blink {
+      flex: none;
+      width: 0.62em;
+      color: #2A2118;
+      font-size: 16px;
+      line-height: 1.3;
+      animation: diary-blink 1s steps(1) infinite;
+    }
+    .diary-note.is-focus .diary-blink,
+    .diary-note.is-filled .diary-blink { display: none; }
+    .diary-note textarea {
+      flex: 1;
+      min-width: 0;
+      width: 100%;
+      min-height: 1.3em;
+      border: 0;
+      background: transparent;
+      color: #2A2118;
+      font: inherit;
+      font-size: 16px;
+      line-height: 1.3;
+      padding: 0;
+      margin: 0;
+      resize: none;
+      overflow: hidden;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      caret-color: #2A2118;
+      field-sizing: content;
+    }
+    .diary-note textarea:focus { outline: none; }
+    .diary-note textarea::placeholder { color: #2A2118; opacity: 1; }
+    @keyframes diary-blink { 50% { opacity: 0; } }
+    .move-wheel {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 80;
+      background: #F3EEE4;
+      color: #2A2118;
+      border-top: 1px solid rgba(42, 33, 24, 0.18);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .move-wheel[hidden] { display: none; }
+    .move-wheel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      font-family: "Playfair Display", serif;
+      font-size: 16px;
+    }
+    .move-wheel-head button {
+      min-height: 36px;
+      padding: 0 14px;
+      border-radius: 999px;
+      background: #2A2118;
+      color: #F6F1E8;
+      font-weight: 600;
+    }
+    .move-wheel-frame { position: relative; height: 176px; }
+    .move-wheel-frame::before,
+    .move-wheel-frame::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 58px;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .move-wheel-frame::before { top: 0; background: linear-gradient(#F3EEE4, rgba(243, 238, 228, 0)); }
+    .move-wheel-frame::after { bottom: 0; background: linear-gradient(rgba(243, 238, 228, 0), #F3EEE4); }
+    .move-wheel-mark {
+      position: absolute;
+      left: 20px;
+      right: 20px;
+      top: 66px;
+      height: 44px;
+      border-top: 1px solid rgba(42, 33, 24, 0.28);
+      border-bottom: 1px solid rgba(42, 33, 24, 0.28);
+      pointer-events: none;
+    }
+    .move-wheel-col {
+      height: 176px;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      padding: 66px 0;
+      scrollbar-width: none;
+      touch-action: pan-y;
+      overscroll-behavior: contain;
+    }
+    .move-wheel-item {
+      height: 44px;
+      scroll-snap-align: center;
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      font-weight: 600;
+      color: rgba(42, 33, 24, 0.45);
+    }
+    .move-wheel-item.is-on { color: #2A2118; font-size: 18px; }
+    .orient-lock {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: #2A2118;
+      color: #F6F1E8;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      font-family: "Playfair Display", serif;
+      font-weight: 600;
+      font-size: 28px;
+      line-height: 1.2;
+    }
+    @media screen and (orientation: landscape) and (max-height: 520px) {
+      .orient-lock { display: flex; }
+      html, body { overflow: hidden; touch-action: none; }
+    }
+  </style>
+</head>
+<body class="is-home">
+  <p id="plan-gate" class="welcome-title" style="width:min(100%,440px);margin:0 auto;padding:48px 20px;text-align:center">Plan wird geladen.</p>
+  <section id="welcome" class="welcome" hidden>
+    <h1 class="welcome-title" id="welcome-title">gogogo</h1>
+    <div class="photo" id="photo" role="button" tabindex="0">
+      <input id="photo-file" type="file" accept="image/*" />
+      <p id="photo-copy">Lade Dein Motivationsbild hoch. Dich selbst, ein Vorbild, ein Ort. Egal, was Deine eigene Motivation ausmacht.</p>
+      <img id="photo-img" alt="" hidden />
+    </div>
+    <p class="tip">Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.</p>
+    <div class="days" id="days"></div>
+    <div class="routine-row">
+      <button type="button" id="routine-start" class="routine-start">Start der 12 Wochenroutine</button>
+      <button type="button" id="tagebuch" class="routine-start">Tagebuch</button>
+    </div>
+    <div class="weeks" id="weeks"></div>
+    <p class="routine-note" id="routine-note" hidden></p>
+    <div class="dock">
+      <button type="button" class="go-primary" id="go-today">Heutiges Workout</button>
+      <div class="go-row">
+        <button type="button" class="go-quiet" id="go-shift">Schieben</button>
+        <button type="button" class="go-quiet" id="go-short">Kurzfassung 15 min</button>
+      </div>
+    </div>
+  </section>
+  <section id="diary" class="diary" hidden>
+    <div class="diary-bar">
+      <button type="button" id="diary-back" class="home-btn" aria-label="Zur Übersicht">
+        <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.2 12 4l8 7.2V20a1 1 0 0 1-1 1h-5.2v-6.2H10.2V21H5a1 1 0 0 1-1-1v-8.8Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </button>
+      <h1>Tagebuch</h1>
+    </div>
+    <div id="diary-list"></div>
+    <input id="diary-photo-file" type="file" accept="image/*" hidden />
+  </section>
+  <div class="move-wheel" id="move-wheel" hidden>
+    <div class="move-wheel-head">
+      <span>Bewegt</span>
+      <button type="button" id="move-wheel-done">Fertig</button>
+    </div>
+    <div class="move-wheel-frame">
+      <div class="move-wheel-mark"></div>
+      <div class="move-wheel-col" id="move-wheel-col"></div>
+    </div>
+  </div>
+  <div class="sand-modal" id="days-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="days-title">
+      <h2 class="ask" id="days-title"></h2>
+      <button type="button" id="days-ok">Zweiten Tag festlegen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="start-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="start-title">
+      <h2 class="ask" id="start-title">Hast Du die Workouts so verteilt, dass sie an Wochentagen sind, an denen Du grundsätzlich dafür Zeit hast?</h2>
+      <p class="ask-error" id="start-error" hidden></p>
+      <button type="button" id="start-ok">Ja passt</button>
+      <button type="button" class="sand-quiet" id="start-pick">Tage auswählen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="photo-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="photo-title">
+      <h2 class="ask" id="photo-title">Motivationsbild</h2>
+      <button type="button" id="photo-replace">Neues Bild</button>
+      <button type="button" class="sand-quiet" id="photo-remove">Entfernen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="end-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="end-title">
+      <h2 id="end-title">Challenge beenden?</h2>
+      <p>Die 12 Wochen Challenge wird vorzeitig beendet. Deine gespeicherten Workouts bleiben erhalten.</p>
+      <div class="sand-actions">
+        <button type="button" class="sand-quiet" id="end-cancel">Abbrechen</button>
+        <button type="button" id="end-confirm">Beenden</button>
+      </div>
+    </div>
+  </div>
+  <div class="sand-modal" id="short-choice" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="short-choice-title">
+      <h2 class="ask" id="short-choice-title">5 Übungen sind fertig.</h2>
+      <button type="button" id="short-done-btn">Fertig</button>
+      <button type="button" class="sand-quiet" id="short-more">noch eine Übung</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="wa-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="wa-title">
+      <h2 class="ask" id="wa-title">Zusammenfassung per WhatsApp an meinen Trainer.</h2>
+      <button type="button" class="sand-quiet" id="wa-no">Nein, zum Tagebuch</button>
+      <button type="button" id="wa-send">Ja, zu WhatsApp</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="diary-menu" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-label="Eintrag">
+      <button type="button" id="diary-menu-delete">Eintrag löschen</button>
+      <button type="button" id="diary-menu-photo">Bild ändern</button>
+      <button type="button" id="diary-menu-text">Text ändern</button>
+      <button type="button" id="diary-menu-more">weitere Bewegung</button>
+      <button type="button" id="diary-menu-share">Eintrag teilen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="diary-share" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-label="Eintrag teilen">
+      <button type="button" class="sand-quiet" id="diary-share-photo" aria-pressed="false">Foto teilen</button>
+      <button type="button" class="sand-quiet" id="diary-share-notes" aria-pressed="false">Notizen teilen</button>
+      <button type="button" class="sand-quiet" id="diary-share-exercises" aria-pressed="false">Übungen teilen</button>
+      <button type="button" id="diary-share-send" disabled>Absenden</button>
+      <button type="button" class="sand-quiet" id="diary-share-cancel">Abbrechen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="diary-delete" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="diary-delete-title">
+      <h2 class="ask" id="diary-delete-title">wirklich löschen?</h2>
+      <div class="sand-actions">
+        <button type="button" class="sand-quiet" id="diary-delete-cancel">Abbrechen</button>
+        <button type="button" id="diary-delete-confirm">Löschen</button>
+      </div>
+    </div>
+  </div>
+  <div class="orient-lock" id="orient-lock" role="dialog" aria-label="Hochformat">Dreh Dein Telefon zurück</div>
+  <div class="sand-modal" id="short-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="short-title">
+      <h2 id="short-title">Kurzfassung, 15 Minuten.</h2>
+      <p>Du kannst das Workout schon nach 5 Übungen beenden.</p>
+      <button type="button" id="short-go">Ins Workout</button>
+    </div>
+  </div>
+  <main hidden>
+    <div class="plan-bar">
+      <button type="button" id="back-welcome" class="home-btn" aria-label="Zur Übersicht">
+        <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.2 12 4l8 7.2V20a1 1 0 0 1-1 1h-5.2v-6.2H10.2V21H5a1 1 0 0 1-1-1v-8.8Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </button>
+      <h1>Krafttraining</h1>
+    </div>
+    <div id="short-banner" class="short-banner" hidden>
+      <p id="short-banner-text">Kurzfassung. Nach 5 Übungen kannst du beenden.</p>
+    </div>
+
+    <div class="sticky-bar" id="sticky-bar">
+      <div class="date-row">
+        <label for="date">Datum</label>
+        <input id="date" type="date" />
+      </div>
+      <div class="meta">
+        <p id="progress"></p>
+        <p id="status" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Ansicht">
+      <button type="button" id="tab-workout" class="is-active" role="tab" aria-selected="true" aria-controls="panel-workout">Heute</button>
+      <button type="button" id="tab-history" role="tab" aria-selected="false" aria-controls="panel-history">Historie</button>
+    </div>
+
+    <section id="panel-workout" role="tabpanel" aria-labelledby="tab-workout">
+      <div id="list"></div>
+      <button type="button" id="reset-workout" class="reset">Alles Löschen und Neustart</button>
+    </section>
+
+    <section id="panel-history" role="tabpanel" aria-labelledby="tab-history" hidden>
+      <p class="hint">Tippe ein Datum, um das Workout zu öffnen. Wischen zeigt alle Übungen.</p>
+      <div id="history"></div>
+    </section>
+
+    <p class="banner" id="banner" hidden></p>
+  </main>
+  <div class="modal" id="done-modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="done-title">
+      <h2 id="done-title">Hey.</h2>
+      <p>Wunderbar! Gut gemacht. Gute Erholung und schick das gerne Deinem Trainer. Oder genieß es für Dich ;) ... Bis zum nächsten Mal hier im Trainingsplan.</p>
+      <div class="modal-actions">
+        <button type="button" class="quiet" id="done-photo">Foto machen</button>
+        <button type="button" class="primary" id="done-ok">Weiter</button>
+      </div>
+      <input id="done-photo-file" type="file" accept="image/*" capture="environment" hidden />
+    </div>
+  </div>
+  <div class="modal" id="reset-modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="reset-title">
+      <h2 id="reset-title">Wirklich alles löschen?</h2>
+      <p id="reset-copy">Alle Haken, Wiederholungen und Gewichte von diesem Tag werden gelöscht. Danach ist das Workout wieder leer. Andere Tage in der Historie bleiben erhalten.</p>
+      <div class="modal-actions">
+        <button type="button" class="quiet" id="reset-cancel">Abbrechen</button>
+        <button type="button" class="primary" id="reset-confirm">Alles löschen</button>
+      </div>
+    </div>
+  </div>
+  <div class="wheel" id="wheel" hidden>
+    <div class="wheel-head">
+      <span id="wheel-label">Wiederholungen</span>
+      <button type="button" id="wheel-done">Fertig</button>
+    </div>
+    <div class="wheel-frame">
+      <div class="wheel-mark"></div>
+      <div class="wheel-col" id="wheel-col"></div>
+    </div>
+  </div>
+
+  <script src="/plan/template.js"></script>
+  <script src="/plan/log.js"></script>
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+      var pathSlug = "";
+      var parts = location.pathname.split("/").filter(Boolean);
+      if (parts[0] === "plan" && parts[1] && parts[1] !== "index.html") pathSlug = decodeURIComponent(parts[1]);
+      var slug = (params.get("slug") || pathSlug || "").trim().toLowerCase();
+      function showGate(message) {
+        var gate = document.getElementById("plan-gate");
+        document.getElementById("welcome").hidden = true;
+        document.getElementById("diary").hidden = true;
+        document.querySelector("main").hidden = true;
+        gate.hidden = false;
+        gate.textContent = message;
+      }
+      if (!slug || !/^[a-z0-9-]{2,48}$/.test(slug)) {
+        showGate("Öffne den Link zu Deinem Trainingsplan.");
+        return;
+      }
+      var bootUrl = "https://agpysewcsakdpmpftndp.supabase.co";
+      var bootKey = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
+      var bootHost = location.hostname;
+      var bootBase = (bootHost === "localhost" || bootHost === "127.0.0.1") ? location.origin : bootUrl;
+      fetch(bootBase + "/rest/v1/go_plan_athletes?slug=eq." + encodeURIComponent(slug) + "&select=slug,name,headline,trainer_wa,exercises,days,started_on", {
+        headers: { apikey: bootKey, Authorization: "Bearer " + bootKey }
+      }).then(function (res) { return res.json(); }).then(function (rows) {
+        if (!Array.isArray(rows) || !rows[0] || !Array.isArray(rows[0].exercises) || !rows[0].exercises.length) {
+          showGate("Dieser Trainingsplan ist noch nicht angelegt.");
+          return;
+        }
+        startAthlete(rows[0]);
+      }).catch(function () {
+        showGate("Der Trainingsplan ist gerade nicht erreichbar.");
+      });
+
+      function startAthlete(athlete) {
+      document.getElementById("plan-gate").hidden = true;
+      document.getElementById("welcome").hidden = false;
+      var Log = window.PlanLog.create(athlete.exercises, athlete.name);
+      var PLAN_SLUG = athlete.slug;
+      var PLAN_NAME = athlete.name || "Du";
+      var PLAN_WA = String(athlete.trainer_wa || "491747015500").replace(/\D/g, "") || "491747015500";
+      var PLAN_HEADLINE = athlete.headline || "Krafttraining";
+      document.title = "gogogo · " + PLAN_NAME;
+      var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+      if (appleTitle) appleTitle.setAttribute("content", PLAN_NAME);
+      document.getElementById("welcome-title").textContent = "gogogo " + PLAN_NAME + "!";
+      var planHeading = document.querySelector(".plan-bar h1");
+      if (planHeading) planHeading.textContent = PLAN_HEADLINE;
+      document.getElementById("done-title").textContent = "Hey " + PLAN_NAME + ".";
+      var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
+      var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
+      var host = location.hostname;
+      // Live site uses the gogogo Supabase project. A local preview posts to the same origin.
+      var apiBase = (host === "localhost" || host === "127.0.0.1") ? location.origin : SUPABASE_URL;
+
+      var serverLogs = [];
+      var date = Log.berlinToday();
+      var draft = Log.draftFromLogs([], date);
+      var generation = 0;
+      var celebratedDate = "";
+      var timers = {};
+      var tail = Promise.resolve();
+
+      var dateInput = document.getElementById("date");
+      var listEl = document.getElementById("list");
+      var historyEl = document.getElementById("history");
+      var progressEl = document.getElementById("progress");
+      var statusEl = document.getElementById("status");
+      var bannerEl = document.getElementById("banner");
+      var workoutTab = document.getElementById("tab-workout");
+      var historyTab = document.getElementById("tab-history");
+      var workoutPanel = document.getElementById("panel-workout");
+      var historyPanel = document.getElementById("panel-history");
+
+      dateInput.value = date;
+
+      function rest(path, opts) {
+        var headers = {
+          apikey: SUPABASE_KEY,
+          Authorization: "Bearer " + SUPABASE_KEY,
+          "Content-Type": "application/json"
+        };
+        if (opts && opts.prefer) headers.Prefer = opts.prefer;
+        return fetch(apiBase + "/rest/v1/" + path, {
+          method: (opts && opts.method) || "GET",
+          headers: headers,
+          body: opts && opts.body != null ? JSON.stringify(opts.body) : undefined,
+          cache: "no-store"
+        }).then(function (res) {
+          return res.text().then(function (text) {
+            if (!res.ok) throw new Error(text || res.statusText);
+            if (!text) return null;
+            return JSON.parse(text);
+          });
+        });
+      }
+
+      function explainError(err) {
+        var msg = String((err && err.message) || err || "");
+        if (/PGRST205|schema cache|does not exist|Could not find the table/i.test(msg)) {
+          return "Die Tabelle fehlt noch. Einmal go-plan.sql im Supabase SQL Editor ausführen.";
+        }
+        if (/Failed to fetch|NetworkError|Load failed|name not resolved/i.test(msg)) {
+          return "Supabase ist gerade nicht erreichbar.";
+        }
+        return "Speichern fehlgeschlagen.";
+      }
+
+      function showBanner(text) {
+        if (!text) {
+          bannerEl.hidden = true;
+          bannerEl.textContent = "";
+          return;
+        }
+        bannerEl.hidden = false;
+        bannerEl.textContent = text;
+      }
+
+      function setStatus(text, isError) {
+        statusEl.textContent = text || "";
+        statusEl.classList.toggle("err", !!isError);
+      }
+
+      function viewLogs() {
+        return Log.projectLogs(serverLogs, date, draft);
+      }
+
+      var CHECK_SVG = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7.2 5.2 10.5 12 3.5" fill="none" stroke="#C7413B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      var WHEEL_MAX = 30;
+      var WHEEL_ITEM = 44;
+      var wheelInput = null;
+      var wheelLock = false;
+      var wheelTouched = false;
+      var wheelSettleTimer = 0;
+
+      function historyKg(ex) {
+        return Log.suggestionKg(serverLogs, ex.id, date);
+      }
+
+      function paintMeta() {
+        var logs = viewLogs();
+        progressEl.textContent = Log.doneCount(logs, date) + " von " + Log.EXERCISES.length + " Übungen erledigt";
+        Log.EXERCISES.forEach(function (ex) {
+          var stat = document.querySelector('[data-stat="' + ex.id + '"]');
+          if (stat) stat.textContent = Log.statLine(ex, Log.statsFor(logs, ex));
+          var item = document.querySelector('[data-item="' + ex.id + '"]');
+          if (!item) return;
+          item.classList.toggle("is-done", Log.exerciseComplete(logs, date, ex));
+          if (ex.kind === "check") {
+            var btn = item.querySelector("[data-check]");
+            if (btn) btn.setAttribute("aria-pressed", draft[ex.id].done ? "true" : "false");
+            return;
+          }
+          syncSets(ex);
+          var history = historyKg(ex);
+          item.querySelectorAll("[data-reps]").forEach(function (input) {
+            var idx = Number(input.dataset.idx);
+            var set = draft[ex.id].sets[idx];
+            if (input !== wheelInput) input.value = set && set.reps ? set.reps : "";
+          });
+          item.querySelectorAll("[data-set-check]").forEach(function (button) {
+            var idx = Number(button.dataset.idx);
+            var on = !!(draft[ex.id].sets[idx] && draft[ex.id].sets[idx].done);
+            button.classList.toggle("is-on", on);
+            button.setAttribute("aria-pressed", on ? "true" : "false");
+          });
+          item.querySelectorAll("[data-kg]").forEach(function (input) {
+            var idx = Number(input.dataset.idx);
+            var set = draft[ex.id].sets[idx];
+            var kg = Log.displayKg(ex, draft[ex.id].sets, idx, history);
+            var source = set && set.kgTouched ? "" : (idx === 0 ? Log.weightSource(serverLogs, ex.id, date) : "");
+            if (document.activeElement !== input) {
+              input.value = kg == null ? "" : Log.formatNumber(kg);
+              input.classList.toggle("is-suggestion", !!source && kg != null);
+            }
+            var hint = item.querySelector('[data-kghint="' + ex.id + "-" + idx + '"]');
+            if (hint) hint.textContent = source === "last" ? "zuletzt" : "";
+          });
+        });
+        renderHistory();
+        syncShortFinish();
+      }
+
+      function fillCopy(parent, ex) {
+        var nameEl = document.createElement("span");
+        nameEl.className = "name";
+        nameEl.textContent = ex.name;
+        parent.appendChild(nameEl);
+        if (ex.cue) {
+          var cue = document.createElement("span");
+          cue.className = "cue";
+          cue.textContent = ex.cue;
+          parent.appendChild(cue);
+        }
+        if (ex.note) {
+          var note = document.createElement("span");
+          note.className = "note";
+          note.textContent = ex.note;
+          parent.appendChild(note);
+        }
+      }
+
+      function renderList() {
+        listEl.textContent = "";
+        var group = "";
+        Log.EXERCISES.forEach(function (ex) {
+          if (ex.group !== group) {
+            group = ex.group;
+            var heading = document.createElement("h2");
+            heading.className = "group";
+            heading.textContent = group;
+            listEl.appendChild(heading);
+            var blurb = Log.groupHint(group);
+            if (blurb) {
+              var blurbEl = document.createElement("p");
+              blurbEl.className = "group-hint";
+              blurbEl.textContent = blurb;
+              listEl.appendChild(blurbEl);
+            }
+          }
+          var item = document.createElement("article");
+          item.className = "item";
+          item.dataset.item = ex.id;
+
+          if (ex.kind === "check") {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "check-btn";
+            btn.dataset.check = ex.id;
+            btn.setAttribute("aria-pressed", "false");
+            var mark = document.createElement("span");
+            mark.className = "mark";
+            mark.innerHTML = CHECK_SVG;
+            var copy = document.createElement("div");
+            copy.className = "check-copy";
+            fillCopy(copy, ex);
+            var stat = document.createElement("p");
+            stat.className = "stat";
+            stat.dataset.stat = ex.id;
+            copy.appendChild(stat);
+            btn.appendChild(mark);
+            btn.appendChild(copy);
+            item.appendChild(btn);
+          } else {
+            fillCopy(item, ex);
+            var statEl = document.createElement("p");
+            statEl.className = "stat";
+            statEl.dataset.stat = ex.id;
+            var controls = document.createElement("div");
+            controls.className = "sets";
+            controls.dataset.sets = ex.id;
+            item.appendChild(statEl);
+            item.appendChild(controls);
+            renderSetRows(ex, controls);
+          }
+
+          listEl.appendChild(item);
+        });
+        paintMeta();
+      }
+
+      function renderHistory() {
+        var logs = viewLogs();
+        var dates = Log.historyDates(logs);
+        historyEl.textContent = "";
+        if (!dates.length) {
+          var empty = document.createElement("p");
+          empty.className = "empty";
+          empty.textContent = "Noch kein Workout gespeichert.";
+          historyEl.appendChild(empty);
+          return;
+        }
+        var scroll = document.createElement("div");
+        scroll.className = "table-scroll";
+        var table = document.createElement("table");
+        var thead = document.createElement("thead");
+        var headRow = document.createElement("tr");
+        var dateTh = document.createElement("th");
+        dateTh.textContent = "Datum";
+        headRow.appendChild(dateTh);
+        Log.EXERCISES.forEach(function (ex) {
+          var th = document.createElement("th");
+          th.textContent = ex.short || ex.name;
+          th.title = ex.name;
+          headRow.appendChild(th);
+        });
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+
+        var tbody = document.createElement("tbody");
+        dates.forEach(function (iso) {
+          var tr = document.createElement("tr");
+          var td = document.createElement("td");
+          var open = document.createElement("button");
+          open.type = "button";
+          open.dataset.open = iso;
+          open.textContent = Log.formatDate(iso);
+          td.appendChild(open);
+          tr.appendChild(td);
+          Log.EXERCISES.forEach(function (ex) {
+            var cell = document.createElement("td");
+            cell.textContent = Log.cellText(ex, Log.rowsFor(logs, iso, ex));
+            tr.appendChild(cell);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+
+        var tfoot = document.createElement("tfoot");
+        ["Ø", "Best"].forEach(function (label) {
+          var tr = document.createElement("tr");
+          var th = document.createElement("td");
+          th.textContent = label;
+          tr.appendChild(th);
+          Log.EXERCISES.forEach(function (ex) {
+            var cell = document.createElement("td");
+            var stats = Log.statsFor(logs, ex);
+            cell.textContent = label === "Ø" ? Log.avgText(ex, stats, logs) : Log.bestText(ex, stats);
+            tr.appendChild(cell);
+          });
+          tfoot.appendChild(tr);
+        });
+        table.appendChild(tfoot);
+        scroll.appendChild(table);
+        historyEl.appendChild(scroll);
+      }
+
+      function clearTimers() {
+        Object.keys(timers).forEach(function (id) { clearTimeout(timers[id]); });
+      }
+
+      function scheduleSave(ex, immediate) {
+        clearTimeout(timers[ex.id]);
+        var wait = immediate ? 0 : 350;
+        timers[ex.id] = setTimeout(function () { saveExercise(ex); }, wait);
+      }
+
+      function renderSetRows(ex, box) {
+        var count = Log.visibleSetCount(ex, draft[ex.id].sets);
+        var previousWheel = wheelInput;
+        box.textContent = "";
+        for (var i = 0; i < count; i++) box.appendChild(buildSetRow(ex, i));
+        if (previousWheel && previousWheel.dataset.id === ex.id) {
+          var still = box.querySelector('[data-reps][data-idx="' + previousWheel.dataset.idx + '"]');
+          wheelInput = still;
+          if (!still) closeWheel();
+        }
+      }
+
+      function syncSets(ex) {
+        var box = document.querySelector('[data-sets="' + ex.id + '"]');
+        if (!box) return;
+        var want = Log.visibleSetCount(ex, draft[ex.id].sets);
+        if (box.querySelectorAll(".set-row").length !== want) renderSetRows(ex, box);
+      }
+
+      function buildSetRow(ex, index) {
+        var row = document.createElement("div");
+        row.className = "set-row";
+        var check = document.createElement("button");
+        check.type = "button";
+        check.className = "set-check";
+        check.dataset.setCheck = ex.id;
+        check.dataset.id = ex.id;
+        check.dataset.idx = String(index);
+        check.setAttribute("aria-label", ex.name + " Satz " + (index + 1) + " erledigt");
+        var mark = document.createElement("span");
+        mark.className = "mark";
+        mark.innerHTML = CHECK_SVG;
+        check.appendChild(mark);
+
+        var reps = document.createElement("label");
+        reps.className = "reps";
+        var repsInput = document.createElement("input");
+        repsInput.dataset.reps = ex.id;
+        repsInput.dataset.id = ex.id;
+        repsInput.dataset.idx = String(index);
+        repsInput.readOnly = true;
+        repsInput.inputMode = "none";
+        repsInput.autocomplete = "off";
+        repsInput.tabIndex = -1;
+        repsInput.setAttribute("aria-label", ex.name + " Satz " + (index + 1) + " Wiederholungen");
+        var repsUnit = document.createElement("span");
+        repsUnit.className = "unit";
+        repsUnit.textContent = "Wdh";
+        reps.appendChild(repsInput);
+        reps.appendChild(repsUnit);
+        row.appendChild(check);
+        row.appendChild(reps);
+
+        if (ex.weight) {
+          var wrap = document.createElement("div");
+          wrap.className = "kg-wrap";
+          var kg = document.createElement("div");
+          kg.className = "kg";
+          var minus = document.createElement("button");
+          minus.type = "button";
+          minus.className = "step minus";
+          minus.dataset.act = "minus";
+          minus.dataset.id = ex.id;
+          minus.dataset.idx = String(index);
+          minus.setAttribute("aria-label", ex.name + " Gewicht senken");
+          minus.textContent = "−";
+          var kgInput = document.createElement("input");
+          kgInput.dataset.kg = ex.id;
+          kgInput.dataset.id = ex.id;
+          kgInput.dataset.idx = String(index);
+          kgInput.inputMode = "decimal";
+          kgInput.autocomplete = "off";
+          kgInput.setAttribute("aria-label", ex.name + " Gewicht in Kilogramm");
+          var unit = document.createElement("span");
+          unit.className = "unit";
+          unit.textContent = "kg";
+          var plus = document.createElement("button");
+          plus.type = "button";
+          plus.className = "step plus";
+          plus.dataset.act = "plus";
+          plus.dataset.id = ex.id;
+          plus.dataset.idx = String(index);
+          plus.setAttribute("aria-label", ex.name + " Gewicht erhöhen");
+          plus.textContent = "+";
+          kg.appendChild(minus);
+          kg.appendChild(kgInput);
+          kg.appendChild(unit);
+          kg.appendChild(plus);
+          var hint = document.createElement("span");
+          hint.className = "kg-hint";
+          hint.dataset.kghint = ex.id + "-" + index;
+          wrap.appendChild(kg);
+          wrap.appendChild(hint);
+          row.appendChild(wrap);
+        }
+        return row;
+      }
+
+      function saveExercise(ex) {
+        var gen = ++generation;
+        var when = date;
+        var plans = Log.payloadsFor(ex, draft[ex.id], serverLogs, when);
+        setStatus("Speichert …", false);
+        tail = tail.then(function () {
+          var chain = Promise.resolve();
+          plans.forEach(function (plan) {
+            chain = chain.then(function () {
+              var exists = serverLogs.some(function (row) {
+                return row.workout_date === when && row.exercise_id === plan.storageId;
+              });
+              if (!plan.body) {
+                if (!exists) return null;
+                return rest(
+                  "go_plan_logs?athlete_id=eq." + encodeURIComponent(PLAN_SLUG) + "&workout_date=eq." + encodeURIComponent(when) + "&exercise_id=eq." + encodeURIComponent(plan.storageId),
+                  { method: "DELETE", prefer: "return=minimal" }
+                );
+              }
+              return rest("go_plan_logs?athlete_id=eq." + encodeURIComponent(PLAN_SLUG) + "&on_conflict=athlete_id,workout_date,exercise_id", {
+                method: "POST",
+                prefer: "resolution=merge-duplicates,return=minimal",
+                body: {
+                  athlete_id: PLAN_SLUG,
+                  workout_date: when,
+                  exercise_id: plan.storageId,
+                  reps: plan.body.reps,
+                  weight_kg: plan.body.weight_kg,
+                  done: plan.body.done,
+                  updated_at: new Date().toISOString()
+                }
+              });
+            });
+          });
+          return chain.then(function () {
+            return rest("go_plan_logs?athlete_id=eq." + encodeURIComponent(PLAN_SLUG) + "&select=workout_date,exercise_id,reps,weight_kg,done&order=workout_date.desc");
+          }).then(function (rows) {
+            if (gen !== generation) return;
+            serverLogs = rows || [];
+            showBanner("");
+            setStatus("Gespeichert", false);
+            paintMeta();
+          }).catch(function (err) {
+            if (gen !== generation) return;
+            var text = explainError(err);
+            setStatus(text, true);
+            if (/Tabelle fehlt/.test(text)) showBanner(text);
+          });
+        });
+      }
+
+      function load() {
+        setStatus("", false);
+        rest("go_plan_logs?athlete_id=eq." + encodeURIComponent(PLAN_SLUG) + "&select=workout_date,exercise_id,reps,weight_kg,done&order=workout_date.desc")
+          .then(function (rows) {
+            serverLogs = rows || [];
+            draft = Log.draftFromLogs(serverLogs, date);
+            showBanner("");
+            renderList();
+            paintWelcome();
+            if (!document.getElementById("diary").hidden) openDiary();
+          })
+          .catch(function (err) {
+            serverLogs = [];
+            draft = Log.draftFromLogs([], date);
+            showBanner(explainError(err));
+            renderList();
+            paintWelcome();
+          });
+      }
+
+      function showTab(which) {
+        var workout = which === "workout";
+        workoutTab.classList.toggle("is-active", workout);
+        historyTab.classList.toggle("is-active", !workout);
+        workoutTab.setAttribute("aria-selected", workout ? "true" : "false");
+        historyTab.setAttribute("aria-selected", workout ? "false" : "true");
+        workoutPanel.hidden = !workout;
+        historyPanel.hidden = workout;
+        if (!workout) renderHistory();
+      }
+
+      var wheel = document.getElementById("wheel");
+      var wheelCol = document.getElementById("wheel-col");
+      var wheelLabel = document.getElementById("wheel-label");
+      var stickyBar = document.getElementById("sticky-bar");
+
+      function buildWheel() {
+        if (wheelCol.childElementCount) return;
+        for (var n = 1; n <= WHEEL_MAX; n++) {
+          var item = document.createElement("div");
+          item.className = "wheel-item";
+          item.dataset.n = String(n);
+          item.textContent = String(n);
+          wheelCol.appendChild(item);
+        }
+      }
+
+      function highlightWheel(n) {
+        wheelCol.querySelectorAll(".wheel-item").forEach(function (item) {
+          item.classList.toggle("is-on", Number(item.dataset.n) === n);
+        });
+      }
+
+      function wheelValue() {
+        var n = Math.round(wheelCol.scrollTop / WHEEL_ITEM) + 1;
+        if (n < 1) n = 1;
+        if (n > WHEEL_MAX) n = WHEEL_MAX;
+        return n;
+      }
+
+      function applyWheel(n) {
+        if (!wheelInput) return;
+        var ex = Log.exerciseById(wheelInput.dataset.id);
+        var idx = Number(wheelInput.dataset.idx);
+        if (!ex || !draft[ex.id].sets[idx]) return;
+        highlightWheel(n);
+        draft[ex.id].sets[idx].reps = String(n);
+        wheelInput.value = String(n);
+        scheduleSave(ex, false);
+      }
+
+      function keepFieldVisible(input) {
+        var top = wheel.getBoundingClientRect().top;
+        var rect = input.getBoundingClientRect();
+        if (rect.bottom > top - 12) window.scrollBy(0, rect.bottom - (top - 16));
+      }
+
+      function settleWheel() {
+        wheelLock = true;
+        window.clearTimeout(wheelSettleTimer);
+        wheelSettleTimer = window.setTimeout(function () { wheelLock = false; }, 200);
+      }
+
+      function openWheel(input) {
+        if (document.activeElement && document.activeElement !== document.body) document.activeElement.blur();
+        buildWheel();
+        wheelInput = input;
+        var ex = Log.exerciseById(input.dataset.id);
+        var idx = Number(input.dataset.idx);
+        wheelLabel.textContent = (ex ? ex.name : "Wiederholungen") + " · Satz " + (idx + 1);
+        wheel.hidden = false;
+        document.body.classList.add("wheel-open");
+        wheelTouched = false;
+        var current = parseInt(input.value, 10);
+        var n = current >= 1 && current <= WHEEL_MAX ? current : 10;
+        settleWheel();
+        wheelCol.scrollTop = (n - 1) * WHEEL_ITEM;
+        highlightWheel(n);
+        window.setTimeout(function () { keepFieldVisible(input); }, 60);
+      }
+
+      function closeWheel() {
+        wheel.hidden = true;
+        wheelInput = null;
+        wheelTouched = false;
+        document.body.classList.remove("wheel-open");
+      }
+
+      function finishWheel() {
+        if (!wheel.hidden && wheelTouched) applyWheel(wheelValue());
+        closeWheel();
+      }
+
+      wheel.addEventListener("pointerdown", function (event) {
+        if (event.target.closest("#wheel-done")) return;
+        wheelTouched = true;
+      });
+      wheel.addEventListener("wheel", function () { wheelTouched = true; });
+      wheelCol.addEventListener("click", function (event) {
+        var item = event.target.closest(".wheel-item");
+        if (!item) return;
+        var n = Number(item.dataset.n);
+        if (!n) return;
+        wheelTouched = true;
+        settleWheel();
+        wheelCol.scrollTop = (n - 1) * WHEEL_ITEM;
+        applyWheel(n);
+      });
+      wheelCol.addEventListener("scroll", function () {
+        if (wheel.hidden) return;
+        if (wheelLock && !wheelTouched) {
+          settleWheel();
+          highlightWheel(wheelValue());
+          return;
+        }
+        wheelTouched = true;
+        applyWheel(wheelValue());
+      });
+      document.getElementById("wheel-done").addEventListener("click", function () { finishWheel(); });
+
+      dateInput.addEventListener("change", function () {
+        var pendingWheel = !wheel.hidden && wheelTouched && wheelInput ? Log.exerciseById(wheelInput.dataset.id) : null;
+        if (pendingWheel) applyWheel(wheelValue());
+        closeWheel();
+        clearTimers();
+        if (pendingWheel) saveExercise(pendingWheel);
+        closeDone();
+        closeReset();
+        date = dateInput.value || Log.berlinToday();
+        dateInput.value = date;
+        draft = Log.draftFromLogs(serverLogs, date);
+        renderList();
+      });
+
+      workoutTab.addEventListener("click", function () { showTab("workout"); });
+      historyTab.addEventListener("click", function () { finishWheel(); showTab("history"); });
+
+      var tap = null;
+      var TAP_MOVE = 12;
+      var TAP_MS = 500;
+
+      listEl.addEventListener("pointerdown", function (event) {
+        var reps = event.target.closest("[data-reps], .reps");
+        if (!reps) return;
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        var input = reps.dataset.reps ? reps : reps.querySelector("[data-reps]");
+        if (input) input.blur();
+        tap = { id: event.pointerId, x: event.clientX, y: event.clientY, t: Date.now(), input: input, moved: false };
+      });
+
+      document.addEventListener("pointermove", function (event) {
+        if (!tap || event.pointerId !== tap.id) return;
+        if (Math.abs(event.clientX - tap.x) > TAP_MOVE || Math.abs(event.clientY - tap.y) > TAP_MOVE) tap.moved = true;
+      });
+
+      document.addEventListener("pointerup", function (event) {
+        if (!tap || event.pointerId !== tap.id) return;
+        var info = tap;
+        tap = null;
+        if (!info.input || info.moved || Date.now() - info.t > TAP_MS) return;
+        event.preventDefault();
+        openWheel(info.input);
+      });
+
+      document.addEventListener("pointercancel", function (event) {
+        if (tap && event.pointerId === tap.id) tap = null;
+      });
+
+      listEl.addEventListener("click", function (event) {
+        var reps = event.target.closest("[data-reps], .reps");
+        if (reps) {
+          event.preventDefault();
+          return;
+        }
+        var check = event.target.closest("[data-check]");
+        if (check) {
+          var ex = Log.exerciseById(check.dataset.check);
+          draft[ex.id].done = !draft[ex.id].done;
+          paintMeta();
+          scheduleSave(ex, true);
+          noteProgress();
+          return;
+        }
+        var setCheck = event.target.closest("[data-set-check]");
+        if (setCheck) {
+          var exercise = Log.exerciseById(setCheck.dataset.id);
+          var idx = Number(setCheck.dataset.idx);
+          var set = draft[exercise.id].sets[idx];
+          set.done = !set.done;
+          if (!set.done) {
+            for (var j = idx + 1; j < draft[exercise.id].sets.length; j++) {
+              draft[exercise.id].sets[j] = { reps: "", kg: null, kgTouched: false, done: false };
+            }
+          }
+          paintMeta();
+          scheduleSave(exercise, true);
+          noteProgress();
+          return;
+        }
+        var step = event.target.closest("[data-act]");
+        if (!step) return;
+        var weighted = Log.exerciseById(step.dataset.id);
+        var setIdx = Number(step.dataset.idx);
+        var current = Log.displayKg(weighted, draft[weighted.id].sets, setIdx, historyKg(weighted));
+        var delta = step.dataset.act === "plus" ? weighted.step : -weighted.step;
+        var next = current == null && delta < 0 ? null : Log.addKg(current == null ? 0 : current, delta);
+        if (current == null && delta > 0) next = weighted.step;
+        draft[weighted.id].sets[setIdx].kg = next;
+        draft[weighted.id].sets[setIdx].kgTouched = next != null;
+        paintMeta();
+        scheduleSave(weighted, true);
+      });
+
+      listEl.addEventListener("input", function (event) {
+        var kg = event.target.closest("[data-kg]");
+        if (!kg) return;
+        var exercise = Log.exerciseById(kg.dataset.id);
+        var idx = Number(kg.dataset.idx);
+        var raw = kg.value.trim();
+        var parsed = Log.parseKg(raw);
+        draft[exercise.id].sets[idx].kgTouched = true;
+        kg.classList.remove("is-suggestion");
+        var hint = document.querySelector('[data-kghint="' + exercise.id + "-" + idx + '"]');
+        if (hint) hint.textContent = "";
+        if (raw && parsed == null) return;
+        draft[exercise.id].sets[idx].kg = parsed;
+        paintMeta();
+        scheduleSave(exercise, false);
+      });
+
+      document.addEventListener("click", function (event) {
+        if (wheel.hidden) return;
+        if (event.target.closest("#wheel") || event.target.closest("[data-reps], .reps")) return;
+        finishWheel();
+      });
+
+      if ("IntersectionObserver" in window) {
+        var sentinel = document.createElement("div");
+        sentinel.style.height = "1px";
+        stickyBar.parentNode.insertBefore(sentinel, stickyBar);
+        new IntersectionObserver(function (entries) {
+          stickyBar.classList.toggle("is-stuck", !entries[0].isIntersecting);
+        }, { threshold: 0 }).observe(sentinel);
+      }
+
+      var doneModal = document.getElementById("done-modal");
+      var resetModal = document.getElementById("reset-modal");
+
+      function workoutComplete() {
+        var logs = viewLogs();
+        return Log.EXERCISES.every(function (ex) {
+          return Log.exerciseComplete(logs, date, ex);
+        });
+      }
+
+      function noteProgress() {
+        if (!workoutComplete()) {
+          celebratedDate = "";
+          return;
+        }
+        if (celebratedDate === date) return;
+        celebratedDate = date;
+        finishWheel();
+        resetModal.hidden = true;
+        if (shortMode) {
+          shortMode = false;
+          writeStore(HOME_SHORT_SESSION, "");
+          document.getElementById("short-banner").hidden = true;
+        }
+        document.getElementById("short-choice").hidden = true;
+        markDiaryMove(date, PLAN_HEADLINE);
+        doneModal.hidden = false;
+        document.getElementById("done-ok").focus();
+      }
+
+      function closeDone(openSummary) {
+        doneModal.hidden = true;
+        if (openSummary) document.getElementById("wa-modal").hidden = false;
+      }
+
+      function askReset() {
+        finishWheel();
+        doneModal.hidden = true;
+        document.getElementById("reset-copy").textContent = "Alle Haken, Wiederholungen und Gewichte vom " + Log.formatDate(date) + " werden gelöscht. Danach ist das Workout wieder leer. Andere Tage in der Historie bleiben erhalten.";
+        resetModal.hidden = false;
+        document.getElementById("reset-cancel").focus();
+      }
+
+      function closeReset() {
+        resetModal.hidden = true;
+      }
+
+      function resetWorkout() {
+        var when = date;
+        var gen = ++generation;
+        clearTimers();
+        closeWheel();
+        closeReset();
+        closeDone();
+        celebratedDate = "";
+        serverLogs = serverLogs.filter(function (row) { return row.workout_date !== when; });
+        draft = Log.draftFromLogs(serverLogs, when);
+        renderList();
+        setStatus("Löscht …", false);
+        tail = tail.then(function () {
+          return rest("go_plan_logs?athlete_id=eq." + encodeURIComponent(PLAN_SLUG) + "&workout_date=eq." + encodeURIComponent(when), {
+            method: "DELETE",
+            prefer: "return=minimal"
+          });
+        }).then(function () {
+          return rest("go_plan_logs?athlete_id=eq." + encodeURIComponent(PLAN_SLUG) + "&select=workout_date,exercise_id,reps,weight_kg,done&order=workout_date.desc");
+        }).then(function (rows) {
+          if (gen !== generation) return;
+          serverLogs = rows || [];
+          if (date === when) {
+            draft = Log.draftFromLogs(serverLogs, date);
+            renderList();
+          }
+          showBanner("");
+          setStatus("Neu gestartet", false);
+        }).catch(function (err) {
+          if (gen !== generation) return;
+          setStatus(explainError(err), true);
+          load();
+        });
+      }
+
+      document.getElementById("done-ok").addEventListener("click", function () { closeDone(true); });
+      doneModal.addEventListener("click", function (event) {
+        if (event.target === doneModal) closeDone(true);
+      });
+      document.getElementById("reset-workout").addEventListener("click", askReset);
+      document.getElementById("reset-cancel").addEventListener("click", closeReset);
+      document.getElementById("reset-confirm").addEventListener("click", resetWorkout);
+      resetModal.addEventListener("click", function (event) {
+        if (event.target === resetModal) closeReset();
+      });
+      document.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") return;
+        if (!resetModal.hidden) closeReset();
+        else if (!doneModal.hidden) closeDone();
+      });
+
+      historyEl.addEventListener("click", function (event) {
+        var open = event.target.closest("[data-open]");
+        if (!open) return;
+        finishWheel();
+        closeDone();
+        date = open.dataset.open;
+        dateInput.value = date;
+        draft = Log.draftFromLogs(serverLogs, date);
+        renderList();
+        showTab("workout");
+      });
+
+      var DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+      var HOME_DAYS = "plan_" + PLAN_SLUG + "_days";
+      var HOME_PHOTO = "plan_" + PLAN_SLUG + "_photo";
+      var HOME_START = "plan_" + PLAN_SLUG + "_routine_start";
+      var HOME_SHIFT = "plan_" + PLAN_SLUG + "_shift";
+      var HOME_SHORT = "plan_" + PLAN_SLUG + "_short_done";
+      var HOME_SHORT_SESSION = "plan_" + PLAN_SLUG + "_short_session";
+      var HOME_PHOTOS = "plan_" + PLAN_SLUG + "_workout_photos";
+      var HOME_DIARY = "plan_" + PLAN_SLUG + "_diary";
+      var HOME_DIARY_FROM = "plan_" + PLAN_SLUG + "_diary_from";
+      var MOVES = [PLAN_HEADLINE, PLAN_HEADLINE + " kurz", ">5.000 Schritte", ">10.000 Schritte", "Laufen", "Fahrradfahren", "Sport", "Wandern", "Schwimmen"];
+      var welcomeEl = document.getElementById("welcome");
+      var mainEl = document.querySelector("main");
+      var shortMode = false;
+
+      function readStore(key, fallback) {
+        try {
+          var raw = localStorage.getItem(key);
+          if (raw == null || raw === "") return fallback;
+          return JSON.parse(raw);
+        } catch (e) {
+          return fallback;
+        }
+      }
+
+      function writeStore(key, value) {
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+      }
+
+      function addDays(iso, n) {
+        var p = String(iso || "").split("-");
+        var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+        d.setUTCDate(d.getUTCDate() + n);
+        var m = String(d.getUTCMonth() + 1);
+        var day = String(d.getUTCDate());
+        if (m.length < 2) m = "0" + m;
+        if (day.length < 2) day = "0" + day;
+        return d.getUTCFullYear() + "-" + m + "-" + day;
+      }
+
+      function weekdayIndex(iso) {
+        var p = iso.split("-");
+        var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+        return (d.getUTCDay() + 6) % 7;
+      }
+
+      function mondayOf(iso) {
+        return addDays(iso, -weekdayIndex(iso));
+      }
+
+      function isoWeek(iso) {
+        var p = iso.split("-");
+        var date = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+        var day = date.getUTCDay() || 7;
+        date.setUTCDate(date.getUTCDate() + 4 - day);
+        var yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+        return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+      }
+
+      function formatLong(iso) {
+        var p = iso.split("-");
+        var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+        return new Intl.DateTimeFormat("de-DE", {
+          weekday: "long", day: "numeric", month: "long", timeZone: "UTC"
+        }).format(d);
+      }
+
+      function formatSpoken(iso) {
+        var p = iso.split("-");
+        var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+        return new Intl.DateTimeFormat("de-DE", {
+          day: "numeric", month: "long", year: "numeric", timeZone: "UTC"
+        }).format(d);
+      }
+
+      function planDays() {
+        var days = readStore(HOME_DAYS, ["tue", "sat"]);
+        if (!Array.isArray(days)) days = ["tue", "sat"];
+        days = days.filter(function (key) { return DAY_KEYS.indexOf(key) >= 0; });
+        return days.slice(0, 2);
+      }
+
+      function shiftFrom() {
+        var value = readStore(HOME_SHIFT, "");
+        return typeof value === "string" ? value : "";
+      }
+
+      function shortDone() {
+        var list = readStore(HOME_SHORT, []);
+        return Array.isArray(list) ? list : [];
+      }
+
+      function routineStart() {
+        var value = readStore(HOME_START, "");
+        return typeof value === "string" ? value : "";
+      }
+
+      function effectiveDate(iso) {
+        return shiftFrom() === iso ? addDays(iso, 1) : iso;
+      }
+
+      function dayFinished(iso) {
+        var when = effectiveDate(iso);
+        if (shortDone().indexOf(when) >= 0) return true;
+        return Log.EXERCISES.every(function (ex) {
+          return Log.exerciseComplete(serverLogs, when, ex);
+        });
+      }
+
+      function weekFinished(monday) {
+        var days = planDays();
+        if (!days.length) return false;
+        return days.every(function (key) {
+          return dayFinished(addDays(monday, DAY_KEYS.indexOf(key)));
+        });
+      }
+
+      function paintPhoto() {
+        var img = document.getElementById("photo-img");
+        var copy = document.getElementById("photo-copy");
+        var url = "";
+        try { url = localStorage.getItem(HOME_PHOTO) || ""; } catch (e) {}
+        if (url) {
+          img.src = url;
+          img.hidden = false;
+          copy.hidden = true;
+        } else {
+          img.removeAttribute("src");
+          img.hidden = true;
+          copy.hidden = false;
+        }
+      }
+
+      function shiftTarget() {
+        var from = shiftFrom();
+        return from ? addDays(from, 1) : "";
+      }
+
+      function shiftActive(today) {
+        var target = shiftTarget();
+        return !!target && target >= today;
+      }
+
+      var DAY_NAMES = {
+        mon: "Montag", tue: "Dienstag", wed: "Mittwoch", thu: "Donnerstag",
+        fri: "Freitag", sat: "Samstag", sun: "Sonntag"
+      };
+      var pendingDay = null;
+      var firstDay = null;
+      var routineTouched = false;
+      var ROUTINE_ID = PLAN_SLUG;
+
+      function routineMissing(err) {
+        var msg = String((err && err.message) || err || "");
+        return /PGRST205|schema cache|does not exist|Could not find the table/i.test(msg);
+      }
+
+      function routineErrorText(err) {
+        var msg = String((err && err.message) || err || "");
+        if (routineMissing(err)) {
+          return "Die Tabelle fehlt noch. Einmal go-plan.sql im Supabase SQL Editor ausführen.";
+        }
+        if (/Failed to fetch|NetworkError|Load failed|name not resolved/i.test(msg)) {
+          return "Supabase ist gerade nicht erreichbar.";
+        }
+        return "Die Routine konnte nicht gespeichert werden.";
+      }
+
+      function showRoutineNote(text) {
+        var note = document.getElementById("routine-note");
+        if (!text) {
+          note.hidden = true;
+          note.textContent = "";
+          return;
+        }
+        note.hidden = false;
+        note.textContent = text;
+      }
+
+      function saveRoutine(days, started) {
+        return rest("go_plan_athletes?slug=eq." + encodeURIComponent(PLAN_SLUG), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: {
+            days: days,
+            started_on: started || null,
+            updated_at: new Date().toISOString()
+          }
+        });
+      }
+
+      function deleteRoutine() {
+        return rest("go_plan_athletes?slug=eq." + encodeURIComponent(PLAN_SLUG), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { started_on: null, updated_at: new Date().toISOString() }
+        });
+      }
+
+      function loadRoutine() {
+        return rest("go_plan_athletes?slug=eq." + encodeURIComponent(PLAN_SLUG) + "&select=name,days,started_on")
+          .then(function (rows) {
+            if (routineTouched || !rows || !rows.length) return;
+            var row = rows[0];
+            if (Array.isArray(row.days)) {
+              var days = row.days.filter(function (key) { return DAY_KEYS.indexOf(key) >= 0; }).slice(0, 2);
+              writeStore(HOME_DAYS, days);
+            }
+            writeStore(HOME_START, typeof row.started_on === "string" ? row.started_on : "");
+            paintWelcome();
+          })
+          .catch(function () {});
+      }
+
+      function paintWelcome() {
+        var today = Log.berlinToday();
+        var selected = planDays();
+        var moved = shiftTarget();
+        var shifted = shiftActive(today);
+        var picking = !!firstDay;
+        var todayKey = DAY_KEYS[weekdayIndex(today)];
+        var todayPlanned = !picking && selected.indexOf(todayKey) >= 0;
+        var box = document.getElementById("days");
+        box.textContent = "";
+        document.querySelector(".tip").textContent = picking
+          ? "Zweiten Tag festlegen."
+          : (routineStart()
+            ? "Die Wochentage bleiben, solange die Routine läuft."
+            : "Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.");
+        for (var i = 0; i < 7; i++) {
+          var iso = addDays(today, i);
+          var key = DAY_KEYS[weekdayIndex(iso)];
+          var on = picking ? key === firstDay : selected.indexOf(key) >= 0;
+          var isSource = shifted && shiftFrom() === iso;
+          var isTarget = shifted && moved === iso;
+          var brown = on && !isSource && !isTarget;
+          var button = document.createElement("button");
+          button.type = "button";
+          button.className = "day" + (brown ? " is-on" : "") + (isTarget ? " is-moved" : "") + (isSource ? " is-line" : "");
+          button.disabled = !!routineStart();
+          button.dataset.day = key;
+          button.setAttribute("aria-pressed", (brown || isTarget) ? "true" : "false");
+          var name = document.createElement("span");
+          name.textContent = formatLong(iso);
+          button.appendChild(name);
+          if (brown || isTarget) {
+            var side = document.createElement("span");
+            side.className = "day-side";
+            var emoji = document.createElement("span");
+            emoji.className = "day-mark";
+            emoji.textContent = "🤸";
+            emoji.setAttribute("aria-hidden", "true");
+            side.appendChild(emoji);
+            button.appendChild(side);
+          }
+          box.appendChild(button);
+        }
+        var start = routineStart();
+        var startBtn = document.getElementById("routine-start");
+        var weeks = document.getElementById("weeks");
+        startBtn.textContent = start ? "Deine Routine läuft. Klick wenn Challenge vorzeitig beenden." : "Start der 12 Wochenroutine";
+        weeks.textContent = "";
+        var origin = mondayOf(today);
+        for (var w = 0; w < 12; w++) {
+          var weekMonday = addDays(origin, w * 7);
+          var kw = isoWeek(weekMonday);
+          var mark = document.createElement("div");
+          mark.className = "week-box" + (start && weekFinished(weekMonday) ? " is-full" : "");
+          mark.textContent = String(kw);
+          mark.title = "KW " + kw;
+          weeks.appendChild(mark);
+        }
+        var shiftBtn = document.getElementById("go-shift");
+        shiftBtn.textContent = shifted && !picking ? "Nicht verschieben" : "Schieben";
+        shiftBtn.disabled = picking || (!shifted && !todayPlanned);
+        var todayBtn = document.getElementById("go-today");
+        todayBtn.disabled = picking || shifted || !todayPlanned;
+        todayBtn.classList.toggle("is-due", todayPlanned && !shifted && !picking);
+        document.getElementById("go-short").disabled = picking || shifted || !todayPlanned;
+        paintPhoto();
+      }
+
+      function choosePlanDay(key) {
+        if (routineStart()) return;
+        if (!document.getElementById("days-modal").hidden) return;
+        if (firstDay) {
+          if (key === firstDay) return;
+          commitPlanDays([firstDay, key]);
+          return;
+        }
+        pendingDay = key;
+        document.getElementById("days-title").textContent = "Workout-Tag 1 am " + DAY_NAMES[key] + ".";
+        document.getElementById("days-modal").hidden = false;
+      }
+
+      function commitPlanDays(days) {
+        saveRoutine(days, routineStart()).then(function () {
+          routineTouched = true;
+          writeStore(HOME_DAYS, days);
+          showRoutineNote("");
+          firstDay = null;
+          pendingDay = null;
+          paintWelcome();
+        }).catch(function (err) {
+          showRoutineNote(routineErrorText(err));
+          if (routineMissing(err)) {
+            routineTouched = true;
+            writeStore(HOME_DAYS, days);
+            firstDay = null;
+            pendingDay = null;
+            paintWelcome();
+          }
+        });
+      }
+
+      function setHome(on) {
+        finishMoveWheel(false);
+        document.body.classList.toggle("is-home", on);
+        document.body.classList.remove("is-diary");
+        welcomeEl.hidden = !on;
+        document.getElementById("diary").hidden = true;
+        document.getElementById("diary-menu").hidden = true;
+        document.getElementById("diary-delete").hidden = true;
+        document.getElementById("diary-share").hidden = true;
+        document.getElementById("short-choice").hidden = true;
+        document.getElementById("wa-modal").hidden = true;
+        mainEl.hidden = on;
+        var theme = document.querySelector('meta[name="theme-color"]');
+        if (theme) theme.setAttribute("content", on ? "#F3EEE4" : "#C7413B");
+        window.scrollTo(0, 0);
+      }
+
+      function enterWorkout(short) {
+        var today = Log.berlinToday();
+        var todayKey = DAY_KEYS[weekdayIndex(today)];
+        if (firstDay || shiftActive(today) || planDays().indexOf(todayKey) < 0) return;
+        shortMode = !!short;
+        shortPromptedAt = 0;
+        writeStore(HOME_SHORT_SESSION, short ? today : "");
+        document.getElementById("short-modal").hidden = true;
+        document.getElementById("short-choice").hidden = true;
+        var when = shiftFrom() === today ? addDays(today, 1) : today;
+        setHome(false);
+        document.getElementById("short-banner").hidden = !shortMode;
+        if (date !== when) {
+          dateInput.value = when;
+          dateInput.dispatchEvent(new Event("change"));
+        }
+        syncShortFinish();
+      }
+
+      var shortPromptedAt = 0;
+
+      function completedCount() {
+        var logs = viewLogs();
+        var n = 0;
+        Log.EXERCISES.forEach(function (ex) {
+          if (Log.exerciseComplete(logs, date, ex)) n += 1;
+        });
+        return n;
+      }
+
+      function syncShortFinish() {
+        var banner = document.getElementById("short-banner");
+        var text = document.getElementById("short-banner-text");
+        if (!banner || banner.hidden) return;
+        var n = completedCount();
+        var shown = n > 5 ? 5 : n;
+        text.textContent = "Kurzfassung. Nach 5 Übungen kannst du beenden. " + shown + " von 5.";
+        var choice = document.getElementById("short-choice");
+        if (!shortMode || n < 5 || n <= shortPromptedAt || workoutComplete() || !doneModal.hidden) {
+          return;
+        }
+        shortPromptedAt = n;
+        choice.hidden = false;
+      }
+
+      function finishShort() {
+        if (!shortMode || completedCount() < 5) return;
+        var list = shortDone();
+        if (list.indexOf(date) < 0) {
+          list.push(date);
+          writeStore(HOME_SHORT, list);
+        }
+        writeStore(HOME_SHORT_SESSION, "");
+        shortMode = false;
+        document.getElementById("short-banner").hidden = true;
+        document.getElementById("short-choice").hidden = true;
+        finishWheel();
+        resetModal.hidden = true;
+        celebratedDate = date;
+        markDiaryMove(date, PLAN_HEADLINE + " kurz");
+        doneModal.hidden = false;
+        document.getElementById("done-ok").focus();
+      }
+
+      function compressPhoto(file, done) {
+        if (!file || !done) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          var img = new Image();
+          img.onload = function () {
+            var max = 900;
+            var scale = Math.min(1, max / Math.max(img.width, img.height));
+            var canvas = document.createElement("canvas");
+            canvas.width = Math.max(1, Math.round(img.width * scale));
+            canvas.height = Math.max(1, Math.round(img.height * scale));
+            canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+            done(canvas.toDataURL("image/jpeg", 0.72));
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function storePhoto(file) {
+        compressPhoto(file, function (url) {
+          try { localStorage.setItem(HOME_PHOTO, url); } catch (e) {}
+          paintPhoto();
+        });
+      }
+
+      function workoutPhotoMap() {
+        var map = readStore(HOME_PHOTOS, {});
+        if (!map || typeof map !== "object" || Array.isArray(map)) return {};
+        return map;
+      }
+
+      function storeWorkoutPhoto(file, iso) {
+        var when = iso || date;
+        compressPhoto(file, function (url) {
+          var map = workoutPhotoMap();
+          map[when] = url;
+          writeStore(HOME_PHOTOS, map);
+          if (!document.getElementById("diary").hidden) openDiary();
+        });
+      }
+
+      function diaryMap() {
+        var map = readStore(HOME_DIARY, {});
+        if (!map || typeof map !== "object" || Array.isArray(map)) return {};
+        return map;
+      }
+
+      function diaryEntry(iso) {
+        var row = diaryMap()[iso];
+        if (!row || typeof row !== "object") return { note: "", move: "", extras: [], cleared: false };
+        var extras = Array.isArray(row.extras) ? row.extras.map(function (extra) {
+          return {
+            move: String((extra && extra.move) || ""),
+            note: String((extra && extra.note) || "").slice(0, 200)
+          };
+        }) : [];
+        return {
+          note: String(row.note || "").slice(0, 200),
+          move: String(row.move || ""),
+          extras: extras,
+          cleared: !!row.cleared
+        };
+      }
+
+      function saveDiaryEntry(iso, entry) {
+        var map = diaryMap();
+        var extras = Array.isArray(entry.extras) ? entry.extras : [];
+        map[iso] = {
+          note: String(entry.note || "").slice(0, 200),
+          move: entry.move || "",
+          extras: extras.map(function (extra) {
+            return {
+              move: extra && extra.move ? String(extra.move) : "",
+              note: String((extra && extra.note) || "").slice(0, 200)
+            };
+          }),
+          cleared: !!entry.cleared
+        };
+        writeStore(HOME_DIARY, map);
+      }
+
+      function markDiaryMove(iso, label) {
+        var entry = diaryEntry(iso);
+        entry.move = label;
+        entry.cleared = false;
+        saveDiaryEntry(iso, entry);
+      }
+
+      function ensureDiaryFrom() {
+        var stored = readStore(HOME_DIARY_FROM, "");
+        var today = Log.berlinToday();
+        if (typeof stored !== "string" || !stored) {
+          writeStore(HOME_DIARY_FROM, today);
+          return today;
+        }
+        return stored;
+      }
+
+      function dayFullyDone(iso) {
+        return Log.EXERCISES.every(function (ex) {
+          return Log.exerciseComplete(serverLogs, iso, ex);
+        });
+      }
+
+      function diaryStatus(iso) {
+        var entry = diaryEntry(iso);
+        if (entry.cleared) return "";
+        if (MOVES.indexOf(entry.move) >= 0) return entry.move;
+        if (dayFullyDone(iso)) return PLAN_HEADLINE;
+        if (shortDone().indexOf(iso) >= 0) return PLAN_HEADLINE + " kurz";
+        return "";
+      }
+
+      function diaryDates() {
+        var today = Log.berlinToday();
+        var from = ensureDiaryFrom();
+        var start = routineStart();
+        if (start && start < from) from = start;
+        function consider(iso) {
+          if (iso && iso < from && iso <= today) from = iso;
+        }
+        Object.keys(workoutPhotoMap()).forEach(consider);
+        Object.keys(diaryMap()).forEach(function (iso) {
+          var row = diaryMap()[iso];
+          if (row && row.cleared && !row.note && !row.move && !(row.extras && row.extras.length)) return;
+          consider(iso);
+        });
+        shortDone().forEach(consider);
+        Log.historyDates(serverLogs).forEach(consider);
+        var dates = [];
+        var cursor = today;
+        var guard = 0;
+        while (cursor >= from && guard < 140) {
+          dates.push(cursor);
+          cursor = addDays(cursor, -1);
+          guard += 1;
+        }
+        return dates;
+      }
+
+      var diaryPhotoDate = "";
+      var diaryMenuDate = "";
+      var moveDate = "";
+      var moveButton = null;
+      var moveSlot = -1;
+      var moveTouched = false;
+      var moveLock = false;
+      var moveLockTimer = 0;
+      var MOVE_ITEM = 44;
+
+      function diaryNoteField(iso, value, write, primary) {
+        var note = document.createElement("label");
+        note.className = "diary-note" + (value ? " is-filled" : "");
+        var blink = document.createElement("span");
+        blink.className = "diary-blink";
+        blink.setAttribute("aria-hidden", "true");
+        blink.textContent = "_";
+        var input = document.createElement("textarea");
+        input.rows = 1;
+        input.maxLength = 200;
+        input.value = value || "";
+        input.placeholder = value ? "" : "meine Notizen.";
+        input.setAttribute("aria-label", "meine Notizen.");
+        input.setAttribute("enterkeyhint", "enter");
+        if (primary) input.dataset.note = iso;
+        function fitNote() {
+          input.style.height = "auto";
+          input.style.height = input.scrollHeight + "px";
+        }
+        input.addEventListener("focus", function () {
+          note.classList.add("is-focus");
+          input.placeholder = "";
+          fitNote();
+        });
+        input.addEventListener("blur", function () {
+          note.classList.remove("is-focus");
+          if (!input.value) input.placeholder = "meine Notizen.";
+        });
+        input.addEventListener("input", function () {
+          if (input.value.length > 200) input.value = input.value.slice(0, 200);
+          note.classList.toggle("is-filled", !!input.value);
+          fitNote();
+          write(input.value);
+        });
+        requestAnimationFrame(fitNote);
+        note.appendChild(blink);
+        note.appendChild(input);
+        return note;
+      }
+
+      function moveButtonEl(iso, label, slot) {
+        var status = document.createElement("button");
+        status.type = "button";
+        status.className = "diary-status";
+        status.textContent = label || "";
+        status.setAttribute("aria-label", label || "Bewegung wählen");
+        if (slot >= 0) status.dataset.extra = String(slot);
+        status.addEventListener("click", function (event) {
+          event.stopPropagation();
+          openMoveWheel(iso, status, slot);
+        });
+        return status;
+      }
+
+      function appendExtra(iso, extra, index) {
+        var card = document.querySelector('[data-card="' + iso + '"]');
+        if (!card) return null;
+        var status = moveButtonEl(iso, extra.move, index);
+        var note = diaryNoteField(iso, extra.note, function (value) {
+          var next = diaryEntry(iso);
+          if (!next.extras[index]) return;
+          next.extras[index].note = value;
+          saveDiaryEntry(iso, next);
+        }, false);
+        card.appendChild(status);
+        card.appendChild(note);
+        return status;
+      }
+
+      function openDiary() {
+        finishMoveWheel(false);
+        document.getElementById("diary-menu").hidden = true;
+        document.getElementById("diary-delete").hidden = true;
+        document.getElementById("diary-share").hidden = true;
+        document.body.classList.remove("is-home");
+        document.body.classList.add("is-diary");
+        welcomeEl.hidden = true;
+        mainEl.hidden = true;
+        document.getElementById("diary").hidden = false;
+        var theme = document.querySelector('meta[name="theme-color"]');
+        if (theme) theme.setAttribute("content", "#F3EEE4");
+        var list = document.getElementById("diary-list");
+        var photos = workoutPhotoMap();
+        var dates = diaryDates();
+        list.textContent = "";
+        dates.forEach(function (iso) {
+          if (!diaryMap()[iso]) saveDiaryEntry(iso, { note: "", move: "", extras: [], cleared: false });
+          var entry = diaryEntry(iso);
+          var card = document.createElement("article");
+          card.className = "diary-card";
+          card.dataset.card = iso;
+          var head = document.createElement("div");
+          head.className = "diary-head";
+          var when = document.createElement("p");
+          when.className = "diary-date";
+          when.textContent = formatLong(iso);
+          var more = document.createElement("button");
+          more.type = "button";
+          more.className = "diary-more";
+          more.textContent = "...";
+          more.setAttribute("aria-label", "Eintrag");
+          more.addEventListener("click", function (event) {
+            event.stopPropagation();
+            openDiaryMenu(iso);
+          });
+          head.appendChild(when);
+          head.appendChild(more);
+          card.appendChild(head);
+
+          var photoBtn = document.createElement("button");
+          photoBtn.type = "button";
+          photoBtn.className = "diary-photo-btn";
+          photoBtn.setAttribute("aria-label", "Foto hochladen / aufnehmen");
+          if (photos[iso]) {
+            var img = document.createElement("img");
+            img.className = "diary-photo";
+            img.alt = "";
+            img.src = photos[iso];
+            photoBtn.appendChild(img);
+          } else {
+            var frame = document.createElement("div");
+            frame.className = "diary-photo is-empty";
+            frame.textContent = "Foto hochladen / aufnehmen";
+            photoBtn.appendChild(frame);
+          }
+          photoBtn.addEventListener("click", function () {
+            diaryPhotoDate = iso;
+            document.getElementById("diary-photo-file").click();
+          });
+          card.appendChild(photoBtn);
+          card.appendChild(moveButtonEl(iso, diaryStatus(iso), -1));
+          card.appendChild(diaryNoteField(iso, entry.note, function (value) {
+            var next = diaryEntry(iso);
+            next.note = value;
+            saveDiaryEntry(iso, next);
+          }, true));
+          entry.extras.forEach(function (extra, index) {
+            card.appendChild(moveButtonEl(iso, extra.move, index));
+            card.appendChild(diaryNoteField(iso, extra.note, function (value) {
+              var next = diaryEntry(iso);
+              if (!next.extras[index]) return;
+              next.extras[index].note = value;
+              saveDiaryEntry(iso, next);
+            }, false));
+          });
+          list.appendChild(card);
+        });
+        window.scrollTo(0, 0);
+      }
+
+      function openDiaryMenu(iso) {
+        finishMoveWheel(false);
+        diaryMenuDate = iso;
+        document.getElementById("diary-menu").hidden = false;
+      }
+
+      function closeDiaryMenu() {
+        document.getElementById("diary-menu").hidden = true;
+      }
+
+      function deleteDiaryEntry(iso) {
+        var photos = workoutPhotoMap();
+        if (photos[iso]) {
+          delete photos[iso];
+          writeStore(HOME_PHOTOS, photos);
+        }
+        var map = diaryMap();
+        map[iso] = { note: "", move: "", extras: [], cleared: true };
+        writeStore(HOME_DIARY, map);
+        closeDiaryMenu();
+        openDiary();
+      }
+
+      var sharePick = { photo: false, notes: false, exercises: false };
+      var shareIso = "";
+      var shareLogs = null;
+
+      function exerciseShareBody(logs, iso) {
+        var lines = [];
+        Log.EXERCISES.forEach(function (ex) {
+          if (ex.group === "Hauptteil") return;
+          var rows = Log.rowsFor(logs, iso, ex);
+          if (rows[0] && rows[0].done) lines.push(ex.name);
+        });
+        var main = Log.summaryText(logs, iso).split("\n").slice(3).join("\n").trim();
+        if (lines.length && main) lines.push("");
+        if (main) lines.push(main);
+        return lines.join("\n").trim();
+      }
+
+      function resetSharePick() {
+        sharePick.photo = false;
+        sharePick.notes = false;
+        sharePick.exercises = false;
+        ["photo", "notes", "exercises"].forEach(function (key) {
+          var button = document.getElementById("diary-share-" + key);
+          button.classList.add("sand-quiet");
+          button.setAttribute("aria-pressed", "false");
+        });
+        document.getElementById("diary-share-send").disabled = true;
+      }
+
+      function toggleShare(key) {
+        sharePick[key] = !sharePick[key];
+        var button = document.getElementById("diary-share-" + key);
+        button.classList.toggle("sand-quiet", !sharePick[key]);
+        button.setAttribute("aria-pressed", sharePick[key] ? "true" : "false");
+        document.getElementById("diary-share-send").disabled = !(sharePick.photo || sharePick.notes || sharePick.exercises);
+      }
+
+      function openDiaryShare(iso) {
+        shareIso = iso;
+        shareLogs = null;
+        resetSharePick();
+        document.getElementById("diary-share").hidden = false;
+        rest("go_plan_logs?athlete_id=eq." + encodeURIComponent(PLAN_SLUG) + "&select=workout_date,exercise_id,reps,weight_kg,done&workout_date=eq." + encodeURIComponent(iso))
+          .then(function (rows) {
+            if (shareIso === iso) shareLogs = rows || [];
+          })
+          .catch(function () {
+            if (shareIso !== iso) return;
+            shareLogs = serverLogs.filter(function (row) { return row.workout_date === iso; });
+          });
+      }
+
+      function closeDiaryShare() {
+        document.getElementById("diary-share").hidden = true;
+      }
+
+      function dataUrlFile(dataUrl, name) {
+        var parts = String(dataUrl || "").split(",");
+        if (parts.length < 2) return null;
+        var mime = (parts[0].match(/:(.*?);/) || [])[1] || "image/jpeg";
+        var binary = atob(parts[1]);
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return new File([bytes], name, { type: mime });
+      }
+
+      function shareDiaryFallback(text, file) {
+        if (text && String(text).trim()) {
+          window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
+        }
+        if (!file) return;
+        var url = URL.createObjectURL(file);
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+      }
+
+      function shareDiaryNow(text, file) {
+        var payload = { title: PLAN_NAME };
+        if (text && String(text).trim()) payload.text = text;
+        if (file) payload.files = [file];
+        if (file && navigator.share && (!navigator.canShare || navigator.canShare(payload))) {
+          navigator.share(payload).catch(function (err) {
+            if (err && err.name === "AbortError") return;
+            shareDiaryFallback(text, file);
+          });
+          return;
+        }
+        shareDiaryFallback(text, file);
+      }
+
+      function submitDiaryShare() {
+        var iso = diaryMenuDate;
+        if (!iso || (!sharePick.photo && !sharePick.notes && !sharePick.exercises)) return;
+        var logs = shareLogs || serverLogs.filter(function (row) { return row.workout_date === iso; });
+        var chunks = [PLAN_NAME, formatLong(iso), ""];
+        if (sharePick.notes) {
+          var entry = diaryEntry(iso);
+          function push(move, note) {
+            if (!move && !note) return;
+            if (move) chunks.push(move);
+            if (note) chunks.push(note);
+            chunks.push("");
+          }
+          push(diaryStatus(iso), entry.note);
+          entry.extras.forEach(function (extra) { push(extra.move, extra.note); });
+        }
+        if (sharePick.exercises) {
+          chunks.push(exerciseShareBody(logs, iso) || "Keine Übungen gespeichert.");
+          chunks.push("");
+        }
+        var text = (sharePick.notes || sharePick.exercises) ? chunks.join("\n").replace(/\n+$/, "") + "\n" : "";
+        var photo = sharePick.photo ? (workoutPhotoMap()[iso] || "") : "";
+        var file = photo ? dataUrlFile(photo, PLAN_SLUG + "-" + iso + ".jpg") : null;
+        closeDiaryShare();
+        if (!String(text).trim() && !file) return;
+        shareDiaryNow(text, file);
+      }
+
+      function moveIndex() {
+        var col = document.getElementById("move-wheel-col");
+        var n = Math.round(col.scrollTop / MOVE_ITEM);
+        if (n < 0) n = 0;
+        if (n > MOVES.length - 1) n = MOVES.length - 1;
+        return n;
+      }
+
+      function highlightMove(index) {
+        document.querySelectorAll(".move-wheel-item").forEach(function (item) {
+          item.classList.toggle("is-on", Number(item.dataset.index) === index);
+        });
+      }
+
+      function settleMove() {
+        moveLock = true;
+        window.clearTimeout(moveLockTimer);
+        moveLockTimer = window.setTimeout(function () { moveLock = false; }, 200);
+      }
+
+      function applyMove(index) {
+        if (!moveDate || !moveTouched) return;
+        var label = MOVES[index];
+        var entry = diaryEntry(moveDate);
+        entry.cleared = false;
+        if (moveSlot === "new") {
+          entry.extras.push({ move: label, note: "" });
+          saveDiaryEntry(moveDate, entry);
+          moveSlot = entry.extras.length - 1;
+          moveButton = appendExtra(moveDate, entry.extras[moveSlot], moveSlot);
+          return;
+        }
+        if (moveSlot >= 0) {
+          if (!entry.extras[moveSlot]) entry.extras[moveSlot] = { move: "", note: "" };
+          entry.extras[moveSlot].move = label;
+        } else {
+          entry.move = label;
+        }
+        saveDiaryEntry(moveDate, entry);
+        if (moveButton) {
+          moveButton.textContent = label;
+          moveButton.setAttribute("aria-label", label);
+        }
+      }
+
+      function openMoveWheel(iso, button, slot) {
+        var wheel = document.getElementById("move-wheel");
+        var col = document.getElementById("move-wheel-col");
+        moveDate = iso;
+        moveButton = button || null;
+        moveSlot = slot == null ? -1 : slot;
+        moveTouched = false;
+        col.textContent = "";
+        MOVES.forEach(function (label, index) {
+          var item = document.createElement("div");
+          item.className = "move-wheel-item";
+          item.dataset.index = String(index);
+          item.textContent = label;
+          col.appendChild(item);
+        });
+        var entry = diaryEntry(iso);
+        var currentLabel = "";
+        if (moveSlot === "new") currentLabel = "";
+        else if (moveSlot >= 0) currentLabel = (entry.extras[moveSlot] && entry.extras[moveSlot].move) || "";
+        else currentLabel = entry.move || diaryStatus(iso);
+        var current = MOVES.indexOf(currentLabel);
+        if (current < 0) current = 0;
+        wheel.hidden = false;
+        settleMove();
+        col.scrollTop = current * MOVE_ITEM;
+        highlightMove(current);
+      }
+
+      function finishMoveWheel(commit) {
+        var wheel = document.getElementById("move-wheel");
+        if (!wheel || wheel.hidden) return;
+        if (commit !== false && moveTouched) applyMove(moveIndex());
+        wheel.hidden = true;
+        moveTouched = false;
+        moveDate = "";
+        moveButton = null;
+        moveSlot = -1;
+      }
+
+      function sendSummary() {
+        var text = Log.summaryText(viewLogs(), date);
+        var blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = PLAN_SLUG + "-" + date + ".txt";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+        setHome(true);
+        paintWelcome();
+        window.open("https://wa.me/" + PLAN_WA + "?text=" + encodeURIComponent(text), "_blank", "noopener");
+      }
+
+      function tryLockPortrait() {
+        try {
+          var orient = screen.orientation || screen.mozOrientation || screen.msOrientation;
+          if (orient && typeof orient.lock === "function") orient.lock("portrait").catch(function () {});
+        } catch (e) {}
+      }
+
+      function closeDaysPrompt() {
+        pendingDay = null;
+        document.getElementById("days-modal").hidden = true;
+      }
+
+      function hasPhoto() {
+        try { return !!localStorage.getItem(HOME_PHOTO); } catch (e) { return false; }
+      }
+
+      document.getElementById("days").addEventListener("click", function (event) {
+        var day = event.target.closest("[data-day]");
+        if (!day) return;
+        choosePlanDay(day.dataset.day);
+      });
+      document.getElementById("days-ok").addEventListener("click", function () {
+        if (!pendingDay) return;
+        firstDay = pendingDay;
+        pendingDay = null;
+        document.getElementById("days-modal").hidden = true;
+        paintWelcome();
+      });
+      document.getElementById("days-modal").addEventListener("click", function (event) {
+        if (event.target.id === "days-modal") closeDaysPrompt();
+      });
+      document.getElementById("routine-start").addEventListener("click", function () {
+        if (routineStart()) {
+          document.getElementById("end-modal").hidden = false;
+          return;
+        }
+        document.getElementById("start-error").hidden = true;
+        document.getElementById("start-modal").hidden = false;
+      });
+      document.getElementById("start-ok").addEventListener("click", function () {
+        var button = this;
+        var today = Log.berlinToday();
+        button.disabled = true;
+        saveRoutine(planDays(), today).then(function () {
+          routineTouched = true;
+          writeStore(HOME_START, today);
+          showRoutineNote("");
+          document.getElementById("start-modal").hidden = true;
+          paintWelcome();
+        }).catch(function (err) {
+          var error = document.getElementById("start-error");
+          error.hidden = false;
+          error.textContent = routineErrorText(err);
+          if (routineMissing(err)) {
+            routineTouched = true;
+            writeStore(HOME_START, today);
+            showRoutineNote(routineErrorText(err));
+            document.getElementById("start-modal").hidden = true;
+            paintWelcome();
+          }
+        }).then(function () { button.disabled = false; });
+      });
+      document.getElementById("start-pick").addEventListener("click", function () {
+        document.getElementById("start-modal").hidden = true;
+      });
+      document.getElementById("start-modal").addEventListener("click", function (event) {
+        if (event.target.id === "start-modal") event.currentTarget.hidden = true;
+      });
+      document.getElementById("go-today").addEventListener("click", function () { enterWorkout(false); });
+      document.getElementById("go-shift").addEventListener("click", function () {
+        var today = Log.berlinToday();
+        var todayKey = DAY_KEYS[weekdayIndex(today)];
+        if (firstDay) return;
+        if (shiftActive(today)) writeStore(HOME_SHIFT, "");
+        else if (planDays().indexOf(todayKey) >= 0) writeStore(HOME_SHIFT, today);
+        paintWelcome();
+      });
+      document.getElementById("end-cancel").addEventListener("click", function () {
+        document.getElementById("end-modal").hidden = true;
+      });
+      document.getElementById("end-confirm").addEventListener("click", function () {
+        var button = this;
+        button.disabled = true;
+        deleteRoutine().then(function () {
+          routineTouched = true;
+          writeStore(HOME_START, "");
+          showRoutineNote("");
+          document.getElementById("end-modal").hidden = true;
+          paintWelcome();
+        }).catch(function (err) {
+          if (routineMissing(err)) {
+            routineTouched = true;
+            writeStore(HOME_START, "");
+            showRoutineNote(routineErrorText(err));
+            document.getElementById("end-modal").hidden = true;
+            paintWelcome();
+            return;
+          }
+          showRoutineNote(routineErrorText(err));
+        }).then(function () { button.disabled = false; });
+      });
+      document.getElementById("end-modal").addEventListener("click", function (event) {
+        if (event.target.id === "end-modal") event.currentTarget.hidden = true;
+      });
+      document.getElementById("go-short").addEventListener("click", function () {
+        var today = Log.berlinToday();
+        var todayKey = DAY_KEYS[weekdayIndex(today)];
+        if (firstDay || shiftActive(today) || planDays().indexOf(todayKey) < 0) return;
+        document.getElementById("short-modal").hidden = false;
+      });
+      document.getElementById("short-go").addEventListener("click", function () { enterWorkout(true); });
+      document.getElementById("short-modal").addEventListener("click", function (event) {
+        if (event.target.id === "short-modal") event.currentTarget.hidden = true;
+      });
+      document.getElementById("back-welcome").addEventListener("click", function () {
+        finishWheel();
+        closeDone();
+        closeReset();
+        setHome(true);
+        paintWelcome();
+      });
+      document.getElementById("short-done-btn").addEventListener("click", finishShort);
+      document.getElementById("short-more").addEventListener("click", function () {
+        document.getElementById("short-choice").hidden = true;
+      });
+      document.getElementById("short-choice").addEventListener("click", function (event) {
+        if (event.target.id === "short-choice") event.currentTarget.hidden = true;
+      });
+      document.getElementById("photo").addEventListener("click", function (event) {
+        if (event.target.id === "photo-file") return;
+        if (hasPhoto()) {
+          document.getElementById("photo-modal").hidden = false;
+          return;
+        }
+        document.getElementById("photo-file").click();
+      });
+      document.getElementById("photo-replace").addEventListener("click", function () {
+        document.getElementById("photo-modal").hidden = true;
+        document.getElementById("photo-file").click();
+      });
+      document.getElementById("photo-remove").addEventListener("click", function () {
+        try { localStorage.removeItem(HOME_PHOTO); } catch (e) {}
+        document.getElementById("photo-modal").hidden = true;
+        paintPhoto();
+      });
+      document.getElementById("photo-modal").addEventListener("click", function (event) {
+        if (event.target.id === "photo-modal") event.currentTarget.hidden = true;
+      });
+      document.getElementById("photo-file").addEventListener("change", function (event) {
+        storePhoto(event.target.files && event.target.files[0]);
+        event.target.value = "";
+      });
+      document.getElementById("done-photo").addEventListener("click", function () {
+        document.getElementById("done-photo-file").click();
+      });
+      document.getElementById("done-photo-file").addEventListener("change", function (event) {
+        var file = event.target.files && event.target.files[0];
+        event.target.value = "";
+        if (!file) return;
+        storeWorkoutPhoto(file, date);
+        closeDone(true);
+      });
+      document.getElementById("diary-photo-file").addEventListener("change", function (event) {
+        storeWorkoutPhoto(event.target.files && event.target.files[0], diaryPhotoDate);
+        event.target.value = "";
+      });
+      document.getElementById("move-wheel-col").addEventListener("scroll", function () {
+        if (document.getElementById("move-wheel").hidden) return;
+        highlightMove(moveIndex());
+        if (!moveTouched) return;
+        applyMove(moveIndex());
+      });
+      document.getElementById("move-wheel-col").addEventListener("click", function (event) {
+        var item = event.target.closest(".move-wheel-item");
+        if (!item) return;
+        var index = Number(item.dataset.index);
+        moveTouched = true;
+        settleMove();
+        document.getElementById("move-wheel-col").scrollTop = index * MOVE_ITEM;
+        highlightMove(index);
+        applyMove(index);
+      });
+      document.getElementById("move-wheel").addEventListener("pointerdown", function (event) {
+        if (event.target.closest("#move-wheel-done")) return;
+        moveTouched = true;
+      });
+      document.getElementById("move-wheel").addEventListener("wheel", function () { moveTouched = true; });
+      document.getElementById("move-wheel-done").addEventListener("click", function (event) {
+        event.stopPropagation();
+        finishMoveWheel(true);
+      });
+      document.addEventListener("click", function (event) {
+        var wheel = document.getElementById("move-wheel");
+        if (!wheel || wheel.hidden) return;
+        if (event.target.closest("#move-wheel") || event.target.closest(".diary-status")) return;
+        finishMoveWheel(true);
+      });
+      document.getElementById("wa-send").addEventListener("click", function (event) {
+        event.stopPropagation();
+        sendSummary();
+      });
+      document.getElementById("wa-no").addEventListener("click", function (event) {
+        event.stopPropagation();
+        document.getElementById("wa-modal").hidden = true;
+        openDiary();
+      });
+      document.getElementById("wa-modal").addEventListener("click", function (event) {
+        if (event.target.id === "wa-modal") event.currentTarget.hidden = true;
+      });
+      document.getElementById("diary-menu-delete").addEventListener("click", function (event) {
+        event.stopPropagation();
+        if (!diaryMenuDate) return;
+        closeDiaryMenu();
+        document.getElementById("diary-delete").hidden = false;
+      });
+      document.getElementById("diary-delete-cancel").addEventListener("click", function (event) {
+        event.stopPropagation();
+        document.getElementById("diary-delete").hidden = true;
+      });
+      document.getElementById("diary-delete-confirm").addEventListener("click", function (event) {
+        event.stopPropagation();
+        document.getElementById("diary-delete").hidden = true;
+        if (diaryMenuDate) deleteDiaryEntry(diaryMenuDate);
+      });
+      document.getElementById("diary-delete").addEventListener("click", function (event) {
+        if (event.target.id === "diary-delete") event.currentTarget.hidden = true;
+      });
+      document.getElementById("diary-menu-photo").addEventListener("click", function (event) {
+        event.stopPropagation();
+        diaryPhotoDate = diaryMenuDate;
+        closeDiaryMenu();
+        document.getElementById("diary-photo-file").click();
+      });
+      document.getElementById("diary-menu-text").addEventListener("click", function (event) {
+        event.stopPropagation();
+        var iso = diaryMenuDate;
+        closeDiaryMenu();
+        var input = document.querySelector('[data-note="' + iso + '"]');
+        if (input) input.focus();
+      });
+      document.getElementById("diary-menu-more").addEventListener("click", function (event) {
+        event.stopPropagation();
+        var iso = diaryMenuDate;
+        closeDiaryMenu();
+        openMoveWheel(iso, null, "new");
+      });
+      document.getElementById("diary-menu-share").addEventListener("click", function (event) {
+        event.stopPropagation();
+        var iso = diaryMenuDate;
+        closeDiaryMenu();
+        if (!iso) return;
+        openDiaryShare(iso);
+      });
+      ["photo", "notes", "exercises"].forEach(function (key) {
+        document.getElementById("diary-share-" + key).addEventListener("click", function (event) {
+          event.stopPropagation();
+          toggleShare(key);
+        });
+      });
+      document.getElementById("diary-share-send").addEventListener("click", function (event) {
+        event.stopPropagation();
+        submitDiaryShare();
+      });
+      document.getElementById("diary-share-cancel").addEventListener("click", function (event) {
+        event.stopPropagation();
+        closeDiaryShare();
+      });
+      document.getElementById("diary-share").addEventListener("click", function (event) {
+        if (event.target.id === "diary-share") closeDiaryShare();
+      });
+      document.getElementById("diary-menu").addEventListener("click", function (event) {
+        if (event.target.id === "diary-menu") closeDiaryMenu();
+      });
+      document.getElementById("tagebuch").addEventListener("click", openDiary);
+      document.getElementById("diary-back").addEventListener("click", function () {
+        finishMoveWheel(false);
+        setHome(true);
+        paintWelcome();
+      });
+      tryLockPortrait();
+      window.addEventListener("orientationchange", tryLockPortrait);
+
+      ensureDiaryFrom();
+      paintWelcome();
+      loadRoutine();
+      load();
+      }
+    })();
+  </script>
+</body>
+</html>

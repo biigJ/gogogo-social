@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <meta name="theme-color" content="#F3EEE4" />
+  <title>Trainingspläne</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
+  <script src="/plan/template.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100svh;
+      background: #F3EEE4;
+      color: #2A2118;
+      font-family: Inter, system-ui, sans-serif;
+      font-size: 16px;
+      line-height: 1.4;
+    }
+    main { width: min(100%, 720px); margin: 0 auto; padding: calc(20px + env(safe-area-inset-top)) 16px 48px; }
+    h1 { font-family: "Playfair Display", serif; font-weight: 600; font-size: 34px; letter-spacing: -0.03em; }
+    h2 { font-family: "Playfair Display", serif; font-weight: 600; font-size: 24px; margin-top: 8px; }
+    p.lead { margin-top: 8px; }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; border: 0; background: none; }
+    input, select, textarea {
+      width: 100%;
+      margin-top: 4px;
+      padding: 10px 12px;
+      border: 1px solid #2A2118;
+      border-radius: 0;
+      background: transparent;
+    }
+    textarea { min-height: 64px; resize: vertical; }
+    label { display: block; margin-top: 12px; font-size: 13px; font-weight: 600; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+    .btn, .person button, .ex-tools button {
+      min-height: 44px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1.5px solid #2A2118;
+      background: #2A2118;
+      color: #F6F1E8;
+      font-weight: 600;
+    }
+    .quiet { background: transparent; color: #2A2118; }
+    .btn:disabled { opacity: 0.4; }
+    .person, .ex {
+      margin-top: 12px;
+      padding: 14px;
+      border: 1px solid rgba(42, 33, 24, 0.28);
+    }
+    .person { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .person a { color: #2A2118; }
+    .ex-tools { display: flex; gap: 8px; margin-top: 10px; }
+    .check { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-weight: 600; }
+    .check input { width: auto; margin: 0; }
+    .note { margin-top: 12px; color: #C7413B; }
+    .note[hidden], #editor[hidden], #list[hidden] { display: none; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } .person { align-items: flex-start; flex-direction: column; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Trainingspläne</h1>
+    <p class="lead">Die Vorlage ist Natalyas Krafttraining. Jede Person bekommt denselben Ablauf und einen eigenen Link.</p>
+    <div class="actions">
+      <button type="button" class="btn" id="new-plan">Neue Person aus der Vorlage</button>
+    </div>
+    <p class="note" id="status" hidden></p>
+    <div id="list"></div>
+    <form id="editor" hidden>
+      <h2 id="editor-title">Neue Person</h2>
+      <label>Name<input id="name" name="name" autocomplete="name" required /></label>
+      <div class="grid">
+        <label>Adresse<input id="slug" name="slug" autocapitalize="off" required /></label>
+        <label>Überschrift<input id="headline" name="headline" value="Krafttraining" required /></label>
+      </div>
+      <label>WhatsApp des Trainers<input id="wa" name="wa" inputmode="tel" value="491747015500" /></label>
+      <p class="lead" id="link-preview"></p>
+      <div id="exercises"></div>
+      <div class="actions">
+        <button type="button" class="btn quiet" id="add-ex">Übung hinzufügen</button>
+        <button type="submit" class="btn" id="save">Speichern</button>
+        <button type="button" class="btn quiet" id="cancel">Abbrechen</button>
+      </div>
+    </form>
+  </main>
+  <script>
+    (function () {
+      var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
+      var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
+      var host = location.hostname;
+      var apiBase = (host === "localhost" || host === "127.0.0.1") ? location.origin : SUPABASE_URL;
+      var template = window.PLAN_TEMPLATE;
+      var people = [];
+      var exercises = [];
+      var slugTouched = false;
+      var editing = "";
+
+      function rest(path, opts) {
+        var headers = {
+          apikey: SUPABASE_KEY,
+          Authorization: "Bearer " + SUPABASE_KEY,
+          "Content-Type": "application/json"
+        };
+        if (opts && opts.prefer) headers.Prefer = opts.prefer;
+        return fetch(apiBase + "/rest/v1/" + path, {
+          method: (opts && opts.method) || "GET",
+          headers: headers,
+          body: opts && opts.body != null ? JSON.stringify(opts.body) : undefined
+        }).then(function (res) {
+          return res.text().then(function (text) {
+            if (!res.ok) throw new Error(text || res.statusText);
+            if (!text) return null;
+            return JSON.parse(text);
+          });
+        });
+      }
+
+      function missingTable(err) {
+        return /PGRST205|schema cache|does not exist|Could not find the table/i.test(String((err && err.message) || err || ""));
+      }
+
+      function setStatus(text) {
+        var node = document.getElementById("status");
+        node.hidden = !text;
+        node.textContent = text || "";
+      }
+
+      function slugify(value) {
+        return String(value || "").toLowerCase()
+          .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+          .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
+      }
+
+      function athleteUrl(slug) {
+        if (host === "localhost" || host === "127.0.0.1") {
+          return location.origin + "/plan/index.html?slug=" + encodeURIComponent(slug);
+        }
+        return location.origin + "/plan/" + encodeURIComponent(slug);
+      }
+
+      function cloneTemplate() {
+        return JSON.parse(JSON.stringify(template.exercises || []));
+      }
+
+      function blankExercise() {
+        return {
+          id: "ex" + Math.random().toString(36).slice(2, 8),
+          name: "",
+          short: "",
+          group: "Hauptteil",
+          kind: "reps",
+          sets: 3,
+          weight: false,
+          step: 1,
+          startKg: "",
+          cue: "",
+          note: ""
+        };
+      }
+
+      function paintLink() {
+        var slug = document.getElementById("slug").value.trim();
+        document.getElementById("link-preview").textContent = slug ? athleteUrl(slug) : "";
+      }
+
+      function paintPeople() {
+        var list = document.getElementById("list");
+        list.textContent = "";
+        people.forEach(function (person) {
+          var card = document.createElement("article");
+          card.className = "person";
+          var copy = document.createElement("div");
+          var title = document.createElement("strong");
+          title.textContent = person.name;
+          var link = document.createElement("a");
+          link.href = athleteUrl(person.slug);
+          link.target = "_blank";
+          link.rel = "noopener";
+          link.textContent = person.slug;
+          copy.appendChild(title);
+          copy.appendChild(document.createElement("br"));
+          copy.appendChild(link);
+          var edit = document.createElement("button");
+          edit.type = "button";
+          edit.className = "quiet";
+          edit.textContent = "Bearbeiten";
+          edit.addEventListener("click", function () { openEditor(person.slug); });
+          card.appendChild(copy);
+          card.appendChild(edit);
+          list.appendChild(card);
+        });
+      }
+
+      function field(label, value, onInput, type) {
+        var wrap = document.createElement("label");
+        wrap.textContent = label;
+        var input = document.createElement(type === "area" ? "textarea" : "input");
+        if (type !== "area") input.type = "text";
+        input.value = value == null ? "" : String(value);
+        input.addEventListener("input", function () { onInput(input.value); });
+        wrap.appendChild(input);
+        return wrap;
+      }
+
+      function paintExercises() {
+        var box = document.getElementById("exercises");
+        box.textContent = "";
+        exercises.forEach(function (ex, index) {
+          var card = document.createElement("article");
+          card.className = "ex";
+          var grid = document.createElement("div");
+          grid.className = "grid";
+          var group = document.createElement("label");
+          group.textContent = "Teil";
+          var groupSelect = document.createElement("select");
+          ["Aufwärmen", "Hauptteil"].forEach(function (name) {
+            var option = document.createElement("option");
+            option.value = name;
+            option.textContent = name;
+            if (ex.group === name) option.selected = true;
+            groupSelect.appendChild(option);
+          });
+          groupSelect.addEventListener("change", function () { ex.group = groupSelect.value; });
+          group.appendChild(groupSelect);
+          var kind = document.createElement("label");
+          kind.textContent = "Art";
+          var kindSelect = document.createElement("select");
+          [["check", "Haken"], ["reps", "Sätze"]].forEach(function (pair) {
+            var option = document.createElement("option");
+            option.value = pair[0];
+            option.textContent = pair[1];
+            if (ex.kind === pair[0]) option.selected = true;
+            kindSelect.appendChild(option);
+          });
+          kindSelect.addEventListener("change", function () {
+            ex.kind = kindSelect.value;
+            paintExercises();
+          });
+          kind.appendChild(kindSelect);
+          grid.appendChild(group);
+          grid.appendChild(kind);
+          card.appendChild(grid);
+          card.appendChild(field("Name", ex.name, function (value) { ex.name = value; }));
+          card.appendChild(field("Kurz", ex.short, function (value) { ex.short = value; }));
+          card.appendChild(field("Anleitung", ex.cue, function (value) { ex.cue = value; }, "area"));
+          card.appendChild(field("Zeile unter der Übung", ex.note, function (value) { ex.note = value; }));
+          if (ex.kind !== "check") {
+            var sets = field("Sätze", ex.sets, function (value) { ex.sets = value; });
+            card.appendChild(sets);
+            var weight = document.createElement("label");
+            weight.className = "check";
+            var boxInput = document.createElement("input");
+            boxInput.type = "checkbox";
+            boxInput.checked = !!ex.weight;
+            boxInput.addEventListener("change", function () {
+              ex.weight = boxInput.checked;
+              paintExercises();
+            });
+            weight.appendChild(boxInput);
+            weight.appendChild(document.createTextNode("Mit Gewicht"));
+            card.appendChild(weight);
+            if (ex.weight) {
+              card.appendChild(field("Startgewicht kg", ex.startKg, function (value) { ex.startKg = value; }));
+            }
+          }
+          var tools = document.createElement("div");
+          tools.className = "ex-tools";
+          function tool(text, fn) {
+            var button = document.createElement("button");
+            button.type = "button";
+            button.className = "quiet";
+            button.textContent = text;
+            button.addEventListener("click", fn);
+            tools.appendChild(button);
+          }
+          tool("Hoch", function () {
+            if (index === 0) return;
+            var previous = exercises[index - 1];
+            exercises[index - 1] = ex;
+            exercises[index] = previous;
+            paintExercises();
+          });
+          tool("Runter", function () {
+            if (index === exercises.length - 1) return;
+            var next = exercises[index + 1];
+            exercises[index + 1] = ex;
+            exercises[index] = next;
+            paintExercises();
+          });
+          tool("Entfernen", function () {
+            exercises.splice(index, 1);
+            paintExercises();
+          });
+          card.appendChild(tools);
+          box.appendChild(card);
+        });
+      }
+
+      function openEditor(slug) {
+        var person = null;
+        people.forEach(function (item) { if (item.slug === slug) person = item; });
+        editing = person ? person.slug : "";
+        slugTouched = !!person;
+        document.getElementById("editor-title").textContent = person ? person.name : "Neue Person";
+        document.getElementById("name").value = person ? person.name : "";
+        document.getElementById("slug").value = person ? person.slug : "";
+        document.getElementById("slug").readOnly = !!person;
+        document.getElementById("headline").value = person ? (person.headline || "Krafttraining") : template.headline;
+        document.getElementById("wa").value = person ? (person.trainer_wa || template.trainer_wa) : template.trainer_wa;
+        exercises = person ? JSON.parse(JSON.stringify(person.exercises || [])) : cloneTemplate();
+        document.getElementById("editor").hidden = false;
+        document.getElementById("list").hidden = true;
+        paintExercises();
+        paintLink();
+        document.getElementById("name").focus();
+      }
+
+      function closeEditor() {
+        document.getElementById("editor").hidden = true;
+        document.getElementById("list").hidden = false;
+        editing = "";
+      }
+
+      function cleanExercises() {
+        return exercises.map(function (ex) {
+          var item = {
+            id: ex.id,
+            name: String(ex.name || "").trim(),
+            short: String(ex.short || "").trim(),
+            group: ex.group === "Aufwärmen" ? "Aufwärmen" : "Hauptteil",
+            kind: ex.kind === "check" ? "check" : "reps",
+            cue: String(ex.cue || "").trim(),
+            note: String(ex.note || "").trim()
+          };
+          if (!item.short) item.short = item.name.slice(0, 18);
+          if (item.kind === "reps") {
+            var sets = parseInt(ex.sets, 10);
+            item.sets = sets > 0 ? Math.min(sets, 12) : 1;
+            if (ex.weight) {
+              item.weight = true;
+              item.step = 1;
+              if (String(ex.startKg || "").trim()) item.startKg = Number(String(ex.startKg).replace(",", "."));
+            }
+          }
+          return item;
+        }).filter(function (ex) { return ex.name; });
+      }
+
+      function loadPeople() {
+        return rest("go_plan_athletes?select=slug,name,headline,trainer_wa,exercises,updated_at&order=name.asc")
+          .then(function (rows) {
+            people = Array.isArray(rows) ? rows : [];
+            paintPeople();
+            setStatus("");
+          })
+          .catch(function (err) {
+            people = [];
+            paintPeople();
+            setStatus(missingTable(err)
+              ? "Die Tabellen fehlen noch. Einmal go-plan.sql im Supabase SQL Editor ausführen."
+              : "Die Pläne sind gerade nicht erreichbar.");
+          });
+      }
+
+      function saveTemplate() {
+        return rest("go_plan_templates?on_conflict=slug", {
+          method: "POST",
+          prefer: "resolution=merge-duplicates,return=minimal",
+          body: {
+            slug: template.slug,
+            title: template.title,
+            headline: template.headline,
+            exercises: template.exercises,
+            updated_at: new Date().toISOString()
+          }
+        }).catch(function () {});
+      }
+
+      document.getElementById("new-plan").addEventListener("click", function () { openEditor(""); });
+      document.getElementById("cancel").addEventListener("click", closeEditor);
+      document.getElementById("add-ex").addEventListener("click", function () {
+        exercises.push(blankExercise());
+        paintExercises();
+      });
+      document.getElementById("name").addEventListener("input", function () {
+        if (slugTouched || editing) return;
+        document.getElementById("slug").value = slugify(this.value);
+        paintLink();
+      });
+      document.getElementById("slug").addEventListener("input", function () {
+        slugTouched = true;
+        this.value = slugify(this.value);
+        paintLink();
+      });
+      document.getElementById("editor").addEventListener("submit", function (event) {
+        event.preventDefault();
+        var name = document.getElementById("name").value.trim();
+        var slug = slugify(document.getElementById("slug").value);
+        var headline = document.getElementById("headline").value.trim() || "Krafttraining";
+        var wa = document.getElementById("wa").value.replace(/\D/g, "") || "491747015500";
+        var cleaned = cleanExercises();
+        if (!name || !/^[a-z0-9-]{2,48}$/.test(slug)) {
+          setStatus("Name und eine kurze Adresse aus Buchstaben und Zahlen.");
+          return;
+        }
+        if (!cleaned.length) {
+          setStatus("Der Plan braucht mindestens eine Übung.");
+          return;
+        }
+        var button = document.getElementById("save");
+        button.disabled = true;
+        rest("go_plan_athletes?on_conflict=slug", {
+          method: "POST",
+          prefer: "resolution=merge-duplicates,return=minimal",
+          body: {
+            slug: slug,
+            name: name,
+            headline: headline,
+            trainer_wa: wa,
+            template_slug: template.slug,
+            exercises: cleaned,
+            updated_at: new Date().toISOString()
+          }
+        }).then(function () {
+          closeEditor();
+          return loadPeople();
+        }).catch(function (err) {
+          setStatus(missingTable(err)
+            ? "Die Tabellen fehlen noch. Einmal go-plan.sql im Supabase SQL Editor ausführen."
+            : "Speichern fehlgeschlagen.");
+        }).then(function () { button.disabled = false; });
+      });
+
+      saveTemplate().then(loadPeople);
+    })();
+  </script>
+</body>
+</html>
