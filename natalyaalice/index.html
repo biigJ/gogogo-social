@@ -1041,6 +1041,15 @@
       <button type="button" id="diary-menu-share">Eintrag teilen</button>
     </div>
   </div>
+  <div class="sand-modal" id="diary-delete" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="diary-delete-title">
+      <h2 class="ask" id="diary-delete-title">wirklich löschen?</h2>
+      <div class="sand-actions">
+        <button type="button" class="sand-quiet" id="diary-delete-cancel">Abbrechen</button>
+        <button type="button" id="diary-delete-confirm">Löschen</button>
+      </div>
+    </div>
+  </div>
   <div class="orient-lock" id="orient-lock" role="dialog" aria-label="Hochformat">Dreh Dein Telefon zurück</div>
   <div class="sand-modal" id="short-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="short-title">
@@ -2258,6 +2267,7 @@
         welcomeEl.hidden = !on;
         document.getElementById("diary").hidden = true;
         document.getElementById("diary-menu").hidden = true;
+        document.getElementById("diary-delete").hidden = true;
         document.getElementById("short-choice").hidden = true;
         document.getElementById("wa-modal").hidden = true;
         mainEl.hidden = on;
@@ -2553,6 +2563,7 @@
       function openDiary() {
         finishMoveWheel(false);
         document.getElementById("diary-menu").hidden = true;
+        document.getElementById("diary-delete").hidden = true;
         document.body.classList.remove("is-home");
         document.body.classList.add("is-diary");
         welcomeEl.hidden = true;
@@ -2976,7 +2987,21 @@
       });
       document.getElementById("diary-menu-delete").addEventListener("click", function (event) {
         event.stopPropagation();
+        if (!diaryMenuDate) return;
+        closeDiaryMenu();
+        document.getElementById("diary-delete").hidden = false;
+      });
+      document.getElementById("diary-delete-cancel").addEventListener("click", function (event) {
+        event.stopPropagation();
+        document.getElementById("diary-delete").hidden = true;
+      });
+      document.getElementById("diary-delete-confirm").addEventListener("click", function (event) {
+        event.stopPropagation();
+        document.getElementById("diary-delete").hidden = true;
         if (diaryMenuDate) deleteDiaryEntry(diaryMenuDate);
+      });
+      document.getElementById("diary-delete").addEventListener("click", function (event) {
+        if (event.target.id === "diary-delete") event.currentTarget.hidden = true;
       });
       document.getElementById("diary-menu-photo").addEventListener("click", function (event) {
         event.stopPropagation();
