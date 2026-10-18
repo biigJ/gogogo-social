@@ -666,9 +666,13 @@
       color: #2A2118;
       border: 1.5px solid #2A2118;
     }
-    #diary-menu .sand-card { padding-top: 16px; padding-bottom: 16px; }
-    #diary-menu .sand-card button { margin-top: 10px; }
-    #diary-menu .sand-card button:first-of-type { margin-top: 0; }
+    #diary-menu .sand-card,
+    #diary-share .sand-card { padding-top: 16px; padding-bottom: 16px; }
+    #diary-menu .sand-card button,
+    #diary-share .sand-card button { margin-top: 10px; }
+    #diary-menu .sand-card button:first-of-type,
+    #diary-share .sand-card button:first-of-type { margin-top: 0; }
+    #diary-share button:disabled { opacity: 0.4; }
     .home-btn {
       display: grid;
       place-items: center;
@@ -1039,6 +1043,15 @@
       <button type="button" id="diary-menu-text">Text ändern</button>
       <button type="button" id="diary-menu-more">weitere Bewegung</button>
       <button type="button" id="diary-menu-share">Eintrag teilen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="diary-share" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-label="Eintrag teilen">
+      <button type="button" class="sand-quiet" id="diary-share-photo" aria-pressed="false">Foto teilen</button>
+      <button type="button" class="sand-quiet" id="diary-share-notes" aria-pressed="false">Notizen teilen</button>
+      <button type="button" class="sand-quiet" id="diary-share-exercises" aria-pressed="false">Übungen teilen</button>
+      <button type="button" id="diary-share-send" disabled>Absenden</button>
+      <button type="button" class="sand-quiet" id="diary-share-cancel">Abbrechen</button>
     </div>
   </div>
   <div class="sand-modal" id="diary-delete" hidden>
@@ -2268,6 +2281,7 @@
         document.getElementById("diary").hidden = true;
         document.getElementById("diary-menu").hidden = true;
         document.getElementById("diary-delete").hidden = true;
+        document.getElementById("diary-share").hidden = true;
         document.getElementById("short-choice").hidden = true;
         document.getElementById("wa-modal").hidden = true;
         mainEl.hidden = on;
@@ -2564,6 +2578,7 @@
         finishMoveWheel(false);
         document.getElementById("diary-menu").hidden = true;
         document.getElementById("diary-delete").hidden = true;
+        document.getElementById("diary-share").hidden = true;
         document.body.classList.remove("is-home");
         document.body.classList.add("is-diary");
         welcomeEl.hidden = true;
@@ -2663,17 +2678,127 @@
         openDiary();
       }
 
-      function diaryShareText(iso) {
-        var entry = diaryEntry(iso);
-        var lines = ["Natalya", formatLong(iso), ""];
-        function pushBlock(move, note) {
-          if (move) lines.push(move);
-          if (note) lines.push(note);
-          if (move || note) lines.push("");
+      var sharePick = { photo: false, notes: false, exercises: false };
+      var shareIso = "";
+      var shareLogs = null;
+
+      function exerciseShareBody(logs, iso) {
+        var lines = [];
+        Log.EXERCISES.forEach(function (ex) {
+          if (ex.group === "Hauptteil") return;
+          var rows = Log.rowsFor(logs, iso, ex);
+          if (rows[0] && rows[0].done) lines.push(ex.name);
+        });
+        var main = Log.summaryText(logs, iso).split("\n").slice(3).join("\n").trim();
+        if (lines.length && main) lines.push("");
+        if (main) lines.push(main);
+        return lines.join("\n").trim();
+      }
+
+      function resetSharePick() {
+        sharePick.photo = false;
+        sharePick.notes = false;
+        sharePick.exercises = false;
+        ["photo", "notes", "exercises"].forEach(function (key) {
+          var button = document.getElementById("diary-share-" + key);
+          button.classList.add("sand-quiet");
+          button.setAttribute("aria-pressed", "false");
+        });
+        document.getElementById("diary-share-send").disabled = true;
+      }
+
+      function toggleShare(key) {
+        sharePick[key] = !sharePick[key];
+        var button = document.getElementById("diary-share-" + key);
+        button.classList.toggle("sand-quiet", !sharePick[key]);
+        button.setAttribute("aria-pressed", sharePick[key] ? "true" : "false");
+        document.getElementById("diary-share-send").disabled = !(sharePick.photo || sharePick.notes || sharePick.exercises);
+      }
+
+      function openDiaryShare(iso) {
+        shareIso = iso;
+        shareLogs = null;
+        resetSharePick();
+        document.getElementById("diary-share").hidden = false;
+        rest("go_natalya_logs?select=workout_date,exercise_id,reps,weight_kg,done&workout_date=eq." + encodeURIComponent(iso))
+          .then(function (rows) {
+            if (shareIso === iso) shareLogs = rows || [];
+          })
+          .catch(function () {
+            if (shareIso !== iso) return;
+            shareLogs = serverLogs.filter(function (row) { return row.workout_date === iso; });
+          });
+      }
+
+      function closeDiaryShare() {
+        document.getElementById("diary-share").hidden = true;
+      }
+
+      function dataUrlFile(dataUrl, name) {
+        var parts = String(dataUrl || "").split(",");
+        if (parts.length < 2) return null;
+        var mime = (parts[0].match(/:(.*?);/) || [])[1] || "image/jpeg";
+        var binary = atob(parts[1]);
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return new File([bytes], name, { type: mime });
+      }
+
+      function shareDiaryFallback(text, file) {
+        if (text && String(text).trim()) {
+          window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
         }
-        pushBlock(diaryStatus(iso), entry.note);
-        entry.extras.forEach(function (extra) { pushBlock(extra.move, extra.note); });
-        return lines.join("\n").replace(/\n+$/, "") + "\n";
+        if (!file) return;
+        var url = URL.createObjectURL(file);
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = file.name;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+      }
+
+      function shareDiaryNow(text, file) {
+        var payload = { title: "Natalya" };
+        if (text && String(text).trim()) payload.text = text;
+        if (file) payload.files = [file];
+        if (file && navigator.share && (!navigator.canShare || navigator.canShare(payload))) {
+          navigator.share(payload).catch(function (err) {
+            if (err && err.name === "AbortError") return;
+            shareDiaryFallback(text, file);
+          });
+          return;
+        }
+        shareDiaryFallback(text, file);
+      }
+
+      function submitDiaryShare() {
+        var iso = diaryMenuDate;
+        if (!iso || (!sharePick.photo && !sharePick.notes && !sharePick.exercises)) return;
+        var logs = shareLogs || serverLogs.filter(function (row) { return row.workout_date === iso; });
+        var chunks = ["Natalya", formatLong(iso), ""];
+        if (sharePick.notes) {
+          var entry = diaryEntry(iso);
+          function push(move, note) {
+            if (!move && !note) return;
+            if (move) chunks.push(move);
+            if (note) chunks.push(note);
+            chunks.push("");
+          }
+          push(diaryStatus(iso), entry.note);
+          entry.extras.forEach(function (extra) { push(extra.move, extra.note); });
+        }
+        if (sharePick.exercises) {
+          chunks.push(exerciseShareBody(logs, iso) || "Keine Übungen gespeichert.");
+          chunks.push("");
+        }
+        var text = (sharePick.notes || sharePick.exercises) ? chunks.join("\n").replace(/\n+$/, "") + "\n" : "";
+        var photo = sharePick.photo ? (workoutPhotoMap()[iso] || "") : "";
+        var file = photo ? dataUrlFile(photo, "natalya-" + iso + ".jpg") : null;
+        closeDiaryShare();
+        if (!String(text).trim() && !file) return;
+        shareDiaryNow(text, file);
       }
 
       function moveIndex() {
@@ -3027,8 +3152,24 @@
         var iso = diaryMenuDate;
         closeDiaryMenu();
         if (!iso) return;
-        var text = diaryShareText(iso);
-        window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
+        openDiaryShare(iso);
+      });
+      ["photo", "notes", "exercises"].forEach(function (key) {
+        document.getElementById("diary-share-" + key).addEventListener("click", function (event) {
+          event.stopPropagation();
+          toggleShare(key);
+        });
+      });
+      document.getElementById("diary-share-send").addEventListener("click", function (event) {
+        event.stopPropagation();
+        submitDiaryShare();
+      });
+      document.getElementById("diary-share-cancel").addEventListener("click", function (event) {
+        event.stopPropagation();
+        closeDiaryShare();
+      });
+      document.getElementById("diary-share").addEventListener("click", function (event) {
+        if (event.target.id === "diary-share") closeDiaryShare();
       });
       document.getElementById("diary-menu").addEventListener("click", function (event) {
         if (event.target.id === "diary-menu") closeDiaryMenu();
