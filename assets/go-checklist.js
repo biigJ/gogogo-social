@@ -44,6 +44,32 @@
     hike: "Wandern"
   };
 
+  /* Icon aus Art oder Name. Gespeicherte Alt-Einträge bleiben so lesbar. */
+  function activityEmoji(input) {
+    var label = "";
+    var kind = "";
+    var tech = "";
+    if (input && typeof input === "object") {
+      label = String(input.label || input.name || "");
+      kind = String(input.kind || "");
+      tech = String(input.technique || "");
+    } else {
+      label = String(input || "");
+    }
+    var blob = (tech + " " + kind + " " + label).toLowerCase();
+    if (kind === "zirkel" || /zirkel/.test(blob)) return "🔥";
+    if (kind === "kraft") return "🏋️‍♀️";
+    if (/schwimm|\bswim\b/.test(blob)) return "🏊";
+    if (/ruder|rowing|\brow\b/.test(blob)) return "🚣";
+    if (/wandern|\bhike\b/.test(blob)) return "🥾";
+    if (/radfahr|fahrrad|rennrad|cycling|\bbike\b|indoor/.test(blob)) return "🚴";
+    if (kind === "walk" || /spazier|\bgehen\b|\bwalk\b/.test(blob)) return "🚶";
+    if (kind === "jog" || /joggen|jogging|\blaufen\b|\brun\b/.test(blob)) return "🏃";
+    if (kind === "ausdauer" || tech) return "🏃";
+    if (!kind && !label && !tech) return "🤸";
+    return "🏋️‍♀️";
+  }
+
   function metaOf(raw) {
     if (!raw) return {};
     if (typeof raw === "string") {
@@ -165,6 +191,8 @@
       if (!preset) return;
       var tech = String(preset.technique || "");
       var name = TECH[tech] || tech || "Ausdauer";
+      var icon = activityEmoji({ kind: "ausdauer", technique: tech, label: name });
+      if (icon && name.indexOf(icon) !== 0) name = icon + " " + name;
       var bits = [];
       if (preset.duration_min != null && preset.duration_min !== "") bits.push(String(preset.duration_min) + " min");
       if (preset.distance_km != null && preset.distance_km !== "") bits.push(String(preset.distance_km) + " km");
@@ -219,6 +247,7 @@
     forSecret: forSecret,
     forAccount: forAccount,
     planMeta: planMeta,
-    catalogSystem: catalogSystem
+    catalogSystem: catalogSystem,
+    activityEmoji: activityEmoji
   };
 });

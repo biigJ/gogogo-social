@@ -778,9 +778,11 @@
     }
     .book-btn svg { display: block; }
     #days-kinds button,
-    #days-pick button { margin-top: 10px; }
+    #days-pick button,
+    #ausdauer-pick button { margin-top: 10px; }
     #days-kinds button:first-of-type,
-    #days-pick button:first-of-type { margin-top: 16px; }
+    #days-pick button:first-of-type,
+    #ausdauer-pick button:first-of-type { margin-top: 16px; }
     #diary-vis .sand-card button { margin-top: 10px; }
     #diary-vis .sand-card button:first-of-type { margin-top: 16px; }
     #diary-vis .sand-card button.is-on {
@@ -1056,6 +1058,12 @@
       <p class="ask-error" id="days-error" hidden></p>
     </div>
   </div>
+  <div class="sand-modal" id="ausdauer-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="ausdauer-title">
+      <h2 class="ask" id="ausdauer-title">Welche Einheit?</h2>
+      <div id="ausdauer-pick"></div>
+    </div>
+  </div>
   <div class="sand-modal" id="start-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="start-title">
       <h2 class="ask" id="start-title">Hast Du die Workouts so verteilt, dass sie an Wochentagen sind, an denen Du grundsätzlich dafür Zeit hast?</h2>
@@ -1249,6 +1257,8 @@
       var userOwned = false;
       var planningWeek = false;
       var weekSaving = false;
+      var ausdauerPick = {};
+      var pendingWorkoutShort = false;
       var adminDayKeys = null;
       var diaryVisibility = "private";
       var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
@@ -2341,7 +2351,7 @@
             : (userOwned
               ? "Deine Woche ist geplant. Der Trainer kann die Tage nicht mehr verschieben."
               : (adminDayKeys && adminDayKeys.length
-                ? "Die Tage legt Dein Trainer fest."
+                ? "Bevor Du die Routine startest, leg Deine Woche fest."
                 : "Dein Trainer stellt den Plan zusammen.")))
           : (picking
             ? "Zweiten Tag festlegen."
@@ -2351,13 +2361,24 @@
         var planBtn = document.getElementById("plan-week");
         if (planBtn) {
           planBtn.hidden = !sessionMode;
+          planBtn.textContent = planningWeek ? "Fertig" : "Meine Bewegung in der Woche planen";
           planBtn.classList.toggle("is-on", planningWeek);
           planBtn.setAttribute("aria-pressed", planningWeek ? "true" : "false");
         }
         for (var i = 0; i < 7; i++) {
           var iso = addDays(today, i);
           var key = DAY_KEYS[weekdayIndex(iso)];
-          var unit = sessionMode ? userUnits[weekdayIndex(iso)] : null;
+          var wdIndex = weekdayIndex(iso);
+          var unit = null;
+          if (sessionMode) {
+            unit = userUnits[wdIndex] || null;
+            if (!unit && !userOwned) {
+              var manyAus = ausWeekdays.indexOf(wdIndex) >= 0
+                ? ausdauerChoices().filter(function (choice) { return choice.row; })
+                : [];
+              unit = manyAus.length > 1 ? { kind: "ausdauer", label: "Ausdauer" } : visibleUnit(wdIndex);
+            }
+          }
           var on = picking ? key === firstDay : selected.indexOf(key) >= 0;
           var isSource = shifted && shiftFrom() === iso;
           var isTarget = shifted && moved === iso;
@@ -2382,7 +2403,7 @@
             }
             var emoji = document.createElement("span");
             emoji.className = "day-mark";
-            emoji.textContent = unit && unit.kind ? unitEmoji(unit.kind) : "🤸";
+            emoji.textContent = unit && unit.kind ? activityEmoji(unit) : "🤸";
             emoji.setAttribute("aria-hidden", "true");
             side.appendChild(emoji);
             button.appendChild(side);
@@ -2454,6 +2475,7 @@
       }
 
       function setHome(on) {
+        if (on) ausdauerPick = {};
         finishMoveWheel(false);
         document.body.classList.toggle("is-home", on);
         document.body.classList.remove("is-diary");
@@ -2472,24 +2494,102 @@
         window.scrollTo(0, 0);
       }
 
-      function enterWorkout(short) {
-        var today = Log.berlinToday();
-        var todayKey = DAY_KEYS[weekdayIndex(today)];
-        if (firstDay || shiftActive(today) || planDays().indexOf(todayKey) < 0) return;
+      function ausdauerChoicesForWorkout(iso) {
+        var wd = weekdayIndex(iso);
+        var unit = userOwned ? (userUnits[wd] || null) : (trainerUnits[wd] && trainerUnits[wd].kind === "ausdauer" ? trainerUnits[wd] : null);
+        var isAus = userOwned ? !!(userUnits[wd] && userUnits[wd].kind === "ausdauer") : ausWeekdays.indexOf(wd) >= 0;
+        if (!isAus) return [];
+        if (userOwned && userUnits[wd] && userUnits[wd].kind === "ausdauer") unit = userUnits[wd];
+        if (unit && unit.presetId) {
+          var pinned = ausdauerChoices().filter(function (choice) {
+            return String(choice.presetId) === String(unit.presetId);
+          });
+          if (pinned.length) return pinned;
+          return [{ label: unit.label || "Ausdauer", presetId: unit.presetId, technique: unit.technique || "", row: null }];
+        }
+        var many = ausdauerChoices().filter(function (choice) { return choice.row; });
+        if (many.length > 1) return many;
+        if (many.length === 1) return many;
+        if (unit && unit.label) return [{ label: unit.label, presetId: "", technique: unit.technique || "", row: null }];
+        return [];
+      }
+
+      function exercisesForAusdauerChoice(choice) {
+        if (choice && choice.row && window.GoChecklist) {
+          return GoChecklist.forAccount({ presets: {}, rows: [], hidden: [], ausdauer: [choice.row] });
+        }
+        var label = (choice && choice.label) || "Ausdauer";
+        var named = activityEmoji({ kind: "ausdauer", label: label, technique: choice && choice.technique }) + " " + label;
+        return [{
+          id: "aus-" + label,
+          name: named.trim(),
+          short: named.trim().slice(0, 18),
+          kind: "check",
+          cue: "",
+          note: "",
+          group: "Ausdauer"
+        }];
+      }
+
+      function closeAusdauerPick() {
+        var modal = document.getElementById("ausdauer-modal");
+        if (modal) modal.hidden = true;
+        var box = document.getElementById("ausdauer-pick");
+        if (box) box.textContent = "";
+      }
+
+      function openAusdauerPick(iso, choices) {
+        var modal = document.getElementById("ausdauer-modal");
+        var box = document.getElementById("ausdauer-pick");
+        var title = document.getElementById("ausdauer-title");
+        if (!modal || !box) return;
+        if (title) title.textContent = "Welche Einheit?";
+        box.textContent = "";
+        choices.forEach(function (choice) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = (activityEmoji({ kind: "ausdauer", label: choice.label, technique: choice.technique }) + " " + choice.label).trim();
+          button.addEventListener("click", function () {
+            ausdauerPick[iso] = choice;
+            closeAusdauerPick();
+            startWorkout(iso, pendingWorkoutShort);
+          });
+          box.appendChild(button);
+        });
+        modal.hidden = false;
+      }
+
+      function startWorkout(when, short) {
         shortMode = !!short;
         shortPromptedAt = 0;
-        writeStore(HOME_SHORT_SESSION, short ? today : "");
+        writeStore(HOME_SHORT_SESSION, short ? when : "");
         document.getElementById("short-modal").hidden = true;
         document.getElementById("short-choice").hidden = true;
-        var when = shiftFrom() === today ? addDays(today, 1) : today;
         if (sessionMode && sessionReady) applySessionExercises(when);
         setHome(false);
         document.getElementById("short-banner").hidden = !shortMode;
         if (date !== when) {
+          date = when;
           dateInput.value = when;
-          dateInput.dispatchEvent(new Event("change"));
         }
+        draft = Log.draftFromLogs(serverLogs, date);
+        renderList();
         syncShortFinish();
+      }
+
+      function enterWorkout(short) {
+        var today = Log.berlinToday();
+        var todayKey = DAY_KEYS[weekdayIndex(today)];
+        if (firstDay || shiftActive(today) || planDays().indexOf(todayKey) < 0) return;
+        var when = shiftFrom() === today ? addDays(today, 1) : today;
+        pendingWorkoutShort = !!short;
+        var choices = sessionMode ? ausdauerChoicesForWorkout(when) : [];
+        if (choices.length > 1) {
+          openAusdauerPick(when, choices);
+          return;
+        }
+        if (choices.length === 1) ausdauerPick[when] = choices[0];
+        startWorkout(when, short);
       }
 
       var shortPromptedAt = 0;
@@ -3113,11 +3213,17 @@
         document.getElementById("days-modal").hidden = true;
       }
 
-      function unitEmoji(kind) {
-        if (kind === "zirkel") return "🔥";
-        if (kind === "kraft") return "🏋️‍♀️";
-        if (kind === "ausdauer") return "🏃";
+      function activityEmoji(input) {
+        if (window.GoChecklist && GoChecklist.activityEmoji) return GoChecklist.activityEmoji(input);
+        if (!input) return "🤸";
+        if (input.kind === "zirkel") return "🔥";
+        if (input.kind === "kraft") return "🏋️‍♀️";
+        if (input.kind === "ausdauer") return "🏃";
         return "🤸";
+      }
+
+      function unitEmoji(kind) {
+        return activityEmoji({ kind: kind });
       }
 
       function openWeekKind(key) {
@@ -3136,29 +3242,47 @@
       }
 
       function ausdauerChoices() {
-        var techName = { run: "Laufen", bike: "Radfahren", row: "Rudern", swim: "Schwimmen", walk: "Gehen", hike: "Wandern" };
+        var techName = {
+          run: "Laufen", bike: "Radfahren", indoor: "Radfahren", row: "Rudern",
+          swim: "Schwimmen", walk: "Gehen", hike: "Wandern", xc: "Crosstrainer"
+        };
         var list = [];
         (sessionAusdauer || []).forEach(function (row) {
           if (!row) return;
-          var name = techName[String(row.technique || "")] || String(row.technique || "") || "Ausdauer";
+          var tech = String(row.technique || "");
+          var name = techName[tech] || tech || "Ausdauer";
           var bits = [];
           if (row.duration_min != null && row.duration_min !== "") bits.push(String(row.duration_min) + " min");
           if (row.distance_km != null && row.distance_km !== "") bits.push(String(row.distance_km) + " km");
           list.push({
             label: bits.length ? name + " · " + bits.join(" · ") : name,
             presetId: String(row.id || ""),
-            systemId: ""
+            systemId: "",
+            technique: tech,
+            row: row
           });
         });
         if (list.length) return list;
         return [
-          { label: "Laufen", presetId: "", systemId: "" },
-          { label: "Radfahren", presetId: "", systemId: "" },
-          { label: "Rudern", presetId: "", systemId: "" },
-          { label: "Schwimmen", presetId: "", systemId: "" },
-          { label: "Gehen", presetId: "", systemId: "" },
-          { label: "Wandern", presetId: "", systemId: "" }
+          { label: "Laufen", presetId: "", systemId: "", technique: "run" },
+          { label: "Radfahren", presetId: "", systemId: "", technique: "bike" },
+          { label: "Rudern", presetId: "", systemId: "", technique: "row" },
+          { label: "Schwimmen", presetId: "", systemId: "", technique: "swim" },
+          { label: "Gehen", presetId: "", systemId: "", technique: "walk" },
+          { label: "Wandern", presetId: "", systemId: "", technique: "hike" }
         ];
+      }
+
+      function takenKraftIds(exceptWd) {
+        var ids = [];
+        for (var wd = 0; wd <= 6; wd++) {
+          if (wd === exceptWd) continue;
+          var unit = userOwned ? userUnits[wd] : visibleUnit(wd);
+          if (!unit || unit.kind !== "kraft") continue;
+          var id = unit.systemId || "krafttraining";
+          if (id && ids.indexOf(id) < 0) ids.push(id);
+        }
+        return ids;
       }
 
       function kraftChoices() {
@@ -3187,17 +3311,35 @@
         var pick = document.getElementById("days-pick");
         pick.textContent = "";
         pick.hidden = false;
-        var options = kind === "kraft" ? kraftChoices() : (kind === "ausdauer" ? ausdauerChoices() : [{ label: "Zirkeltraining", systemId: "", presetId: "" }]);
+        var options = kind === "kraft" ? kraftChoices() : (kind === "ausdauer" ? ausdauerChoices() : [{ label: "Zirkeltraining", systemId: "", presetId: "", technique: "" }]);
+        if (kind === "kraft") {
+          var wd = DAY_KEYS.indexOf(pendingDay);
+          var taken = takenKraftIds(wd);
+          var current = userOwned ? userUnits[wd] : visibleUnit(wd);
+          var currentId = current && current.kind === "kraft" ? (current.systemId || "krafttraining") : "";
+          options = options.filter(function (opt) {
+            var id = opt.systemId || "krafttraining";
+            return taken.indexOf(id) < 0 || id === currentId;
+          });
+        }
+        if (!options.length) {
+          var note = document.createElement("p");
+          note.textContent = kind === "kraft"
+            ? "Jedes Krafttraining ist schon an einem Tag vergeben."
+            : "Zirkeltraining ist schon vergeben.";
+          pick.appendChild(note);
+        }
         options.forEach(function (opt) {
           var button = document.createElement("button");
           button.type = "button";
-          button.textContent = (unitEmoji(kind) + " " + opt.label).trim();
+          button.textContent = (activityEmoji({ kind: kind, label: opt.label, technique: opt.technique || "" }) + " " + opt.label).trim();
           button.addEventListener("click", function () {
             commitWeekUnit(DAY_KEYS.indexOf(pendingDay), {
               kind: kind,
               label: opt.label,
               systemId: opt.systemId || "",
-              presetId: opt.presetId || ""
+              presetId: opt.presetId || "",
+              technique: opt.technique || ""
             });
           });
           pick.appendChild(button);
@@ -3250,6 +3392,7 @@
                   label: unit.label || "",
                   systemId: unit.systemId || null,
                   presetId: unit.presetId || null,
+                  technique: unit.technique || null,
                   source: "user"
                 }
               };
@@ -3315,13 +3458,25 @@
         }
         kraftWeekdays.concat(ausWeekdays).forEach(function (wd) {
           if (next[wd]) return;
+          var many = ausWeekdays.indexOf(wd) >= 0
+            ? ausdauerChoices().filter(function (choice) { return choice.row; })
+            : [];
           var fromTrainer = trainerUnits[wd];
+          if (fromTrainer && fromTrainer.kind === "ausdauer" && !fromTrainer.presetId && many.length > 1) {
+            next[wd] = { kind: "ausdauer", label: "Ausdauer", systemId: "", presetId: "", technique: "" };
+            return;
+          }
+          if ((!fromTrainer || fromTrainer.kind !== "kraft") && many.length > 1) {
+            next[wd] = { kind: "ausdauer", label: "Ausdauer", systemId: "", presetId: "", technique: "" };
+            return;
+          }
           if (fromTrainer && fromTrainer.kind && fromTrainer.kind !== "zirkel") {
             next[wd] = {
               kind: fromTrainer.kind,
               label: fromTrainer.label || "",
               systemId: fromTrainer.systemId || "",
-              presetId: fromTrainer.presetId || ""
+              presetId: fromTrainer.presetId || "",
+              technique: fromTrainer.technique || ""
             };
             return;
           }
@@ -3331,7 +3486,8 @@
             kind: unit.kind,
             label: unit.label || "",
             systemId: unit.systemId || "",
-            presetId: unit.presetId || ""
+            presetId: unit.presetId || "",
+            technique: unit.technique || ""
           };
         });
         return next;
@@ -3371,6 +3527,9 @@
         try { return !!localStorage.getItem(HOME_PHOTO); } catch (e) { return false; }
       }
 
+      document.getElementById("ausdauer-modal").addEventListener("click", function (event) {
+        if (event.target.id === "ausdauer-modal") closeAusdauerPick();
+      });
       document.getElementById("days").addEventListener("click", function (event) {
         var day = event.target.closest("[data-day]");
         if (!day) return;
@@ -3683,19 +3842,11 @@
           }];
         }
         if (unit.kind === "ausdauer") {
-          if (unit.presetId) {
-            var preset = (sessionAusdauer || []).filter(function (row) {
-              return String(row.id) === String(unit.presetId);
-            })[0];
-            if (preset) {
-              return GoChecklist.forAccount({ presets: {}, rows: [], hidden: [], ausdauer: [preset] });
-            }
-          }
-          var name = unit.label || "Ausdauer";
+          var named = activityEmoji(unit) + " " + (unit.label || "Ausdauer");
           return [{
-            id: "aus-" + name,
-            name: name,
-            short: name.slice(0, 18),
+            id: "aus-" + (unit.label || "ausdauer"),
+            name: named.trim(),
+            short: named.trim().slice(0, 18),
             kind: "check",
             cue: "",
             note: "",
@@ -3737,16 +3888,32 @@
         var title = document.getElementById("workout-title");
         if (!title) return;
         var text = "Einfache Basics";
-        if (userOwned) {
-          var unit = userUnits[weekdayIndex(iso)];
-          if (unit && unit.label) text = unit.label;
-          else if (!unit) text = "Bewegung";
+        var picked = ausdauerPick[iso];
+        var unit = userOwned ? userUnits[weekdayIndex(iso)] : null;
+        if (picked && picked.label) text = picked.label;
+        else if (userOwned && unit && unit.label) text = unit.label;
+        else if (userOwned && !unit) text = "Bewegung";
+        var iconSource = picked || unit;
+        if (iconSource && text !== "Bewegung") {
+          var icon = activityEmoji(iconSource.kind ? iconSource : { kind: "ausdauer", label: text, technique: iconSource.technique });
+          if (icon && text.indexOf(icon) !== 0) text = icon + " " + text;
         }
         title.textContent = text;
       }
 
       function applySessionExercises(iso) {
         if (!sessionMode || !sessionReady || !window.GoChecklist) return;
+        var choices = ausdauerChoicesForWorkout(iso);
+        var picked = ausdauerPick[iso];
+        if (choices.length > 1 && !picked) {
+          if (welcomeEl && welcomeEl.hidden) openAusdauerPick(iso, choices);
+          return;
+        }
+        if (choices.length && (picked || choices.length === 1)) {
+          Log.useExercises(exercisesForAusdauerChoice(picked || choices[0]));
+          paintWorkoutTitle(iso);
+          return;
+        }
         if (userOwned) {
           Log.useExercises(exercisesForUnit(userUnits[weekdayIndex(iso)]));
           paintWorkoutTitle(iso);
@@ -3817,7 +3984,8 @@
               kind: String(workout.kind),
               label: workout.label != null ? String(workout.label) : "",
               systemId: workout.systemId != null ? String(workout.systemId) : "",
-              presetId: workout.presetId != null ? String(workout.presetId) : ""
+              presetId: workout.presetId != null ? String(workout.presetId) : "",
+              technique: workout.technique != null ? String(workout.technique) : ""
             };
           });
         }

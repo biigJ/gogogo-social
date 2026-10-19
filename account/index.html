@@ -27,6 +27,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <script src="/assets/go-account-session.js"></script>
+  <script src="/assets/go-checklist.js"></script>
   <script src="/assets/account-ui-i18n.js"></script>
   <script src="/gogogo-i18n-entries.js"></script>
   <script src="/assets/go-dither.js" defer></script>
@@ -8463,21 +8464,23 @@
 
       function unitEmojiFor(u) {
         if (!u) return "🏋️‍♀️";
+        if (window.GoChecklist && GoChecklist.activityEmoji) return GoChecklist.activityEmoji(u);
         var k = String(u.kind || "");
-        var label = String(u.label || "").toLowerCase();
-        /* Ausdauer-Technik aus Label/Kind — Schwimmen nicht als Laufen zeigen. */
-        if (k === "swim" || /schwimm|swim/.test(label)) return "🏊";
-        if (k === "bike" || /rennrad|fahrrad|cycling|\bbike\b|indoor[-\s]?bike/.test(label)) return "🚴";
-        if (/ruder|rowing|\brow\b/.test(label)) return "🚣";
-        if (k === "walk" || /spazier|walk/.test(label)) return "🚶‍♂️";
-        if (k === "jog" || /joggen|jogging/.test(label)) return "🏃";
-        if (k === "bodyweight" || /bodyweight|körpergewicht/.test(label)) return "🤸";
-        if (k === "team" || /mannschaft|team sport|fußball|fussball/.test(label)) return "⚽";
-        if (k === "yoga" || /yoga|mobility/.test(label)) return "🧘";
-        if (u.emoji) return u.emoji;
+        var label = String(u.label || "");
+        var blob = (k + " " + label).toLowerCase();
+        if (k === "zirkel" || /zirkel/.test(blob)) return "🔥";
         if (k === "kraft") return "🏋️‍♀️";
+        if (/schwimm|\bswim\b/.test(blob)) return "🏊";
+        if (/ruder|rowing|\brow\b/.test(blob)) return "🚣";
+        if (/wandern|\bhike\b/.test(blob)) return "🥾";
+        if (/radfahr|fahrrad|rennrad|cycling|\bbike\b|indoor/.test(blob)) return "🚴";
+        if (k === "walk" || /spazier|\bgehen\b|\bwalk\b/.test(blob)) return "🚶";
+        if (k === "jog" || /joggen|jogging|\blaufen\b|\brun\b/.test(blob)) return "🏃";
+        if (k === "bodyweight" || /bodyweight|körpergewicht/.test(blob)) return "🤸";
+        if (k === "team" || /mannschaft|team sport|fußball|fussball/.test(blob)) return "⚽";
+        if (k === "yoga" || /yoga|mobility/.test(blob)) return "🧘";
+        if (u.emoji) return String(u.emoji);
         if (k === "ausdauer") return "🏃";
-        if (k === "zirkel") return "🔥";
         return "🏋️‍♀️";
       }
 
