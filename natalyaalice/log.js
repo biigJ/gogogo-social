@@ -518,8 +518,44 @@
     return true;
   }
 
-  function summaryText(logs, date) {
-    var lines = ["Natalya", formatDate(date), ""];
+  function useExercises(list) {
+    if (!Array.isArray(list)) return false;
+    var next = [];
+    var seen = {};
+    list.forEach(function (raw) {
+      if (!raw || !raw.id || seen[raw.id]) return;
+      var kind = raw.kind === "check" ? "check" : "reps";
+      var sets = parseInt(raw.sets, 10);
+      if (!sets || sets < 1) sets = 1;
+      if (sets > 12) sets = 12;
+      var group = raw.group === "Aufwärmen" || raw.group === "Ausdauer" ? raw.group : "Hauptteil";
+      var ex = {
+        id: String(raw.id),
+        name: String(raw.name || raw.id),
+        short: String(raw.short || raw.name || raw.id).slice(0, 18),
+        kind: kind,
+        cue: String(raw.cue || ""),
+        note: String(raw.note || ""),
+        group: group
+      };
+      if (kind === "reps") {
+        ex.sets = sets;
+        if (raw.weight) {
+          ex.weight = true;
+          ex.step = Number(raw.step) > 0 ? Number(raw.step) : 1;
+          if (raw.startKg != null && raw.startKg !== "") ex.startKg = Number(raw.startKg);
+        }
+      }
+      seen[ex.id] = true;
+      next.push(ex);
+    });
+    EXERCISES.splice(0, EXERCISES.length);
+    next.forEach(function (ex) { EXERCISES.push(ex); });
+    return true;
+  }
+
+  function summaryText(logs, date, person) {
+    var lines = [person || "Natalya", formatDate(date), ""];
     EXERCISES.forEach(function (ex) {
       if (ex.group !== "Hauptteil") return;
       var rows = rowsFor(logs, date, ex);
@@ -581,6 +617,7 @@
     statsFor: statsFor,
     cellText: cellText,
     summaryText: summaryText,
+    useExercises: useExercises,
     avgText: avgText,
     bestText: bestText,
     statLine: statLine,

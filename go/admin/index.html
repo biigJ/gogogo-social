@@ -17,7 +17,7 @@
   <script src="/assets/go-orient-lock.js" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="/assets/go-qr.js"></script>
   <script src="/assets/go-account-session.js"></script>
@@ -218,9 +218,6 @@
       outline-offset: 4px;
     }
     .cycle { width: 240px; height: 240px; display: block; pointer-events: none; }
-    .cycle.is-spinning { animation: spin 120s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    @media (prefers-reduced-motion: reduce) { .cycle.is-spinning { animation: none; } }
     .cycle-portrait {
       position: absolute;
       inset: 50%;
@@ -670,6 +667,7 @@
       align-items: center;
     }
     .admin-kraft__ex .kraft-rename,
+    .admin-kraft__ex .kraft-note,
     .admin-kraft__ex .kraft-del {
       flex-shrink: 0;
       background: rgba(247, 245, 240, 0.14);
@@ -688,8 +686,14 @@
     .admin-kraft__ex .kraft-del {
       font-size: 1.35rem;
     }
+    .admin-kraft__ex .kraft-note.is-on {
+      background: var(--paper);
+      color: var(--red);
+    }
     .admin-kraft__ex .kraft-rename:hover,
     .admin-kraft__ex .kraft-rename:active,
+    .admin-kraft__ex .kraft-note:hover,
+    .admin-kraft__ex .kraft-note:active,
     .admin-kraft__ex .kraft-del:hover,
     .admin-kraft__ex .kraft-del:active {
       opacity: 1;
@@ -1224,21 +1228,6 @@
     .msg { min-height: 1.2em; margin-top: 12px; font-size: 0.85rem; font-weight: 500; }
     .msg.is-error { text-decoration: underline; }
     .panel[hidden] { display: none !important; }
-    .ptr-spinner {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 0;
-      overflow: hidden;
-      color: var(--ink-on-red);
-      opacity: 0;
-      transition: height 0.15s ease, opacity 0.15s ease;
-    }
-    .ptr-spinner.is-pulling { height: 48px; opacity: 0.6; }
-    .ptr-spinner.is-ready { height: 48px; opacity: 1; }
-    .ptr-spinner.is-loading { height: 48px; opacity: 1; }
-    @keyframes ptr-spin { to { transform: rotate(360deg); } }
-    .ptr-spinner.is-loading svg { animation: ptr-spin 0.7s linear infinite; }
     #admin-result-extras[hidden] { display: none !important; }
     .qr-box {
       padding: 0;
@@ -1513,6 +1502,12 @@
       font-size: 0.95rem;
     }
     .kraft-rename-input::placeholder { color: var(--placeholder); }
+    textarea.kraft-rename-input {
+      min-height: 120px;
+      text-align: left;
+      font-weight: 400;
+      resize: vertical;
+    }
     .challenge-amount-dial {
       position: relative;
       width: 220px;
@@ -1636,6 +1631,52 @@
       font-weight: 600;
       opacity: 0.85;
     }
+    html.is-overview,
+    html.is-overview body {
+      background: #F3EEE4;
+      color: #2A2118;
+      font-family: "Fraunces", Palatino, "Times New Roman", serif;
+      font-weight: 400;
+    }
+    html.is-overview body::before,
+    html.is-overview body::after { background: #F3EEE4; }
+    html.is-overview body,
+    html.is-overview body * { font-family: "Fraunces", Palatino, "Times New Roman", serif; }
+    html.is-overview body * { font-weight: 400; }
+    html.is-overview body h1,
+    html.is-overview body .msg,
+    html.is-overview body strong,
+    html.is-overview body .site-header__brand,
+    html.is-overview body .auth-btn,
+    html.is-overview body .list-action,
+    html.is-overview body .list-item__name strong { font-weight: 600; }
+    html.is-overview .site-header {
+      background: #F3EEE4;
+      color: #2A2118;
+      border-radius: 0;
+      box-shadow: inset 0 0 0 1px #2A2118;
+    }
+    html.is-overview .icon-btn__burger i,
+    html.is-overview .icon-btn__burger::before,
+    html.is-overview .icon-btn__burger::after { background: #2A2118; }
+    html.is-overview .list-item,
+    html.is-overview .list-action,
+    html.is-overview .list-challenge {
+      background: transparent;
+      color: #2A2118;
+      border: 1px solid #2A2118;
+      border-radius: 0;
+    }
+    html.is-overview .list-action.is-on,
+    html.is-overview .list-challenge.is-active {
+      background: #2A2118;
+      color: #F3EEE4;
+      border-color: #2A2118;
+    }
+    html.is-overview .list-item__stake,
+    html.is-overview .list-item__admin-star { color: #C7413B; }
+    html.is-overview body h1,
+    html.is-overview .msg { color: #2A2118; }
   </style>
 </head>
 <body>
@@ -1675,7 +1716,7 @@
       aria-label="Zurück zum Generator"
       disabled
     >
-      <svg class="cycle is-spinning" id="cycle" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
+      <svg class="cycle" id="cycle" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
       <span class="cycle-portrait" id="cycle-portrait" aria-hidden="true">
         <img id="cycle-portrait-img" alt="" />
       </span>
@@ -1749,9 +1790,6 @@
     </div>
 
     <div class="panel" id="panel-list" hidden>
-      <div class="ptr-spinner" id="ptr-spinner" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="24" height="24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="40 20" /></svg>
-      </div>
       <h1>Alle Nutzer</h1>
       <p class="msg" id="list-msg" role="status"></p>
       <div class="list" id="code-list"></div>
@@ -1803,6 +1841,17 @@
         <div class="challenge-modal__actions">
           <button type="button" class="challenge-modal__btn is-ghost" id="kraft-rename-cancel">Abbrechen</button>
           <button type="button" class="challenge-modal__btn" id="kraft-rename-ok">Speichern</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="challenge-modal" id="kraft-note-modal" hidden aria-hidden="true">
+      <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="kraft-note-title">
+        <p class="challenge-modal__title" id="kraft-note-title">Trainernotiz</p>
+        <textarea class="kraft-rename-input" id="kraft-note-input" maxlength="400" rows="5" placeholder="Hinweis unter der Übung"></textarea>
+        <div class="challenge-modal__actions">
+          <button type="button" class="challenge-modal__btn is-ghost" id="kraft-note-cancel">Abbrechen</button>
+          <button type="button" class="challenge-modal__btn" id="kraft-note-ok">Speichern</button>
         </div>
       </div>
     </div>
@@ -1889,6 +1938,7 @@
         <hr class="admin-rule" />
         <section class="admin-plan" id="admin-plan" aria-label="Trainingsplan">
           <h2 class="admin-plan__title">Trainingsplan</h2>
+          <p class="admin-plan__hint" id="admin-diary-vis" hidden></p>
           <div class="admin-plan__block">
             <label for="plan-blurb">Kurzer Satz zum Nutzer</label>
             <textarea id="plan-blurb" rows="2" maxlength="280" placeholder="Kurzbeschreibung…"></textarea>
@@ -2049,6 +2099,12 @@
           <p class="admin-kraft__hint">Haken = vorausgewählte Übungen. In der App erscheint der Haken hinter dem Namen.</p>
           <div class="admin-kraft__systems" id="kraft-admin-systems"></div>
           <div class="admin-kraft__ex" id="kraft-admin-ex"></div>
+          <div class="admin-kraft__days" id="kraft-plan-days" hidden>
+            <p class="admin-kraft__hint">Tage im Wochenplan</p>
+            <div class="admin-plan__dayflags" id="kraft-plan-day-checks"></div>
+            <button class="btn admin-plan__save" type="button" id="kraft-days-save">Tage speichern</button>
+            <p class="msg" id="kraft-days-msg" role="status"></p>
+          </div>
           <div class="admin-kraft__new" id="kraft-admin-new-wrap">
             <button class="btn" type="button" id="kraft-admin-new">NEU</button>
             <input id="kraft-admin-new-name" type="text" maxlength="48" placeholder="Übungsname" hidden />
@@ -2097,6 +2153,7 @@
     </div>
   </div>
 
+  <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/account/ausdauer-catalog.js"></script>
   <script>
@@ -2196,7 +2253,11 @@
       var kraftGlobalExtras = {};
       var kraftLegacyExtras = {};
       var kraftNameOverrides = {};
+      var kraftTrainerNotes = {};
+      var kraftPlanMeta = {};
+      var kraftNoteColumnOk = true;
       var kraftGlobalTableOk = false;
+      var sharedPlanDaysLoaded = false;
       var kraftHiddenBySystem = {};
       var kraftHiddenTableOk = false;
       var kraftTableMissing = false;
@@ -2357,6 +2418,14 @@
           ren.dataset.ex = ex.id;
           ren.title = "Übung umbenennen";
           actions.appendChild(ren);
+          var noteBtn = document.createElement("button");
+          noteBtn.type = "button";
+          noteBtn.className = "kraft-note" + (kraftTrainerNotes[ex.id] ? " is-on" : "");
+          noteBtn.textContent = "i";
+          noteBtn.dataset.ex = ex.id;
+          noteBtn.title = "Trainernotiz";
+          noteBtn.setAttribute("aria-label", "Trainernotiz");
+          actions.appendChild(noteBtn);
           var del = document.createElement("button");
           del.type = "button";
           del.className = "kraft-del";
@@ -2369,9 +2438,98 @@
         });
       }
 
+      var SHARED_DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+      var SHARED_DAY_LABELS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+      function syncKraftDayPanel() {
+        var box = document.getElementById("kraft-plan-days");
+        if (!box) return;
+        var on = kraftAdminSystem === "krafttraining";
+        box.hidden = !on;
+        if (on) ensureSharedPlanDays();
+      }
+
+      function paintSharedPlanDays(keys) {
+        var wrap = document.getElementById("kraft-plan-day-checks");
+        if (!wrap) return;
+        var selected = {};
+        (keys || []).forEach(function (key) { selected[key] = true; });
+        wrap.innerHTML = "";
+        SHARED_DAY_KEYS.forEach(function (key, index) {
+          var label = document.createElement("label");
+          label.className = "admin-plan__zirkel";
+          var input = document.createElement("input");
+          input.type = "checkbox";
+          input.className = "kraft-shared-day";
+          input.dataset.day = key;
+          input.checked = !!selected[key];
+          input.setAttribute("aria-label", SHARED_DAY_LABELS[index]);
+          label.appendChild(input);
+          label.appendChild(document.createTextNode(SHARED_DAY_LABELS[index]));
+          wrap.appendChild(label);
+        });
+      }
+
+      async function ensureSharedPlanDays() {
+        if (sharedPlanDaysLoaded) return;
+        sharedPlanDaysLoaded = true;
+        paintSharedPlanDays(["tue", "sat"]);
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_natalya_routine?id=eq.natalya&select=days",
+            { headers: apiHeaders() }
+          );
+          if (!res.ok) return;
+          var rows = await res.json();
+          var days = rows && rows[0] && Array.isArray(rows[0].days) ? rows[0].days : ["tue", "sat"];
+          paintSharedPlanDays(days);
+        } catch (e) {}
+      }
+
+      async function saveSharedPlanDays() {
+        var msg = document.getElementById("kraft-days-msg");
+        var days = [];
+        document.querySelectorAll(".kraft-shared-day").forEach(function (input) {
+          if (input.checked) days.push(input.dataset.day);
+        });
+        if (msg) {
+          msg.textContent = "Speichere …";
+          msg.classList.remove("is-error");
+        }
+        try {
+          var res = await fetch(SUPABASE_URL + "/rest/v1/go_natalya_routine?on_conflict=id", {
+            method: "POST",
+            headers: apiHeaders({
+              "Content-Type": "application/json",
+              Prefer: "resolution=merge-duplicates,return=minimal"
+            }),
+            body: JSON.stringify({
+              id: "natalya",
+              name: "Krafttraining",
+              days: days,
+              updated_at: new Date().toISOString()
+            })
+          });
+          if (!res.ok) {
+            if (msg) {
+              msg.textContent = "Tage speichern fehlgeschlagen. go-natalya-routine.sql ausführen?";
+              msg.classList.add("is-error");
+            }
+            return;
+          }
+          if (msg) msg.textContent = "Tage gespeichert.";
+        } catch (e) {
+          if (msg) {
+            msg.textContent = "Tage speichern fehlgeschlagen.";
+            msg.classList.add("is-error");
+          }
+        }
+      }
+
       function refreshKraftAdminUi() {
         renderKraftAdminSystems();
         renderKraftAdminExercises();
+        syncKraftDayPanel();
       }
 
       function collectKraftAdminChecks() {
@@ -2415,9 +2573,18 @@
         kraftGlobalTableOk = false;
         try {
           var res = await fetch(
-            SUPABASE_URL + "/rest/v1/go_kraft_exercises?select=id,system_id,name&order=created_at.asc",
+            SUPABASE_URL + "/rest/v1/go_kraft_exercises?select=id,system_id,name,trainer_note,plan_meta&order=created_at.asc",
             { headers: apiHeaders() }
           );
+          if (res.status === 400) {
+            kraftNoteColumnOk = false;
+            res = await fetch(
+              SUPABASE_URL + "/rest/v1/go_kraft_exercises?select=id,system_id,name&order=created_at.asc",
+              { headers: apiHeaders() }
+            );
+          } else {
+            kraftNoteColumnOk = true;
+          }
           if (!res.ok) return false;
           var rows = await res.json();
           var cat = kraftCat();
@@ -2434,6 +2601,8 @@
             var id = String(row.id);
             var name = String(row.name || row.id);
             kraftNameOverrides[id] = name;
+            kraftTrainerNotes[id] = row.trainer_note != null ? String(row.trainer_note) : "";
+            kraftPlanMeta[id] = row.plan_meta && typeof row.plan_meta === "object" ? row.plan_meta : {};
             if (!row.system_id) return;
             if (catalogIds[id]) return;
             if (!kraftGlobalExtras[row.system_id]) kraftGlobalExtras[row.system_id] = [];
@@ -2767,6 +2936,106 @@
           modal.addEventListener("click", onBackdrop);
           setTimeout(function () { input.focus(); input.select(); }, 50);
         });
+      }
+
+      function promptKraftNote(current) {
+        return new Promise(function (resolve) {
+          var modal = document.getElementById("kraft-note-modal");
+          var input = document.getElementById("kraft-note-input");
+          var ok = document.getElementById("kraft-note-ok");
+          var cancel = document.getElementById("kraft-note-cancel");
+          if (!modal || !input || !ok || !cancel) {
+            resolve(null);
+            return;
+          }
+          input.value = current || "";
+          function finish(val) {
+            ok.removeEventListener("click", onOk);
+            cancel.removeEventListener("click", onCancel);
+            input.removeEventListener("keydown", onKey);
+            modal.removeEventListener("click", onBackdrop);
+            closeChallengeModal(modal);
+            resolve(val);
+          }
+          function onOk(e) { e.stopPropagation(); finish(String(input.value || "").trim()); }
+          function onCancel(e) { e.stopPropagation(); finish(null); }
+          function onBackdrop(e) { if (e.target === modal) finish(null); }
+          function onKey(e) { if (e.key === "Escape") { e.preventDefault(); onCancel(e); } }
+          openChallengeModal(modal);
+          ok.addEventListener("click", onOk);
+          cancel.addEventListener("click", onCancel);
+          input.addEventListener("keydown", onKey);
+          modal.addEventListener("click", onBackdrop);
+          setTimeout(function () { input.focus(); }, 50);
+        });
+      }
+
+      function catalogPlanMeta(exId) {
+        if (window.GoChecklist && typeof GoChecklist.planMeta === "function") {
+          return GoChecklist.planMeta(exId) || {};
+        }
+        return kraftPlanMeta[exId] || {};
+      }
+
+      async function editKraftTrainerNote(exId) {
+        var id = String(exId);
+        var current = kraftTrainerNotes[id] || "";
+        var note = await promptKraftNote(current);
+        if (note == null || note === current) return;
+        setKraftAdminMsg("Speichere Notiz …");
+        var name = kraftExerciseNameById(id);
+        var meta = catalogPlanMeta(id);
+        var headers = apiHeaders({ "Content-Type": "application/json", Prefer: "return=representation" });
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_kraft_exercises?id=eq." + encodeURIComponent(id),
+            { method: "PATCH", headers: headers, body: JSON.stringify({ trainer_note: note, name: name }) }
+          );
+          var text = "";
+          try { text = await res.text(); } catch (eText) {}
+          if (/trainer_note|plan_meta|PGRST204|schema cache/i.test(text)) {
+            kraftNoteColumnOk = false;
+            setKraftAdminMsg("Trainernotiz braucht go-trainer-note.sql im Supabase SQL Editor.", true);
+            return;
+          }
+          var updated = [];
+          if (text) {
+            try { updated = JSON.parse(text); } catch (eParse) { updated = []; }
+          }
+          if (!res.ok) {
+            setKraftAdminMsg("Notiz speichern fehlgeschlagen.", true);
+            return;
+          }
+          if (!Array.isArray(updated) || !updated.length) {
+            var created = await fetch(SUPABASE_URL + "/rest/v1/go_kraft_exercises", {
+              method: "POST",
+              headers: headers,
+              body: JSON.stringify({
+                id: id,
+                system_id: kraftAdminSystem,
+                name: name,
+                trainer_note: note,
+                plan_meta: meta
+              })
+            });
+            var createdText = "";
+            try { createdText = await created.text(); } catch (eCreated) {}
+            if (/trainer_note|plan_meta|PGRST204/i.test(createdText)) {
+              setKraftAdminMsg("Trainernotiz braucht go-trainer-note.sql im Supabase SQL Editor.", true);
+              return;
+            }
+            if (!created.ok) {
+              setKraftAdminMsg("Notiz speichern fehlgeschlagen.", true);
+              return;
+            }
+          }
+          kraftTrainerNotes[id] = note;
+          kraftNoteColumnOk = true;
+          refreshKraftAdminUi();
+          setKraftAdminMsg("Trainernotiz gespeichert.");
+        } catch (e) {
+          setKraftAdminMsg("Notiz speichern fehlgeschlagen.", true);
+        }
       }
 
       async function renameGlobalKraftExercise(exId, name) {
@@ -3847,6 +4116,7 @@
       }
 
       function hideAllPanels() {
+        document.documentElement.classList.remove("is-overview");
         panelLogin.hidden = true;
         panelGen.hidden = true;
         panelResult.hidden = true;
@@ -4289,9 +4559,41 @@
         syncKindUiFromUnits();
         resetZirkelTextStash();
       }
+      function paintDiaryVisibility(value) {
+        var el = document.getElementById("admin-diary-vis");
+        if (!el) return;
+        var label = {
+          private: "Tagebuch: Nur für mich",
+          trainer: "Tagebuch: Offen für Trainer",
+          friends: "Tagebuch: Offen für Freunde"
+        }[value];
+        if (!label) {
+          el.hidden = true;
+          el.textContent = "";
+          return;
+        }
+        el.hidden = false;
+        el.textContent = label;
+      }
+
+      async function loadDiaryVisibility(accountId) {
+        paintDiaryVisibility("");
+        if (!accountId || String(accountId).indexOf("local-") === 0) return;
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(accountId) + "&select=diary_visibility",
+            { headers: apiHeaders() }
+          );
+          if (!res.ok) return;
+          var rows = await res.json();
+          if (rows && rows[0]) paintDiaryVisibility(rows[0].diary_visibility);
+        } catch (e) {}
+      }
+
       async function loadCoachPlan(accountId) {
         clearPlanForm();
         await loadKraftPresets(accountId);
+        loadDiaryVisibility(accountId);
         await loadAusdauerPresets(accountId);
         if (!accountId || String(accountId).indexOf("local-") === 0) return;
         try {
@@ -6450,6 +6752,7 @@
 
       async function showList() {
         hideAllPanels();
+        document.documentElement.classList.add("is-overview");
         panelList.hidden = false;
         activeAccount = null;
         activeAccountIds = [];
@@ -6621,49 +6924,6 @@
         updateAuthBtn();
       }
 
-      (function initPullToRefresh() {
-        var THRESHOLD = 72;
-        var startY = 0;
-        var pulling = false;
-        var spinner = document.getElementById("ptr-spinner");
-
-        function isListVisible() {
-          return panelList && !panelList.hidden;
-        }
-
-        document.addEventListener("touchstart", function (e) {
-          if (!isListVisible()) return;
-          if (window.scrollY > 2) return;
-          startY = e.touches[0].clientY;
-          pulling = false;
-        }, { passive: true });
-
-        document.addEventListener("touchmove", function (e) {
-          if (!isListVisible() || !startY) return;
-          var dy = e.touches[0].clientY - startY;
-          if (dy <= 0) { pulling = false; return; }
-          pulling = true;
-          if (dy < THRESHOLD) {
-            spinner.classList.add("is-pulling");
-            spinner.classList.remove("is-ready");
-          } else {
-            spinner.classList.add("is-ready");
-            spinner.classList.remove("is-pulling");
-          }
-        }, { passive: true });
-
-        document.addEventListener("touchend", async function () {
-          if (!isListVisible() || !pulling) { startY = 0; return; }
-          var wasReady = spinner.classList.contains("is-ready");
-          spinner.classList.remove("is-pulling", "is-ready");
-          startY = 0;
-          pulling = false;
-          if (!wasReady) return;
-          spinner.classList.add("is-loading");
-          await showList();
-          spinner.classList.remove("is-loading");
-        });
-      })();
 
       function showQrMenu() {
         if (trainerAdminMode) {
@@ -7162,6 +7422,8 @@
       if (planSave) planSave.addEventListener("click", function () { saveCoachPlan(); });
       var kraftPlanSave = document.getElementById("kraft-plan-save");
       if (kraftPlanSave) kraftPlanSave.addEventListener("click", function () { saveCoachPlan(); });
+      var kraftDaysSave = document.getElementById("kraft-days-save");
+      if (kraftDaysSave) kraftDaysSave.addEventListener("click", function () { saveSharedPlanDays(); });
       bindZirkelDayChecks();
       bindKindDayChecks();
       var kraftSysWrap = document.getElementById("kraft-admin-systems");
@@ -7194,6 +7456,13 @@
             e.preventDefault();
             e.stopPropagation();
             renameKraftExercise(ren.dataset.ex);
+            return;
+          }
+          var noteBtn = e.target.closest(".kraft-note");
+          if (noteBtn && noteBtn.dataset.ex) {
+            e.preventDefault();
+            e.stopPropagation();
+            editKraftTrainerNote(noteBtn.dataset.ex);
           }
         });
         (function initKraftDragDrop(wrap) {

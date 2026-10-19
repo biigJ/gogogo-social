@@ -150,6 +150,15 @@
     return (DEFAULT_PRESETS[systemId] || []).slice();
   }
 
+  if (root.GoChecklist && typeof root.GoChecklist.catalogSystem === "function") {
+    var shared = root.GoChecklist.catalogSystem();
+    if (shared && shared.system && shared.system.id) {
+      SYSTEMS.push(shared.system);
+      EXERCISES[shared.system.id] = shared.exercises || [];
+      DEFAULT_PRESETS[shared.system.id] = (shared.defaultIds || []).slice();
+    }
+  }
+
   root.GOGOGO_KRAFT = {
     get SYSTEMS() { return SYSTEMS.map(localized); },
     EXERCISES: EXERCISES,

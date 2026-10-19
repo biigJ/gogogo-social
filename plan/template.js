@@ -1,8 +1,8 @@
-/* Natalya's plan, copied as the starting template for every athlete. */
+/* Starting checklist for a new person. */
 (function (root) {
   var TEMPLATE = {
     slug: "natalya",
-    title: "Natalya",
+    title: "Krafttraining",
     headline: "Krafttraining",
     trainer_wa: "491747015500",
     exercises: [
