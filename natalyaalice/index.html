@@ -544,6 +544,14 @@
       margin: 3px 0;
       padding: 5px 10px;
     }
+    .day.is-empty {
+      background: transparent;
+      color: #2A2118;
+      border: 1px solid #C7413B;
+      border-radius: 10px;
+      margin: 3px 0;
+      padding: 5px 10px;
+    }
     .day-side { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; }
     .day-unit { font-size: 12px; line-height: 1.2; }
     .day-mark { font-size: 14px; line-height: 1; }
@@ -836,10 +844,23 @@
       font-size: 14px;
     }
     .diary-foreign {
+      position: relative;
       margin-top: 12px;
       padding-top: 8px;
+      padding-right: 40px;
     }
     .diary-foreign p { margin: 4px 0 0; font-size: 15px; line-height: 1.4; }
+    .diary-reply {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 36px;
+      height: 36px;
+      display: grid;
+      place-items: center;
+      color: #2A2118;
+    }
+    .diary-reply svg { width: 22px; height: 22px; display: block; }
     .book-btn {
       grid-column: 3;
       display: grid;
@@ -1068,8 +1089,22 @@
       .orient-lock { display: flex; }
       html, body { overflow: hidden; touch-action: none; }
     }
+    body.is-session:not([data-shell="workout"]) {
+      height: 100svh;
+      height: 100dvh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    body.is-session:not([data-shell="workout"]) .welcome,
+    body.is-session:not([data-shell="workout"]) .diary {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+      width: min(100%, 440px);
+    }
     body.is-session .welcome,
-    body.is-session .diary { padding-bottom: calc(108px + env(safe-area-inset-bottom)); }
+    body.is-session .diary { padding-bottom: 24px; }
     body.is-session #tagebuch { display: none; }
     body.is-session .routine-row { grid-template-columns: 1fr; }
     body.is-session[data-shell="heute"] .shell-kalender,
@@ -1202,34 +1237,55 @@
     .day-invite {
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      gap: 4px;
-      width: 100%;
-      min-height: 56px;
-      margin: 0 0 6px;
-      padding: 6px 8px;
-      border: 1px solid rgba(42, 33, 24, 0.28);
+      align-items: flex-start;
+      gap: 8px;
+      margin: 8px 0 2px;
+    }
+    .day-invite__row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 32px;
+      color: #2A2118;
+      font-size: 14px;
+      line-height: 1.2;
+    }
+    .day-invite__face, .day-invite__ph {
+      width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: #E4DDD0;
+      display: grid; place-items: center; font-size: 13px; font-weight: 600; flex: none;
+    }
+    .day-invite__plus {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid #2A2118;
       background: transparent;
       color: #2A2118;
-      text-align: left;
+      font-size: 28px;
+      font-weight: 400;
+      line-height: 1;
+      display: grid;
+      place-items: center;
     }
-    .day-invite__people { display: flex; gap: 6px; min-height: 28px; align-items: center; }
-    .day-invite__face, .day-invite__ph {
-      width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: #E4DDD0;
-      display: grid; place-items: center; font-size: 12px; font-weight: 600;
-    }
-    .day-invite__place { font-size: 12px; line-height: 1.2; }
-    .day-invite__empty { font-size: 12px; opacity: 0.7; }
     .app-pill {
       display: none;
       position: fixed;
       left: 0; right: 0; bottom: 0;
       z-index: 50;
       justify-content: center;
-      padding: 0 16px calc(8px + env(safe-area-inset-bottom));
+      padding: 0 16px env(safe-area-inset-bottom);
       pointer-events: none;
     }
-    body.is-session:not([data-shell="workout"]) .app-pill { display: flex; }
+    body.is-session:not([data-shell="workout"]) .app-pill {
+      display: flex;
+      position: relative;
+      left: auto;
+      right: auto;
+      bottom: auto;
+      flex: none;
+      width: 100%;
+      z-index: 50;
+    }
     .app-pill nav {
       pointer-events: auto;
       width: min(100% - 0px, 390px);
@@ -1256,6 +1312,18 @@
     .app-pill button.is-on { opacity: 1; }
     .app-pill svg { width: 26px; height: 26px; display: block; }
     .app-pill small { font-size: 9px; line-height: 1; letter-spacing: 0.01em; }
+    .pill-ico { position: relative; display: block; width: 26px; height: 26px; }
+    .pill-dot {
+      position: absolute;
+      top: -3px;
+      right: -7px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #2A2118;
+      pointer-events: none;
+    }
+    .pill-dot[hidden] { display: none; }
     .home-btn.is-back {
       width: 44px; height: 44px; border-radius: 50%;
       border: 1.6px solid currentColor;
@@ -1800,18 +1868,17 @@
   </div>
   <div class="sand-modal" id="invite-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="invite-title">
-      <h2 class="ask" id="invite-title">Einladen</h2>
+      <h2 class="ask" id="invite-title">Nachricht an:</h2>
       <div id="invite-people"></div>
-      <input class="invite-place" id="invite-place" placeholder="Ort" aria-label="Ort" />
-      <p class="team-msg" id="invite-msg"></p>
-      <button type="button" id="invite-save">Speichern</button>
-      <button type="button" class="sand-quiet" id="invite-wa">per WhatsApp</button>
     </div>
   </div>
   <div class="app-pill">
     <nav aria-label="Bereiche">
       <button type="button" data-shell="plan" aria-label="Planung">
-        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg>
+        <span class="pill-ico">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg>
+          <span class="pill-dot" hidden></span>
+        </span>
         <small>Planung</small>
       </button>
       <button type="button" data-shell="heute" class="is-on" aria-label="Heute">
@@ -1819,7 +1886,10 @@
         <small>Heute</small>
       </button>
       <button type="button" data-shell="diary" aria-label="Tagebuch">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.2C10.2 4.8 7.6 4.4 4 5.2V19c3.4-.7 6-.2 8 1.2 2-1.4 4.6-1.9 8-1.2V5.2c-3.6-.8-6.2-.4-8 1Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 6.2V20.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+        <span class="pill-ico">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.2C10.2 4.8 7.6 4.4 4 5.2V19c3.4-.7 6-.2 8 1.2 2-1.4 4.6-1.9 8-1.2V5.2c-3.6-.8-6.2-.4-8 1Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 6.2V20.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          <span class="pill-dot" hidden></span>
+        </span>
         <small>Tagebuch</small>
       </button>
     </nav>
@@ -1963,6 +2033,7 @@
       var diaryPeople = {};
       var sharedEntries = [];
       var diaryBuddyIds = {};
+      var diaryNote = false;
       var pendingShare = "";
       var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
       var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
@@ -3078,9 +3149,10 @@
           var isSource = shifted && shiftFrom() === iso;
           var isTarget = shifted && moved === iso;
           var brown = on && !isSource && !isTarget;
+          var assigned = brown || isTarget || !!(unit && unit.kind);
           var button = document.createElement("button");
           button.type = "button";
-          button.className = "day" + (brown ? " is-on" : "") + (isTarget ? " is-moved" : "") + (isSource ? " is-line" : "");
+          button.className = "day" + (brown ? " is-on" : "") + (isTarget ? " is-moved" : "") + (isSource ? " is-line" : "") + (sessionMode && planningWeek && !assigned && !isSource ? " is-empty" : "");
           button.disabled = sessionMode ? !planningWeek : !!routineStart();
           button.dataset.day = key;
           button.setAttribute("aria-pressed", (brown || isTarget) ? "true" : "false");
@@ -3222,7 +3294,15 @@
         mainEl.hidden = on;
         var theme = document.querySelector('meta[name="theme-color"]');
         if (theme) theme.setAttribute("content", on ? "#F3EEE4" : "#C7413B");
+        scrollShellTop();
+      }
+
+      function scrollShellTop() {
         window.scrollTo(0, 0);
+        var welcome = document.getElementById("welcome");
+        var diary = document.getElementById("diary");
+        if (welcome) welcome.scrollTop = 0;
+        if (diary) diary.scrollTop = 0;
       }
 
       function ausdauerChoicesForWorkout(iso) {
@@ -3609,7 +3689,7 @@
         if (String(person.id) === String(sessionAccount.id)) return true;
         var vis = person.diary_visibility || "private";
         if (vis === "trainer" && String(person.trainer_id || "") === String(sessionAccount.id)) return true;
-        if (vis === "friends" && diaryBuddyIds[String(person.id)]) return true;
+        if (diaryVisibility === "friends" && vis === "friends" && diaryBuddyIds[String(person.id)]) return true;
         return false;
       }
 
@@ -3694,10 +3774,47 @@
               sharedEntries = entries || [];
             });
           })
+          .then(function () {
+            refreshDiaryNote();
+            paintPill();
+          })
           .catch(function () {
             diaryPosts = [];
             sharedEntries = [];
+            refreshDiaryNote();
+            paintPill();
           });
+      }
+
+      function diarySeenKey() {
+        return storePrefix + "diary_seen";
+      }
+
+      function refreshDiaryNote() {
+        diaryNote = false;
+        if (!sessionAccount) return;
+        var me = String(sessionAccount.id);
+        var seen = readStore(diarySeenKey(), "");
+        diaryNote = diaryPosts.some(function (post) {
+          if (!post || String(post.author_id || "") === me) return false;
+          if (String(post.reply_to_id || "") !== me) return false;
+          if (seen && String(post.created_at || "") <= String(seen)) return false;
+          return true;
+        });
+      }
+
+      function markDiarySeen() {
+        if (!sessionAccount) return;
+        var me = String(sessionAccount.id);
+        var latest = "";
+        diaryPosts.forEach(function (post) {
+          if (!post || String(post.reply_to_id || "") !== me) return;
+          var stamp = String(post.created_at || "");
+          if (stamp > latest) latest = stamp;
+        });
+        writeStore(diarySeenKey(), latest || new Date().toISOString());
+        diaryNote = false;
+        paintPill();
       }
 
       function diaryCommentEl(post) {
@@ -3764,6 +3881,28 @@
         });
       }
 
+      function diaryReplyButton(ownerId) {
+        var bubble = document.createElement("button");
+        bubble.type = "button";
+        bubble.className = "diary-reply";
+        bubble.setAttribute("aria-label", "Antworten");
+        bubble.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6.5h14v8.2H8.2L5 18.2v-3.5H5V6.5Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+        bubble.addEventListener("click", function (event) {
+          event.stopPropagation();
+          var card = bubble.parentNode;
+          var existing = card.querySelector(".diary-composer");
+          if (existing) {
+            existing.remove();
+            return;
+          }
+          var form = diaryComposer(ownerId);
+          card.appendChild(form);
+          var input = form.querySelector("input");
+          if (input) input.focus();
+        });
+        return bubble;
+      }
+
       function renderDiaryShare(list) {
         if (!sessionMode || !sessionAccount) return;
         var old = list.querySelector(".diary-share-feed");
@@ -3797,10 +3936,10 @@
               note.textContent = entry.note;
               card.appendChild(note);
             }
+            card.appendChild(diaryReplyButton(id));
             box.appendChild(card);
           });
           postsForOwner(id).forEach(function (post) { box.appendChild(diaryCommentEl(post)); });
-          box.appendChild(diaryComposer(id));
         });
         list.appendChild(box);
       }
@@ -3891,9 +4030,12 @@
         });
         renderDiaryShare(list);
         loadDiaryShare().then(function () {
-          if (document.body.dataset.shell === "diary") renderDiaryShare(list);
+          if (document.body.dataset.shell === "diary") {
+            renderDiaryShare(list);
+            markDiarySeen();
+          }
         });
-        window.scrollTo(0, 0);
+        scrollShellTop();
       }
 
       function openDiaryMenu(iso) {
@@ -4642,12 +4784,24 @@
       document.getElementById("start-modal").addEventListener("click", function (event) {
         if (event.target.id === "start-modal") event.currentTarget.hidden = true;
       });
+      function planHasInvite() {
+        var map = inviteStore();
+        return Object.keys(map).some(function (iso) {
+          var row = map[iso];
+          return row && Array.isArray(row.people) && row.people.length;
+        });
+      }
+
       function paintPill() {
         document.querySelectorAll(".app-pill button").forEach(function (btn) {
           var on = btn.getAttribute("data-shell") === shellTab;
           btn.classList.toggle("is-on", on);
           if (on) btn.setAttribute("aria-current", "page");
           else btn.removeAttribute("aria-current");
+          var dot = btn.querySelector(".pill-dot");
+          if (!dot) return;
+          var tab = btn.getAttribute("data-shell");
+          dot.hidden = tab === "plan" ? !planHasInvite() : !diaryNote;
         });
       }
 
@@ -4678,7 +4832,7 @@
         if (planPane === "orte") {
           loadAccountPlaces().then(function () { ensurePlaceMap(); });
         }
-        window.scrollTo(0, 0);
+        scrollShellTop();
       }
 
       function inviteStore() {
@@ -4693,44 +4847,41 @@
 
       function dayInviteEl(iso) {
         var saved = inviteStore()[iso] || null;
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "day-invite";
-        btn.dataset.invite = iso;
-        var people = document.createElement("span");
-        people.className = "day-invite__people";
+        var wrap = document.createElement("div");
+        wrap.className = "day-invite";
         var faces = saved && Array.isArray(saved.people) ? saved.people : [];
-        if (!faces.length) {
-          var empty = document.createElement("span");
-          empty.className = "day-invite__empty";
-          empty.textContent = "einladen";
-          people.appendChild(empty);
-        } else {
-          faces.forEach(function (person) {
-            if (person && person.photo) {
-              var img = document.createElement("img");
-              img.className = "day-invite__face";
-              img.alt = "";
-              img.src = person.photo;
-              people.appendChild(img);
-            } else {
-              var ph = document.createElement("span");
-              ph.className = "day-invite__ph";
-              ph.textContent = String((person && person.name) || "?").slice(0, 1);
-              people.appendChild(ph);
-            }
-          });
-        }
-        var place = document.createElement("span");
-        place.className = "day-invite__place";
-        place.textContent = saved && saved.place ? saved.place : "";
-        btn.appendChild(people);
-        btn.appendChild(place);
-        btn.addEventListener("click", function (event) {
+        faces.forEach(function (person) {
+          if (!person) return;
+          var row = document.createElement("div");
+          row.className = "day-invite__row";
+          if (person.photo) {
+            var img = document.createElement("img");
+            img.className = "day-invite__face";
+            img.alt = "";
+            img.src = person.photo;
+            row.appendChild(img);
+          } else {
+            var ph = document.createElement("span");
+            ph.className = "day-invite__ph";
+            ph.textContent = String(person.name || "?").slice(0, 1);
+            row.appendChild(ph);
+          }
+          var name = document.createElement("span");
+          name.textContent = person.name || "Team";
+          row.appendChild(name);
+          wrap.appendChild(row);
+        });
+        var plus = document.createElement("button");
+        plus.type = "button";
+        plus.className = "day-invite__plus";
+        plus.textContent = "+";
+        plus.setAttribute("aria-label", "Nachricht an");
+        plus.addEventListener("click", function (event) {
           event.stopPropagation();
           openInvite(iso);
         });
-        return btn;
+        wrap.appendChild(plus);
+        return wrap;
       }
 
       function personFace(person) {
@@ -5002,14 +5153,9 @@
 
       function openInvite(iso) {
         inviteIso = iso;
-        document.getElementById("invite-title").textContent = formatLong(iso);
-        document.getElementById("invite-msg").textContent = "";
-        var saved = inviteStore()[iso] || {};
-        document.getElementById("invite-place").value = saved.place || "";
+        document.getElementById("invite-title").textContent = "Nachricht an:";
         var box = document.getElementById("invite-people");
         box.textContent = "";
-        var chosen = {};
-        (saved.people || []).forEach(function (person) { if (person && person.id) chosen[person.id] = true; });
         function fill(list) {
           box.textContent = "";
           if (!list.length) {
@@ -5021,15 +5167,10 @@
           list.forEach(function (person) {
             var btn = document.createElement("button");
             btn.type = "button";
-            btn.className = "invite-person" + (chosen[person.id] ? " is-on" : "");
+            btn.className = "invite-person";
             btn.textContent = person.name + (person.isTrainerPerson ? " (Trainer)" : "");
             btn.addEventListener("click", function () {
-              btn.classList.toggle("is-on");
-            });
-            btn.dataset.person = JSON.stringify({
-              id: person.id,
-              name: person.name,
-              photo: person.photo_url || ""
+              addDayInvite(iso, person);
             });
             box.appendChild(btn);
           });
@@ -5039,31 +5180,23 @@
         document.getElementById("invite-modal").hidden = false;
       }
 
-      function selectedInvitePeople() {
-        var people = [];
-        document.querySelectorAll("#invite-people .invite-person.is-on").forEach(function (btn) {
-          try { people.push(JSON.parse(btn.dataset.person)); } catch (e) {}
-        });
-        return people;
-      }
-
-      function saveInvite(sendWa) {
-        var place = String(document.getElementById("invite-place").value || "").trim();
-        var msg = document.getElementById("invite-msg");
-        if (!place) {
-          msg.textContent = "Ort angeben.";
-          return;
-        }
-        var people = selectedInvitePeople();
+      function addDayInvite(iso, person) {
+        if (!person || !person.id) return;
         var map = inviteStore();
-        map[inviteIso] = { people: people, place: place };
+        var saved = map[iso] && typeof map[iso] === "object" ? map[iso] : {};
+        var people = Array.isArray(saved.people) ? saved.people.slice() : [];
+        if (!people.some(function (row) { return String(row.id) === String(person.id); })) {
+          people.push({
+            id: person.id,
+            name: person.name || "Team",
+            photo: person.photo_url || ""
+          });
+        }
+        map[iso] = { people: people, place: saved.place || "" };
         writeStore(storePrefix + "day_invites", map);
         document.getElementById("invite-modal").hidden = true;
         paintWelcome();
-        if (sendWa) {
-          var text = "Kommst Du mit am " + formatLong(inviteIso) + "? Ort: " + place;
-          window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
-        }
+        paintPill();
       }
 
       function openMovedDialog() {
@@ -5118,8 +5251,6 @@
         window.clearTimeout(placeTimer);
         placeTimer = window.setTimeout(searchPlaces, 280);
       });
-      document.getElementById("invite-save").addEventListener("click", function () { saveInvite(false); });
-      document.getElementById("invite-wa").addEventListener("click", function () { saveInvite(true); });
       document.getElementById("invite-modal").addEventListener("click", function (event) {
         if (event.target.id === "invite-modal") event.currentTarget.hidden = true;
       });
@@ -5734,7 +5865,10 @@
       paintVisibility();
       paintWelcome();
       if (!sessionMode) loadRoutine();
-      (sessionMode ? loadSessionPlan() : loadSharedPlan()).then(function () { load(); });
+      (sessionMode ? loadSessionPlan() : loadSharedPlan()).then(function () {
+        load();
+        if (sessionMode) loadDiaryShare();
+      });
     })();
   </script>
 </body>
