@@ -491,6 +491,27 @@
       object-fit: cover;
     }
     .photo input { display: none; }
+    .plan-week {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 48px;
+      margin: 8px 0 4px;
+      padding: 10px 14px;
+      border: 1.5px solid #2A2118;
+      border-radius: 12px;
+      background: transparent;
+      color: #2A2118;
+      font-family: "Playfair Display", serif;
+      font-weight: 500;
+      font-size: 15px;
+      line-height: 1.3;
+      text-align: center;
+      cursor: pointer;
+    }
+    .plan-week.is-on { background: #2A2118; color: #F6F1E8; }
+    .plan-week[hidden] { display: none; }
     .days { margin-top: 14px; }
     .day {
       display: flex;
@@ -515,6 +536,7 @@
       padding: 5px 10px;
     }
     .day-side { display: flex; align-items: center; gap: 6px; margin-left: auto; flex: none; }
+    .day-unit { font-size: 12px; line-height: 1.2; }
     .day-mark { font-size: 14px; line-height: 1; }
     .day.is-line {
       background: transparent;
@@ -755,6 +777,10 @@
       color: inherit;
     }
     .book-btn svg { display: block; }
+    #days-kinds button,
+    #days-pick button { margin-top: 10px; }
+    #days-kinds button:first-of-type,
+    #days-pick button:first-of-type { margin-top: 16px; }
     #diary-vis .sand-card button { margin-top: 10px; }
     #diary-vis .sand-card button:first-of-type { margin-top: 16px; }
     #diary-vis .sand-card button.is-on {
@@ -975,6 +1001,7 @@
       <img id="photo-img" alt="" hidden />
     </div>
     <p class="tip">Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.</p>
+    <button type="button" id="plan-week" class="plan-week" hidden>Meine Bewegung in der Woche planen</button>
     <div class="days" id="days"></div>
     <div class="routine-row">
       <button type="button" id="routine-start" class="routine-start">Start der 12 Wochenroutine</button>
@@ -1016,7 +1043,17 @@
   <div class="sand-modal" id="days-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="days-title">
       <h2 class="ask" id="days-title"></h2>
-      <button type="button" id="days-ok">Zweiten Tag festlegen</button>
+      <div id="days-secret">
+        <button type="button" id="days-ok">Zweiten Tag festlegen</button>
+      </div>
+      <div id="days-kinds" hidden>
+        <button type="button" data-week-kind="zirkel">🔥 Zirkeltraining</button>
+        <button type="button" data-week-kind="kraft">🏋️‍♀️ Kraft</button>
+        <button type="button" data-week-kind="ausdauer">🏃 Ausdauer</button>
+        <button type="button" class="sand-quiet" id="days-clear">Tag freilassen</button>
+      </div>
+      <div id="days-pick" hidden></div>
+      <p class="ask-error" id="days-error" hidden></p>
     </div>
   </div>
   <div class="sand-modal" id="start-modal" hidden>
@@ -1105,7 +1142,7 @@
       <button type="button" id="back-welcome" class="home-btn" aria-label="Zur Übersicht">
         <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.2 12 4l8 7.2V20a1 1 0 0 1-1 1h-5.2v-6.2H10.2V21H5a1 1 0 0 1-1-1v-8.8Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
       </button>
-      <h1>Einfache Basics</h1>
+      <h1 id="workout-title">Einfache Basics</h1>
       <button type="button" id="plan-book" class="book-btn" aria-label="Tagebuch sichtbar für">
         <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.2C10.2 4.8 7.6 4.4 4 5.2V19c3.4-.7 6-.2 8 1.2 2-1.4 4.6-1.9 8-1.2V5.2c-3.6-.8-6.2-.4-8 1Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 6.2V20.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
       </button>
@@ -1176,6 +1213,7 @@
 
   <script src="/assets/go-account-session.js"></script>
   <script src="/assets/go-checklist.js"></script>
+  <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
   <script>
     (function () {
@@ -1205,6 +1243,12 @@
       var sessionAusdauer = [];
       var kraftWeekdays = [];
       var ausWeekdays = [];
+      var zirkelWeekday = null;
+      var userUnits = {};
+      var trainerUnits = {};
+      var userOwned = false;
+      var planningWeek = false;
+      var weekSaving = false;
       var adminDayKeys = null;
       var diaryVisibility = "private";
       var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
@@ -2292,17 +2336,28 @@
         var box = document.getElementById("days");
         box.textContent = "";
         document.querySelector(".tip").textContent = sessionMode
-          ? (adminDayKeys && adminDayKeys.length
-            ? "Die Tage legt Dein Trainer fest."
-            : "Dein Trainer stellt den Plan zusammen.")
+          ? (planningWeek
+            ? "Wochentag wählen. Danach Zirkeltraining, Kraft oder Ausdauer."
+            : (userOwned
+              ? "Deine Woche ist geplant. Der Trainer kann die Tage nicht mehr verschieben."
+              : (adminDayKeys && adminDayKeys.length
+                ? "Die Tage legt Dein Trainer fest."
+                : "Dein Trainer stellt den Plan zusammen.")))
           : (picking
             ? "Zweiten Tag festlegen."
             : (routineStart()
               ? "Die Wochentage bleiben, solange die Routine läuft."
               : "Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest."));
+        var planBtn = document.getElementById("plan-week");
+        if (planBtn) {
+          planBtn.hidden = !sessionMode;
+          planBtn.classList.toggle("is-on", planningWeek);
+          planBtn.setAttribute("aria-pressed", planningWeek ? "true" : "false");
+        }
         for (var i = 0; i < 7; i++) {
           var iso = addDays(today, i);
           var key = DAY_KEYS[weekdayIndex(iso)];
+          var unit = sessionMode ? userUnits[weekdayIndex(iso)] : null;
           var on = picking ? key === firstDay : selected.indexOf(key) >= 0;
           var isSource = shifted && shiftFrom() === iso;
           var isTarget = shifted && moved === iso;
@@ -2310,18 +2365,24 @@
           var button = document.createElement("button");
           button.type = "button";
           button.className = "day" + (brown ? " is-on" : "") + (isTarget ? " is-moved" : "") + (isSource ? " is-line" : "");
-          button.disabled = !!routineStart() || sessionMode;
+          button.disabled = sessionMode ? !planningWeek : !!routineStart();
           button.dataset.day = key;
           button.setAttribute("aria-pressed", (brown || isTarget) ? "true" : "false");
           var name = document.createElement("span");
           name.textContent = formatLong(iso);
           button.appendChild(name);
-          if (brown || isTarget) {
+          if (brown || isTarget || (unit && unit.kind)) {
             var side = document.createElement("span");
             side.className = "day-side";
+            if (unit && unit.label) {
+              var label = document.createElement("span");
+              label.className = "day-unit";
+              label.textContent = unit.label;
+              side.appendChild(label);
+            }
             var emoji = document.createElement("span");
             emoji.className = "day-mark";
-            emoji.textContent = "🤸";
+            emoji.textContent = unit && unit.kind ? unitEmoji(unit.kind) : "🤸";
             emoji.setAttribute("aria-hidden", "true");
             side.appendChild(emoji);
             button.appendChild(side);
@@ -2354,7 +2415,13 @@
       }
 
       function choosePlanDay(key) {
-        if (sessionMode || routineStart()) return;
+        if (sessionMode) {
+          if (!planningWeek) return;
+          if (!document.getElementById("days-modal").hidden) return;
+          openWeekKind(key);
+          return;
+        }
+        if (routineStart()) return;
         if (!document.getElementById("days-modal").hidden) return;
         if (firstDay) {
           if (key === firstDay) return;
@@ -2415,6 +2482,7 @@
         document.getElementById("short-modal").hidden = true;
         document.getElementById("short-choice").hidden = true;
         var when = shiftFrom() === today ? addDays(today, 1) : today;
+        if (sessionMode && sessionReady) applySessionExercises(when);
         setHome(false);
         document.getElementById("short-banner").hidden = !shortMode;
         if (date !== when) {
@@ -3031,7 +3099,272 @@
 
       function closeDaysPrompt() {
         pendingDay = null;
+        var pick = document.getElementById("days-pick");
+        if (pick) {
+          pick.hidden = true;
+          pick.textContent = "";
+        }
+        var kinds = document.getElementById("days-kinds");
+        if (kinds) kinds.hidden = true;
+        var secret = document.getElementById("days-secret");
+        if (secret) secret.hidden = !!sessionMode;
+        var err = document.getElementById("days-error");
+        if (err) err.hidden = true;
         document.getElementById("days-modal").hidden = true;
+      }
+
+      function unitEmoji(kind) {
+        if (kind === "zirkel") return "🔥";
+        if (kind === "kraft") return "🏋️‍♀️";
+        if (kind === "ausdauer") return "🏃";
+        return "🤸";
+      }
+
+      function openWeekKind(key) {
+        pendingDay = key;
+        var title = document.getElementById("days-title");
+        var wd = DAY_KEYS.indexOf(key);
+        var current = visibleUnit(wd);
+        title.textContent = DAY_NAMES[key] + (current && current.label ? ". Aktuell: " + current.label + "." : ".");
+        document.getElementById("days-secret").hidden = true;
+        document.getElementById("days-kinds").hidden = false;
+        var pick = document.getElementById("days-pick");
+        pick.hidden = true;
+        pick.textContent = "";
+        document.getElementById("days-error").hidden = true;
+        document.getElementById("days-modal").hidden = false;
+      }
+
+      function ausdauerChoices() {
+        var techName = { run: "Laufen", bike: "Radfahren", row: "Rudern", swim: "Schwimmen", walk: "Gehen", hike: "Wandern" };
+        var list = [];
+        (sessionAusdauer || []).forEach(function (row) {
+          if (!row) return;
+          var name = techName[String(row.technique || "")] || String(row.technique || "") || "Ausdauer";
+          var bits = [];
+          if (row.duration_min != null && row.duration_min !== "") bits.push(String(row.duration_min) + " min");
+          if (row.distance_km != null && row.distance_km !== "") bits.push(String(row.distance_km) + " km");
+          list.push({
+            label: bits.length ? name + " · " + bits.join(" · ") : name,
+            presetId: String(row.id || ""),
+            systemId: ""
+          });
+        });
+        if (list.length) return list;
+        return [
+          { label: "Laufen", presetId: "", systemId: "" },
+          { label: "Radfahren", presetId: "", systemId: "" },
+          { label: "Rudern", presetId: "", systemId: "" },
+          { label: "Schwimmen", presetId: "", systemId: "" },
+          { label: "Gehen", presetId: "", systemId: "" },
+          { label: "Wandern", presetId: "", systemId: "" }
+        ];
+      }
+
+      function kraftChoices() {
+        var list = [];
+        var cat = window.GOGOGO_KRAFT;
+        if (cat && cat.SYSTEMS) list = cat.SYSTEMS.slice();
+        if (!list.some(function (sys) { return sys && sys.id === "krafttraining"; })) {
+          list.unshift({ id: "krafttraining", name: "Einfache Basics" });
+        }
+        list.sort(function (a, b) {
+          if (a.id === "krafttraining") return -1;
+          if (b.id === "krafttraining") return 1;
+          return 0;
+        });
+        return list.map(function (sys) {
+          return { label: sys.name, systemId: sys.id, presetId: "" };
+        });
+      }
+
+      function showWeekPick(kind) {
+        if (!pendingDay) return;
+        var title = document.getElementById("days-title");
+        var names = { zirkel: "Zirkeltraining", kraft: "Kraft", ausdauer: "Ausdauer" };
+        title.textContent = (names[kind] || "Training") + " am " + DAY_NAMES[pendingDay] + ".";
+        document.getElementById("days-kinds").hidden = true;
+        var pick = document.getElementById("days-pick");
+        pick.textContent = "";
+        pick.hidden = false;
+        var options = kind === "kraft" ? kraftChoices() : (kind === "ausdauer" ? ausdauerChoices() : [{ label: "Zirkeltraining", systemId: "", presetId: "" }]);
+        options.forEach(function (opt) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = (unitEmoji(kind) + " " + opt.label).trim();
+          button.addEventListener("click", function () {
+            commitWeekUnit(DAY_KEYS.indexOf(pendingDay), {
+              kind: kind,
+              label: opt.label,
+              systemId: opt.systemId || "",
+              presetId: opt.presetId || ""
+            });
+          });
+          pick.appendChild(button);
+        });
+        var back = document.createElement("button");
+        back.type = "button";
+        back.className = "sand-quiet";
+        back.textContent = "Zurück";
+        back.addEventListener("click", function () {
+          if (pendingDay) openWeekKind(pendingDay);
+        });
+        pick.appendChild(back);
+      }
+
+      function syncWeekdaysFromUnits() {
+        kraftWeekdays = [];
+        ausWeekdays = [];
+        zirkelWeekday = null;
+        Object.keys(userUnits).forEach(function (key) {
+          var wd = Number(key);
+          var unit = userUnits[wd];
+          if (!(wd >= 0 && wd <= 6) || !unit) return;
+          if (unit.kind === "kraft" && kraftWeekdays.indexOf(wd) < 0) kraftWeekdays.push(wd);
+          if (unit.kind === "ausdauer" && ausWeekdays.indexOf(wd) < 0) ausWeekdays.push(wd);
+          if (unit.kind === "zirkel") zirkelWeekday = wd;
+        });
+        var merged = kraftWeekdays.slice();
+        ausWeekdays.forEach(function (n) { if (merged.indexOf(n) < 0) merged.push(n); });
+        if (zirkelWeekday != null && merged.indexOf(zirkelWeekday) < 0) merged.push(zirkelWeekday);
+        adminDayKeys = keysFromWeekdays(merged);
+      }
+
+      function saveUserWeek(nextUnits) {
+        var id = sessionAccount.id;
+        var columns = ["day_mo", "day_di", "day_mi", "day_do", "day_fr", "day_sa", "day_so"];
+        return rest("go_coach_plans?account_id=eq." + encodeURIComponent(id) + "&select=day_training_units")
+          .catch(function () { return []; })
+          .then(function () {
+            var units = { user_owned: true };
+            var kraft = [];
+            var aus = [];
+            var zirkel = null;
+            for (var wd = 0; wd <= 6; wd++) {
+              var unit = nextUnits[wd];
+              if (!unit || !unit.kind) continue;
+              units[String(wd)] = {
+                source: "user",
+                workout: {
+                  kind: unit.kind,
+                  label: unit.label || "",
+                  systemId: unit.systemId || null,
+                  presetId: unit.presetId || null,
+                  source: "user"
+                }
+              };
+              if (unit.kind === "kraft") kraft.push(wd);
+              else if (unit.kind === "ausdauer") aus.push(wd);
+              else if (unit.kind === "zirkel") zirkel = wd;
+            }
+            if (zirkel == null) units.zirkel_none = true;
+            var payload = {
+              account_id: id,
+              updated_at: new Date().toISOString(),
+              kraft_weekdays: kraft,
+              ausdauer_weekdays: aus,
+              zirkel_weekday: zirkel,
+              day_training_units: units
+            };
+            columns.forEach(function (col, idx) {
+              var unit = nextUnits[idx];
+              payload[col] = unit && unit.label ? unit.label : null;
+            });
+            function postPlan(body) {
+              return rest("go_coach_plans?on_conflict=account_id", {
+                method: "POST",
+                prefer: "resolution=merge-duplicates,return=minimal",
+                body: body
+              });
+            }
+            return postPlan(payload).catch(function (err) {
+              var msg = String((err && err.message) || err || "");
+              if (zirkel == null && /zirkel_weekday|23502|not-null|null value/i.test(msg)) {
+                delete payload.zirkel_weekday;
+                return postPlan(payload);
+              }
+              throw err;
+            });
+          });
+      }
+
+      function visibleUnit(wd) {
+        if (userOwned) return userUnits[wd] || null;
+        if (trainerUnits[wd]) return trainerUnits[wd];
+        if (kraftWeekdays.indexOf(wd) >= 0) return { kind: "kraft", label: "Einfache Basics", systemId: "krafttraining", presetId: "" };
+        if (ausWeekdays.indexOf(wd) >= 0) {
+          var choice = ausdauerChoices()[0];
+          return {
+            kind: "ausdauer",
+            label: choice ? choice.label : "Ausdauer",
+            systemId: "",
+            presetId: choice ? choice.presetId : ""
+          };
+        }
+        return null;
+      }
+
+      function unitsBeforeEdit() {
+        var next = {};
+        if (userOwned) {
+          Object.keys(userUnits).forEach(function (key) {
+            var n = Number(key);
+            if (userUnits[n]) next[n] = userUnits[n];
+          });
+          return next;
+        }
+        kraftWeekdays.concat(ausWeekdays).forEach(function (wd) {
+          if (next[wd]) return;
+          var fromTrainer = trainerUnits[wd];
+          if (fromTrainer && fromTrainer.kind && fromTrainer.kind !== "zirkel") {
+            next[wd] = {
+              kind: fromTrainer.kind,
+              label: fromTrainer.label || "",
+              systemId: fromTrainer.systemId || "",
+              presetId: fromTrainer.presetId || ""
+            };
+            return;
+          }
+          var unit = visibleUnit(wd);
+          if (!unit || !unit.kind || unit.kind === "zirkel") return;
+          next[wd] = {
+            kind: unit.kind,
+            label: unit.label || "",
+            systemId: unit.systemId || "",
+            presetId: unit.presetId || ""
+          };
+        });
+        return next;
+      }
+
+      function commitWeekUnit(wd, unit) {
+        if (weekSaving || !(wd >= 0 && wd <= 6)) return;
+        var next = unitsBeforeEdit();
+        if (unit && unit.kind === "zirkel") {
+          Object.keys(next).forEach(function (key) {
+            if (next[key] && next[key].kind === "zirkel") delete next[key];
+          });
+        }
+        if (unit) next[wd] = unit;
+        else delete next[wd];
+        weekSaving = true;
+        var errEl = document.getElementById("days-error");
+        if (errEl) errEl.hidden = true;
+        saveUserWeek(next).then(function () {
+          userUnits = next;
+          userOwned = true;
+          syncWeekdaysFromUnits();
+          weekSaving = false;
+          closeDaysPrompt();
+          paintWelcome();
+          if (sessionReady) applySessionExercises(date);
+        }).catch(function () {
+          weekSaving = false;
+          if (errEl) {
+            errEl.hidden = false;
+            errEl.textContent = "Speichern fehlgeschlagen. Bitte noch einmal versuchen.";
+          }
+        });
       }
 
       function hasPhoto() {
@@ -3043,8 +3376,23 @@
         if (!day) return;
         choosePlanDay(day.dataset.day);
       });
-      document.getElementById("days-ok").addEventListener("click", function () {
+      document.getElementById("plan-week").addEventListener("click", function () {
+        if (!sessionMode) return;
+        planningWeek = !planningWeek;
+        if (!planningWeek) closeDaysPrompt();
+        paintWelcome();
+      });
+      document.getElementById("days-kinds").addEventListener("click", function (event) {
+        var choice = event.target.closest("[data-week-kind]");
+        if (!choice) return;
+        showWeekPick(choice.getAttribute("data-week-kind"));
+      });
+      document.getElementById("days-clear").addEventListener("click", function () {
         if (!pendingDay) return;
+        commitWeekUnit(DAY_KEYS.indexOf(pendingDay), null);
+      });
+      document.getElementById("days-ok").addEventListener("click", function () {
+        if (sessionMode || !pendingDay) return;
         firstDay = pendingDay;
         pendingDay = null;
         document.getElementById("days-modal").hidden = true;
@@ -3321,8 +3669,90 @@
         });
       }
 
+      function exercisesForUnit(unit) {
+        if (!unit || !window.GoChecklist) return [];
+        if (unit.kind === "zirkel") {
+          return [{
+            id: "zirkel",
+            name: unit.label || "Zirkeltraining",
+            short: "Zirkel",
+            kind: "check",
+            cue: "",
+            note: "",
+            group: "Hauptteil"
+          }];
+        }
+        if (unit.kind === "ausdauer") {
+          if (unit.presetId) {
+            var preset = (sessionAusdauer || []).filter(function (row) {
+              return String(row.id) === String(unit.presetId);
+            })[0];
+            if (preset) {
+              return GoChecklist.forAccount({ presets: {}, rows: [], hidden: [], ausdauer: [preset] });
+            }
+          }
+          var name = unit.label || "Ausdauer";
+          return [{
+            id: "aus-" + name,
+            name: name,
+            short: name.slice(0, 18),
+            kind: "check",
+            cue: "",
+            note: "",
+            group: "Ausdauer"
+          }];
+        }
+        if (unit.kind === "kraft") {
+          var systemId = unit.systemId || "krafttraining";
+          if (systemId === "krafttraining") {
+            if (linkedNatalya) return GoChecklist.forSecret(sessionRows, sessionHidden);
+            var presets = {};
+            presets.krafttraining = sessionPresets.krafttraining || GoChecklist.BASE.map(function (ex) { return ex.id; });
+            return GoChecklist.forAccount({
+              presets: presets,
+              rows: sessionRows,
+              hidden: sessionHidden,
+              ausdauer: []
+            });
+          }
+          var cat = window.GOGOGO_KRAFT;
+          var list = cat && cat.exercisesFor ? cat.exercisesFor(systemId) : [];
+          return list.map(function (ex) {
+            return {
+              id: systemId + "-" + ex.id,
+              name: ex.name,
+              short: String(ex.name || "").slice(0, 18),
+              kind: "reps",
+              sets: 3,
+              cue: "",
+              note: "",
+              group: "Hauptteil"
+            };
+          });
+        }
+        return [];
+      }
+
+      function paintWorkoutTitle(iso) {
+        var title = document.getElementById("workout-title");
+        if (!title) return;
+        var text = "Einfache Basics";
+        if (userOwned) {
+          var unit = userUnits[weekdayIndex(iso)];
+          if (unit && unit.label) text = unit.label;
+          else if (!unit) text = "Bewegung";
+        }
+        title.textContent = text;
+      }
+
       function applySessionExercises(iso) {
         if (!sessionMode || !sessionReady || !window.GoChecklist) return;
+        if (userOwned) {
+          Log.useExercises(exercisesForUnit(userUnits[weekdayIndex(iso)]));
+          paintWorkoutTitle(iso);
+          return;
+        }
+        paintWorkoutTitle(iso);
         if (linkedNatalya) {
           Log.useExercises(GoChecklist.forSecret(sessionRows, sessionHidden));
           return;
@@ -3369,6 +3799,31 @@
         return keys;
       }
 
+      function parseStoredUnits(raw) {
+        var map = raw;
+        if (typeof raw === "string") {
+          try { map = JSON.parse(raw); } catch (eUnits) { map = {}; }
+        }
+        var owned = !!(map && map.user_owned);
+        var units = {};
+        if (map && typeof map === "object") {
+          Object.keys(map).forEach(function (key) {
+            var wd = Number(key);
+            if (!(wd >= 0 && wd <= 6)) return;
+            var row = map[key];
+            var workout = row && row.workout ? row.workout : row;
+            if (!workout || !workout.kind) return;
+            units[wd] = {
+              kind: String(workout.kind),
+              label: workout.label != null ? String(workout.label) : "",
+              systemId: workout.systemId != null ? String(workout.systemId) : "",
+              presetId: workout.presetId != null ? String(workout.presetId) : ""
+            };
+          });
+        }
+        return { owned: owned, units: units };
+      }
+
       function loadSessionPlan() {
         var id = encodeURIComponent(sessionAccount.id);
         var title = document.querySelector(".welcome-title");
@@ -3379,7 +3834,7 @@
           loadExerciseRows(),
           loadHiddenRows(),
           rest("go_kraft_presets?account_id=eq." + id + "&select=system_id,exercise_ids").catch(function () { return []; }),
-          rest("go_coach_plans?account_id=eq." + id + "&select=kraft_weekdays,ausdauer_weekdays").catch(function () { return []; }),
+          rest("go_coach_plans?account_id=eq." + id + "&select=kraft_weekdays,ausdauer_weekdays,zirkel_weekday,day_training_units").catch(function () { return []; }),
           rest("go_ausdauer_presets?account_id=eq." + id + "&source=eq.trainer&select=id,technique,incline,duration_min,speed,distance_km").catch(function () { return []; }),
           rest("go_accounts?id=eq." + id + "&select=diary_visibility").catch(function () { return []; })
         ]).then(function (pack) {
@@ -3396,14 +3851,15 @@
             sessionPresets.krafttraining = GoChecklist.BASE.map(function (ex) { return ex.id; });
           }
           var plan = pack[3] && pack[3][0];
+          var stored = parseStoredUnits(plan && plan.day_training_units);
           kraftWeekdays = plan ? parseWeekdays(plan.kraft_weekdays) : [];
           ausWeekdays = plan ? parseWeekdays(plan.ausdauer_weekdays) : [];
-          var needSharedDays = linkedNatalya || (!kraftWeekdays.length && !ausWeekdays.length);
+          var needSharedDays = !stored.owned && (linkedNatalya || (!kraftWeekdays.length && !ausWeekdays.length));
           var daysReady = needSharedDays
             ? rest("go_natalya_routine?id=eq.natalya&select=days").catch(function () { return []; })
             : Promise.resolve(null);
           return daysReady.then(function (routineRows) {
-            if (routineRows && routineRows[0] && Array.isArray(routineRows[0].days)) {
+            if (!stored.owned && routineRows && routineRows[0] && Array.isArray(routineRows[0].days)) {
               var nums = [];
               routineRows[0].days.forEach(function (key) {
                 var n = DAY_KEYS.indexOf(String(key));
@@ -3414,9 +3870,20 @@
                 ausWeekdays = [];
               }
             }
-            var merged = kraftWeekdays.slice();
-            ausWeekdays.forEach(function (n) { if (merged.indexOf(n) < 0) merged.push(n); });
-            adminDayKeys = keysFromWeekdays(merged);
+            if (stored.owned) {
+              userOwned = true;
+              userUnits = stored.units;
+              trainerUnits = {};
+              syncWeekdaysFromUnits();
+            } else {
+              userOwned = false;
+              userUnits = {};
+              trainerUnits = stored.units;
+              zirkelWeekday = null;
+              var merged = kraftWeekdays.slice();
+              ausWeekdays.forEach(function (n) { if (merged.indexOf(n) < 0) merged.push(n); });
+              adminDayKeys = keysFromWeekdays(merged);
+            }
             sessionAusdauer = pack[4] || [];
             var visRow = pack[5] && pack[5][0];
             if (visRow && (visRow.diary_visibility === "trainer" || visRow.diary_visibility === "friends" || visRow.diary_visibility === "private")) {

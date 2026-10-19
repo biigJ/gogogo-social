@@ -2036,6 +2036,7 @@
         <section class="admin-plan" id="admin-plan" aria-label="Trainingsplan">
           <h2 class="admin-plan__title">Trainingsplan</h2>
           <p class="admin-plan__hint" id="admin-diary-vis" hidden></p>
+          <p class="admin-plan__hint" id="admin-week-lock" hidden></p>
           <div class="admin-plan__block">
             <label for="plan-blurb">Kurzer Satz zum Nutzer</label>
             <textarea id="plan-blurb" rows="2" maxlength="280" placeholder="Kurzbeschreibung…"></textarea>
@@ -2343,6 +2344,7 @@
       var ZIRKEL_DAY_NAMES = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
       var DEFAULT_ZIRKEL_WD = 4;
       var zirkelUiWeekday = DEFAULT_ZIRKEL_WD;
+      var coachWeekLocked = false;
       var zirkelTextStash = {};
       var zirkelConfirmBusy = false;
       var kraftAdminSystem = "full";
@@ -3275,6 +3277,50 @@
         return arr.map(Number).filter(function (n) { return n >= 0 && n <= 6; });
       }
 
+      function planRawObject(raw) {
+        var map = raw;
+        if (typeof raw === "string") {
+          try { map = JSON.parse(raw); } catch (e) { map = null; }
+        }
+        return map && typeof map === "object" ? map : null;
+      }
+
+      function planUnitsOwned(raw) {
+        var map = planRawObject(raw);
+        return !!(map && map.user_owned);
+      }
+
+      function planZirkelNone(raw) {
+        var map = planRawObject(raw);
+        return !!(map && map.zirkel_none);
+      }
+
+      function applyCoachWeekLock(locked) {
+        coachWeekLocked = !!locked;
+        if (coachWeekLocked) {
+          document.querySelectorAll(".plan-zirkel-check, .plan-kraft-check, .plan-ausdauer-check, .plan-alt-opt").forEach(function (el) {
+            el.disabled = true;
+          });
+          PLAN_DAY_FIELD_IDS.forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.disabled = true;
+          });
+        }
+        var hint = document.getElementById("admin-week-lock");
+        if (hint) {
+          hint.hidden = !coachWeekLocked;
+          hint.textContent = coachWeekLocked
+            ? "Der Nutzer hat die Woche selbst geplant. Zirkel, Kraft und Ausdauer sind fest und können nicht verschoben werden."
+            : "";
+        }
+      }
+
+      function omitLockedWeekFields(payload) {
+        ["day_mo", "day_di", "day_mi", "day_do", "day_fr", "day_sa", "day_so", "zirkel_weekday", "kraft_weekdays", "ausdauer_weekdays", "day_training_units"].forEach(function (key) {
+          delete payload[key];
+        });
+      }
+
       var dayTrainingUnits = {};
 
       function parseDayTrainingUnits(raw) {
@@ -3397,6 +3443,7 @@
       }
 
       function setDayAlternative(wd, kind) {
+        if (coachWeekLocked) return;
         if (!dayTrainingUnits[wd]) return;
         var alt = defaultAdminAlternative();
         for (var i = 0; i < ADMIN_ALT_OPTIONS.length; i++) {
@@ -3436,6 +3483,7 @@
             btn.className = "plan-alt-opt" + (opt.kind === currentKind ? " is-on" : "");
             btn.setAttribute("data-wd", String(wd));
             btn.setAttribute("data-alt-kind", opt.kind);
+            btn.disabled = coachWeekLocked;
             btn.textContent = (opt.emoji ? opt.emoji + " " : "") + opt.label;
             optsWrap.appendChild(btn);
           });
@@ -3590,6 +3638,10 @@
       }
 
       async function onKindCheckChange(box, kind) {
+        if (coachWeekLocked) {
+          box.checked = !box.checked;
+          return;
+        }
         var wd = parseInt(box.getAttribute("data-wd"), 10);
         if (!(wd >= 0 && wd <= 6)) return;
         var zirkelWd = getSelectedZirkelWeekday();
@@ -3651,6 +3703,7 @@
           planRoot.addEventListener("click", function (ev) {
             var btn = ev.target.closest(".plan-alt-opt");
             if (!btn) return;
+            if (coachWeekLocked) return;
             ev.preventDefault();
             var wd = parseInt(btn.getAttribute("data-wd"), 10);
             var kind = btn.getAttribute("data-alt-kind");
@@ -3975,11 +4028,16 @@
         });
         zirkelUiWeekday = selected != null ? selected : -1;
         syncKindUiFromUnits();
+        if (coachWeekLocked) applyCoachWeekLock(true);
       }
 
       function bindZirkelDayChecks() {
         getZirkelChecks().forEach(function (box) {
           box.addEventListener("change", async function () {
+            if (coachWeekLocked) {
+              applyZirkelDayUi(zirkelUiWeekday >= 0 && zirkelUiWeekday <= 6 ? zirkelUiWeekday : null, { clearZirkelText: false });
+              return;
+            }
             var n = parseInt(box.getAttribute("data-wd"), 10);
             if (!(n >= 0 && n <= 6)) n = DEFAULT_ZIRKEL_WD;
             var prev = zirkelUiWeekday >= 0 && zirkelUiWeekday <= 6 ? zirkelUiWeekday : null;
@@ -4621,6 +4679,12 @@
       }
 
       function clearPlanForm() {
+        coachWeekLocked = false;
+        var lockHint = document.getElementById("admin-week-lock");
+        if (lockHint) {
+          lockHint.hidden = true;
+          lockHint.textContent = "";
+        }
         PLAN_FIELDS.forEach(function (pair) {
           var el = document.getElementById(pair[0]);
           if (el) {
@@ -4647,13 +4711,30 @@
           var el = document.getElementById(pair[0]);
           if (el) el.value = row[pair[1]] != null ? String(row[pair[1]]) : "";
         });
+        var owned = planUnitsOwned(row.day_training_units);
         var zw = row.zirkel_weekday != null ? Number(row.zirkel_weekday) : null;
         if (!(zw >= 0 && zw <= 6)) zw = null;
-        applyZirkelDayUi(zw, { clearZirkelText: true });
-        applyKindChecks(".plan-kraft-check", parseWeekdayList(row.kraft_weekdays));
-        applyKindChecks(".plan-ausdauer-check", parseWeekdayList(row.ausdauer_weekdays));
         dayTrainingUnits = parseDayTrainingUnits(row.day_training_units);
-        if (zw != null && !dayTrainingUnits[zw]) {
+        var kraftDays = parseWeekdayList(row.kraft_weekdays);
+        var ausDays = parseWeekdayList(row.ausdauer_weekdays);
+        if (owned) {
+          kraftDays = [];
+          ausDays = [];
+          zw = null;
+          Object.keys(dayTrainingUnits).forEach(function (key) {
+            var unit = dayTrainingUnits[key];
+            var n = Number(key);
+            if (!unit) return;
+            if (unit.kind === "kraft") kraftDays.push(n);
+            else if (unit.kind === "ausdauer") ausDays.push(n);
+            else if (unit.kind === "zirkel") zw = n;
+          });
+          if (planZirkelNone(row.day_training_units)) zw = null;
+        }
+        applyZirkelDayUi(zw, { clearZirkelText: true });
+        applyKindChecks(".plan-kraft-check", kraftDays.filter(function (n) { return n !== zw; }));
+        applyKindChecks(".plan-ausdauer-check", ausDays.filter(function (n) { return n !== zw; }));
+        if (!owned && zw != null && !dayTrainingUnits[zw]) {
           dayTrainingUnits[zw] = {
             kind: "zirkel",
             label: "Zirkeltraining",
@@ -4664,6 +4745,7 @@
         }
         syncKindUiFromUnits();
         resetZirkelTextStash();
+        if (owned) applyCoachWeekLock(true);
       }
       function paintDiaryVisibility(value) {
         var el = document.getElementById("admin-diary-vis");
@@ -5097,6 +5179,7 @@
         var inserts = [];
         for (var i = 0; i < DAY_PLAN_KEYS.length; i++) {
           var key = DAY_PLAN_KEYS[i];
+          if (!Object.prototype.hasOwnProperty.call(payload, key)) continue;
           var oldVal = previous ? normPlanText(previous[key]) : null;
           var newVal = normPlanText(payload[key]);
           if (oldVal === newVal) continue;
@@ -5179,6 +5262,9 @@
       }
 
       async function archiveZirkelChange(accountId, previous, payload) {
+        if (!payload || !Object.prototype.hasOwnProperty.call(payload, "zirkel_weekday")) {
+          return { ok: true, missing: false };
+        }
         var oldRaw = previous && previous.zirkel_weekday != null ? Number(previous.zirkel_weekday) : null;
         var newRaw = payload && payload.zirkel_weekday != null ? Number(payload.zirkel_weekday) : null;
         var oldWd = oldRaw >= 0 && oldRaw <= 6 ? oldRaw : null;
@@ -5239,12 +5325,17 @@
           /* Name der Einheit auch als Tages-Text — Kreis zeigt das auch ohne day_training_units-Spalte. */
           payload[dk] = u.label || (u.kind === "ausdauer" ? "Ausdauer" : "Kraft");
         });
+        if (coachWeekLocked) omitLockedWeekFields(payload);
         if (planMsg) {
           planMsg.classList.remove("is-error");
           planMsg.textContent = "Speichere …";
         }
         try {
           var previous = await fetchPlanRow(activeAccount.id);
+          if (planUnitsOwned(previous && previous.day_training_units)) {
+            omitLockedWeekFields(payload);
+            applyCoachWeekLock(true);
+          }
           var archived = await archiveChangedDays(activeAccount.id, previous, payload);
           if (!archived.ok) {
             throw new Error(archived.detail || "History insert failed");
