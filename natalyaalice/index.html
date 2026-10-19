@@ -1187,10 +1187,17 @@
         location.replace("/login/?next=" + encodeURIComponent("/workout/"));
         return;
       }
+      var NATALYA_SERIAL = "24011901";
+      function isLinkedNatalya(acc) {
+        if (!acc) return false;
+        if (String(acc.phone || "").toLowerCase() === "natalya") return true;
+        return String(acc.serial_number || "") === NATALYA_SERIAL;
+      }
+      var linkedNatalya = isLinkedNatalya(sessionAccount);
       var openWorkout = /(?:\?|&)open=1(?:&|$)/.test(location.search);
       var openDate = "";
       try { openDate = new URLSearchParams(location.search).get("date") || ""; } catch (eOpen) {}
-      var storePrefix = sessionMode ? ("wk_" + sessionAccount.id + "_") : "";
+      var storePrefix = sessionMode && !linkedNatalya ? ("wk_" + sessionAccount.id + "_") : "";
       var sessionReady = false;
       var sessionRows = [];
       var sessionHidden = [];
@@ -1249,12 +1256,12 @@
       }
 
       function logQuery() {
-        if (!sessionMode) return "go_natalya_logs?";
+        if (!sessionMode || linkedNatalya) return "go_natalya_logs?";
         return "go_workout_logs?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&";
       }
 
       function logConflict() {
-        return sessionMode ? "account_id,workout_date,exercise_id" : "workout_date,exercise_id";
+        return sessionMode && !linkedNatalya ? "account_id,workout_date,exercise_id" : "workout_date,exercise_id";
       }
 
       function logRead(extra) {
@@ -1276,7 +1283,7 @@
           done: plan.body.done,
           updated_at: new Date().toISOString()
         };
-        if (sessionMode) body.account_id = sessionAccount.id;
+        if (sessionMode && !linkedNatalya) body.account_id = sessionAccount.id;
         return body;
       }
 
@@ -3316,6 +3323,10 @@
 
       function applySessionExercises(iso) {
         if (!sessionMode || !sessionReady || !window.GoChecklist) return;
+        if (linkedNatalya) {
+          Log.useExercises(GoChecklist.forSecret(sessionRows, sessionHidden));
+          return;
+        }
         var wd = weekdayIndex(iso);
         Log.useExercises(GoChecklist.forAccount({
           presets: kraftWeekdays.indexOf(wd) >= 0 ? sessionPresets : {},
@@ -3375,23 +3386,45 @@
           sessionRows = pack[0] || [];
           sessionHidden = pack[1] || [];
           sessionPresets = {};
+          var sawKraftPreset = false;
           (pack[2] || []).forEach(function (row) {
             if (!row || !row.system_id) return;
+            if (String(row.system_id) === "krafttraining") sawKraftPreset = true;
             sessionPresets[String(row.system_id)] = parseIdList(row.exercise_ids);
           });
+          if (!linkedNatalya && !sawKraftPreset && window.GoChecklist) {
+            sessionPresets.krafttraining = GoChecklist.BASE.map(function (ex) { return ex.id; });
+          }
           var plan = pack[3] && pack[3][0];
           kraftWeekdays = plan ? parseWeekdays(plan.kraft_weekdays) : [];
           ausWeekdays = plan ? parseWeekdays(plan.ausdauer_weekdays) : [];
-          var merged = kraftWeekdays.slice();
-          ausWeekdays.forEach(function (n) { if (merged.indexOf(n) < 0) merged.push(n); });
-          adminDayKeys = keysFromWeekdays(merged);
-          sessionAusdauer = pack[4] || [];
-          var visRow = pack[5] && pack[5][0];
-          if (visRow && (visRow.diary_visibility === "trainer" || visRow.diary_visibility === "friends" || visRow.diary_visibility === "private")) {
-            diaryVisibility = visRow.diary_visibility;
-          }
-          sessionReady = true;
-          paintVisibility();
+          var needSharedDays = linkedNatalya || (!kraftWeekdays.length && !ausWeekdays.length);
+          var daysReady = needSharedDays
+            ? rest("go_natalya_routine?id=eq.natalya&select=days").catch(function () { return []; })
+            : Promise.resolve(null);
+          return daysReady.then(function (routineRows) {
+            if (routineRows && routineRows[0] && Array.isArray(routineRows[0].days)) {
+              var nums = [];
+              routineRows[0].days.forEach(function (key) {
+                var n = DAY_KEYS.indexOf(String(key));
+                if (n >= 0 && nums.indexOf(n) < 0) nums.push(n);
+              });
+              if (nums.length && (linkedNatalya || (!kraftWeekdays.length && !ausWeekdays.length))) {
+                kraftWeekdays = nums;
+                ausWeekdays = [];
+              }
+            }
+            var merged = kraftWeekdays.slice();
+            ausWeekdays.forEach(function (n) { if (merged.indexOf(n) < 0) merged.push(n); });
+            adminDayKeys = keysFromWeekdays(merged);
+            sessionAusdauer = pack[4] || [];
+            var visRow = pack[5] && pack[5][0];
+            if (visRow && (visRow.diary_visibility === "trainer" || visRow.diary_visibility === "friends" || visRow.diary_visibility === "private")) {
+              diaryVisibility = visRow.diary_visibility;
+            }
+            sessionReady = true;
+            paintVisibility();
+          });
         }).catch(function () {
           adminDayKeys = adminDayKeys || [];
           sessionReady = true;

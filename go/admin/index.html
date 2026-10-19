@@ -4135,7 +4135,7 @@
           return;
         }
         if (trainerSessionAccount) stashTrainerSession(trainerSessionAccount);
-        window.location.href = "/account/?goto=profile";
+        window.location.href = "/workout/";
       }
 
       function initTrainerAdminMode() {
@@ -4476,7 +4476,7 @@
           window.alert("Account konnte lokal nicht gespeichert werden.");
           return;
         }
-        window.location.href = "/account/?goto=profile";
+        window.location.href = "/workout/";
       }
 
       function openCurrentUserProfile() {
@@ -6858,6 +6858,101 @@
         list.appendChild(wrap);
       }
 
+      async function ensureNatalyaUser() {
+        var serial = "24011901";
+        var code = "1901";
+        var dayNames = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+        var inviteRes = await fetch(
+          SUPABASE_URL + "/rest/v1/go_invite_codes?serial_number=eq." + serial + "&select=id,code&limit=1",
+          { headers: apiHeaders() }
+        );
+        var invites = inviteRes.ok ? await inviteRes.json() : [];
+        if (!invites.length) {
+          var taken = await fetch(
+            SUPABASE_URL + "/rest/v1/go_invite_codes?code=eq." + code + "&select=code&limit=1",
+            { headers: apiHeaders() }
+          );
+          var takenRows = taken.ok ? await taken.json() : [];
+          if (takenRows.length) return;
+          var createdInvite = await fetch(SUPABASE_URL + "/rest/v1/go_invite_codes", {
+            method: "POST",
+            headers: apiHeaders({ "Content-Type": "application/json", Prefer: "return=representation" }),
+            body: JSON.stringify({ first_name: "Natalya", serial_number: serial, code: code })
+          });
+          if (!createdInvite.ok) return;
+        }
+        var accRes = await fetch(
+          SUPABASE_URL + "/rest/v1/go_accounts?serial_number=eq." + serial + "&select=id,phone,invite_code,name&limit=1",
+          { headers: apiHeaders() }
+        );
+        var accounts = accRes.ok ? await accRes.json() : [];
+        var account = accounts[0] || null;
+        if (!account) {
+          var createdAcc = await fetch(SUPABASE_URL + "/rest/v1/go_accounts", {
+            method: "POST",
+            headers: apiHeaders({ "Content-Type": "application/json", Prefer: "return=representation" }),
+            body: JSON.stringify({
+              name: "Natalya",
+              phone: "natalya",
+              invite_code: code,
+              serial_number: serial
+            })
+          });
+          if (!createdAcc.ok) return;
+          var createdRows = await createdAcc.json();
+          account = createdRows && createdRows[0];
+        } else if (String(account.phone || "") !== "natalya" || String(account.invite_code || "") !== code) {
+          await fetch(SUPABASE_URL + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(account.id), {
+            method: "PATCH",
+            headers: apiHeaders({ "Content-Type": "application/json", Prefer: "return=minimal" }),
+            body: JSON.stringify({ name: "Natalya", phone: "natalya", invite_code: code, serial_number: serial })
+          });
+        }
+        if (!account || !account.id) return;
+        var presetRes = await fetch(
+          SUPABASE_URL + "/rest/v1/go_kraft_presets?account_id=eq." + encodeURIComponent(account.id) + "&system_id=eq.krafttraining&select=account_id&limit=1",
+          { headers: apiHeaders() }
+        );
+        var presets = presetRes.ok ? await presetRes.json() : [];
+        if (!presets.length && window.GoChecklist && GoChecklist.BASE) {
+          await fetch(SUPABASE_URL + "/rest/v1/go_kraft_presets", {
+            method: "POST",
+            headers: apiHeaders({ "Content-Type": "application/json", Prefer: "return=minimal" }),
+            body: JSON.stringify({
+              account_id: account.id,
+              system_id: "krafttraining",
+              exercise_ids: GoChecklist.BASE.map(function (ex) { return ex.id; })
+            })
+          });
+        }
+        var planRes = await fetch(
+          SUPABASE_URL + "/rest/v1/go_coach_plans?account_id=eq." + encodeURIComponent(account.id) + "&select=account_id&limit=1",
+          { headers: apiHeaders() }
+        );
+        var plans = planRes.ok ? await planRes.json() : [];
+        if (plans.length) return;
+        var routineRes = await fetch(
+          SUPABASE_URL + "/rest/v1/go_natalya_routine?id=eq.natalya&select=days",
+          { headers: apiHeaders() }
+        );
+        var routine = routineRes.ok ? await routineRes.json() : [];
+        var days = routine[0] && Array.isArray(routine[0].days) ? routine[0].days : ["thu", "sun"];
+        var weekdays = [];
+        days.forEach(function (key) {
+          var n = dayNames.indexOf(String(key));
+          if (n >= 0 && weekdays.indexOf(n) < 0) weekdays.push(n);
+        });
+        await fetch(SUPABASE_URL + "/rest/v1/go_coach_plans", {
+          method: "POST",
+          headers: apiHeaders({ "Content-Type": "application/json", Prefer: "return=minimal" }),
+          body: JSON.stringify({
+            account_id: account.id,
+            kraft_weekdays: weekdays,
+            ausdauer_weekdays: []
+          })
+        });
+      }
+
       async function showList() {
         hideAllPanels();
         setAdminTheme(true);
@@ -6879,6 +6974,9 @@
         listMsg.textContent = "Lade …";
         listMsg.classList.remove("is-error");
         try {
+          if (!trainerAdminMode) {
+            try { await ensureNatalyaUser(); } catch (eNatalya) {}
+          }
           var rows = [];
           if (trainerAdminMode && trainerSessionAccount && trainerSessionAccount.id) {
             var clientsRes = await fetch(
