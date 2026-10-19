@@ -59,6 +59,12 @@
     var blob = (tech + " " + kind + " " + label).toLowerCase();
     if (kind === "zirkel" || /zirkel/.test(blob)) return "🔥";
     if (kind === "kraft") return "🏋️‍♀️";
+    if (/schritte/.test(blob)) return "👟";
+    if (/mannschaft/.test(blob)) return "⚽";
+    if (/radtour/.test(blob)) return "🚴";
+    if (/yoga|pilates/.test(blob)) return "🧘";
+    if (/fitnesskurs/.test(blob)) return "💪";
+    if (/tanz/.test(blob)) return "💃";
     if (/schwimm|\bswim\b/.test(blob)) return "🏊";
     if (/ruder|rowing|\brow\b/.test(blob)) return "🚣";
     if (/wandern|\bhike\b/.test(blob)) return "🥾";
@@ -66,6 +72,7 @@
     if (kind === "walk" || /spazier|\bgehen\b|\bwalk\b/.test(blob)) return "🚶";
     if (kind === "jog" || /joggen|jogging|\blaufen\b|\brun\b/.test(blob)) return "🏃";
     if (kind === "ausdauer" || tech) return "🏃";
+    if (kind === "alternative" || /alternative bewegung/.test(blob)) return "🤸";
     if (!kind && !label && !tech) return "🤸";
     return "🏋️‍♀️";
   }

@@ -779,9 +779,13 @@
     .book-btn svg { display: block; }
     #days-kinds button,
     #days-pick button,
+    #move-kinds button,
+    #move-pick button,
     #ausdauer-pick button { margin-top: 10px; }
     #days-kinds button:first-of-type,
     #days-pick button:first-of-type,
+    #move-kinds button:first-of-type,
+    #move-pick button:first-of-type,
     #ausdauer-pick button:first-of-type { margin-top: 16px; }
     #diary-vis .sand-card button { margin-top: 10px; }
     #diary-vis .sand-card button:first-of-type { margin-top: 16px; }
@@ -1052,10 +1056,23 @@
         <button type="button" data-week-kind="zirkel">🔥 Zirkeltraining</button>
         <button type="button" data-week-kind="kraft">🏋️‍♀️ Kraft</button>
         <button type="button" data-week-kind="ausdauer">🏃 Ausdauer</button>
+        <button type="button" data-week-kind="alternative">🤸 Alternative Bewegung</button>
         <button type="button" class="sand-quiet" id="days-clear">Tag freilassen</button>
       </div>
       <div id="days-pick" hidden></div>
       <p class="ask-error" id="days-error" hidden></p>
+    </div>
+  </div>
+  <div class="sand-modal" id="move-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="move-title">
+      <h2 class="ask" id="move-title">Bewegung</h2>
+      <div id="move-kinds">
+        <button type="button" data-move-kind="zirkel">🔥 Zirkeltraining</button>
+        <button type="button" data-move-kind="kraft">🏋️‍♀️ Kraft</button>
+        <button type="button" data-move-kind="ausdauer">🏃 Ausdauer</button>
+        <button type="button" data-move-kind="alternative">🤸 Alternative Bewegung</button>
+      </div>
+      <div id="move-pick" hidden></div>
     </div>
   </div>
   <div class="sand-modal" id="ausdauer-modal" hidden>
@@ -2347,7 +2364,7 @@
         box.textContent = "";
         document.querySelector(".tip").textContent = sessionMode
           ? (planningWeek
-            ? "Wochentag wählen. Danach Zirkeltraining, Kraft oder Ausdauer."
+            ? "Wochentag wählen. Danach Zirkeltraining, Kraft, Ausdauer oder Alternative Bewegung."
             : (userOwned
               ? "Deine Woche ist geplant. Der Trainer kann die Tage nicht mehr verschieben."
               : (adminDayKeys && adminDayKeys.length
@@ -2753,10 +2770,18 @@
       function diaryStatus(iso) {
         var entry = diaryEntry(iso);
         if (entry.cleared) return "";
-        if (MOVES.indexOf(entry.move) >= 0) return entry.move;
+        if (entry.move) return entry.move;
         if (dayFullyDone(iso)) return "Einfache Basics";
         if (shortDone().indexOf(iso) >= 0) return "Einfache Basics kurz";
         return "";
+      }
+
+      function displayMove(label) {
+        var text = String(label || "");
+        if (!text) return "";
+        var icon = activityEmoji({ label: text });
+        if (icon && text.indexOf(icon) !== 0) return icon + " " + text;
+        return text;
       }
 
       function diaryDates() {
@@ -2840,7 +2865,7 @@
         var status = document.createElement("button");
         status.type = "button";
         status.className = "diary-status";
-        status.textContent = label || "";
+        status.textContent = displayMove(label);
         status.setAttribute("aria-label", label || "Bewegung wählen");
         if (slot >= 0) status.dataset.extra = String(slot);
         status.addEventListener("click", function (event) {
@@ -3135,39 +3160,89 @@
         }
       }
 
+      function closeMoveModal() {
+        var modal = document.getElementById("move-modal");
+        if (modal) modal.hidden = true;
+        var kinds = document.getElementById("move-kinds");
+        if (kinds) kinds.hidden = false;
+        var pick = document.getElementById("move-pick");
+        if (pick) {
+          pick.hidden = true;
+          pick.textContent = "";
+        }
+        var title = document.getElementById("move-title");
+        if (title) title.textContent = "Bewegung";
+      }
+
+      function commitMoveLabel(label) {
+        if (!moveDate || !label) return;
+        var entry = diaryEntry(moveDate);
+        entry.cleared = false;
+        if (moveSlot === "new") {
+          entry.extras.push({ move: label, note: "" });
+          saveDiaryEntry(moveDate, entry);
+          moveSlot = entry.extras.length - 1;
+          moveButton = appendExtra(moveDate, entry.extras[moveSlot], moveSlot);
+        } else if (moveSlot >= 0) {
+          if (!entry.extras[moveSlot]) entry.extras[moveSlot] = { move: "", note: "" };
+          entry.extras[moveSlot].move = label;
+          saveDiaryEntry(moveDate, entry);
+        } else {
+          entry.move = label;
+          saveDiaryEntry(moveDate, entry);
+        }
+        if (moveButton) {
+          moveButton.textContent = displayMove(label);
+          moveButton.setAttribute("aria-label", label);
+        }
+        finishMoveWheel(false);
+      }
+
+      function showMovePick(kind) {
+        var title = document.getElementById("move-title");
+        var names = { kraft: "Kraft", ausdauer: "Ausdauer", alternative: "Alternative Bewegung" };
+        if (title) title.textContent = names[kind] || "Bewegung";
+        document.getElementById("move-kinds").hidden = true;
+        var pick = document.getElementById("move-pick");
+        pick.textContent = "";
+        pick.hidden = false;
+        var options = kind === "kraft" ? kraftChoices() : (kind === "ausdauer" ? ausdauerChoices() : alternativeChoices());
+        options.forEach(function (opt) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = (activityEmoji({ kind: kind, label: opt.label, technique: opt.technique || "" }) + " " + opt.label).trim();
+          button.addEventListener("click", function () {
+            commitMoveLabel(opt.label);
+          });
+          pick.appendChild(button);
+        });
+        var back = document.createElement("button");
+        back.type = "button";
+        back.className = "sand-quiet";
+        back.textContent = "Zurück";
+        back.addEventListener("click", function () {
+          closeMoveModal();
+          document.getElementById("move-modal").hidden = false;
+        });
+        pick.appendChild(back);
+      }
+
       function openMoveWheel(iso, button, slot) {
-        var wheel = document.getElementById("move-wheel");
-        var col = document.getElementById("move-wheel-col");
         moveDate = iso;
         moveButton = button || null;
         moveSlot = slot == null ? -1 : slot;
         moveTouched = false;
-        col.textContent = "";
-        MOVES.forEach(function (label, index) {
-          var item = document.createElement("div");
-          item.className = "move-wheel-item";
-          item.dataset.index = String(index);
-          item.textContent = label;
-          col.appendChild(item);
-        });
-        var entry = diaryEntry(iso);
-        var currentLabel = "";
-        if (moveSlot === "new") currentLabel = "";
-        else if (moveSlot >= 0) currentLabel = (entry.extras[moveSlot] && entry.extras[moveSlot].move) || "";
-        else currentLabel = entry.move || diaryStatus(iso);
-        var current = MOVES.indexOf(currentLabel);
-        if (current < 0) current = 0;
-        wheel.hidden = false;
-        settleMove();
-        col.scrollTop = current * MOVE_ITEM;
-        highlightMove(current);
+        closeMoveModal();
+        document.getElementById("move-modal").hidden = false;
       }
 
       function finishMoveWheel(commit) {
         var wheel = document.getElementById("move-wheel");
-        if (!wheel || wheel.hidden) return;
-        if (commit !== false && moveTouched) applyMove(moveIndex());
-        wheel.hidden = true;
+        if (wheel && !wheel.hidden) {
+          if (commit !== false && moveTouched) applyMove(moveIndex());
+          wheel.hidden = true;
+        }
+        closeMoveModal();
         moveTouched = false;
         moveDate = "";
         moveButton = null;
@@ -3218,6 +3293,7 @@
         if (!input) return "🤸";
         if (input.kind === "zirkel") return "🔥";
         if (input.kind === "kraft") return "🏋️‍♀️";
+        if (input.kind === "alternative") return "🤸";
         if (input.kind === "ausdauer") return "🏃";
         return "🤸";
       }
@@ -3302,16 +3378,37 @@
         });
       }
 
+      function alternativeChoices() {
+        return [
+          "> 5.000 Schritte",
+          "> 10.000 Schritte",
+          "> 20.000 Schritte",
+          "Mannschaftssport",
+          "Radtour",
+          "Yoga / Pilates",
+          "Fitnesskurs",
+          "Tanzen"
+        ].map(function (label) {
+          return { label: label, systemId: "", presetId: "", technique: "" };
+        });
+      }
+
       function showWeekPick(kind) {
         if (!pendingDay) return;
         var title = document.getElementById("days-title");
-        var names = { zirkel: "Zirkeltraining", kraft: "Kraft", ausdauer: "Ausdauer" };
+        var names = { zirkel: "Zirkeltraining", kraft: "Kraft", ausdauer: "Ausdauer", alternative: "Alternative Bewegung" };
         title.textContent = (names[kind] || "Training") + " am " + DAY_NAMES[pendingDay] + ".";
         document.getElementById("days-kinds").hidden = true;
         var pick = document.getElementById("days-pick");
         pick.textContent = "";
         pick.hidden = false;
-        var options = kind === "kraft" ? kraftChoices() : (kind === "ausdauer" ? ausdauerChoices() : [{ label: "Zirkeltraining", systemId: "", presetId: "", technique: "" }]);
+        var options = kind === "kraft"
+          ? kraftChoices()
+          : (kind === "ausdauer"
+            ? ausdauerChoices()
+            : (kind === "alternative"
+              ? alternativeChoices()
+              : [{ label: "Zirkeltraining", systemId: "", presetId: "", technique: "" }]));
         if (kind === "kraft") {
           var wd = DAY_KEYS.indexOf(pendingDay);
           var taken = takenKraftIds(wd);
@@ -3358,16 +3455,19 @@
         kraftWeekdays = [];
         ausWeekdays = [];
         zirkelWeekday = null;
+        var altWeekdays = [];
         Object.keys(userUnits).forEach(function (key) {
           var wd = Number(key);
           var unit = userUnits[wd];
           if (!(wd >= 0 && wd <= 6) || !unit) return;
           if (unit.kind === "kraft" && kraftWeekdays.indexOf(wd) < 0) kraftWeekdays.push(wd);
           if (unit.kind === "ausdauer" && ausWeekdays.indexOf(wd) < 0) ausWeekdays.push(wd);
+          if (unit.kind === "alternative" && altWeekdays.indexOf(wd) < 0) altWeekdays.push(wd);
           if (unit.kind === "zirkel") zirkelWeekday = wd;
         });
         var merged = kraftWeekdays.slice();
         ausWeekdays.forEach(function (n) { if (merged.indexOf(n) < 0) merged.push(n); });
+        altWeekdays.forEach(function (n) { if (merged.indexOf(n) < 0) merged.push(n); });
         if (zirkelWeekday != null && merged.indexOf(zirkelWeekday) < 0) merged.push(zirkelWeekday);
         adminDayKeys = keysFromWeekdays(merged);
       }
@@ -3545,6 +3645,16 @@
         var choice = event.target.closest("[data-week-kind]");
         if (!choice) return;
         showWeekPick(choice.getAttribute("data-week-kind"));
+      });
+      document.getElementById("move-kinds").addEventListener("click", function (event) {
+        var choice = event.target.closest("[data-move-kind]");
+        if (!choice) return;
+        var kind = choice.getAttribute("data-move-kind");
+        if (kind === "zirkel") commitMoveLabel("Zirkeltraining");
+        else showMovePick(kind);
+      });
+      document.getElementById("move-modal").addEventListener("click", function (event) {
+        if (event.target.id === "move-modal") finishMoveWheel(false);
       });
       document.getElementById("days-clear").addEventListener("click", function () {
         if (!pendingDay) return;
@@ -3851,6 +3961,18 @@
             cue: "",
             note: "",
             group: "Ausdauer"
+          }];
+        }
+        if (unit.kind === "alternative") {
+          var altNamed = (activityEmoji(unit) + " " + (unit.label || "Alternative Bewegung")).trim();
+          return [{
+            id: "alt-" + (unit.label || "alternative"),
+            name: altNamed,
+            short: altNamed.slice(0, 18),
+            kind: "check",
+            cue: "",
+            note: "",
+            group: "Hauptteil"
           }];
         }
         if (unit.kind === "kraft") {

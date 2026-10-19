@@ -1183,6 +1183,7 @@
       letter-spacing: -0.02em;
       margin-bottom: 24px;
       opacity: 0.95;
+      white-space: pre-line;
     }
     .field {
       display: block; width: 100%; margin-bottom: 12px; padding: 14px;
@@ -1235,6 +1236,7 @@
       text-align: center;
       color: var(--ink-on-red);
     }
+    .qr-box[hidden] { display: none !important; }
     .qr-box #qr-mount {
       width: 220px; height: 220px; margin: 0 auto 14px;
       display: flex; align-items: center; justify-content: center;
@@ -1710,8 +1712,10 @@
       border-radius: 0;
       font-weight: 400;
     }
-    html.is-overview .admin-name,
-    html.is-overview .qr-box,
+    html.is-overview .admin-name {
+      color: #2A2118;
+      text-decoration: none;
+    }
     html.is-overview .qr-box a,
     html.is-overview .result-meta,
     html.is-overview .admin-plan__title,
@@ -1798,9 +1802,7 @@
         <button type="button" data-view="list" class="menu-list-label">Alle Nutzer</button>
         <button type="button" data-view="wa" class="menu-trainer-only">WhatsApp-Nummer</button>
         <button type="button" data-view="mantras" class="menu-admin-only">Mantras</button>
-        <button type="button" data-view="qr" class="menu-qr-hide">QR anzeigen</button>
         <a href="/go/">gogogo.social/go</a>
-        <a href="/invite/" class="menu-qr-hide">gogogo.social/invite</a>
       </nav>
     </div>
   </div>
@@ -1978,6 +1980,7 @@
       </div>
       <div id="admin-result-extras">
         <hr class="admin-rule" />
+        <h2 class="admin-plan__title">Community-Verlauf</h2>
         <div class="admin-chat" id="admin-chat">
           <div class="admin-feed" id="admin-feed" aria-live="polite"></div>
           <form class="admin-composer" id="admin-composer">
@@ -1999,7 +2002,7 @@
           <button class="btn" type="button" id="admin-user-ok">OK</button>
           <p class="admin-user-ok__hint">OK = gelesen → zurück zu Alle Nutzer (Punkt weg).</p>
         </div>
-        <hr class="admin-rule admin-cal-rule" />
+        <hr class="admin-rule admin-cal-rule" hidden />
         <section class="admin-cal" id="admin-cal" aria-label="Kalender" hidden>
           <h2 class="admin-plan__title">Kalender</h2>
           <p class="admin-kraft__hint">Vergangene Tage ohne Eintrag kannst Du nachtragen. Heute und Zukunft sind gesperrt.</p>
@@ -2033,26 +2036,30 @@
           <p class="msg" id="trainer-msg" role="status"></p>
         </section>
         <hr class="admin-rule" />
-        <section class="admin-plan" id="admin-plan" aria-label="Trainingsplan">
-          <h2 class="admin-plan__title">Trainingsplan</h2>
-          <p class="admin-plan__hint" id="admin-diary-vis" hidden></p>
-          <p class="admin-plan__hint" id="admin-week-lock" hidden></p>
+        <section class="admin-plan" id="admin-analyse" aria-label="User Analyse">
+          <h2 class="admin-plan__title">User Analyse</h2>
           <div class="admin-plan__block">
-            <label for="plan-blurb">Kurzer Satz zum Nutzer</label>
+            <label for="plan-blurb">Kurzbeschreibung</label>
             <textarea id="plan-blurb" rows="2" maxlength="280" placeholder="Kurzbeschreibung…"></textarea>
           </div>
           <div class="admin-plan__block">
             <label for="plan-life">Lebenssituation</label>
-            <textarea id="plan-life" rows="3" maxlength="600" placeholder="Beschreibung der Lebenssituation…"></textarea>
+            <textarea id="plan-life" rows="3" maxlength="600" placeholder="Lebenssituation…"></textarea>
           </div>
           <div class="admin-plan__block">
-            <label for="plan-goal">Ziel</label>
+            <label for="plan-goal">Ziel des Nutzers</label>
             <textarea id="plan-goal" rows="2" maxlength="400" placeholder="Ziel des Nutzers…"></textarea>
           </div>
           <div class="admin-plan__block">
-            <label for="plan-phase">Aktuelle Phase &amp; Schritte</label>
-            <textarea id="plan-phase" rows="3" maxlength="600" placeholder="Phase und zu erledigende Schritte…"></textarea>
+            <label for="plan-phase">Phase und Schritte</label>
+            <textarea id="plan-phase" rows="3" maxlength="600" placeholder="Phase und Schritte…"></textarea>
           </div>
+        </section>
+        <hr class="admin-rule" />
+        <section class="admin-plan" id="admin-plan" aria-label="Trainingsplan">
+          <h2 class="admin-plan__title">Trainingsplan</h2>
+          <p class="admin-plan__hint" id="admin-diary-vis" hidden></p>
+          <p class="admin-plan__hint" id="admin-week-lock" hidden></p>
           <div class="admin-plan__block" data-plan-day="0">
             <div class="admin-plan__dayhead">
               <label for="plan-mo">Montag</label>
@@ -3310,7 +3317,7 @@
         if (hint) {
           hint.hidden = !coachWeekLocked;
           hint.textContent = coachWeekLocked
-            ? "Der Nutzer hat die Woche selbst geplant. Zirkel, Kraft und Ausdauer sind fest und können nicht verschoben werden."
+            ? "Der Nutzer hat die Woche selbst geplant. Zirkel, Kraft, Ausdauer und Alternative Bewegung sind fest und können nicht verschoben werden."
             : "";
         }
       }
@@ -3502,7 +3509,6 @@
           var icon = window.GoChecklist && GoChecklist.activityEmoji ? GoChecklist.activityEmoji(u) : "";
           span.textContent = icon && u.label.indexOf(icon) !== 0 ? icon + " " + u.label : u.label;
         }
-        renderPlanAltOptions();
       }
 
       function clearDayTrainingUnit(wd) {
@@ -3699,20 +3705,6 @@
         document.querySelectorAll(".plan-ausdauer-check").forEach(function (box) {
           box.addEventListener("change", function () { onKindCheckChange(box, "ausdauer"); });
         });
-        var planRoot = document.getElementById("admin-plan");
-        if (planRoot) {
-          planRoot.addEventListener("click", function (ev) {
-            var btn = ev.target.closest(".plan-alt-opt");
-            if (!btn) return;
-            if (coachWeekLocked) return;
-            ev.preventDefault();
-            var wd = parseInt(btn.getAttribute("data-wd"), 10);
-            var kind = btn.getAttribute("data-alt-kind");
-            if (!(wd >= 0 && wd <= 6) || !kind) return;
-            setDayAlternative(wd, kind);
-          });
-        }
-        for (var wd = 0; wd <= 6; wd++) ensurePlanAltSection(wd);
       }
 
       function syncKindUiFromUnits() {
@@ -5543,9 +5535,9 @@
         if (wd == null) return { title: "—", meta: "" };
         var u = dayTrainingUnits[wd];
         if (u && u.label) {
-          var alt = u.alternative || defaultAdminAlternative();
-          var altTxt = (alt.emoji ? alt.emoji + " " : "") + (alt.label || "Spaziergang");
-          return { title: u.label, meta: "Alt: " + altTxt };
+          var icon = window.GoChecklist && GoChecklist.activityEmoji ? GoChecklist.activityEmoji(u) : "";
+          var title = icon && String(u.label).indexOf(icon) !== 0 ? icon + " " + u.label : u.label;
+          return { title: title, meta: "" };
         }
         var ta = PLAN_DAY_FIELD_IDS[wd] ? document.getElementById(PLAN_DAY_FIELD_IDS[wd]) : null;
         var txt = ta ? String(ta.value || "").trim() : "";
@@ -5893,44 +5885,36 @@
           setResultExtrasVisible(false);
         }
         var metaEl = document.getElementById("result-meta");
-        metaEl.hidden = !(serial || code);
-        metaEl.textContent = serial || code ? (serial + " · " + code) : "";
+        var metaLines = [];
+        if (serial) metaLines.push("ID " + serial);
+        if (code) metaLines.push("Code " + code);
+        metaEl.hidden = !metaLines.length;
+        metaEl.textContent = metaLines.join("\n");
         var link = document.getElementById("qr-link");
         var qrBox = document.getElementById("qr-box");
-        if (trainerAdminMode) {
-          if (link) {
-            link.removeAttribute("href");
-            link.textContent = "";
-            link.hidden = true;
-          }
-          if (qrBox) qrBox.hidden = true;
-          var qrMount = document.getElementById("qr-mount");
-          if (qrMount) qrMount.innerHTML = "";
-        } else {
-          if (qrBox) qrBox.hidden = false;
-          if (link) {
-            link.href = url;
-            link.textContent = url;
-            link.hidden = false;
-          }
-          renderQr(url);
+        if (link) {
+          link.removeAttribute("href");
+          link.textContent = "";
+          link.hidden = true;
         }
-        setCycleVisible(true);
-        setCycleBack(true);
+        if (qrBox) qrBox.hidden = true;
+        var qrMount = document.getElementById("qr-mount");
+        if (qrMount) qrMount.innerHTML = "";
+        setCycleVisible(false);
+        setCycleBack(false);
         setActorName(name || "");
         setCyclePhoto(null);
         updateAuthBtn();
         /* Gelesen erst mit OK — kein automatisches Löschen beim Öffnen. */
         activeAccount = await resolveAccount(name, serial, code);
-        if (activeAccount && activeAccount.photo_url) setCyclePhoto(activeAccount.photo_url);
-        if (activeAccount && activeAccount.training_date) setActorName(name || "", activeAccount.training_date);
+        setCyclePhoto(null);
+        setCycleVisible(false);
+        if (activeAccount) setActorName((activeAccount.name || name || ""));
         refreshTrainerUi();
+        hideAdminCalendar();
         if (!trainerAdminMode || activeAccount) {
           await renderMirroredFeed(activeAccount);
           await loadCoachPlan(activeAccount && activeAccount.id);
-          await loadAdminCalendar();
-        } else {
-          hideAdminCalendar();
         }
       }
 
@@ -7634,8 +7618,7 @@
             else if (view === "mantras") {
               if (trainerAdminMode) return;
               showMantras();
-            } else if (view === "wa") showWaPanel();
-            else if (view === "qr") showQrMenu();
+            }             else if (view === "wa") showWaPanel();
             else showGen();
           });
         });
