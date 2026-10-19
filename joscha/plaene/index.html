@@ -79,7 +79,7 @@
       <label>Name<input id="name" name="name" autocomplete="name" required /></label>
       <div class="grid">
         <label>Adresse<input id="slug" name="slug" autocapitalize="off" required /></label>
-        <label>Überschrift<input id="headline" name="headline" value="Krafttraining" required /></label>
+        <label>Überschrift<input id="headline" name="headline" value="Einfache Basics" required /></label>
       </div>
       <label>WhatsApp des Trainers<input id="wa" name="wa" inputmode="tel" value="491747015500" /></label>
       <p class="lead" id="link-preview"></p>
@@ -304,6 +304,12 @@
         });
       }
 
+      function unitHeadline(value) {
+        var text = String(value || "").trim();
+        if (!text || text === "Krafttraining") return "Einfache Basics";
+        return text;
+      }
+
       function openEditor(slug) {
         var person = null;
         people.forEach(function (item) { if (item.slug === slug) person = item; });
@@ -313,7 +319,7 @@
         document.getElementById("name").value = person ? person.name : "";
         document.getElementById("slug").value = person ? person.slug : "";
         document.getElementById("slug").readOnly = !!person;
-        document.getElementById("headline").value = person ? (person.headline || "Krafttraining") : template.headline;
+        document.getElementById("headline").value = unitHeadline(person ? person.headline : template.headline);
         document.getElementById("wa").value = person ? (person.trainer_wa || template.trainer_wa) : template.trainer_wa;
         exercises = person ? JSON.parse(JSON.stringify(person.exercises || [])) : cloneTemplate();
         document.getElementById("editor").hidden = false;
@@ -404,7 +410,7 @@
         event.preventDefault();
         var name = document.getElementById("name").value.trim();
         var slug = slugify(document.getElementById("slug").value);
-        var headline = document.getElementById("headline").value.trim() || "Krafttraining";
+        var headline = unitHeadline(document.getElementById("headline").value);
         var wa = document.getElementById("wa").value.replace(/\D/g, "") || "491747015500";
         var cleaned = cleanExercises();
         if (!name || !/^[a-z0-9-]{2,48}$/.test(slug)) {

@@ -3,7 +3,7 @@
   var DARK = "#F7F5F0";
   var PAGE = "#C7413B";
 
-  function renderGoQr(mount, url) {
+  function renderGoQr(mount, url, colors) {
     if (!mount) return;
     mount.innerHTML = "";
     url = url || LANDING;
@@ -15,8 +15,8 @@
       text: url,
       width: 220,
       height: 220,
-      colorDark: DARK,
-      colorLight: PAGE,
+      colorDark: (colors && colors.dark) || DARK,
+      colorLight: (colors && colors.light) || PAGE,
       correctLevel: QRCode.CorrectLevel.M
     });
   }

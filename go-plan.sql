@@ -5,7 +5,7 @@
 create table if not exists go_plan_templates (
   slug text primary key,
   title text not null,
-  headline text not null default 'Krafttraining',
+  headline text not null default 'Einfache Basics',
   exercises jsonb not null default '[]'::jsonb,
   updated_at timestamptz not null default now()
 );
@@ -13,7 +13,7 @@ create table if not exists go_plan_templates (
 create table if not exists go_plan_athletes (
   slug text primary key,
   name text not null,
-  headline text not null default 'Krafttraining',
+  headline text not null default 'Einfache Basics',
   trainer_wa text not null default '491747015500',
   template_slug text,
   exercises jsonb not null default '[]'::jsonb,

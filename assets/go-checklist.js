@@ -205,7 +205,7 @@
 
   function catalogSystem() {
     return {
-      system: { id: "krafttraining", name: "Krafttraining" },
+      system: { id: "krafttraining", name: "Einfache Basics" },
       exercises: BASE.map(function (ex) {
         return { id: ex.id, name: ex.name };
       }),

@@ -2,8 +2,8 @@
 (function (root) {
   var TEMPLATE = {
     slug: "natalya",
-    title: "Krafttraining",
-    headline: "Krafttraining",
+    title: "Einfache Basics",
+    headline: "Einfache Basics",
     trainer_wa: "491747015500",
     exercises: [
     {

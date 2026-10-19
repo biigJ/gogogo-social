@@ -1077,7 +1077,7 @@
       <button type="button" id="back-welcome" class="home-btn" aria-label="Zur Übersicht">
         <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.2 12 4l8 7.2V20a1 1 0 0 1-1 1h-5.2v-6.2H10.2V21H5a1 1 0 0 1-1-1v-8.8Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
       </button>
-      <h1>Krafttraining</h1>
+      <h1>Einfache Basics</h1>
     </div>
     <div id="short-banner" class="short-banner" hidden>
       <p id="short-banner-text">Kurzfassung. Nach 5 Übungen kannst du beenden.</p>
@@ -1187,7 +1187,8 @@
       var PLAN_SLUG = athlete.slug;
       var PLAN_NAME = athlete.name || "Du";
       var PLAN_WA = String(athlete.trainer_wa || "491747015500").replace(/\D/g, "") || "491747015500";
-      var PLAN_HEADLINE = athlete.headline || "Krafttraining";
+      var PLAN_HEADLINE = athlete.headline || "Einfache Basics";
+      if (PLAN_HEADLINE === "Krafttraining") PLAN_HEADLINE = "Einfache Basics";
       document.title = "gogogo · " + PLAN_NAME;
       var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
       if (appleTitle) appleTitle.setAttribute("content", PLAN_NAME);
@@ -2451,18 +2452,25 @@
         return map;
       }
 
+      function renameMove(label) {
+        var text = String(label || "");
+        if (text === "Krafttraining") return PLAN_HEADLINE;
+        if (text === "Krafttraining kurz") return PLAN_HEADLINE + " kurz";
+        return text;
+      }
+
       function diaryEntry(iso) {
         var row = diaryMap()[iso];
         if (!row || typeof row !== "object") return { note: "", move: "", extras: [], cleared: false };
         var extras = Array.isArray(row.extras) ? row.extras.map(function (extra) {
           return {
-            move: String((extra && extra.move) || ""),
+            move: renameMove((extra && extra.move) || ""),
             note: String((extra && extra.note) || "").slice(0, 200)
           };
         }) : [];
         return {
           note: String(row.note || "").slice(0, 200),
-          move: String(row.move || ""),
+          move: renameMove(row.move || ""),
           extras: extras,
           cleared: !!row.cleared
         };
