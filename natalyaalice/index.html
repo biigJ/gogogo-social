@@ -1279,7 +1279,32 @@
     }
     .team-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .team-avatar.is-plus { background: transparent; border: 1px solid #2A2118; font-size: 28px; font-weight: 400; }
-    .team-name { font-size: 16px; font-weight: 600; line-height: 1.3; }
+    .team-main {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex: 1;
+      min-width: 0;
+      min-height: 52px;
+      padding: 0;
+      color: inherit;
+      text-align: left;
+    }
+    .team-name { flex: 1; min-width: 0; font-size: 16px; font-weight: 600; line-height: 1.3; }
+    .team-pencil {
+      flex: none;
+      width: 31px;
+      height: 31px;
+      margin-left: auto;
+      border: 1px solid #2A2118;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      color: #2A2118;
+      background: transparent;
+    }
+    .team-pencil svg { width: 16px; height: 16px; display: block; }
     .team-msg { margin-top: 8px; min-height: 1.2em; color: #C7413B; }
     .orte-search, .invite-place, .team-id {
       width: 100%;
@@ -1292,8 +1317,9 @@
       font: inherit;
       font-size: 16px;
     }
-    .orte-map { width: 100%; height: 260px; margin-top: 12px; border: 1px solid #2A2118; }
-    .orte-list { margin-top: 10px; }
+    .orte-map { width: 100%; height: 260px; margin-top: 12px; border: 1px solid #2A2118; pointer-events: none; }
+    .orte-map .leaflet-container { touch-action: pan-y; }
+    .orte-list { margin-top: 10px; overflow: visible; }
     .orte-list button, .invite-person {
       display: block;
       width: 100%;
@@ -1383,6 +1409,13 @@
     }
     .heute-mantra {
       margin: 18px 8px 0;
+      height: 2.7em;
+      min-height: 2.7em;
+      max-height: 2.7em;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
       text-align: center;
       font-family: "Playfair Display", serif;
       font-size: 16px;
@@ -1497,6 +1530,7 @@
       resize: none;
       overflow: hidden;
     }
+    .profile-about { height: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
     .profile-about:focus, .profile-mantra:focus { outline: none; }
     .profile-sheet.is-editing .profile-goal,
     .profile-sheet.is-editing .profile-about,
@@ -1507,7 +1541,8 @@
     }
     .profile-sheet.is-editing .profile-goal { cursor: pointer; }
     .profile-pencil[hidden] { display: none; }
-    .profile-mantra-list { margin-top: 8px; }
+    .profile-trainer-list, .profile-mantra-list { margin-top: 8px; }
+    .profile-trainer-list button,
     .profile-mantra-list button {
       display: block;
       width: 100%;
@@ -1523,6 +1558,7 @@
       line-height: 1.35;
       text-align: left;
     }
+    .profile-trainer-list button.is-on { font-weight: 700; }
     .profile-photos-label { margin-top: 22px; }
     #profile-places-block[hidden],
     #profile-photos-label[hidden] { display: none; }
@@ -2216,7 +2252,7 @@
     </div>
     <div class="heute-head shell-heute">
       <button type="button" id="heute-wa" class="heute-wa" aria-label="Sofortnachricht an Trainer">
-        <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12.04 2C6.58 2 2.15 6.4 2.15 11.83c0 1.74.46 3.38 1.26 4.81L2 22l5.5-1.44a10 10 0 0 0 4.54 1.1h.01c5.46 0 9.89-4.4 9.89-9.83C21.94 6.4 17.5 2 12.04 2zm5.78 13.95c-.24.68-1.4 1.3-1.94 1.38-.5.08-1.12.11-1.81-.11-.41-.14-.95-.31-1.64-.61-2.88-1.24-4.76-4.14-4.9-4.33-.14-.19-1.16-1.54-1.16-2.94s.73-2.08 1-2.37c.24-.27.64-.4 1.02-.4h.37c.12 0 .28-.04.44.34.16.4.56 1.38.61 1.48.05.1.08.22.02.36-.06.14-.1.22-.19.34-.1.12-.2.26-.29.35-.1.1-.2.2-.08.39.11.19.5.82 1.07 1.33.74.66 1.36.86 1.55.96.19.1.3.08.41-.05.11-.13.48-.56.61-.75.13-.19.26-.16.44-.1.18.07 1.14.54 1.34.64.19.1.32.14.37.22.05.08.05.72-.19 1.4z"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M6 6.5h12a2 2 0 0 1 2 2v6.2a2 2 0 0 1-2 2H10l-3.6 2.6V16.7H6a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2Z"/></svg>
       </button>
       <h1 class="welcome-title"><span class="welcome-name">gogogo Natalya</span><span class="welcome-bang">!</span></h1>
       <button type="button" id="heute-menu" class="heute-burger" aria-label="Menü" aria-haspopup="dialog">
@@ -2505,6 +2541,10 @@
       <p class="profile-label">Über mich</p>
       <textarea class="profile-about" id="profile-about" maxlength="300" placeholder="Über mich" readonly></textarea>
     </div>
+    <div class="profile-block" id="profile-trainer-block" hidden>
+      <p class="profile-label">Trainer</p>
+      <div class="profile-trainer-list" id="profile-trainer-list"></div>
+    </div>
     <div class="profile-block" id="profile-places-block" hidden>
       <p class="profile-label">Orte</p>
       <div id="profile-places"></div>
@@ -2642,6 +2682,13 @@
       }
       var shellTab = "heute";
       var planPane = "kalender";
+      var sessionIsTrainer = !!(sessionAccount && sessionAccount.is_trainer);
+      try {
+        if (sessionMode && new URLSearchParams(location.search).get("plan") === "team") {
+          shellTab = "plan";
+          planPane = "team";
+        }
+      } catch (ePlan) {}
       var teamPeople = [];
       var remoteInvites = [];
       var mantraList = [];
@@ -2655,8 +2702,8 @@
       var leafletMarker = null;
       if (sessionMode) {
         document.body.classList.add("is-session");
-        document.body.dataset.shell = "heute";
-        document.body.dataset.plan = "kalender";
+        document.body.dataset.shell = shellTab;
+        document.body.dataset.plan = planPane;
       }
       var NATALYA_SERIAL = "24011901";
       function isLinkedNatalya(acc) {
@@ -6152,15 +6199,18 @@
           id: sessionAccount && sessionAccount.id,
           name: personName(),
           photo_url: sessionAccount && sessionAccount.photo_url || "",
+          trainer_id: sessionAccount && sessionAccount.trainer_id || "",
           isSelf: true
         };
         var today = Log.berlinToday();
         [me].concat(teamPeople).forEach(function (person) {
           var away = personAway(person, today);
-          var row = document.createElement("button");
-          row.type = "button";
+          var row = document.createElement("div");
           row.className = "team-row" + (away ? " is-away" : "");
-          row.appendChild(personFace(person));
+          var main = document.createElement("button");
+          main.type = "button";
+          main.className = "team-main";
+          main.appendChild(personFace(person));
           var name = document.createElement("span");
           name.className = "team-name";
           name.textContent = person.isSelf ? "Ich" : (person.name + (person.isTrainerPerson ? " (Trainer)" : ""));
@@ -6171,8 +6221,22 @@
             name.appendChild(document.createTextNode(" "));
             name.appendChild(tag);
           }
-          row.appendChild(name);
-          row.addEventListener("click", function () { openProfile(person); });
+          main.appendChild(name);
+          main.addEventListener("click", function () { openProfile(person); });
+          row.appendChild(main);
+          var mineId = sessionAccount && String(sessionAccount.id);
+          if (sessionIsTrainer && !person.isSelf && person.trainer_id && String(person.trainer_id) === mineId) {
+            var pencil = document.createElement("button");
+            pencil.type = "button";
+            pencil.className = "team-pencil";
+            pencil.setAttribute("aria-label", "Admin für " + (person.name || "Nutzer"));
+            pencil.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg>';
+            pencil.addEventListener("click", function (event) {
+              event.stopPropagation();
+              openTrainerAdmin(person);
+            });
+            row.appendChild(pencil);
+          }
           box.appendChild(row);
         });
         var add = document.createElement("button");
@@ -6191,6 +6255,12 @@
         box.appendChild(add);
       }
 
+      function openTrainerAdmin(person) {
+        if (!sessionIsTrainer || !person || !person.id) return;
+        if (String(person.trainer_id || "") !== String(sessionAccount.id)) return;
+        location.href = "/go/admin/?trainer=1&user=" + encodeURIComponent(person.id) + "&back=team";
+      }
+
       function loadTeam() {
         if (!sessionMode || !sessionAccount) return Promise.resolve();
         var id = sessionAccount.id;
@@ -6198,7 +6268,17 @@
           .catch(function () { return []; })
           .then(function (rows) {
             var me = rows && rows[0];
+            if (me) {
+              if (me.trainer_id) sessionAccount.trainer_id = me.trainer_id;
+              sessionAccount.is_trainer = !!me.is_trainer;
+              sessionIsTrainer = !!me.is_trainer;
+              if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+            }
             var trainerId = (me && me.trainer_id) || sessionAccount.trainer_id || "";
+            var clientQuery = sessionIsTrainer
+              ? rest("go_accounts?trainer_id=eq." + encodeURIComponent(id) + "&select=id,name,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id")
+                .catch(function () { return []; })
+              : Promise.resolve([]);
             return rest("go_buddies?account_id=eq." + encodeURIComponent(id) + "&select=buddy_id")
               .catch(function () { return []; })
               .then(function (links) {
@@ -6211,16 +6291,19 @@
                   ids.push(bid);
                 });
                 if (trainerId && !seenBuddy[String(trainerId)] && String(trainerId) !== String(id)) ids.push(String(trainerId));
-                if (!ids.length) return { people: [], trainerId: trainerId };
-                return rest("go_accounts?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=id,name,photo_url,serial_number,is_trainer,about_me,diary_visibility")
-                  .catch(function () { return []; })
-                  .then(function (accs) { return { people: accs || [], trainerId: trainerId }; });
+                var peopleQuery = ids.length
+                  ? rest("go_accounts?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=id,name,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id")
+                    .catch(function () { return []; })
+                  : Promise.resolve([]);
+                return Promise.all([peopleQuery, clientQuery]).then(function (pack) {
+                  return { people: pack[0] || [], clients: pack[1] || [], trainerId: trainerId };
+                });
               });
           })
           .then(function (pack) {
             var peopleSeen = {};
             teamPeople = [];
-            (pack.people || []).forEach(function (person) {
+            (pack.people || []).concat(pack.clients || []).forEach(function (person) {
               if (!person || !person.id) return;
               var pid = String(person.id);
               if ((sessionAccount && pid === String(sessionAccount.id)) || peopleSeen[pid]) return;
@@ -6391,7 +6474,15 @@
             leafletMap.invalidateSize();
             return;
           }
-          leafletMap = window.L.map("orte-map").setView([52.52, 13.405], 11);
+          leafletMap = window.L.map("orte-map", {
+            scrollWheelZoom: false,
+            dragging: false,
+            touchZoom: false,
+            doubleClickZoom: false,
+            boxZoom: false,
+            keyboard: false
+          }).setView([52.52, 13.405], 11);
+          if (leafletMap.tap) leafletMap.tap.disable();
           window.L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
             maxZoom: 19,
             attribution: "&copy; OpenStreetMap"
@@ -7724,6 +7815,48 @@
         var mantra = document.getElementById("profile-mantra");
         if (about) about.readOnly = !on;
         if (mantra) mantra.readOnly = !on;
+        fitProfileAbout();
+      }
+
+      function fitProfileAbout() {
+        var about = document.getElementById("profile-about");
+        if (!about) return;
+        about.style.height = "auto";
+        about.style.height = Math.max(about.scrollHeight, 24) + "px";
+      }
+
+      function paintTrainerChoices(list) {
+        var block = document.getElementById("profile-trainer-block");
+        var box = document.getElementById("profile-trainer-list");
+        if (!block || !box) return;
+        var mine = !!(profilePerson && profilePerson.isSelf);
+        block.hidden = !mine;
+        if (!mine) return;
+        box.textContent = "";
+        var current = String((sessionAccount && sessionAccount.trainer_id) || "");
+        var shown = 0;
+        (list || []).forEach(function (trainer) {
+          if (!trainer || !trainer.id || !trainer.is_trainer) return;
+          if (sessionAccount && String(trainer.id) === String(sessionAccount.id)) return;
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = trainer.name || "Trainer";
+          if (String(trainer.id) === current) button.classList.add("is-on");
+          button.addEventListener("click", function () {
+            sessionAccount.trainer_id = trainer.id;
+            saveProfileFields({ trainer_id: trainer.id });
+            paintTrainerChoices(list);
+            loadTeam();
+          });
+          box.appendChild(button);
+          shown += 1;
+        });
+        if (!shown) {
+          var empty = document.createElement("p");
+          empty.className = "profile-place";
+          empty.textContent = "Noch kein Trainer.";
+          box.appendChild(empty);
+        }
       }
 
       function fillProfile(account, plan, photos, mine) {
@@ -7733,8 +7866,9 @@
         setProfileEditing(false);
         var about = profileAbout(account);
         var aboutBox = document.getElementById("profile-about");
-        aboutBox.value = about.text || "";
+        aboutBox.value = String(about.text || "").slice(0, 300);
         aboutBox.readOnly = true;
+        fitProfileAbout();
         var placesBlock = document.getElementById("profile-places-block");
         var places = document.getElementById("profile-places");
         places.textContent = "";
@@ -7824,6 +7958,13 @@
             (pack[2] || []).forEach(pushPost);
           }
           fillProfile(account, pack[1] && pack[1][0], photos, mine);
+          if (mine) {
+            rest("go_accounts?is_trainer=eq.true&select=id,name,photo_url,is_trainer&order=name.asc&limit=40")
+              .catch(function () { return []; })
+              .then(function (rows) { paintTrainerChoices(rows || []); });
+          } else {
+            paintTrainerChoices([]);
+          }
         });
       }
 
@@ -7902,12 +8043,17 @@
       document.getElementById("goal-modal").addEventListener("click", function (event) {
         if (event.target.id === "goal-modal") event.currentTarget.hidden = true;
       });
+      document.getElementById("profile-about").addEventListener("input", function () {
+        if (this.value.length > 300) this.value = this.value.slice(0, 300);
+        fitProfileAbout();
+      });
       document.getElementById("profile-about").addEventListener("change", function () {
         if (!profilePerson || !profilePerson.isSelf) return;
         if (!document.getElementById("profile-sheet").classList.contains("is-editing")) return;
         var about = profileAbout(sessionAccount);
         about.text = String(this.value || "").slice(0, 300);
         saveProfileFields({ about_me: about });
+        fitProfileAbout();
       });
       document.getElementById("profile-mantra").addEventListener("input", function () {
         this.dataset.listed = "";
@@ -8137,6 +8283,7 @@
       }
       paintVisibility();
       paintWelcome();
+      if (sessionMode && shellTab === "plan" && planPane === "team") showPlan("team");
       if (!sessionMode) loadRoutine();
       (sessionMode ? loadSessionPlan() : loadSharedPlan()).then(function () {
         load();

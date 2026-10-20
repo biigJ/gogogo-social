@@ -1594,6 +1594,9 @@
     body.is-trainer-mode .site-header__brand::after {
       content: none;
     }
+    #trainer-back[hidden] { display: none; }
+    #trainer-back svg { width: 18px; height: 18px; display: block; }
+    body.is-trainer-return #btn-menu { display: none; }
     body.is-trainer-mode .menu-admin-only { display: none !important; }
     body.is-trainer-mode .menu-trainer-only { display: block; }
     body.is-trainer-mode .menu-qr-hide,
@@ -1784,6 +1787,9 @@
   <div class="site-top">
     <header class="site-header">
       <div class="site-header__left">
+        <button class="icon-btn" id="trainer-back" type="button" hidden aria-label="Zurück zum Team">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
         <button class="icon-btn" id="btn-menu" type="button" aria-label="Menü" aria-expanded="false">
           <span class="icon-btn__burger"><i></i></span>
         </button>
@@ -4218,6 +4224,16 @@
         trainerSessionAccount = acc;
         trainerAdminMode = true;
         document.body.classList.add("is-trainer-mode");
+        if (params.get("back") === "team") {
+          document.body.classList.add("is-trainer-return");
+          var backBtn = document.getElementById("trainer-back");
+          if (backBtn) {
+            backBtn.hidden = false;
+            backBtn.addEventListener("click", function () {
+              window.location.href = "/workout/?plan=team";
+            });
+          }
+        }
         var brand = document.querySelector(".site-header__brand");
         if (brand) brand.textContent = "Trainer";
         var listBtn = document.querySelector(".menu-list-label");
@@ -7673,9 +7689,47 @@
         if (!document.getElementById("gen-code").value) fillCode();
       }
 
+      async function openFocusedTrainerUser(id) {
+        if (!trainerAdminMode || !trainerSessionAccount || !id) {
+          showList();
+          return;
+        }
+        try {
+          var res = await fetch(
+            SUPABASE_URL + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(id) +
+            "&select=id,name,serial_number,invite_code,trainer_id&limit=1",
+            { headers: apiHeaders() }
+          );
+          var rows = res.ok ? await res.json() : [];
+          var acc = rows && rows[0];
+          if (!acc || String(acc.trainer_id || "") !== String(trainerSessionAccount.id)) {
+            showList();
+            return;
+          }
+          await showResult(acc.name || "", acc.serial_number || "", acc.invite_code || "", {
+            id: null,
+            first_name: acc.name || "",
+            serial_number: acc.serial_number || "",
+            code: acc.invite_code || "",
+            accountId: acc.id
+          });
+          if (!activeAccount) {
+            activeAccount = acc;
+            activeAccountIds = [acc.id];
+            await loadCoachPlan(acc.id);
+          }
+        } catch (eFocus) {
+          showList();
+        }
+      }
+
       try {
-        if (initTrainerAdminMode() || isAuthed()) showList();
-        else showLogin();
+        if (initTrainerAdminMode() || isAuthed()) {
+          var focusUser = "";
+          try { focusUser = new URLSearchParams(location.search).get("user") || ""; } catch (eFocusUser) {}
+          if (trainerAdminMode && focusUser) openFocusedTrainerUser(focusUser);
+          else showList();
+        } else showLogin();
       } catch (e) { showLogin(); }
       updateAuthBtn();
 
