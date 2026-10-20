@@ -519,7 +519,7 @@
       min-height: 44px;
       padding: 8px 10px;
     }
-    .plan-week.is-on { background: #2A2118; color: #F6F1E8; }
+    .plan-week.is-on { background: #C7413B; color: #F6F1E8; }
     .plan-week[hidden] { display: none; }
     .days { margin-top: 14px; }
     .day {
@@ -1090,8 +1090,8 @@
       html, body { overflow: hidden; touch-action: none; }
     }
     body.is-session:not([data-shell="workout"]) {
-      height: 100svh;
-      height: 100dvh;
+      height: var(--screen-h, 100dvh);
+      max-height: var(--screen-h, 100dvh);
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -1099,9 +1099,13 @@
     body.is-session:not([data-shell="workout"]) .welcome,
     body.is-session:not([data-shell="workout"]) .diary {
       flex: 1 1 auto;
+      align-self: center;
       min-height: 0;
+      min-width: 0;
       overflow: auto;
+      overflow-x: hidden;
       width: min(100%, 440px);
+      max-width: 440px;
     }
     body.is-session .welcome,
     body.is-session .diary { padding-bottom: 24px; }
@@ -1114,7 +1118,7 @@
     body.is-session[data-shell="workout"] .welcome { display: none !important; }
     body.is-session[data-shell="heute"] .welcome,
     body.is-session[data-shell="plan"] .welcome { display: flex; flex-direction: column; }
-    body.is-session[data-shell="heute"] .welcome-title { order: 1; }
+    body.is-session[data-shell="heute"] .heute-head { order: 1; }
     body.is-session[data-shell="heute"] .photo { order: 2; }
     body.is-session[data-shell="heute"] .dock { order: 3; margin-top: 16px; }
     body.is-session[data-shell="heute"] .dock .go-row { display: none; }
@@ -1228,7 +1232,28 @@
       color: #2A2118;
       font-size: 13px;
     }
-    .training-more img { width: 100%; height: auto; margin-top: 12px; }
+    #plan-training, .training-copy, .training-more, .video-block, .tile {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+    .training-more img,
+    .training-more video,
+    .video-block__media,
+    .video-block__media img,
+    .video-block__media video,
+    .about-card__photo {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+    }
+    .video-block__media {
+      overflow: hidden;
+      margin-top: 12px;
+    }
+    .video-block__media video,
+    .video-block__media img { object-fit: cover; }
     .training-more ul { margin: 8px 0 0; padding-left: 1.2em; }
     .training-more li { margin-top: 6px; font-size: 14px; line-height: 1.4; }
     .training-more details { margin-top: 8px; }
@@ -1250,54 +1275,71 @@
       font-size: 14px;
       line-height: 1.2;
     }
-    .day-invite__face, .day-invite__ph {
-      width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: #E4DDD0;
-      display: grid; place-items: center; font-size: 13px; font-weight: 600; flex: none;
+    .day-place {
+      margin: 6px 2px 0;
+      font-size: 13px;
+      line-height: 1.3;
+      color: #2A2118;
     }
-    .day-invite__plus {
+    .day-invite__face, .day-invite__ph, .day-invite__plus {
       width: 44px;
       height: 44px;
       border-radius: 50%;
+      flex: none;
+    }
+    .day-invite__face, .day-invite__ph {
+      object-fit: cover;
+      background: #E4DDD0;
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .day-invite__plus {
       border: 1px solid #2A2118;
       background: transparent;
       color: #2A2118;
-      font-size: 28px;
-      font-weight: 400;
-      line-height: 1;
+      padding: 0;
       display: grid;
       place-items: center;
     }
+    .day-invite__plus svg { width: 22px; height: 22px; display: block; }
     .app-pill {
       display: none;
-      position: fixed;
-      left: 0; right: 0; bottom: 0;
-      z-index: 50;
-      justify-content: center;
-      padding: 0 16px env(safe-area-inset-bottom);
-      pointer-events: none;
-    }
-    body.is-session:not([data-shell="workout"]) .app-pill {
-      display: flex;
       position: relative;
       left: auto;
       right: auto;
       bottom: auto;
+      z-index: 50;
       flex: none;
       width: 100%;
-      z-index: 50;
+      justify-content: center;
+      align-items: flex-end;
+      padding: 0 16px 0;
+      margin: 0;
+      pointer-events: none;
     }
+    body.is-session:not([data-shell="workout"]) .app-pill { display: flex; }
     .app-pill nav {
       pointer-events: auto;
-      width: min(100% - 0px, 390px);
+      width: min(100%, 390px);
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       align-items: center;
       height: 68px;
       padding: 0 6px;
+      margin: 0;
       background: #ececeb;
       color: rgba(52, 34, 32, 0.9);
       border-radius: 999px;
       box-shadow: 0 8px 24px rgba(52, 34, 32, 0.18);
+      transform: scale(1);
+      transform-origin: center bottom;
+      transition: transform 180ms ease;
+    }
+    .app-pill nav.is-compact { transform: scale(0.9); }
+    @media (prefers-reduced-motion: reduce) {
+      .app-pill nav { transition: none; }
     }
     .app-pill button {
       display: flex;
@@ -1307,9 +1349,11 @@
       gap: 2px;
       height: 100%;
       color: inherit;
-      opacity: 0.55;
     }
-    .app-pill button.is-on { opacity: 1; }
+    .app-pill button svg,
+    .app-pill button small { opacity: 0.55; }
+    .app-pill button.is-on svg,
+    .app-pill button.is-on small { opacity: 1; }
     .app-pill svg { width: 26px; height: 26px; display: block; }
     .app-pill small { font-size: 9px; line-height: 1; letter-spacing: 0.01em; }
     .pill-ico { position: relative; display: block; width: 26px; height: 26px; }
@@ -1317,11 +1361,58 @@
       position: absolute;
       top: -3px;
       right: -7px;
-      width: 8px;
-      height: 8px;
+      width: 9px;
+      height: 9px;
       border-radius: 50%;
-      background: #2A2118;
+      background: #120c08;
+      opacity: 1;
       pointer-events: none;
+    }
+    .heute-head { position: relative; }
+    .heute-burger {
+      display: none;
+      position: absolute;
+      right: 0;
+      top: 50%;
+      width: 44px;
+      height: 44px;
+      transform: translateY(-50%);
+      place-items: center;
+      align-content: center;
+      gap: 5px;
+      color: #2A2118;
+    }
+    body.is-session[data-shell="heute"] .heute-burger { display: grid; }
+    .heute-burger span {
+      display: block;
+      width: 18px;
+      height: 1.6px;
+      background: currentColor;
+    }
+    .heute-menu a, .heute-menu button {
+      display: block;
+      width: 100%;
+      margin-top: 8px;
+      min-height: 44px;
+      padding: 8px 10px;
+      border: 1px solid rgba(42, 33, 24, 0.28);
+      border-radius: 12px;
+      background: transparent;
+      color: #2A2118;
+      text-align: center;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    #account-edit .sand-card input {
+      width: 100%;
+      min-height: 46px;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border: 1px solid #2A2118;
+      background: transparent;
+      color: #2A2118;
+      font: inherit;
+      font-size: 16px;
     }
     .pill-dot[hidden] { display: none; }
     .home-btn.is-back {
@@ -1682,7 +1773,12 @@
         </article>
       </div>
     </div>
-    <h1 class="welcome-title shell-heute">gogogo Natalya!</h1>
+    <div class="heute-head shell-heute">
+      <h1 class="welcome-title">gogogo Natalya!</h1>
+      <button type="button" id="heute-menu" class="heute-burger" aria-label="Menü" aria-haspopup="dialog">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
     <div class="photo shell-heute" id="photo" role="button" tabindex="0">
       <input id="photo-file" type="file" accept="image/*" />
       <p id="photo-copy">Lade Dein Motivationsbild hoch. Dich selbst, ein Vorbild, ein Ort. Egal, was Deine eigene Motivation ausmacht.</p>
@@ -1853,9 +1949,10 @@
   <div class="sand-modal" id="moved-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="moved-title">
       <h2 class="ask" id="moved-title"></h2>
-      <button type="button" id="moved-ok">fertig</button>
-      <p class="ask" id="moved-after" hidden>Schreib was und mach ein Foto für das Tagebuch.</p>
-      <button type="button" id="moved-diary" hidden>zum Tagebuch</button>
+      <button type="button" id="moved-ok">festhalten</button>
+      <p class="ask" id="moved-after" hidden>Schreib was und mach ein Foto für das Tagebuch</p>
+      <button type="button" id="moved-wa" hidden>Trainer auf WhatsApp</button>
+      <button type="button" class="sand-quiet" id="moved-diary" hidden>ohne Foto weiter</button>
     </div>
   </div>
   <div class="sand-modal" id="team-modal" hidden>
@@ -1864,6 +1961,26 @@
       <input class="team-id" id="team-id" inputmode="numeric" maxlength="8" placeholder="ID" aria-label="ID" />
       <button type="button" id="team-search">Suchen</button>
       <p class="team-msg" id="team-msg"></p>
+    </div>
+  </div>
+  <div class="sand-modal" id="heute-menu-modal" hidden>
+    <div class="sand-card heute-menu" role="dialog" aria-modal="true" aria-label="Menü">
+      <button type="button" data-menu="name">Vorname</button>
+      <button type="button" data-menu="phone">Telefon</button>
+      <button type="button" data-menu="code">Code ändern</button>
+      <a href="/?landing=1">Website</a>
+      <a href="/impressum/">Impressum</a>
+      <a href="/datenschutz/">Datenschutz</a>
+      <a href="/kontakt/">Kontakt</a>
+    </div>
+  </div>
+  <div class="sand-modal" id="account-edit" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="account-edit-title">
+      <h2 class="ask" id="account-edit-title">Code ändern</h2>
+      <input id="account-edit-input" type="text" autocomplete="off" />
+      <p class="team-msg" id="account-edit-msg"></p>
+      <button type="button" id="account-edit-save">Speichern</button>
+      <button type="button" class="sand-quiet" id="account-edit-cancel">Abbrechen</button>
     </div>
   </div>
   <div class="sand-modal" id="invite-modal" hidden>
@@ -3121,7 +3238,7 @@
         box.textContent = "";
         document.querySelector(".tip").textContent = sessionMode
           ? (planningWeek
-            ? "Wochentag wählen. Danach Zirkeltraining, Kraft, Ausdauer oder Alternative Bewegung."
+            ? "Tipp auf den Wochentag und wähle eine Kategorie."
             : (userOwned
               ? "Deine Woche ist geplant. Der Trainer kann die Tage nicht mehr verschieben."
               : (adminDayKeys && adminDayKeys.length
@@ -3178,7 +3295,16 @@
           var block = document.createElement("div");
           block.className = "day-block";
           block.appendChild(button);
-          if (sessionMode) block.appendChild(dayInviteEl(iso));
+          if (sessionMode) {
+            var placeName = trainingPlaceName();
+            if (placeName) {
+              var place = document.createElement("p");
+              place.className = "day-place";
+              place.textContent = placeName;
+              block.appendChild(place);
+            }
+            block.appendChild(dayInviteEl(iso));
+          }
           box.appendChild(block);
         }
         var start = routineStart();
@@ -3207,18 +3333,20 @@
           var todayWd = weekdayIndex(todayIso);
           var todayUnit = displayUnit(todayWd);
           todayKind = todayUnit && todayUnit.kind ? todayUnit.kind : "";
-          todayBtn.textContent = todayKind === "alternative"
-            ? "Ich hab mich bewegt"
-            : (todayKind === "zirkel"
-              ? "Zirkeltraining gemacht"
-              : (todayKind === "ausdauer" ? "Mein Ausdauertraining" : "Heutiges Workout"));
+          todayBtn.textContent = todayKind === "spontan"
+            ? "Beweg Dich & schreib's auf"
+            : (todayKind === "alternative"
+              ? "Ich hab mich bewegt"
+              : (todayKind === "zirkel"
+                ? "Zirkeltraining gemacht"
+                : (todayKind === "ausdauer" ? "Mein Ausdauertraining" : "Heutiges Workout")));
           todayBtn.dataset.kind = todayKind;
           todayBtn.dataset.unitLabel = todayUnit && todayUnit.label ? todayUnit.label : "";
         } else {
           todayBtn.textContent = "Heutiges Workout";
           todayBtn.dataset.kind = "";
         }
-        todayBtn.disabled = picking || shifted || !todayPlanned;
+        todayBtn.disabled = picking || shifted || (!todayPlanned && todayKind !== "spontan");
         todayBtn.classList.toggle("is-due", todayPlanned && !shifted && !picking);
         document.getElementById("go-short").disabled = picking || shifted || !todayPlanned;
         paintPhoto();
@@ -3303,7 +3431,117 @@
         var diary = document.getElementById("diary");
         if (welcome) welcome.scrollTop = 0;
         if (diary) diary.scrollTop = 0;
+        var nav = document.querySelector(".app-pill nav");
+        if (nav) nav.classList.remove("is-compact");
       }
+
+      function fitScreen() {
+        var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+        if (h) document.documentElement.style.setProperty("--screen-h", Math.round(h) + "px");
+      }
+
+      function bindPillShrink() {
+        var nav = document.querySelector(".app-pill nav");
+        if (!nav) return;
+        var lastY = 0;
+        var compact = false;
+        function onScroll(event) {
+          var y = event.currentTarget.scrollTop || 0;
+          var dy = y - lastY;
+          if (y <= 8) compact = false;
+          else if (dy > 4) compact = true;
+          else if (dy < -4) compact = false;
+          lastY = y;
+          nav.classList.toggle("is-compact", compact);
+        }
+        ["welcome", "diary"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.addEventListener("scroll", onScroll, { passive: true });
+        });
+        fitScreen();
+        window.addEventListener("resize", fitScreen);
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener("resize", fitScreen);
+          window.visualViewport.addEventListener("scroll", fitScreen);
+        }
+      }
+
+      var accountEditField = "";
+      function openAccountEdit(field) {
+        accountEditField = field;
+        var title = document.getElementById("account-edit-title");
+        var input = document.getElementById("account-edit-input");
+        document.getElementById("account-edit-msg").textContent = "";
+        if (field === "name") {
+          title.textContent = "Vorname";
+          input.value = sessionAccount && sessionAccount.name ? sessionAccount.name : "";
+          input.inputMode = "text";
+          input.maxLength = 40;
+        } else if (field === "phone") {
+          title.textContent = "Telefon";
+          input.value = sessionAccount && sessionAccount.phone ? sessionAccount.phone : "";
+          input.inputMode = "tel";
+          input.maxLength = 20;
+        } else {
+          title.textContent = "Code ändern";
+          input.value = sessionAccount && sessionAccount.invite_code ? sessionAccount.invite_code : "";
+          input.inputMode = "numeric";
+          input.maxLength = 8;
+        }
+        document.getElementById("heute-menu-modal").hidden = true;
+        document.getElementById("account-edit").hidden = false;
+        input.focus();
+      }
+
+      function saveAccountEdit() {
+        if (!sessionAccount) return;
+        var input = document.getElementById("account-edit-input");
+        var value = String(input.value || "").trim();
+        var msg = document.getElementById("account-edit-msg");
+        var body = {};
+        if (accountEditField === "name") {
+          if (!value) { msg.textContent = "Vorname fehlt."; return; }
+          body.name = value;
+        } else if (accountEditField === "phone") {
+          body.phone = value;
+        } else {
+          var code = value.replace(/\D/g, "");
+          if (code.length < 4) { msg.textContent = "Mindestens 4 Ziffern."; return; }
+          body.invite_code = code;
+        }
+        rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: body
+        }).then(function () {
+          Object.keys(body).forEach(function (key) { sessionAccount[key] = body[key]; });
+          if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+          if (body.name) {
+            var title = document.querySelector(".welcome-title");
+            if (title) title.textContent = "gogogo " + body.name + "!";
+          }
+          document.getElementById("account-edit").hidden = true;
+        }).catch(function () { msg.textContent = "Speichern fehlgeschlagen."; });
+      }
+
+      document.getElementById("heute-menu").addEventListener("click", function () {
+        document.getElementById("heute-menu-modal").hidden = false;
+      });
+      document.getElementById("heute-menu-modal").addEventListener("click", function (event) {
+        var choice = event.target.closest("[data-menu]");
+        if (choice) {
+          openAccountEdit(choice.getAttribute("data-menu"));
+          return;
+        }
+        if (event.target.id === "heute-menu-modal") event.currentTarget.hidden = true;
+      });
+      document.getElementById("account-edit-save").addEventListener("click", saveAccountEdit);
+      document.getElementById("account-edit-cancel").addEventListener("click", function () {
+        document.getElementById("account-edit").hidden = true;
+      });
+      document.getElementById("account-edit").addEventListener("click", function (event) {
+        if (event.target.id === "account-edit") event.currentTarget.hidden = true;
+      });
 
       function ausdauerChoicesForWorkout(iso) {
         var wd = weekdayIndex(iso);
@@ -3790,17 +4028,46 @@
         return storePrefix + "diary_seen";
       }
 
+      function selectedTeamIds() {
+        var ids = {};
+        var map = inviteStore();
+        Object.keys(map).forEach(function (iso) {
+          var people = map[iso] && map[iso].people;
+          if (!Array.isArray(people)) return;
+          people.forEach(function (person) {
+            if (person && person.id) ids[String(person.id)] = true;
+          });
+        });
+        return ids;
+      }
+
       function refreshDiaryNote() {
         diaryNote = false;
         if (!sessionAccount) return;
         var me = String(sessionAccount.id);
         var seen = readStore(diarySeenKey(), "");
-        diaryNote = diaryPosts.some(function (post) {
+        var incoming = diaryPosts.some(function (post) {
           if (!post || String(post.author_id || "") === me) return false;
           if (String(post.reply_to_id || "") !== me) return false;
           if (seen && String(post.created_at || "") <= String(seen)) return false;
           return true;
         });
+        var selected = selectedTeamIds();
+        var teamSeen = String(readStore(storePrefix + "diary_team_seen", "") || "");
+        var fromTeam = diaryVisibility === "friends" && diaryPosts.some(function (post) {
+          var from = String((post && post.author_id) || "");
+          if (!from || from === me || !selected[from]) return false;
+          if (String(post.reply_to_id || "") === me) return false;
+          if (teamSeen && String(post.created_at || "") <= teamSeen) return false;
+          return true;
+        });
+        var teamDay = teamSeen.slice(0, 10);
+        var fromEntries = diaryVisibility === "friends" && sharedEntries.some(function (entry) {
+          if (!entry || !selected[String(entry.account_id)] || !(entry.note || entry.move)) return false;
+          if (!teamDay) return true;
+          return String(entry.entry_date || "") > teamDay;
+        });
+        diaryNote = incoming || fromTeam || fromEntries;
       }
 
       function markDiarySeen() {
@@ -3812,7 +4079,9 @@
           var stamp = String(post.created_at || "");
           if (stamp > latest) latest = stamp;
         });
-        writeStore(diarySeenKey(), latest || new Date().toISOString());
+        var now = new Date().toISOString();
+        writeStore(diarySeenKey(), latest || now);
+        if (diaryVisibility === "friends") writeStore(storePrefix + "diary_team_seen", now);
         diaryNote = false;
         paintPill();
       }
@@ -4523,6 +4792,7 @@
         ausWeekdays = [];
         zirkelWeekday = null;
         var altWeekdays = [];
+        var spontanWeekdays = [];
         Object.keys(userUnits).forEach(function (key) {
           var wd = Number(key);
           var unit = userUnits[wd];
@@ -4530,11 +4800,13 @@
           if (unit.kind === "kraft" && kraftWeekdays.indexOf(wd) < 0) kraftWeekdays.push(wd);
           if (unit.kind === "ausdauer" && ausWeekdays.indexOf(wd) < 0) ausWeekdays.push(wd);
           if (unit.kind === "alternative" && altWeekdays.indexOf(wd) < 0) altWeekdays.push(wd);
+          if (unit.kind === "spontan" && spontanWeekdays.indexOf(wd) < 0) spontanWeekdays.push(wd);
           if (unit.kind === "zirkel") zirkelWeekday = wd;
         });
         var merged = kraftWeekdays.slice();
         ausWeekdays.forEach(function (n) { if (merged.indexOf(n) < 0) merged.push(n); });
         altWeekdays.forEach(function (n) { if (merged.indexOf(n) < 0) merged.push(n); });
+        spontanWeekdays.forEach(function (n) { if (merged.indexOf(n) < 0) merged.push(n); });
         if (zirkelWeekday != null && merged.indexOf(zirkelWeekday) < 0) merged.push(zirkelWeekday);
         adminDayKeys = keysFromWeekdays(merged);
       }
@@ -4735,7 +5007,7 @@
       });
       document.getElementById("days-clear").addEventListener("click", function () {
         if (!pendingDay) return;
-        commitWeekUnit(DAY_KEYS.indexOf(pendingDay), null);
+        commitWeekUnit(DAY_KEYS.indexOf(pendingDay), { kind: "spontan", label: "Am Tag spontan" });
       });
       document.getElementById("days-ok").addEventListener("click", function () {
         if (sessionMode || !pendingDay) return;
@@ -4845,6 +5117,11 @@
         return Array.isArray(list) ? list : [];
       }
 
+      function trainingPlaceName() {
+        var named = placeStore().filter(function (item) { return item && item.name; });
+        return named.length ? String(named[0].name) : "";
+      }
+
       function dayInviteEl(iso) {
         var saved = inviteStore()[iso] || null;
         var wrap = document.createElement("div");
@@ -4867,14 +5144,17 @@
             row.appendChild(ph);
           }
           var name = document.createElement("span");
-          name.textContent = person.name || "Team";
+          var label = person.name || "Team";
+          if (person.isTrainer) label += ", Trainer";
+          label += " (Warten auf Bestätigung)";
+          name.textContent = label;
           row.appendChild(name);
           wrap.appendChild(row);
         });
         var plus = document.createElement("button");
         plus.type = "button";
         plus.className = "day-invite__plus";
-        plus.textContent = "+";
+        plus.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
         plus.setAttribute("aria-label", "Nachricht an");
         plus.addEventListener("click", function (event) {
           event.stopPropagation();
@@ -5164,13 +5444,18 @@
             box.appendChild(note);
             return;
           }
+          var chosen = {};
+          var saved = inviteStore()[iso] || {};
+          (saved.people || []).forEach(function (person) { if (person && person.id) chosen[String(person.id)] = true; });
           list.forEach(function (person) {
             var btn = document.createElement("button");
             btn.type = "button";
-            btn.className = "invite-person";
+            btn.className = "invite-person" + (chosen[String(person.id)] ? " is-on" : "");
+            btn.dataset.id = String(person.id);
             btn.textContent = person.name + (person.isTrainerPerson ? " (Trainer)" : "");
             btn.addEventListener("click", function () {
-              addDayInvite(iso, person);
+              toggleDayInvite(iso, person);
+              btn.classList.toggle("is-on", invitedOnDay(iso, person.id));
             });
             box.appendChild(btn);
           });
@@ -5180,23 +5465,37 @@
         document.getElementById("invite-modal").hidden = false;
       }
 
-      function addDayInvite(iso, person) {
+      function invitedOnDay(iso, id) {
+        var saved = inviteStore()[iso] || {};
+        return (saved.people || []).some(function (row) { return row && String(row.id) === String(id); });
+      }
+
+      function toggleDayInvite(iso, person) {
         if (!person || !person.id) return;
         var map = inviteStore();
         var saved = map[iso] && typeof map[iso] === "object" ? map[iso] : {};
         var people = Array.isArray(saved.people) ? saved.people.slice() : [];
-        if (!people.some(function (row) { return String(row.id) === String(person.id); })) {
+        if (invitedOnDay(iso, person.id)) {
+          people = people.filter(function (row) { return !row || String(row.id) !== String(person.id); });
+        } else {
           people.push({
             id: person.id,
             name: person.name || "Team",
-            photo: person.photo_url || ""
+            photo: person.photo_url || "",
+            isTrainer: !!person.isTrainerPerson
           });
         }
-        map[iso] = { people: people, place: saved.place || "" };
+        map[iso] = { people: people, place: saved.place || trainingPlaceName() };
         writeStore(storePrefix + "day_invites", map);
-        document.getElementById("invite-modal").hidden = true;
         paintWelcome();
+        refreshDiaryNote();
         paintPill();
+      }
+
+      function movementLabel() {
+        var raw = document.getElementById("go-today").dataset.unitLabel || "";
+        var name = String(raw).split("·")[0].trim();
+        return name || "bewegt";
       }
 
       function openMovedDialog() {
@@ -5205,12 +5504,21 @@
         document.getElementById("moved-title").textContent = title;
         document.getElementById("moved-ok").hidden = false;
         document.getElementById("moved-after").hidden = true;
+        document.getElementById("moved-wa").hidden = true;
         document.getElementById("moved-diary").hidden = true;
         document.getElementById("moved-modal").hidden = false;
       }
 
+      function holdMovement() {
+        markDiaryMove(Log.berlinToday(), movementLabel());
+      }
+
       document.getElementById("go-today").addEventListener("click", function () {
         var kind = this.dataset.kind || "";
+        if (sessionMode && kind === "spontan") {
+          openDiary();
+          return;
+        }
         if (sessionMode && (kind === "alternative" || kind === "ausdauer" || kind === "zirkel")) {
           openMovedDialog();
           return;
@@ -5255,12 +5563,17 @@
         if (event.target.id === "invite-modal") event.currentTarget.hidden = true;
       });
       document.getElementById("moved-ok").addEventListener("click", function () {
-        var src = document.getElementById("go-today");
-        var label = src.dataset.unitLabel || "";
-        if (label) markDiaryMove(Log.berlinToday(), label);
+        holdMovement();
         this.hidden = true;
         document.getElementById("moved-after").hidden = false;
+        document.getElementById("moved-wa").hidden = false;
         document.getElementById("moved-diary").hidden = false;
+      });
+      document.getElementById("moved-wa").addEventListener("click", function () {
+        holdMovement();
+        var text = "Ich habe mich ausreichend bewegt und war " + movementLabel();
+        window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
+        document.getElementById("moved-modal").hidden = true;
       });
       document.getElementById("moved-diary").addEventListener("click", function () {
         document.getElementById("moved-modal").hidden = true;
@@ -5780,6 +6093,7 @@
         writeStore(HOME_VIS, value);
         paintVisibility();
         closeVisibility();
+        if (sessionMode) loadDiaryShare();
         if (!sessionMode) return;
         rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
           method: "PATCH",
@@ -5867,8 +6181,13 @@
       if (!sessionMode) loadRoutine();
       (sessionMode ? loadSessionPlan() : loadSharedPlan()).then(function () {
         load();
-        if (sessionMode) loadDiaryShare();
+        if (sessionMode) {
+          loadAccountPlaces().then(function () { paintWelcome(); });
+          loadDiaryShare();
+        }
       });
+      fitScreen();
+      bindPillShrink();
     })();
   </script>
 </body>
