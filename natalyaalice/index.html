@@ -9,7 +9,38 @@
   <meta name="apple-mobile-web-app-title" content="Natalya" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>gogogo · Natalya</title>
-  <link rel="manifest" href="/natalyaalice/manifest.webmanifest" />
+  <link rel="manifest" id="app-manifest" href="/natalyaalice/manifest.webmanifest" />
+  <script>
+    (function () {
+      var path = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "");
+      var workout = path === "/workout" || /(?:\?|&)as=workout(?:&|$)/.test(location.search);
+      if (!workout) return;
+      var account = null;
+      try { account = JSON.parse(localStorage.getItem("gogogo_go_account") || "null"); } catch (e) {}
+      if (!account || !account.name) {
+        var parts = String(document.cookie || "").split(";");
+        for (var i = 0; i < parts.length; i++) {
+          var bit = parts[i].trim();
+          if (bit.indexOf("gogogo_go_account=") !== 0) continue;
+          try { account = JSON.parse(decodeURIComponent(bit.slice("gogogo_go_account=".length))); } catch (e2) {}
+        }
+      }
+      var home = "";
+      try { home = new URLSearchParams(location.search).get("home") || ""; } catch (e3) {}
+      if (home && account && String(account.id) !== String(home)) account = null;
+      var id = (account && account.id) || home;
+      var name = account && String(account.name || "").trim();
+      var link = document.getElementById("app-manifest");
+      if (!id || !name) {
+        if (link) link.removeAttribute("href");
+        return;
+      }
+      document.title = "gogogo · " + name;
+      var apple = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+      if (apple) apple.setAttribute("content", name);
+      if (link) link.href = "/api/pwa-manifest?id=" + encodeURIComponent(id) + "&name=" + encodeURIComponent(name);
+    })();
+  </script>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -1428,13 +1459,14 @@
       line-height: 1.35;
     }
     .heute-away[hidden] { display: none; }
-    .heute-crew { margin-top: 16px; }
+    .heute-crew { margin-top: 32px; }
     .heute-crew__title {
       margin: 0 8px 4px;
       font-size: 14px;
       font-weight: 600;
       text-align: left;
     }
+    .heute-crew__row { font-size: 14px; }
     .heute-crew__row, .heute-join {
       display: flex;
       align-items: center;
@@ -1472,13 +1504,25 @@
       align-items: center;
       min-height: 31px;
     }
-    .profile-back, .profile-pencil {
+    .profile-back {
       width: 31px;
       height: 31px;
       border-radius: 50%;
       border: 1px solid #2A2118;
       display: grid;
       place-items: center;
+      color: #2A2118;
+      padding: 0;
+      background: transparent;
+    }
+    .profile-pencil {
+      width: 31px;
+      height: 31px;
+      border: 0;
+      border-radius: 0;
+      display: grid;
+      place-items: center;
+      justify-self: end;
       color: #2A2118;
       padding: 0;
       background: transparent;
@@ -1496,6 +1540,17 @@
       font-weight: 600;
       flex: none;
     }
+    button.profile-ph {
+      border: 0;
+      padding: 0;
+      color: inherit;
+      font: inherit;
+      font-size: 28px;
+      font-weight: 600;
+      overflow: hidden;
+    }
+    button.profile-ph.is-mine { cursor: pointer; }
+    button.profile-ph .profile-photo { width: 100%; height: 100%; }
     .profile-goal-col { flex: 1; min-width: 0; padding-top: 4px; }
     .profile-name {
       margin: 0;
@@ -1541,24 +1596,53 @@
     }
     .profile-sheet.is-editing .profile-goal { cursor: pointer; }
     .profile-pencil[hidden] { display: none; }
-    .profile-trainer-list, .profile-mantra-list { margin-top: 8px; }
-    .profile-trainer-list button,
-    .profile-mantra-list button {
+    .profile-trainer-list { margin-top: 8px; }
+    .profile-trainer-open {
       display: block;
       width: 100%;
       margin: 0;
-      padding: 10px 2px;
+      padding: 2px 0;
       border: 0;
-      border-bottom: 1px solid rgba(42, 33, 24, 0.18);
-      border-radius: 0;
       background: transparent;
       color: #2A2118;
-      font-size: 14px;
-      font-weight: 500;
+      font: inherit;
+      font-size: 15px;
       line-height: 1.35;
       text-align: left;
     }
-    .profile-trainer-list button.is-on { font-weight: 700; }
+    #trainer-options { margin-top: 8px; text-align: left; max-height: 46vh; overflow: auto; }
+    #trainer-options button {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      min-height: 0;
+      margin: 0;
+      padding: 12px 2px;
+      border: 0;
+      border-bottom: 1px solid rgba(42, 33, 24, 0.2);
+      border-radius: 0;
+      background: transparent;
+      color: #2A2118;
+      font-weight: 500;
+      text-align: left;
+    }
+    #trainer-options button .tick {
+      width: 22px;
+      height: 22px;
+      border: 1.5px solid #2A2118;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      flex: none;
+      color: transparent;
+    }
+    #trainer-options button.is-on .tick {
+      background: #2A2118;
+      color: #F6F1E8;
+    }
+    #trainer-modal h2 { text-align: center; }
     .profile-photos-label { margin-top: 22px; }
     #profile-places-block[hidden],
     #profile-photos-label[hidden] { display: none; }
@@ -2520,6 +2604,13 @@
       <div id="goal-options"></div>
     </div>
   </div>
+  <div class="sand-modal" id="trainer-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="trainer-title">
+      <h2 class="ask" id="trainer-title">Trainer</h2>
+      <div id="trainer-options"></div>
+      <button type="button" id="trainer-save">Trainer festlegen</button>
+    </div>
+  </div>
   <section class="profile-sheet" id="profile-sheet" hidden>
     <div class="profile-top">
       <button type="button" class="profile-back" id="profile-back" aria-label="Zurück">
@@ -2531,7 +2622,8 @@
       </button>
     </div>
     <div class="profile-head">
-      <span class="profile-ph" id="profile-ph">?</span>
+      <button type="button" class="profile-ph" id="profile-ph" aria-label="Profilfoto">?</button>
+      <input id="profile-photo-file" type="file" accept="image/*" hidden />
       <div class="profile-goal-col">
         <p class="profile-label">Ziel</p>
         <p class="profile-goal" id="profile-goal">Ziel wählen</p>
@@ -2552,7 +2644,6 @@
     <div class="profile-block">
       <p class="profile-label">Mantra</p>
       <textarea class="profile-mantra" id="profile-mantra" maxlength="220" readonly></textarea>
-      <div class="profile-mantra-list" id="profile-mantra-list"></div>
     </div>
     <div class="profile-block">
       <p class="profile-challenge" id="profile-challenge">12-Wochenroutine nicht gestartet</p>
@@ -2676,10 +2767,44 @@
       var sessionMode = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "") === "/workout"
         || /(?:\?|&)as=workout(?:&|$)/.test(location.search);
       var sessionAccount = sessionMode && window.GoAccountSession ? GoAccountSession.load() : null;
+      var homeUserId = "";
+      try { homeUserId = new URLSearchParams(location.search).get("home") || ""; } catch (eHome) {}
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(homeUserId)) homeUserId = "";
+      function applyInstalledIdentity(account) {
+        if (!sessionMode || !account || !account.id) return;
+        var installedName = String(account.name || "").trim();
+        if (!installedName) return;
+        document.title = "gogogo · " + installedName;
+        var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+        if (appleTitle) appleTitle.setAttribute("content", installedName);
+        var manifestLink = document.getElementById("app-manifest");
+        if (manifestLink) {
+          manifestLink.setAttribute("href", "/api/pwa-manifest?id=" + encodeURIComponent(account.id) + "&name=" + encodeURIComponent(installedName));
+        }
+      }
+      if (sessionMode && homeUserId && (!sessionAccount || String(sessionAccount.id) !== homeUserId)) {
+        var homeHost = location.hostname;
+        var homeBase = (homeHost === "localhost" || homeHost === "127.0.0.1") ? location.origin : "https://agpysewcsakdpmpftndp.supabase.co";
+        var homeKey = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
+        fetch(homeBase + "/rest/v1/go_accounts?id=eq." + encodeURIComponent(homeUserId) + "&select=id,name,phone,invite_code,serial_number,is_trainer,trainer_id,created_at&limit=1", {
+          headers: { apikey: homeKey, Authorization: "Bearer " + homeKey }
+        }).then(function (res) {
+          return res.ok ? res.json() : [];
+        }).then(function (rows) {
+          var row = rows && rows[0];
+          if (!row || !row.name || String(row.id) !== homeUserId) throw new Error("missing");
+          if (window.GoAccountSession) GoAccountSession.save(row);
+          location.replace("/workout/?home=" + encodeURIComponent(row.id));
+        }).catch(function () {
+          location.replace("/login/?next=" + encodeURIComponent("/workout/?home=" + encodeURIComponent(homeUserId)));
+        });
+        return;
+      }
       if (sessionMode && (!sessionAccount || !sessionAccount.id)) {
         location.replace("/login/?next=" + encodeURIComponent("/workout/"));
         return;
       }
+      applyInstalledIdentity(sessionAccount);
       var shellTab = "heute";
       var planPane = "kalender";
       var sessionIsTrainer = !!(sessionAccount && sessionAccount.is_trainer);
@@ -2697,6 +2822,8 @@
       var pendingUnit = null;
       var profilePerson = null;
       var GOAL_OPTIONS = ["just for Fun", "HYROX", "abnehmen", "Bodybuilding", "Krafttraining", "Hybrid Athlet", "Schwimmer", "Marathon", "Triathlon", "Wellbeing"];
+      var EMPTY_MANTRA = "- kein eigenes Mantra -";
+      var profileTrainerChoices = [];
       var inviteIso = "";
       var leafletMap = null;
       var leafletMarker = null;
@@ -4370,6 +4497,9 @@
           var map = workoutPhotoMap();
           map[when] = url;
           writeStore(HOME_PHOTOS, map);
+          var entry = diaryEntry(when);
+          entry.cleared = false;
+          saveDiaryEntry(when, entry);
           if (!document.getElementById("diary").hidden) openDiary();
         });
       }
@@ -4390,12 +4520,16 @@
       function diaryEntry(iso) {
         var row = diaryMap()[iso];
         if (!row || typeof row !== "object") return { note: "", move: "", extras: [], cleared: false };
-        var extras = Array.isArray(row.extras) ? row.extras.map(function (extra) {
-          return {
-            move: renameMove((extra && extra.move) || ""),
-            note: String((extra && extra.note) || "").slice(0, 200)
-          };
-        }) : [];
+        var extras = [];
+        if (Array.isArray(row.extras)) {
+          row.extras.forEach(function (extra) {
+            if (!extra || extra.photo) return;
+            extras.push({
+              move: renameMove(extra.move || ""),
+              note: String(extra.note || "").slice(0, 200)
+            });
+          });
+        }
         return {
           note: String(row.note || "").slice(0, 200),
           move: renameMove(row.move || ""),
@@ -4419,7 +4553,7 @@
           cleared: !!entry.cleared
         };
         writeStore(HOME_DIARY, map);
-        if (sessionMode) syncDiaryEntry(iso, map[iso]);
+        syncDiaryEntry(iso, map[iso], workoutPhotoMap()[iso] || "");
       }
 
       function markDiaryMove(iso, label) {
@@ -4917,7 +5051,6 @@
         var dates = diaryDates();
         list.textContent = "";
         dates.forEach(function (iso) {
-          if (!diaryMap()[iso]) saveDiaryEntry(iso, { note: "", move: "", extras: [], cleared: false });
           var entry = diaryEntry(iso);
           var card = document.createElement("article");
           card.className = "diary-card";
@@ -5004,7 +5137,11 @@
           delete photos[iso];
           writeStore(HOME_PHOTOS, photos);
         }
+        serverLogs = serverLogs.filter(function (row) {
+          return String(row && row.workout_date || "").slice(0, 10) !== iso;
+        });
         saveDiaryEntry(iso, { note: "", move: "", extras: [], cleared: true });
+        rest(logDeletePath(iso), { method: "DELETE", prefer: "return=minimal" }).catch(function () {});
         closeDiaryMenu();
         openDiary();
       }
@@ -6263,50 +6400,72 @@
 
       function loadTeam() {
         if (!sessionMode || !sessionAccount) return Promise.resolve();
-        var id = sessionAccount.id;
-        return rest("go_accounts?id=eq." + encodeURIComponent(id) + "&select=id,trainer_id,photo_url,is_trainer")
+        var id = String(sessionAccount.id);
+        var personSelect = "id,name,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id";
+        return rest("go_accounts?id=eq." + encodeURIComponent(id) + "&select=id,name,trainer_id,photo_url,is_trainer")
           .catch(function () { return []; })
           .then(function (rows) {
             var me = rows && rows[0];
             if (me) {
+              if (me.name) sessionAccount.name = me.name;
               if (me.trainer_id) sessionAccount.trainer_id = me.trainer_id;
               sessionAccount.is_trainer = !!me.is_trainer;
               sessionIsTrainer = !!me.is_trainer;
               if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+              applyInstalledIdentity(sessionAccount);
             }
             var trainerId = (me && me.trainer_id) || sessionAccount.trainer_id || "";
-            var clientQuery = sessionIsTrainer
-              ? rest("go_accounts?trainer_id=eq." + encodeURIComponent(id) + "&select=id,name,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id")
+            var ownName = String((me && me.name) || sessionAccount.name || "").trim();
+            var siblingQuery = (me && me.is_trainer && ownName)
+              ? rest("go_accounts?name=eq." + encodeURIComponent(ownName) + "&is_trainer=eq.true&select=id,name,is_trainer")
                 .catch(function () { return []; })
-              : Promise.resolve([]);
-            return rest("go_buddies?account_id=eq." + encodeURIComponent(id) + "&select=buddy_id")
-              .catch(function () { return []; })
-              .then(function (links) {
+              : Promise.resolve([{ id: id, name: ownName, is_trainer: true }]);
+            return siblingQuery.then(function (siblings) {
+              var selfIds = [];
+              function addSelf(row) {
+                if (!row || !row.id) return;
+                if (ownName && String(row.name || "").trim().toLowerCase() !== ownName.toLowerCase()) return;
+                if (row.is_trainer === false) return;
+                var sid = String(row.id);
+                if (selfIds.indexOf(sid) < 0) selfIds.push(sid);
+              }
+              addSelf({ id: id, name: ownName, is_trainer: true });
+              if (me && me.is_trainer) (siblings || []).forEach(addSelf);
+              if (!selfIds.length) selfIds.push(id);
+              var selfFilter = "in.(" + selfIds.map(encodeURIComponent).join(",") + ")";
+              return Promise.all([
+                rest("go_buddies?account_id=" + selfFilter + "&select=account_id,buddy_id").catch(function () { return []; }),
+                rest("go_buddies?buddy_id=" + selfFilter + "&select=account_id,buddy_id").catch(function () { return []; }),
+                rest("go_accounts?trainer_id=" + selfFilter + "&select=" + personSelect).catch(function () { return []; })
+              ]).then(function (pack) {
                 var ids = [];
                 var seenBuddy = {};
-                (links || []).forEach(function (row) {
-                  var bid = row && row.buddy_id ? String(row.buddy_id) : "";
-                  if (!bid || bid === String(id) || seenBuddy[bid]) return;
-                  seenBuddy[bid] = true;
-                  ids.push(bid);
-                });
-                if (trainerId && !seenBuddy[String(trainerId)] && String(trainerId) !== String(id)) ids.push(String(trainerId));
+                function addPerson(pid) {
+                  pid = pid ? String(pid) : "";
+                  if (!pid || selfIds.indexOf(pid) >= 0 || seenBuddy[pid]) return;
+                  seenBuddy[pid] = true;
+                  ids.push(pid);
+                }
+                (pack[0] || []).forEach(function (row) { addPerson(row && row.buddy_id); });
+                (pack[1] || []).forEach(function (row) { addPerson(row && row.account_id); });
+                if (trainerId) addPerson(trainerId);
                 var peopleQuery = ids.length
-                  ? rest("go_accounts?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=id,name,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id")
-                    .catch(function () { return []; })
+                  ? rest("go_accounts?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=" + personSelect).catch(function () { return []; })
                   : Promise.resolve([]);
-                return Promise.all([peopleQuery, clientQuery]).then(function (pack) {
-                  return { people: pack[0] || [], clients: pack[1] || [], trainerId: trainerId };
+                return peopleQuery.then(function (people) {
+                  return { people: people || [], clients: pack[2] || [], trainerId: trainerId, selfIds: selfIds };
                 });
               });
+            });
           })
           .then(function (pack) {
             var peopleSeen = {};
+            var selfIds = pack.selfIds || [id];
             teamPeople = [];
             (pack.people || []).concat(pack.clients || []).forEach(function (person) {
               if (!person || !person.id) return;
               var pid = String(person.id);
-              if ((sessionAccount && pid === String(sessionAccount.id)) || peopleSeen[pid]) return;
+              if (selfIds.indexOf(pid) >= 0 || peopleSeen[pid]) return;
               peopleSeen[pid] = true;
               person.isTrainerPerson = pid === String(pack.trainerId) || !!person.is_trainer;
               teamPeople.push(person);
@@ -7415,21 +7574,131 @@
         }).catch(function () {});
       }
 
-      function syncDiaryEntry(iso, entry) {
-        if (!sessionMode || !entry) return;
-        rest("go_diary_entries?on_conflict=account_id,entry_date", {
-          method: "POST",
-          prefer: "resolution=merge-duplicates,return=minimal",
-          body: {
-            account_id: sessionAccount.id,
-            entry_date: iso,
-            note: entry.note || "",
-            move: entry.move || "",
-            extras: entry.extras || [],
-            cleared: !!entry.cleared,
-            updated_at: new Date().toISOString()
+      var diaryAccountId = sessionAccount && sessionAccount.id ? String(sessionAccount.id) : "";
+      var diarySyncReady = null;
+
+      function ensureDiaryAccount() {
+        if (diaryAccountId) return Promise.resolve(diaryAccountId);
+        if (sessionAccount && sessionAccount.id) {
+          diaryAccountId = String(sessionAccount.id);
+          return Promise.resolve(diaryAccountId);
+        }
+        return rest("go_accounts?or=(phone.eq.natalya,serial_number.eq.24011901)&select=id&limit=1")
+          .catch(function () { return []; })
+          .then(function (rows) {
+            var row = rows && rows[0];
+            if (row && row.id) diaryAccountId = String(row.id);
+            return diaryAccountId;
+          });
+      }
+
+      function extrasWithPhoto(extras, photo) {
+        var list = [];
+        (extras || []).forEach(function (extra) {
+          if (!extra || extra.photo) return;
+          list.push({
+            move: extra.move ? String(extra.move) : "",
+            note: String(extra.note || "").slice(0, 200)
+          });
+        });
+        if (photo) list.push({ photo: String(photo) });
+        return list;
+      }
+
+      function splitDiaryExtras(extras) {
+        var photo = "";
+        var clean = [];
+        (Array.isArray(extras) ? extras : []).forEach(function (extra) {
+          if (extra && extra.photo && !extra.move && !extra.note) {
+            photo = String(extra.photo);
+            return;
           }
-        }).catch(function () {});
+          if (!extra || extra.photo) return;
+          clean.push({
+            move: extra.move ? String(extra.move) : "",
+            note: String(extra.note || "").slice(0, 200)
+          });
+        });
+        return { photo: photo, extras: clean };
+      }
+
+      function syncDiaryEntry(iso, entry, photo) {
+        if (!entry || !iso) return;
+        ensureDiaryAccount().then(function (id) {
+          if (!id) return;
+          var cleared = !!entry.cleared;
+          rest("go_diary_entries?on_conflict=account_id,entry_date", {
+            method: "POST",
+            prefer: "resolution=merge-duplicates,return=minimal",
+            body: {
+              account_id: id,
+              entry_date: iso,
+              note: cleared ? "" : (entry.note || ""),
+              move: cleared ? "" : (entry.move || ""),
+              extras: cleared ? [] : extrasWithPhoto(entry.extras, photo || ""),
+              cleared: cleared,
+              updated_at: new Date().toISOString()
+            }
+          }).catch(function () {});
+        });
+      }
+
+      function applyRemoteDiary(rows) {
+        var map = diaryMap();
+        var photos = workoutPhotoMap();
+        (rows || []).forEach(function (row) {
+          if (!row || !row.entry_date) return;
+          var iso = String(row.entry_date).slice(0, 10);
+          var parsed = splitDiaryExtras(row.extras);
+          map[iso] = {
+            note: row.cleared ? "" : String(row.note || ""),
+            move: row.cleared ? "" : String(row.move || ""),
+            extras: row.cleared ? [] : parsed.extras,
+            cleared: !!row.cleared
+          };
+          if (row.cleared || !parsed.photo) delete photos[iso];
+          else photos[iso] = parsed.photo;
+        });
+        writeStore(HOME_DIARY, map);
+        writeStore(HOME_PHOTOS, photos);
+      }
+
+      function pushLocalDiary(rows) {
+        var seen = {};
+        (rows || []).forEach(function (row) {
+          if (row && row.entry_date) seen[String(row.entry_date).slice(0, 10)] = true;
+        });
+        var map = diaryMap();
+        var photos = workoutPhotoMap();
+        Object.keys(map).forEach(function (iso) {
+          if (seen[iso]) return;
+          var entry = map[iso];
+          if (!entry) return;
+          var photo = photos[iso] || "";
+          if (!entry.note && !entry.move && !(entry.extras && entry.extras.length) && !entry.cleared && !photo) return;
+          syncDiaryEntry(iso, entry, photo);
+        });
+        Object.keys(photos).forEach(function (iso) {
+          if (seen[iso] || map[iso] || !photos[iso]) return;
+          syncDiaryEntry(iso, { note: "", move: "", extras: [], cleared: false }, photos[iso]);
+        });
+      }
+
+      function loadOwnDiary() {
+        if (diarySyncReady) return diarySyncReady;
+        diarySyncReady = ensureDiaryAccount().then(function (id) {
+          if (!id) return;
+          return rest("go_diary_entries?account_id=eq." + encodeURIComponent(id) + "&select=entry_date,note,move,extras,cleared&order=entry_date.desc&limit=400")
+            .catch(function () { return null; })
+            .then(function (rows) {
+              if (!rows) return;
+              applyRemoteDiary(rows);
+              pushLocalDiary(rows);
+              var diary = document.getElementById("diary");
+              if (diary && !diary.hidden) openDiary();
+            });
+        });
+        return diarySyncReady;
       }
 
       ["diary-book", "plan-book"].forEach(function (id) {
@@ -7530,7 +7799,6 @@
         return rest("go_mantras?select=slot,body&order=slot.asc&limit=40").catch(function () { return []; }).then(function (rows) {
           mantraList = rows || [];
           paintHeuteExtras();
-          paintProfileMantras();
         });
       }
 
@@ -7769,6 +8037,9 @@
 
       function paintProfileFace(person) {
         var ph = document.getElementById("profile-ph");
+        var mine = !!(person && person.isSelf);
+        ph.classList.toggle("is-mine", mine);
+        ph.setAttribute("aria-label", mine ? "Profilfoto ändern" : "Profilfoto");
         ph.textContent = "";
         if (person && person.photo_url) {
           var img = document.createElement("img");
@@ -7781,30 +8052,158 @@
         ph.textContent = String((person && person.name) || "?").slice(0, 1);
       }
 
-      function paintProfileMantras() {
-        var box = document.getElementById("profile-mantra-list");
-        if (!box) return;
-        box.textContent = "";
-        var sheet = document.getElementById("profile-sheet");
+      function mantraToSave(value) {
+        var text = String(value || "").trim();
+        if (!text || text === EMPTY_MANTRA) return "";
+        return text.slice(0, 220);
+      }
+
+      function paintProfileMantra(account) {
         var mantra = document.getElementById("profile-mantra");
-        if (mantra && sheet && !sheet.hidden && mantra.dataset.listed === "1" && !personalMantra()) {
-          mantra.value = todayMantra();
-        }
-        mantraList.forEach(function (row) {
-          if (!row || !row.body) return;
-          var button = document.createElement("button");
-          button.type = "button";
-          button.textContent = String(row.body);
-          button.addEventListener("click", function () {
-            var live = document.getElementById("profile-sheet");
-            if (!profilePerson || !profilePerson.isSelf || !live || !live.classList.contains("is-editing")) return;
-            var field = document.getElementById("profile-mantra");
-            field.value = String(row.body).slice(0, 220);
-            field.dataset.listed = "";
-            saveProfileFields({ mantra: field.value });
-          });
-          box.appendChild(button);
+        if (!mantra) return;
+        var own = String((account && account.mantra) || "").trim();
+        var editing = document.getElementById("profile-sheet").classList.contains("is-editing");
+        mantra.value = own || (editing ? "" : EMPTY_MANTRA);
+        mantra.readOnly = !editing;
+        mantra.style.height = "auto";
+        mantra.style.height = Math.max(mantra.scrollHeight, 24) + "px";
+      }
+
+      function dedupedTrainers(list) {
+        var groups = [];
+        var byName = {};
+        (list || []).forEach(function (trainer) {
+          if (!trainer || !trainer.id || !trainer.is_trainer) return;
+          if (sessionAccount && String(trainer.id) === String(sessionAccount.id)) return;
+          var label = String(trainer.name || "Trainer").trim() || "Trainer";
+          if (sessionAccount && sessionAccount.is_trainer && label.toLowerCase() === String(sessionAccount.name || "").trim().toLowerCase()) return;
+          var key = label.toLowerCase();
+          if (!byName[key]) {
+            byName[key] = { name: label, id: String(trainer.id), ids: [], phone: String(trainer.phone || "").toLowerCase() };
+            groups.push(byName[key]);
+          }
+          var group = byName[key];
+          if (group.ids.indexOf(String(trainer.id)) < 0) group.ids.push(String(trainer.id));
+          if (String(trainer.phone || "").toLowerCase() === "coach") {
+            group.id = String(trainer.id);
+            group.phone = "coach";
+          }
         });
+        return groups;
+      }
+
+      var trainerPick = "";
+
+      function openTrainerDialog() {
+        if (!profilePerson || !profilePerson.isSelf || !sessionAccount) return;
+        var box = document.getElementById("trainer-options");
+        var save = document.getElementById("trainer-save");
+        if (!box || !save) return;
+        trainerPick = String(sessionAccount.trainer_id || "");
+        function paint(list) {
+          var groups = dedupedTrainers(list || []);
+          box.textContent = "";
+          if (!groups.length) {
+            var empty = document.createElement("p");
+            empty.textContent = "Noch kein Trainer.";
+            box.appendChild(empty);
+            save.disabled = true;
+            return;
+          }
+          save.disabled = !trainerPick;
+          groups.forEach(function (group) {
+            var button = document.createElement("button");
+            button.type = "button";
+            var label = document.createElement("span");
+            label.textContent = group.name;
+            var tick = document.createElement("span");
+            tick.className = "tick";
+            tick.innerHTML = '<svg viewBox="0 0 14 14" width="12" height="12" aria-hidden="true"><path d="M2 7.2 5.2 10.5 12 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+            button.appendChild(label);
+            button.appendChild(tick);
+            if (group.ids.indexOf(trainerPick) >= 0) button.classList.add("is-on");
+            button.addEventListener("click", function () {
+              var currentId = String(sessionAccount.trainer_id || "");
+              trainerPick = group.ids.indexOf(currentId) >= 0 ? currentId : group.id;
+              box.querySelectorAll("button").forEach(function (item) { item.classList.remove("is-on"); });
+              button.classList.add("is-on");
+              save.disabled = !trainerPick;
+            });
+            box.appendChild(button);
+          });
+        }
+        var ready = profileTrainerChoices.length
+          ? Promise.resolve(profileTrainerChoices)
+          : rest("go_accounts?is_trainer=eq.true&select=id,name,phone,is_trainer&order=name.asc&limit=40").catch(function () { return []; });
+        ready.then(function (rows) {
+          profileTrainerChoices = rows || [];
+          paint(profileTrainerChoices);
+        });
+        document.getElementById("trainer-modal").hidden = false;
+      }
+
+      function paintTrainerBlock(account, list) {
+        var block = document.getElementById("profile-trainer-block");
+        var box = document.getElementById("profile-trainer-list");
+        if (!block || !box) return;
+        var mine = !!(profilePerson && profilePerson.isSelf);
+        block.hidden = false;
+        box.textContent = "";
+        var current = String((account && account.trainer_id) || (mine && sessionAccount && sessionAccount.trainer_id) || "");
+        if (mine) {
+          var open = document.createElement("button");
+          open.type = "button";
+          open.className = "profile-trainer-open";
+          open.textContent = "Trainer wählen";
+          open.addEventListener("click", openTrainerDialog);
+          box.appendChild(open);
+          if (!current) return;
+          var knownName = "";
+          (list || profileTrainerChoices || []).forEach(function (trainer) {
+            if (trainer && String(trainer.id) === current && trainer.name) knownName = String(trainer.name);
+          });
+          if (knownName) {
+            open.textContent = knownName;
+            return;
+          }
+          var viewed = String(profilePerson && profilePerson.id || "");
+          rest("go_accounts?id=eq." + encodeURIComponent(current) + "&select=id,name")
+            .catch(function () { return []; })
+            .then(function (rows) {
+              if (!profilePerson || String(profilePerson.id || "") !== viewed) return;
+              if (String(sessionAccount && sessionAccount.trainer_id || "") !== current) return;
+              open.textContent = (rows && rows[0] && rows[0].name) || "Trainer";
+            });
+          return;
+        }
+        function writeName(text) {
+          box.textContent = "";
+          var line = document.createElement("p");
+          line.className = "profile-place";
+          line.textContent = text;
+          box.appendChild(line);
+        }
+        if (!current) {
+          writeName("Noch kein Trainer.");
+          return;
+        }
+        var known = null;
+        (list || []).forEach(function (trainer) {
+          if (trainer && String(trainer.id) === current) known = trainer;
+        });
+        if (known && known.name) {
+          writeName(String(known.name));
+          return;
+        }
+        var viewedId = String(profilePerson && profilePerson.id || "");
+        rest("go_accounts?id=eq." + encodeURIComponent(current) + "&select=id,name")
+          .catch(function () { return []; })
+          .then(function (rows) {
+            if (!profilePerson || String(profilePerson.id || "") !== viewedId) return;
+            var live = String((mine && sessionAccount && sessionAccount.trainer_id) || (account && account.trainer_id) || "");
+            if (live !== current) return;
+            writeName((rows && rows[0] && rows[0].name) || "Trainer");
+          });
       }
 
       function setProfileEditing(on) {
@@ -7826,37 +8225,9 @@
       }
 
       function paintTrainerChoices(list) {
-        var block = document.getElementById("profile-trainer-block");
-        var box = document.getElementById("profile-trainer-list");
-        if (!block || !box) return;
-        var mine = !!(profilePerson && profilePerson.isSelf);
-        block.hidden = !mine;
-        if (!mine) return;
-        box.textContent = "";
-        var current = String((sessionAccount && sessionAccount.trainer_id) || "");
-        var shown = 0;
-        (list || []).forEach(function (trainer) {
-          if (!trainer || !trainer.id || !trainer.is_trainer) return;
-          if (sessionAccount && String(trainer.id) === String(sessionAccount.id)) return;
-          var button = document.createElement("button");
-          button.type = "button";
-          button.textContent = trainer.name || "Trainer";
-          if (String(trainer.id) === current) button.classList.add("is-on");
-          button.addEventListener("click", function () {
-            sessionAccount.trainer_id = trainer.id;
-            saveProfileFields({ trainer_id: trainer.id });
-            paintTrainerChoices(list);
-            loadTeam();
-          });
-          box.appendChild(button);
-          shown += 1;
-        });
-        if (!shown) {
-          var empty = document.createElement("p");
-          empty.className = "profile-place";
-          empty.textContent = "Noch kein Trainer.";
-          box.appendChild(empty);
-        }
+        profileTrainerChoices = list || [];
+        var account = profilePerson && profilePerson.isSelf ? sessionAccount : profilePerson;
+        paintTrainerBlock(account, profileTrainerChoices);
       }
 
       function fillProfile(account, plan, photos, mine) {
@@ -7889,11 +8260,8 @@
           });
         }
         var mantra = document.getElementById("profile-mantra");
-        var ownMantra = String((account && account.mantra) || "").trim();
-        mantra.value = ownMantra || todayMantra();
-        mantra.dataset.listed = ownMantra ? "" : "1";
-        mantra.readOnly = true;
-        paintProfileMantras();
+        if (mantra) mantra.readOnly = true;
+        paintProfileMantra(account);
         var started = mine ? routineStart() : (about.challenge_started || "");
         document.getElementById("profile-challenge").textContent = started ? "12-Wochenroutine gestartet" : "12-Wochenroutine nicht gestartet";
         renderProfileWeeks(started, mine);
@@ -7934,7 +8302,7 @@
         requestAnimationFrame(function () { sheet.classList.add("is-open"); });
         var id = encodeURIComponent(person.id);
         Promise.all([
-          rest("go_accounts?id=eq." + id + "&select=id,name,photo_url,training_goal,about_me,mantra,workout_places,diary_visibility").catch(function () { return []; }),
+          rest("go_accounts?id=eq." + id + "&select=id,name,photo_url,training_goal,about_me,mantra,workout_places,diary_visibility,trainer_id").catch(function () { return []; }),
           rest("go_coach_plans?account_id=eq." + id + "&select=blurb,life_situation,goal,phase_steps").catch(function () { return []; }),
           rest("go_community_posts?author_id=eq." + id + "&select=author_id,photo_url&limit=60").catch(function () { return []; })
         ]).then(function (pack) {
@@ -7959,17 +8327,23 @@
           }
           fillProfile(account, pack[1] && pack[1][0], photos, mine);
           if (mine) {
-            rest("go_accounts?is_trainer=eq.true&select=id,name,photo_url,is_trainer&order=name.asc&limit=40")
+            rest("go_accounts?is_trainer=eq.true&select=id,name,phone,is_trainer&order=name.asc&limit=40")
               .catch(function () { return []; })
-              .then(function (rows) { paintTrainerChoices(rows || []); });
+              .then(function (rows) {
+                profileTrainerChoices = rows || [];
+                paintTrainerBlock(account, profileTrainerChoices);
+              });
           } else {
-            paintTrainerChoices([]);
+            profileTrainerChoices = [];
+            paintTrainerBlock(account, []);
           }
         });
       }
 
       function closeProfile() {
         var sheet = document.getElementById("profile-sheet");
+        var trainerModal = document.getElementById("trainer-modal");
+        if (trainerModal) trainerModal.hidden = true;
         sheet.classList.remove("is-open");
         sheet.classList.remove("is-editing");
         window.setTimeout(function () { if (!sheet.classList.contains("is-open")) sheet.hidden = true; }, 280);
@@ -8004,6 +8378,34 @@
         if (event.target.id === "invite-in-modal") event.currentTarget.hidden = true;
       });
       document.getElementById("profile-back").addEventListener("click", closeProfile);
+      document.getElementById("profile-ph").addEventListener("click", function () {
+        if (!profilePerson || !profilePerson.isSelf) return;
+        document.getElementById("profile-photo-file").click();
+      });
+      document.getElementById("profile-photo-file").addEventListener("change", function (event) {
+        var file = event.target.files && event.target.files[0];
+        event.target.value = "";
+        if (!file || !profilePerson || !profilePerson.isSelf) return;
+        compressPhoto(file, function (url) {
+          if (!url || !sessionAccount) return;
+          sessionAccount.photo_url = url;
+          profilePerson.photo_url = url;
+          saveProfileFields({ photo_url: url });
+          paintProfileFace(profilePerson);
+          loadTeam();
+        });
+      });
+      document.getElementById("trainer-save").addEventListener("click", function () {
+        if (!trainerPick || !sessionAccount || !profilePerson || !profilePerson.isSelf) return;
+        sessionAccount.trainer_id = trainerPick;
+        saveProfileFields({ trainer_id: trainerPick });
+        paintTrainerBlock(sessionAccount, profileTrainerChoices);
+        loadTeam();
+        document.getElementById("trainer-modal").hidden = true;
+      });
+      document.getElementById("trainer-modal").addEventListener("click", function (event) {
+        if (event.target.id === "trainer-modal") event.currentTarget.hidden = true;
+      });
       function openGoalPicker() {
         if (!profilePerson || !profilePerson.isSelf) return;
         var box = document.getElementById("goal-options");
@@ -8029,12 +8431,12 @@
           var about = profileAbout(sessionAccount);
           about.text = String(document.getElementById("profile-about").value || "").slice(0, 300);
           var mantraEl = document.getElementById("profile-mantra");
-          var fields = { about_me: about };
-          if (mantraEl.dataset.listed !== "1") fields.mantra = String(mantraEl.value || "").slice(0, 220);
-          saveProfileFields(fields);
+          var savedMantra = mantraToSave(mantraEl.value);
+          sessionAccount.mantra = savedMantra;
+          saveProfileFields({ about_me: about, mantra: savedMantra });
         }
         setProfileEditing(next);
-        if (next) paintProfileMantras();
+        paintProfileMantra(sessionAccount);
       });
       document.getElementById("profile-goal").addEventListener("click", function () {
         if (!document.getElementById("profile-sheet").classList.contains("is-editing")) return;
@@ -8056,13 +8458,16 @@
         fitProfileAbout();
       });
       document.getElementById("profile-mantra").addEventListener("input", function () {
-        this.dataset.listed = "";
+        this.style.height = "auto";
+        this.style.height = Math.max(this.scrollHeight, 24) + "px";
       });
       document.getElementById("profile-mantra").addEventListener("change", function () {
         if (!profilePerson || !profilePerson.isSelf) return;
         if (!document.getElementById("profile-sheet").classList.contains("is-editing")) return;
-        this.dataset.listed = "";
-        saveProfileFields({ mantra: String(this.value || "").slice(0, 220) });
+        var saved = mantraToSave(this.value);
+        sessionAccount.mantra = saved;
+        saveProfileFields({ mantra: saved });
+        this.value = saved;
       });
 
       function isoParts(iso) {
@@ -8277,6 +8682,7 @@
       paintAbsenceWheels();
 
       ensureDiaryFrom();
+      loadOwnDiary();
       if (!sessionMode) {
         var storedVis = readStore(HOME_VIS, "private");
         if (storedVis === "trainer" || storedVis === "friends" || storedVis === "private") diaryVisibility = storedVis;
