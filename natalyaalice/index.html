@@ -1540,7 +1540,8 @@
       font-weight: 600;
       flex: none;
     }
-    button.profile-ph {
+    label.profile-ph {
+      position: relative;
       border: 0;
       padding: 0;
       color: inherit;
@@ -1549,8 +1550,19 @@
       font-weight: 600;
       overflow: hidden;
     }
-    button.profile-ph.is-mine { cursor: pointer; }
-    button.profile-ph .profile-photo { width: 100%; height: 100%; }
+    label.profile-ph.is-mine { cursor: pointer; }
+    label.profile-ph .profile-photo { width: 100%; height: 100%; }
+    .profile-photo-file {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    label.profile-ph:not(.is-mine) .profile-photo-file { display: none; }
     .profile-goal-col { flex: 1; min-width: 0; padding-top: 4px; }
     .profile-name {
       margin: 0;
@@ -1642,7 +1654,15 @@
       background: #2A2118;
       color: #F6F1E8;
     }
-    #trainer-modal h2 { text-align: center; }
+    #trainer-modal .sand-card {
+      display: flex;
+      flex-direction: column;
+      max-height: min(78vh, 640px);
+      text-align: left;
+    }
+    #trainer-modal h2 { text-align: center; flex: none; }
+    #trainer-save { flex: none; margin-top: 18px; }
+    #trainer-save:disabled { opacity: 0.4; }
     .profile-photos-label { margin-top: 22px; }
     #profile-places-block[hidden],
     #profile-photos-label[hidden] { display: none; }
@@ -2622,8 +2642,9 @@
       </button>
     </div>
     <div class="profile-head">
-      <button type="button" class="profile-ph" id="profile-ph" aria-label="Profilfoto">?</button>
-      <input id="profile-photo-file" type="file" accept="image/*" hidden />
+      <label class="profile-ph" id="profile-ph" aria-label="Profilfoto">?
+        <input id="profile-photo-file" class="profile-photo-file" type="file" accept="image/*" disabled />
+      </label>
       <div class="profile-goal-col">
         <p class="profile-label">Ziel</p>
         <p class="profile-goal" id="profile-goal">Ziel wählen</p>
@@ -8037,19 +8058,26 @@
 
       function paintProfileFace(person) {
         var ph = document.getElementById("profile-ph");
+        var file = document.getElementById("profile-photo-file");
         var mine = !!(person && person.isSelf);
         ph.classList.toggle("is-mine", mine);
         ph.setAttribute("aria-label", mine ? "Profilfoto ändern" : "Profilfoto");
-        ph.textContent = "";
+        if (file) file.disabled = !mine;
+        Array.from(ph.childNodes).forEach(function (node) {
+          if (node !== file) ph.removeChild(node);
+        });
         if (person && person.photo_url) {
           var img = document.createElement("img");
           img.className = "profile-photo";
           img.alt = "";
           img.src = person.photo_url;
-          ph.appendChild(img);
+          if (file) ph.insertBefore(img, file);
+          else ph.appendChild(img);
           return;
         }
-        ph.textContent = String((person && person.name) || "?").slice(0, 1);
+        var letter = document.createTextNode(String((person && person.name) || "?").slice(0, 1));
+        if (file) ph.insertBefore(letter, file);
+        else ph.appendChild(letter);
       }
 
       function mantraToSave(value) {
@@ -8134,7 +8162,7 @@
         }
         var ready = profileTrainerChoices.length
           ? Promise.resolve(profileTrainerChoices)
-          : rest("go_accounts?is_trainer=eq.true&select=id,name,phone,is_trainer&order=name.asc&limit=40").catch(function () { return []; });
+          : rest("go_accounts?is_trainer=eq.true&select=id,name,phone,is_trainer&order=name.asc&limit=500").catch(function () { return []; });
         ready.then(function (rows) {
           profileTrainerChoices = rows || [];
           paint(profileTrainerChoices);
@@ -8306,6 +8334,7 @@
           rest("go_coach_plans?account_id=eq." + id + "&select=blurb,life_situation,goal,phase_steps").catch(function () { return []; }),
           rest("go_community_posts?author_id=eq." + id + "&select=author_id,photo_url&limit=60").catch(function () { return []; })
         ]).then(function (pack) {
+          if (!profilePerson || String(profilePerson.id || "") !== String(person.id || "")) return;
           var account = (pack[0] && pack[0][0]) || (mine ? sessionAccount : person);
           if (mine && sessionAccount) {
             account = Object.assign({}, account || {}, sessionAccount);
@@ -8325,9 +8354,15 @@
           } else if (shared) {
             (pack[2] || []).forEach(pushPost);
           }
+          if (account && account.photo_url) {
+            profilePerson.photo_url = account.photo_url;
+            if (mine && sessionAccount) sessionAccount.photo_url = account.photo_url;
+          }
+          if (mine && account && account.trainer_id && sessionAccount) sessionAccount.trainer_id = account.trainer_id;
+          paintProfileFace(profilePerson);
           fillProfile(account, pack[1] && pack[1][0], photos, mine);
           if (mine) {
-            rest("go_accounts?is_trainer=eq.true&select=id,name,phone,is_trainer&order=name.asc&limit=40")
+            rest("go_accounts?is_trainer=eq.true&select=id,name,phone,is_trainer&order=name.asc&limit=500")
               .catch(function () { return []; })
               .then(function (rows) {
                 profileTrainerChoices = rows || [];
@@ -8378,10 +8413,6 @@
         if (event.target.id === "invite-in-modal") event.currentTarget.hidden = true;
       });
       document.getElementById("profile-back").addEventListener("click", closeProfile);
-      document.getElementById("profile-ph").addEventListener("click", function () {
-        if (!profilePerson || !profilePerson.isSelf) return;
-        document.getElementById("profile-photo-file").click();
-      });
       document.getElementById("profile-photo-file").addEventListener("change", function (event) {
         var file = event.target.files && event.target.files[0];
         event.target.value = "";
