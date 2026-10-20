@@ -32,12 +32,20 @@ create policy "go_workout_places_insert_anon"
 -- Start-Orte (external_id verhindert Duplikate; App prüft zusätzlich ~80 % Namensähnlichkeit)
 insert into go_workout_places (name, lat, lng, map_source, external_id)
 values
-  ('FF Schönhauser Allee', 52.5408, 13.4124, 'seed', 'seed:ff-schoenhauser'),
+  ('FF Schönhauser Allee', 52.54955, 13.41355, 'seed', 'seed:ff-schoenhauser'),
   ('Holmes Place Neue Welt', 52.5055, 13.4437, 'seed', 'seed:holmes-neue-welt'),
   ('Hagius Berlin', 52.4969, 13.4386, 'seed', 'seed:hagius-berlin'),
-  ('Hasenheide Park', 52.4774, 13.4194, 'seed', 'seed:hasenheide'),
+  ('Hasenheide Park', 52.4865, 13.4178, 'seed', 'seed:hasenheide'),
   ('Tempelhofer Feld', 52.4734, 13.4039, 'seed', 'seed:tempelhofer-feld'),
   ('Columbiabad Neukölln', 52.4830, 13.4310, 'seed', 'seed:columbiabad-neukoelln'),
   ('Prinzenbad Kreuzberg', 52.4885, 13.4055, 'seed', 'seed:prinzenbad-kreuzberg'),
   ('Schwimmbad Landsberger Allee', 52.5285, 13.4720, 'seed', 'seed:schwimmbad-landsberger')
 on conflict (external_id) do nothing;
+
+update go_workout_places
+set lat = 52.54955, lng = 13.41355
+where external_id = 'seed:ff-schoenhauser';
+
+update go_workout_places
+set lat = 52.4865, lng = 13.4178
+where external_id = 'seed:hasenheide';
