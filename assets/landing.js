@@ -353,6 +353,10 @@
     if (!payload || !payload.href) return;
     back.hidden = false;
     back.setAttribute("href", String(payload.href));
+    if (String(payload.href).indexOf("/workout") >= 0) {
+      back.classList.add("is-arrow");
+      back.setAttribute("aria-label", "Zurück");
+    }
     var nav = back.closest(".lp-nav");
     if (nav) nav.classList.add("has-profile-back");
     back.addEventListener("click", function () {
