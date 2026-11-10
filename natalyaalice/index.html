@@ -7908,7 +7908,7 @@
       function loadTeam() {
         if (!sessionMode || !sessionAccount) return Promise.resolve();
         var id = String(sessionAccount.id);
-        var personSelect = "id,name,nickname,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id";
+        var personSelect = "id,name,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id";
         return rest("go_accounts?id=eq." + encodeURIComponent(id) + "&select=id,name,trainer_id,photo_url,is_trainer")
           .catch(function () { return []; })
           .then(function (rows) {
@@ -7984,8 +7984,27 @@
             renderTeam();
             attachInvitePhotos();
             if (document.body.dataset.shell !== "workout") paintWelcome();
+            attachNicknames(teamPeople).then(function (changed) {
+              if (changed && document.body.dataset.shell === "heute") paintHeuteCrew();
+            });
           })
           .catch(function () { renderTeam(); });
+      }
+
+      function attachNicknames(people) {
+        var ids = (people || []).map(function (p) { return p && p.id; }).filter(Boolean);
+        if (!ids.length) return Promise.resolve(false);
+        return rest("go_accounts?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=id,nickname")
+          .then(function (rows) {
+            var map = {};
+            (rows || []).forEach(function (row) { if (row && row.nickname) map[String(row.id)] = row.nickname; });
+            var changed = false;
+            people.forEach(function (p) {
+              if (p && map[String(p.id)] && p.nickname !== map[String(p.id)]) { p.nickname = map[String(p.id)]; changed = true; }
+            });
+            return changed;
+          })
+          .catch(function () { return false; });
       }
 
       function searchTeam() {
@@ -8000,7 +8019,7 @@
         var filter = serial
           ? "serial_number=eq." + encodeURIComponent(serial)
           : "nickname=ilike." + encodeURIComponent(likeExact(nick));
-        rest("go_accounts?" + filter + "&select=id,name,photo_url,serial_number,is_trainer,nickname&limit=1")
+        rest("go_accounts?" + filter + "&select=id,name,photo_url,serial_number,is_trainer&limit=1")
           .then(function (rows) {
             var found = rows && rows[0];
             if (!found || !found.id || String(found.id) === String(sessionAccount.id)) {
@@ -10318,7 +10337,7 @@
         recsBox.closest(".profile-block").hidden = !mine && !recsBox.value;
         paintProfileLinks(about, mine);
         paintProfileWeek(account, plan, mine);
-        paintProfileZirkel(account, mine);
+        attachNicknames([account]).then(function () { paintProfileZirkel(account, mine); });
         fitProfileAbout();
         var placesBlock = document.getElementById("profile-places-block");
         var places = document.getElementById("profile-places");
@@ -10382,7 +10401,7 @@
         requestAnimationFrame(function () { sheet.classList.add("is-open"); });
         var id = encodeURIComponent(person.id);
         Promise.all([
-          rest("go_accounts?id=eq." + id + "&select=id,name,nickname,photo_url,training_goal,about_me,mantra,workout_places,weekday_meet_prefs,diary_visibility,trainer_id").catch(function () { return []; }),
+          rest("go_accounts?id=eq." + id + "&select=id,name,photo_url,training_goal,about_me,mantra,workout_places,weekday_meet_prefs,diary_visibility,trainer_id").catch(function () { return []; }),
           rest("go_coach_plans?account_id=eq." + id + "&select=blurb,life_situation,goal,phase_steps,day_training_units,kraft_weekdays,ausdauer_weekdays,zirkel_weekday").catch(function () { return []; }),
           rest("go_community_posts?author_id=eq." + id + "&select=author_id,photo_url&limit=60").catch(function () { return []; })
         ]).then(function (pack) {
