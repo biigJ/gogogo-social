@@ -47,6 +47,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/natalyaalice/ffc.css" />
   <style>
     :root {
       --bg: #C7413B;
@@ -1237,12 +1238,15 @@
     body.is-session[data-shell="workout"] .welcome { display: none !important; }
     body.is-session[data-shell="heute"] .welcome,
     body.is-session[data-shell="plan"] .welcome { display: flex; flex-direction: column; }
-    body.is-session[data-shell="heute"] .heute-head { order: 1; }
-    body.is-session[data-shell="heute"] .heute-mantra { order: 2; }
-    body.is-session[data-shell="heute"] .photo { order: 3; }
-    body.is-session[data-shell="heute"] .dock { order: 4; margin-top: 16px; }
-    body.is-session[data-shell="heute"] .heute-crew { order: 5; }
-    body.is-session[data-shell="heute"] .heute-joins { order: 6; }
+    body.is-session[data-shell="heute"] .heute-head,
+    body.is-session[data-shell="heute"] .heute-mantra,
+    body.is-session[data-shell="heute"] .photo,
+    body.is-session[data-shell="heute"] .heute-crew { display: none !important; }
+    body.is-session[data-shell="heute"] .heute-stories { order: 1; }
+    body.is-session[data-shell="heute"] .heute-start { order: 2; }
+    body.is-session[data-shell="heute"] .dock { order: 3; margin-top: 18px; }
+    body.is-session[data-shell="heute"] .heute-events { order: 4; }
+    body.is-session[data-shell="heute"] .heute-joins { order: 5; }
     body.is-session[data-shell="heute"] .dock .go-row { display: none; }
     body.is-session[data-shell="plan"] .plan-tabs { order: 1; }
     body.is-session[data-shell="plan"] .absence-block { order: 2; }
@@ -1261,10 +1265,10 @@
     body.is-session[data-shell="plan"][data-plan="kalender"] #plan-team,
     body.is-session[data-shell="plan"][data-plan="kalender"] #plan-orte,
     body.is-session[data-shell="plan"][data-plan="kalender"] #plan-training { display: none !important; }
-    .plan-tabs, .shell-plan { display: none; }
+    .plan-tabs, .shell-plan, .heute-start, .heute-events, .zirkel-block { display: none; }
     body.is-session[data-shell="plan"] .plan-tabs {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(4, 1fr) 40px;
       gap: 0;
       margin: 4px 0 16px;
       border-bottom: 1px solid rgba(42, 33, 24, 0.28);
@@ -1801,7 +1805,7 @@
       color: rgba(42, 33, 24, 0.55);
     }
     .absence-block { display: none; margin-top: 8px; }
-    body.is-session[data-shell="plan"][data-plan="kalender"] .absence-block { display: block; }
+    body.is-session[data-shell="plan"][data-plan="training"] .absence-block { display: block; }
     #absence-open.routine-start,
     #absence-save.routine-start { height: auto; min-height: 44px; }
     .absence-editor[hidden] { display: none; }
@@ -2000,15 +2004,214 @@
       width: 44px; height: 44px; border-radius: 50%;
       border: 1.6px solid currentColor;
     }
+    .plan-tabs__menu { display: grid; place-items: center; }
+    .plan-tabs__menu .heute-burger {
+      display: grid;
+      position: static;
+      width: 40px;
+      height: 40px;
+      transform: none;
+    }
+    .tip.is-owned {
+      font-size: min(20px, 4.1vw);
+      line-height: 1.3;
+    }
+    .tip.is-owned span {
+      display: block;
+      white-space: nowrap;
+    }
+    .day-place {
+      display: flex;
+      align-items: center;
+      margin: 6px 0 0;
+      padding: 0 10px;
+      min-height: 28px;
+      border: 1px solid #2A2118;
+      border-radius: 0;
+      font-size: 14px;
+      line-height: 1.2;
+    }
+    .day-invite__add {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      font-weight: 500;
+      color: #2A2118;
+    }
+    .team-wa {
+      flex: none;
+      width: 44px;
+      height: 44px;
+      margin-left: auto;
+      display: grid;
+      place-items: center;
+      color: #2A2118;
+    }
+    .team-wa svg { width: 24px; height: 24px; display: block; }
+    body.is-session[data-shell="heute"] .heute-start {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .heute-start svg { width: 20px; height: 20px; flex: none; }
+    .heute-stories { margin: 0 -20px 14px; }
+    .heute-stories[hidden] { display: none !important; }
+    .heute-stories__row {
+      display: flex;
+      gap: 14px;
+      padding: 4px 20px 6px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .heute-stories__row::-webkit-scrollbar { display: none; }
+    .heute-stories__team { display: contents; }
+    .crew-story {
+      flex: none;
+      width: 68px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      color: #2A2118;
+    }
+    .crew-story__ring {
+      width: 64px;
+      height: 64px;
+      padding: 2.5px;
+      border-radius: 50%;
+      background: conic-gradient(#C7413B, #2A2118, #C7413B);
+    }
+    .crew-story__ring .team-avatar {
+      width: 100%;
+      height: 100%;
+      border: 2.5px solid #F3EEE4;
+      font-size: 20px;
+    }
+    .crew-story__ring .team-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .crew-story__name {
+      max-width: 68px;
+      font-size: 11px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .heute-stories .story-hint { padding: 0 20px; }
+    body.is-session #go-today {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      min-height: 0;
+      padding: 16px 18px;
+      border-radius: 0;
+      border: 1px solid #2A2118;
+      background: transparent;
+      color: #2A2118;
+      text-align: left;
+    }
+    body.is-session #go-today:disabled { opacity: 1; }
+    .today-card__kicker, .today-card__line { display: none; }
+    body.is-session .today-card__kicker,
+    body.is-session .today-card__line { display: block; }
+    .today-card__kicker { font-size: 12px; font-weight: 600; color: rgba(42, 33, 24, 0.58); }
+    body.is-session .today-card__title {
+      font-family: "Playfair Display", serif;
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    .today-card__line { font-size: 13px; font-weight: 500; line-height: 1.3; }
+    .today-card__line:empty { display: none; }
+    .today-invite {
+      display: block;
+      margin: 10px 0 0 auto;
+      padding: 6px 2px;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      color: #2A2118;
+    }
+    .today-invite[hidden] { display: none; }
+    body.is-session[data-shell="heute"] .heute-events { display: block; margin-top: 18px; }
+    .heute-events:empty { display: none !important; }
+    .ev-sheet {
+      position: fixed;
+      inset: 0;
+      z-index: 75;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      background: rgba(42, 33, 24, 0.35);
+    }
+    .ev-sheet[hidden] { display: none; }
+    .ev-sheet__card {
+      width: min(100%, 440px);
+      max-height: calc(100% - 40px);
+      overflow-y: auto;
+      padding: 22px 20px calc(24px + env(safe-area-inset-bottom));
+      background: #F3EEE4;
+      text-align: left;
+    }
+    body.is-session #plan-training .zirkel-block { display: block; }
+    .zirkel-block {
+      margin-top: 36px;
+      padding-top: 18px;
+      border-top: 1px solid rgba(42, 33, 24, 0.28);
+    }
+    .zirkel-head {
+      font-family: "Playfair Display", serif;
+      font-weight: 600;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 12px;
+    }
+    .zirkel-login p { font-size: 14px; line-height: 1.45; margin-bottom: 12px; }
+    .zirkel-login[hidden], .zirkel-body[hidden] { display: none; }
+    #zirkel-login-btn.routine-start, #zirkel-setup.routine-start {
+      height: auto;
+      min-height: 48px;
+      font-size: 15px;
+    }
+    .zirkel-sub-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .zirkel-sub {
+      margin: 26px 0 10px;
+      font-family: "Playfair Display", serif;
+      font-weight: 600;
+      font-size: 20px;
+      letter-spacing: -0.01em;
+    }
+    .zirkel-sub-row .zirkel-sub { margin-bottom: 10px; }
+    .zirkel-foot {
+      display: flex;
+      justify-content: center;
+      gap: 22px;
+      margin-top: 26px;
+      font-size: 13px;
+    }
+    .zirkel-foot button { text-decoration: underline; text-underline-offset: 3px; color: rgba(42, 33, 24, 0.7); }
   </style>
 </head>
 <body class="is-home">
   <section id="welcome" class="welcome">
-    <div class="plan-tabs" role="tablist" aria-label="Planung">
+    <div class="plan-tabs" role="tablist" aria-label="Profil">
       <button type="button" data-plan="team" role="tab">Team</button>
       <button type="button" data-plan="orte" role="tab">Orte</button>
-      <button type="button" data-plan="kalender" class="is-on" role="tab">Kalender</button>
-      <button type="button" data-plan="training" role="tab">Training</button>
+      <button type="button" data-plan="training" role="tab">go!</button>
+      <button type="button" data-plan="kalender" class="is-on" role="tab">Woche</button>
+      <span class="plan-tabs__menu">
+        <button type="button" id="heute-menu" class="heute-burger" aria-label="Menü" aria-haspopup="dialog">
+          <span></span><span></span><span></span>
+        </button>
+      </span>
     </div>
     <div class="shell-plan" id="plan-team"></div>
     <div class="shell-plan" id="plan-orte">
@@ -2353,21 +2556,48 @@
           </p>
         </article>
       </div>
+      <section class="zirkel-block" id="zirkel-block">
+        <h2 class="zirkel-head">Zirkeltraining</h2>
+        <div class="zirkel-login" id="zirkel-login">
+          <p>Melde Dich mit Deinem Zirkeltraining-Account an. Es ist derselbe Account wie unter gogogo.social/zirkeltraining.</p>
+          <button type="button" class="routine-start" id="zirkel-login-btn">Anmelden</button>
+        </div>
+        <div class="zirkel-body ffc" id="zirkel-body" hidden>
+          <button type="button" class="routine-start" id="zirkel-setup">Workout einstellen</button>
+          <div class="zirkel-sub-row">
+            <h3 class="zirkel-sub">Leaderboard</h3>
+            <span id="zirkel-plus-slot"></span>
+          </div>
+          <div id="zirkel-board"></div>
+          <h3 class="zirkel-sub">Aufzeichnungen</h3>
+          <div id="zirkel-records"></div>
+          <h3 class="zirkel-sub">Persönliche Bestleistungen</h3>
+          <div id="zirkel-bests"></div>
+          <p class="zirkel-foot">
+            <button type="button" id="zirkel-profile">Zirkel-Profil</button>
+            <button type="button" id="zirkel-logout">Abmelden</button>
+          </p>
+        </div>
+      </section>
     </div>
     <div class="heute-head shell-heute">
       <button type="button" id="heute-wa" class="heute-wa" aria-label="Sofortnachricht an Trainer">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M6 6.5h12a2 2 0 0 1 2 2v6.2a2 2 0 0 1-2 2H10l-3.6 2.6V16.7H6a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2Z"/></svg>
       </button>
       <h1 class="welcome-title"><span class="welcome-name">gogogo Natalya</span><span class="welcome-bang">!</span></h1>
-      <button type="button" id="heute-menu" class="heute-burger" aria-label="Menü" aria-haspopup="dialog">
-        <span></span><span></span><span></span>
-      </button>
     </div>
     <div class="photo shell-heute" id="photo" role="button" tabindex="0">
       <input id="photo-file" type="file" accept="image/*" />
       <p id="photo-copy">Lade Dein Motivationsbild hoch. Dich selbst, ein Vorbild, ein Ort. Egal, was Deine eigene Motivation ausmacht.</p>
       <img id="photo-img" alt="" hidden />
     </div>
+    <div class="heute-stories shell-heute" id="heute-stories" hidden>
+      <div class="heute-stories__row ffc" id="heute-stories-row"><span class="heute-stories__team" id="heute-stories-team"></span></div>
+    </div>
+    <button type="button" class="go-primary heute-start shell-heute" id="heute-start">
+      <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
+      <span>Workout starten</span>
+    </button>
     <p class="tip shell-kalender">Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.</p>
     <button type="button" id="plan-week" class="plan-week shell-kalender" hidden>Meine Bewegung in der Woche planen</button>
     <div class="days shell-kalender" id="days"></div>
@@ -2390,8 +2620,9 @@
     <div class="weeks shell-kalender" id="weeks"></div>
     <p class="routine-note shell-kalender" id="routine-note" hidden></p>
     <div class="dock">
-      <p class="heute-away" id="heute-away" hidden>Alternativer Alltag gem. Deiner Angabe unter Planung.</p>
-      <button type="button" class="go-primary" id="go-today">Heutiges Workout</button>
+      <p class="heute-away" id="heute-away" hidden>Alternativer Alltag gem. Deiner Angabe unter Profil.</p>
+      <button type="button" class="go-primary" id="go-today"><span class="today-card__kicker" id="today-kicker"></span><span class="today-card__title" id="today-title">Heutiges Workout</span><span class="today-card__line" id="today-line"></span></button>
+      <button type="button" class="today-invite" id="today-invite" hidden>Einladen</button>
       <div class="go-row">
         <button type="button" class="go-quiet" id="go-shift">Schieben</button>
         <button type="button" class="go-quiet" id="go-short">Kurzfassung 15 min</button>
@@ -2399,6 +2630,7 @@
     </div>
     <p class="heute-mantra shell-heute" id="heute-mantra"></p>
     <div class="heute-crew shell-heute" id="heute-crew"></div>
+    <div class="heute-events ffc shell-heute" id="heute-events"></div>
     <div class="heute-joins shell-heute" id="heute-joins"></div>
   </section>
   <section id="diary" class="diary" hidden>
@@ -2406,7 +2638,7 @@
       <button type="button" id="diary-back" class="home-btn is-back" aria-label="Zurück">
         <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
-      <h1>Tagebuch</h1>
+      <h1>Historie</h1>
       <label class="diary-share-pick">
         <select id="diary-share-select" aria-label="Tagebuch sichtbar für">
           <option value="private">privat</option>
@@ -2568,15 +2800,30 @@
   </div>
   <div class="sand-modal" id="team-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="team-title">
-      <h2 class="ask" id="team-title">ID eingeben</h2>
-      <input class="team-id" id="team-id" inputmode="numeric" maxlength="8" placeholder="ID" aria-label="ID" />
+      <h2 class="ask" id="team-title">ID oder Nickname eingeben</h2>
+      <input class="team-id" id="team-id" maxlength="20" placeholder="ID oder Nickname" aria-label="ID oder Nickname" autocomplete="off" autocapitalize="off" spellcheck="false" />
       <button type="button" id="team-search">Suchen</button>
       <p class="team-msg" id="team-msg"></p>
     </div>
   </div>
+  <div class="sand-modal" id="go-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-label="Workout starten">
+      <div id="go-kinds">
+        <button type="button" data-go-kind="kraft">🏋️‍♀️ Kraft</button>
+        <button type="button" data-go-kind="ausdauer">🏃 Ausdauer</button>
+        <button type="button" data-go-kind="zirkel">🔥 Zirkeltraining</button>
+        <button type="button" data-go-kind="alternative">🤸 Alternative Bewegung</button>
+      </div>
+      <div id="go-pick" hidden></div>
+    </div>
+  </div>
+  <div class="ev-sheet" id="ev-sheet" hidden>
+    <div class="ev-sheet__card ffc" id="ev-sheet-card" role="dialog" aria-modal="true" aria-label="Event"></div>
+  </div>
   <div class="sand-modal" id="heute-menu-modal" hidden>
     <div class="sand-card heute-menu" role="dialog" aria-modal="true" aria-label="Menü">
       <button type="button" data-menu="name">Vorname ändern</button>
+      <button type="button" data-menu="nickname">Nickname festlegen</button>
       <button type="button" data-menu="phone">Telefonnummer angeben</button>
       <button type="button" data-menu="code">Login-Code ändern</button>
       <button type="button" data-menu="website">Website besuchen</button>
@@ -2676,23 +2923,23 @@
   </section>
   <div class="app-pill">
     <nav aria-label="Bereiche">
-      <button type="button" data-shell="plan" aria-label="Planung">
+      <button type="button" data-shell="plan" aria-label="Profil">
         <span class="pill-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.6 20.2c.6-3.9 3.7-6.3 7.4-6.3s6.8 2.4 7.4 6.3"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
-        <small>Planung</small>
+        <small>Profil</small>
       </button>
       <button type="button" data-shell="heute" class="is-on" aria-label="Heute">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3.2v3.1M12 17.7v3.1M3.2 12h3.1M17.7 12h3.1M5.7 5.7l2.2 2.2M16.1 16.1l2.2 2.2M18.3 5.7l-2.2 2.2M7.9 16.1l-2.2 2.2"/></svg>
         <small>Heute</small>
       </button>
-      <button type="button" data-shell="diary" aria-label="Tagebuch">
+      <button type="button" data-shell="diary" aria-label="Historie">
         <span class="pill-ico">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.2C10.2 4.8 7.6 4.4 4 5.2V19c3.4-.7 6-.2 8 1.2 2-1.4 4.6-1.9 8-1.2V5.2c-3.6-.8-6.2-.4-8 1Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 6.2V20.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
-        <small>Tagebuch</small>
+        <small>Historie</small>
       </button>
     </nav>
   </div>
@@ -2778,6 +3025,480 @@
     </div>
   </div>
 
+  <!-- ffc:start -->
+  <div class="ffc" id="ffc-root">
+<div class="app-scroll" id="appScroll">
+<div class="wrap">
+  <div class="screen active" id="auth">
+    <div class="auth-box">
+      <div class="brand">Zirkeltraining</div>
+      <button type="button" class="ffc-close" data-ffc-close aria-label="Schließen"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="tagline" id="authTagline">Anmelden, um dein Training zu speichern</div>
+
+      <input type="email" id="authEmail" class="auth-input" placeholder="E-Mail" autocomplete="email">
+      <input type="password" id="authPassword" class="auth-input" placeholder="Passwort" autocomplete="current-password">
+      <button class="back-link" id="authForgotBtn" style="align-self:flex-end; margin:-4px 0 14px;">Passwort vergessen?</button>
+
+      <button class="start-btn" id="authSubmitBtn">Anmelden</button>
+      <button class="back-link" id="authToggleBtn" style="align-self:center; margin-top:16px;">Noch keinen Account? Registrieren</button>
+      <div class="auth-error" id="authError"></div>
+    </div>
+  </div>
+  <div class="screen" id="newpass">
+    <div class="auth-box">
+      <div class="brand">Zirkeltraining</div>
+      <div class="tagline">Neues Passwort festlegen</div>
+      <input type="password" id="newPass1" class="auth-input" placeholder="Neues Passwort (mind. 6 Zeichen)" autocomplete="new-password">
+      <input type="password" id="newPass2" class="auth-input" placeholder="Neues Passwort wiederholen" autocomplete="new-password">
+      <button class="start-btn" id="newPassBtn">Passwort speichern</button>
+      <div class="auth-error" id="newPassStatus"></div>
+    </div>
+  </div>
+  <div class="screen" id="home">
+    <div class="home-greet">
+      <span class="home-greet-small">Willkommen zurück,</span>
+      <span class="home-greet-name" id="homeName">Athlet</span>
+    </div>
+    <button class="home-hero" id="goSetupBtn">
+      <span class="home-hero-icon">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
+      </span>
+      <span class="home-hero-title">Workout starten</span>
+    </button>
+    <div class="home-events" id="homeEvents"></div>
+  </div>
+  <div class="screen" id="setup">
+    <div class="page-head">
+      <button class="round-back" id="backFromSetup" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="page-head-title">Workout einstellen</div>
+      <span class="page-head-spacer"></span>
+    </div>
+    <div class="seg-ctrl setup-mode" id="setupModeSeg"><button data-mode="standard" class="active">Standard</button><button data-mode="custom">Benutzerdefiniert</button></div>
+
+    <div class="card">
+      <div class="card-label">
+        <span class="name">Stationen</span>
+        <span class="value ex-count" id="exCount"></span>
+      </div>
+      <div class="ex-grid" id="exercisePlan"></div>
+      <div class="run-order">
+        <span class="run-order-lbl">Laufen</span>
+        <div class="seg-ctrl run-seg" id="runOrderSeg"><button data-run="first" class="active">Vor der Station</button><button data-run="second">Nach der Station</button></div>
+      </div>
+      <div class="ex-hint" id="exHint" style="display:none;"></div>
+      <div class="ex-preview" id="exPreview"></div>
+    </div>
+
+    <div class="summary">
+      <div class="item"><div class="num" id="sumRounds">0</div><div class="lbl">Runden</div></div>
+      <div class="item"><div class="num" id="sumWork">4:00</div><div class="lbl">Arbeit</div></div>
+      <div class="item"><div class="num" id="sumRest">30s</div><div class="lbl">Pause</div></div>
+      <div class="item"><div class="num" id="sumTotal">0:00</div><div class="lbl">Gesamt</div></div>
+    </div>
+
+    <button class="start-btn" id="startBtn">Workout starten</button>
+  </div>
+  <div class="screen run" id="run">
+    <div class="run-top">
+      <button class="run-home" id="runHomeBtn" aria-label="Workout abbrechen">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="lane" id="lane"></div>
+    </div>
+    <div class="phase-label" id="phaseLabel">ARBEIT</div>
+    <div class="round-of" id="roundOf">Runde 1 / 8</div>
+    <div class="exercise-display" id="exerciseDisplay"></div>
+    <div class="clock" id="clock">04:00</div>
+    <div class="sub-clock-row">
+      <div class="sub-clock" id="subClock">Total: 00:00</div>
+      <button class="run-skip" id="runSkipBtn" aria-label="Weiter zur nächsten Phase">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 5.2v13.6c0 .8.9 1.3 1.6.8l9.4-6.8c.6-.4.6-1.2 0-1.6L7.6 4.4C6.9 3.9 6 4.4 6 5.2z"/><rect x="17.2" y="4.5" width="2.6" height="15" rx="1"/></svg>
+      </button>
+    </div>
+
+    <div class="log-card" id="logCard">
+      <div class="log-title">Runde <span id="logRoundNum">1</span> protokollieren</div>
+      <div class="log-row">
+        <select id="exerciseSelect">
+          <option value="">Übung wählen…</option>
+        </select>
+      </div>
+      <div class="log-row">
+        <div class="amount-wrap">
+          <input type="number" id="amountInput" placeholder="0" min="0" inputmode="numeric">
+          <span class="unit-label" id="unitLabel">Meter</span>
+        </div>
+      </div>
+      <div class="log-record" id="logRecord"></div>
+      <div class="log-points" id="logPoints"></div>
+    </div>
+
+    <div class="controls" id="controlsNormal" style="display:none;">
+      <button class="ctrl-btn" id="resetBtn">Reset</button>
+      <button class="ctrl-btn primary" id="pauseBtn" style="display:none;">Pause</button>
+      <button class="ctrl-btn" id="skipBtn">Skip</button>
+    </div>
+    <div class="run-plan" id="runPlan">
+      <div class="plan-list-wrap">
+        <div class="plan-list" id="planList"></div>
+        <div class="plan-scrollbar" id="planScrollbar"><span id="planScrollThumb"></span></div>
+      </div>
+      <div class="plan-hint" id="planHint"></div>
+    </div>
+
+    <div class="controls" id="controlsFinal" style="display:none;">
+      <button class="ctrl-btn" id="resetBtn2" style="display:none;">Reset</button>
+      <button class="ctrl-btn chalk" id="finishNowBtn">Workout beenden</button>
+    </div>
+  </div>
+  <div class="screen finish" id="finish">
+    <div class="phase-label">GESCHAFFT</div>
+    <h2>Workout <span class="chalk">beendet</span></h2>
+    <p id="finishSummary">8 Runden · 4:00 Arbeit · 30s Pause</p>
+    <p id="finishSaveStatus" style="display:none; font-size:12px; text-align:center; margin:-12px 0 16px;"></p>
+    <div class="finish-points" id="finishPoints"></div>
+    <div class="finish-edit-hint" id="finishEditHint"></div>
+    <div class="finish-log" id="finishLog"></div>
+    <div class="finish-edit-status" id="finishEditStatus"></div>
+    <div class="finish-actions">
+      <button class="post-cta" id="postCreateBtn">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span>Story posten <small>· 24 h sichtbar</small></span>
+      </button>
+      <input type="file" id="postCamInput" accept="image/*" capture="environment" style="display:none;">
+      <button class="start-btn" id="restartBtn">Neues Workout</button>
+      <button class="back-link" id="finishToHome" style="align-self:center;">Zur Startseite</button>
+    </div>
+  </div>
+  <div class="screen" id="connect">
+    <div class="story-bar" id="postStrip"></div>
+    <div class="story-hint" id="storyHint"></div>
+
+    <div class="conn-tabs-row">
+      <div class="seg-ctrl conn-seg" id="connSeg"><button data-csub="friends" class="active">Freunde</button><button data-csub="events">Events</button></div>
+      <button class="lb-plus" id="lbPlusBtn" title="Freund, Gruppe oder Event hinzufügen" aria-label="Freund, Gruppe oder Event hinzufügen">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      </button>
+    </div>
+    <div class="lb-menu" id="lbMenu">
+      <div class="lb-menu-row">
+        <button class="ctrl-btn" id="lbOptFriend">+ Freund</button>
+        <button class="ctrl-btn" id="lbOptGroup">+ Gruppe</button>
+        <button class="ctrl-btn" id="lbOptEvent">+ Event</button>
+      </div>
+
+      <div class="card lb-form" id="lbFriendForm" style="margin-bottom:0;">
+        <div class="card-label"><span class="name">Freund hinzufügen</span></div>
+        <input type="text" id="lbFriendQuery" class="auth-input" placeholder="Nickname oder E-Mail" autocomplete="off" autocapitalize="off" spellcheck="false">
+        <button class="start-btn" id="lbFriendSend">Anfrage senden</button>
+        <div class="lb-form-status" id="lbFriendStatus"></div>
+      </div>
+
+      <div class="card lb-form" id="lbGroupForm" style="margin-bottom:0;">
+        <div class="card-label"><span class="name">Gruppe erstellen</span></div>
+        <input type="text" id="lbGroupName" class="auth-input" placeholder="Gruppenname, z. B. Friday Circle" maxlength="40" autocomplete="off">
+        <div class="history-section-title" style="margin:6px 0 6px;">Freunde auswählen</div>
+        <div class="lb-pick-list" id="lbGroupPick"></div>
+        <button class="start-btn" id="lbGroupCreate">Gruppe erstellen</button>
+        <div class="lb-form-status" id="lbGroupStatus"></div>
+      </div>
+    </div>
+
+    <div id="connNotice"></div>
+    <div id="connPaneEvents" style="display:none;">
+      <button class="start-btn ev-new" id="evNewBtn">+ Event erstellen</button>
+      <div class="card ev-form" id="evForm">
+        <div id="evStep1">
+          <label class="ev-q" for="evTitle">Was?</label>
+          <input type="text" id="evTitle" class="auth-input" placeholder="Was?" maxlength="80" autocomplete="off">
+          <label class="ev-q" for="evWhen">Wann?</label>
+          <input type="datetime-local" id="evWhen" class="auth-input">
+          <label class="ev-q" for="evWhere">Wo?</label>
+          <input type="text" id="evWhere" class="auth-input" placeholder="Wo?" maxlength="120" autocomplete="off">
+          <label class="ev-q">Hintergrundbild <span class="ev-q-opt">optional</span></label>
+          <div class="ev-img-pick" id="evImgPick">
+            <button type="button" class="ev-img-btn" id="evImgBtn">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="8.5" cy="9.5" r="1.8"/><path d="M21 16l-5.2-5.2a1.5 1.5 0 0 0-2.1 0L5 19.5"/></svg>
+              Bild wählen
+            </button>
+          </div>
+          <input type="file" id="evImgInput" accept="image/*" style="display:none;">
+          <button class="start-btn" id="evNext">Weiter</button>
+          <button class="back-link" id="evCancel" style="display:block; margin:12px auto 0;">Abbrechen</button>
+        </div>
+        <div id="evStep2" style="display:none;">
+          <div class="ev-summary" id="evSummary"></div>
+          <div class="history-section-title" style="margin:0 0 8px;">Wer soll das Event sehen?</div>
+          <label class="post-toggle">
+            <span>An alle Freunde senden</span>
+            <input type="checkbox" id="evAll" checked>
+            <span class="switch"></span>
+          </label>
+          <div class="lb-pick-list" id="evPick" style="display:none;"></div>
+          <div class="ev-btns">
+            <button class="ctrl-btn" id="evBack">Zurück</button>
+            <button class="start-btn" id="evCreate">Event anlegen</button>
+          </div>
+        </div>
+        <div class="lb-form-status" id="evStatus"></div>
+      </div>
+      <div class="history-section-title">Anstehende Events</div>
+      <div id="evList"></div>
+    </div>
+    <div id="connPaneFriends">
+    <div id="lbRequestsWrap" style="display:none;">
+      <div class="history-section-title">Anfragen an dich</div>
+      <div class="lb-table" id="lbRequests"></div>
+    </div>
+
+    <div class="history-section-title">Deine Freunde</div>
+    <div class="lb-table" id="lbFriends"></div>
+
+    <div class="history-section-title">Deine Gruppen</div>
+    <div class="lb-table" id="connGroups"></div>
+    </div>
+  </div>
+  <div class="screen" id="leaderboard">
+    <div class="history-title">Training</div>
+    <div class="seg-ctrl"><button data-sub="leaderboard" class="active">Leaderboard</button><button data-sub="records">Aufzeichnungen</button><button data-sub="knowledge">Knowledge</button></div>
+    <div class="lb-week" id="lbWeek"></div>
+    <button class="lb-info-btn" id="lbPointsInfoBtn">Wie werden die Punkte berechnet?</button>
+    <div class="lb-info" id="lbPointsInfo">
+      <p>Jede Runde wird mit dem Tempo der <b>Hyrox-Elite</b> in derselben Disziplin verglichen. Grundlage sind die Wettkampfzeiten der 15 besten Pro-Athleten bzw. -Athletinnen.</p>
+      <p><b>100 Punkte</b> = so viel, wie die Elite in deiner Arbeitszeit schaffen würde. 50 Punkte = die Hälfte davon. So ist ein Sled Push genauso viel wert wie ein Lauf – gemessen am jeweiligen Optimum.</p>
+      <p>Kürzere Runden werden fair umgerechnet, weil man über kurze Zeit etwas schneller sein kann. Frauen werden mit der Frauen-Elite verglichen – dafür das Geschlecht im Profil eintragen.</p>
+      <p>Pro Runde gibt es höchstens 150 Punkte. Deine Wochenpunkte sind die Summe aller Runden seit Montag.</p>
+    </div>
+
+    <div id="lbNotice"></div>
+
+    <div class="lb-scopes" id="lbScopes"></div>
+    <div class="lb-table" id="lbTable"></div>
+    <div id="lbGroupActions" style="text-align:center;"></div>
+  </div>
+  <div class="screen" id="records">
+    <div class="history-title">Training</div>
+    <div class="seg-ctrl"><button data-sub="leaderboard">Leaderboard</button><button data-sub="records" class="active">Aufzeichnungen</button><button data-sub="knowledge">Knowledge</button></div>
+    <button class="bf-open" id="bfOpenBtn">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Training nachpflegen
+    </button>
+    <div id="historyList"></div>
+    <button class="clear-history" id="clearHistoryBtn">Verlauf löschen</button>
+  </div>
+  <div class="screen" id="knowledge">
+    <div class="history-title">Training</div>
+    <div class="seg-ctrl"><button data-sub="leaderboard">Leaderboard</button><button data-sub="records">Aufzeichnungen</button><button data-sub="knowledge" class="active">Knowledge</button></div>
+    <div class="kn-sub">Das Wichtigste in 30 Sekunden – und was an Fitness-Mythen dran ist.</div>
+    <input type="search" id="knSearch" class="auth-input kn-search" placeholder="Suchen, z. B. Muskelkater" autocomplete="off">
+    <div class="lb-scopes" id="knCats"></div>
+    <div class="kn-list" id="knList"></div>
+    <div class="kn-note">Allgemeine Infos als Anhaltspunkt – kein Ersatz für ärztlichen Rat oder einen Trainer, der dich kennt.</div>
+  </div>
+  <div class="screen" id="profile">
+    <div class="history-title"><button type="button" class="ffc-close" data-ffc-close aria-label="Schließen"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>Zirkel-Profil</div>
+
+    <div class="avatar-edit">
+      <button class="avatar avatar-xl" id="profileAvatar" aria-label="Profilbild ändern"></button>
+      <div class="avatar-col">
+        <div class="avatar-actions">
+          <button class="lb-mini" id="avatarPickBtn">Foto wählen</button>
+          <button class="lb-mini warn" id="avatarRemoveBtn" style="display:none;">Entfernen</button>
+        </div>
+        <div class="insta-box" id="instaBox"></div>
+      </div>
+      <div class="avatar-status" id="avatarStatus"></div>
+      <input type="file" id="avatarInput" accept="image/*" style="display:none;">
+    </div>
+
+    <div class="card">
+      <div class="card-label">
+        <span class="name">Nickname</span>
+        <span class="value" style="font-size:11px; color:var(--text-dim); font-weight:500;">so finden dich Freunde</span>
+      </div>
+      <input type="text" id="profileNickname" class="auth-input" style="margin-bottom:0;" placeholder="z. B. hendrik_fit" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </div>
+
+    <div class="card">
+      <div class="card-label">
+        <span class="name">Geburtsdatum</span>
+        <span class="value" id="profileAgeVal" style="font-size:14px; color:var(--chalk); font-weight:600;"></span>
+      </div>
+      <input type="date" id="profileBirthdate" class="auth-input" style="margin-bottom:0;">
+    </div>
+
+    <div class="card">
+      <div class="card-label">
+        <span class="name">Gewicht</span>
+      </div>
+      <div class="amount-wrap" style="width:100%;">
+        <input type="number" id="profileWeight" placeholder="0" min="0" step="0.1" inputmode="decimal">
+        <span class="unit-label">kg</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">
+        <span class="name">Geschlecht</span>
+      </div>
+      <select id="profileGender" style="width:100%; background:var(--panel-raised); border:1px solid var(--line); color:var(--text); font-family:'Inter',sans-serif; font-size:14px; padding:12px 10px; border-radius:8px; outline:none;">
+        <option value="">Bitte wählen…</option>
+        <option value="male">Männlich</option>
+        <option value="female">Weiblich</option>
+        <option value="other">Divers</option>
+      </select>
+    </div>
+
+    <button class="start-btn" id="saveProfileBtn">Speichern</button>
+    <div class="auth-error" id="profileStatus"></div>
+
+    <div class="history-section-title" style="margin-top:28px;">Persönliche Bestleistungen</div>
+    <div class="pb-grid" id="pbGrid"></div>
+
+    <button class="logout-btn" id="logoutBtn">Abmelden</button>
+  </div>
+
+
+</div>
+</div>
+<div class="plan-sheet" id="postSheet" aria-hidden="true">
+  <div class="plan-sheet-inner">
+    <div class="page-head">
+      <button class="round-back" id="postClose" aria-label="Schließen">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="page-head-title">Neue Story</div>
+      <span class="page-head-spacer"></span>
+    </div>
+    <canvas id="postCanvas" class="post-canvas" width="1080" height="1350"></canvas>
+    <label class="post-toggle">
+      <span>Trainingsstats einblenden</span>
+      <input type="checkbox" id="postStatsToggle" checked>
+      <span class="switch"></span>
+    </label>
+    <div class="post-btns">
+      <button class="ctrl-btn" id="postRetake">Neues Foto</button>
+      <button class="ctrl-btn primary" id="postPublish">Posten</button>
+    </div>
+    <div class="post-status" id="postStatus"></div>
+    <div class="plan-hint">Dein Post ist 24 Stunden für dich und deine Freunde in Connect sichtbar und wird danach gelöscht.</div>
+  </div>
+</div>
+<div class="fp-sheet" id="bfSheet" aria-hidden="true">
+  <div class="fp-inner">
+    <div class="page-head">
+      <button class="round-back" id="bfBack" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+      </button>
+      <div class="page-head-title">Training nachpflegen</div>
+      <span class="page-head-spacer"></span>
+    </div>
+
+    <div id="bfStep1">
+      <div class="card">
+        <div class="card-label"><span class="name">Datum</span></div>
+        <input type="date" id="bfDate" class="auth-input bf-date">
+      </div>
+      <div class="card">
+        <div class="card-label"><span class="name">Stationen</span><span class="value ex-count" id="bfCount"></span></div>
+        <div class="ex-grid" id="bfPlan"></div>
+        <div class="run-order">
+          <span class="run-order-lbl">Laufen</span>
+          <div class="seg-ctrl run-seg" id="bfRunSeg"><button data-run="first" class="active">Vor der Station</button><button data-run="second">Nach der Station</button></div>
+        </div>
+      </div>
+      <button class="start-btn" id="bfNext">Weiter</button>
+    </div>
+
+    <div id="bfStep2" style="display:none;">
+      <div class="bf-sum" id="bfSum"></div>
+      <div class="finish-points" id="bfPoints"></div>
+      <div class="finish-log bf-log" id="bfLog"></div>
+      <button class="start-btn" id="bfSave">Speichern</button>
+      <button class="back-link" id="bfToStep1" style="display:block; margin:12px auto 0;">Zurück</button>
+    </div>
+    <div class="lb-form-status" id="bfStatus"></div>
+  </div>
+</div>
+<div class="fp-sheet" id="fpSheet" aria-hidden="true">
+  <div class="fp-inner">
+    <div class="fp-top">
+      <button class="round-back" id="fpClose" aria-label="Schließen">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div id="fpBody"></div>
+  </div>
+</div>
+<div class="post-viewer" id="postViewer" aria-hidden="true">
+  <div class="pv-progress" id="pvProgress"></div>
+  <div class="post-viewer-head">
+    <span class="avatar" id="pvAvatar"></span>
+    <div class="pv-meta"><b id="pvName"></b><span id="pvTime"></span></div>
+    <button class="pv-del" id="pvDelete" style="display:none;">Löschen</button>
+    <button class="round-back" id="pvClose" aria-label="Schließen">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="pv-stage" id="pvStage"><img id="pvImg" alt="Post" draggable="false"></div>
+  <div class="pv-foot" id="pvFoot">
+    <button class="pv-views" id="pvViewsBtn" style="visibility:hidden;">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span id="pvViewsLabel">Gesehen von 0</span>
+    </button>
+  </div>
+  <div class="pv-sheet" id="pvSheet">
+    <div class="pv-sheet-head"><b id="pvSheetTitle">Gesehen von</b><button class="pv-sheet-close" id="pvSheetClose">Fertig</button></div>
+    <div class="pv-list" id="pvList"></div>
+  </div>
+</div>
+<div id="safeProbe" style="position:fixed; left:0; bottom:0; width:0; height:0; padding-bottom:env(safe-area-inset-bottom); visibility:hidden; pointer-events:none;"></div>
+<div class="quit-overlay" id="wtOverlay" aria-hidden="true">
+  <div class="quit-box wt-box" role="dialog" aria-modal="true" aria-labelledby="wtTitle">
+    <div class="quit-title" id="wtTitle">Gewicht</div>
+    <div class="quit-text" id="wtSub"></div>
+    <div class="wt-options" id="wtOptions"></div>
+    <button class="quit-no" id="wtCancel">Abbrechen</button>
+  </div>
+</div>
+<div class="quit-overlay" id="cntOverlay" aria-hidden="true">
+  <div class="quit-box wt-box" role="dialog" aria-modal="true" aria-labelledby="cntTitle">
+    <div class="quit-title" id="cntTitle">Wie oft?</div>
+    <div class="quit-text" id="cntSub"></div>
+    <div class="cnt-options" id="cntOptions"></div>
+    <button class="quit-no" id="cntCancel">Abbrechen</button>
+  </div>
+</div>
+<div class="quit-overlay" id="quitOverlay" aria-hidden="true">
+  <div class="quit-box" role="dialog" aria-modal="true" aria-labelledby="quitTitle">
+    <div class="quit-title" id="quitTitle">Workout abbrechen?</div>
+    <div class="quit-text">Bist du sicher, dass du das Workout abbrechen willst? Das laufende Workout wird nicht gespeichert.</div>
+    <button class="start-btn quit-yes" id="quitYes">Ja, abbrechen</button>
+    <button class="quit-no" id="quitNo">Weiter trainieren</button>
+  </div>
+</div>
+<nav class="tabbar" id="tabbar">
+  <button data-tab="home" aria-label="Home">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></svg>
+    <span>Home</span>
+  </button>
+  <button data-tab="connect" aria-label="Connect">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18.5 14.4c1.9.7 3 2.6 3 5.6"/></svg>
+    <span>Connect</span>
+  </button>
+  <button data-tab="training" aria-label="Training">
+    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 6h2.5a1.5 1.5 0 0 1 1.5 1.5c0 2.2-1.8 4-4 4"/><path d="M7 6H4.5A1.5 1.5 0 0 0 3 7.5c0 2.2 1.8 4 4 4"/></svg>
+    <span>Training</span>
+  </button>
+  <button data-tab="profile" aria-label="Profil">
+    <span class="tab-avatar" id="tabAvatar"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.2 3.6-7 8-7s8 2.8 8 7"/></svg></span>
+    <span>Profil</span>
+  </button>
+</nav>
+  </div>
+  <!-- ffc:end -->
   <script src="/assets/go-account-session.js"></script>
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
@@ -2828,6 +3549,7 @@
       applyInstalledIdentity(sessionAccount);
       var shellTab = "heute";
       var planPane = "kalender";
+      var todayPick = null;
       var sessionIsTrainer = !!(sessionAccount && sessionAccount.is_trainer);
       try {
         if (sessionMode && new URLSearchParams(location.search).get("plan") === "team") {
@@ -3976,11 +4698,13 @@
         var todayPlanned = !picking && selected.indexOf(todayKey) >= 0;
         var box = document.getElementById("days");
         box.textContent = "";
-        document.querySelector(".tip").textContent = sessionMode
+        var tipEl = document.querySelector(".tip");
+        tipEl.classList.toggle("is-owned", !!(sessionMode && !planningWeek && userOwned));
+        tipEl.textContent = sessionMode
           ? (planningWeek
             ? "Tipp auf den Wochentag und wähle eine Kategorie."
             : (userOwned
-              ? "Deine Woche ist geplant. Der Trainer kann die Tage nicht mehr verschieben."
+              ? "Du hast Deine eigene Planung gestartet und Dein Trainer kann nicht mehr eingreifen."
               : (adminDayKeys && adminDayKeys.length
                 ? "Bevor Du die Routine startest, leg Deine Woche fest."
                 : "Dein Trainer stellt den Plan zusammen.")))
@@ -3989,10 +4713,13 @@
             : (routineStart()
               ? "Die Wochentage bleiben, solange die Routine läuft."
               : "Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest."));
+        if (tipEl.classList.contains("is-owned")) {
+          tipEl.innerHTML = "<span>Du hast Deine eigene Planung gestartet und</span><span>Dein Trainer kann nicht mehr eingreifen.</span>";
+        }
         var planBtn = document.getElementById("plan-week");
         if (planBtn) {
           planBtn.hidden = !sessionMode;
-          planBtn.textContent = planningWeek ? "Fertig" : "Meine Bewegung in der Woche planen";
+          planBtn.textContent = planningWeek ? "Fertig" : "Klick, um ein Event pro Tag zu planen";
           planBtn.classList.toggle("is-on", planningWeek);
           planBtn.setAttribute("aria-pressed", planningWeek ? "true" : "false");
         }
@@ -4039,7 +4766,7 @@
             var placeName = placeForWeekday(wdIndex);
             var place = document.createElement("p");
             place.className = "day-place";
-            place.textContent = placeName;
+            place.textContent = "Ort: " + placeName;
             block.appendChild(place);
             incomingFor(iso).forEach(function (invite) {
               block.appendChild(dayMeetEl(invite));
@@ -4051,6 +4778,7 @@
           }
           box.appendChild(block);
         }
+        if (sessionMode) requestAnimationFrame(syncPlaceHeights);
         var start = routineStart();
         var startBtn = document.getElementById("routine-start");
         var weeks = document.getElementById("weeks");
@@ -4079,36 +4807,53 @@
           var todayWd = weekdayIndex(todayIso);
           var todayUnit = displayUnit(todayWd);
           todayKind = todayUnit && todayUnit.kind ? todayUnit.kind : "";
+          var todayPlace = placeForWeekday(todayWd);
           if (awayToday) {
-            todayBtn.textContent = "Wie bewegst Du Dich?";
+            setTodayCard("Wie bewegst Du Dich?", "Alternativer Alltag");
             todayBtn.dataset.kind = "away";
             todayBtn.dataset.away = "1";
             todayBtn.dataset.unitLabel = "";
           } else {
-            todayBtn.textContent = todayKind === "spontan"
-              ? "Beweg Dich & schreib's auf"
-              : (todayKind === "alternative"
-                ? "Ich hab mich bewegt"
-                : (todayKind === "zirkel"
-                  ? "Zirkeltraining gemacht"
-                  : (todayKind === "ausdauer" ? "Mein Ausdauertraining" : "Heutiges Workout")));
+            var cardTitle = todayKind === "spontan"
+              ? "Am Tag spontan"
+              : (todayUnit && todayUnit.label
+                ? (activityEmoji(todayUnit) + " " + todayUnit.label).trim()
+                : "Heute frei");
+            setTodayCard(cardTitle, todayKind && todayKind !== "spontan" ? "Ort: " + todayPlace : "");
             todayBtn.dataset.kind = todayKind;
             todayBtn.dataset.away = "";
             todayBtn.dataset.unitLabel = todayUnit && todayUnit.label ? todayUnit.label : "";
           }
+          document.getElementById("today-invite").hidden = awayToday || todayKind !== "zirkel";
         } else {
-          todayBtn.textContent = "Heutiges Workout";
+          setTodayCard("Heutiges Workout", "");
           todayBtn.dataset.kind = "";
           todayBtn.dataset.away = "";
         }
         var awayNote = document.getElementById("heute-away");
         if (awayNote) awayNote.hidden = !awayToday;
         paintAbsenceButton();
-        todayBtn.disabled = awayToday ? false : (picking || shifted || (!todayPlanned && todayKind !== "spontan"));
+        todayBtn.disabled = sessionMode ? false : (picking || shifted || !todayPlanned);
         todayBtn.classList.toggle("is-due", !awayToday && todayPlanned && !shifted && !picking);
         document.getElementById("go-short").disabled = picking || shifted || !todayPlanned;
         paintPhoto();
         paintHeuteExtras();
+      }
+
+      function setTodayCard(title, line) {
+        var kicker = document.getElementById("today-kicker");
+        if (kicker) kicker.textContent = sessionMode ? "Heute" : "";
+        document.getElementById("today-title").textContent = title;
+        document.getElementById("today-line").textContent = line || "";
+      }
+
+      function syncPlaceHeights() {
+        document.querySelectorAll("#days .day-block").forEach(function (block) {
+          var day = block.querySelector(".day");
+          var place = block.querySelector(".day-place");
+          if (!day || !place || !day.offsetHeight) return;
+          place.style.height = day.offsetHeight + "px";
+        });
       }
 
       function choosePlanDay(key) {
@@ -4152,7 +4897,7 @@
 
       function closeShellModals() {
         closeDaysPrompt();
-        ["moved-modal", "team-modal", "invite-modal", "time-modal", "invite-in-modal", "goal-modal", "ausdauer-modal", "photo-modal", "short-modal", "quick-wa"].forEach(function (id) {
+        ["moved-modal", "team-modal", "invite-modal", "time-modal", "invite-in-modal", "goal-modal", "ausdauer-modal", "photo-modal", "short-modal", "quick-wa", "go-modal"].forEach(function (id) {
           var el = document.getElementById(id);
           if (el) el.hidden = true;
         });
@@ -4217,12 +4962,10 @@
 
       function alignBurger() {
         var bang = document.querySelector(".welcome-bang");
-        var burger = document.getElementById("heute-menu");
         var wa = document.getElementById("heute-wa");
-        var head = burger && burger.parentElement;
-        if (!bang || !burger || !head) return;
+        if (!bang || !wa) return;
         var mid = (bang.offsetTop + bang.offsetHeight / 2);
-        [burger, wa].forEach(function (el) {
+        [wa].forEach(function (el) {
           if (!el) return;
           el.style.top = mid + "px";
           el.style.transform = "translateY(-50%)";
@@ -4266,6 +5009,11 @@
           input.value = sessionAccount && sessionAccount.name ? sessionAccount.name : "";
           input.inputMode = "text";
           input.maxLength = 40;
+        } else if (field === "nickname") {
+          title.textContent = "Nickname festlegen";
+          input.value = sessionAccount && sessionAccount.nickname ? sessionAccount.nickname : "";
+          input.inputMode = "text";
+          input.maxLength = 20;
         } else if (field === "phone") {
           title.textContent = "Telefonnummer angeben";
           input.value = sessionAccount && sessionAccount.phone ? sessionAccount.phone : "";
@@ -4288,6 +5036,10 @@
         var value = String(input.value || "").trim();
         var msg = document.getElementById("account-edit-msg");
         var body = {};
+        if (accountEditField === "nickname") {
+          saveNickname(value.replace(/^@/, ""));
+          return;
+        }
         if (accountEditField === "name") {
           if (!value) { msg.textContent = "Vorname fehlt."; return; }
           body.name = value;
@@ -4308,6 +5060,94 @@
           if (body.name) paintWelcomeTitle(body.name);
           document.getElementById("account-edit").hidden = true;
         }).catch(function () { msg.textContent = "Speichern fehlgeschlagen."; });
+      }
+
+      var NICKNAME_RE = /^[A-Za-z0-9._-]{3,20}$/;
+      var NICK_TAKEN = "Dieser Nickname ist schon vergeben.";
+
+      function likeExact(value) {
+        return String(value || "").replace(/[\\%_]/g, function (ch) { return "\\" + ch; });
+      }
+
+      function nicknameError(err) {
+        var text = String((err && err.message) || err || "");
+        if (/23505|duplicate key|already exists|unique/i.test(text)) return NICK_TAKEN;
+        if (/nickname/i.test(text) && /column|schema cache|does not exist|PGRST204/i.test(text)) {
+          return "Nicknames sind noch nicht eingerichtet. Einmal go-account-nickname.sql im Supabase SQL Editor ausführen.";
+        }
+        return "Speichern fehlgeschlagen.";
+      }
+
+      function saveNickname(nick) {
+        var msg = document.getElementById("account-edit-msg");
+        var current = String((sessionAccount && sessionAccount.nickname) || "");
+        if (!NICKNAME_RE.test(nick)) {
+          msg.textContent = "3–20 Zeichen, nur Buchstaben, Zahlen, Punkt, _ und -.";
+          return;
+        }
+        if (nick === current) {
+          document.getElementById("account-edit").hidden = true;
+          return;
+        }
+        msg.textContent = "Wird geprüft …";
+        var me = String(sessionAccount.id);
+        rest("go_accounts?nickname=ilike." + encodeURIComponent(likeExact(nick)) + "&select=id&limit=2")
+          .then(function (rows) {
+            var taken = (rows || []).some(function (row) { return row && String(row.id) !== me; });
+            if (taken) throw new Error("23505");
+            return rest("go_accounts?id=eq." + encodeURIComponent(me), {
+              method: "PATCH",
+              prefer: "return=minimal",
+              body: { nickname: nick }
+            });
+          })
+          .then(function () {
+            if (!window.FFC || !FFC.user()) return null;
+            return FFC.setNickname(nick).then(function (res) {
+              if (res && res.error && res.error.code === "23505") {
+                return rest("go_accounts?id=eq." + encodeURIComponent(me), {
+                  method: "PATCH",
+                  prefer: "return=minimal",
+                  body: { nickname: current || null }
+                }).catch(function () {}).then(function () {
+                  throw new Error("23505");
+                });
+              }
+              return null;
+            });
+          })
+          .then(function () {
+            sessionAccount.nickname = nick;
+            if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+            msg.textContent = "";
+            document.getElementById("account-edit").hidden = true;
+          })
+          .catch(function (err) { msg.textContent = nicknameError(err); });
+      }
+
+      function adoptFfcNickname(profile) {
+        if (!sessionMode || !sessionAccount || !profile) return;
+        var mine = String(sessionAccount.nickname || "");
+        var theirs = String(profile.nickname || "");
+        if (mine && !theirs && window.FFC) {
+          FFC.setNickname(mine);
+          return;
+        }
+        if (mine || !theirs || !NICKNAME_RE.test(theirs)) return;
+        var me = String(sessionAccount.id);
+        rest("go_accounts?nickname=ilike." + encodeURIComponent(likeExact(theirs)) + "&select=id&limit=2")
+          .then(function (rows) {
+            if ((rows || []).some(function (row) { return row && String(row.id) !== me; })) return null;
+            return rest("go_accounts?id=eq." + encodeURIComponent(me), {
+              method: "PATCH",
+              prefer: "return=minimal",
+              body: { nickname: theirs }
+            }).then(function () {
+              sessionAccount.nickname = theirs;
+              if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+            });
+          })
+          .catch(function () {});
       }
 
       document.getElementById("heute-menu").addEventListener("click", function () {
@@ -6058,7 +6898,11 @@
           loadAccountPlaces().then(function () { ensurePlaceMap(); });
         }
         scrollShellTop();
-        if (planPane === "kalender") requestAnimationFrame(scrollAbsenceWheels);
+        if (planPane === "training") {
+          requestAnimationFrame(scrollAbsenceWheels);
+          refreshZirkel();
+        }
+        if (planPane === "kalender") requestAnimationFrame(syncPlaceHeights);
       }
 
       function inviteStore() {
@@ -6331,7 +7175,13 @@
           event.stopPropagation();
           openInvite(iso);
         });
-        wrap.appendChild(plus);
+        var add = document.createElement("div");
+        add.className = "day-invite__add";
+        var addLabel = document.createElement("span");
+        addLabel.textContent = "Einladen:";
+        add.appendChild(addLabel);
+        add.appendChild(plus);
+        wrap.appendChild(add);
         return wrap;
       }
 
@@ -6348,6 +7198,8 @@
         }
         return wrap;
       }
+
+      var WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M4.2 19.8l1.1-3.9A8.3 8.3 0 1 1 8.4 19z"/><path d="M9.1 7.9c-.3 0-.7.1-.9.5-.3.5-.6 1.2-.4 2.1.4 1.6 1.9 3.6 3.9 4.6 1.2.6 2.3.7 2.9.3.5-.3.8-.8.8-1.2 0-.2-.1-.3-.3-.4l-1.6-.8c-.2-.1-.4 0-.5.1l-.6.8c-.1.1-.3.2-.5.1-.9-.4-1.8-1.2-2.3-2.1-.1-.2 0-.3.1-.5l.5-.6c.1-.1.1-.3.1-.5l-.6-1.6c-.1-.3-.3-.4-.6-.4z" fill="currentColor" stroke="none"/></svg>';
 
       function renderTeam() {
         var box = document.getElementById("plan-team");
@@ -6382,6 +7234,19 @@
           main.appendChild(name);
           main.addEventListener("click", function () { openProfile(person); });
           row.appendChild(main);
+          var myTrainer = sessionAccount && sessionAccount.trainer_id ? String(sessionAccount.trainer_id) : "";
+          if (!person.isSelf && myTrainer && String(person.id) === myTrainer) {
+            var wa = document.createElement("button");
+            wa.type = "button";
+            wa.className = "team-wa";
+            wa.setAttribute("aria-label", "Sofortnachricht an Trainer");
+            wa.innerHTML = WA_ICON;
+            wa.addEventListener("click", function (event) {
+              event.stopPropagation();
+              openQuickWa();
+            });
+            row.appendChild(wa);
+          }
           var mineId = sessionAccount && String(sessionAccount.id);
           if (sessionIsTrainer && !person.isSelf && person.trainer_id && String(person.trainer_id) === mineId) {
             var pencil = document.createElement("button");
@@ -6504,12 +7369,17 @@
 
       function searchTeam() {
         var msg = document.getElementById("team-msg");
-        var serial = String(document.getElementById("team-id").value || "").replace(/\D/g, "");
-        if (serial.length < 4) {
+        var raw = String(document.getElementById("team-id").value || "").trim().replace(/^@/, "");
+        var serial = /^\d+$/.test(raw) ? raw : "";
+        var nick = serial ? "" : raw;
+        if (serial ? serial.length < 4 : !NICKNAME_RE.test(nick)) {
           msg.textContent = "nicht gefunden";
           return;
         }
-        rest("go_accounts?serial_number=eq." + encodeURIComponent(serial) + "&select=id,name,photo_url,serial_number,is_trainer&limit=1")
+        var filter = serial
+          ? "serial_number=eq." + encodeURIComponent(serial)
+          : "nickname=ilike." + encodeURIComponent(likeExact(nick));
+        rest("go_accounts?" + filter + "&select=id,name,photo_url,serial_number,is_trainer,nickname&limit=1")
           .then(function (rows) {
             var found = rows && rows[0];
             if (!found || !found.id || String(found.id) === String(sessionAccount.id)) {
@@ -6519,6 +7389,7 @@
             var exists = teamPeople.some(function (person) { return String(person.id) === String(found.id); });
             function done() {
               document.getElementById("team-modal").hidden = true;
+              if (found.nickname && window.FFC && FFC.user()) FFC.friendRequest(found.nickname);
               loadTeam();
             }
             if (exists) {
@@ -6986,12 +7857,92 @@
       }
 
       function movementLabel() {
-        var raw = document.getElementById("go-today").dataset.unitLabel || "";
+        var raw = movedPick || document.getElementById("go-today").dataset.unitLabel || "";
         var name = String(raw).split("·")[0].trim();
         return name || "bewegt";
       }
 
+      var movedPick = "";
+
+      function openTodayEvent() {
+        var btn = document.getElementById("go-today");
+        var kind = btn.dataset.kind || "";
+        var label = kind && kind !== "spontan" && kind !== "away" ? (btn.dataset.unitLabel || "") : "";
+        if (kind === "zirkel" && !label) label = "Zirkeltraining";
+        var place = placeForWeekday(weekdayIndex(Log.berlinToday()));
+        requireFfc(function () {
+          FFC.openEvent({ title: label, where: isHomePlace(place) ? "" : place });
+        });
+      }
+
+      function openGoPick() {
+        document.getElementById("go-kinds").hidden = false;
+        var pick = document.getElementById("go-pick");
+        pick.hidden = true;
+        pick.textContent = "";
+        document.getElementById("go-modal").hidden = false;
+      }
+
+      function closeGoPick() {
+        document.getElementById("go-modal").hidden = true;
+        var pick = document.getElementById("go-pick");
+        pick.hidden = true;
+        pick.textContent = "";
+        document.getElementById("go-kinds").hidden = false;
+      }
+
+      function showGoPick(kind) {
+        var options = kind === "kraft"
+          ? kraftChoices()
+          : (kind === "ausdauer" ? ausdauerChoices() : alternativeChoices());
+        document.getElementById("go-kinds").hidden = true;
+        var pick = document.getElementById("go-pick");
+        pick.textContent = "";
+        pick.hidden = false;
+        options.forEach(function (opt) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = (activityEmoji({ kind: kind, label: opt.label, technique: opt.technique || "" }) + " " + opt.label).trim();
+          button.addEventListener("click", function () {
+            closeGoPick();
+            var unit = {
+              kind: kind,
+              label: opt.label,
+              systemId: opt.systemId || "",
+              presetId: opt.presetId || "",
+              technique: opt.technique || ""
+            };
+            if (kind === "kraft") startPickedWorkout(unit);
+            else openMovedFor(opt.label);
+          });
+          pick.appendChild(button);
+        });
+        var back = document.createElement("button");
+        back.type = "button";
+        back.className = "sand-quiet";
+        back.textContent = "Zurück";
+        back.addEventListener("click", openGoPick);
+        pick.appendChild(back);
+      }
+
+      function startPickedWorkout(unit) {
+        var today = Log.berlinToday();
+        todayPick = { iso: today, unit: unit };
+        startWorkout(today, false);
+      }
+
+      function openMovedFor(label) {
+        movedPick = label || "";
+        document.getElementById("moved-title").textContent = label;
+        document.getElementById("moved-ok").hidden = false;
+        document.getElementById("moved-after").hidden = true;
+        document.getElementById("moved-wa").hidden = true;
+        document.getElementById("moved-diary").hidden = true;
+        document.getElementById("moved-modal").hidden = false;
+      }
+
       function openMovedDialog() {
+        movedPick = "";
         var btn = document.getElementById("go-today");
         var title = btn.dataset.unitLabel || btn.textContent;
         document.getElementById("moved-title").textContent = title;
@@ -7012,15 +7963,31 @@
           openDiary();
           return;
         }
-        if (sessionMode && kind === "spontan") {
-          openDiary();
+        if (sessionMode && kind === "zirkel") {
+          requireFfc(function () { FFC.openSetup(); });
           return;
         }
-        if (sessionMode && (kind === "alternative" || kind === "ausdauer" || kind === "zirkel")) {
-          openMovedDialog();
+        if (sessionMode) {
+          openTodayEvent();
           return;
         }
         enterWorkout(false);
+      });
+      document.getElementById("today-invite").addEventListener("click", openTodayEvent);
+      document.getElementById("heute-start").addEventListener("click", openGoPick);
+      document.getElementById("go-kinds").addEventListener("click", function (event) {
+        var choice = event.target.closest("[data-go-kind]");
+        if (!choice) return;
+        var kind = choice.getAttribute("data-go-kind");
+        if (kind === "zirkel") {
+          closeGoPick();
+          requireFfc(function () { FFC.openSetup(); });
+          return;
+        }
+        showGoPick(kind);
+      });
+      document.getElementById("go-modal").addEventListener("click", function (event) {
+        if (event.target.id === "go-modal") closeGoPick();
       });
       document.querySelector(".app-pill").addEventListener("click", function (event) {
         var btn = event.target.closest("button");
@@ -7031,6 +7998,7 @@
         else {
           setHome(true);
           paintWelcome();
+          refreshFfcHeute(false);
         }
       });
       var bookNav = document.getElementById("book-nav");
@@ -7385,7 +8353,11 @@
         var text = "Einfache Basics";
         var picked = ausdauerPick[iso];
         var unit = userOwned ? userUnits[weekdayIndex(iso)] : null;
-        if (picked && picked.label) text = picked.label;
+        if (todayPick && todayPick.iso === iso) {
+          picked = null;
+          unit = todayPick.unit;
+          text = unit.label || text;
+        } else if (picked && picked.label) text = picked.label;
         else if (userOwned && unit && unit.label) text = unit.label;
         else if (userOwned && !unit) text = "Bewegung";
         var iconSource = picked || unit;
@@ -7398,6 +8370,11 @@
 
       function applySessionExercises(iso) {
         if (!sessionMode || !sessionReady || !window.GoChecklist) return;
+        if (todayPick && todayPick.iso === iso) {
+          Log.useExercises(exercisesForUnit(todayPick.unit));
+          paintWorkoutTitle(iso);
+          return;
+        }
         var choices = ausdauerChoicesForWorkout(iso);
         var picked = ausdauerPick[iso];
         if (choices.length > 1 && !picked) {
@@ -7878,35 +8855,48 @@
         return "Training";
       }
 
+      var crewActive = 0;
+
+      function paintStoriesVisibility() {
+        var wrap = document.getElementById("heute-stories");
+        if (!wrap) return;
+        var strip = document.getElementById("postStrip");
+        var ffcStories = strip ? strip.querySelectorAll('.story[data-u]:not([data-u="add"])').length : 0;
+        wrap.hidden = !sessionMode || (crewActive + ffcStories) === 0;
+      }
+
       function paintHeuteCrew() {
-        var box = document.getElementById("heute-crew");
+        var box = document.getElementById("heute-stories-team");
         if (!box) return;
-        box.textContent = "";
         if (!sessionMode || !sessionAccount) return;
         var today = Log.berlinToday();
         var wd = weekdayIndex(today);
-        var mine = placeForWeekday(wd);
         function draw(people) {
           box.textContent = "";
-          var title = document.createElement("p");
-          title.className = "heute-crew__title";
-          title.textContent = "Dein Team trainiert heute:";
-          box.appendChild(title);
+          crewActive = people.length;
           people.forEach(function (person) {
-            var row = document.createElement("div");
-            row.className = "heute-crew__row";
-            row.appendChild(personFace(person));
+            var item = document.createElement("button");
+            item.type = "button";
+            item.className = "crew-story";
+            var ring = document.createElement("span");
+            ring.className = "crew-story__ring";
+            ring.appendChild(personFace(person));
+            item.appendChild(ring);
             var name = document.createElement("span");
-            var bits = [person.name || "Team"];
-            if (person.isTrainerPerson) bits.push("Trainer");
-            bits.push(person.place || mine || "zu Hause");
-            bits.push(person.activity || "Training");
-            name.textContent = bits.join(", ");
-            row.appendChild(name);
-            box.appendChild(row);
+            name.className = "crew-story__name";
+            name.textContent = person.name || "Team";
+            item.appendChild(name);
+            item.setAttribute("aria-label", (person.name || "Team") + ", " + (person.activity || "Training") + ", " + (person.place || "zu Hause"));
+            item.addEventListener("click", function () {
+              var known = null;
+              teamPeople.forEach(function (row) { if (String(row.id) === String(person.id)) known = row; });
+              openProfile(known || person);
+            });
+            box.appendChild(item);
           });
+          paintStoriesVisibility();
         }
-        if (crewCache && crewCache.day === today && crewCache.place === mine) {
+        if (crewCache && crewCache.day === today) {
           draw(crewCache.people);
           return;
         }
@@ -7916,7 +8906,7 @@
           if (!ids.length) { draw([]); return null; }
           var list = ids.map(encodeURIComponent).join(",");
           return Promise.all([
-            rest("go_accounts?id=in.(" + list + ")&select=id,name,weekday_meet_prefs,photo_url,is_trainer").catch(function () { return []; }),
+            rest("go_accounts?id=in.(" + list + ")&select=id,name,weekday_meet_prefs,photo_url,is_trainer,about_me").catch(function () { return []; }),
             rest("go_coach_plans?account_id=in.(" + list + ")&select=account_id,day_training_units,kraft_weekdays,ausdauer_weekdays,zirkel_weekday").catch(function () { return []; })
           ]).then(function (pack) {
             var plans = {};
@@ -7924,13 +8914,13 @@
             var people = [];
             (pack[0] || []).forEach(function (account) {
               if (!account || String(account.id) === String(sessionAccount.id)) return;
+              if (!trainsOn(plans[String(account.id)], wd)) return;
+              if (awayOn(today, absenceOf(account))) return;
               var prefs = account.weekday_meet_prefs || {};
               if (typeof prefs === "string") { try { prefs = JSON.parse(prefs); } catch (eP) { prefs = {}; } }
               var pref = prefs[String(wd)] || {};
               var place = String(pref.place || "").trim();
               if (!place || isHomePlace(place)) place = "zu Hause";
-              if (place.toLowerCase() !== String(mine).toLowerCase()) return;
-              if (!trainsOn(plans[String(account.id)], wd)) return;
               var known = null;
               teamPeople.forEach(function (item) { if (String(item.id) === String(account.id)) known = item; });
               people.push({
@@ -7942,7 +8932,7 @@
                 activity: planActivity(plans[String(account.id)], wd)
               });
             });
-            crewCache = { day: today, place: mine, people: people };
+            crewCache = { day: today, people: people };
             draw(people);
           });
         }).catch(function () { draw([]); });
@@ -8662,11 +9652,12 @@
         waNote.classList.toggle("is-focus", document.activeElement === waText);
         waNote.classList.toggle("is-filled", !!String(waText.value || "").trim());
       }
-      document.getElementById("heute-wa").addEventListener("click", function () {
+      function openQuickWa() {
         if (waText) waText.value = "";
         paintWaNote();
         document.getElementById("quick-wa").hidden = false;
-      });
+      }
+      document.getElementById("heute-wa").addEventListener("click", openQuickWa);
       if (waText) {
         waText.addEventListener("input", paintWaNote);
         waText.addEventListener("focus", paintWaNote);
@@ -8712,6 +9703,165 @@
       });
       paintAbsenceWheels();
 
+      var ffcPending = null;
+      var ffcAuthWanted = false;
+      var ffcHeuteAt = 0;
+      var FFC_OVERLAY = ["setup", "run", "finish", "newpass", "profile"];
+
+      function requireFfc(action) {
+        if (!window.FFC) return;
+        if (FFC.user()) { action(); return; }
+        ffcPending = action;
+        ffcAuthWanted = true;
+        FFC.showAuth("login");
+      }
+
+      function closeFfcOverlay() {
+        ffcAuthWanted = false;
+        ffcPending = null;
+        document.body.classList.remove("ffc-open");
+      }
+
+      function paintZirkelState() {
+        var logged = !!(window.FFC && FFC.user());
+        document.getElementById("zirkel-login").hidden = logged;
+        document.getElementById("zirkel-body").hidden = !logged;
+      }
+
+      function refreshZirkel() {
+        paintZirkelState();
+        if (window.FFC && FFC.user()) FFC.refreshTraining();
+      }
+
+      function refreshFfcHeute(force) {
+        if (!sessionMode || !window.FFC || !FFC.user()) return;
+        if (!force && Date.now() - ffcHeuteAt < 30000) return;
+        ffcHeuteAt = Date.now();
+        FFC.refreshHeute();
+      }
+
+      function mountFfc() {
+        if (!sessionMode) return;
+        function put(id, target, before) {
+          var el = document.getElementById(id);
+          if (!el || !target) return;
+          if (before) target.insertBefore(el, before);
+          else target.appendChild(el);
+        }
+        var row = document.getElementById("heute-stories-row");
+        put("postStrip", row, row.firstChild);
+        put("storyHint", document.getElementById("heute-stories"));
+        var events = document.getElementById("heute-events");
+        put("connNotice", events);
+        put("evList", events);
+        put("evForm", document.getElementById("ev-sheet-card"));
+        put("lbPlusBtn", document.getElementById("zirkel-plus-slot"));
+        var board = document.getElementById("zirkel-board");
+        ["lbMenu", "lbRequestsWrap", "lbWeek", "lbPointsInfoBtn", "lbPointsInfo", "lbNotice", "lbScopes", "lbTable", "lbGroupActions"].forEach(function (id) {
+          put(id, board);
+        });
+        var records = document.getElementById("zirkel-records");
+        ["bfOpenBtn", "historyList", "clearHistoryBtn"].forEach(function (id) { put(id, records); });
+        put("pbGrid", document.getElementById("zirkel-bests"));
+        var strip = document.getElementById("postStrip");
+        if (strip && window.MutationObserver) {
+          new MutationObserver(paintStoriesVisibility).observe(strip, { childList: true });
+        }
+        var training = document.getElementById("plan-training");
+        var intro = training && training.querySelector(".training-intro");
+        ["absence-block", "routine-row-block", "weeks", "routine-note"].forEach(function (id) {
+          var el = id === "routine-row-block" ? document.querySelector(".routine-row") : document.getElementById(id);
+          if (el && training) training.insertBefore(el, intro || training.firstChild);
+        });
+        [".routine-row", "#weeks", "#routine-note", "#absence-block"].forEach(function (sel) {
+          var el = document.querySelector(sel);
+          if (el) el.classList.remove("shell-kalender");
+        });
+      }
+
+      window.FFC_HOST = {
+        onScreen: function (name) {
+          var open = FFC_OVERLAY.indexOf(name) >= 0 || (name === "auth" && ffcAuthWanted);
+          document.body.classList.toggle("ffc-open", open);
+          if (name === "home") {
+            ffcAuthWanted = false;
+            var act = ffcPending;
+            ffcPending = null;
+            if (act) act();
+            else {
+              refreshFfcHeute(true);
+              if (shellTab === "plan" && planPane === "training") refreshZirkel();
+            }
+            return;
+          }
+          if (name === "connect") {
+            document.body.classList.remove("ffc-open");
+            setHome(true);
+            paintWelcome();
+            return;
+          }
+          if (name === "leaderboard" || name === "records" || name === "knowledge") {
+            document.body.classList.remove("ffc-open");
+            showPlan("training");
+          }
+        },
+        onAuth: function (user) {
+          paintZirkelState();
+          if (!user) {
+            paintStoriesVisibility();
+            return;
+          }
+          refreshFfcHeute(true);
+          if (shellTab === "plan" && planPane === "training") refreshZirkel();
+        },
+        onProfile: function (profile) {
+          adoptFfcNickname(profile);
+        },
+        onEventOpen: function () {
+          document.getElementById("ev-sheet").hidden = false;
+        },
+        onEventClose: function () {
+          document.getElementById("ev-sheet").hidden = true;
+        },
+        onNicknameWanted: function () {
+          if (sessionMode) openAccountEdit("nickname");
+        },
+        onSaved: function () {
+          if (sessionMode) markDiaryMove(Log.berlinToday(), "Zirkeltraining");
+        }
+      };
+
+      if (sessionMode) {
+        mountFfc();
+        document.getElementById("ffc-root").addEventListener("click", function (event) {
+          if (event.target.closest("[data-ffc-close]")) closeFfcOverlay();
+        });
+        document.getElementById("ev-sheet").addEventListener("click", function (event) {
+          if (event.target.id === "ev-sheet" && window.FFC) FFC.closeEvent();
+        });
+        document.getElementById("zirkel-login-btn").addEventListener("click", function () {
+          requireFfc(refreshZirkel);
+        });
+        document.getElementById("zirkel-setup").addEventListener("click", function () {
+          requireFfc(function () { FFC.openSetup(); });
+        });
+        document.getElementById("zirkel-profile").addEventListener("click", function () {
+          if (window.FFC && FFC.user()) FFC.openProfile();
+        });
+        document.getElementById("zirkel-logout").addEventListener("click", function () {
+          if (window.FFC) FFC.logout();
+        });
+        paintZirkelState();
+        rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id) + "&select=nickname")
+          .then(function (rows) {
+            var row = rows && rows[0];
+            if (!row) return;
+            sessionAccount.nickname = row.nickname || "";
+            if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+          })
+          .catch(function () {});
+      }
+
       ensureDiaryFrom();
       loadOwnDiary();
       if (!sessionMode) {
@@ -8741,5 +9891,7 @@
       bindPillShrink();
     })();
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/natalyaalice/ffc.js"></script>
 </body>
 </html>
