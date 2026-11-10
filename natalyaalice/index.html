@@ -1238,7 +1238,10 @@
       max-width: 440px;
     }
     body.is-session .welcome,
-    body.is-session .diary { padding-bottom: 108px; }
+    body.is-session .diary {
+      padding-top: calc(4px + env(safe-area-inset-top));
+      padding-bottom: calc(84px + env(safe-area-inset-bottom));
+    }
     body.is-home, body.is-diary { min-height: 100%; }
     html:has(body.is-session:not([data-shell="workout"])) { background: #F3EEE4; }
     body.is-session #tagebuch { display: none; }
@@ -1259,7 +1262,7 @@
     body.is-session[data-shell="heute"] .heute-start { order: 3; }
     body.is-session[data-shell="heute"] #go-today { min-height: 224px; }
     body.is-session[data-shell="heute"] .heute-events { order: 4; }
-    body.is-session[data-shell="heute"] .heute-joins { order: 5; }
+    body.is-session[data-shell="heute"] .heute-joins { order: 3; }
     body.is-session[data-shell="heute"] .dock .go-row { display: none; }
     body.is-session[data-shell="plan"] .plan-tabs { order: 1; }
     body.is-session[data-shell="plan"] .absence-block { order: 2; }
@@ -1271,15 +1274,7 @@
     body.is-session[data-shell="plan"] #days { order: 7; }
     body.is-session[data-shell="plan"] .shell-plan { order: 8; }
     body.is-session[data-shell="plan"] .dock { display: none !important; }
-    body.is-session[data-shell="plan"]:not([data-plan="kalender"]) .dock,
-    body.is-session[data-shell="plan"][data-plan="team"] .shell-kalender,
-    body.is-session[data-shell="plan"][data-plan="orte"] .shell-kalender,
-    body.is-session[data-shell="plan"][data-plan="training"] .shell-kalender,
-    body.is-session[data-shell="plan"][data-plan="info"] .shell-kalender,
-    body.is-session[data-shell="plan"][data-plan="kalender"] #plan-info,
-    body.is-session[data-shell="plan"][data-plan="kalender"] #plan-team,
-    body.is-session[data-shell="plan"][data-plan="kalender"] #plan-orte,
-    body.is-session[data-shell="plan"][data-plan="kalender"] #plan-training { display: none !important; }
+    body.is-session[data-shell="plan"]:not([data-plan="kalender"]) .shell-kalender { display: none !important; }
     .plan-tabs, .shell-plan, .heute-start, .heute-events, .zirkel-block { display: none; }
     body.is-session[data-shell="plan"] .plan-tabs {
       display: grid;
@@ -1298,11 +1293,23 @@
     }
     .plan-tabs button.is-on { color: #2A2118; border-bottom-color: #2A2118; }
     body.is-session[data-shell="plan"] .shell-plan { display: block; }
-    #plan-team, #plan-orte, #plan-training, #plan-info { display: none; }
+    #plan-team, #plan-orte, #plan-training, #plan-info, #plan-settings { display: none !important; }
     body.is-session[data-shell="plan"][data-plan="info"] #plan-info,
     body.is-session[data-shell="plan"][data-plan="team"] #plan-team,
-    body.is-session[data-shell="plan"][data-plan="orte"] #plan-orte,
-    body.is-session[data-shell="plan"][data-plan="training"] #plan-training { display: block; }
+    body.is-session[data-shell="plan"][data-plan="training"] #plan-training,
+    body.is-session[data-shell="plan"][data-plan="settings"] #plan-settings { display: block !important; }
+    .settings-list a, .settings-list button {
+      display: block;
+      width: 100%;
+      padding: 14px 2px;
+      border: 0;
+      border-bottom: 1px solid rgba(42, 33, 24, 0.2);
+      border-radius: 0;
+      background: transparent;
+      color: #2A2118;
+      text-align: left;
+      text-decoration: none;
+    }
     #team-add { border-bottom: 0; }
     .team-row {
       display: flex;
@@ -1505,6 +1512,27 @@
       background: #2A2118;
       color: #F6F1E8;
     }
+    .invite-card {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 12px;
+      padding: 16px 18px;
+      border: 1px solid #2A2118;
+      color: #2A2118;
+      text-align: left;
+    }
+    .invite-card.is-pending { border-color: #C7413B; }
+    .invite-card__actions { display: flex; gap: 8px; margin-top: 10px; }
+    .invite-card__actions button {
+      flex: 1;
+      min-height: 44px;
+      border: 1px solid #2A2118;
+      background: transparent;
+      color: #2A2118;
+    }
+    .invite-card__actions button.is-yes { background: #2A2118; color: #F6F1E8; }
+    .invite-card__ok { color: rgba(42, 33, 24, 0.58); }
     .profile-sheet {
       position: fixed;
       inset: 0;
@@ -1627,6 +1655,27 @@
       padding: 8px 10px;
     }
     .profile-sheet.is-editing .profile-goal { cursor: pointer; }
+    .profile-links { display: flex; gap: 16px; flex-wrap: wrap; }
+    .profile-links a { color: #2A2118; text-decoration: underline; text-underline-offset: 3px; }
+    .profile-links-edit { display: none; }
+    .profile-sheet.is-editing .profile-links { display: none; }
+    .profile-sheet.is-editing .profile-links-edit { display: grid; gap: 8px; }
+    .profile-links-block.is-empty:not([hidden]) { display: none; }
+    .profile-sheet.is-editing .profile-links-block.is-empty { display: block; }
+    .profile-links-edit input {
+      width: 100%;
+      min-height: 40px;
+      padding: 8px 10px;
+      border: 0;
+      border-radius: 8px;
+      background: #fff;
+      color: #2A2118;
+      font: inherit;
+    }
+    .profile-week { display: grid; gap: 6px; }
+    .profile-week__row { display: flex; gap: 12px; align-items: baseline; }
+    .profile-week__day { flex: none; width: 76px; color: rgba(42, 33, 24, 0.58); }
+    .profile-week__what { min-width: 0; overflow-wrap: anywhere; }
     .profile-pencil[hidden] { display: none; }
     .profile-trainer-list { margin-top: 8px; }
     .profile-trainer-open {
@@ -1684,8 +1733,9 @@
     #trainer-save { flex: none; margin-top: 18px; }
     #trainer-save:disabled { opacity: 0.4; }
     .profile-photos-label { margin-top: 22px; }
+    .profile-sheet .profile-block[hidden],
     #profile-places-block[hidden],
-    #profile-photos-label[hidden] { display: none; }
+    #profile-photos-label[hidden] { display: none !important; }
     .profile-place { margin-top: 4px; font-size: 15px; }
     .profile-challenge { margin-top: 8px; font-family: "Playfair Display", serif; font-size: 16px; }
     .profile-notes p { margin: 4px 0 0; font-size: 12px; line-height: 1.35; }
@@ -1821,8 +1871,7 @@
       color: rgba(42, 33, 24, 0.55);
     }
     .absence-block { display: none; margin-top: 8px; }
-    body.is-session[data-shell="plan"][data-plan="training"] .absence-block { display: block; }
-    #absence-open.routine-start,
+    body.is-session[data-shell="plan"][data-plan="kalender"] .absence-block { display: block; }
     #absence-save.routine-start { height: auto; min-height: 44px; }
     .absence-editor[hidden] { display: none; }
     #absence-save.routine-start { margin-top: 12px; }
@@ -1935,7 +1984,18 @@
       transform-origin: center bottom;
       transition: transform 180ms ease;
     }
-    .app-pill nav.is-compact { transform: scale(0.9); }
+    .app-pill nav.is-compact { transform: none; }
+    body.is-session .app-pill { padding: 0; }
+    body.is-session .app-pill nav {
+      width: 100%;
+      height: calc(60px + env(safe-area-inset-bottom));
+      padding: 0 6px env(safe-area-inset-bottom);
+      border-radius: 0;
+      background: #F3EEE4;
+      color: #2A2118;
+      border-top: 1px solid rgba(42, 33, 24, 0.28);
+      box-shadow: none;
+    }
     @media (prefers-reduced-motion: reduce) {
       .app-pill nav { transition: none; }
     }
@@ -2030,7 +2090,8 @@
     .plan-tabs .plan-tabs__top button {
       display: grid;
       place-items: center;
-      width: 44px;
+      width: auto;
+      min-width: 44px;
       height: 44px;
       min-height: 0;
       padding: 0;
@@ -2040,7 +2101,7 @@
     .plan-tabs .plan-tabs__top button.is-on { color: #2A2118; }
     .plan-tabs__info {
       font-family: "Playfair Display", serif;
-      font-size: 26px !important;
+      font-size: 26px;
       font-weight: 600;
       line-height: 1;
     }
@@ -2078,11 +2139,93 @@
       text-align: left;
       cursor: pointer;
     }
-    body.is-session #days .day { min-height: 68px; }
-    body.is-session #days .day.is-on,
-    body.is-session #days .day.is-empty,
-    body.is-session #days .day.is-moved,
-    body.is-session #days .day.is-line { min-height: 48px; }
+    body.is-session #days .day-card {
+      margin: 0 0 12px;
+      padding: 14px 16px 14px;
+      border: 1px solid #2A2118;
+    }
+    body.is-session #days .day-card:has(.day.is-empty),
+    body.is-session #days .day-card:has(.day.is-edit) { border-color: #C7413B; }
+    body.is-session #days .day-card.is-travel { border-style: dashed; }
+    .day-card__head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: rgba(42, 33, 24, 0.58);
+    }
+    .day-card__time {
+      flex: none;
+      padding: 2px 0 2px 10px;
+      color: #2A2118;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .day-card__time.is-empty { color: rgba(42, 33, 24, 0.58); }
+    body.is-session #days .day.day-card__main,
+    body.is-session #days .day.day-card__main.is-empty,
+    body.is-session #days .day.day-card__main.is-edit {
+      display: block;
+      min-height: 0;
+      margin: 4px 0 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: #2A2118;
+      font-family: "Playfair Display", serif;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+    body.is-session #days .day.day-card__main.is-empty { color: #C7413B; }
+    body.is-session #days .day-card .day-place { margin-top: 10px; min-height: 36px; }
+    body.is-session #days .day-card .day-invite { margin-bottom: 0; }
+    .week-mode {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid #2A2118;
+      margin: 0 0 6px;
+    }
+    .week-mode button {
+      min-height: 44px;
+      color: #2A2118;
+      background: transparent;
+    }
+    .week-mode button.is-on { background: #2A2118; color: #F6F1E8; }
+    .time-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      max-height: 46vh;
+      overflow-y: auto;
+    }
+    #days-place .time-grid button { min-height: 40px; padding: 0; text-align: center; border: 1px solid rgba(42, 33, 24, 0.28); }
+    #days-place .time-grid button.is-current { background: #2A2118; color: #F6F1E8; border-color: #2A2118; }
+    #days-place .time-grid button.is-current::after { content: none; }
+    .place-add {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .place-add input {
+      flex: 1;
+      min-width: 0;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 1px solid #2A2118;
+      border-radius: 0;
+      background: transparent;
+      color: #2A2118;
+      font: inherit;
+    }
+    #days-place .place-add button {
+      flex: none;
+      width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 1px solid #2A2118;
+      text-align: center;
+    }
     body.is-session .plan-week#plan-week { min-height: 75px; }
     .day-invite__add {
       display: flex;
@@ -2094,14 +2237,31 @@
     }
     .team-wa {
       flex: none;
-      width: 44px;
-      height: 44px;
+      width: 31px;
+      height: 31px;
       margin-left: auto;
+      border: 1px solid #2A2118;
+      border-radius: 50%;
       display: grid;
       place-items: center;
+      padding: 0;
+      color: #2A2118;
+      background: transparent;
+    }
+    .team-wa svg { width: 16px; height: 16px; display: block; }
+    .coach-head { margin: 22px 0 4px; }
+    .coach-head:first-child { margin-top: 4px; }
+    .coach-empty { margin: 10px 2px; color: rgba(42, 33, 24, 0.6); }
+    .coach-pick {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      min-height: 44px;
+      border: 1px solid #2A2118;
+      border-radius: 12px;
+      background: transparent;
       color: #2A2118;
     }
-    .team-wa svg { width: 24px; height: 24px; display: block; }
     body.is-session[data-shell="heute"] .heute-start {
       display: flex;
       align-items: center;
@@ -2120,11 +2280,12 @@
       text-align: center;
     }
     .heute-start svg { width: 20px; height: 20px; flex: none; }
-    .heute-stories { margin: 0 -20px 14px; }
+    .heute-stories { margin: 0 -20px 14px; --story-d: min(96px, calc((min(100vw, 440px) - 38px) / 3.8)); }
+    .heute-stories #postStrip { display: none !important; }
     .heute-stories[hidden] { display: none !important; }
     .heute-stories__row {
       display: flex;
-      gap: 14px;
+      gap: 6px;
       padding: 4px 20px 6px;
       overflow-x: auto;
       overflow-y: hidden;
@@ -2136,7 +2297,7 @@
     .heute-stories__team { display: contents; }
     .crew-story {
       flex: none;
-      width: 68px;
+      width: var(--story-d, 68px);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -2144,12 +2305,18 @@
       color: #2A2118;
     }
     .crew-story__ring {
-      width: 64px;
-      height: 64px;
-      padding: 2.5px;
+      width: var(--story-d, 64px);
+      height: var(--story-d, 64px);
+      padding: 1px;
       border-radius: 50%;
+      background: rgba(42, 33, 24, 0.28);
+    }
+    .crew-story.has-story .crew-story__ring {
+      padding: 4px;
       background: conic-gradient(#C7413B, #2A2118, #C7413B);
     }
+    .crew-story.has-story.is-seen .crew-story__ring { background: #2A2118; }
+    .crew-story--add .team-avatar { background: transparent; border-style: dashed; }
     .crew-story__ring .team-avatar {
       width: 100%;
       height: 100%;
@@ -2158,7 +2325,7 @@
     }
     .crew-story__ring .team-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .crew-story__name {
-      max-width: 68px;
+      max-width: var(--story-d, 68px);
       font-size: 11px;
       line-height: 1.2;
       white-space: nowrap;
@@ -2225,11 +2392,17 @@
       text-align: left;
     }
     body.is-session #plan-training .zirkel-block { display: block; }
-    .zirkel-block {
-      margin-top: 36px;
-      padding-top: 18px;
-      border-top: 1px solid rgba(42, 33, 24, 0.28);
+    .go-section__head { margin: 8px 0 10px; }
+    .go-section__head + .go-card { margin-top: 0; }
+    .go-card {
+      margin: 0 0 26px;
+      padding: 16px 18px 18px;
+      border: 1px solid #2A2118;
     }
+    .go-card__title { margin: 0 0 6px; }
+    .go-card__copy { margin: 0 0 12px; }
+    .go-card .routine-row { margin-top: 8px !important; }
+    .go-card #weeks { margin-top: 10px; }
     .zirkel-head {
       font-family: "Playfair Display", serif;
       font-weight: 600;
@@ -2262,23 +2435,64 @@
       font-size: 13px;
     }
     .zirkel-foot button { text-decoration: underline; text-underline-offset: 3px; color: rgba(42, 33, 24, 0.7); }
+
+    /* Typografie: zwei Schriftstile (Playfair Display 600, Inter 500) und drei Größen (S, M, L).
+       Ausnahmen: Workout-Ansicht (main) und laufendes Zirkeltraining (#run) mit großen Zählern. */
+    :root { --t-s: 13px; --t-m: 16px; --t-l: 24px; }
+    body.is-session :where(*:not(main, main *, #run, #run *, svg, svg *)) {
+      font-family: Inter, system-ui, sans-serif !important;
+      font-weight: 500 !important;
+      font-size: var(--t-m) !important;
+    }
+    body.is-session :is(h1, h2, .welcome-title, .welcome-title *, .diary h1, .profile-name, .plan-tabs__info,
+      .today-card__title, .day-card__main, .go-card__title, .go-section__head, .sand-card h2, .modal-card h2,
+      .zirkel-head, .orient-lock, .diary-share-name, .crew-story .team-avatar, .profile-ph, .heute-start span,
+      .ffc .summary .num, .ffc .fp-num, .ffc .kn-big, .ffc .home-ev-title, .ffc .page-head-title, .ffc .fp-name,
+      .ffc .quit-title, .ffc .avatar-xl, .ffc .brand, .ffc .history-title):not(main *, #run *) {
+      font-family: "Playfair Display", Georgia, serif !important;
+      font-weight: 600 !important;
+      font-size: var(--t-l) !important;
+      line-height: 1.2;
+    }
+    body.is-session :is(h3, h4, .tip, .tip span, .plan-week, .routine-start, .heute-mantra, .profile-challenge,
+      .diary-date, .zirkel-sub, .coach-head, .diary-empty, .move-wheel-head, .welcome-bang):not(main *, #run *) {
+      font-family: "Playfair Display", Georgia, serif !important;
+      font-weight: 600 !important;
+    }
+    body.is-session :is(small, .today-card__kicker, .day-card__head, .day-card__head *, .crew-story__name,
+      .app-pill small, .profile-label, .absence-col small, .absence-bis, .profile-notes p, .zirkel-foot,
+      .zirkel-foot button, .profile-week__day, .invite-card__ok, .coach-empty, .team-msg, .go-card__copy,
+      .settings-list a, .story-name, .ffc .dim, .ffc .lb-hint, .ffc .history-empty, .pill-dot,
+      .tip.is-owned, .tip.is-owned span):not(main *, #run *) {
+      font-size: var(--t-s) !important;
+      line-height: 1.35;
+    }
+    body.is-session .tip.is-owned span { white-space: normal; }
   </style>
 </head>
 <body class="is-home">
   <section id="welcome" class="welcome">
     <div class="plan-tabs" role="tablist" aria-label="Profil">
       <div class="plan-tabs__top">
-        <button type="button" data-plan="info" class="plan-tabs__info" role="tab" aria-label="Info">I</button>
-        <button type="button" id="heute-menu" class="plan-tabs__gear" aria-label="Einstellungen" aria-haspopup="dialog">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </button>
+        <button type="button" data-plan="info" class="plan-tabs__info" role="tab">Info</button>
       </div>
-      <button type="button" data-plan="team" role="tab">Team</button>
-      <button type="button" data-plan="orte" role="tab">Orte</button>
       <button type="button" data-plan="kalender" class="is-on" role="tab">Woche</button>
-      <button type="button" data-plan="training" role="tab">go!</button>
+      <button type="button" data-plan="team" role="tab">Coaching</button>
+      <button type="button" data-plan="training" role="tab">Go!</button>
+      <button type="button" data-plan="settings" role="tab">Einstellung</button>
     </div>
     <div class="shell-plan" id="plan-team"></div>
+    <div class="shell-plan settings-list" id="plan-settings">
+      <button type="button" data-menu="name">Vorname ändern</button>
+      <button type="button" data-menu="nickname">Nickname festlegen</button>
+      <button type="button" data-menu="phone">Telefonnummer angeben</button>
+      <button type="button" data-menu="email">E-Mail-Adresse angeben</button>
+      <button type="button" data-menu="code">Login-Code ändern</button>
+      <button type="button" data-menu="website">Website besuchen</button>
+      <a href="/impressum/">Impressum</a>
+      <a href="/datenschutz/">Datenschutz</a>
+      <a href="/kontakt/">Kontakt</a>
+    </div>
     <div class="shell-plan" id="plan-orte">
       <input class="orte-search" id="orte-search" type="search" placeholder="Ort suchen" aria-label="Ort suchen" />
       <div class="orte-list" id="orte-list"></div>
@@ -2623,8 +2837,14 @@
       </div>
     </div>
     <div class="shell-plan" id="plan-training">
-      <section class="zirkel-block" id="zirkel-block">
-        <h2 class="zirkel-head">Zirkeltraining</h2>
+      <h2 class="go-section__head">Challenges</h2>
+      <div class="go-card" id="go-card-routine">
+        <h3 class="go-card__title">12-Wochen-Routine</h3>
+        <p class="go-card__copy">Halte zwölf Wochen lang Deine Wochentage. Jede volle Woche wird markiert.</p>
+      </div>
+      <h2 class="go-section__head">Dienstleistungen</h2>
+      <section class="zirkel-block go-card" id="zirkel-block">
+        <h3 class="go-card__title">Zirkeltraining</h3>
         <div class="zirkel-login" id="zirkel-login">
           <p>Melde Dich einmal mit E-Mail und Login-Code von Zirkeltraining an. Es ist derselbe Account wie unter gogogo.social/zirkeltraining.</p>
           <button type="button" class="routine-start" id="zirkel-login-btn">Anmelden</button>
@@ -2669,15 +2889,18 @@
     <button type="button" id="plan-week" class="plan-week shell-kalender" hidden>Meine Bewegung in der Woche planen</button>
     <div class="days shell-kalender" id="days"></div>
     <div class="absence-block shell-kalender" id="absence-block">
-      <button type="button" id="absence-open" class="routine-start">Abwesenheit planen</button>
+      <div class="week-mode" role="group" aria-label="Woche">
+        <button type="button" data-week-mode="home" class="is-on" aria-pressed="true">vor Ort</button>
+        <button type="button" data-week-mode="travel" aria-pressed="false">Reise</button>
+      </div>
       <div class="absence-editor" id="absence-editor" hidden>
-        <p class="absence-copy">Mein Alltag sieht in der Zeit anders aus und ich muss meinen Plan alternativ gestalten:</p>
+        <p class="absence-copy">Ich bin auf Reise und wähle für diese Tage eine Alternative:</p>
         <div class="absence-range">
           <div class="absence-wheels" id="absence-start"></div>
           <span class="absence-bis">bis</span>
           <div class="absence-wheels" id="absence-end"></div>
         </div>
-        <button type="button" id="absence-save" class="routine-start">Speichern</button>
+        <button type="button" id="absence-save" class="routine-start">Reise speichern</button>
       </div>
     </div>
     <div class="routine-row shell-kalender">
@@ -2888,19 +3111,6 @@
   <div class="ev-sheet" id="ev-sheet" hidden>
     <div class="ev-sheet__card ffc" id="ev-sheet-card" role="dialog" aria-modal="true" aria-label="Event"></div>
   </div>
-  <div class="sand-modal" id="heute-menu-modal" hidden>
-    <div class="sand-card heute-menu" role="dialog" aria-modal="true" aria-label="Menü">
-      <button type="button" data-menu="name">Vorname ändern</button>
-      <button type="button" data-menu="nickname">Nickname festlegen</button>
-      <button type="button" data-menu="phone">Telefonnummer angeben</button>
-      <button type="button" data-menu="email">E-Mail-Adresse angeben</button>
-      <button type="button" data-menu="code">Login-Code ändern</button>
-      <button type="button" data-menu="website">Website besuchen</button>
-      <a href="/impressum/">Impressum</a>
-      <a href="/datenschutz/">Datenschutz</a>
-      <a href="/kontakt/">Kontakt</a>
-    </div>
-  </div>
   <div class="sand-modal" id="account-edit" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="account-edit-title">
       <h2 class="ask" id="account-edit-title">Code ändern</h2>
@@ -2966,9 +3176,28 @@
         <p class="profile-goal" id="profile-goal">Ziel wählen</p>
       </div>
     </div>
+    <div class="profile-block profile-links-block" id="profile-links-block">
+      <div class="profile-links" id="profile-links"></div>
+      <div class="profile-links-edit">
+        <input type="text" id="profile-instagram" maxlength="80" placeholder="Instagram, z. B. @name" autocomplete="off" />
+        <input type="text" id="profile-linkedin" maxlength="160" placeholder="LinkedIn-Link" autocomplete="off" />
+      </div>
+    </div>
     <div class="profile-block">
       <p class="profile-label">Über mich</p>
       <textarea class="profile-about" id="profile-about" maxlength="300" placeholder="Über mich" readonly></textarea>
+    </div>
+    <div class="profile-block">
+      <p class="profile-label">So ist meine Woche organisiert</p>
+      <div class="profile-week" id="profile-week"></div>
+    </div>
+    <div class="profile-block" id="profile-zirkel-block" hidden>
+      <p class="profile-label">Zirkeltraining</p>
+      <p class="profile-zirkel" id="profile-zirkel"></p>
+    </div>
+    <div class="profile-block">
+      <p class="profile-label">Empfehlungen</p>
+      <textarea class="profile-about profile-recs" id="profile-recs" maxlength="400" placeholder="Bücher, Podcasts, Orte, Rezepte …" readonly></textarea>
     </div>
     <div class="profile-block" id="profile-trainer-block" hidden>
       <p class="profile-label">Trainer</p>
@@ -3000,7 +3229,10 @@
         <small>Profil</small>
       </button>
       <button type="button" data-shell="heute" class="is-on" aria-label="Heute">
-        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3.2v3.1M12 17.7v3.1M3.2 12h3.1M17.7 12h3.1M5.7 5.7l2.2 2.2M16.1 16.1l2.2 2.2M18.3 5.7l-2.2 2.2M7.9 16.1l-2.2 2.2"/></svg>
+        <span class="pill-ico">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3.2v3.1M12 17.7v3.1M3.2 12h3.1M17.7 12h3.1M5.7 5.7l2.2 2.2M16.1 16.1l2.2 2.2M18.3 5.7l-2.2 2.2M7.9 16.1l-2.2 2.2"/></svg>
+          <span class="pill-dot" hidden></span>
+        </span>
         <small>Heute</small>
       </button>
       <button type="button" data-shell="diary" aria-label="Historie">
@@ -4793,6 +5025,10 @@
           planBtn.setAttribute("aria-pressed", planningWeek ? "true" : "false");
         }
         for (var i = 0; i < 7; i++) {
+          if (sessionMode) {
+            box.appendChild(sessionDayCard(addDays(today, i)));
+            continue;
+          }
           var iso = addDays(today, i);
           var key = DAY_KEYS[weekdayIndex(iso)];
           var wdIndex = weekdayIndex(iso);
@@ -4831,26 +5067,8 @@
           var block = document.createElement("div");
           block.className = "day-block";
           block.appendChild(button);
-          if (sessionMode) {
-            var placeName = placeForWeekday(wdIndex);
-            var place = document.createElement("button");
-            place.type = "button";
-            place.className = "day-place";
-            place.textContent = "Ort: " + placeName;
-            place.setAttribute("aria-label", "Ort am " + DAY_NAMES[key] + " ändern");
-            place.addEventListener("click", openDayPlace.bind(null, wdIndex));
-            block.appendChild(place);
-            incomingFor(iso).forEach(function (invite) {
-              block.appendChild(dayMeetEl(invite));
-            });
-            acceptedIncoming(iso).forEach(function (invite) {
-              block.appendChild(dayMeetEl(invite));
-            });
-            block.appendChild(dayInviteEl(iso));
-          }
           box.appendChild(block);
         }
-        if (sessionMode) requestAnimationFrame(syncPlaceHeights);
         var start = routineStart();
         var startBtn = document.getElementById("routine-start");
         var weeks = document.getElementById("weeks");
@@ -4881,7 +5099,8 @@
           todayKind = todayUnit && todayUnit.kind ? todayUnit.kind : "";
           var todayPlace = placeForWeekday(todayWd);
           if (awayToday) {
-            setTodayCard("Wie bewegst Du Dich?", "Alternativer Alltag");
+            var todayAlt = travelAltFor(todayIso);
+            setTodayCard(todayAlt ? (activityEmoji({ kind: "alternative", label: todayAlt }) + " " + todayAlt).trim() : "Alternative wählen", "Reise");
             todayBtn.dataset.kind = "away";
             todayBtn.dataset.away = "1";
             todayBtn.dataset.unitLabel = "";
@@ -4891,7 +5110,7 @@
               : (todayUnit && todayUnit.label
                 ? (activityEmoji(todayUnit) + " " + todayUnit.label).trim()
                 : "Heute frei");
-            setTodayCard(cardTitle, todayKind && todayKind !== "spontan" ? "Ort: " + todayPlace : "");
+            setTodayCard(cardTitle, todayKind && todayKind !== "spontan" ? "Ort: " + todayPlace : "", todayKind ? timeForWeekday(todayWd) : "");
             todayBtn.dataset.kind = todayKind;
             todayBtn.dataset.away = "";
             todayBtn.dataset.unitLabel = todayUnit && todayUnit.label ? todayUnit.label : "";
@@ -4912,20 +5131,64 @@
         paintHeuteExtras();
       }
 
-      function setTodayCard(title, line) {
-        var kicker = document.getElementById("today-kicker");
-        if (kicker) kicker.textContent = sessionMode ? "Heute" : "";
-        document.getElementById("today-title").textContent = title;
-        document.getElementById("today-line").textContent = line || "";
+      function sessionDayCard(iso) {
+        var wd = weekdayIndex(iso);
+        var key = DAY_KEYS[wd];
+        var unit = displayUnit(wd);
+        var away = awayOn(iso, absenceOf(sessionAccount));
+        var block = document.createElement("div");
+        block.className = "day-block day-card" + (away ? " is-travel" : "");
+        var head = document.createElement("div");
+        head.className = "day-card__head";
+        var dateEl = document.createElement("span");
+        dateEl.className = "day-card__date";
+        dateEl.textContent = (away ? "Reise · " : "") + formatLong(iso);
+        head.appendChild(dateEl);
+        var time = timeForWeekday(wd);
+        if (!away) {
+          var timeBtn = document.createElement("button");
+          timeBtn.type = "button";
+          timeBtn.className = "day-card__time" + (time ? "" : " is-empty");
+          timeBtn.textContent = time ? time + " Uhr" : "Uhrzeit";
+          timeBtn.setAttribute("aria-label", "Uhrzeit am " + DAY_NAMES[key] + " ändern");
+          timeBtn.addEventListener("click", function () { openDayTime(wd); });
+          head.appendChild(timeBtn);
+        }
+        block.appendChild(head);
+        var main = document.createElement("button");
+        main.type = "button";
+        main.className = "day day-card__main";
+        if (away) {
+          var alt = travelAltFor(iso);
+          main.dataset.travel = iso;
+          main.textContent = alt ? (activityEmoji({ kind: "alternative", label: alt }) + " " + alt).trim() : "Alternative für die Reise wählen";
+          main.classList.toggle("is-empty", !alt);
+          block.appendChild(main);
+          return block;
+        }
+        main.dataset.day = key;
+        main.disabled = !planningWeek;
+        if (unit && unit.kind === "spontan") main.textContent = "Am Tag spontan";
+        else if (unit && unit.kind) main.textContent = (activityEmoji(unit) + " " + (unit.label || "")).trim();
+        else main.textContent = planningWeek ? "Tippe, um zu planen" : "Frei";
+        if (planningWeek) main.classList.add(unit && unit.kind ? "is-edit" : "is-empty");
+        block.appendChild(main);
+        var place = document.createElement("button");
+        place.type = "button";
+        place.className = "day-place";
+        place.textContent = "Ort: " + placeForWeekday(wd);
+        place.setAttribute("aria-label", "Ort am " + DAY_NAMES[key] + " ändern");
+        place.addEventListener("click", function () { openDayPlace(wd); });
+        block.appendChild(place);
+        block.appendChild(dayInviteEl(iso));
+        return block;
       }
 
-      function syncPlaceHeights() {
-        document.querySelectorAll("#days .day-block").forEach(function (block) {
-          var day = block.querySelector(".day");
-          var place = block.querySelector(".day-place");
-          if (!day || !place || !day.offsetHeight) return;
-          place.style.height = day.offsetHeight + "px";
-        });
+      function setTodayCard(title, line, time) {
+        var kicker = document.getElementById("today-kicker");
+        if (kicker) kicker.textContent = sessionMode ? "Heute" + (time ? " · " + time + " Uhr" : "") : "";
+        document.getElementById("today-title").textContent = title;
+        document.getElementById("today-line").textContent = line || "";
       }
 
       function choosePlanDay(key) {
@@ -5102,7 +5365,6 @@
           input.inputMode = "numeric";
           input.maxLength = 8;
         }
-        document.getElementById("heute-menu-modal").hidden = true;
         document.getElementById("account-edit").hidden = false;
         input.focus();
       }
@@ -5254,24 +5516,18 @@
           .catch(function () {});
       }
 
-      document.getElementById("heute-menu").addEventListener("click", function () {
-        document.getElementById("heute-menu-modal").hidden = false;
-      });
-      document.getElementById("heute-menu-modal").addEventListener("click", function (event) {
+      document.getElementById("plan-settings").addEventListener("click", function (event) {
         var choice = event.target.closest("[data-menu]");
-        if (choice) {
-          var field = choice.getAttribute("data-menu");
-          if (field === "website") {
-            try {
-              sessionStorage.setItem("gogogo_profile_website_return", JSON.stringify({ href: "/workout/", at: Date.now() }));
-            } catch (eWeb) {}
-            location.href = "/?landing=1";
-            return;
-          }
-          openAccountEdit(field);
+        if (!choice) return;
+        var field = choice.getAttribute("data-menu");
+        if (field === "website") {
+          try {
+            sessionStorage.setItem("gogogo_profile_website_return", JSON.stringify({ href: "/workout/", at: Date.now() }));
+          } catch (eWeb) {}
+          location.href = "/?landing=1";
           return;
         }
-        if (event.target.id === "heute-menu-modal") event.currentTarget.hidden = true;
+        openAccountEdit(field);
       });
       document.getElementById("account-edit-save").addEventListener("click", saveAccountEdit);
       document.getElementById("account-edit-cancel").addEventListener("click", function () {
@@ -6873,6 +7129,11 @@
         if (event.target.id === "ausdauer-modal") closeAusdauerPick();
       });
       document.getElementById("days").addEventListener("click", function (event) {
+        var travel = event.target.closest("[data-travel]");
+        if (travel) {
+          openTravelAlt(travel.dataset.travel);
+          return;
+        }
         var day = event.target.closest("[data-day]");
         if (!day) return;
         choosePlanDay(day.dataset.day);
@@ -6970,7 +7231,7 @@
           var dot = btn.querySelector(".pill-dot");
           if (!dot) return;
           var tab = btn.getAttribute("data-shell");
-          dot.hidden = tab === "plan" ? !planHasInvite() : !diaryNote;
+          dot.hidden = tab === "heute" ? !planHasInvite() : (tab === "diary" ? !diaryNote : true);
         });
       }
 
@@ -7006,7 +7267,6 @@
           requestAnimationFrame(scrollAbsenceWheels);
           refreshZirkel();
         }
-        if (planPane === "kalender") requestAnimationFrame(syncPlaceHeights);
       }
 
       function inviteStore() {
@@ -7054,9 +7314,15 @@
         if (!sessionMode || !sessionAccount) return;
         var prefs = {};
         var map = dayPlaceMap();
+        var times = dayTimeMap();
         Object.keys(map).forEach(function (key) {
           if (!map[key] || isHomePlace(map[key])) return;
           prefs[key] = { place: map[key], label: "" };
+        });
+        Object.keys(times).forEach(function (key) {
+          if (!times[key]) return;
+          if (!prefs[key]) prefs[key] = { place: "", label: "" };
+          prefs[key].time = times[key];
         });
         rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
           method: "PATCH",
@@ -7068,29 +7334,89 @@
         }).catch(function () {});
       }
 
+      function addSavedPlace(name) {
+        var clean = String(name || "").trim();
+        if (!clean || isHomePlace(clean)) return;
+        var list = placeStore().filter(function (item) { return item && item.name && item.name !== clean; });
+        var point = fixedCoords(clean);
+        list.unshift({ name: clean, lat: point.lat, lng: point.lng });
+        list = list.slice(0, 12);
+        writeStore(storePrefix + "places", list);
+        persistAccountPlaces(list);
+      }
+
+      function renderPlaceChoices(box, current, onChoose, withHome) {
+        box.textContent = "";
+        box.hidden = false;
+        var names = withHome ? ["zu Hause"] : [];
+        placeStore().forEach(function (item) {
+          if (item && item.name && !isHomePlace(item.name) && names.indexOf(item.name) < 0) names.push(item.name);
+        });
+        names.forEach(function (name) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = name;
+          if (name === current) button.classList.add("is-current");
+          button.addEventListener("click", function () { onChoose(name); });
+          box.appendChild(button);
+        });
+        var form = document.createElement("form");
+        form.className = "place-add";
+        var input = document.createElement("input");
+        input.type = "text";
+        input.maxLength = 60;
+        input.placeholder = "Neuer Ort, z. B. Volkspark";
+        input.setAttribute("aria-label", "Neuer Ort");
+        var add = document.createElement("button");
+        add.type = "submit";
+        add.textContent = "+";
+        add.setAttribute("aria-label", "Ort hinzufügen");
+        form.appendChild(input);
+        form.appendChild(add);
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          var name = String(input.value || "").trim();
+          if (!name) { input.focus(); return; }
+          addSavedPlace(name);
+          onChoose(name);
+        });
+        box.appendChild(form);
+        return box;
+      }
+
       function askWeekPlace(unit) {
         if (!pendingDay) return;
         pendingUnit = unit;
         document.getElementById("days-kinds").hidden = true;
         document.getElementById("days-pick").hidden = true;
         document.getElementById("days-title").textContent = "Ort am " + DAY_NAMES[pendingDay] + ".";
-        var box = document.getElementById("days-place");
-        box.textContent = "";
-        box.hidden = false;
-        var places = placeStore().filter(function (item) { return item && item.name && !isHomePlace(item.name); });
-        places.forEach(function (item) {
-          var button = document.createElement("button");
-          button.type = "button";
-          button.textContent = item.name;
-          button.addEventListener("click", function () { finishWeekPlace(item.name); });
-          box.appendChild(button);
-        });
+        var box = renderPlaceChoices(document.getElementById("days-place"), placeForWeekday(DAY_KEYS.indexOf(pendingDay)), function (name) { askWeekTime(name); }, true);
         var skip = document.createElement("button");
         skip.type = "button";
         skip.className = "sand-quiet";
         skip.textContent = "ohne Ort planen";
-        skip.addEventListener("click", function () { finishWeekPlace(""); });
+        skip.addEventListener("click", function () { askWeekTime(""); });
         box.appendChild(skip);
+      }
+
+      function askWeekTime(placeName) {
+        if (!pendingDay || !pendingUnit) return;
+        var wd = DAY_KEYS.indexOf(pendingDay);
+        setDayPlace(wd, placeName);
+        if (pendingUnit.kind === "spontan") {
+          var spontan = pendingUnit;
+          pendingUnit = null;
+          setDayTime(wd, "");
+          commitWeekUnit(wd, spontan);
+          return;
+        }
+        document.getElementById("days-title").textContent = "Uhrzeit am " + DAY_NAMES[pendingDay] + ".";
+        renderTimeChoices(document.getElementById("days-place"), timeForWeekday(wd), function (time) {
+          setDayTime(wd, time);
+          var unit = pendingUnit;
+          pendingUnit = null;
+          commitWeekUnit(wd, unit);
+        });
       }
 
       function openDayPlace(wd) {
@@ -7102,46 +7428,121 @@
         document.getElementById("days-pick").hidden = true;
         document.getElementById("days-error").hidden = true;
         document.getElementById("days-title").textContent = "Ort am " + DAY_NAMES[key] + ".";
-        var box = document.getElementById("days-place");
-        box.textContent = "";
-        box.hidden = false;
-        var current = placeForWeekday(wd);
-        function choose(name) {
+        renderPlaceChoices(document.getElementById("days-place"), placeForWeekday(wd), function (name) {
           setDayPlace(wd, name);
           closeDaysPrompt();
           paintWelcome();
-        }
-        var names = ["zu Hause"];
-        placeStore().forEach(function (item) {
-          if (item && item.name && !isHomePlace(item.name) && names.indexOf(item.name) < 0) names.push(item.name);
-        });
-        names.forEach(function (name) {
-          var button = document.createElement("button");
-          button.type = "button";
-          button.textContent = name;
-          if (name === current) button.classList.add("is-current");
-          button.addEventListener("click", function () { choose(name); });
-          box.appendChild(button);
-        });
-        var more = document.createElement("button");
-        more.type = "button";
-        more.className = "sand-quiet";
-        more.textContent = "Neuen Ort unter Orte anlegen";
-        more.addEventListener("click", function () {
-          closeDaysPrompt();
-          showPlan("orte");
-        });
-        box.appendChild(more);
+        }, true);
         document.getElementById("days-modal").hidden = false;
       }
 
-      function finishWeekPlace(name) {
-        if (!pendingDay || !pendingUnit) return;
-        var wd = DAY_KEYS.indexOf(pendingDay);
-        setDayPlace(wd, name);
-        var unit = pendingUnit;
+      function dayTimeMap() {
+        var map = readStore(storePrefix + "day_times", {});
+        return map && typeof map === "object" && !Array.isArray(map) ? map : {};
+      }
+
+      function timeForWeekday(wd) {
+        var t = String(dayTimeMap()[String(wd)] || "");
+        return /^\d{1,2}:\d{2}$/.test(t) ? t : "";
+      }
+
+      function setDayTime(wd, time) {
+        var map = dayTimeMap();
+        if (time) map[String(wd)] = time;
+        else delete map[String(wd)];
+        writeStore(storePrefix + "day_times", map);
+        persistMeetPrefs();
+      }
+
+      function renderTimeChoices(box, current, onChoose) {
+        box.textContent = "";
+        box.hidden = false;
+        var grid = document.createElement("div");
+        grid.className = "time-grid";
+        for (var h = 6; h <= 21; h++) {
+          [":00", ":30"].forEach(function (m) {
+            var t = h + m;
+            var button = document.createElement("button");
+            button.type = "button";
+            button.textContent = t;
+            if (t === current) button.classList.add("is-current");
+            button.addEventListener("click", function () { onChoose(t); });
+            grid.appendChild(button);
+          });
+        }
+        box.appendChild(grid);
+        var skip = document.createElement("button");
+        skip.type = "button";
+        skip.className = "sand-quiet";
+        skip.textContent = "ohne Uhrzeit";
+        skip.addEventListener("click", function () { onChoose(""); });
+        box.appendChild(skip);
+        var on = grid.querySelector(".is-current") || grid.children[Math.min(grid.children.length - 1, 24)];
+        requestAnimationFrame(function () { if (on && on.scrollIntoView) on.scrollIntoView({ block: "center" }); });
+      }
+
+      function openDayTime(wd) {
+        pendingDay = null;
         pendingUnit = null;
-        commitWeekUnit(wd, unit);
+        document.getElementById("days-secret").hidden = true;
+        document.getElementById("days-kinds").hidden = true;
+        document.getElementById("days-pick").hidden = true;
+        document.getElementById("days-error").hidden = true;
+        document.getElementById("days-title").textContent = "Uhrzeit am " + DAY_NAMES[DAY_KEYS[wd]] + ".";
+        renderTimeChoices(document.getElementById("days-place"), timeForWeekday(wd), function (time) {
+          setDayTime(wd, time);
+          closeDaysPrompt();
+          paintWelcome();
+        });
+        document.getElementById("days-modal").hidden = false;
+      }
+
+      var TRAVEL_ALTS = ["Hotel-Workout", "Laufen", "Spazieren", "Schwimmen", "Yoga", "Radfahren", "Pause"];
+
+      function travelAltFor(iso) {
+        var about = profileAbout(sessionAccount);
+        var alts = about && about.absence && about.absence.alts;
+        return alts && typeof alts === "object" ? String(alts[iso] || "") : "";
+      }
+
+      function setTravelAlt(iso, label) {
+        var about = profileAbout(sessionAccount) || {};
+        var abs = about.absence && typeof about.absence === "object" ? about.absence : {};
+        var alts = abs.alts && typeof abs.alts === "object" ? abs.alts : {};
+        Object.keys(alts).forEach(function (key) { if (abs.end && key > abs.end) delete alts[key]; });
+        if (label) alts[iso] = label;
+        else delete alts[iso];
+        abs.alts = alts;
+        about.absence = abs;
+        return saveAbout(about);
+      }
+
+      function openTravelAlt(iso) {
+        pendingDay = null;
+        pendingUnit = null;
+        document.getElementById("days-secret").hidden = true;
+        document.getElementById("days-kinds").hidden = true;
+        document.getElementById("days-pick").hidden = true;
+        document.getElementById("days-error").hidden = true;
+        document.getElementById("days-title").textContent = "Alternative am " + formatLong(iso) + ".";
+        var box = document.getElementById("days-place");
+        box.textContent = "";
+        box.hidden = false;
+        var current = travelAltFor(iso);
+        TRAVEL_ALTS.forEach(function (label) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = label;
+          if (label === current) button.classList.add("is-current");
+          button.addEventListener("click", function () {
+            setTravelAlt(iso, label).then(function () {
+              closeDaysPrompt();
+              paintWelcome();
+            });
+          });
+          box.appendChild(button);
+        });
+        document.getElementById("days-modal").hidden = false;
       }
 
       function absenceOf(account) {
@@ -7154,10 +7555,28 @@
         return start <= end ? { start: start, end: end } : { start: end, end: start };
       }
 
+      var weekModeOpen = false;
+
       function paintAbsenceButton() {
-        var btn = document.getElementById("absence-open");
-        if (!btn) return;
-        btn.textContent = absenceOf(sessionAccount) ? "Abwesenheit aktiv" : "Abwesenheit planen";
+        var range = absenceOf(sessionAccount);
+        var travel = !!(range && range.end >= Log.berlinToday()) || weekModeOpen;
+        document.querySelectorAll("[data-week-mode]").forEach(function (btn) {
+          var on = (btn.dataset.weekMode === "travel") === travel;
+          btn.classList.toggle("is-on", on);
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+        var save = document.getElementById("absence-save");
+        if (save) save.textContent = range && !weekModeOpen ? "Reise ändern" : "Reise speichern";
+      }
+
+      function saveAbout(about) {
+        sessionAccount.about_me = about;
+        if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+        return rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { about_me: about }
+        }).catch(function () {});
       }
 
       function awayOn(iso, range) {
@@ -7351,15 +7770,16 @@
         var box = document.getElementById("plan-team");
         if (!box) return;
         box.textContent = "";
-        var me = {
-          id: sessionAccount && sessionAccount.id,
-          name: personName(),
-          photo_url: sessionAccount && sessionAccount.photo_url || "",
-          trainer_id: sessionAccount && sessionAccount.trainer_id || "",
-          isSelf: true
-        };
         var today = Log.berlinToday();
-        [me].concat(teamPeople).forEach(function (person) {
+        var mineId = String((sessionAccount && sessionAccount.id) || "");
+        var myTrainer = sessionAccount && sessionAccount.trainer_id ? String(sessionAccount.trainer_id) : "";
+        function head(text) {
+          var h = document.createElement("h3");
+          h.className = "coach-head";
+          h.textContent = text;
+          box.appendChild(h);
+        }
+        function personRow(person, extra) {
           var away = personAway(person, today);
           var row = document.createElement("div");
           row.className = "team-row" + (away ? " is-away" : "");
@@ -7369,7 +7789,7 @@
           main.appendChild(personFace(person));
           var name = document.createElement("span");
           name.className = "team-name";
-          name.textContent = person.isSelf ? "Ich" : (person.name + (person.isTrainerPerson ? " (Trainer)" : ""));
+          name.textContent = person.name || "Team";
           if (away) {
             var tag = document.createElement("span");
             tag.className = "away-tag";
@@ -7380,8 +7800,16 @@
           main.appendChild(name);
           main.addEventListener("click", function () { openProfile(person); });
           row.appendChild(main);
-          var myTrainer = sessionAccount && sessionAccount.trainer_id ? String(sessionAccount.trainer_id) : "";
-          if (!person.isSelf && myTrainer && String(person.id) === myTrainer) {
+          if (extra) extra(row);
+          box.appendChild(row);
+        }
+        head("Mein Trainer");
+        var trainer = null;
+        teamPeople.forEach(function (person) {
+          if (myTrainer && String(person.id) === myTrainer) trainer = person;
+        });
+        if (trainer) {
+          personRow(trainer, function (row) {
             var wa = document.createElement("button");
             wa.type = "button";
             wa.className = "team-wa";
@@ -7392,9 +7820,31 @@
               openQuickWa();
             });
             row.appendChild(wa);
-          }
-          var mineId = sessionAccount && String(sessionAccount.id);
-          if (sessionIsTrainer && !person.isSelf && person.trainer_id && String(person.trainer_id) === mineId) {
+          });
+        } else {
+          var none = document.createElement("p");
+          none.className = "coach-empty";
+          none.textContent = "Noch kein Trainer gewählt.";
+          box.appendChild(none);
+        }
+        var pick = document.createElement("button");
+        pick.type = "button";
+        pick.className = "coach-pick";
+        pick.textContent = trainer ? "Trainer ändern" : "Trainer wählen";
+        pick.addEventListener("click", function () { openTeamSearch("trainer"); });
+        box.appendChild(pick);
+        head("Coachees");
+        var coachees = teamPeople.filter(function (person) {
+          return person && person.trainer_id && String(person.trainer_id) === mineId;
+        });
+        if (!coachees.length) {
+          var empty = document.createElement("p");
+          empty.className = "coach-empty";
+          empty.textContent = "Noch niemand hat Dich als Coach gewählt.";
+          box.appendChild(empty);
+        }
+        coachees.forEach(function (person) {
+          personRow(person, sessionIsTrainer ? function (row) {
             var pencil = document.createElement("button");
             pencil.type = "button";
             pencil.className = "team-pencil";
@@ -7405,23 +7855,19 @@
               openTrainerAdmin(person);
             });
             row.appendChild(pencil);
-          }
-          box.appendChild(row);
+          } : null);
         });
-        var add = document.createElement("button");
-        add.type = "button";
-        add.className = "team-row";
-        add.id = "team-add";
-        var plus = document.createElement("span");
-        plus.className = "team-avatar is-plus";
-        plus.textContent = "+";
-        add.appendChild(plus);
-        add.addEventListener("click", function () {
-          document.getElementById("team-id").value = "";
-          document.getElementById("team-msg").textContent = "";
-          document.getElementById("team-modal").hidden = false;
-        });
-        box.appendChild(add);
+      }
+
+      var teamSearchMode = "friend";
+      function openTeamSearch(mode) {
+        teamSearchMode = mode === "trainer" ? "trainer" : "friend";
+        document.getElementById("team-title").textContent = teamSearchMode === "trainer"
+          ? "Trainer: ID oder Nickname eingeben"
+          : "Freund: ID oder Nickname eingeben";
+        document.getElementById("team-id").value = "";
+        document.getElementById("team-msg").textContent = "";
+        document.getElementById("team-modal").hidden = false;
       }
 
       function openTrainerAdmin(person) {
@@ -7433,7 +7879,7 @@
       function loadTeam() {
         if (!sessionMode || !sessionAccount) return Promise.resolve();
         var id = String(sessionAccount.id);
-        var personSelect = "id,name,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id";
+        var personSelect = "id,name,nickname,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id";
         return rest("go_accounts?id=eq." + encodeURIComponent(id) + "&select=id,name,trainer_id,photo_url,is_trainer")
           .catch(function () { return []; })
           .then(function (rows) {
@@ -7530,6 +7976,19 @@
             var found = rows && rows[0];
             if (!found || !found.id || String(found.id) === String(sessionAccount.id)) {
               msg.textContent = "nicht gefunden";
+              return;
+            }
+            if (teamSearchMode === "trainer") {
+              rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+                method: "PATCH",
+                prefer: "return=minimal",
+                body: { trainer_id: found.id }
+              }).then(function () {
+                sessionAccount.trainer_id = found.id;
+                if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+                document.getElementById("team-modal").hidden = true;
+                loadTeam();
+              }).catch(function () { msg.textContent = "Speichern fehlgeschlagen."; });
               return;
             }
             var exists = teamPeople.some(function (person) { return String(person.id) === String(found.id); });
@@ -7631,6 +8090,14 @@
             if (row.photo_url) sessionAccount.photo_url = row.photo_url;
             var prefs = row.weekday_meet_prefs;
             if (typeof prefs === "string") { try { prefs = JSON.parse(prefs); } catch (ePref) { prefs = null; } }
+            if (prefs && typeof prefs === "object" && !Object.keys(dayTimeMap()).length) {
+              var storedTimes = {};
+              Object.keys(prefs).forEach(function (key) {
+                var t = prefs[key] && prefs[key].time;
+                if (t && /^\d{1,2}:\d{2}$/.test(t)) storedTimes[key] = t;
+              });
+              if (Object.keys(storedTimes).length) writeStore(storePrefix + "day_times", storedTimes);
+            }
             if (prefs && typeof prefs === "object" && !Object.keys(dayPlaceMap()).length) {
               var stored = {};
               Object.keys(prefs).forEach(function (key) {
@@ -7900,7 +8367,11 @@
         var unit = displayUnit(wd);
         var label = unit && unit.label ? unit.label : "Training";
         var place = placeForWeekday(wd);
-        var time = chosenTime();
+        var time = timeForWeekday(wd);
+        if (!time) {
+          time = chosenTime();
+          setDayTime(wd, time);
+        }
         var jobs = pendingInvitePeople.filter(function (person) {
           return !personAway(person, iso);
         }).map(function (person) {
@@ -7948,6 +8419,7 @@
         Promise.all(jobs).then(function () {
           syncInviteStore();
           document.getElementById("time-modal").hidden = true;
+          document.getElementById("invite-modal").hidden = true;
           pendingInvitePeople = [];
           paintWelcome();
           refreshDiaryNote();
@@ -8316,7 +8788,8 @@
       document.getElementById("go-today").addEventListener("click", function () {
         var kind = this.dataset.kind || "";
         if (sessionMode && (this.dataset.away === "1" || kind === "away")) {
-          openDiary();
+          if (travelAltFor(Log.berlinToday())) openDiary();
+          else openTravelAlt(Log.berlinToday());
           return;
         }
         if (sessionMode && kind === "zirkel") {
@@ -9175,21 +9648,72 @@
         box.textContent = "";
         if (!sessionAccount) return;
         var today = Log.berlinToday();
+        var last = addDays(today, 6);
         var me = String(sessionAccount.id);
-        remoteInvites.forEach(function (row) {
-          if (!row || row.status !== "accepted" || String(row.to_id) !== me) return;
-          if (String(row.workout_date || "").slice(0, 10) !== today) return;
-          var button = document.createElement("button");
-          button.type = "button";
-          button.className = "heute-join";
-          button.textContent = (row.workout_label || "Training") + (row.meet_time ? " · " + row.meet_time : "");
-          button.addEventListener("click", function () {
-            var go = document.getElementById("go-today");
-            go.dataset.kind = "ausdauer";
-            go.dataset.unitLabel = row.workout_label || "Training";
-            openMovedDialog();
-          });
-          box.appendChild(button);
+        var seen = {};
+        var rows = remoteInvites.filter(function (row) {
+          if (!row || String(row.to_id) !== me) return false;
+          if (row.status !== "pending" && row.status !== "accepted") return false;
+          var iso = String(row.workout_date || "").slice(0, 10);
+          if (iso < today || iso > last) return false;
+          var key = String(row.from_id) + ":" + iso;
+          if (seen[key]) return false;
+          seen[key] = true;
+          return true;
+        }).sort(function (a, b) {
+          return String(a.workout_date).localeCompare(String(b.workout_date)) || String(a.meet_time || "").localeCompare(String(b.meet_time || ""));
+        });
+        rows.forEach(function (row) {
+          var iso = String(row.workout_date).slice(0, 10);
+          var owner = inviteOwner(row);
+          var card = document.createElement("div");
+          card.className = "invite-card" + (row.status === "pending" ? " is-pending" : "");
+          var kicker = document.createElement("span");
+          kicker.className = "today-card__kicker";
+          kicker.textContent = (iso === today ? "Heute" : formatLong(iso)) + (row.meet_time ? " · " + row.meet_time + " Uhr" : "");
+          var title = document.createElement("span");
+          title.className = "today-card__title";
+          title.textContent = (activityEmoji({ label: row.workout_label }) + " " + (row.workout_label || "Training")).trim();
+          var line = document.createElement("span");
+          line.className = "today-card__line";
+          line.textContent = "Einladung von " + owner.name + " · Ort: " + (row.place || "zu Hause");
+          card.appendChild(kicker);
+          card.appendChild(title);
+          card.appendChild(line);
+          var actions = document.createElement("div");
+          actions.className = "invite-card__actions";
+          if (row.status === "pending") {
+            [["accepted", "Annehmen"], ["declined", "Absagen"]].forEach(function (pair) {
+              var btn = document.createElement("button");
+              btn.type = "button";
+              btn.textContent = pair[1];
+              btn.className = pair[0] === "accepted" ? "is-yes" : "";
+              btn.addEventListener("click", function () {
+                pendingIncoming = row;
+                decideIncoming(pair[0]);
+              });
+              actions.appendChild(btn);
+            });
+          } else if (iso === today) {
+            var go = document.createElement("button");
+            go.type = "button";
+            go.className = "is-yes";
+            go.textContent = "Erledigt";
+            go.addEventListener("click", function () {
+              var todayBtn = document.getElementById("go-today");
+              todayBtn.dataset.kind = "ausdauer";
+              todayBtn.dataset.unitLabel = row.workout_label || "Training";
+              openMovedDialog();
+            });
+            actions.appendChild(go);
+          } else {
+            var ok = document.createElement("span");
+            ok.className = "invite-card__ok";
+            ok.textContent = "Zugesagt";
+            actions.appendChild(ok);
+          }
+          card.appendChild(actions);
+          box.appendChild(card);
         });
       }
 
@@ -9207,7 +9731,7 @@
         var aus = Array.isArray(plan.ausdauer_weekdays) ? plan.ausdauer_weekdays.map(Number) : [];
         if (kraft.indexOf(Number(wd)) >= 0) return "Kraft";
         if (aus.indexOf(Number(wd)) >= 0) return "Ausdauer";
-        if (Number(plan.zirkel_weekday) === Number(wd)) return "Zirkeltraining";
+        if (plan.zirkel_weekday != null && plan.zirkel_weekday !== "" && Number(plan.zirkel_weekday) === Number(wd)) return "Zirkeltraining";
         return "Training";
       }
 
@@ -9216,82 +9740,107 @@
       function paintStoriesVisibility() {
         var wrap = document.getElementById("heute-stories");
         if (!wrap) return;
-        var strip = document.getElementById("postStrip");
-        var ffcStories = strip ? strip.querySelectorAll('.story[data-u]:not([data-u="add"])').length : 0;
-        wrap.hidden = !sessionMode || (crewActive + ffcStories) === 0;
+        wrap.hidden = !sessionMode || !sessionAccount;
+      }
+
+      function ffcStoryList() {
+        try { return window.FFC && FFC.stories ? FFC.stories() : []; } catch (e) { return []; }
+      }
+
+      function storyItem(person, story, onOpen) {
+        var item = document.createElement("button");
+        item.type = "button";
+        item.className = "crew-story" + (story ? " has-story" + (story.seen ? " is-seen" : "") : "");
+        var ring = document.createElement("span");
+        ring.className = "crew-story__ring";
+        ring.appendChild(personFace(person));
+        item.appendChild(ring);
+        var name = document.createElement("span");
+        name.className = "crew-story__name";
+        name.textContent = person.label || person.name || "Team";
+        item.appendChild(name);
+        item.setAttribute("aria-label", (person.label || person.name || "Team") + (story ? ", Story ansehen" : ", Profil ansehen"));
+        item.addEventListener("click", onOpen);
+        return item;
       }
 
       function paintHeuteCrew() {
         var box = document.getElementById("heute-stories-team");
         if (!box) return;
         if (!sessionMode || !sessionAccount) return;
-        var today = Log.berlinToday();
-        var wd = weekdayIndex(today);
-        function draw(people) {
-          box.textContent = "";
-          crewActive = people.length;
-          people.forEach(function (person) {
-            var item = document.createElement("button");
-            item.type = "button";
-            item.className = "crew-story";
-            var ring = document.createElement("span");
-            ring.className = "crew-story__ring";
-            ring.appendChild(personFace(person));
-            item.appendChild(ring);
-            var name = document.createElement("span");
-            name.className = "crew-story__name";
-            name.textContent = person.name || "Team";
-            item.appendChild(name);
-            item.setAttribute("aria-label", (person.name || "Team") + ", " + (person.activity || "Training") + ", " + (person.place || "zu Hause"));
-            item.addEventListener("click", function () {
-              var known = null;
-              teamPeople.forEach(function (row) { if (String(row.id) === String(person.id)) known = row; });
-              openProfile(known || person);
-            });
-            box.appendChild(item);
-          });
-          paintStoriesVisibility();
+        box.textContent = "";
+        var stories = ffcStoryList();
+        var byNick = {};
+        stories.forEach(function (story) {
+          if (story && story.nickname) byNick[String(story.nickname).toLowerCase()] = story;
+        });
+        var used = {};
+        function storyFor(person, isMe) {
+          if (isMe) {
+            for (var i = 0; i < stories.length; i++) if (stories[i].is_me) return stories[i];
+            return null;
+          }
+          var nick = String((person && person.nickname) || "").toLowerCase();
+          return nick && byNick[nick] && !byNick[nick].is_me ? byNick[nick] : null;
         }
-        if (crewCache && crewCache.day === today) {
-          draw(crewCache.people);
-          return;
+        function openFor(person, story) {
+          return function () {
+            if (story && window.FFC && FFC.openStory && FFC.openStory(story.index)) return;
+            openProfile(person);
+          };
         }
-        var ready = teamPeople.length ? Promise.resolve() : loadTeam();
-        Promise.resolve(ready).then(function () {
-          var ids = teamPeople.map(function (person) { return person && person.id; }).filter(Boolean);
-          if (!ids.length) { draw([]); return null; }
-          var list = ids.map(encodeURIComponent).join(",");
-          return Promise.all([
-            rest("go_accounts?id=in.(" + list + ")&select=id,name,weekday_meet_prefs,photo_url,is_trainer,about_me").catch(function () { return []; }),
-            rest("go_coach_plans?account_id=in.(" + list + ")&select=account_id,day_training_units,kraft_weekdays,ausdauer_weekdays,zirkel_weekday").catch(function () { return []; })
-          ]).then(function (pack) {
-            var plans = {};
-            (pack[1] || []).forEach(function (row) { if (row && row.account_id) plans[String(row.account_id)] = row; });
-            var people = [];
-            (pack[0] || []).forEach(function (account) {
-              if (!account || String(account.id) === String(sessionAccount.id)) return;
-              if (!trainsOn(plans[String(account.id)], wd)) return;
-              if (awayOn(today, absenceOf(account))) return;
-              var prefs = account.weekday_meet_prefs || {};
-              if (typeof prefs === "string") { try { prefs = JSON.parse(prefs); } catch (eP) { prefs = {}; } }
-              var pref = prefs[String(wd)] || {};
-              var place = String(pref.place || "").trim();
-              if (!place || isHomePlace(place)) place = "zu Hause";
-              var known = null;
-              teamPeople.forEach(function (item) { if (String(item.id) === String(account.id)) known = item; });
-              people.push({
-                id: account.id,
-                name: (known && known.name) || account.name || "Team",
-                photo_url: account.photo_url || (known && known.photo_url) || "",
-                isTrainerPerson: !!(known && known.isTrainerPerson) || !!account.is_trainer,
-                place: place,
-                activity: planActivity(plans[String(account.id)], wd)
-              });
-            });
-            crewCache = { day: today, people: people };
-            draw(people);
+        var me = {
+          id: sessionAccount.id,
+          name: sessionAccount.name,
+          nickname: sessionAccount.nickname,
+          photo_url: sessionAccount.photo_url,
+          isSelf: true,
+          label: "Deine Story"
+        };
+        var myStory = storyFor(me, true);
+        if (myStory) used[myStory.index] = true;
+        box.appendChild(storyItem(me, myStory, openFor(me, myStory)));
+        var seenIds = {};
+        var friends = teamPeople.filter(function (person) {
+          if (!person || !person.id || person.isSelf || String(person.id) === String(sessionAccount.id)) return false;
+          if (seenIds[person.id]) return false;
+          seenIds[person.id] = true;
+          return true;
+        }).map(function (person) {
+          var story = storyFor(person, false);
+          if (story) used[story.index] = true;
+          return { person: person, story: story };
+        });
+        stories.forEach(function (story) {
+          if (story.is_me || used[story.index]) return;
+          friends.push({
+            person: { id: "ffc-" + story.uid, name: story.nickname, nickname: story.nickname, photo_url: story.avatar_url || "" },
+            story: story
           });
-        }).catch(function () { draw([]); });
+        });
+        friends.sort(function (a, b) {
+          var sa = a.story ? (a.story.seen ? 1 : 0) : 2;
+          var sb = b.story ? (b.story.seen ? 1 : 0) : 2;
+          return sa - sb;
+        });
+        crewActive = friends.length;
+        friends.forEach(function (entry) {
+          box.appendChild(storyItem(entry.person, entry.story, openFor(entry.person, entry.story)));
+        });
+        var add = document.createElement("button");
+        add.type = "button";
+        add.className = "crew-story crew-story--add";
+        add.innerHTML = '<span class="crew-story__ring"><span class="team-avatar">+</span></span><span class="crew-story__name">Freund</span>';
+        add.setAttribute("aria-label", "Freund hinzufügen");
+        add.addEventListener("click", function () { openTeamSearch("friend"); });
+        box.appendChild(add);
+        paintStoriesVisibility();
+        if (!teamPeople.length && !paintHeuteCrew.loading) {
+          paintHeuteCrew.loading = true;
+          Promise.resolve(loadTeam()).then(function () {
+            if (teamPeople.length) paintHeuteCrew();
+          }).catch(function () {});
+        }
       }
 
       function paintHeuteExtras() {
@@ -9588,14 +10137,135 @@
         var mantra = document.getElementById("profile-mantra");
         if (about) about.readOnly = !on;
         if (mantra) mantra.readOnly = !on;
+        var recs = document.getElementById("profile-recs");
+        if (recs) recs.readOnly = !on;
         fitProfileAbout();
       }
 
+      function socialUrl(kind, raw) {
+        var v = String(raw || "").trim();
+        if (!v) return "";
+        if (/^https?:\/\//i.test(v)) return v;
+        if (kind === "instagram") return "https://www.instagram.com/" + encodeURIComponent(v.replace(/^@/, "").replace(/^(www\.)?instagram\.com\//i, "").replace(/\/+$/, "")) + "/";
+        if (/^(www\.)?linkedin\.com\//i.test(v)) return "https://" + v;
+        return "https://www.linkedin.com/in/" + encodeURIComponent(v.replace(/^@/, "")) + "/";
+      }
+
+      function paintProfileLinks(about, mine) {
+        var box = document.getElementById("profile-links");
+        var block = document.getElementById("profile-links-block");
+        if (!box || !block) return;
+        box.textContent = "";
+        var any = false;
+        [["instagram", "Instagram"], ["linkedin", "LinkedIn"]].forEach(function (pair) {
+          var url = socialUrl(pair[0], about[pair[0]]);
+          if (!url) return;
+          any = true;
+          var a = document.createElement("a");
+          a.href = url;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.textContent = pair[1];
+          box.appendChild(a);
+        });
+        document.getElementById("profile-instagram").value = String(about.instagram || "");
+        document.getElementById("profile-linkedin").value = String(about.linkedin || "");
+        block.classList.toggle("is-empty", !any);
+        block.hidden = !any && !mine;
+      }
+
+      function weekRowsFor(account, plan, mine) {
+        var prefs = account && account.weekday_meet_prefs;
+        if (typeof prefs === "string") { try { prefs = JSON.parse(prefs); } catch (eW) { prefs = {}; } }
+        prefs = prefs && typeof prefs === "object" ? prefs : {};
+        var units = plan && plan.day_training_units;
+        if (typeof units === "string") { try { units = JSON.parse(units); } catch (eU) { units = null; } }
+        var rows = [];
+        for (var wd = 0; wd < 7; wd++) {
+          var label = "";
+          var emoji = "";
+          if (mine) {
+            var unit = displayUnit(wd);
+            if (unit && unit.kind) {
+              label = unit.kind === "spontan" ? "Am Tag spontan" : (unit.label || "");
+              emoji = unit.kind === "spontan" ? "" : activityEmoji(unit);
+            }
+          } else {
+            var row = units && units[String(wd)];
+            var workout = row && (row.workout || row);
+            if (workout && (workout.kind || workout.label)) {
+              label = workout.kind === "spontan" ? "Am Tag spontan" : (workout.label || planActivity(plan, wd));
+              emoji = workout.kind === "spontan" ? "" : activityEmoji(workout);
+            } else if (plan && planActivity(plan, wd) !== "Training") {
+              label = planActivity(plan, wd);
+              emoji = activityEmoji({ label: label });
+            }
+          }
+          if (!label) continue;
+          var pref = prefs[String(wd)] || {};
+          var place = mine ? placeForWeekday(wd) : String(pref.place || "").trim();
+          var time = mine ? timeForWeekday(wd) : String(pref.time || "");
+          rows.push({ wd: wd, label: (emoji + " " + label).trim(), place: place && !isHomePlace(place) ? place : "zu Hause", time: time });
+        }
+        return rows;
+      }
+
+      function paintProfileWeek(account, plan, mine) {
+        var box = document.getElementById("profile-week");
+        if (!box) return;
+        box.textContent = "";
+        var rows = weekRowsFor(account, plan, mine);
+        if (!rows.length) {
+          var empty = document.createElement("p");
+          empty.className = "profile-place";
+          empty.textContent = "Noch keine Woche geplant.";
+          box.appendChild(empty);
+          return;
+        }
+        rows.forEach(function (row) {
+          var line = document.createElement("div");
+          line.className = "profile-week__row";
+          var day = document.createElement("span");
+          day.className = "profile-week__day";
+          day.textContent = DAY_NAMES[DAY_KEYS[row.wd]].slice(0, 2) + (row.time ? " · " + row.time : "");
+          var what = document.createElement("span");
+          what.className = "profile-week__what";
+          what.textContent = row.label + " · " + row.place;
+          line.appendChild(day);
+          line.appendChild(what);
+          box.appendChild(line);
+        });
+      }
+
+      function paintProfileZirkel(account, mine) {
+        var block = document.getElementById("profile-zirkel-block");
+        var line = document.getElementById("profile-zirkel");
+        if (!block || !line) return;
+        block.hidden = true;
+        if (!window.FFC || !FFC.weeklyPoints || !FFC.user || !FFC.user()) return;
+        var viewed = String(account && account.id || "");
+        var nick = String((account && account.nickname) || "").toLowerCase();
+        FFC.weeklyPoints().then(function (rows) {
+          if (!rows || !profilePerson || String(profilePerson.id || "") !== viewed) return;
+          var hit = null;
+          rows.forEach(function (row) {
+            if (mine ? row.is_me : (nick && String(row.nickname || "").toLowerCase() === nick)) hit = row;
+          });
+          if (!hit) return;
+          var points = Number(hit.points || 0).toLocaleString("de-DE");
+          var workouts = Number(hit.workouts || 0);
+          line.textContent = "Diese Woche: " + points + " Punkte · " + workouts + (workouts === 1 ? " Workout" : " Workouts");
+          block.hidden = false;
+        }).catch(function () {});
+      }
+
       function fitProfileAbout() {
-        var about = document.getElementById("profile-about");
-        if (!about) return;
-        about.style.height = "auto";
-        about.style.height = Math.max(about.scrollHeight, 24) + "px";
+        ["profile-about", "profile-recs"].forEach(function (id) {
+          var box = document.getElementById(id);
+          if (!box) return;
+          box.style.height = "auto";
+          box.style.height = Math.max(box.scrollHeight, 24) + "px";
+        });
       }
 
       function paintTrainerChoices(list) {
@@ -9613,6 +10283,13 @@
         var aboutBox = document.getElementById("profile-about");
         aboutBox.value = String(about.text || "").slice(0, 300);
         aboutBox.readOnly = true;
+        var recsBox = document.getElementById("profile-recs");
+        recsBox.value = String(about.recs || "").slice(0, 400);
+        recsBox.readOnly = true;
+        recsBox.closest(".profile-block").hidden = !mine && !recsBox.value;
+        paintProfileLinks(about, mine);
+        paintProfileWeek(account, plan, mine);
+        paintProfileZirkel(account, mine);
         fitProfileAbout();
         var placesBlock = document.getElementById("profile-places-block");
         var places = document.getElementById("profile-places");
@@ -9676,8 +10353,8 @@
         requestAnimationFrame(function () { sheet.classList.add("is-open"); });
         var id = encodeURIComponent(person.id);
         Promise.all([
-          rest("go_accounts?id=eq." + id + "&select=id,name,photo_url,training_goal,about_me,mantra,workout_places,diary_visibility,trainer_id").catch(function () { return []; }),
-          rest("go_coach_plans?account_id=eq." + id + "&select=blurb,life_situation,goal,phase_steps").catch(function () { return []; }),
+          rest("go_accounts?id=eq." + id + "&select=id,name,nickname,photo_url,training_goal,about_me,mantra,workout_places,weekday_meet_prefs,diary_visibility,trainer_id").catch(function () { return []; }),
+          rest("go_coach_plans?account_id=eq." + id + "&select=blurb,life_situation,goal,phase_steps,day_training_units,kraft_weekdays,ausdauer_weekdays,zirkel_weekday").catch(function () { return []; }),
           rest("go_community_posts?author_id=eq." + id + "&select=author_id,photo_url&limit=60").catch(function () { return []; })
         ]).then(function (pack) {
           if (!profilePerson || String(profilePerson.id || "") !== String(person.id || "")) return;
@@ -9747,7 +10424,8 @@
 
       document.getElementById("invite-send").addEventListener("click", function () {
         if (!pendingInvitePeople.length) return;
-        openTimeWheel();
+        if (pendingInviteIso && timeForWeekday(weekdayIndex(pendingInviteIso))) sendDayInvites();
+        else openTimeWheel();
       });
       document.getElementById("time-send").addEventListener("click", sendDayInvites);
       document.getElementById("time-modal").addEventListener("click", function (event) {
@@ -9807,6 +10485,10 @@
         if (!next) {
           var about = profileAbout(sessionAccount);
           about.text = String(document.getElementById("profile-about").value || "").slice(0, 300);
+          about.recs = String(document.getElementById("profile-recs").value || "").slice(0, 400);
+          about.instagram = String(document.getElementById("profile-instagram").value || "").trim().slice(0, 80);
+          about.linkedin = String(document.getElementById("profile-linkedin").value || "").trim().slice(0, 160);
+          paintProfileLinks(about, true);
           var mantraEl = document.getElementById("profile-mantra");
           var savedMantra = mantraToSave(mantraEl.value);
           sessionAccount.mantra = savedMantra;
@@ -9833,6 +10515,10 @@
         about.text = String(this.value || "").slice(0, 300);
         saveProfileFields({ about_me: about });
         fitProfileAbout();
+      });
+      document.getElementById("profile-recs").addEventListener("input", function () {
+        this.style.height = "auto";
+        this.style.height = Math.max(this.scrollHeight, 24) + "px";
       });
       document.getElementById("profile-mantra").addEventListener("input", function () {
         this.style.height = "auto";
@@ -9981,14 +10667,11 @@
         if (!start || !end) return;
         if (end < start) end = start;
         var about = profileAbout(sessionAccount);
+        var prevAlts = about.absence && about.absence.alts;
         about.absence = { start: start, end: end, active: true };
-        sessionAccount.about_me = about;
-        if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
-        rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
-          method: "PATCH",
-          prefer: "return=minimal",
-          body: { about_me: about }
-        }).catch(function () {});
+        if (prevAlts && typeof prevAlts === "object") about.absence.alts = prevAlts;
+        saveAbout(about);
+        weekModeOpen = false;
         var editor = document.getElementById("absence-editor");
         if (editor) editor.hidden = true;
         paintAbsenceButton();
@@ -10044,14 +10727,30 @@
             openWa(row && (row.whatsapp_phone || row.phone));
           });
       });
-      document.getElementById("absence-open").addEventListener("click", function () {
-        var editor = document.getElementById("absence-editor");
-        if (!editor) return;
-        editor.hidden = !editor.hidden;
-        if (!editor.hidden) {
-          paintAbsenceWheels();
-          requestAnimationFrame(function () { requestAnimationFrame(scrollAbsenceWheels); });
-        }
+      document.querySelectorAll("[data-week-mode]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var editor = document.getElementById("absence-editor");
+          if (btn.dataset.weekMode === "home") {
+            weekModeOpen = false;
+            if (editor) editor.hidden = true;
+            var about = profileAbout(sessionAccount);
+            if (about.absence && about.absence.active !== false) {
+              about.absence.active = false;
+              saveAbout(about);
+            }
+            paintAbsenceButton();
+            paintWelcome();
+            return;
+          }
+          weekModeOpen = !absenceOf(sessionAccount);
+          if (!editor) return;
+          editor.hidden = !editor.hidden && !weekModeOpen;
+          if (!editor.hidden) {
+            paintAbsenceWheels();
+            requestAnimationFrame(function () { requestAnimationFrame(scrollAbsenceWheels); });
+          }
+          paintAbsenceButton();
+        });
       });
       document.getElementById("absence-save").addEventListener("click", function () {
         window.clearTimeout(absenceSyncTimer);
@@ -10138,18 +10837,19 @@
           new MutationObserver(paintStoriesVisibility).observe(strip, { childList: true });
         }
         var training = document.getElementById("plan-training");
-        var zirkel = document.getElementById("zirkel-block");
-        ["absence-block", "routine-row-block", "weeks", "routine-note"].forEach(function (id) {
+        var routineCard = document.getElementById("go-card-routine");
+        ["routine-row-block", "weeks", "routine-note"].forEach(function (id) {
           var el = id === "routine-row-block" ? document.querySelector(".routine-row") : document.getElementById(id);
-          if (el && training) training.insertBefore(el, zirkel);
+          if (el && routineCard) routineCard.appendChild(el);
         });
-        [".routine-row", "#weeks", "#routine-note", "#absence-block"].forEach(function (sel) {
+        [".routine-row", "#weeks", "#routine-note"].forEach(function (sel) {
           var el = document.querySelector(sel);
           if (el) el.classList.remove("shell-kalender");
         });
       }
 
       window.FFC_HOST = {
+        onStories: function () { paintHeuteCrew(); },
         onScreen: function (name) {
           var open = FFC_OVERLAY.indexOf(name) >= 0 || (name === "auth" && ffcAuthWanted);
           document.body.classList.toggle("ffc-open", open);

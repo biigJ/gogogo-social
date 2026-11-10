@@ -2705,6 +2705,7 @@
         '<span class="story-name'+(seen?' dim':'')+'">'+esc(u.nickname)+'</span></button>';
     });
     postStripEl.innerHTML = html;
+    host('onStories');
   }
 
   // eigene abgelaufene Bilder aus dem Speicher löschen (falls kein Aufräum-Job läuft)
@@ -3292,6 +3293,22 @@
       ]);
     },
     async openProfile(){ await openTab('profile'); },
+    stories(){
+      return storyUsers.map((u,i)=>({ index:i, uid:u.uid, nickname:u.nickname, avatar_url:u.avatar_url, is_me:!!u.is_me, seen:u.posts.every(p=>p.seen) }));
+    },
+    openStory(index){
+      const u = storyUsers[index];
+      if(!u) return false;
+      const firstUnseen = u.is_me ? 0 : u.posts.findIndex(p=>!p.seen);
+      openStory(index, firstUnseen < 0 ? 0 : firstUnseen);
+      return true;
+    },
+    async weeklyPoints(){
+      if(!currentUser) return null;
+      const { data, error } = await sb.rpc('weekly_leaderboard', { p_group_id: null });
+      if(error) return null;
+      return (data || []).map(r=>({ user_id:r.user_id, nickname:r.nickname, points:r.points, workouts:r.workouts, is_me:!!r.is_me }));
+    },
     async setNickname(nickname){
       if(!currentUser) return { error:null };
       return sb.from('profiles').upsert({ user_id: currentUser.id, nickname: nickname }, { onConflict:'user_id' });
