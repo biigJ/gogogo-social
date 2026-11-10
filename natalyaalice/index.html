@@ -1221,6 +1221,9 @@
       .orient-lock { display: flex; }
       html, body { overflow: hidden; touch-action: none; }
     }
+    html.has-vp-gap:has(body.is-session:not([data-shell="workout"])),
+    html.has-vp-gap body.is-session:not([data-shell="workout"]) { overflow: hidden; }
+    html.has-vp-gap .app-pill { bottom: calc(-1 * var(--vp-gap, 0px)); }
     body.is-session:not([data-shell="workout"]) {
       height: var(--screen-h, 100dvh);
       max-height: var(--screen-h, 100dvh);
@@ -5265,9 +5268,26 @@
         if (nav) nav.classList.remove("is-compact");
       }
 
+      function viewportGap() {
+        var standalone = window.navigator.standalone === true ||
+          !!(window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+        if (!standalone || !window.screen || !window.screen.height) return 0;
+        var portrait = window.innerHeight >= window.innerWidth;
+        var full = portrait
+          ? Math.max(window.screen.height, window.screen.width)
+          : Math.min(window.screen.height, window.screen.width);
+        var gap = Math.round(full - window.innerHeight);
+        return gap > 0 && gap <= 90 ? gap : 0;
+      }
+
       function fitScreen() {
         var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-        if (h) document.documentElement.style.setProperty("--screen-h", Math.round(h) + "px");
+        // iOS home-screen apps with a translucent status bar report a viewport that ends one status bar too early.
+        var gap = viewportGap();
+        var root = document.documentElement;
+        root.style.setProperty("--vp-gap", gap + "px");
+        root.classList.toggle("has-vp-gap", gap > 0);
+        if (h) root.style.setProperty("--screen-h", Math.round(h + gap) + "px");
         alignBurger();
       }
 
