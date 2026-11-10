@@ -221,7 +221,7 @@
     } else {
       authSubmitBtn.textContent = 'Link zum Zurücksetzen senden';
       authToggleBtn.textContent = '← Zurück zur Anmeldung';
-      authTaglineEl.textContent = 'Gib deine E-Mail ein – wir schicken dir einen Link für ein neues Passwort';
+      authTaglineEl.textContent = 'Gib deine E-Mail ein – wir schicken dir einen Link für einen neuen Login-Code';
     }
   }
   authForgotBtn.addEventListener('click', ()=>{
@@ -259,14 +259,14 @@
   newPassBtn.addEventListener('click', async ()=>{
     const p1 = newPass1El.value, p2 = newPass2El.value;
     newPassStatus.style.color = '';
-    if(p1.length < 6){ newPassStatus.textContent = 'Das Passwort muss mindestens 6 Zeichen haben.'; return; }
+    if(p1.length < 6){ newPassStatus.textContent = 'Der Login-Code muss mindestens 6 Zeichen haben.'; return; }
     if(p1 !== p2){ newPassStatus.textContent = 'Die beiden Passwörter stimmen nicht überein.'; return; }
     newPassBtn.disabled = true;
     const { error } = await sb.auth.updateUser({ password: p1 });
     newPassBtn.disabled = false;
     if(error){
       newPassStatus.textContent = /same|different from the old/i.test(error.message)
-        ? 'Das neue Passwort muss sich vom alten unterscheiden.'
+        ? 'Der neue Login-Code muss sich vom alten unterscheiden.'
         : /expired|invalid|session/i.test(error.message)
           ? 'Der Link ist abgelaufen. Bitte fordere auf der Anmeldeseite einen neuen an.'
           : 'Nicht gespeichert: ' + friendlyAuthError(error);
@@ -275,7 +275,7 @@
     recoveryMode = false;
     history.replaceState(null, '', location.pathname);   // Token aus der Adresszeile entfernen
     newPassStatus.style.color = 'var(--chalk)';
-    newPassStatus.textContent = 'Passwort geändert – du bist angemeldet.';
+    newPassStatus.textContent = 'Login-Code geändert – du bist angemeldet.';
     setTimeout(()=> showScreen('home'), 1200);
   });
 
@@ -285,13 +285,13 @@
       return 'Verbindung zu Supabase fehlgeschlagen. Öffne die Datei in einem echten Browser-Tab (nicht in der Chat-Vorschau) und prüfe deine Internetverbindung.';
     }
     if(/invalid login credentials/i.test(msg)){
-      return 'E-Mail oder Passwort ist falsch.';
+      return 'E-Mail oder Login-Code ist falsch.';
     }
     if(/user already registered|already registered/i.test(msg)){
       return 'Für diese E-Mail existiert bereits ein Account. Bitte anmelden.';
     }
     if(/password should be at least/i.test(msg)){
-      return 'Das Passwort ist zu kurz (mind. 6 Zeichen).';
+      return 'Der Login-Code ist zu kurz (mind. 6 Zeichen).';
     }
     return msg;
   }
@@ -316,7 +316,7 @@
     }
 
     if(!email || !password){
-      authErrorEl.textContent = 'Bitte E-Mail und Passwort eingeben.';
+      authErrorEl.textContent = 'Bitte E-Mail und Login-Code eingeben.';
       return;
     }
 
@@ -3247,9 +3247,21 @@
   }
   window.FFC = {
     user: ()=> currentUser,
-    showAuth(mode){
+    showAuth(mode, opts){
+      opts = opts || {};
       setAuthMode(mode || 'login');
+      const brand = document.querySelector('#auth .brand');
+      if(brand) brand.textContent = opts.title || 'Zirkeltraining';
+      if(opts.tagline && (mode || 'login') === 'login') authTaglineEl.textContent = opts.tagline;
+      if(opts.email && !authEmailEl.value) authEmailEl.value = opts.email;
       showScreen('auth');
+    },
+    async signIn(email, password){
+      try{
+        const { data, error } = await sb.auth.signInWithPassword({ email, password });
+        if(!error && data && data.user) currentUser = data.user;
+        return { error };
+      }catch(err){ return { error: err }; }
     },
     async openSetup(){
       await refreshCachedHistory();

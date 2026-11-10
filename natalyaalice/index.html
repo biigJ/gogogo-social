@@ -757,6 +757,8 @@
       font-weight: 500;
       text-align: left;
     }
+    #days-place button.is-current { font-weight: 700; }
+    #days-place button.is-current::after { content: " ✓"; }
     #days-place button.sand-quiet {
       margin-top: 12px;
       border: 0;
@@ -998,6 +1000,16 @@
     #move-kinds button:first-of-type,
     #move-pick button:first-of-type,
     #ausdauer-pick button:first-of-type { margin-top: 16px; }
+    #go-pick > button { margin-top: 10px; }
+    #go-pick > button:first-child { margin-top: 16px; }
+    #go-pick > .go-step-next { margin-top: 18px; }
+    #go-pick .invite-person { cursor: pointer; border-bottom: 1px solid rgba(42, 33, 24, 0.14); margin-top: 0; }
+    .go-scroll {
+      max-height: 52vh;
+      margin-top: 10px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
     #diary-vis .sand-card button { margin-top: 10px; }
     #diary-vis .sand-card button:first-of-type { margin-top: 16px; }
     #diary-vis .sand-card button.is-on {
@@ -1243,8 +1255,9 @@
     body.is-session[data-shell="heute"] .photo,
     body.is-session[data-shell="heute"] .heute-crew { display: none !important; }
     body.is-session[data-shell="heute"] .heute-stories { order: 1; }
-    body.is-session[data-shell="heute"] .heute-start { order: 2; }
-    body.is-session[data-shell="heute"] .dock { order: 3; margin-top: 18px; }
+    body.is-session[data-shell="heute"] .dock { order: 2; margin-top: 4px; }
+    body.is-session[data-shell="heute"] .heute-start { order: 3; }
+    body.is-session[data-shell="heute"] #go-today { min-height: 224px; }
     body.is-session[data-shell="heute"] .heute-events { order: 4; }
     body.is-session[data-shell="heute"] .heute-joins { order: 5; }
     body.is-session[data-shell="heute"] .dock .go-row { display: none; }
@@ -1262,13 +1275,15 @@
     body.is-session[data-shell="plan"][data-plan="team"] .shell-kalender,
     body.is-session[data-shell="plan"][data-plan="orte"] .shell-kalender,
     body.is-session[data-shell="plan"][data-plan="training"] .shell-kalender,
+    body.is-session[data-shell="plan"][data-plan="info"] .shell-kalender,
+    body.is-session[data-shell="plan"][data-plan="kalender"] #plan-info,
     body.is-session[data-shell="plan"][data-plan="kalender"] #plan-team,
     body.is-session[data-shell="plan"][data-plan="kalender"] #plan-orte,
     body.is-session[data-shell="plan"][data-plan="kalender"] #plan-training { display: none !important; }
     .plan-tabs, .shell-plan, .heute-start, .heute-events, .zirkel-block { display: none; }
     body.is-session[data-shell="plan"] .plan-tabs {
       display: grid;
-      grid-template-columns: repeat(4, 1fr) 40px;
+      grid-template-columns: repeat(4, 1fr);
       gap: 0;
       margin: 4px 0 16px;
       border-bottom: 1px solid rgba(42, 33, 24, 0.28);
@@ -1283,7 +1298,8 @@
     }
     .plan-tabs button.is-on { color: #2A2118; border-bottom-color: #2A2118; }
     body.is-session[data-shell="plan"] .shell-plan { display: block; }
-    #plan-team, #plan-orte, #plan-training { display: none; }
+    #plan-team, #plan-orte, #plan-training, #plan-info { display: none; }
+    body.is-session[data-shell="plan"][data-plan="info"] #plan-info,
     body.is-session[data-shell="plan"][data-plan="team"] #plan-team,
     body.is-session[data-shell="plan"][data-plan="orte"] #plan-orte,
     body.is-session[data-shell="plan"][data-plan="training"] #plan-training { display: block; }
@@ -1702,7 +1718,7 @@
       color: #2A2118;
       font-size: 13px;
     }
-    #plan-training, .training-copy, .training-more, .video-block, .tile {
+    #plan-training, #plan-info, .training-copy, .training-more, .video-block, .tile {
       width: 100%;
       max-width: 100%;
       min-width: 0;
@@ -2004,13 +2020,38 @@
       width: 44px; height: 44px; border-radius: 50%;
       border: 1.6px solid currentColor;
     }
-    .plan-tabs__menu { display: grid; place-items: center; }
-    .plan-tabs__menu .heute-burger {
+    .plan-tabs__top {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .plan-tabs .plan-tabs__top button {
       display: grid;
-      position: static;
-      width: 40px;
-      height: 40px;
-      transform: none;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      min-height: 0;
+      padding: 0;
+      border: 0;
+      color: rgba(42, 33, 24, 0.55);
+    }
+    .plan-tabs .plan-tabs__top button.is-on { color: #2A2118; }
+    .plan-tabs__info {
+      font-family: "Playfair Display", serif;
+      font-size: 26px !important;
+      font-weight: 600;
+      line-height: 1;
+    }
+    .plan-tabs__gear svg {
+      width: 24px;
+      height: 24px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
     .tip.is-owned {
       font-size: min(20px, 4.1vw);
@@ -2023,14 +2064,26 @@
     .day-place {
       display: flex;
       align-items: center;
+      width: 100%;
       margin: 6px 0 0;
       padding: 0 10px;
       min-height: 28px;
       border: 1px solid #2A2118;
       border-radius: 0;
+      background: transparent;
+      color: #2A2118;
+      font: inherit;
       font-size: 14px;
       line-height: 1.2;
+      text-align: left;
+      cursor: pointer;
     }
+    body.is-session #days .day { min-height: 68px; }
+    body.is-session #days .day.is-on,
+    body.is-session #days .day.is-empty,
+    body.is-session #days .day.is-moved,
+    body.is-session #days .day.is-line { min-height: 48px; }
+    body.is-session .plan-week#plan-week { min-height: 75px; }
     .day-invite__add {
       display: flex;
       align-items: center;
@@ -2054,7 +2107,17 @@
       align-items: center;
       justify-content: center;
       gap: 10px;
-      margin-top: 8px;
+      width: 100%;
+      min-height: 224px;
+      margin-top: 16px;
+      padding: 16px 18px;
+      border: 1px solid #2A2118;
+      border-radius: 0;
+      background: transparent;
+      color: #2A2118;
+      font-size: 17px;
+      line-height: 1.3;
+      text-align: center;
     }
     .heute-start svg { width: 20px; height: 20px; flex: none; }
     .heute-stories { margin: 0 -20px 14px; }
@@ -2107,6 +2170,7 @@
       display: flex;
       flex-direction: column;
       align-items: flex-start;
+      justify-content: center;
       gap: 4px;
       min-height: 0;
       padding: 16px 18px;
@@ -2203,15 +2267,16 @@
 <body class="is-home">
   <section id="welcome" class="welcome">
     <div class="plan-tabs" role="tablist" aria-label="Profil">
+      <div class="plan-tabs__top">
+        <button type="button" data-plan="info" class="plan-tabs__info" role="tab" aria-label="Info">I</button>
+        <button type="button" id="heute-menu" class="plan-tabs__gear" aria-label="Einstellungen" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </div>
       <button type="button" data-plan="team" role="tab">Team</button>
       <button type="button" data-plan="orte" role="tab">Orte</button>
-      <button type="button" data-plan="training" role="tab">go!</button>
       <button type="button" data-plan="kalender" class="is-on" role="tab">Woche</button>
-      <span class="plan-tabs__menu">
-        <button type="button" id="heute-menu" class="heute-burger" aria-label="Menü" aria-haspopup="dialog">
-          <span></span><span></span><span></span>
-        </button>
-      </span>
+      <button type="button" data-plan="training" role="tab">go!</button>
     </div>
     <div class="shell-plan" id="plan-team"></div>
     <div class="shell-plan" id="plan-orte">
@@ -2219,7 +2284,7 @@
       <div class="orte-list" id="orte-list"></div>
       <div class="orte-map" id="orte-map" aria-label="Karte"></div>
     </div>
-    <div class="shell-plan" id="plan-training">
+    <div class="shell-plan" id="plan-info">
       <p class="training-intro">Trainingspläne erstellt Dein Trainer. Die Funktion wird erweitert, damit Du aus diversen Quellen und Formaten Deine Pläne und Verknüpfungen mit anderen Apps verbinden kannst. Work in Progress. Folgend ein bisschen Hintergrund.</p>
       <div class="training-copy">
         <h2>Drei Trainingsarten für drei Reize</h2>
@@ -2556,10 +2621,12 @@
           </p>
         </article>
       </div>
+    </div>
+    <div class="shell-plan" id="plan-training">
       <section class="zirkel-block" id="zirkel-block">
         <h2 class="zirkel-head">Zirkeltraining</h2>
         <div class="zirkel-login" id="zirkel-login">
-          <p>Melde Dich mit Deinem Zirkeltraining-Account an. Es ist derselbe Account wie unter gogogo.social/zirkeltraining.</p>
+          <p>Melde Dich einmal mit E-Mail und Login-Code von Zirkeltraining an. Es ist derselbe Account wie unter gogogo.social/zirkeltraining.</p>
           <button type="button" class="routine-start" id="zirkel-login-btn">Anmelden</button>
         </div>
         <div class="zirkel-body ffc" id="zirkel-body" hidden>
@@ -2596,7 +2663,7 @@
     </div>
     <button type="button" class="go-primary heute-start shell-heute" id="heute-start">
       <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
-      <span>Workout starten</span>
+      <span>außerplanmäßiges Workout jetzt starten</span>
     </button>
     <p class="tip shell-kalender">Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.</p>
     <button type="button" id="plan-week" class="plan-week shell-kalender" hidden>Meine Bewegung in der Woche planen</button>
@@ -2808,6 +2875,7 @@
   </div>
   <div class="sand-modal" id="go-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-label="Workout starten">
+      <h2 class="ask" id="go-title" hidden></h2>
       <div id="go-kinds">
         <button type="button" data-go-kind="kraft">🏋️‍♀️ Kraft</button>
         <button type="button" data-go-kind="ausdauer">🏃 Ausdauer</button>
@@ -2825,6 +2893,7 @@
       <button type="button" data-menu="name">Vorname ändern</button>
       <button type="button" data-menu="nickname">Nickname festlegen</button>
       <button type="button" data-menu="phone">Telefonnummer angeben</button>
+      <button type="button" data-menu="email">E-Mail-Adresse angeben</button>
       <button type="button" data-menu="code">Login-Code ändern</button>
       <button type="button" data-menu="website">Website besuchen</button>
       <a href="/impressum/">Impressum</a>
@@ -3036,8 +3105,8 @@
       <div class="tagline" id="authTagline">Anmelden, um dein Training zu speichern</div>
 
       <input type="email" id="authEmail" class="auth-input" placeholder="E-Mail" autocomplete="email">
-      <input type="password" id="authPassword" class="auth-input" placeholder="Passwort" autocomplete="current-password">
-      <button class="back-link" id="authForgotBtn" style="align-self:flex-end; margin:-4px 0 14px;">Passwort vergessen?</button>
+      <input type="password" id="authPassword" class="auth-input" placeholder="Login-Code" autocomplete="current-password">
+      <button class="back-link" id="authForgotBtn" style="align-self:flex-end; margin:-4px 0 14px;">Login-Code vergessen?</button>
 
       <button class="start-btn" id="authSubmitBtn">Anmelden</button>
       <button class="back-link" id="authToggleBtn" style="align-self:center; margin-top:16px;">Noch keinen Account? Registrieren</button>
@@ -3047,10 +3116,10 @@
   <div class="screen" id="newpass">
     <div class="auth-box">
       <div class="brand">Zirkeltraining</div>
-      <div class="tagline">Neues Passwort festlegen</div>
-      <input type="password" id="newPass1" class="auth-input" placeholder="Neues Passwort (mind. 6 Zeichen)" autocomplete="new-password">
-      <input type="password" id="newPass2" class="auth-input" placeholder="Neues Passwort wiederholen" autocomplete="new-password">
-      <button class="start-btn" id="newPassBtn">Passwort speichern</button>
+      <div class="tagline">Neuen Login-Code festlegen</div>
+      <input type="password" id="newPass1" class="auth-input" placeholder="Neuer Login-Code (mind. 6 Zeichen)" autocomplete="new-password">
+      <input type="password" id="newPass2" class="auth-input" placeholder="Neuen Login-Code wiederholen" autocomplete="new-password">
+      <button class="start-btn" id="newPassBtn">Login-Code speichern</button>
       <div class="auth-error" id="newPassStatus"></div>
     </div>
   </div>
@@ -4764,9 +4833,12 @@
           block.appendChild(button);
           if (sessionMode) {
             var placeName = placeForWeekday(wdIndex);
-            var place = document.createElement("p");
+            var place = document.createElement("button");
+            place.type = "button";
             place.className = "day-place";
             place.textContent = "Ort: " + placeName;
+            place.setAttribute("aria-label", "Ort am " + DAY_NAMES[key] + " ändern");
+            place.addEventListener("click", openDayPlace.bind(null, wdIndex));
             block.appendChild(place);
             incomingFor(iso).forEach(function (invite) {
               block.appendChild(dayMeetEl(invite));
@@ -5014,6 +5086,11 @@
           input.value = sessionAccount && sessionAccount.nickname ? sessionAccount.nickname : "";
           input.inputMode = "text";
           input.maxLength = 20;
+        } else if (field === "email") {
+          title.textContent = "E-Mail-Adresse für Zirkeltraining";
+          input.value = accountEmail();
+          input.inputMode = "email";
+          input.maxLength = 120;
         } else if (field === "phone") {
           title.textContent = "Telefonnummer angeben";
           input.value = sessionAccount && sessionAccount.phone ? sessionAccount.phone : "";
@@ -5040,6 +5117,13 @@
           saveNickname(value.replace(/^@/, ""));
           return;
         }
+        if (accountEditField === "email") {
+          if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) { msg.textContent = "Bitte eine gültige E-Mail-Adresse eingeben."; return; }
+          saveAccountEmail(value).then(function () {
+            document.getElementById("account-edit").hidden = true;
+          }).catch(function () { msg.textContent = "Speichern fehlgeschlagen."; });
+          return;
+        }
         if (accountEditField === "name") {
           if (!value) { msg.textContent = "Vorname fehlt."; return; }
           body.name = value;
@@ -5060,6 +5144,26 @@
           if (body.name) paintWelcomeTitle(body.name);
           document.getElementById("account-edit").hidden = true;
         }).catch(function () { msg.textContent = "Speichern fehlgeschlagen."; });
+      }
+
+      function accountEmail() {
+        return String(profileAbout(sessionAccount).email || "").trim();
+      }
+
+      function saveAccountEmail(email) {
+        if (!sessionAccount) return Promise.resolve();
+        var about = profileAbout(sessionAccount);
+        var clean = String(email || "").trim().toLowerCase();
+        if (clean) about.email = clean;
+        else delete about.email;
+        return rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { about_me: about }
+        }).then(function () {
+          sessionAccount.about_me = about;
+          if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+        });
       }
 
       var NICKNAME_RE = /^[A-Za-z0-9._-]{3,20}$/;
@@ -6989,6 +7093,48 @@
         box.appendChild(skip);
       }
 
+      function openDayPlace(wd) {
+        var key = DAY_KEYS[wd];
+        pendingDay = null;
+        pendingUnit = null;
+        document.getElementById("days-secret").hidden = true;
+        document.getElementById("days-kinds").hidden = true;
+        document.getElementById("days-pick").hidden = true;
+        document.getElementById("days-error").hidden = true;
+        document.getElementById("days-title").textContent = "Ort am " + DAY_NAMES[key] + ".";
+        var box = document.getElementById("days-place");
+        box.textContent = "";
+        box.hidden = false;
+        var current = placeForWeekday(wd);
+        function choose(name) {
+          setDayPlace(wd, name);
+          closeDaysPrompt();
+          paintWelcome();
+        }
+        var names = ["zu Hause"];
+        placeStore().forEach(function (item) {
+          if (item && item.name && !isHomePlace(item.name) && names.indexOf(item.name) < 0) names.push(item.name);
+        });
+        names.forEach(function (name) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = name;
+          if (name === current) button.classList.add("is-current");
+          button.addEventListener("click", function () { choose(name); });
+          box.appendChild(button);
+        });
+        var more = document.createElement("button");
+        more.type = "button";
+        more.className = "sand-quiet";
+        more.textContent = "Neuen Ort unter Orte anlegen";
+        more.addEventListener("click", function () {
+          closeDaysPrompt();
+          showPlan("orte");
+        });
+        box.appendChild(more);
+        document.getElementById("days-modal").hidden = false;
+      }
+
       function finishWeekPlace(name) {
         if (!pendingDay || !pendingUnit) return;
         var wd = DAY_KEYS.indexOf(pendingDay);
@@ -7870,12 +8016,17 @@
         var label = kind && kind !== "spontan" && kind !== "away" ? (btn.dataset.unitLabel || "") : "";
         if (kind === "zirkel" && !label) label = "Zirkeltraining";
         var place = placeForWeekday(weekdayIndex(Log.berlinToday()));
+        var heading = label || document.getElementById("today-title").textContent || "Heute";
         requireFfc(function () {
           FFC.openEvent({ title: label, where: isHomePlace(place) ? "" : place });
-        });
+        }, { title: heading, tagline: "Melde Dich an, um Dein Team einzuladen." });
       }
 
+      var goFlow = null;
+
       function openGoPick() {
+        goFlow = null;
+        document.getElementById("go-title").hidden = true;
         document.getElementById("go-kinds").hidden = false;
         var pick = document.getElementById("go-pick");
         pick.hidden = true;
@@ -7885,49 +8036,254 @@
 
       function closeGoPick() {
         document.getElementById("go-modal").hidden = true;
+        document.getElementById("go-title").hidden = true;
         var pick = document.getElementById("go-pick");
         pick.hidden = true;
         pick.textContent = "";
         document.getElementById("go-kinds").hidden = false;
       }
 
+      function goStep(title, build) {
+        document.getElementById("go-kinds").hidden = true;
+        var head = document.getElementById("go-title");
+        head.textContent = title || "";
+        head.hidden = !title;
+        var pick = document.getElementById("go-pick");
+        pick.textContent = "";
+        pick.hidden = false;
+        build(pick);
+      }
+
+      function goButton(box, label, className, onClick) {
+        var button = document.createElement("button");
+        button.type = "button";
+        if (className) button.className = className;
+        button.textContent = label;
+        button.addEventListener("click", onClick);
+        box.appendChild(button);
+        return button;
+      }
+
+      function goCheckRow(box, label, photo, on, onToggle) {
+        var row = document.createElement("div");
+        row.className = "invite-person";
+        if (photo !== null) {
+          if (photo) {
+            var img = document.createElement("img");
+            img.className = "invite-person__face";
+            img.alt = "";
+            img.src = photo;
+            row.appendChild(img);
+          } else {
+            var ph = document.createElement("span");
+            ph.className = "invite-person__ph";
+            ph.textContent = String(label || "?").slice(0, 1);
+            row.appendChild(ph);
+          }
+        }
+        var name = document.createElement("span");
+        name.className = "invite-person__name";
+        name.textContent = label;
+        var check = document.createElement("button");
+        check.type = "button";
+        check.className = "invite-check" + (on ? " is-on" : "");
+        check.setAttribute("aria-label", "auswählen");
+        check.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        row.addEventListener("click", function () {
+          on = !on;
+          check.classList.toggle("is-on", on);
+          onToggle(on);
+        });
+        row.appendChild(name);
+        row.appendChild(check);
+        box.appendChild(row);
+      }
+
       function showGoPick(kind) {
         var options = kind === "kraft"
           ? kraftChoices()
           : (kind === "ausdauer" ? ausdauerChoices() : alternativeChoices());
-        document.getElementById("go-kinds").hidden = true;
-        var pick = document.getElementById("go-pick");
-        pick.textContent = "";
-        pick.hidden = false;
-        options.forEach(function (opt) {
-          var button = document.createElement("button");
-          button.type = "button";
-          button.textContent = (activityEmoji({ kind: kind, label: opt.label, technique: opt.technique || "" }) + " " + opt.label).trim();
-          button.addEventListener("click", function () {
-            closeGoPick();
-            var unit = {
-              kind: kind,
-              label: opt.label,
-              systemId: opt.systemId || "",
-              presetId: opt.presetId || "",
-              technique: opt.technique || ""
-            };
-            if (kind === "kraft") startPickedWorkout(unit);
-            else openMovedFor(opt.label);
+        goStep("", function (pick) {
+          options.forEach(function (opt) {
+            var label = (activityEmoji({ kind: kind, label: opt.label, technique: opt.technique || "" }) + " " + opt.label).trim();
+            goButton(pick, label, "", function () {
+              goFlow = {
+                kind: kind,
+                option: opt,
+                people: [],
+                unit: {
+                  kind: kind,
+                  label: opt.label,
+                  systemId: opt.systemId || "",
+                  presetId: opt.presetId || "",
+                  technique: opt.technique || ""
+                }
+              };
+              askGoTeam();
+            });
           });
-          pick.appendChild(button);
+          goButton(pick, "Zurück", "sand-quiet", openGoPick);
         });
-        var back = document.createElement("button");
-        back.type = "button";
-        back.className = "sand-quiet";
-        back.textContent = "Zurück";
-        back.addEventListener("click", openGoPick);
-        pick.appendChild(back);
       }
 
-      function startPickedWorkout(unit) {
+      function askGoTeam() {
+        if (!goFlow) return;
         var today = Log.berlinToday();
-        todayPick = { iso: today, unit: unit };
+        var me = String(sessionAccount && sessionAccount.id);
+        var ready = teamPeople.length ? Promise.resolve() : loadTeam();
+        Promise.resolve(ready).then(function () {
+          if (!goFlow) return;
+          var others = teamPeople.filter(function (person) {
+            return person && person.id && String(person.id) !== me && !personAway(person, today);
+          });
+          if (!others.length) {
+            askGoPlan();
+            return;
+          }
+          goStep("Ist jemand aus dem Team dabei?", function (box) {
+            others.forEach(function (person) {
+              var id = String(person.id);
+              var picked = goFlow.people.some(function (item) { return String(item.id) === id; });
+              goCheckRow(box, person.name + (person.isTrainerPerson ? " (Trainer)" : ""), person.photo_url || "", picked, function (on) {
+                goFlow.people = goFlow.people.filter(function (item) { return String(item.id) !== id; });
+                if (on) goFlow.people.push(person);
+              });
+            });
+            goButton(box, "Weiter", "go-step-next", askGoPlan);
+            goButton(box, "Zurück", "sand-quiet", function () {
+              if (goFlow.kind === "zirkel") openGoPick();
+              else showGoPick(goFlow.kind);
+            });
+          });
+        });
+      }
+
+      function nowTimeLabel() {
+        var parts = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" }).format(new Date());
+        return parts.replace(/^0/, "");
+      }
+
+      function inviteGoPeople(people, label) {
+        if (!sessionAccount || !people || !people.length) return;
+        var iso = Log.berlinToday();
+        var place = placeForWeekday(weekdayIndex(iso));
+        var time = nowTimeLabel();
+        Promise.all(people.map(function (person) {
+          var row = {
+            from_id: sessionAccount.id,
+            to_id: person.id,
+            workout_date: iso,
+            workout_label: label,
+            from_name: personName(),
+            place: place,
+            meet_time: time,
+            status: "pending"
+          };
+          return rest("go_workout_invites", { method: "POST", prefer: "return=representation", body: row })
+            .then(function (rows) {
+              var saved = Array.isArray(rows) ? rows[0] : rows;
+              remoteInvites.push(saved && saved.id ? saved : Object.assign({ id: "local-" + person.id + "-" + iso }, row));
+            })
+            .catch(function () {
+              remoteInvites.push(Object.assign({ id: "local-" + person.id + "-" + iso }, row));
+            });
+        })).then(function () {
+          syncInviteStore();
+          paintPill();
+        });
+      }
+
+      function goStart(run) {
+        var flow = goFlow;
+        closeGoPick();
+        if (!flow) return;
+        inviteGoPeople(flow.people, flow.unit.label || "Training");
+        run(flow);
+      }
+
+      function askGoPlan() {
+        if (!goFlow) return;
+        var kind = goFlow.kind;
+        if (kind === "zirkel") {
+          goStart(function () {
+            requireFfc(function () { FFC.openSetup(); }, { title: "Zirkeltraining" });
+          });
+          return;
+        }
+        if (kind === "alternative") {
+          goStart(function (flow) { openMovedFor(flow.unit.label); });
+          return;
+        }
+        goStep("Plan wählen", function (box) {
+          if (kind === "kraft") {
+            var base = exercisesForUnit(goFlow.unit);
+            goButton(box, "Plan übernehmen" + (base.length ? " · " + base.length + " Übungen" : ""), "", function () {
+              goStart(function (flow) { startPickedWorkout(flow.unit, null); });
+            });
+            goButton(box, "Plan zusammenstellen", "", function () { composeKraftPlan(base); });
+          } else {
+            var label = goFlow.unit.label || "Ausdauer";
+            goButton(box, "Plan übernehmen · " + label, "", function () {
+              goStart(function (flow) { openMovedFor(flow.unit.label); });
+            });
+            if (label.indexOf("·") < 0) {
+              [20, 30, 45, 60, 90].forEach(function (minutes) {
+                goButton(box, label + " · " + minutes + " min", "", function () {
+                  goFlow.unit.label = label + " · " + minutes + " min";
+                  goStart(function (flow) { openMovedFor(flow.unit.label); });
+                });
+              });
+            }
+          }
+          goButton(box, "Zurück", "sand-quiet", askGoTeam);
+        });
+      }
+
+      function composeKraftPlan(base) {
+        var pool = base.slice();
+        var seen = {};
+        pool.forEach(function (ex) { seen[String(ex.name || "").toLowerCase()] = true; });
+        var cat = window.GOGOGO_KRAFT;
+        if (cat && cat.SYSTEMS && cat.exercisesFor) {
+          cat.SYSTEMS.forEach(function (sys) {
+            (cat.exercisesFor(sys.id) || []).forEach(function (ex) {
+              var key = String(ex.name || "").toLowerCase();
+              if (!key || seen[key]) return;
+              seen[key] = true;
+              pool.push({ id: "mix-" + ex.id, name: ex.name, short: String(ex.name).slice(0, 18), kind: "reps", sets: 3, cue: "", note: "", group: "Hauptteil" });
+            });
+          });
+        }
+        var chosen = {};
+        base.forEach(function (ex) { chosen[ex.id] = true; });
+        goStep("Plan zusammenstellen", function (box) {
+          var list = document.createElement("div");
+          list.className = "go-scroll";
+          pool.forEach(function (ex) {
+            goCheckRow(list, ex.name, null, !!chosen[ex.id], function (on) {
+              if (on) chosen[ex.id] = true;
+              else delete chosen[ex.id];
+            });
+          });
+          box.appendChild(list);
+          var msg = document.createElement("p");
+          msg.className = "team-msg";
+          goButton(box, "Workout starten", "go-step-next", function () {
+            var picked = pool.filter(function (ex) { return chosen[ex.id]; });
+            if (!picked.length) {
+              msg.textContent = "Wähle mindestens eine Übung.";
+              return;
+            }
+            goStart(function (flow) { startPickedWorkout(flow.unit, picked); });
+          });
+          box.appendChild(msg);
+          goButton(box, "Zurück", "sand-quiet", askGoPlan);
+        });
+      }
+
+      function startPickedWorkout(unit, exercises) {
+        var today = Log.berlinToday();
+        todayPick = { iso: today, unit: unit, exercises: exercises || null };
         startWorkout(today, false);
       }
 
@@ -7980,8 +8336,8 @@
         if (!choice) return;
         var kind = choice.getAttribute("data-go-kind");
         if (kind === "zirkel") {
-          closeGoPick();
-          requireFfc(function () { FFC.openSetup(); });
+          goFlow = { kind: "zirkel", people: [], unit: { kind: "zirkel", label: "Zirkeltraining" } };
+          askGoTeam();
           return;
         }
         showGoPick(kind);
@@ -8371,7 +8727,7 @@
       function applySessionExercises(iso) {
         if (!sessionMode || !sessionReady || !window.GoChecklist) return;
         if (todayPick && todayPick.iso === iso) {
-          Log.useExercises(exercisesForUnit(todayPick.unit));
+          Log.useExercises(todayPick.exercises || exercisesForUnit(todayPick.unit));
           paintWorkoutTitle(iso);
           return;
         }
@@ -9708,12 +10064,26 @@
       var ffcHeuteAt = 0;
       var FFC_OVERLAY = ["setup", "run", "finish", "newpass", "profile"];
 
-      function requireFfc(action) {
+      function requireFfc(action, opts) {
         if (!window.FFC) return;
         if (FFC.user()) { action(); return; }
+        opts = opts || {};
+        var email = accountEmail();
+        var code = String((sessionAccount && sessionAccount.invite_code) || "");
+        function askLogin() {
+          ffcPending = action;
+          ffcAuthWanted = true;
+          FFC.showAuth("login", { title: opts.title, tagline: opts.tagline, email: email });
+        }
+        if (!email || code.length < 6) { askLogin(); return; }
         ffcPending = action;
-        ffcAuthWanted = true;
-        FFC.showAuth("login");
+        FFC.signIn(email, code).then(function (res) {
+          if (res && res.error) { askLogin(); return; }
+          if (ffcPending === action) {
+            ffcPending = null;
+            action();
+          }
+        });
       }
 
       function closeFfcOverlay() {
@@ -9768,10 +10138,10 @@
           new MutationObserver(paintStoriesVisibility).observe(strip, { childList: true });
         }
         var training = document.getElementById("plan-training");
-        var intro = training && training.querySelector(".training-intro");
+        var zirkel = document.getElementById("zirkel-block");
         ["absence-block", "routine-row-block", "weeks", "routine-note"].forEach(function (id) {
           var el = id === "routine-row-block" ? document.querySelector(".routine-row") : document.getElementById(id);
-          if (el && training) training.insertBefore(el, intro || training.firstChild);
+          if (el && training) training.insertBefore(el, zirkel);
         });
         [".routine-row", "#weeks", "#routine-note", "#absence-block"].forEach(function (sel) {
           var el = document.querySelector(sel);
@@ -9811,6 +10181,7 @@
             paintStoriesVisibility();
             return;
           }
+          if (sessionMode && user.email && !accountEmail()) saveAccountEmail(user.email).catch(function () {});
           refreshFfcHeute(true);
           if (shellTab === "plan" && planPane === "training") refreshZirkel();
         },
