@@ -3088,10 +3088,66 @@
     .team-slide__art + .team-slide__cta,
     .team-slide__art + .team-slide__about,
     .team-slide__art + .team-slide__title,
-    .team-slide__art + .team-wa {
+    .team-slide__art + .team-slide__add-friend {
       margin-top: 36px;
     }
+    .team-slide__art + .team-wa {
+      margin-top: 72px; /* doppelter Abstand zum Bild */
+    }
     .team-slide .team-wa + .team-slide__about { margin-top: 12px; }
+    .team-slide__about + .team-slide__cta { margin-top: 36px; }
+    .team-slide__add-friend {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      width: auto;
+      margin: 36px 0 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #2A2118;
+      cursor: pointer;
+    }
+    .team-slide__add-friend-circle {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: 1.5px solid #2A2118;
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+      font-weight: 500;
+      line-height: 1;
+      background: transparent;
+    }
+    .team-slide.is-group-empty {
+      display: flex;
+      flex-direction: column;
+      min-height: calc(100svh - 230px - env(safe-area-inset-bottom, 0px));
+    }
+    .team-slide.is-group-empty .team-slide__cta {
+      margin-top: auto;
+      margin-bottom: 8px;
+    }
+    .team-slide__art.is-upload-cta {
+      cursor: pointer;
+      color: #2A2118;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+    .team-slide__art.is-upload-cta input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    .go-slide__art img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
     .team-slide__about {
       margin: 0 0 12px;
       font-size: 15px;
@@ -3954,7 +4010,7 @@
       <div class="go-rail" id="go-rail" aria-label="Go Angebote"></div>
       <div class="go-card" id="go-card-routine" hidden>
         <h3 class="go-card__title">12-Wochen-Routine</h3>
-        <p class="go-card__copy">Halte zwölf Wochen lang Deine Wochentage. Jede volle Woche wird markiert.</p>
+        <p class="go-card__copy">Poste 12 Wochen lang jeden Tag ein Event. Egal ob Du krank bist oder einen Marathon gelaufen bist. Egal, es geht um das Engagement und dass Freunde sehen, dass Du commitet bist. Und Du wirst eine Gewohnheit entwickeln. Nutz es, um so viele Events als Training oder andere Bewegung zu gestalten. Klick unten, um zu starten. Vorher noch die Trainings in der Woche setzen und dann geht es los. Wer die Wochen voll bekommt, erhält ein Personal Training for free!</p>
       </div>
       <section class="zirkel-block go-card" id="zirkel-block" hidden>
         <h3 class="go-card__title">Zirkeltraining</h3>
@@ -4317,7 +4373,7 @@
   </div>
   <div class="sand-modal" id="feedback-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
-      <h2 class="ask" id="feedback-title">Feedback-Formular</h2>
+      <h2 class="ask" id="feedback-title">Feedback</h2>
       <p>Schreib uns, was gut läuft und was wir verbessern sollen.</p>
       <textarea id="feedback-text" maxlength="2000" rows="6" placeholder="Dein Feedback …" style="width:100%;min-height:140px;padding:12px;border:1px solid #2A2118;background:#F6F1E8;color:#2A2118;font:inherit;"></textarea>
       <button type="button" class="routine-start" id="feedback-send" style="margin-top:12px;">Senden</button>
@@ -8864,7 +8920,7 @@
         box.hidden = false;
         var grid = document.createElement("div");
         grid.className = "time-grid";
-        for (var h = 6; h <= 21; h++) {
+        for (var h = 7; h <= 22; h++) {
           [":00", ":30"].forEach(function (m) {
             var t = h + m;
             var button = document.createElement("button");
@@ -9436,17 +9492,41 @@
         return row;
       }
 
-      function teamPortrait(person, fallback) {
+      function teamPortrait(person, fallback, opts) {
+        opts = opts || {};
         var art = document.createElement("div");
         art.className = "team-slide__art";
-        if (person && person.photo_url) {
+        var src = (person && person.photo_url) || opts.fallbackSrc || "";
+        if (src) {
           var img = document.createElement("img");
           img.alt = "";
-          img.src = person.photo_url;
+          img.src = src;
           art.appendChild(img);
-        } else {
-          art.textContent = fallback || ((person && person.name) ? String(person.name).slice(0, 1) : "?");
+          return art;
         }
+        if (opts.uploadCta) {
+          art.classList.add("is-upload-cta");
+          art.textContent = "Foto hochladen";
+          var file = document.createElement("input");
+          file.type = "file";
+          file.accept = "image/*";
+          file.addEventListener("change", function (event) {
+            var f = event.target.files && event.target.files[0];
+            event.target.value = "";
+            if (!f || !sessionAccount) return;
+            compressPhoto(f, function (url) {
+              if (!url) return;
+              sessionAccount.photo_url = url;
+              if (profilePerson && profilePerson.isSelf) profilePerson.photo_url = url;
+              saveProfileFields({ photo_url: url });
+              if (document.body.dataset.plan === "profil") renderProfil();
+              if (document.body.dataset.plan === "team") renderTeam();
+            });
+          });
+          art.appendChild(file);
+          return art;
+        }
+        art.textContent = fallback || ((person && person.name) ? String(person.name).slice(0, 1) : "?");
         return art;
       }
 
@@ -9524,7 +9604,7 @@
         var meSlide = document.createElement("article");
         meSlide.className = "team-slide";
         meSlide.appendChild(teamSlideHead("Mein Profil"));
-        meSlide.appendChild(teamPortrait(mePerson, personName().slice(0, 1)));
+        meSlide.appendChild(teamPortrait(mePerson, personName().slice(0, 1), { uploadCta: !mePerson.photo_url }));
         var editBtn = document.createElement("button");
         editBtn.type = "button";
         editBtn.className = "team-slide__cta is-solid";
@@ -9536,7 +9616,7 @@
         var feedbackBtn = document.createElement("button");
         feedbackBtn.type = "button";
         feedbackBtn.className = "team-slide__cta is-solid";
-        feedbackBtn.textContent = "Feedback-Formular";
+        feedbackBtn.textContent = "Feedback";
         feedbackBtn.addEventListener("click", function () {
           openFeedbackForm();
         });
@@ -9598,7 +9678,11 @@
         pick.innerHTML = PENCIL_ICON;
         pick.addEventListener("click", function () { openTeamSearch("trainer"); });
         coachSlide.appendChild(teamSlideHead("Mein Coach", pick));
-        coachSlide.appendChild(teamPortrait(trainer, trainer ? String(trainer.name || "?").slice(0, 1) : "C"));
+        coachSlide.appendChild(teamPortrait(
+          trainer,
+          trainer ? String(trainer.name || "?").slice(0, 1) : "C",
+          { fallbackSrc: "/assets/gogogo/gogogo-Coach-small.jpg" }
+        ));
         if (trainer) {
           var wa = document.createElement("button");
           wa.type = "button";
@@ -9617,6 +9701,26 @@
         }
         about.textContent = aboutText || (trainer ? "" : "Noch kein Coach gewählt.");
         coachSlide.appendChild(about);
+        var ptCta = document.createElement("button");
+        ptCta.type = "button";
+        ptCta.className = "team-slide__cta is-solid";
+        ptCta.textContent = "Personal Training";
+        ptCta.addEventListener("click", function () {
+          if (!trainer) {
+            openTeamSearch("trainer");
+            return;
+          }
+          requestPersonalTraining(trainer).then(function () {
+            setHome(true);
+            paintWelcome();
+            refreshFfcHeute(false);
+            setHeuteFilter("all");
+            paintHeuteJoins();
+          }).catch(function (err) {
+            alert((err && err.message) || "Anfrage fehlgeschlagen.");
+          });
+        });
+        coachSlide.appendChild(ptCta);
         paintCoachAppointments(coachSlide, trainer);
         box.appendChild(coachSlide);
 
@@ -9628,14 +9732,10 @@
           slide.appendChild(teamSlideHead("Meine Gruppen"));
           var art = document.createElement("label");
           art.className = "team-slide__art is-upload";
-          if (group && group.photo_url) {
-            var img = document.createElement("img");
-            img.alt = "";
-            img.src = group.photo_url;
-            art.appendChild(img);
-          } else {
-            art.appendChild(document.createTextNode("Foto hochladen"));
-          }
+          var gImg = document.createElement("img");
+          gImg.alt = "";
+          gImg.src = (group && group.photo_url) || "/assets/gogogo/gogogo-Gruppe-small.jpg";
+          art.appendChild(gImg);
           var file = document.createElement("input");
           file.type = "file";
           file.accept = "image/*";
@@ -9676,16 +9776,30 @@
         }
         if (!groups.length) {
           var emptyGroup = document.createElement("article");
-          emptyGroup.className = "team-slide is-scroll";
+          emptyGroup.className = "team-slide is-scroll is-group-empty";
           emptyGroup.appendChild(teamSlideHead("Meine Gruppen"));
           var emptyArt = document.createElement("div");
           emptyArt.className = "team-slide__art";
-          emptyArt.textContent = "Noch keine Gruppe";
+          var emptyImg = document.createElement("img");
+          emptyImg.alt = "";
+          emptyImg.src = "/assets/gogogo/gogogo-Gruppe-small.jpg";
+          emptyArt.appendChild(emptyImg);
           emptyGroup.appendChild(emptyArt);
-          var hint = document.createElement("p");
-          hint.className = "team-slide__about";
-          hint.textContent = "Gründe eine Gruppe unter gogogo.";
-          emptyGroup.appendChild(hint);
+          var addFriend = document.createElement("button");
+          addFriend.type = "button";
+          addFriend.className = "team-slide__add-friend";
+          addFriend.setAttribute("aria-label", "Freunde hinzufügen");
+          addFriend.innerHTML = '<span class="team-slide__add-friend-circle" aria-hidden="true">+</span>';
+          addFriend.addEventListener("click", function () { openTeamSearch("friend"); });
+          emptyGroup.appendChild(addFriend);
+          var createBtn = document.createElement("button");
+          createBtn.type = "button";
+          createBtn.className = "team-slide__cta is-solid";
+          createBtn.textContent = "Gruppe erstellen";
+          createBtn.addEventListener("click", function () {
+            openGoSub("group", "Gruppe erstellen");
+          });
+          emptyGroup.appendChild(createBtn);
           box.appendChild(emptyGroup);
         } else {
           groups.forEach(groupSlide);
@@ -9959,14 +10073,40 @@
         if (!rail) return;
         rail.textContent = "";
         var slides = [
-          { id: "routine", title: "12-Wochen-Routine", copy: "Halte zwölf Wochen lang Deine Wochentage. Jede volle Woche wird markiert.", cta: "Routine starten", kind: "kraft" },
-          { id: "zirkel", title: "Zirkeltraining", copy: "Registriere Dich einmal und trainiere im gemeinsamen Rhythmus mit Freunden, Leaderboard und Stories.", cta: "Zu den Einstellungen", kind: "zirkel" },
-          { id: "coach", title: "Triff Deinen Coach", copy: "Persönliche Treffen mit Deinem Coach — klarer Rahmen, echte Begleitung.", cta: "Personal Training", kind: "intensiv" },
-          { id: "group", title: "Gründe eine Gruppe", copy: "Eine eigene Gruppe mit Freunden. Sichtbar unter Historie, Heute und Coaching.", cta: "Gruppe gründen", kind: "ausdauer" },
-          { id: "nutrition", title: "Ernährung", copy: "Einfache Prinzipien für Alltag und Training: Protein, Rhythmus, ohne Überoptimierung.", cta: "Mehr erfahren", kind: "alternative" },
-          { id: "webcall", title: "Web-Call Trainingsplan", copy: "Kurz online mit Deinem Coach den Wochenplan abstimmen — klar, konkret, umsetzbar.", cta: "Call buchen", kind: "intensiv" }
+          {
+            id: "routine",
+            title: "12-Wochen-Routine",
+            copy: "Poste 12 Wochen lang jeden Tag ein Event. Egal ob Du krank bist oder einen Marathon gelaufen bist. Egal, es geht um das Engagement und dass Freunde sehen, dass Du commitet bist. Und Du wirst eine Gewohnheit entwickeln. Nutz es, um so viele Events als Training oder andere Bewegung zu gestalten. Klick unten, um zu starten. Vorher noch die Trainings in der Woche setzen und dann geht es los. Wer die Wochen voll bekommt, erhält ein Personal Training for free!",
+            cta: "Routine starten",
+            kind: "kraft",
+            image: "/assets/gogogo/gogogo-12wochen-routine.jpg"
+          },
+          {
+            id: "zirkel",
+            title: "Zirkeltraining",
+            copy: "Registriere Dich einmal und trainiere im gemeinsamen Rhythmus mit Freunden, Leaderboard und Stories.",
+            cta: "Zu den Einstellungen",
+            kind: "zirkel",
+            image: "/assets/gogogo/gogogo-Zirkeltraining.jpg"
+          },
+          {
+            id: "nutrition",
+            title: "Ernährung",
+            copy: "Einfache Prinzipien für Alltag und Training: Protein, Rhythmus, ohne Überoptimierung.",
+            cta: "Mehr erfahren",
+            kind: "alternative",
+            image: "/assets/gogogo/gogogo-Ernaehrung.jpg"
+          },
+          {
+            id: "webcall",
+            title: "Web-Call Trainingsplan",
+            copy: "Kurz online mit Deinem Coach den Wochenplan abstimmen — klar, konkret, umsetzbar.",
+            cta: "Call buchen",
+            kind: "intensiv",
+            image: "/assets/gogogo/gogogo-Web-Call.jpg"
+          }
         ];
-        slides.forEach(function (slide, idx) {
+        slides.forEach(function (slide) {
           var card = document.createElement("article");
           card.className = "go-slide";
           var title = document.createElement("h3");
@@ -9976,6 +10116,12 @@
           var art = document.createElement("div");
           art.className = "go-slide__art";
           art.setAttribute("aria-hidden", "true");
+          if (slide.image) {
+            var img = document.createElement("img");
+            img.src = slide.image;
+            img.alt = "";
+            art.appendChild(img);
+          }
           card.appendChild(art);
           var copy = document.createElement("p");
           copy.className = "go-slide__copy";
@@ -9985,7 +10131,14 @@
           cta.type = "button";
           cta.className = "go-slide__cta";
           cta.textContent = slide.cta;
-          cta.addEventListener("click", function () { openGoSub(slide.id, slide.title); });
+          cta.addEventListener("click", function () {
+            if (slide.id === "webcall") {
+              if (typeof openCalendlyPt === "function") openCalendlyPt();
+              else window.open(CALENDLY_PT_URL, "_blank", "noopener");
+              return;
+            }
+            openGoSub(slide.id, slide.title);
+          });
           card.appendChild(cta);
           rail.appendChild(card);
         });
@@ -10868,9 +11021,9 @@
         var wheel = document.getElementById("time-wheel");
         wheel.textContent = "";
         var times = [];
-        for (var hour = 8; hour <= 20; hour++) {
+        for (var hour = 7; hour <= 22; hour++) {
           times.push(hour + ":00");
-          if (hour < 20) times.push(hour + ":30");
+          if (hour < 22) times.push(hour + ":30");
         }
         times.forEach(function (label) {
           var button = document.createElement("button");
@@ -10891,7 +11044,7 @@
 
       function chosenTime() {
         var on = document.querySelector("#time-wheel button.is-on");
-        return on ? on.textContent : "8:00";
+        return on ? on.textContent : "7:00";
       }
 
       function sendDayInvites() {
