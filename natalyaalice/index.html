@@ -1340,31 +1340,52 @@
     body.is-session[data-shell="woche"] .tip { order: 7; }
     body.is-session[data-shell="woche"] #plan-week { order: 8; margin-top: 16px; }
     body.is-session[data-shell="woche"] .tip,
-    body.is-session[data-shell="woche"] #plan-week { display: none !important; }
+    body.is-session[data-shell="woche"] #plan-week,
+    body.is-session[data-shell="woche"] .routine-row,
+    body.is-session[data-shell="woche"] #weeks,
+    body.is-session[data-shell="woche"] #routine-note { display: none !important; }
     body.is-session[data-shell="woche"] {
-      overflow-x: hidden;
+      overflow: hidden;
     }
     body.is-session[data-shell="woche"] .welcome {
-      overflow-x: hidden;
+      overflow: hidden;
       min-height: 100dvh;
+      height: 100dvh;
       box-sizing: border-box;
-      /* Oberkante wie früher bei vor Ort / Reise */
-      padding-top: calc(4px + env(safe-area-inset-top) + 22px);
-      padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+      padding: 0;
+      width: min(100%, 440px);
     }
     body.is-session[data-shell="plan"] .dock,
     body.is-session[data-shell="woche"] .dock { display: none !important; }
     body.is-session[data-shell="plan"] .shell-kalender { display: none !important; }
     body.is-session[data-shell="woche"] .shell-kalender { display: block; }
     body.is-session[data-shell="woche"] .days.shell-kalender { display: flex; }
-    body.is-session[data-shell="woche"] .absence-block { display: block; }
-    body.is-session[data-shell="woche"] .routine-row { display: grid; }
+    body.is-session[data-shell="woche"] .absence-block { display: none; }
     body.is-session[data-shell="woche"] .week-mode { display: none; }
     body.is-session[data-shell="woche"] .absence-block.is-editing {
-      order: 0;
-      margin-bottom: 10px;
+      display: grid !important;
+      place-items: end center;
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      margin: 0;
+      padding: 16px;
+      box-sizing: border-box;
+      background: rgba(20, 8, 6, 0.55);
+      order: unset;
     }
-    body.is-session[data-shell="woche"] .absence-block.is-editing .week-mode { display: grid; }
+    body.is-session[data-shell="woche"] .absence-block.is-editing .week-mode {
+      display: none;
+    }
+    body.is-session[data-shell="woche"] .absence-block.is-editing .absence-editor {
+      display: block;
+      width: min(100%, 400px);
+      margin: 0;
+      padding: 18px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+      background: #F3EEE4;
+      border: 1px solid #2A2118;
+      box-sizing: border-box;
+    }
     .plan-tabs, .shell-plan, .heute-start, .heute-events, .zirkel-block { display: none; }
     body.is-session[data-shell="plan"] .plan-tabs {
       display: grid;
@@ -2409,7 +2430,7 @@
       display: flex;
       flex-direction: row;
       align-items: stretch;
-      gap: 12px;
+      gap: 0;
       margin: 0;
       padding: 0;
       overflow-x: auto;
@@ -2421,28 +2442,34 @@
     }
     body.is-session #days.days::-webkit-scrollbar { display: none; height: 0; }
     body.is-session[data-shell="woche"] #days.days {
-      flex: 1 1 auto;
-      min-height: calc(100dvh - 168px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
-      align-items: stretch;
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      width: 100vw;
+      max-width: none;
+      height: 100dvh;
+      min-height: 100dvh;
+      margin: 0;
+      left: 0;
+      transform: none;
     }
     body.is-session #days .day-block {
       flex: 0 0 100%;
       width: 100%;
       margin: 0;
       scroll-snap-align: start;
-      display: flex;
-      flex-direction: column;
+      position: relative;
       min-height: 100%;
+      height: 100%;
     }
     body.is-session #days .day-card {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
+      position: absolute;
+      inset: 0;
+      display: block;
       box-sizing: border-box;
       width: 100%;
-      flex: 1 1 auto;
-      min-height: calc(100dvh - 210px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      height: 100%;
+      min-height: 100%;
       margin: 0;
       padding: 0;
       border: 0;
@@ -2458,18 +2485,44 @@
       object-fit: cover;
       pointer-events: none;
     }
+    .day-card__suitcase {
+      position: absolute;
+      top: calc(4px + env(safe-area-inset-top, 0px) + 6px);
+      right: max(12px, calc((100vw - min(100vw, 440px)) / 2 + 12px));
+      z-index: 5;
+      width: 40px;
+      height: 40px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: rgba(42, 33, 24, 0.38);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+    .day-card__suitcase.is-on { color: #2A2118; }
+    .day-card__suitcase svg {
+      width: 22px;
+      height: 22px;
+      display: block;
+    }
     .day-card__overlay {
-      position: relative;
-      z-index: 1;
+      position: absolute;
+      left: 50%;
+      top: 38%;
+      transform: translateX(-50%);
+      z-index: 2;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 10px;
-      width: 100%;
-      margin-top: auto;
-      padding: 28px 16px 18px;
+      gap: 8px;
+      width: min(100% - 40px, 400px);
+      margin: 0;
+      padding: 0;
       box-sizing: border-box;
-      background: linear-gradient(180deg, rgba(243, 238, 228, 0) 0%, rgba(243, 238, 228, 0.72) 28%, rgba(243, 238, 228, 0.92) 100%);
+      background: none;
       color: #2A2118;
     }
     .day-card__overlay .day-card__blurb {
@@ -2484,22 +2537,22 @@
       width: auto;
       max-width: 100%;
       margin: 0;
-      min-height: 34px;
-      padding: 0 12px;
-      border: 1px solid rgba(42, 33, 24, 0.55);
-      background: rgba(246, 241, 232, 0.72);
+      min-height: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: #2A2118;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.3;
     }
     body.is-session #days .day-card__overlay .day-invite {
       width: 100%;
-      margin: 2px 0 0;
+      margin: 4px 0 0;
     }
     .day-card__overlay-tools {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-      width: 100%;
-      margin-top: 2px;
+      display: none;
     }
     .day-card__time {
       margin: 0;
@@ -2514,22 +2567,8 @@
       cursor: pointer;
     }
     .day-card__time:disabled { cursor: default; opacity: 0.7; }
-    .day-card__reise {
-      margin: 0;
-      padding: 0;
-      border: 0;
-      background: transparent;
-      color: #2A2118;
-      font: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      cursor: pointer;
-    }
-    .day-card__head {
-      display: none;
-    }
+    .day-card__reise { display: none; }
+    .day-card__head { display: none; }
     .day-card__head-label {
       flex: 1 1 auto;
       min-width: 0;
@@ -2548,19 +2587,22 @@
       align-self: baseline;
     }
     .day-card__head:disabled { cursor: default; }
-    .day-card__meta {
-      display: none;
-    }
+    .day-card__meta { display: none; }
     .day-card__meta .day-card__blurb { margin: 2px 0 0; }
     .day-card__meta .day-alt { margin-top: 4px; }
     body.is-session #days .day.day-card__main,
     body.is-session #days .day.day-card__main.is-empty,
     body.is-session #days .day.day-card__main.is-edit {
+      position: absolute;
+      left: 50%;
+      top: calc(52px + env(safe-area-inset-top, 0px));
+      transform: translateX(-50%);
+      z-index: 4;
       display: block;
-      width: 100%;
-      flex: none;
+      width: min(100% - 96px, 320px);
+      max-width: min(100% - 96px, 320px);
       min-height: 0;
-      margin: 0 0 10px;
+      margin: 0;
       padding: 0;
       border: 0;
       border-radius: 0;
@@ -2571,6 +2613,9 @@
       font-weight: 600;
       line-height: 1.2;
       text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     body.is-session #days .day.day-card__main.is-empty { color: #C7413B; }
     body.is-session #days .day-block .day-place {
@@ -3311,8 +3356,31 @@
       order: 7; /* direkt unter plan-tabs (order 1), vor den Slides */
     }
     body.is-session[data-shell="woche"] #week-rail-nav {
+      position: fixed;
+      top: calc(4px + env(safe-area-inset-top, 0px) + 10px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(100%, 440px);
+      padding: 0 52px 0 20px;
+      box-sizing: border-box;
       order: 1;
-      margin: 0 0 8px;
+      margin: 0;
+      z-index: 20;
+      pointer-events: none;
+    }
+    body.is-session[data-shell="woche"] #week-rail-nav .rail-nav__btn,
+    body.is-session[data-shell="woche"] #week-rail-nav .rail-nav__title {
+      pointer-events: auto;
+    }
+    body.is-session[data-shell="woche"] #week-rail-nav .rail-nav__title {
+      font-family: Inter, system-ui, sans-serif !important;
+      font-size: var(--t-s, 13px) !important;
+      font-weight: 600 !important;
+      line-height: 1.35 !important;
+      color: rgba(42, 33, 24, 0.58) !important;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     body.is-session[data-shell="plan"][data-plan="team"] #plan-team { order: 8; }
     body.is-session[data-shell="plan"][data-plan="training"] #plan-training { order: 8; }
@@ -6663,6 +6731,61 @@
       }
 
 
+      var SUITCASE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7V5.8A1.8 1.8 0 0 1 9.8 4h4.4A1.8 1.8 0 0 1 16 5.8V7"/><rect x="4.5" y="7" width="15" height="12.5" rx="1.6"/><path d="M4.5 12h15M9.5 11v2M14.5 11v2"/></svg>';
+
+      function shortenWorkoutTitle(raw) {
+        var text = String(raw || "").replace(/\s+/g, " ").trim();
+        if (!text) return text;
+        if (text.length > 28) text = text.slice(0, 27).replace(/\s+\S*$/, "").trim() + "…";
+        return text;
+      }
+
+      function openAbsencePopup() {
+        var editor = document.getElementById("absence-editor");
+        if (!editor) return;
+        weekModeOpen = true;
+        editor.hidden = false;
+        paintAbsenceWheels();
+        requestAnimationFrame(function () { requestAnimationFrame(scrollAbsenceWheels); });
+        paintAbsenceButton();
+        syncAbsenceEditing();
+      }
+
+      function closeAbsencePopup() {
+        var editor = document.getElementById("absence-editor");
+        weekModeOpen = false;
+        if (editor) editor.hidden = true;
+        paintAbsenceButton();
+        syncAbsenceEditing();
+      }
+
+      function onSuitcaseClick(iso, away) {
+        if (away) {
+          var home = document.querySelector('[data-week-mode="home"]');
+          if (home) home.click();
+          return;
+        }
+        var alt = travelAltFor(iso);
+        if (!alt) {
+          openAbsencePopup();
+          return;
+        }
+        var about = profileAbout(sessionAccount) || {};
+        var abs = about.absence && typeof about.absence === "object" ? about.absence : null;
+        if (!abs || !abs.start || !abs.end) {
+          openAbsencePopup();
+          return;
+        }
+        abs.active = true;
+        if (iso < abs.start) abs.start = iso;
+        if (iso > abs.end) abs.end = iso;
+        about.absence = abs;
+        saveAbout(about).then(function () {
+          paintAbsenceButton();
+          paintWelcome();
+        });
+      }
+
       function sessionDayCard(iso) {
         var wd = weekdayIndex(iso);
         var key = DAY_KEYS[wd];
@@ -6672,25 +6795,7 @@
         var travel = away ? travelAltFor(iso) : "";
         var wrap = document.createElement("div");
         wrap.className = "day-block";
-        wrap.dataset.title = (away ? "Reise · " : "") + DAY_NAMES[key];
-
-        var main = document.createElement("button");
-        main.type = "button";
-        main.className = "day day-card__main";
-        if (away) {
-          main.dataset.travel = iso;
-          main.textContent = travel ? (activityEmoji({ kind: "alternative", label: travel }) + " " + travel).trim() : "Alternative wählen";
-          main.classList.toggle("is-empty", !travel);
-        } else {
-          main.dataset.day = key;
-          if (unit && unit.kind === "spontan") main.textContent = "Am Tag spontan";
-          else if (unit && unit.kind) main.textContent = (activityEmoji(unit) + " " + (unit.label || "")).trim();
-          else {
-            main.textContent = "Tippe, um zu planen";
-            main.classList.add("is-empty");
-          }
-        }
-        wrap.appendChild(main);
+        wrap.dataset.title = (away ? "Reise · " : "") + formatLong(iso) + (time ? " · " + time + " Uhr" : "");
 
         var block = document.createElement("div");
         block.className = "day-card" + (away ? " is-travel" : "") + ((!away && !(unit && unit.kind)) ? " is-empty" : "");
@@ -6698,13 +6803,38 @@
         else if (unit && unit.kind) applyWorkoutTone(block, unit);
         else applyWorkoutTone(block, { kind: "extra" });
 
+        var suitcase = document.createElement("button");
+        suitcase.type = "button";
+        suitcase.className = "day-card__suitcase" + (away ? " is-on" : "");
+        suitcase.setAttribute("aria-label", away ? "Wieder vor Ort" : "Reise / Alternative");
+        suitcase.setAttribute("aria-pressed", away ? "true" : "false");
+        suitcase.innerHTML = SUITCASE_SVG;
+        suitcase.addEventListener("click", function (event) {
+          event.stopPropagation();
+          onSuitcaseClick(iso, away);
+        });
+        block.appendChild(suitcase);
+
+        var main = document.createElement("button");
+        main.type = "button";
+        main.className = "day day-card__main";
+        if (away) {
+          main.dataset.travel = iso;
+          main.textContent = shortenWorkoutTitle(travel ? (activityEmoji({ kind: "alternative", label: travel }) + " " + travel).trim() : "Alternative wählen");
+          main.classList.toggle("is-empty", !travel);
+        } else {
+          main.dataset.day = key;
+          if (unit && unit.kind === "spontan") main.textContent = "Am Tag spontan";
+          else if (unit && unit.kind) main.textContent = shortenWorkoutTitle((activityEmoji(unit) + " " + (unit.label || "")).trim());
+          else {
+            main.textContent = "Tippe, um zu planen";
+            main.classList.add("is-empty");
+          }
+        }
+        block.appendChild(main);
+
         var overlay = document.createElement("div");
         overlay.className = "day-card__overlay";
-
-        var blurb = document.createElement("p");
-        blurb.className = "day-card__blurb";
-        blurb.textContent = workoutBlurb(away ? null : unit, away, away ? travel : dayAltFor(iso));
-        overlay.appendChild(blurb);
 
         if (!away) {
           var place = document.createElement("button");
@@ -6714,11 +6844,13 @@
           place.setAttribute("aria-label", "Ort am " + DAY_NAMES[key] + " ändern");
           place.addEventListener("click", function () { openDayPlace(wd); });
           overlay.appendChild(place);
-          overlay.appendChild(dayInviteEl(iso));
+        } else {
+          var placeAway = document.createElement("p");
+          placeAway.className = "day-place";
+          placeAway.textContent = "Auf Reise";
+          overlay.appendChild(placeAway);
         }
 
-        var tools = document.createElement("div");
-        tools.className = "day-card__overlay-tools";
         var timeBtn = document.createElement("button");
         timeBtn.type = "button";
         timeBtn.className = "day-card__time";
@@ -6729,20 +6861,14 @@
         } else {
           timeBtn.disabled = true;
         }
-        tools.appendChild(timeBtn);
-        var reise = document.createElement("button");
-        reise.type = "button";
-        reise.className = "day-card__reise";
-        reise.textContent = away ? "vor Ort" : "Reise";
-        reise.setAttribute("aria-label", away ? "Wieder vor Ort planen" : "Reise planen");
-        reise.addEventListener("click", function (event) {
-          event.stopPropagation();
-          var target = document.querySelector(away ? '[data-week-mode="home"]' : '[data-week-mode="travel"]');
-          if (target) target.click();
-        });
-        tools.appendChild(reise);
-        tools.appendChild(dayCsvButton());
-        overlay.appendChild(tools);
+        overlay.appendChild(timeBtn);
+
+        var blurb = document.createElement("p");
+        blurb.className = "day-card__blurb";
+        blurb.textContent = workoutBlurb(away ? null : unit, away, away ? travel : dayAltFor(iso));
+        overlay.appendChild(blurb);
+
+        if (!away) overlay.appendChild(dayInviteEl(iso));
 
         block.appendChild(overlay);
         wrap.appendChild(block);
@@ -14580,6 +14706,7 @@
         var editor = document.getElementById("absence-editor");
         if (editor) editor.hidden = true;
         paintAbsenceButton();
+        if (typeof syncAbsenceEditing === "function") syncAbsenceEditing();
         paintWelcome();
         if (document.body.dataset.plan === "team") renderTeam();
         askCreateTravelAlts();
@@ -14670,6 +14797,10 @@
       document.getElementById("absence-save").addEventListener("click", function () {
         window.clearTimeout(absenceSyncTimer);
         saveAbsenceRange();
+      });
+      document.getElementById("absence-block").addEventListener("click", function (event) {
+        if (event.target !== event.currentTarget) return;
+        if (typeof closeAbsencePopup === "function") closeAbsencePopup();
       });
       paintAbsenceWheels();
 
