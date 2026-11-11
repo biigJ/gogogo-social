@@ -2753,12 +2753,16 @@
       overflow-x: auto;
       overflow-y: hidden;
       scroll-snap-type: x mandatory;
+      scroll-behavior: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
+      overscroll-behavior-x: contain;
       touch-action: pan-x pan-y;
     }
     body.is-session #plan-team.team-rail .team-slide.is-scroll {
+      /* Native nested scroll: vertical inside slide, horizontal on rail */
       touch-action: pan-x pan-y;
+      overscroll-behavior: contain;
     }
     body.is-session #plan-training .go-rail::-webkit-scrollbar,
     body.is-session #plan-team.team-rail::-webkit-scrollbar { display: none; height: 0; }
@@ -9044,45 +9048,6 @@
         box.appendChild(coacheeSlide);
         syncGroupOptions();
         syncHScrollDock();
-        bindTeamRailGestures();
-      }
-
-      function bindTeamRailGestures() {
-        var rail = document.getElementById("plan-team");
-        if (!rail || rail.dataset.gesturesBound) return;
-        rail.dataset.gesturesBound = "1";
-        var sx = 0, sy = 0, sl = 0, st = 0, axis = "", slide = null, active = false;
-        rail.addEventListener("touchstart", function (event) {
-          if (!event.touches || !event.touches[0]) return;
-          active = true;
-          sx = event.touches[0].clientX;
-          sy = event.touches[0].clientY;
-          sl = rail.scrollLeft;
-          axis = "";
-          slide = event.target.closest(".team-slide.is-scroll");
-          st = slide ? slide.scrollTop : 0;
-        }, { passive: true });
-        rail.addEventListener("touchmove", function (event) {
-          if (!active || !event.touches || !event.touches[0]) return;
-          var x = event.touches[0].clientX;
-          var y = event.touches[0].clientY;
-          var dx = x - sx;
-          var dy = y - sy;
-          if (!axis) {
-            if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-            axis = Math.abs(dx) > Math.abs(dy) * 1.1 ? "x" : "y";
-          }
-          if (axis === "x") {
-            rail.scrollLeft = sl - dx;
-            if (event.cancelable) event.preventDefault();
-          } else if (axis === "y" && slide) {
-            slide.scrollTop = st - dy;
-            if (event.cancelable) event.preventDefault();
-          }
-        }, { passive: false });
-        function endGesture() { active = false; axis = ""; slide = null; }
-        rail.addEventListener("touchend", endGesture, { passive: true });
-        rail.addEventListener("touchcancel", endGesture, { passive: true });
       }
 
 
