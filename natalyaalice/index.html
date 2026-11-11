@@ -1314,6 +1314,14 @@
     body.is-session[data-shell="plan"] #plan-week { order: 6; margin-top: 16px; }
     body.is-session[data-shell="plan"] #days { order: 7; }
     body.is-session[data-shell="plan"] .shell-plan { order: 8; }
+    body.is-session[data-shell="plan"][data-plan="kalender"] .tip,
+    body.is-session[data-shell="plan"][data-plan="kalender"] #plan-week { display: none !important; }
+    body.is-session[data-shell="plan"][data-plan="kalender"] {
+      overflow-x: hidden;
+    }
+    body.is-session[data-shell="plan"][data-plan="kalender"] .welcome {
+      overflow-x: hidden;
+    }
     body.is-session[data-shell="plan"] .dock { display: none !important; }
     body.is-session[data-shell="plan"]:not([data-plan="kalender"]) .shell-kalender { display: none !important; }
     .plan-tabs, .shell-plan, .heute-start, .heute-events, .zirkel-block { display: none; }
@@ -1567,7 +1575,9 @@
     .invite-card {
       display: flex;
       flex-direction: column;
+      justify-content: center;
       gap: 4px;
+      min-height: 224px;
       margin-top: 12px;
       padding: 16px 18px;
       border: 1px solid #2A2118;
@@ -2147,13 +2157,9 @@
       line-height: 1;
     }
     .plan-tabs__gear svg {
-      width: 24px;
-      height: 24px;
-      fill: none;
-      stroke: currentColor;
-      stroke-width: 1.6;
-      stroke-linecap: round;
-      stroke-linejoin: round;
+      width: 20px;
+      height: 20px;
+      display: block;
     }
     .tip.is-owned {
       font-size: min(20px, 4.1vw);
@@ -2180,47 +2186,92 @@
       text-align: left;
       cursor: pointer;
     }
+    body.is-session #days.days {
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+      gap: 12px;
+      margin: 14px -20px 0;
+      padding: 0 20px 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-x: contain;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    body.is-session #days.days::-webkit-scrollbar { display: none; }
+    body.is-session #days .day-block {
+      flex: 0 0 min(100%, 340px);
+      width: min(100%, 340px);
+      margin: 0;
+      scroll-snap-align: start;
+    }
     body.is-session #days .day-card {
-      margin: 0 0 12px;
-      padding: 14px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 4px;
+      box-sizing: border-box;
+      min-height: 224px;
+      margin: 0;
+      padding: 16px 18px;
       border: 1px solid #2A2118;
     }
     body.is-session #days .day-card:has(.day.is-empty),
     body.is-session #days .day-card:has(.day.is-edit) { border-color: #C7413B; }
     body.is-session #days .day-card.is-travel { border-style: dashed; }
     .day-card__head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
+      display: block;
+      width: 100%;
+      padding: 0;
       color: rgba(42, 33, 24, 0.58);
+      font-size: 12px;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
     }
-    .day-card__time {
-      flex: none;
-      padding: 2px 0 2px 10px;
-      color: #2A2118;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-    }
-    .day-card__time.is-empty { color: rgba(42, 33, 24, 0.58); }
+    .day-card__head:disabled { cursor: default; }
     body.is-session #days .day.day-card__main,
     body.is-session #days .day.day-card__main.is-empty,
     body.is-session #days .day.day-card__main.is-edit {
       display: block;
+      width: 100%;
       min-height: 0;
-      margin: 4px 0 0;
+      margin: 0;
       padding: 0;
       border: 0;
       border-radius: 0;
       background: transparent;
       color: #2A2118;
       font-family: "Playfair Display", serif;
+      font-size: 22px;
       font-weight: 600;
       line-height: 1.2;
+      text-align: left;
     }
     body.is-session #days .day.day-card__main.is-empty { color: #C7413B; }
-    body.is-session #days .day-card .day-place { margin-top: 10px; min-height: 36px; }
-    body.is-session #days .day-card .day-invite { margin-bottom: 0; }
+    body.is-session #days .day-card .day-place {
+      width: 100%;
+      margin-top: 8px;
+      min-height: 36px;
+    }
+    body.is-session #days .day-card .day-invite { width: 100%; margin: 8px 0 0; }
+    .day-alt {
+      display: block;
+      width: 100%;
+      margin-top: 10px;
+      padding: 0;
+      color: #2A2118;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: left;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .day-alt.is-set { text-decoration: none; }
+    .day-invite__add span { display: none; }
     .week-mode {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -2415,15 +2466,18 @@
     .today-card__line { font-size: 13px; font-weight: 500; line-height: 1.3; }
     .today-card__line:empty { display: none; }
     .today-invite {
-      display: block;
-      margin: 10px 0 0 auto;
-      padding: 6px 2px;
-      font-size: 14px;
-      font-weight: 600;
-      text-decoration: underline;
-      text-underline-offset: 3px;
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      margin: 10px 0 0;
+      padding: 0;
+      border: 1.5px solid #2A2118;
+      border-radius: 999px;
+      background: transparent;
       color: #2A2118;
     }
+    .today-invite svg { width: 22px; height: 22px; display: block; }
     .today-invite[hidden] { display: none; }
     body.is-session[data-shell="heute"] .heute-events { display: block; margin-top: 18px; }
     .heute-events:empty { display: none !important; }
@@ -2531,7 +2585,7 @@
       <button type="button" data-plan="team" role="tab">Coaching</button>
       <button type="button" data-plan="training" role="tab">Go!</button>
       <button type="button" data-plan="settings" class="plan-tabs__gear" role="tab" aria-label="Einstellung">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Z"/><path d="M19.4 13.1a7.6 7.6 0 0 0 .1-1.1 7.6 7.6 0 0 0-.1-1.1l2-1.6-1.9-3.3-2.4 1a7.4 7.4 0 0 0-1.9-1.1l-.4-2.5H9.2l-.4 2.5a7.4 7.4 0 0 0-1.9 1.1l-2.4-1L2.6 9.3l2 1.6a7.6 7.6 0 0 0-.1 1.1 7.6 7.6 0 0 0 .1 1.1l-2 1.6 1.9 3.3 2.4-1a7.4 7.4 0 0 0 1.9 1.1l.4 2.5h3.8l.4-2.5a7.4 7.4 0 0 0 1.9-1.1l2.4 1 1.9-3.3-2-1.6Z"/></svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
     </div>
     <div class="shell-plan" id="plan-team"></div>
@@ -2553,10 +2607,8 @@
       <div class="orte-map" id="orte-map" aria-label="Karte"></div>
     </div>
     <div class="shell-plan" id="plan-info">
-      <p class="training-intro">Trainingspläne erstellt Dein Trainer. Die Funktion wird erweitert, damit Du aus diversen Quellen und Formaten Deine Pläne und Verknüpfungen mit anderen Apps verbinden kannst. Work in Progress. Folgend ein bisschen Hintergrund.</p>
       <div class="training-copy">
         <h2>Drei Trainingsarten für drei Reize</h2>
-        <p>Drei Trainingsarten zielen auf einzelne Systeme. Kraft verändert Muskulatur, Sehnen und Nervensystem. Ausdauer verändert Herz, Kreislauf und die Energieproduktion in den Zellen. Intensives Training verändert, wie viel Leistung Du aus diesem System kurzfristig abrufen kannst. Jeder Reiz löst eine andere Anpassung aus, und diese Anpassungen laufen weitgehend unabhängig voneinander.</p>
         <h3>Kraft</h3>
         <p>Krafttraining wirkt strukturell. Unter Last entstehen mechanische Signale in der Muskelzelle, die die Produktion neuer kontraktiler Proteine anstoßen. Der Muskelquerschnitt wächst, Sehnen und Bindegewebe werden dichter, die Knochendichte steigt. Parallel dazu passiert ein großer Teil der frühen Fortschritte im Nervensystem: Dein Körper lernt, mehr Fasern gleichzeitig und besser koordiniert anzusteuern. Deshalb wirst Du in den ersten Wochen deutlich stärker, ohne sichtbar mehr Muskel zu haben.</p>
         <p>Zusätzlich ist Muskulatur das größte Zielgewebe für Insulin. Mehr trainierte Muskelmasse bedeutet, dass Glukose schneller aus dem Blut in die Zelle gelangt. Krafttraining verbessert Insulinsensitivität und Blutzuckerregulation daher unabhängig von Gewichtsverlust. Der Reiz selbst hält etwa 48 bis 72 Stunden an, danach fällt die Proteinsynthese auf Ausgangsniveau zurück. Aus dieser Zeitspanne ergibt sich die sinnvolle Frequenz pro Muskelgruppe.</p>
@@ -2973,7 +3025,7 @@
     <div class="dock">
       <p class="heute-away" id="heute-away" hidden>Alternativer Alltag gem. Deiner Angabe unter Profil.</p>
       <button type="button" class="go-primary" id="go-today"><span class="today-card__kicker" id="today-kicker"></span><span class="today-card__title" id="today-title">Heutiges Workout</span><span class="today-card__line" id="today-line"></span></button>
-      <button type="button" class="today-invite" id="today-invite" hidden>Einladen</button>
+      <button type="button" class="today-invite" id="today-invite" hidden aria-label="Einladen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <div class="go-row">
         <button type="button" class="go-quiet" id="go-shift">Schieben</button>
         <button type="button" class="go-quiet" id="go-short">Kurzfassung 15 min</button>
@@ -3305,7 +3357,7 @@
       </button>
       <button type="button" data-shell="heute" class="is-on" aria-label="Heute">
         <span class="pill-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3.2v3.1M12 17.7v3.1M3.2 12h3.1M17.7 12h3.1M5.7 5.7l2.2 2.2M16.1 16.1l2.2 2.2M18.3 5.7l-2.2 2.2M7.9 16.1l-2.2 2.2"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
         <small>Heute</small>
@@ -5077,30 +5129,26 @@
         var box = document.getElementById("days");
         box.textContent = "";
         var tipEl = document.querySelector(".tip");
-        tipEl.classList.toggle("is-owned", !!(sessionMode && !planningWeek && userOwned));
-        tipEl.textContent = sessionMode
-          ? (planningWeek
-            ? "Tipp auf den Wochentag und wähle eine Kategorie."
-            : (userOwned
-              ? "Du hast Deine eigene Planung gestartet und Dein Trainer kann nicht mehr eingreifen."
-              : (adminDayKeys && adminDayKeys.length
-                ? "Bevor Du die Routine startest, leg Deine Woche fest."
-                : "Dein Trainer stellt den Plan zusammen.")))
-          : (picking
+        if (sessionMode) {
+          tipEl.classList.remove("is-owned");
+          tipEl.textContent = "";
+          tipEl.hidden = true;
+        } else {
+          tipEl.hidden = false;
+          tipEl.classList.remove("is-owned");
+          tipEl.textContent = picking
             ? "Zweiten Tag festlegen."
             : (routineStart()
               ? "Die Wochentage bleiben, solange die Routine läuft."
-              : "Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest."));
-        if (tipEl.classList.contains("is-owned")) {
-          tipEl.innerHTML = "<span>Du hast Deine eigene Planung gestartet und</span><span>Dein Trainer kann nicht mehr eingreifen.</span>";
+              : "Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.");
         }
         var planBtn = document.getElementById("plan-week");
         if (planBtn) {
-          planBtn.hidden = !sessionMode;
-          planBtn.textContent = planningWeek ? "Fertig" : "Klick, um ein Event pro Tag zu planen";
-          planBtn.classList.toggle("is-on", planningWeek);
-          planBtn.setAttribute("aria-pressed", planningWeek ? "true" : "false");
+          planBtn.hidden = true;
+          planBtn.classList.remove("is-on");
+          planBtn.removeAttribute("aria-pressed");
         }
+        if (sessionMode) planningWeek = true;
         for (var i = 0; i < 7; i++) {
           if (sessionMode) {
             box.appendChild(sessionDayCard(addDays(today, i)));
@@ -5213,42 +5261,43 @@
         var key = DAY_KEYS[wd];
         var unit = displayUnit(wd);
         var away = awayOn(iso, absenceOf(sessionAccount));
+        var wrap = document.createElement("div");
+        wrap.className = "day-block";
         var block = document.createElement("div");
-        block.className = "day-block day-card" + (away ? " is-travel" : "");
-        var head = document.createElement("div");
+        block.className = "day-card" + (away ? " is-travel" : "");
+        var head = document.createElement("button");
+        head.type = "button";
         head.className = "day-card__head";
-        var dateEl = document.createElement("span");
-        dateEl.className = "day-card__date";
-        dateEl.textContent = (away ? "Reise · " : "") + formatLong(iso);
-        head.appendChild(dateEl);
         var time = timeForWeekday(wd);
+        head.textContent = (away ? "Reise · " : "") + formatLong(iso) + (time ? " · " + time + " Uhr" : "");
         if (!away) {
-          var timeBtn = document.createElement("button");
-          timeBtn.type = "button";
-          timeBtn.className = "day-card__time" + (time ? "" : " is-empty");
-          timeBtn.textContent = time ? time + " Uhr" : "Uhrzeit";
-          timeBtn.setAttribute("aria-label", "Uhrzeit am " + DAY_NAMES[key] + " ändern");
-          timeBtn.addEventListener("click", function () { openDayTime(wd); });
-          head.appendChild(timeBtn);
+          head.setAttribute("aria-label", "Uhrzeit am " + DAY_NAMES[key] + " ändern");
+          head.addEventListener("click", function () { openDayTime(wd); });
+        } else {
+          head.disabled = true;
         }
         block.appendChild(head);
         var main = document.createElement("button");
         main.type = "button";
         main.className = "day day-card__main";
         if (away) {
-          var alt = travelAltFor(iso);
+          var travel = travelAltFor(iso);
           main.dataset.travel = iso;
-          main.textContent = alt ? (activityEmoji({ kind: "alternative", label: alt }) + " " + alt).trim() : "Alternative für die Reise wählen";
-          main.classList.toggle("is-empty", !alt);
+          main.textContent = travel ? (activityEmoji({ kind: "alternative", label: travel }) + " " + travel).trim() : "Alternative wählen";
+          main.classList.toggle("is-empty", !travel);
           block.appendChild(main);
-          return block;
+          wrap.appendChild(block);
+          wrap.appendChild(dayAltButton(iso));
+          return wrap;
         }
         main.dataset.day = key;
-        main.disabled = !planningWeek;
+        main.disabled = false;
         if (unit && unit.kind === "spontan") main.textContent = "Am Tag spontan";
         else if (unit && unit.kind) main.textContent = (activityEmoji(unit) + " " + (unit.label || "")).trim();
-        else main.textContent = planningWeek ? "Tippe, um zu planen" : "Frei";
-        if (planningWeek) main.classList.add(unit && unit.kind ? "is-edit" : "is-empty");
+        else {
+          main.textContent = "Tippe, um zu planen";
+          main.classList.add("is-empty");
+        }
         block.appendChild(main);
         var place = document.createElement("button");
         place.type = "button";
@@ -5258,7 +5307,9 @@
         place.addEventListener("click", function () { openDayPlace(wd); });
         block.appendChild(place);
         block.appendChild(dayInviteEl(iso));
-        return block;
+        wrap.appendChild(block);
+        wrap.appendChild(dayAltButton(iso));
+        return wrap;
       }
 
       function setTodayCard(title, line, time) {
@@ -5270,8 +5321,8 @@
 
       function choosePlanDay(key) {
         if (sessionMode) {
-          if (!planningWeek) return;
           if (!document.getElementById("days-modal").hidden) return;
+          planningWeek = true;
           openWeekKind(key);
           return;
         }
@@ -7607,6 +7658,74 @@
       }
 
       var TRAVEL_ALTS = ["Hotel-Workout", "Laufen", "Spazieren", "Schwimmen", "Yoga", "Radfahren", "Pause"];
+      var DAY_ALTS = ["Hotel-Workout", "Laufen", "Spazieren", "Schwimmen", "Yoga", "Radfahren", "Kraft zu Hause", "Pause"];
+
+      function dayAltFor(iso) {
+        var about = profileAbout(sessionAccount);
+        var alts = about && about.day_alts;
+        return alts && typeof alts === "object" ? String(alts[iso] || "") : "";
+      }
+
+      function setDayAlt(iso, label) {
+        var about = profileAbout(sessionAccount) || {};
+        var alts = about.day_alts && typeof about.day_alts === "object" ? about.day_alts : {};
+        if (label) alts[iso] = label;
+        else delete alts[iso];
+        about.day_alts = alts;
+        return saveAbout(about);
+      }
+
+      function dayAltButton(iso) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        var current = dayAltFor(iso) || (awayOn(iso, absenceOf(sessionAccount)) ? travelAltFor(iso) : "");
+        btn.className = "day-alt" + (current ? " is-set" : "");
+        btn.textContent = current ? ("Alternative: " + current) : "Alternative";
+        btn.addEventListener("click", function () {
+          if (awayOn(iso, absenceOf(sessionAccount))) openTravelAlt(iso);
+          else openDayAlt(iso);
+        });
+        return btn;
+      }
+
+      function openDayAlt(iso) {
+        pendingDay = null;
+        pendingUnit = null;
+        document.getElementById("days-secret").hidden = true;
+        document.getElementById("days-kinds").hidden = true;
+        document.getElementById("days-pick").hidden = true;
+        document.getElementById("days-error").hidden = true;
+        document.getElementById("days-title").textContent = "Alternative am " + formatLong(iso) + ".";
+        var box = document.getElementById("days-place");
+        box.textContent = "";
+        box.hidden = false;
+        var current = dayAltFor(iso);
+        DAY_ALTS.forEach(function (label) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.textContent = label;
+          if (label === current) button.classList.add("is-current");
+          button.addEventListener("click", function () {
+            setDayAlt(iso, label).then(function () {
+              closeDaysPrompt();
+              paintWelcome();
+            });
+          });
+          box.appendChild(button);
+        });
+        var clear = document.createElement("button");
+        clear.type = "button";
+        clear.className = "sand-quiet";
+        clear.textContent = "Keine Alternative";
+        clear.addEventListener("click", function () {
+          setDayAlt(iso, "").then(function () {
+            closeDaysPrompt();
+            paintWelcome();
+          });
+        });
+        box.appendChild(clear);
+        document.getElementById("days-modal").hidden = false;
+      }
 
       function travelAltFor(iso) {
         var about = profileAbout(sessionAccount);
@@ -7851,9 +7970,7 @@
         });
         var add = document.createElement("div");
         add.className = "day-invite__add";
-        var addLabel = document.createElement("span");
-        addLabel.textContent = "Einladen:";
-        add.appendChild(addLabel);
+        plus.setAttribute("aria-label", "Einladen");
         add.appendChild(plus);
         wrap.appendChild(add);
         return wrap;
