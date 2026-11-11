@@ -1280,10 +1280,10 @@
     body.is-session[data-shell="heute"] .heute-crew { display: none !important; }
     body.is-session[data-shell="heute"] .heute-stories { order: 1; }
     body.is-session[data-shell="heute"] .dock { order: 2; margin-top: 4px; }
-    body.is-session[data-shell="heute"] .heute-start { order: 3; }
-    body.is-session[data-shell="heute"] #go-today { min-height: 224px; }
-    body.is-session[data-shell="heute"] .heute-events { order: 4; }
     body.is-session[data-shell="heute"] .heute-joins { order: 3; }
+    body.is-session[data-shell="heute"] .heute-start { order: 4; }
+    body.is-session[data-shell="heute"] #go-today { min-height: 224px; }
+    body.is-session[data-shell="heute"] .heute-events { order: 5; }
     body.is-session[data-shell="heute"] .dock .go-row { display: none; }
     body.is-session[data-shell="plan"] .plan-tabs { order: 1; }
     body.is-session[data-shell="plan"] .absence-block { order: 2; }
@@ -2228,6 +2228,19 @@
       color: #2A2118;
       font: inherit;
     }
+    #zirkel-register .sand-card input {
+      display: block;
+      width: 100%;
+      margin: 8px 0 0;
+      padding: 12px 10px;
+      border: 1px solid #2A2118;
+      border-radius: 0;
+      background: transparent;
+      color: #2A2118;
+      font: inherit;
+    }
+    #zirkel-register #zirkel-register-hint { margin: 0 0 8px; }
+    #zirkel-login .sand-quiet { margin-top: 10px; border: 1px solid #2A2118; background: transparent; color: #2A2118; }
     #days-place .place-add button {
       flex: none;
       width: 44px;
@@ -2856,8 +2869,9 @@
       <section class="zirkel-block go-card" id="zirkel-block">
         <h3 class="go-card__title">Zirkeltraining</h3>
         <div class="zirkel-login" id="zirkel-login">
-          <p>Melde Dich einmal mit E-Mail und Login-Code von Zirkeltraining an. Es ist derselbe Account wie unter gogogo.social/zirkeltraining.</p>
-          <button type="button" class="routine-start" id="zirkel-login-btn">Anmelden</button>
+          <p>Registriere Dich einmal mit E-Mail, Passwort und Nickname. Danach speicherst Du Zirkeltraining bei FFC und erscheinst mit Deinen Freunden im gemeinsamen Leaderboard und in den Stories.</p>
+          <button type="button" class="routine-start" id="zirkel-register-btn">Registrieren</button>
+          <button type="button" class="routine-start sand-quiet" id="zirkel-login-btn">Schon Account? Anmelden</button>
         </div>
         <div class="zirkel-body ffc" id="zirkel-body" hidden>
           <button type="button" class="routine-start" id="zirkel-setup">Workout einstellen</button>
@@ -3121,6 +3135,19 @@
   <div class="ev-sheet" id="ev-sheet" hidden>
     <div class="ev-sheet__card ffc" id="ev-sheet-card" role="dialog" aria-modal="true" aria-label="Event"></div>
   </div>
+  <div class="sand-modal" id="zirkel-register" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="zirkel-register-title">
+      <h2 class="ask" id="zirkel-register-title">Zirkeltraining registrieren</h2>
+      <p class="team-msg" id="zirkel-register-hint">E-Mail, Passwort und Nickname. Der Nickname muss bei gogogo und FFC frei sein.</p>
+      <input id="zirkel-reg-email" type="email" placeholder="E-Mail" autocomplete="email" />
+      <input id="zirkel-reg-pass" type="password" placeholder="Passwort (mind. 6 Zeichen)" autocomplete="new-password" />
+      <input id="zirkel-reg-pass2" type="password" placeholder="Passwort wiederholen" autocomplete="new-password" />
+      <input id="zirkel-reg-nick" type="text" maxlength="20" placeholder="Nickname" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <p class="team-msg" id="zirkel-register-msg"></p>
+      <button type="button" id="zirkel-register-save">Registrieren</button>
+      <button type="button" class="sand-quiet" id="zirkel-register-cancel">Abbrechen</button>
+    </div>
+  </div>
   <div class="sand-modal" id="account-edit" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="account-edit-title">
       <h2 class="ask" id="account-edit-title">Code ändern</h2>
@@ -3348,8 +3375,8 @@
       <div class="tagline" id="authTagline">Anmelden, um dein Training zu speichern</div>
 
       <input type="email" id="authEmail" class="auth-input" placeholder="E-Mail" autocomplete="email">
-      <input type="password" id="authPassword" class="auth-input" placeholder="Login-Code" autocomplete="current-password">
-      <button class="back-link" id="authForgotBtn" style="align-self:flex-end; margin:-4px 0 14px;">Login-Code vergessen?</button>
+      <input type="password" id="authPassword" class="auth-input" placeholder="Passwort" autocomplete="current-password">
+      <button class="back-link" id="authForgotBtn" style="align-self:flex-end; margin:-4px 0 14px;">Passwort vergessen?</button>
 
       <button class="start-btn" id="authSubmitBtn">Anmelden</button>
       <button class="back-link" id="authToggleBtn" style="align-self:center; margin-top:16px;">Noch keinen Account? Registrieren</button>
@@ -3359,10 +3386,10 @@
   <div class="screen" id="newpass">
     <div class="auth-box">
       <div class="brand">Zirkeltraining</div>
-      <div class="tagline">Neuen Login-Code festlegen</div>
-      <input type="password" id="newPass1" class="auth-input" placeholder="Neuer Login-Code (mind. 6 Zeichen)" autocomplete="new-password">
-      <input type="password" id="newPass2" class="auth-input" placeholder="Neuen Login-Code wiederholen" autocomplete="new-password">
-      <button class="start-btn" id="newPassBtn">Login-Code speichern</button>
+      <div class="tagline">Neues Passwort festlegen</div>
+      <input type="password" id="newPass1" class="auth-input" placeholder="Neues Passwort (mind. 6 Zeichen)" autocomplete="new-password">
+      <input type="password" id="newPass2" class="auth-input" placeholder="Neues Passwort wiederholen" autocomplete="new-password">
+      <button class="start-btn" id="newPassBtn">Passwort speichern</button>
       <div class="auth-error" id="newPassStatus"></div>
     </div>
   </div>
@@ -5486,10 +5513,18 @@
         }
         msg.textContent = "Wird geprüft …";
         var me = String(sessionAccount.id);
-        rest("go_accounts?nickname=ilike." + encodeURIComponent(likeExact(nick)) + "&select=id&limit=2")
+        Promise.resolve()
+          .then(function () {
+            return rest("go_accounts?nickname=ilike." + encodeURIComponent(likeExact(nick)) + "&select=id&limit=2");
+          })
           .then(function (rows) {
             var taken = (rows || []).some(function (row) { return row && String(row.id) !== me; });
             if (taken) throw new Error("23505");
+            if (!window.FFC || !FFC.nicknameTaken) return { taken: false };
+            return FFC.nicknameTaken(nick);
+          })
+          .then(function (ffc) {
+            if (ffc && ffc.taken) throw new Error("23505");
             return rest("go_accounts?id=eq." + encodeURIComponent(me), {
               method: "PATCH",
               prefer: "return=minimal",
@@ -5499,7 +5534,7 @@
           .then(function () {
             if (!window.FFC || !FFC.user()) return null;
             return FFC.setNickname(nick).then(function (res) {
-              if (res && res.error && res.error.code === "23505") {
+              if (res && res.error && (res.error.code === "23505" || /unique|duplicate/i.test(String(res.error.message || "")))) {
                 return rest("go_accounts?id=eq." + encodeURIComponent(me), {
                   method: "PATCH",
                   prefer: "return=minimal",
@@ -7243,6 +7278,7 @@
       });
       function planHasInvite() {
         if (!sessionAccount) return false;
+        if (ffcIncoming && ffcIncoming.length) return true;
         var me = String(sessionAccount.id);
         var seen = dotsOf().invite_seen.map(String);
         return remoteInvites.some(function (row) {
@@ -7986,9 +8022,206 @@
             if (document.body.dataset.shell !== "workout") paintWelcome();
             attachNicknames(teamPeople).then(function (changed) {
               if (changed && document.body.dataset.shell === "heute") paintHeuteCrew();
+              if (window.FFC && FFC.user()) {
+                if (FFC.refreshFriends) return FFC.refreshFriends().then(mergeFfcFriends);
+                return mergeFfcFriends();
+              }
             });
           })
           .catch(function () { renderTeam(); });
+      }
+
+      var ffcIncoming = [];
+      var ffcFriendSyncing = false;
+
+      function ensureBuddyLink(buddyId) {
+        if (!sessionAccount || !buddyId || String(buddyId) === String(sessionAccount.id)) return Promise.resolve();
+        return rest("go_buddies", {
+          method: "POST",
+          prefer: "return=minimal",
+          body: { account_id: sessionAccount.id, buddy_id: buddyId }
+        }).catch(function () {}).then(function () {
+          return rest("go_buddies", {
+            method: "POST",
+            prefer: "return=minimal",
+            body: { account_id: buddyId, buddy_id: sessionAccount.id }
+          }).catch(function () {});
+        });
+      }
+
+      function mergeFfcFriends() {
+        if (!sessionMode || !sessionAccount || !window.FFC || !FFC.user() || !FFC.friends) {
+          ffcIncoming = [];
+          return Promise.resolve();
+        }
+        var list = FFC.friends() || [];
+        ffcIncoming = list.filter(function (f) { return f && f.status === "pending" && f.incoming; });
+        var accepted = list.filter(function (f) { return f && f.status === "accepted" && f.nickname; });
+        if (!accepted.length) {
+          paintPill();
+          paintHeuteExtras();
+          return Promise.resolve();
+        }
+        var jobsFind = accepted.map(function (f) {
+          return rest("go_accounts?nickname=ilike." + encodeURIComponent(likeExact(f.nickname)) + "&select=id,name,nickname,photo_url,is_trainer,trainer_id,about_me,diary_visibility&limit=1")
+            .catch(function () { return []; });
+        });
+        return Promise.all(jobsFind)
+          .then(function (packs) {
+            var rows = [];
+            packs.forEach(function (pack) { if (pack && pack[0]) rows.push(pack[0]); });
+            var byNick = {};
+            rows.forEach(function (row) {
+              if (row && row.nickname) byNick[String(row.nickname).toLowerCase()] = row;
+            });
+            var jobs = [];
+            var seen = {};
+            teamPeople.forEach(function (p) { if (p && p.id) seen[String(p.id)] = true; });
+            accepted.forEach(function (f) {
+              var hit = byNick[String(f.nickname).toLowerCase()];
+              if (hit && String(hit.id) !== String(sessionAccount.id)) {
+                jobs.push(ensureBuddyLink(hit.id));
+                if (!seen[String(hit.id)]) {
+                  hit.isTrainerPerson = !!hit.is_trainer || String(hit.id) === String(sessionAccount.trainer_id || "");
+                  teamPeople.push(hit);
+                  seen[String(hit.id)] = true;
+                }
+                return;
+              }
+              var fakeId = "ffc-" + String(f.friend_id || f.nickname);
+              if (seen[fakeId]) return;
+              teamPeople.push({
+                id: fakeId,
+                name: f.nickname,
+                nickname: f.nickname,
+                photo_url: f.avatar_url || "",
+                is_trainer: false,
+                isFfcOnly: true
+              });
+              seen[fakeId] = true;
+            });
+            return Promise.all(jobs);
+          })
+          .then(function () {
+            if (document.body.dataset.plan === "team") renderTeam();
+            paintPill();
+            paintHeuteExtras();
+          });
+      }
+
+      function syncExistingBuddiesToFfc() {
+        if (!sessionMode || !sessionAccount || !window.FFC || !FFC.user() || !FFC.friendRequest) return Promise.resolve();
+        var about = profileAbout(sessionAccount);
+        if (about.ffc_friends_synced) return Promise.resolve();
+        var nicks = teamPeople.map(function (p) { return p && p.nickname; }).filter(Boolean);
+        if (!nicks.length) {
+          about.ffc_friends_synced = true;
+          return saveAbout(about);
+        }
+        var chain = Promise.resolve();
+        nicks.forEach(function (nick) {
+          chain = chain.then(function () {
+            return FFC.friendRequest(nick).catch(function () {});
+          });
+        });
+        return chain.then(function () {
+          about.ffc_friends_synced = true;
+          return saveAbout(about);
+        });
+      }
+
+      function onFfcFriendsChanged() {
+        if (ffcFriendSyncing) return;
+        ffcFriendSyncing = true;
+        Promise.resolve()
+          .then(function () { return teamPeople.length ? null : loadTeam(); })
+          .then(mergeFfcFriends)
+          .then(syncExistingBuddiesToFfc)
+          .catch(function () {})
+          .then(function () { ffcFriendSyncing = false; });
+      }
+
+      function openZirkelRegister() {
+        if (!sessionAccount) return;
+        document.getElementById("zirkel-reg-email").value = accountEmail();
+        document.getElementById("zirkel-reg-pass").value = "";
+        document.getElementById("zirkel-reg-pass2").value = "";
+        document.getElementById("zirkel-reg-nick").value = String(sessionAccount.nickname || "");
+        document.getElementById("zirkel-register-msg").textContent = "";
+        document.getElementById("zirkel-register").hidden = false;
+      }
+
+      function submitZirkelRegister() {
+        var msg = document.getElementById("zirkel-register-msg");
+        var email = String(document.getElementById("zirkel-reg-email").value || "").trim().toLowerCase();
+        var pass = String(document.getElementById("zirkel-reg-pass").value || "");
+        var pass2 = String(document.getElementById("zirkel-reg-pass2").value || "");
+        var nick = String(document.getElementById("zirkel-reg-nick").value || "").trim().replace(/^@/, "");
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { msg.textContent = "Bitte eine gültige E-Mail-Adresse eingeben."; return; }
+        if (pass.length < 6) { msg.textContent = "Das Passwort braucht mindestens 6 Zeichen."; return; }
+        if (pass !== pass2) { msg.textContent = "Die Passwörter stimmen nicht überein."; return; }
+        if (!NICKNAME_RE.test(nick)) { msg.textContent = "Nickname: 3–20 Zeichen, nur Buchstaben, Zahlen, Punkt, _ und -."; return; }
+        if (!window.FFC || !FFC.signUp || !FFC.nicknameTaken) { msg.textContent = "Zirkeltraining ist noch nicht geladen."; return; }
+        msg.textContent = "Wird geprüft …";
+        var me = String(sessionAccount.id);
+        var saveBtn = document.getElementById("zirkel-register-save");
+        saveBtn.disabled = true;
+        Promise.resolve()
+          .then(function () {
+            return rest("go_accounts?nickname=ilike." + encodeURIComponent(likeExact(nick)) + "&select=id&limit=2");
+          })
+          .then(function (rows) {
+            if ((rows || []).some(function (row) { return row && String(row.id) !== me; })) throw new Error("23505");
+            return FFC.nicknameTaken(nick);
+          })
+          .then(function (ffc) {
+            if (ffc && ffc.taken) throw new Error("23505");
+            msg.textContent = "Account wird angelegt …";
+            return FFC.signUp(email, pass);
+          })
+          .then(function (res) {
+            if (res && res.error) throw res.error;
+            var data = res && res.data;
+            if (data && data.user && !data.session) {
+              return saveAccountEmail(email).then(function () {
+                sessionAccount.nickname = nick;
+                return rest("go_accounts?id=eq." + encodeURIComponent(me), {
+                  method: "PATCH", prefer: "return=minimal", body: { nickname: nick }
+                }).catch(function () {});
+              }).then(function () {
+                if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+                msg.textContent = "Fast geschafft: Bitte bestätige die E-Mail über den Link, den FFC Dir geschickt hat. Danach hier anmelden.";
+                saveBtn.disabled = false;
+              });
+            }
+            return saveAccountEmail(email).then(function () {
+              return rest("go_accounts?id=eq." + encodeURIComponent(me), {
+                method: "PATCH", prefer: "return=minimal", body: { nickname: nick }
+              });
+            }).then(function () {
+              sessionAccount.nickname = nick;
+              if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+              return FFC.setNickname(nick);
+            }).then(function (nickRes) {
+              if (nickRes && nickRes.error && (nickRes.error.code === "23505" || /unique|duplicate/i.test(String(nickRes.error.message || "")))) {
+                throw new Error("23505");
+              }
+              document.getElementById("zirkel-register").hidden = true;
+              paintZirkelState();
+              refreshZirkel();
+              onFfcFriendsChanged();
+              if (window.FFC && FFC.refreshFriends) return FFC.refreshFriends();
+            });
+          })
+          .catch(function (err) {
+            msg.textContent = nicknameError(err) === NICK_TAKEN
+              ? NICK_TAKEN
+              : ("Registrierung fehlgeschlagen: " + String((err && err.message) || err || ""));
+            if (/already registered|already been registered/i.test(String((err && err.message) || ""))) {
+              msg.textContent = "Für diese E-Mail gibt es schon einen Account. Bitte anmelden.";
+            }
+          })
+          .then(function () { saveBtn.disabled = false; });
       }
 
       function attachNicknames(people) {
@@ -8042,26 +8275,30 @@
             var exists = teamPeople.some(function (person) { return String(person.id) === String(found.id); });
             function done() {
               document.getElementById("team-modal").hidden = true;
-              if (found.nickname && window.FFC && FFC.user()) FFC.friendRequest(found.nickname);
+              if (found.nickname && window.FFC && FFC.user()) FFC.friendRequest(found.nickname).then(onFfcFriendsChanged).catch(function () {});
               loadTeam();
             }
             if (exists) {
               done();
               return;
             }
-            rest("go_buddies", {
-              method: "POST",
-              prefer: "return=minimal",
-              body: { account_id: sessionAccount.id, buddy_id: found.id }
-            }).catch(function () {}).then(function () {
-              return rest("go_buddies", {
-                method: "POST",
-                prefer: "return=minimal",
-                body: { account_id: found.id, buddy_id: sessionAccount.id }
-              }).catch(function () {});
-            }).then(done);
+            ensureBuddyLink(found.id).then(done);
           })
-          .catch(function () { msg.textContent = "nicht gefunden"; });
+          .catch(function () {
+            if (!serial && window.FFC && FFC.user() && FFC.friendRequest) {
+              msg.textContent = "Bei gogogo nicht gefunden – sende Anfrage über Zirkeltraining …";
+              FFC.friendRequest(nick).then(function (res) {
+                if (res && res.error) {
+                  msg.textContent = "nicht gefunden";
+                  return;
+                }
+                document.getElementById("team-modal").hidden = true;
+                onFfcFriendsChanged();
+              }).catch(function () { msg.textContent = "nicht gefunden"; });
+              return;
+            }
+            msg.textContent = "nicht gefunden";
+          });
       }
 
       function renderSavedPlaces(rows) {
@@ -9695,6 +9932,40 @@
         if (!box) return;
         box.textContent = "";
         if (!sessionAccount) return;
+        (ffcIncoming || []).forEach(function (req) {
+          var card = document.createElement("div");
+          card.className = "invite-card is-pending";
+          var kicker = document.createElement("span");
+          kicker.className = "today-card__kicker";
+          kicker.textContent = "Freundesanfrage";
+          var title = document.createElement("span");
+          title.className = "today-card__title";
+          title.textContent = req.nickname || "FFC";
+          var line = document.createElement("span");
+          line.className = "today-card__line";
+          line.textContent = "Möchte Dich bei Zirkeltraining / gogogo als Freund hinzufügen.";
+          card.appendChild(kicker);
+          card.appendChild(title);
+          card.appendChild(line);
+          var actions = document.createElement("div");
+          actions.className = "invite-card__actions";
+          [["Annehmen", true], ["Ablehnen", false]].forEach(function (pair) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.textContent = pair[0];
+            if (pair[1]) btn.className = "is-yes";
+            btn.addEventListener("click", function () {
+              if (!window.FFC || !FFC.respondFriend) return;
+              btn.disabled = true;
+              FFC.respondFriend(req.friendship_id, pair[1]).then(function () {
+                onFfcFriendsChanged();
+              }).catch(function () { btn.disabled = false; });
+            });
+            actions.appendChild(btn);
+          });
+          card.appendChild(actions);
+          box.appendChild(card);
+        });
         var today = Log.berlinToday();
         var last = addDays(today, 6);
         var me = String(sessionAccount.id);
@@ -10926,13 +11197,19 @@
         onAuth: function (user) {
           paintZirkelState();
           if (!user) {
+            ffcIncoming = [];
             paintStoriesVisibility();
+            paintPill();
+            paintHeuteExtras();
             return;
           }
           if (sessionMode && user.email && !accountEmail()) saveAccountEmail(user.email).catch(function () {});
           refreshFfcHeute(true);
           if (shellTab === "plan" && planPane === "training") refreshZirkel();
+          if (window.FFC && FFC.refreshFriends) FFC.refreshFriends().then(onFfcFriendsChanged).catch(function () { onFfcFriendsChanged(); });
+          else onFfcFriendsChanged();
         },
+        onFriends: function () { onFfcFriendsChanged(); },
         onProfile: function (profile) {
           adoptFfcNickname(profile);
         },
@@ -10957,6 +11234,14 @@
         });
         document.getElementById("ev-sheet").addEventListener("click", function (event) {
           if (event.target.id === "ev-sheet" && window.FFC) FFC.closeEvent();
+        });
+        document.getElementById("zirkel-register-btn").addEventListener("click", openZirkelRegister);
+        document.getElementById("zirkel-register-save").addEventListener("click", submitZirkelRegister);
+        document.getElementById("zirkel-register-cancel").addEventListener("click", function () {
+          document.getElementById("zirkel-register").hidden = true;
+        });
+        document.getElementById("zirkel-register").addEventListener("click", function (event) {
+          if (event.target.id === "zirkel-register") event.currentTarget.hidden = true;
         });
         document.getElementById("zirkel-login-btn").addEventListener("click", function () {
           requireFfc(refreshZirkel);

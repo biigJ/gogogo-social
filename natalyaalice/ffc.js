@@ -221,7 +221,7 @@
     } else {
       authSubmitBtn.textContent = 'Link zum Zurücksetzen senden';
       authToggleBtn.textContent = '← Zurück zur Anmeldung';
-      authTaglineEl.textContent = 'Gib deine E-Mail ein – wir schicken dir einen Link für einen neuen Login-Code';
+      authTaglineEl.textContent = 'Gib deine E-Mail ein – wir schicken dir einen Link für ein neues Passwort';
     }
   }
   authForgotBtn.addEventListener('click', ()=>{
@@ -259,14 +259,14 @@
   newPassBtn.addEventListener('click', async ()=>{
     const p1 = newPass1El.value, p2 = newPass2El.value;
     newPassStatus.style.color = '';
-    if(p1.length < 6){ newPassStatus.textContent = 'Der Login-Code muss mindestens 6 Zeichen haben.'; return; }
+    if(p1.length < 6){ newPassStatus.textContent = 'Das Passwort muss mindestens 6 Zeichen haben.'; return; }
     if(p1 !== p2){ newPassStatus.textContent = 'Die beiden Passwörter stimmen nicht überein.'; return; }
     newPassBtn.disabled = true;
     const { error } = await sb.auth.updateUser({ password: p1 });
     newPassBtn.disabled = false;
     if(error){
       newPassStatus.textContent = /same|different from the old/i.test(error.message)
-        ? 'Der neue Login-Code muss sich vom alten unterscheiden.'
+        ? 'Das neue Passwort muss sich vom alten unterscheiden.'
         : /expired|invalid|session/i.test(error.message)
           ? 'Der Link ist abgelaufen. Bitte fordere auf der Anmeldeseite einen neuen an.'
           : 'Nicht gespeichert: ' + friendlyAuthError(error);
@@ -275,7 +275,7 @@
     recoveryMode = false;
     history.replaceState(null, '', location.pathname);   // Token aus der Adresszeile entfernen
     newPassStatus.style.color = 'var(--chalk)';
-    newPassStatus.textContent = 'Login-Code geändert – du bist angemeldet.';
+    newPassStatus.textContent = 'Passwort geändert – du bist angemeldet.';
     setTimeout(()=> showScreen('home'), 1200);
   });
 
@@ -285,13 +285,13 @@
       return 'Verbindung zu Supabase fehlgeschlagen. Öffne die Datei in einem echten Browser-Tab (nicht in der Chat-Vorschau) und prüfe deine Internetverbindung.';
     }
     if(/invalid login credentials/i.test(msg)){
-      return 'E-Mail oder Login-Code ist falsch.';
+      return 'E-Mail oder Passwort ist falsch.';
     }
     if(/user already registered|already registered/i.test(msg)){
       return 'Für diese E-Mail existiert bereits ein Account. Bitte anmelden.';
     }
     if(/password should be at least/i.test(msg)){
-      return 'Der Login-Code ist zu kurz (mind. 6 Zeichen).';
+      return 'Das Passwort ist zu kurz (mind. 6 Zeichen).';
     }
     return msg;
   }
@@ -316,7 +316,7 @@
     }
 
     if(!email || !password){
-      authErrorEl.textContent = 'Bitte E-Mail und Login-Code eingeben.';
+      authErrorEl.textContent = 'Bitte E-Mail und Passwort eingeben.';
       return;
     }
 
@@ -1014,6 +1014,7 @@
     }
     lbFriendList = data || [];
     renderFriends();
+    host('onFriends');
   }
 
   function renderFriends(){
@@ -3309,14 +3310,60 @@
       if(error) return null;
       return (data || []).map(r=>({ user_id:r.user_id, nickname:r.nickname, points:r.points, workouts:r.workouts, is_me:!!r.is_me }));
     },
+    async signUp(email, password){
+      try{
+        const { data, error } = await sb.auth.signUp({ email, password });
+        if(!error && data && data.session && data.user) currentUser = data.user;
+        return { data, error };
+      }catch(err){ return { data:null, error: err }; }
+    },
+    async nicknameTaken(nickname){
+      const nick = String(nickname || '').trim();
+      if(!nick) return { taken:false, error:null };
+      try{
+        const { data, error } = await sb.from('profiles').select('user_id,nickname').ilike('nickname', nick).limit(5);
+        if(error) return { taken:false, error };
+        const me = currentUser && currentUser.id;
+        const taken = (data || []).some(row => row && String(row.user_id) !== String(me || ''));
+        return { taken, error:null };
+      }catch(err){ return { taken:false, error: err }; }
+    },
     async setNickname(nickname){
       if(!currentUser) return { error:null };
       return sb.from('profiles').upsert({ user_id: currentUser.id, nickname: nickname }, { onConflict:'user_id' });
     },
+    friends(){
+      return (lbFriendList || []).map(f=>({
+        friendship_id: f.friendship_id,
+        friend_id: f.friend_id,
+        nickname: f.nickname,
+        avatar_url: f.avatar_url || '',
+        status: f.status,
+        incoming: !!f.incoming
+      }));
+    },
+    async refreshFriends(){
+      if(!currentUser) return [];
+      await loadFriends();
+      host('onFriends');
+      return this.friends();
+    },
     async friendRequest(query){
       if(!currentUser) return { error:null };
       const res = await sb.rpc('send_friend_request', { p_query: query });
-      if(!res.error) loadFriends();
+      if(!res.error){ await loadFriends(); host('onFriends'); }
+      return res;
+    },
+    async respondFriend(id, accept){
+      if(!currentUser) return { error:null };
+      const res = await sb.rpc('respond_friend_request', { p_id: Number(id), p_accept: !!accept });
+      if(!res.error){ await loadFriends(); host('onFriends'); }
+      return res;
+    },
+    async removeFriend(id){
+      if(!currentUser) return { error:null };
+      const res = await sb.rpc('remove_friend', { p_id: Number(id) });
+      if(!res.error){ await loadFriends(); host('onFriends'); }
       return res;
     },
     async logout(){
