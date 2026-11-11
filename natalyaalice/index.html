@@ -1752,7 +1752,9 @@
     .profile-week__row { display: flex; gap: 12px; align-items: baseline; }
     .profile-week__day { flex: none; width: 76px; color: rgba(42, 33, 24, 0.58); }
     .profile-week__what { min-width: 0; overflow-wrap: anywhere; }
-    .profile-pencil[hidden] { display: none; }
+    .profile-pencil[hidden],
+    body.is-session #profile-edit { display: none !important; }
+    #profile-photos-label { display: none !important; }
     .profile-trainer-list { margin-top: 8px; }
     .profile-trainer-open {
       display: block;
@@ -2638,7 +2640,7 @@
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
-      touch-action: pan-y;
+      touch-action: pan-x pan-y;
       padding-bottom: 20px;
       scrollbar-width: thin;
       scrollbar-color: rgba(42, 33, 24, 0.45) transparent;
@@ -2749,14 +2751,14 @@
       margin: 0;
       padding: 0;
       overflow-x: auto;
-      overflow-y: visible;
+      overflow-y: hidden;
       scroll-snap-type: x mandatory;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
-      touch-action: pan-x;
+      touch-action: pan-x pan-y;
     }
     body.is-session #plan-team.team-rail .team-slide.is-scroll {
-      touch-action: pan-y;
+      touch-action: pan-x pan-y;
     }
     body.is-session #plan-training .go-rail::-webkit-scrollbar,
     body.is-session #plan-team.team-rail::-webkit-scrollbar { display: none; height: 0; }
@@ -3948,7 +3950,7 @@
     </div>
     <div class="profile-block profile-split" id="profile-photos-block">
       <div class="profile-photos" id="profile-photos"></div>
-      <p class="profile-label profile-photos-label" id="profile-photos-label" hidden>Fotos aus dem Tagebuch</p>
+      <p class="profile-label profile-photos-label" id="profile-photos-label" hidden style="display:none!important">Fotos aus dem Tagebuch</p>
     </div>
     <div class="profile-block profile-extra-edit" hidden>
       <p class="profile-label">So ist meine Woche organisiert</p>
@@ -8894,16 +8896,16 @@
           name: personName(),
           photo_url: (sessionAccount && sessionAccount.photo_url) || ""
         });
+        meSlide.appendChild(teamSlideHead("Mein Profil"));
+        meSlide.appendChild(teamPortrait(mePerson, personName().slice(0, 1)));
         var editBtn = document.createElement("button");
         editBtn.type = "button";
-        editBtn.setAttribute("aria-label", "Profil bearbeiten");
-        editBtn.innerHTML = PENCIL_ICON;
+        editBtn.className = "team-slide__cta is-solid";
+        editBtn.textContent = "Bearbeiten";
         editBtn.addEventListener("click", function () {
           openProfile(mePerson);
-          window.setTimeout(function () { setProfileEditing(true); }, 120);
         });
-        meSlide.appendChild(teamSlideHead("Mein Profil", editBtn));
-        meSlide.appendChild(teamPortrait(mePerson, personName().slice(0, 1)));
+        meSlide.appendChild(editBtn);
         box.appendChild(meSlide);
 
         // Slide 2: trainer
@@ -9042,6 +9044,45 @@
         box.appendChild(coacheeSlide);
         syncGroupOptions();
         syncHScrollDock();
+        bindTeamRailGestures();
+      }
+
+      function bindTeamRailGestures() {
+        var rail = document.getElementById("plan-team");
+        if (!rail || rail.dataset.gesturesBound) return;
+        rail.dataset.gesturesBound = "1";
+        var sx = 0, sy = 0, sl = 0, st = 0, axis = "", slide = null, active = false;
+        rail.addEventListener("touchstart", function (event) {
+          if (!event.touches || !event.touches[0]) return;
+          active = true;
+          sx = event.touches[0].clientX;
+          sy = event.touches[0].clientY;
+          sl = rail.scrollLeft;
+          axis = "";
+          slide = event.target.closest(".team-slide.is-scroll");
+          st = slide ? slide.scrollTop : 0;
+        }, { passive: true });
+        rail.addEventListener("touchmove", function (event) {
+          if (!active || !event.touches || !event.touches[0]) return;
+          var x = event.touches[0].clientX;
+          var y = event.touches[0].clientY;
+          var dx = x - sx;
+          var dy = y - sy;
+          if (!axis) {
+            if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+            axis = Math.abs(dx) > Math.abs(dy) * 1.1 ? "x" : "y";
+          }
+          if (axis === "x") {
+            rail.scrollLeft = sl - dx;
+            if (event.cancelable) event.preventDefault();
+          } else if (axis === "y" && slide) {
+            slide.scrollTop = st - dy;
+            if (event.cancelable) event.preventDefault();
+          }
+        }, { passive: false });
+        function endGesture() { active = false; axis = ""; slide = null; }
+        rail.addEventListener("touchend", endGesture, { passive: true });
+        rail.addEventListener("touchcancel", endGesture, { passive: true });
       }
 
 
@@ -12529,8 +12570,8 @@
         if (idNick) idNick.textContent = (account && account.nickname) ? ("@" + String(account.nickname).replace(/^@/, "")) : "";
         document.getElementById("profile-goal").textContent = (account && account.training_goal) || (mine ? "Ziel wählen" : "");
         var edit = document.getElementById("profile-edit");
-        if (edit) edit.hidden = !mine;
-        setProfileEditing(false);
+        if (edit) edit.hidden = true;
+        setProfileEditing(!!mine);
         var about = profileAbout(account);
         if (mine && sessionAccount) {
           var localAbout = profileAbout(sessionAccount);
@@ -12540,7 +12581,7 @@
         }
         var aboutBox = document.getElementById("profile-about");
         aboutBox.value = String(about.text || "").slice(0, 300);
-        aboutBox.readOnly = true;
+        aboutBox.readOnly = !mine;
         var coachLine = document.getElementById("profile-coach-line");
         if (coachLine) {
           var tid = account && account.trainer_id ? String(account.trainer_id) : "";
@@ -12559,7 +12600,7 @@
         }
         var recsBox = document.getElementById("profile-recs");
         recsBox.value = String(about.recs || "").slice(0, 400);
-        recsBox.readOnly = true;
+        recsBox.readOnly = !mine;
         recsBox.closest(".profile-block").hidden = !mine && !recsBox.value;
         paintProfileLinks(about, mine);
         paintProfileWeek(account, plan, mine);
@@ -12585,7 +12626,7 @@
           });
         }
         var mantra = document.getElementById("profile-mantra");
-        if (mantra) mantra.readOnly = true;
+        if (mantra) mantra.readOnly = !mine;
         paintProfileMantra(account);
         var started = mine ? routineStart() : (about.challenge_started || "");
         document.getElementById("profile-challenge").textContent = started ? "12-Wochenroutine gestartet" : "12-Wochenroutine nicht gestartet";
@@ -12604,7 +12645,7 @@
           img.src = src;
           grid.appendChild(img);
         });
-        if (label) label.hidden = !list.length;
+        if (label) label.hidden = true;
         var photosBlock = document.getElementById("profile-photos-block");
         if (photosBlock) photosBlock.hidden = !list.length && !mine;
       }
@@ -12864,7 +12905,7 @@
         paintProfileMantra(sessionAccount);
       });
       document.getElementById("profile-goal").addEventListener("click", function () {
-        if (!document.getElementById("profile-sheet").classList.contains("is-editing")) return;
+        if (!profilePerson || !profilePerson.isSelf) return;
         openGoalPicker();
       });
       document.getElementById("goal-modal").addEventListener("click", function (event) {
@@ -12876,7 +12917,6 @@
       });
       document.getElementById("profile-about").addEventListener("change", function () {
         if (!profilePerson || !profilePerson.isSelf) return;
-        if (!document.getElementById("profile-sheet").classList.contains("is-editing")) return;
         var about = profileAbout(sessionAccount);
         about.text = String(this.value || "").slice(0, 300);
         saveProfileFields({ about_me: about });
@@ -12892,11 +12932,28 @@
       });
       document.getElementById("profile-mantra").addEventListener("change", function () {
         if (!profilePerson || !profilePerson.isSelf) return;
-        if (!document.getElementById("profile-sheet").classList.contains("is-editing")) return;
         var saved = mantraToSave(this.value);
         sessionAccount.mantra = saved;
         saveProfileFields({ mantra: saved });
         this.value = saved;
+      });
+      function saveProfileSocial() {
+        if (!profilePerson || !profilePerson.isSelf || !sessionAccount) return;
+        var about = profileAbout(sessionAccount);
+        about.instagram = String(document.getElementById("profile-instagram").value || "").trim().slice(0, 80);
+        about.linkedin = String(document.getElementById("profile-linkedin").value || "").trim().slice(0, 160);
+        about.text = String(document.getElementById("profile-about").value || "").slice(0, 300);
+        about.recs = String(document.getElementById("profile-recs").value || "").slice(0, 400);
+        saveProfileFields({ about_me: about });
+        paintProfileLinks(about, true);
+      }
+      document.getElementById("profile-instagram").addEventListener("change", saveProfileSocial);
+      document.getElementById("profile-linkedin").addEventListener("change", saveProfileSocial);
+      document.getElementById("profile-recs").addEventListener("change", function () {
+        if (!profilePerson || !profilePerson.isSelf) return;
+        var about = profileAbout(sessionAccount);
+        about.recs = String(this.value || "").slice(0, 400);
+        saveProfileFields({ about_me: about });
       });
 
       function isoParts(iso) {
