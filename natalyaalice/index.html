@@ -1360,9 +1360,13 @@
     body.is-session[data-shell="plan"] .shell-plan { display: block; }
     #plan-team, #plan-orte, #plan-training, #plan-info, #plan-settings { display: none !important; }
     body.is-session[data-shell="plan"][data-plan="info"] #plan-info,
-    body.is-session[data-shell="plan"][data-plan="team"] #plan-team,
     body.is-session[data-shell="plan"][data-plan="training"] #plan-training,
     body.is-session[data-shell="plan"][data-plan="settings"] #plan-settings { display: block !important; }
+    body.is-session[data-shell="plan"][data-plan="team"] #plan-team {
+      display: flex !important;
+      flex-direction: row;
+      align-items: flex-start;
+    }
     body.is-session .settings-list a,
     body.is-session .settings-list button {
       display: block;
@@ -2202,15 +2206,21 @@
       align-items: stretch;
       gap: 12px;
       margin: 14px 0 0;
-      padding: 0 0 8px;
+      padding: 0 0 10px;
       overflow-x: auto;
       overflow-y: hidden;
       overscroll-behavior-x: contain;
       scroll-snap-type: x mandatory;
       -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
+      scrollbar-width: auto;
+      scrollbar-color: rgba(42, 33, 24, 0.55) rgba(42, 33, 24, 0.08);
     }
-    body.is-session #days.days::-webkit-scrollbar { display: none; }
+    body.is-session #days.days::-webkit-scrollbar { height: 8px; display: block; }
+    body.is-session #days.days::-webkit-scrollbar-thumb {
+      background: rgba(42, 33, 24, 0.5);
+      border-radius: 999px;
+    }
+    body.is-session #days.days::-webkit-scrollbar-track { background: transparent; }
     body.is-session #days .day-block {
       flex: 0 0 100%;
       width: 100%;
@@ -2259,6 +2269,8 @@
       margin-top: 10px;
       width: 100%;
     }
+    .day-card__meta .day-card__blurb { margin: 2px 0 0; }
+    .day-card__meta .day-alt { margin-top: 4px; }
     body.is-session #days .day.day-card__main,
     body.is-session #days .day.day-card__main.is-empty,
     body.is-session #days .day.day-card__main.is-edit {
@@ -2280,10 +2292,10 @@
     body.is-session #days .day.day-card__main.is-empty { color: #C7413B; }
     body.is-session #days .day-block .day-place {
       width: 100%;
-      margin: 0;
+      margin: 18px 0 0;
       min-height: 36px;
     }
-    body.is-session #days .day-block .day-invite { width: 100%; margin: 0; }
+    body.is-session #days .day-block .day-invite { width: 100%; margin: 12px 0 0; }
     .day-alt {
       display: block;
       width: 100%;
@@ -2432,7 +2444,7 @@
     .heute-stories[hidden] { display: none !important; }
     .heute-stories__row {
       display: flex;
-      gap: 12px;
+      gap: 18px;
       padding: 4px 20px 6px;
       overflow-x: auto;
       overflow-y: hidden;
@@ -2589,13 +2601,14 @@
     /* Typografie: zwei Schriftstile (Playfair Display 600, Inter 500) und drei Größen (S, M, L).
        Ausnahmen: Workout-Ansicht (main) und laufendes Zirkeltraining (#run) mit großen Zählern. */
     :root { --t-s: 13px; --t-m: 16px; --t-l: 24px; }
-    body.is-session :where(*:not(main, main *, #run, #run *, .app-pill *, svg, svg *)) {
+    body.is-session :where(*:not(main, main *, #run, #run *, .app-pill *, svg, svg *, .diary-info-btn, .diary-info-btn *)) {
       font-family: Inter, system-ui, sans-serif !important;
       font-weight: 500 !important;
       font-size: var(--t-m) !important;
     }
     body.is-session :is(h1, h2, .welcome-title, .welcome-title *, .diary h1, .profile-name, .plan-tabs__info,
       .today-card__title, .day-card__main, .go-card__title, .go-section__head, .sand-card h2, .modal-card h2,
+      .diary-info-btn, .diary-info-btn span, .team-slide__title,
       .zirkel-head, .orient-lock, .diary-share-name, .crew-story .team-avatar, .profile-ph, .heute-start span,
       .ffc .summary .num, .ffc .fp-num, .ffc .kn-big, .ffc .home-ev-title, .ffc .page-head-title, .ffc .fp-name,
       .ffc .quit-title, .ffc .avatar-xl, .ffc .brand, .ffc .history-title):not(main *, #run *) {
@@ -2619,20 +2632,92 @@
     }
     body.is-session .tip.is-owned span { white-space: normal; }
 
+
+    .team-slide {
+      flex: 0 0 100%;
+      width: 100%;
+      scroll-snap-align: start;
+    }
+    .team-slide__art {
+      width: 100%;
+      aspect-ratio: 5 / 3;
+      border: 0;
+      border-radius: 0;
+      overflow: hidden;
+      background: #fff;
+      display: grid;
+      place-items: center;
+      color: rgba(42, 33, 24, 0.45);
+      font-size: 14px;
+      font-weight: 600;
+      position: relative;
+    }
+    .team-slide__art img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .team-slide__art.is-upload { cursor: pointer; border: 1px dashed rgba(42, 33, 24, 0.35); }
+    .team-slide__art input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .team-slide__title {
+      margin: 12px 0 6px;
+      font-family: "Playfair Display", serif;
+      font-size: 22px;
+      font-weight: 600;
+    }
+    .team-slide__about {
+      margin: 0 0 12px;
+      font-size: 15px;
+      line-height: 1.4;
+      color: #2A2118;
+      white-space: pre-wrap;
+    }
+    .team-slide__about:empty { display: none; }
+    .team-slide__cta {
+      width: 100%;
+      min-height: 48px;
+      margin-top: 10px;
+      border: 1px solid #2A2118;
+      background: transparent;
+      color: #2A2118;
+      font-weight: 600;
+    }
+    .team-slide__cta.is-solid {
+      background: #2A2118;
+      color: #F6F1E8;
+    }
+    .team-slide .team-wa {
+      margin: 4px 0 8px;
+      margin-left: 0;
+    }
+    .team-slide .team-row { margin-top: 6px; }
+    .team-slide .coach-empty { margin: 8px 0; }
+
     /* Go carousel */
-    body.is-session #plan-training .go-rail {
+    body.is-session #plan-training .go-rail,
+    body.is-session #plan-team.team-rail {
       display: flex;
       flex-direction: row;
       gap: 12px;
       margin: 0;
-      padding: 0 0 8px;
+      padding: 0 0 10px;
       overflow-x: auto;
       overflow-y: hidden;
       scroll-snap-type: x mandatory;
-      scrollbar-width: none;
+      scrollbar-width: auto;
+      scrollbar-color: rgba(42, 33, 24, 0.55) rgba(42, 33, 24, 0.08);
       -webkit-overflow-scrolling: touch;
     }
-    body.is-session #plan-training .go-rail::-webkit-scrollbar { display: none; }
+    body.is-session #plan-training .go-rail::-webkit-scrollbar,
+    body.is-session #plan-team.team-rail::-webkit-scrollbar { height: 8px; display: block; }
+    body.is-session #plan-training .go-rail::-webkit-scrollbar-thumb,
+    body.is-session #plan-team.team-rail::-webkit-scrollbar-thumb {
+      background: rgba(42, 33, 24, 0.5);
+      border-radius: 999px;
+    }
+    body.is-session #plan-training .go-rail::-webkit-scrollbar-track,
+    body.is-session #plan-team.team-rail::-webkit-scrollbar-track { background: transparent; }
     .go-slide {
       flex: 0 0 100%;
       width: 100%;
@@ -2792,14 +2877,14 @@
       border: 0;
       padding: 0;
     }
-    .diary-info-btn {
-      font-family: "Playfair Display", Georgia, serif;
-      font-size: 28px;
-      font-weight: 600;
-      font-style: normal;
-      font-variant: normal;
-      line-height: 1;
-      letter-spacing: 0;
+    .diary-info-btn,
+    .diary-info-btn span {
+      font-family: "Playfair Display", Georgia, "Times New Roman", serif !important;
+      font-size: 30px !important;
+      font-weight: 600 !important;
+      font-style: normal !important;
+      line-height: 1 !important;
+      letter-spacing: 0 !important;
     }
     .diary-fill-filter { color: rgba(42, 33, 24, 0.38); }
     .diary-fill-filter.is-on { color: #2A2118; }
@@ -2830,10 +2915,10 @@
 </head>
 <body class="is-home">
   <section id="welcome" class="welcome">
-    <div class="plan-tabs" role="tablist" aria-label="Profil">
+    <div class="plan-tabs" role="tablist" aria-label="Einstellungen">
+      <button type="button" data-plan="team" role="tab">Team</button>
       <button type="button" data-plan="kalender" class="is-on" role="tab">Woche</button>
-      <button type="button" data-plan="team" role="tab">Coaching</button>
-      <button type="button" data-plan="training" role="tab">Go!</button>
+      <button type="button" data-plan="training" role="tab">gogogo</button>
       <button type="button" data-plan="settings" class="plan-tabs__gear" role="tab" aria-label="Einstellung">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
@@ -3628,12 +3713,12 @@
   <div class="top-edge" aria-hidden="true"></div>
   <div class="app-pill">
     <nav aria-label="Bereiche">
-      <button type="button" data-shell="plan" aria-label="Profil">
+      <button type="button" data-shell="plan" aria-label="Einstellungen">
         <span class="pill-ico">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.6 20.2c.6-3.9 3.7-6.3 7.4-6.3s6.8 2.4 7.4 6.3"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
-        <small>Profil</small>
+        <small>Einstellungen</small>
       </button>
       <button type="button" data-shell="heute" class="is-on" aria-label="Heute">
         <span class="pill-ico">
@@ -5631,11 +5716,11 @@
           main.textContent = travel ? (activityEmoji({ kind: "alternative", label: travel }) + " " + travel).trim() : "Alternative wählen";
           main.classList.toggle("is-empty", !travel);
           meta.appendChild(main);
-          meta.appendChild(dayAltButton(iso));
           var blurbA = document.createElement("p");
           blurbA.className = "day-card__blurb";
           blurbA.textContent = workoutBlurb(null, true, travel);
           meta.appendChild(blurbA);
+          meta.appendChild(dayAltButton(iso));
           wrap.appendChild(meta);
           return wrap;
         }
@@ -5648,6 +5733,10 @@
           main.classList.add("is-empty");
         }
         meta.appendChild(main);
+        var blurb = document.createElement("p");
+        blurb.className = "day-card__blurb";
+        blurb.textContent = workoutBlurb(unit, false, dayAltFor(iso));
+        meta.appendChild(blurb);
         meta.appendChild(dayAltButton(iso));
         var place = document.createElement("button");
         place.type = "button";
@@ -5657,10 +5746,6 @@
         place.addEventListener("click", function () { openDayPlace(wd); });
         meta.appendChild(place);
         meta.appendChild(dayInviteEl(iso));
-        var blurb = document.createElement("p");
-        blurb.className = "day-card__blurb";
-        blurb.textContent = workoutBlurb(unit, false, dayAltFor(iso));
-        meta.appendChild(blurb);
         wrap.appendChild(meta);
         return wrap;
       }
@@ -8047,7 +8132,7 @@
         btn.type = "button";
         var current = dayAltFor(iso) || (awayOn(iso, absenceOf(sessionAccount)) ? travelAltFor(iso) : "");
         btn.className = "day-alt" + (current ? " is-set" : "");
-        btn.textContent = current ? ("Alternative: " + current) : "Alternative";
+        btn.textContent = current ? ("Alternative für Reise festlegen: " + current) : "Alternative für Reise festlegen";
         btn.addEventListener("click", function () {
           if (awayOn(iso, absenceOf(sessionAccount))) openTravelAlt(iso);
           else openDayAlt(iso);
@@ -8449,20 +8534,30 @@
 
       var WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M4.2 19.8l1.1-3.9A8.3 8.3 0 1 1 8.4 19z"/><path d="M9.1 7.9c-.3 0-.7.1-.9.5-.3.5-.6 1.2-.4 2.1.4 1.6 1.9 3.6 3.9 4.6 1.2.6 2.3.7 2.9.3.5-.3.8-.8.8-1.2 0-.2-.1-.3-.3-.4l-1.6-.8c-.2-.1-.4 0-.5.1l-.6.8c-.1.1-.3.2-.5.1-.9-.4-1.8-1.2-2.3-2.1-.1-.2 0-.3.1-.5l.5-.6c.1-.1.1-.3.1-.5l-.6-1.6c-.1-.3-.3-.4-.6-.4z" fill="currentColor" stroke="none"/></svg>';
 
+      function teamPortrait(person, fallback) {
+        var art = document.createElement("div");
+        art.className = "team-slide__art";
+        if (person && person.photo_url) {
+          var img = document.createElement("img");
+          img.alt = "";
+          img.src = person.photo_url;
+          art.appendChild(img);
+        } else {
+          art.textContent = fallback || ((person && person.name) ? String(person.name).slice(0, 1) : "?");
+        }
+        return art;
+      }
+
       function renderTeam() {
         var box = document.getElementById("plan-team");
         if (!box) return;
         box.textContent = "";
+        box.classList.add("team-rail");
         var today = Log.berlinToday();
         var mineId = String((sessionAccount && sessionAccount.id) || "");
         var myTrainer = sessionAccount && sessionAccount.trainer_id ? String(sessionAccount.trainer_id) : "";
-        function head(text) {
-          var h = document.createElement("h3");
-          h.className = "coach-head";
-          h.textContent = text;
-          box.appendChild(h);
-        }
-        function personRow(person, extra) {
+
+        function personRow(person, extra, parent) {
           var away = personAway(person, today);
           var row = document.createElement("div");
           row.className = "team-row" + (away ? " is-away" : "");
@@ -8484,50 +8579,151 @@
           main.addEventListener("click", function () { openProfile(person); });
           row.appendChild(main);
           if (extra) extra(row);
-          box.appendChild(row);
+          (parent || box).appendChild(row);
         }
-        head("Mein Coach");
+
+        // Slide 1: me
+        var meSlide = document.createElement("article");
+        meSlide.className = "team-slide";
+        var mePerson = Object.assign({}, sessionAccount || {}, {
+          isSelf: true,
+          name: personName(),
+          photo_url: (sessionAccount && sessionAccount.photo_url) || ""
+        });
+        meSlide.appendChild(teamPortrait(mePerson, personName().slice(0, 1)));
+        var editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "team-slide__cta is-solid";
+        editBtn.textContent = "Bearbeiten";
+        editBtn.addEventListener("click", function () {
+          openProfile(mePerson);
+          window.setTimeout(function () { setProfileEditing(true); }, 120);
+        });
+        meSlide.appendChild(editBtn);
+        box.appendChild(meSlide);
+
+        // Slide 2: trainer
         var trainer = null;
         teamPeople.forEach(function (person) {
           if (myTrainer && String(person.id) === myTrainer) trainer = person;
         });
+        var coachSlide = document.createElement("article");
+        coachSlide.className = "team-slide";
+        coachSlide.appendChild(teamPortrait(trainer, trainer ? String(trainer.name || "?").slice(0, 1) : "C"));
+        var about = document.createElement("p");
+        about.className = "team-slide__about";
+        var aboutText = "";
         if (trainer) {
-          personRow(trainer, function (row) {
-            var wa = document.createElement("button");
-            wa.type = "button";
-            wa.className = "team-wa";
-            wa.setAttribute("aria-label", "Sofortnachricht an Trainer");
-            wa.innerHTML = WA_ICON;
-            wa.addEventListener("click", function (event) {
-              event.stopPropagation();
-              openQuickWa();
-            });
-            row.appendChild(wa);
-          });
-        } else {
-          var none = document.createElement("p");
-          none.className = "coach-empty";
-          none.textContent = "Noch kein Coach gewählt.";
-          box.appendChild(none);
+          var ta = profileAbout(trainer);
+          aboutText = String((ta && ta.text) || "").trim();
+        }
+        about.textContent = aboutText || (trainer ? "" : "Noch kein Coach gewählt.");
+        coachSlide.appendChild(about);
+        if (trainer) {
+          var wa = document.createElement("button");
+          wa.type = "button";
+          wa.className = "team-wa";
+          wa.setAttribute("aria-label", "Sofortnachricht an Trainer");
+          wa.innerHTML = WA_ICON;
+          wa.addEventListener("click", function () { openQuickWa(); });
+          coachSlide.appendChild(wa);
         }
         var pick = document.createElement("button");
         pick.type = "button";
-        pick.className = "coach-pick";
-        pick.textContent = trainer ? "Coach ändern" : "Coach wählen";
+        pick.className = "team-slide__cta";
+        pick.textContent = trainer ? "Trainer ändern" : "Trainer wählen";
         pick.addEventListener("click", function () { openTeamSearch("trainer"); });
-        box.appendChild(pick);
+        coachSlide.appendChild(pick);
+        box.appendChild(coachSlide);
+
+        // Slide 3: groups (one slide per group, or empty upload slide)
+        var groups = myGroups();
+        function groupSlide(group) {
+          var slide = document.createElement("article");
+          slide.className = "team-slide";
+          var art = document.createElement("label");
+          art.className = "team-slide__art is-upload";
+          if (group && group.photo_url) {
+            var img = document.createElement("img");
+            img.alt = "";
+            img.src = group.photo_url;
+            art.appendChild(img);
+          } else {
+            art.appendChild(document.createTextNode("Foto hochladen"));
+          }
+          var file = document.createElement("input");
+          file.type = "file";
+          file.accept = "image/*";
+          file.addEventListener("change", function (event) {
+            var f = event.target.files && event.target.files[0];
+            event.target.value = "";
+            if (!f || !group) return;
+            compressPhoto(f, function (url) {
+              if (!url) return;
+              var list = myGroups().slice();
+              list.forEach(function (g) {
+                if (g && String(g.id) === String(group.id)) g.photo_url = url;
+              });
+              saveMyGroups(list).then(function () { renderTeam(); });
+            });
+          });
+          art.appendChild(file);
+          slide.appendChild(art);
+          var title = document.createElement("h3");
+          title.className = "team-slide__title";
+          title.textContent = (group && group.name) || "Gruppe";
+          slide.appendChild(title);
+          var desc = document.createElement("p");
+          desc.className = "team-slide__about";
+          desc.textContent = String((group && group.description) || "").trim();
+          slide.appendChild(desc);
+          var members = ((group && group.members) || []).map(String);
+          var people = teamPeople.filter(function (person) { return person && members.indexOf(String(person.id)) >= 0; });
+          if (!people.length) {
+            var empty = document.createElement("p");
+            empty.className = "coach-empty";
+            empty.textContent = "Noch keine Freunde in dieser Gruppe.";
+            slide.appendChild(empty);
+          } else {
+            people.forEach(function (person) { personRow(person, null, slide); });
+          }
+          box.appendChild(slide);
+        }
+        if (!groups.length) {
+          var emptyGroup = document.createElement("article");
+          emptyGroup.className = "team-slide";
+          var emptyArt = document.createElement("div");
+          emptyArt.className = "team-slide__art";
+          emptyArt.textContent = "Noch keine Gruppe";
+          emptyGroup.appendChild(emptyArt);
+          var emptyTitle = document.createElement("h3");
+          emptyTitle.className = "team-slide__title";
+          emptyTitle.textContent = "Gruppe";
+          emptyGroup.appendChild(emptyTitle);
+          var hint = document.createElement("p");
+          hint.className = "team-slide__about";
+          hint.textContent = "Gründe eine Gruppe unter gogogo.";
+          emptyGroup.appendChild(hint);
+          box.appendChild(emptyGroup);
+        } else {
+          groups.forEach(groupSlide);
+        }
+
+        // Slide 4: coachees
+        var coacheeSlide = document.createElement("article");
+        coacheeSlide.className = "team-slide";
         var coacheeHead = document.createElement("h3");
-        coacheeHead.className = "coach-head is-split";
+        coacheeHead.className = "team-slide__title";
         coacheeHead.textContent = "Meine Coachees";
-        box.appendChild(coacheeHead);
+        coacheeSlide.appendChild(coacheeHead);
         var coachees = teamPeople.filter(function (person) {
           return person && person.trainer_id && String(person.trainer_id) === mineId;
         });
         if (!coachees.length) {
-          var empty = document.createElement("p");
-          empty.className = "coach-empty";
-          empty.textContent = "Noch niemand hat Dich als Coach gewählt.";
-          box.appendChild(empty);
+          var emptyC = document.createElement("p");
+          emptyC.className = "coach-empty";
+          emptyC.textContent = "Noch niemand hat Dich als Coach gewählt.";
+          coacheeSlide.appendChild(emptyC);
         }
         coachees.forEach(function (person) {
           personRow(person, sessionIsTrainer ? function (row) {
@@ -8541,9 +8737,9 @@
               openTrainerAdmin(person);
             });
             row.appendChild(pencil);
-          } : null);
+          } : null, coacheeSlide);
         });
-        renderMyGroups(box, personRow);
+        box.appendChild(coacheeSlide);
         syncGroupOptions();
       }
 
@@ -8651,6 +8847,11 @@
           nameIn.placeholder = "Name der Gruppe";
           nameIn.maxLength = 40;
           form.appendChild(nameIn);
+          var descIn = document.createElement("input");
+          descIn.type = "text";
+          descIn.placeholder = "Kurzbeschreibung";
+          descIn.maxLength = 160;
+          form.appendChild(descIn);
           var list = document.createElement("div");
           list.className = "go-group-friends";
           var selected = {};
@@ -8681,6 +8882,8 @@
             groups.push({
               id: "g-" + Date.now().toString(36),
               name: name,
+              description: String(descIn.value || "").trim(),
+              photo_url: "",
               members: Object.keys(selected)
             });
             saveMyGroups(groups).then(function () {
