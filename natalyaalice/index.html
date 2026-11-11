@@ -2901,7 +2901,7 @@
     }
     body.is-session .profile-label[data-hide-label="1"] { display: none !important; }
     body.is-session .profile-sheet:not(.is-editing) .profile-extra-edit { display: none !important; }
-    body.is-session .profile-sheet:not(.is-editing) #profile-trainer-block { display: none !important; }
+    body.is-session #profile-trainer-block { display: none !important; }
     body.is-session .profile-coach-goal {
       display: flex;
       align-items: baseline;
@@ -2915,6 +2915,17 @@
       font-weight: 500;
       flex: 1 1 auto;
       min-width: 0;
+      border: 0;
+      background: transparent;
+      padding: 0;
+      text-align: left;
+      color: #2A2118;
+      font-family: inherit;
+    }
+    body.is-session .profile-coach-line.is-active {
+      cursor: pointer;
+      text-decoration: underline;
+      text-underline-offset: 3px;
     }
     body.is-session .profile-coach-goal .profile-goal {
       margin: 0;
@@ -3933,7 +3944,7 @@
       </div>
     </div>
     <div class="profile-coach-goal" id="profile-coach-goal-row">
-      <p class="profile-coach-line" id="profile-coach-line"></p>
+      <button type="button" class="profile-coach-line" id="profile-coach-line"></button>
       <p class="profile-goal" id="profile-goal">Ziel wählen</p>
     </div>
     <div class="profile-block">
@@ -12360,20 +12371,28 @@
       function paintTrainerBlock(account, list) {
         var block = document.getElementById("profile-trainer-block");
         var box = document.getElementById("profile-trainer-list");
-        if (!block || !box) return;
-        var mine = !!(profilePerson && profilePerson.isSelf);
-        box.textContent = "";
-        if (!mine) {
-          block.hidden = true;
-          return;
+        if (box) box.textContent = "";
+        if (block) block.hidden = true;
+      }
+
+      function paintCoachLine(account, mine) {
+        var coachLine = document.getElementById("profile-coach-line");
+        if (!coachLine) return;
+        var tid = account && account.trainer_id ? String(account.trainer_id) : "";
+        var coach = null;
+        teamPeople.forEach(function (person) { if (tid && String(person.id) === tid) coach = person; });
+        coachLine.classList.toggle("is-active", !!mine);
+        coachLine.disabled = !mine;
+        if (coach) coachLine.textContent = "Coach: " + (coach.name || "Coach");
+        else if (!tid) coachLine.textContent = mine ? "Coach: wählen" : "";
+        else {
+          coachLine.textContent = "Coach: …";
+          rest("go_accounts?id=eq." + encodeURIComponent(tid) + "&select=id,name&limit=1").then(function (rows) {
+            if (!coachLine || !profilePerson) return;
+            var row = rows && rows[0];
+            coachLine.textContent = row && row.name ? ("Coach: " + row.name) : (mine ? "Coach: wählen" : "");
+          }).catch(function () { if (coachLine) coachLine.textContent = mine ? "Coach: wählen" : ""; });
         }
-        block.hidden = false;
-        var open = document.createElement("button");
-        open.type = "button";
-        open.className = "profile-trainer-open";
-        open.textContent = "Trainer wählen";
-        open.addEventListener("click", openTrainerDialog);
-        box.appendChild(open);
       }
 
       function setProfileEditing(on) {
@@ -12547,22 +12566,7 @@
         var aboutBox = document.getElementById("profile-about");
         aboutBox.value = String(about.text || "").slice(0, 300);
         aboutBox.readOnly = !mine;
-        var coachLine = document.getElementById("profile-coach-line");
-        if (coachLine) {
-          var tid = account && account.trainer_id ? String(account.trainer_id) : "";
-          var coach = null;
-          teamPeople.forEach(function (person) { if (tid && String(person.id) === tid) coach = person; });
-          if (coach) coachLine.textContent = "Coach: " + (coach.name || "Coach");
-          else if (!tid) coachLine.textContent = mine ? "Coach: —" : "";
-          else {
-            coachLine.textContent = "Coach: …";
-            rest("go_accounts?id=eq." + encodeURIComponent(tid) + "&select=id,name&limit=1").then(function (rows) {
-              if (!coachLine || !profilePerson) return;
-              var row = rows && rows[0];
-              coachLine.textContent = row && row.name ? ("Coach: " + row.name) : (mine ? "Coach: —" : "");
-            }).catch(function () { if (coachLine) coachLine.textContent = mine ? "Coach: —" : ""; });
-          }
-        }
+        paintCoachLine(account, mine);
         var recsBox = document.getElementById("profile-recs");
         recsBox.value = String(about.recs || "").slice(0, 400);
         recsBox.readOnly = !mine;
@@ -12827,6 +12831,7 @@
         sessionAccount.trainer_id = trainerPick;
         saveProfileFields({ trainer_id: trainerPick });
         paintTrainerBlock(sessionAccount, profileTrainerChoices);
+        paintCoachLine(sessionAccount, true);
         loadTeam();
         document.getElementById("trainer-modal").hidden = true;
       });
@@ -12872,6 +12877,10 @@
       document.getElementById("profile-goal").addEventListener("click", function () {
         if (!profilePerson || !profilePerson.isSelf) return;
         openGoalPicker();
+      });
+      document.getElementById("profile-coach-line").addEventListener("click", function () {
+        if (!profilePerson || !profilePerson.isSelf) return;
+        openTrainerDialog();
       });
       document.getElementById("goal-modal").addEventListener("click", function (event) {
         if (event.target.id === "goal-modal") event.currentTarget.hidden = true;
