@@ -1937,20 +1937,39 @@
     .day-block { margin-bottom: 16px; }
     .day-invite {
       display: flex;
-      flex-direction: column;
-      align-items: flex-start;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
       gap: 8px;
       margin: 8px 0 2px;
     }
     .day-invite__row {
+      display: none; /* Namen ausgeblendet; nur Profilbilder */
+    }
+    .day-invite__faces {
       display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
       align-items: center;
       gap: 8px;
-      min-height: 32px;
-      color: #2A2118;
-      font-size: 14px;
-      line-height: 1.2;
+      overflow-x: auto;
+      max-width: 100%;
+      scrollbar-width: none;
     }
+    .day-invite__faces::-webkit-scrollbar { display: none; }
+    .week-csv-export {
+      display: none;
+      width: 100%;
+      min-height: 44px;
+      margin: 18px 0 0;
+      padding: 0 14px;
+      border: 1px solid #2A2118;
+      background: transparent;
+      color: #2A2118;
+      font-weight: 600;
+      text-align: left;
+    }
+    body.is-session[data-shell="woche"] .week-csv-export { display: block; order: 8; }
     .day-place {
       margin: 6px 2px 0;
       font-size: 13px;
@@ -3742,6 +3761,7 @@
     <p class="tip shell-kalender">Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.</p>
     <button type="button" id="plan-week" class="plan-week shell-kalender" hidden>Meine Bewegung in der Woche planen</button>
     <div class="days shell-kalender" id="days"></div>
+    <button type="button" class="week-csv-export shell-kalender" id="week-csv-export">Export vier Wochen als csv</button>
     <div class="absence-block shell-kalender" id="absence-block">
       <div class="week-mode" role="group" aria-label="Woche">
         <button type="button" data-week-mode="home" class="is-on" aria-pressed="true">vor Ort</button>
@@ -4038,6 +4058,15 @@
       <h2 class="ask" id="trainer-title">Trainer</h2>
       <div id="trainer-options"></div>
       <button type="button" id="trainer-save">Trainer festlegen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="feedback-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
+      <h2 class="ask" id="feedback-title">Feedback-Formular</h2>
+      <p>Schreib uns, was gut läuft und was wir verbessern sollen.</p>
+      <textarea id="feedback-text" maxlength="2000" rows="6" placeholder="Dein Feedback …" style="width:100%;min-height:140px;padding:12px;border:1px solid #2A2118;background:#F6F1E8;color:#2A2118;font:inherit;"></textarea>
+      <button type="button" class="routine-start" id="feedback-send" style="margin-top:12px;">Senden</button>
+      <button type="button" class="routine-start" id="feedback-cancel" style="background:transparent;color:#2A2118;margin-top:8px;">Abbrechen</button>
     </div>
   </div>
   <section class="profile-sheet" id="profile-sheet" hidden>
@@ -8907,28 +8936,40 @@
             time: row.meet_time || ""
           };
         });
+        var row = document.createElement("div");
+        row.className = "day-invite__faces";
         var usedFace = {};
         faces.forEach(function (person) {
           if (!person) return;
           var pid = String(person.id || "");
           if (pid && usedFace[pid]) return;
           if (pid) usedFace[pid] = true;
-          wrap.appendChild(participantRow(person));
+          if (person.photo) {
+            var img = document.createElement("img");
+            img.className = "day-invite__face";
+            img.alt = person.name || "";
+            img.title = person.name || "";
+            img.src = person.photo;
+            row.appendChild(img);
+          } else {
+            var ph = document.createElement("span");
+            ph.className = "day-invite__ph";
+            ph.title = person.name || "";
+            ph.textContent = String(person.name || "?").slice(0, 1);
+            row.appendChild(ph);
+          }
         });
         var plus = document.createElement("button");
         plus.type = "button";
         plus.className = "day-invite__plus";
         plus.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
-        plus.setAttribute("aria-label", "Nachricht an");
+        plus.setAttribute("aria-label", "Einladen");
         plus.addEventListener("click", function (event) {
           event.stopPropagation();
           openInvite(iso);
         });
-        var add = document.createElement("div");
-        add.className = "day-invite__add";
-        plus.setAttribute("aria-label", "Einladen");
-        add.appendChild(plus);
-        wrap.appendChild(add);
+        row.appendChild(plus);
+        wrap.appendChild(row);
         return wrap;
       }
 
@@ -9150,6 +9191,14 @@
           openProfile(mePerson);
         });
         meSlide.appendChild(editBtn);
+        var feedbackBtn = document.createElement("button");
+        feedbackBtn.type = "button";
+        feedbackBtn.className = "team-slide__cta is-solid";
+        feedbackBtn.textContent = "Feedback-Formular";
+        feedbackBtn.addEventListener("click", function () {
+          openFeedbackForm();
+        });
+        meSlide.appendChild(feedbackBtn);
         box.appendChild(meSlide);
       }
 
@@ -9484,6 +9533,85 @@
       }
 
 
+
+      function csvEscape(value) {
+        var text = String(value == null ? "" : value);
+        if (/[",\n\r]/.test(text)) return '"' + text.replace(/"/g, '""') + '"';
+        return text;
+      }
+
+      function exportFourWeeksCsv() {
+        var start = mondayOf(Log.berlinToday());
+        var lines = ["datum,wochentag,art,label,ort,uhrzeit,status"];
+        var dayNames = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+        for (var i = 0; i < 28; i++) {
+          var iso = addDays(start, i);
+          var wd = weekdayIndex(iso);
+          var away = awayOn(iso, absenceOf(sessionAccount));
+          var unit = displayUnit(wd);
+          var kind = "";
+          var label = "";
+          var status = "geplant";
+          if (away) {
+            var alt = travelAltFor(iso);
+            kind = "alternative";
+            label = alt || "Reise";
+            status = alt ? "reise" : "reise-offen";
+          } else if (unit && unit.kind) {
+            kind = unit.kind;
+            label = unit.label || unit.kind;
+          } else {
+            kind = "frei";
+            label = "";
+            status = "offen";
+          }
+          lines.push([
+            csvEscape(iso),
+            csvEscape(dayNames[wd] || ""),
+            csvEscape(kind),
+            csvEscape(label),
+            csvEscape(away ? "" : placeForWeekday(wd)),
+            csvEscape(away ? "" : (timeForWeekday(wd) || "")),
+            csvEscape(status)
+          ].join(","));
+        }
+        var blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "gogogo-vier-wochen-" + start + ".csv";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      }
+
+      function openFeedbackForm() {
+        var modal = document.getElementById("feedback-modal");
+        var text = document.getElementById("feedback-text");
+        if (text) text.value = "";
+        if (modal) modal.hidden = false;
+      }
+
+      function closeFeedbackForm() {
+        var modal = document.getElementById("feedback-modal");
+        if (modal) modal.hidden = true;
+      }
+
+      function sendFeedbackForm() {
+        var text = document.getElementById("feedback-text");
+        var body = text ? String(text.value || "").trim() : "";
+        if (!body) {
+          if (text) text.focus();
+          return;
+        }
+        var name = personName() || "Nutzer";
+        var mail = "mailto:kontakt@gogogo.social?subject=" + encodeURIComponent("gogogo Feedback von " + name)
+          + "&body=" + encodeURIComponent(body);
+        window.location.href = mail;
+        closeFeedbackForm();
+      }
+
       function paintGoRail() {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
@@ -9492,7 +9620,9 @@
           { id: "routine", title: "12-Wochen-Routine", copy: "Halte zwölf Wochen lang Deine Wochentage. Jede volle Woche wird markiert.", cta: "Routine starten", kind: "kraft" },
           { id: "zirkel", title: "Zirkeltraining", copy: "Registriere Dich einmal und trainiere im gemeinsamen Rhythmus mit Freunden, Leaderboard und Stories.", cta: "Zu den Einstellungen", kind: "zirkel" },
           { id: "coach", title: "Triff Deinen Coach", copy: "Persönliche Treffen mit Deinem Coach — klarer Rahmen, echte Begleitung.", cta: "Personal Training", kind: "intensiv" },
-          { id: "group", title: "Gründe eine Gruppe", copy: "Eine eigene Gruppe mit Freunden. Sichtbar unter Historie, Heute und Coaching.", cta: "Gruppe gründen", kind: "ausdauer" }
+          { id: "group", title: "Gründe eine Gruppe", copy: "Eine eigene Gruppe mit Freunden. Sichtbar unter Historie, Heute und Coaching.", cta: "Gruppe gründen", kind: "ausdauer" },
+          { id: "nutrition", title: "Ernährung", copy: "Einfache Prinzipien für Alltag und Training: Protein, Rhythmus, ohne Überoptimierung.", cta: "Mehr erfahren", kind: "alternative" },
+          { id: "webcall", title: "Web-Call Trainingsplan", copy: "Kurz online mit Deinem Coach den Wochenplan abstimmen — klar, konkret, umsetzbar.", cta: "Call buchen", kind: "intensiv" }
         ];
         slides.forEach(function (slide, idx) {
           var card = document.createElement("article");
@@ -9641,6 +9771,34 @@
           });
           form.appendChild(save);
           body.appendChild(form);
+        } else if (kind === "nutrition") {
+          var nCopy = document.createElement("div");
+          nCopy.className = "go-package";
+          nCopy.innerHTML = "<p>Es gibt nicht die richtige Ernährung. Es gibt Prinzipien, die für die meisten funktionieren, und Deinen Alltag, der entscheidet, wie sie zu Dir passen.</p><p><strong>Mein Vorschlag:</strong> proteinreiches Frühstück, eine warme Hauptmahlzeit, 4 bis 5 Stunden Mahlzeitenabstand, gerne Quark mit Protein am Abend.</p>";
+          body.appendChild(nCopy);
+          var nCta = document.createElement("button");
+          nCta.type = "button";
+          nCta.className = "go-slide__cta";
+          nCta.textContent = "Zur Info";
+          nCta.addEventListener("click", function () {
+            closeGoSub();
+            showPlan("info");
+          });
+          body.appendChild(nCta);
+        } else if (kind === "webcall") {
+          var wCopy = document.createElement("div");
+          wCopy.className = "go-package";
+          wCopy.innerHTML = "<p>Im Web-Call gehst Du mit Deinem Coach den Trainingsplan durch: Tage, Orte, Alternativen und die nächsten Wochen.</p>";
+          body.appendChild(wCopy);
+          var wCta = document.createElement("button");
+          wCta.type = "button";
+          wCta.className = "go-slide__cta";
+          wCta.textContent = "Call buchen";
+          wCta.addEventListener("click", function () {
+            if (typeof openCalendlyPt === "function") openCalendlyPt();
+            else if (typeof CALENDLY_PT_URL === "string") window.open(CALENDLY_PT_URL, "_blank", "noopener");
+          });
+          body.appendChild(wCta);
         }
         page.hidden = false;
         requestAnimationFrame(function () { page.classList.add("is-open"); });
@@ -10853,6 +11011,16 @@
         openDayEventFromBtn(this);
       });
       document.getElementById("today-invite").addEventListener("click", openTodayEvent);
+      var weekCsvBtn = document.getElementById("week-csv-export");
+      if (weekCsvBtn) weekCsvBtn.addEventListener("click", exportFourWeeksCsv);
+      var feedbackSend = document.getElementById("feedback-send");
+      var feedbackCancel = document.getElementById("feedback-cancel");
+      var feedbackModal = document.getElementById("feedback-modal");
+      if (feedbackSend) feedbackSend.addEventListener("click", sendFeedbackForm);
+      if (feedbackCancel) feedbackCancel.addEventListener("click", closeFeedbackForm);
+      if (feedbackModal) feedbackModal.addEventListener("click", function (event) {
+        if (event.target === feedbackModal) closeFeedbackForm();
+      });
       document.getElementById("heute-start").addEventListener("click", openGoPick);
       document.getElementById("go-kinds").addEventListener("click", function (event) {
         var choice = event.target.closest("[data-go-kind]");
