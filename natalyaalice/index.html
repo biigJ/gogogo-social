@@ -3124,18 +3124,21 @@
       background: transparent;
     }
     body.is-session #plan-team.team-rail .team-slide.is-group-empty {
+      position: relative;
       display: flex;
       flex-direction: column;
       box-sizing: border-box;
-      height: calc(100svh - 230px - env(safe-area-inset-bottom, 0px));
-      max-height: calc(100svh - 230px - env(safe-area-inset-bottom, 0px));
       min-height: 0;
-      padding-bottom: 2px;
+      padding-bottom: 58px; /* Platz für absolut gesetzten CTA */
       overflow: hidden;
     }
     body.is-session #plan-team.team-rail .team-slide.is-group-empty .team-slide__cta {
-      margin-top: auto;
-      margin-bottom: 6px;
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 4px;
+      width: 100%;
+      margin: 0 !important;
       flex: none;
     }
     .team-slide__art.is-upload-cta {
@@ -9845,6 +9848,10 @@
         box.appendChild(coacheeSlide);
         syncGroupOptions();
         syncHScrollDock();
+        requestAnimationFrame(function () {
+          layoutGroupEmptySlides();
+          requestAnimationFrame(layoutGroupEmptySlides);
+        });
       }
 
 
@@ -9865,6 +9872,35 @@
         return null;
       }
 
+      function layoutGroupEmptySlides() {
+        var rail = document.getElementById("plan-team");
+        if (!rail) return;
+        var dock = document.getElementById("hscroll-dock");
+        var dockTop = (dock && !dock.hidden && dock.classList.contains("is-on"))
+          ? dock.getBoundingClientRect().top
+          : (window.innerHeight - (90 + (parseInt(getComputedStyle(document.documentElement).getPropertyValue("padding-bottom"), 10) || 0)));
+        // Fallback: dock sits at bottom: 68+22+safe ≈ 90px, height 18 → top ≈ innerHeight - 108
+        if (!(dock && !dock.hidden && dock.classList.contains("is-on"))) {
+          dockTop = window.innerHeight - 108 - (parseFloat(getComputedStyle(document.documentElement).paddingBottom) || 0);
+          var safe = 0;
+          try {
+            var probe = document.createElement("div");
+            probe.style.paddingBottom = "env(safe-area-inset-bottom)";
+            document.body.appendChild(probe);
+            safe = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+            probe.remove();
+          } catch (eSafe) {}
+          dockTop = window.innerHeight - (68 + 22 + 18 + safe);
+        }
+        rail.querySelectorAll(".team-slide.is-group-empty").forEach(function (slide) {
+          var top = slide.getBoundingClientRect().top;
+          var h = Math.floor(dockTop - top - 6);
+          if (h < 240) h = 240;
+          slide.style.height = h + "px";
+          slide.style.maxHeight = h + "px";
+        });
+      }
+
       function syncHScrollDock() {
         bindHScrollDock();
         var dock = document.getElementById("hscroll-dock");
@@ -9883,6 +9919,16 @@
         thumb.style.width = thumbW + "%";
         var left = (el.scrollLeft / max) * (100 - thumbW);
         thumb.style.left = left + "%";
+        if (document.body.dataset.plan === "team") layoutGroupEmptySlides();
+      }
+
+      if (!layoutGroupEmptySlides.bound) {
+        layoutGroupEmptySlides.bound = true;
+        window.addEventListener("resize", function () {
+          if (document.body.dataset.shell === "plan" && document.body.dataset.plan === "team") {
+            layoutGroupEmptySlides();
+          }
+        });
       }
 
       function bindHScrollDock() {
