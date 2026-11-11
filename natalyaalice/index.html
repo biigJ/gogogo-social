@@ -1321,7 +1321,7 @@
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 0;
-      margin: 4px 0 16px;
+      margin: 12px 0 16px;
       border-bottom: 1px solid rgba(42, 33, 24, 0.28);
     }
     .plan-tabs button {
@@ -1333,13 +1333,20 @@
       border-bottom: 2px solid transparent;
     }
     .plan-tabs button.is-on { color: #2A2118; border-bottom-color: #2A2118; }
+    .plan-tabs button.plan-tabs__gear {
+      display: grid;
+      place-items: center;
+      padding: 4px 2px 8px;
+    }
+    .plan-tabs button.plan-tabs__gear.is-on { color: #2A2118; }
     body.is-session[data-shell="plan"] .shell-plan { display: block; }
     #plan-team, #plan-orte, #plan-training, #plan-info, #plan-settings { display: none !important; }
     body.is-session[data-shell="plan"][data-plan="info"] #plan-info,
     body.is-session[data-shell="plan"][data-plan="team"] #plan-team,
     body.is-session[data-shell="plan"][data-plan="training"] #plan-training,
     body.is-session[data-shell="plan"][data-plan="settings"] #plan-settings { display: block !important; }
-    .settings-list a, .settings-list button {
+    body.is-session .settings-list a,
+    body.is-session .settings-list button {
       display: block;
       width: 100%;
       padding: 14px 2px;
@@ -1348,6 +1355,10 @@
       border-radius: 0;
       background: transparent;
       color: #2A2118;
+      font-family: Inter, system-ui, sans-serif !important;
+      font-size: var(--t-m, 16px) !important;
+      font-weight: 500 !important;
+      line-height: 1.35;
       text-align: left;
       text-decoration: none;
     }
@@ -2505,7 +2516,7 @@
     body.is-session :is(small, .today-card__kicker, .day-card__head, .day-card__head *, .crew-story__name,
       .profile-label, .absence-col small, .absence-bis, .profile-notes p, .zirkel-foot,
       .zirkel-foot button, .profile-week__day, .invite-card__ok, .coach-empty, .team-msg, .go-card__copy,
-      .settings-list a, .story-name, .ffc .dim, .ffc .lb-hint, .ffc .history-empty, .pill-dot,
+      .story-name, .ffc .dim, .ffc .lb-hint, .ffc .history-empty, .pill-dot,
       .tip.is-owned, .tip.is-owned span):not(main *, #run *) {
       font-size: var(--t-s) !important;
       line-height: 1.35;
@@ -2516,13 +2527,12 @@
 <body class="is-home">
   <section id="welcome" class="welcome">
     <div class="plan-tabs" role="tablist" aria-label="Profil">
-      <div class="plan-tabs__top">
-        <button type="button" data-plan="info" class="plan-tabs__info" role="tab">Info</button>
-      </div>
       <button type="button" data-plan="kalender" class="is-on" role="tab">Woche</button>
       <button type="button" data-plan="team" role="tab">Coaching</button>
       <button type="button" data-plan="training" role="tab">Go!</button>
-      <button type="button" data-plan="settings" role="tab">Einstellung</button>
+      <button type="button" data-plan="settings" class="plan-tabs__gear" role="tab" aria-label="Einstellung">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.4a3.6 3.6 0 1 0 0 7.2 3.6 3.6 0 0 0 0-7.2Z"/><path d="M19.4 13.1a7.6 7.6 0 0 0 .1-1.1 7.6 7.6 0 0 0-.1-1.1l2-1.6-1.9-3.3-2.4 1a7.4 7.4 0 0 0-1.9-1.1l-.4-2.5H9.2l-.4 2.5a7.4 7.4 0 0 0-1.9 1.1l-2.4-1L2.6 9.3l2 1.6a7.6 7.6 0 0 0-.1 1.1 7.6 7.6 0 0 0 .1 1.1l-2 1.6 1.9 3.3 2.4-1a7.4 7.4 0 0 0 1.9 1.1l.4 2.5h3.8l.4-2.5a7.4 7.4 0 0 0 1.9-1.1l2.4 1 1.9-3.3-2-1.6Z"/></svg>
+      </button>
     </div>
     <div class="shell-plan" id="plan-team"></div>
     <div class="shell-plan settings-list" id="plan-settings">
@@ -2532,6 +2542,7 @@
       <button type="button" data-menu="email">E-Mail-Adresse angeben</button>
       <button type="button" data-menu="code">Login-Code ändern</button>
       <button type="button" data-menu="website">Website besuchen</button>
+      <button type="button" data-menu="info">Info</button>
       <a href="/impressum/">Impressum</a>
       <a href="/datenschutz/">Datenschutz</a>
       <a href="/kontakt/">Kontakt</a>
@@ -5619,6 +5630,10 @@
           location.href = "/?landing=1";
           return;
         }
+        if (field === "info") {
+          showPlan("info");
+          return;
+        }
         openAccountEdit(field);
       });
       document.getElementById("account-edit-save").addEventListener("click", saveAccountEdit);
@@ -7330,7 +7345,8 @@
 
       function paintPlanTabs() {
         document.querySelectorAll(".plan-tabs button").forEach(function (btn) {
-          var on = btn.getAttribute("data-plan") === planPane;
+          var pane = btn.getAttribute("data-plan");
+          var on = pane === planPane || (pane === "settings" && planPane === "info");
           btn.classList.toggle("is-on", on);
           btn.setAttribute("aria-selected", on ? "true" : "false");
         });
