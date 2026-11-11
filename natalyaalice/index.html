@@ -1295,12 +1295,16 @@
     body.is-session #tagebuch { display: none; }
     body.is-session .routine-row { grid-template-columns: 1fr; }
     body.is-session[data-shell="heute"] .shell-kalender,
+    body.is-session[data-shell="woche"] .shell-heute,
+    body.is-session[data-shell="woche"] .plan-tabs,
+    body.is-session[data-shell="woche"] .shell-plan,
     body.is-session[data-shell="plan"] #go-today,
     body.is-session[data-shell="plan"] #go-tomorrow,
     body.is-session[data-shell="plan"] .shell-heute,
     body.is-session[data-shell="diary"] .welcome,
     body.is-session[data-shell="workout"] .welcome { display: none !important; }
     body.is-session[data-shell="heute"] .welcome,
+    body.is-session[data-shell="woche"] .welcome,
     body.is-session[data-shell="plan"] .welcome { display: flex; flex-direction: column; }
     body.is-session[data-shell="heute"] .heute-head,
     body.is-session[data-shell="heute"] .heute-mantra,
@@ -1327,20 +1331,32 @@
     body.is-session[data-shell="plan"] #plan-week { order: 6; margin-top: 16px; }
     body.is-session[data-shell="plan"] #days { order: 7; }
     body.is-session[data-shell="plan"] .shell-plan { order: 8; }
-    body.is-session[data-shell="plan"][data-plan="kalender"] .tip,
-    body.is-session[data-shell="plan"][data-plan="kalender"] #plan-week { display: none !important; }
-    body.is-session[data-shell="plan"][data-plan="kalender"] {
+    body.is-session[data-shell="woche"] .absence-block { order: 1; }
+    body.is-session[data-shell="woche"] .routine-row { order: 2; margin-top: 24px; }
+    body.is-session[data-shell="woche"] #weeks { order: 3; }
+    body.is-session[data-shell="woche"] #routine-note { order: 4; }
+    body.is-session[data-shell="woche"] .tip { order: 5; }
+    body.is-session[data-shell="woche"] #plan-week { order: 6; margin-top: 16px; }
+    body.is-session[data-shell="woche"] #days { order: 7; }
+    body.is-session[data-shell="woche"] .tip,
+    body.is-session[data-shell="woche"] #plan-week { display: none !important; }
+    body.is-session[data-shell="woche"] {
       overflow-x: hidden;
     }
-    body.is-session[data-shell="plan"][data-plan="kalender"] .welcome {
+    body.is-session[data-shell="woche"] .welcome {
       overflow-x: hidden;
     }
-    body.is-session[data-shell="plan"] .dock { display: none !important; }
-    body.is-session[data-shell="plan"]:not([data-plan="kalender"]) .shell-kalender { display: none !important; }
+    body.is-session[data-shell="plan"] .dock,
+    body.is-session[data-shell="woche"] .dock { display: none !important; }
+    body.is-session[data-shell="plan"] .shell-kalender { display: none !important; }
+    body.is-session[data-shell="woche"] .shell-kalender { display: block; }
+    body.is-session[data-shell="woche"] .days.shell-kalender { display: flex; }
+    body.is-session[data-shell="woche"] .absence-block { display: block; }
+    body.is-session[data-shell="woche"] .routine-row { display: grid; }
     .plan-tabs, .shell-plan, .heute-start, .heute-events, .zirkel-block { display: none; }
     body.is-session[data-shell="plan"] .plan-tabs {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 0;
       margin: 12px 0 16px;
       border-bottom: 1px solid rgba(42, 33, 24, 0.28);
@@ -1988,7 +2004,7 @@
       color: rgba(42, 33, 24, 0.55);
     }
     .absence-block { display: none; margin-top: 8px; }
-    body.is-session[data-shell="plan"][data-plan="kalender"] .absence-block { display: block; }
+    body.is-session[data-shell="woche"] .absence-block { display: block; }
     #absence-save.routine-start { height: auto; min-height: 44px; }
     .absence-editor[hidden] { display: none; }
     #absence-save.routine-start { margin-top: 12px; }
@@ -2088,7 +2104,7 @@
       pointer-events: auto;
       width: min(100%, 390px);
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       align-items: center;
       height: 68px;
       padding: 0 6px;
@@ -3158,7 +3174,7 @@
       background: transparent;
       touch-action: none;
     }
-    body.is-session[data-shell="plan"][data-plan="kalender"] .hscroll-dock.is-on,
+    body.is-session[data-shell="woche"] .hscroll-dock.is-on,
     body.is-session[data-shell="plan"][data-plan="team"] .hscroll-dock.is-on,
     body.is-session[data-shell="plan"][data-plan="training"] .hscroll-dock.is-on {
       display: block;
@@ -3186,7 +3202,7 @@
       touch-action: none;
     }
     .hscroll-dock__thumb:active { cursor: grabbing; }
-    body.is-session[data-shell="plan"][data-plan="kalender"] .welcome,
+    body.is-session[data-shell="woche"] .welcome,
     body.is-session[data-shell="plan"][data-plan="team"] .welcome,
     body.is-session[data-shell="plan"][data-plan="training"] .welcome,
     body.is-session[data-shell="heute"] .welcome {
@@ -3251,8 +3267,7 @@
 <body class="is-home">
   <section id="welcome" class="welcome">
     <div class="plan-tabs" role="tablist" aria-label="Einstellungen">
-      <button type="button" data-plan="team" role="tab">Team</button>
-      <button type="button" data-plan="kalender" class="is-on" role="tab">Woche</button>
+      <button type="button" data-plan="team" class="is-on" role="tab">Team</button>
       <button type="button" data-plan="training" role="tab">gogogo</button>
       <button type="button" data-plan="settings" class="plan-tabs__gear" role="tab" aria-label="Einstellung">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -4068,6 +4083,13 @@
         </span>
         <small>Heute</small>
       </button>
+      <button type="button" data-shell="woche" aria-label="Woche">
+        <span class="pill-ico">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M8 3.5v3M16 3.5v3M3.5 9.5h17"/><path d="M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01M16 17h.01"/></svg>
+          <span class="pill-dot" hidden></span>
+        </span>
+        <small>Woche</small>
+      </button>
       <button type="button" data-shell="diary" aria-label="Historie">
         <span class="pill-ico">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.2C10.2 4.8 7.6 4.4 4 5.2V19c3.4-.7 6-.2 8 1.2 2-1.4 4.6-1.9 8-1.2V5.2c-3.6-.8-6.2-.4-8 1Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 6.2V20.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
@@ -4699,7 +4721,7 @@
       }
       applyInstalledIdentity(sessionAccount);
       var shellTab = "heute";
-      var planPane = "kalender";
+      var planPane = "team";
       var todayPick = null;
       var sessionIsTrainer = !!(sessionAccount && sessionAccount.is_trainer);
       try {
@@ -8252,11 +8274,30 @@
         });
       }
 
+      function showWoche() {
+        window.setTimeout(syncHScrollDock, 30);
+        closeShellModals();
+        shellTab = "woche";
+        document.body.dataset.shell = "woche";
+        document.body.removeAttribute("data-plan");
+        document.body.classList.add("is-home");
+        document.body.classList.remove("is-diary");
+        welcomeEl.hidden = false;
+        document.getElementById("diary").hidden = true;
+        mainEl.hidden = true;
+        var theme = document.querySelector('meta[name="theme-color"]');
+        if (theme) theme.setAttribute("content", "#F3EEE4");
+        paintPill();
+        paintWelcome();
+        scrollShellTop();
+      }
+
       function showPlan(pane) {
         window.setTimeout(syncHScrollDock, 30);
         closeShellModals();
+        if (pane === "kalender") { showWoche(); return; }
         shellTab = "plan";
-        planPane = pane || planPane || "kalender";
+        planPane = pane || planPane || "team";
         document.body.dataset.shell = "plan";
         document.body.dataset.plan = planPane;
         document.body.classList.add("is-home");
@@ -9230,7 +9271,7 @@
         if (!sessionMode) return null;
         var shell = document.body.dataset.shell;
         var plan = document.body.dataset.plan || planPane;
-        if (shell === "plan" && plan === "kalender") return document.getElementById("days");
+        if (shell === "woche") return document.getElementById("days");
         if (shell === "plan" && plan === "team") return document.getElementById("plan-team");
         if (shell === "plan" && plan === "training") return document.getElementById("go-rail");
         return null;
@@ -9243,12 +9284,8 @@
         if (!dock || !thumb) return;
         var el = activeHScrollEl();
         hScrollTarget = el;
-        var show = !!(el && sessionMode && document.body.dataset.shell === "plan" &&
-          (document.body.dataset.plan === "kalender" || document.body.dataset.plan === "team" || document.body.dataset.plan === "training" ||
-           planPane === "kalender" || planPane === "team" || planPane === "training"));
-        // prefer dataset.plan from body if set by showPlan
         var pane = document.body.dataset.plan || planPane;
-        show = !!(el && sessionMode && document.body.dataset.shell === "plan" && (pane === "kalender" || pane === "team" || pane === "training"));
+        var show = !!(el && sessionMode && ((document.body.dataset.shell === "woche") || (document.body.dataset.shell === "plan" && (pane === "team" || pane === "training"))));
         dock.hidden = !show;
         dock.classList.toggle("is-on", show);
         if (!show || !el) return;
@@ -10761,7 +10798,8 @@
         if (!btn) return;
         var tab = btn.getAttribute("data-shell");
         if (tab === "diary") openDiary();
-        else if (tab === "plan") showPlan(planPane);
+        else if (tab === "plan") showPlan(planPane === "kalender" ? "team" : planPane);
+        else if (tab === "woche") showWoche();
         else {
           setHome(true);
           paintWelcome();
