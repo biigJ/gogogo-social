@@ -1642,8 +1642,8 @@
     .profile-pencil {
       width: 31px;
       height: 31px;
-      border: 0;
-      border-radius: 0;
+      border: 1px solid #2A2118;
+      border-radius: 50%;
       display: grid;
       place-items: center;
       justify-self: end;
@@ -2620,7 +2620,7 @@
       .profile-label, .absence-col small, .absence-bis, .profile-notes p, .zirkel-foot,
       .zirkel-foot button, .profile-week__day, .invite-card__ok, .coach-empty, .team-msg, .go-card__copy,
       .story-name, .ffc .dim, .ffc .lb-hint, .ffc .history-empty, .pill-dot,
-      .tip.is-owned, .tip.is-owned span):not(main *, #run *) {
+      .tip.is-owned, .tip.is-owned span):not(main *, #run *, .profile-text-head) {
       font-size: var(--t-s) !important;
       line-height: 1.35;
     }
@@ -2633,14 +2633,41 @@
       scroll-snap-align: start;
     }
     .team-slide.is-scroll {
-      max-height: calc(100svh - 160px - env(safe-area-inset-bottom, 0px));
+      max-height: calc(100svh - 230px - env(safe-area-inset-bottom, 0px));
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
-      padding-bottom: 12px;
+      overscroll-behavior-y: contain;
+      touch-action: pan-y;
+      padding-bottom: 20px;
       scrollbar-width: thin;
       scrollbar-color: rgba(42, 33, 24, 0.45) transparent;
     }
+    .team-slide__head-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 0 0 10px;
+    }
+    .team-slide__head-row .team-slide__head {
+      margin: 0;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .team-slide__head-action {
+      flex: 0 0 auto;
+      width: 31px;
+      height: 31px;
+      border: 1px solid #2A2118;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: transparent;
+      color: #2A2118;
+      padding: 0;
+    }
+    .team-slide__head-action svg { width: 15px; height: 15px; display: block; }
     .team-slide__art {
       width: 100%;
       aspect-ratio: 1;
@@ -2679,9 +2706,11 @@
     }
     .team-slide__art + .team-slide__cta,
     .team-slide__art + .team-slide__about,
-    .team-slide__art + .team-slide__title {
+    .team-slide__art + .team-slide__title,
+    .team-slide__art + .team-wa {
       margin-top: 36px;
     }
+    .team-slide .team-wa + .team-slide__about { margin-top: 12px; }
     .team-slide__about {
       margin: 0 0 12px;
       font-size: 15px;
@@ -2715,14 +2744,19 @@
     body.is-session #plan-team.team-rail {
       display: flex;
       flex-direction: row;
+      align-items: flex-start;
       gap: 12px;
       margin: 0;
       padding: 0;
       overflow-x: auto;
-      overflow-y: hidden;
+      overflow-y: visible;
       scroll-snap-type: x mandatory;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
+      touch-action: pan-x;
+    }
+    body.is-session #plan-team.team-rail .team-slide.is-scroll {
+      touch-action: pan-y;
     }
     body.is-session #plan-training .go-rail::-webkit-scrollbar,
     body.is-session #plan-team.team-rail::-webkit-scrollbar { display: none; height: 0; }
@@ -2902,13 +2936,57 @@
       pointer-events: auto;
     }
     body.is-session #profile-zirkel-block .profile-label,
+    body.is-session #profile-zirkel-block .profile-text-head,
     body.is-session #profile-nozirkel-block .profile-label,
-    body.is-session .profile-challenge {
+    body.is-session #profile-nozirkel-block .profile-text-head,
+    body.is-session #profile-routine-block .profile-challenge,
+    body.is-session .profile-challenge,
+    body.is-session .profile-text-head {
       font-family: Inter, system-ui, sans-serif !important;
       font-weight: 500 !important;
-      font-size: var(--t-m) !important;
+      font-size: 16px !important;
+      line-height: 1.35 !important;
     }
     body.is-session #profile-trainer-block .profile-label { display: none !important; }
+    body.is-session .profile-split {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(42, 33, 24, 0.28);
+    }
+    body.is-session .profile-split > .profile-label:first-child,
+    body.is-session .profile-split > .profile-challenge:first-child,
+    body.is-session .profile-split > .profile-text-head:first-child {
+      margin-top: 0;
+    }
+    body.is-session #profile-notes { display: none !important; }
+    /* Calendly dismissible */
+    .calendly-overlay .calendly-popup-close,
+    .calendly-popup-close {
+      top: calc(18px + env(safe-area-inset-top, 0px)) !important;
+      right: 16px !important;
+      width: 40px !important;
+      height: 40px !important;
+      z-index: 10001 !important;
+      pointer-events: auto !important;
+    }
+    .calendly-overlay .calendly-popup {
+      top: calc(56px + env(safe-area-inset-top, 0px)) !important;
+      max-height: calc(100% - 72px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)) !important;
+    }
+    .calendly-abort {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+      z-index: 10002;
+      min-height: 44px;
+      padding: 10px 22px;
+      border: 1px solid #2A2118;
+      background: #F6F1E8;
+      color: #2A2118;
+      font-weight: 600;
+      pointer-events: auto;
+    }
 
 
 
@@ -3856,18 +3934,21 @@
       <p class="profile-label" data-hide-label="1">Mantra</p>
       <textarea class="profile-mantra" id="profile-mantra" maxlength="220" readonly></textarea>
     </div>
-    <div class="profile-photos" id="profile-photos"></div>
-    <p class="profile-label profile-photos-label" id="profile-photos-label" hidden>Fotos aus dem Tagebuch</p>
-    <div class="profile-block" id="profile-zirkel-block" hidden>
-      <p class="profile-label profile-text-head">mit Zirkeltraining</p>
+    <div class="profile-block profile-split" id="profile-zirkel-block" hidden>
+      <p class="profile-text-head">Zirkeltraining</p>
       <p class="profile-zirkel" id="profile-zirkel"></p>
     </div>
-    <div class="profile-block" id="profile-nozirkel-block" hidden>
-      <p class="profile-label profile-text-head">ohne Zirkeltraining</p>
+    <div class="profile-block profile-split" id="profile-nozirkel-block" hidden>
+      <p class="profile-text-head">Zirkeltraining</p>
+      <p class="profile-zirkel-empty">Noch nicht gestartet</p>
     </div>
-    <div class="profile-block">
+    <div class="profile-block profile-split" id="profile-routine-block">
       <p class="profile-challenge" id="profile-challenge">12-Wochenroutine nicht gestartet</p>
       <div class="weeks" id="profile-weeks"></div>
+    </div>
+    <div class="profile-block profile-split" id="profile-photos-block">
+      <div class="profile-photos" id="profile-photos"></div>
+      <p class="profile-label profile-photos-label" id="profile-photos-label" hidden>Fotos aus dem Tagebuch</p>
     </div>
     <div class="profile-block profile-extra-edit" hidden>
       <p class="profile-label">So ist meine Woche organisiert</p>
@@ -8741,12 +8822,20 @@
       }
 
       var WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M4.2 19.8l1.1-3.9A8.3 8.3 0 1 1 8.4 19z"/><path d="M9.1 7.9c-.3 0-.7.1-.9.5-.3.5-.6 1.2-.4 2.1.4 1.6 1.9 3.6 3.9 4.6 1.2.6 2.3.7 2.9.3.5-.3.8-.8.8-1.2 0-.2-.1-.3-.3-.4l-1.6-.8c-.2-.1-.4 0-.5.1l-.6.8c-.1.1-.3.2-.5.1-.9-.4-1.8-1.2-2.3-2.1-.1-.2 0-.3.1-.5l.5-.6c.1-.1.1-.3.1-.5l-.6-1.6c-.1-.3-.3-.4-.6-.4z" fill="currentColor" stroke="none"/></svg>';
+      var PENCIL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg>';
 
-      function teamSlideHead(text) {
+      function teamSlideHead(text, actionBtn) {
+        var row = document.createElement("div");
+        row.className = "team-slide__head-row";
         var h = document.createElement("h3");
         h.className = "team-slide__head";
         h.textContent = text;
-        return h;
+        row.appendChild(h);
+        if (actionBtn) {
+          actionBtn.classList.add("team-slide__head-action");
+          row.appendChild(actionBtn);
+        }
+        return row;
       }
 
       function teamPortrait(person, fallback) {
@@ -8805,17 +8894,16 @@
           name: personName(),
           photo_url: (sessionAccount && sessionAccount.photo_url) || ""
         });
-        meSlide.appendChild(teamSlideHead("Mein Profil"));
-        meSlide.appendChild(teamPortrait(mePerson, personName().slice(0, 1)));
         var editBtn = document.createElement("button");
         editBtn.type = "button";
-        editBtn.className = "team-slide__cta is-solid";
-        editBtn.textContent = "Bearbeiten";
+        editBtn.setAttribute("aria-label", "Profil bearbeiten");
+        editBtn.innerHTML = PENCIL_ICON;
         editBtn.addEventListener("click", function () {
           openProfile(mePerson);
           window.setTimeout(function () { setProfileEditing(true); }, 120);
         });
-        meSlide.appendChild(editBtn);
+        meSlide.appendChild(teamSlideHead("Mein Profil", editBtn));
+        meSlide.appendChild(teamPortrait(mePerson, personName().slice(0, 1)));
         box.appendChild(meSlide);
 
         // Slide 2: trainer
@@ -8825,17 +8913,13 @@
         });
         var coachSlide = document.createElement("article");
         coachSlide.className = "team-slide is-scroll";
-        coachSlide.appendChild(teamSlideHead("Mein Coach"));
+        var pick = document.createElement("button");
+        pick.type = "button";
+        pick.setAttribute("aria-label", trainer ? "Trainer ändern" : "Trainer wählen");
+        pick.innerHTML = PENCIL_ICON;
+        pick.addEventListener("click", function () { openTeamSearch("trainer"); });
+        coachSlide.appendChild(teamSlideHead("Mein Coach", pick));
         coachSlide.appendChild(teamPortrait(trainer, trainer ? String(trainer.name || "?").slice(0, 1) : "C"));
-        var about = document.createElement("p");
-        about.className = "team-slide__about";
-        var aboutText = "";
-        if (trainer) {
-          var ta = profileAbout(trainer);
-          aboutText = String((ta && ta.text) || "").trim();
-        }
-        about.textContent = aboutText || (trainer ? "" : "Noch kein Coach gewählt.");
-        coachSlide.appendChild(about);
         if (trainer) {
           var wa = document.createElement("button");
           wa.type = "button";
@@ -8845,12 +8929,15 @@
           wa.addEventListener("click", function () { openQuickWa(); });
           coachSlide.appendChild(wa);
         }
-        var pick = document.createElement("button");
-        pick.type = "button";
-        pick.className = "team-slide__cta";
-        pick.textContent = trainer ? "Trainer ändern" : "Trainer wählen";
-        pick.addEventListener("click", function () { openTeamSearch("trainer"); });
-        coachSlide.appendChild(pick);
+        var about = document.createElement("p");
+        about.className = "team-slide__about";
+        var aboutText = "";
+        if (trainer) {
+          var ta = profileAbout(trainer);
+          aboutText = String((ta && ta.text) || "").trim();
+        }
+        about.textContent = aboutText || (trainer ? "" : "Noch kein Coach gewählt.");
+        coachSlide.appendChild(about);
         box.appendChild(coachSlide);
 
         // Slide 3: groups (one slide per group, or empty upload slide)
@@ -11330,9 +11417,72 @@
       }
 
 
+      function closeCalendlyPt() {
+        try {
+          if (window.Calendly && typeof window.Calendly.closePopupWidget === "function") {
+            window.Calendly.closePopupWidget();
+          }
+        } catch (eClose) {}
+        document.querySelectorAll(".calendly-overlay, .calendly-popup, .calendly-badge-widget").forEach(function (el) {
+          try { el.remove(); } catch (eRm) {}
+        });
+        var abort = document.getElementById("calendly-abort");
+        if (abort) abort.remove();
+        document.removeEventListener("keydown", onCalendlyEscape, true);
+      }
+
+      function onCalendlyEscape(event) {
+        if (event.key === "Escape" || event.keyCode === 27) {
+          event.preventDefault();
+          closeCalendlyPt();
+        }
+      }
+
+      function ensureCalendlyDismiss() {
+        document.addEventListener("keydown", onCalendlyEscape, true);
+        var tries = 0;
+        function attach() {
+          tries += 1;
+          var overlay = document.querySelector(".calendly-overlay");
+          if (!overlay) {
+            if (tries < 40) window.setTimeout(attach, 100);
+            return;
+          }
+          overlay.addEventListener("click", function (event) {
+            if (event.target === overlay) closeCalendlyPt();
+          });
+          var closeBtn = overlay.querySelector(".calendly-popup-close");
+          if (closeBtn) {
+            closeBtn.style.pointerEvents = "auto";
+            closeBtn.addEventListener("click", function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              closeCalendlyPt();
+            }, true);
+          }
+          if (!document.getElementById("calendly-abort")) {
+            var abort = document.createElement("button");
+            abort.type = "button";
+            abort.id = "calendly-abort";
+            abort.className = "calendly-abort";
+            abort.textContent = "Abbrechen";
+            abort.addEventListener("click", function (event) {
+              event.preventDefault();
+              event.stopPropagation();
+              closeCalendlyPt();
+            });
+            document.body.appendChild(abort);
+          }
+        }
+        window.setTimeout(attach, 80);
+      }
+
       function openCalendlyPt() {
         function boot() {
-          if (window.Calendly) window.Calendly.initPopupWidget({ url: CALENDLY_PT_URL });
+          if (window.Calendly) {
+            window.Calendly.initPopupWidget({ url: CALENDLY_PT_URL });
+            ensureCalendlyDismiss();
+          }
         }
         if (window.Calendly) { boot(); return; }
         var s = document.createElement("script");
@@ -12441,18 +12591,10 @@
         document.getElementById("profile-challenge").textContent = started ? "12-Wochenroutine gestartet" : "12-Wochenroutine nicht gestartet";
         renderProfileWeeks(started, mine);
         var notes = document.getElementById("profile-notes");
-        notes.textContent = "";
-        ["blurb", "life_situation", "goal", "phase_steps"].forEach(function (key) {
-          var text = plan && plan[key] ? String(plan[key]).trim() : "";
-          if (!text) return;
-          var paragraph = document.createElement("p");
-          paragraph.textContent = text;
-          notes.appendChild(paragraph);
-        });
+        if (notes) notes.textContent = "";
         var grid = document.getElementById("profile-photos");
         grid.textContent = "";
         var label = document.getElementById("profile-photos-label");
-        if (label) label.hidden = true;
         var noZirkel = document.getElementById("profile-nozirkel-block");
         if (noZirkel) noZirkel.hidden = true;
         var list = (photos || []).filter(Boolean);
@@ -12462,6 +12604,9 @@
           img.src = src;
           grid.appendChild(img);
         });
+        if (label) label.hidden = !list.length;
+        var photosBlock = document.getElementById("profile-photos-block");
+        if (photosBlock) photosBlock.hidden = !list.length && !mine;
       }
 
       function openProfile(person) {
@@ -12595,6 +12740,7 @@
         });
         window.addEventListener("message", function (e) {
           if (!e.data || e.data.event !== "calendly.event_scheduled") return;
+          closeCalendlyPt();
           var payload = e.data.payload || {};
           var eventStart = (payload.event && payload.event.start_time) || null;
           var uri = (payload.event && payload.event.uri) || null;
