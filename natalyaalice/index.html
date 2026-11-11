@@ -1331,13 +1331,14 @@
     body.is-session[data-shell="plan"] #plan-week { order: 6; margin-top: 16px; }
     body.is-session[data-shell="plan"] #days { order: 7; }
     body.is-session[data-shell="plan"] .shell-plan { order: 8; }
-    body.is-session[data-shell="woche"] .absence-block { order: 1; }
-    body.is-session[data-shell="woche"] .routine-row { order: 2; margin-top: 24px; }
-    body.is-session[data-shell="woche"] #weeks { order: 3; }
-    body.is-session[data-shell="woche"] #routine-note { order: 4; }
-    body.is-session[data-shell="woche"] .tip { order: 5; }
-    body.is-session[data-shell="woche"] #plan-week { order: 6; margin-top: 16px; }
-    body.is-session[data-shell="woche"] #days { order: 7; }
+    body.is-session[data-shell="woche"] #week-rail-nav { order: 1; }
+    body.is-session[data-shell="woche"] #days { order: 2; }
+    body.is-session[data-shell="woche"] .absence-block { order: 3; }
+    body.is-session[data-shell="woche"] .routine-row { order: 4; margin-top: 24px; }
+    body.is-session[data-shell="woche"] #weeks { order: 5; }
+    body.is-session[data-shell="woche"] #routine-note { order: 6; }
+    body.is-session[data-shell="woche"] .tip { order: 7; }
+    body.is-session[data-shell="woche"] #plan-week { order: 8; margin-top: 16px; }
     body.is-session[data-shell="woche"] .tip,
     body.is-session[data-shell="woche"] #plan-week { display: none !important; }
     body.is-session[data-shell="woche"] {
@@ -1345,8 +1346,11 @@
     }
     body.is-session[data-shell="woche"] .welcome {
       overflow-x: hidden;
-      /* 1/2 Höhe der obersten Buttons (vor Ort / Reise, min-height 44px) */
+      min-height: 100dvh;
+      box-sizing: border-box;
+      /* Oberkante wie früher bei vor Ort / Reise */
       padding-top: calc(4px + env(safe-area-inset-top) + 22px);
+      padding-bottom: calc(68px + env(safe-area-inset-bottom, 0px));
     }
     body.is-session[data-shell="plan"] .dock,
     body.is-session[data-shell="woche"] .dock { display: none !important; }
@@ -1355,6 +1359,12 @@
     body.is-session[data-shell="woche"] .days.shell-kalender { display: flex; }
     body.is-session[data-shell="woche"] .absence-block { display: block; }
     body.is-session[data-shell="woche"] .routine-row { display: grid; }
+    body.is-session[data-shell="woche"] .week-mode { display: none; }
+    body.is-session[data-shell="woche"] .absence-block.is-editing {
+      order: 0;
+      margin-bottom: 10px;
+    }
+    body.is-session[data-shell="woche"] .absence-block.is-editing .week-mode { display: grid; }
     .plan-tabs, .shell-plan, .heute-start, .heute-events, .zirkel-block { display: none; }
     body.is-session[data-shell="plan"] .plan-tabs {
       display: grid;
@@ -2400,7 +2410,7 @@
       flex-direction: row;
       align-items: stretch;
       gap: 12px;
-      margin: 14px 0 0;
+      margin: 0;
       padding: 0;
       overflow-x: auto;
       overflow-y: hidden;
@@ -2410,18 +2420,29 @@
       scrollbar-width: none;
     }
     body.is-session #days.days::-webkit-scrollbar { display: none; height: 0; }
+    body.is-session[data-shell="woche"] #days.days {
+      flex: 1 1 auto;
+      min-height: calc(100dvh - 168px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+      align-items: stretch;
+    }
     body.is-session #days .day-block {
       flex: 0 0 100%;
       width: 100%;
       margin: 0;
       scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
     }
     body.is-session #days .day-card {
-      display: block;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
       box-sizing: border-box;
       width: 100%;
-      aspect-ratio: 5 / 3;
-      min-height: 0;
+      flex: 1 1 auto;
+      min-height: calc(100dvh - 210px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
       margin: 0;
       padding: 0;
       border: 0;
@@ -2437,21 +2458,77 @@
       object-fit: cover;
       pointer-events: none;
     }
-    .day-card__head {
+    .day-card__overlay {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      width: 100%;
+      margin-top: auto;
+      padding: 28px 16px 18px;
+      box-sizing: border-box;
+      background: linear-gradient(180deg, rgba(243, 238, 228, 0) 0%, rgba(243, 238, 228, 0.72) 28%, rgba(243, 238, 228, 0.92) 100%);
+      color: #2A2118;
+    }
+    .day-card__overlay .day-card__blurb {
+      margin: 0;
+      color: rgba(42, 33, 24, 0.82);
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.4;
+      max-width: 34em;
+    }
+    body.is-session #days .day-card__overlay .day-place {
+      width: auto;
+      max-width: 100%;
+      margin: 0;
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid rgba(42, 33, 24, 0.55);
+      background: rgba(246, 241, 232, 0.72);
+    }
+    body.is-session #days .day-card__overlay .day-invite {
+      width: 100%;
+      margin: 2px 0 0;
+    }
+    .day-card__overlay-tools {
       display: flex;
       align-items: baseline;
       justify-content: space-between;
       gap: 12px;
       width: 100%;
-      margin: 0 0 8px;
+      margin-top: 2px;
+    }
+    .day-card__time {
+      margin: 0;
       padding: 0;
-      color: rgba(42, 33, 24, 0.58);
-      font-size: 12px;
+      border: 0;
+      background: transparent;
+      color: rgba(42, 33, 24, 0.72);
+      font: inherit;
+      font-size: 13px;
       font-weight: 600;
       text-align: left;
       cursor: pointer;
-      background: transparent;
+    }
+    .day-card__time:disabled { cursor: default; opacity: 0.7; }
+    .day-card__reise {
+      margin: 0;
+      padding: 0;
       border: 0;
+      background: transparent;
+      color: #2A2118;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+    }
+    .day-card__head {
+      display: none;
     }
     .day-card__head-label {
       flex: 1 1 auto;
@@ -2472,12 +2549,7 @@
     }
     .day-card__head:disabled { cursor: default; }
     .day-card__meta {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 6px;
-      margin-top: 10px;
-      width: 100%;
+      display: none;
     }
     .day-card__meta .day-card__blurb { margin: 2px 0 0; }
     .day-card__meta .day-alt { margin-top: 4px; }
@@ -2486,18 +2558,19 @@
     body.is-session #days .day.day-card__main.is-edit {
       display: block;
       width: 100%;
+      flex: none;
       min-height: 0;
-      margin: 0;
+      margin: 0 0 10px;
       padding: 0;
       border: 0;
       border-radius: 0;
       background: transparent;
       color: #2A2118;
-      font-family: "Playfair Display", serif;
-      font-size: 22px;
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: var(--t-l, 24px);
       font-weight: 600;
       line-height: 1.2;
-      text-align: left;
+      text-align: center;
     }
     body.is-session #days .day.day-card__main.is-empty { color: #C7413B; }
     body.is-session #days .day-block .day-place {
@@ -3229,12 +3302,17 @@
       box-sizing: border-box;
     }
     body.is-session[data-shell="plan"][data-plan="team"] #team-rail-nav,
-    body.is-session[data-shell="plan"][data-plan="training"] #go-rail-nav {
+    body.is-session[data-shell="plan"][data-plan="training"] #go-rail-nav,
+    body.is-session[data-shell="woche"] #week-rail-nav {
       display: grid;
       grid-template-columns: 28px 1fr 28px;
       align-items: center;
       gap: 6px;
       order: 7; /* direkt unter plan-tabs (order 1), vor den Slides */
+    }
+    body.is-session[data-shell="woche"] #week-rail-nav {
+      order: 1;
+      margin: 0 0 8px;
     }
     body.is-session[data-shell="plan"][data-plan="team"] #plan-team { order: 8; }
     body.is-session[data-shell="plan"][data-plan="training"] #plan-training { order: 8; }
@@ -3704,11 +3782,12 @@
       touch-action: none;
     }
     body.is-session[data-shell="woche"] .hscroll-dock.is-on {
-      display: block;
+      display: none !important;
     }
-    /* Team/gogogo: kein Scrollbalken — Pfeil-Navigation oben */
+    /* Team/gogogo/Woche: kein Scrollbalken — Pfeil-Navigation oben */
     body.is-session[data-shell="plan"][data-plan="team"] .hscroll-dock,
-    body.is-session[data-shell="plan"][data-plan="training"] .hscroll-dock {
+    body.is-session[data-shell="plan"][data-plan="training"] .hscroll-dock,
+    body.is-session[data-shell="woche"] .hscroll-dock {
       display: none !important;
     }
     .hscroll-dock__track {
@@ -3734,7 +3813,6 @@
       touch-action: none;
     }
     .hscroll-dock__thumb:active { cursor: grabbing; }
-    body.is-session[data-shell="woche"] .welcome,
     body.is-session[data-shell="heute"] .welcome {
       padding-bottom: calc(68px + 56px + env(safe-area-inset-bottom, 0px));
     }
@@ -4243,6 +4321,15 @@
     </button>
     <p class="tip shell-kalender">Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.</p>
     <button type="button" id="plan-week" class="plan-week shell-kalender" hidden>Meine Bewegung in der Woche planen</button>
+    <div class="rail-nav" id="week-rail-nav" hidden>
+      <button type="button" class="rail-nav__btn rail-nav__prev" aria-label="Vorheriger Tag">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <h3 class="rail-nav__title" id="week-rail-title"></h3>
+      <button type="button" class="rail-nav__btn rail-nav__next" aria-label="Nächster Tag">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
     <div class="days shell-kalender" id="days"></div>
     <div class="absence-block shell-kalender" id="absence-block">
       <div class="week-mode" role="group" aria-label="Woche">
@@ -6558,6 +6645,7 @@
         document.getElementById("go-short").disabled = picking || shifted || !todayPlanned;
         paintPhoto();
         paintHeuteExtras();
+        syncHScrollDock();
       }
 
       function workoutBlurb(unit, away, altLabel) {
@@ -6580,34 +6668,12 @@
         var key = DAY_KEYS[wd];
         var unit = displayUnit(wd);
         var away = awayOn(iso, absenceOf(sessionAccount));
+        var time = timeForWeekday(wd);
+        var travel = away ? travelAltFor(iso) : "";
         var wrap = document.createElement("div");
         wrap.className = "day-block";
-        var head = document.createElement("div");
-        head.className = "day-card__head";
-        var headLabel = document.createElement("button");
-        headLabel.type = "button";
-        headLabel.className = "day-card__head-label";
-        var time = timeForWeekday(wd);
-        headLabel.textContent = (away ? "Reise · " : "") + formatLong(iso) + (time ? " · " + time + " Uhr" : "");
-        if (!away) {
-          headLabel.setAttribute("aria-label", "Uhrzeit am " + DAY_NAMES[key] + " ändern");
-          headLabel.addEventListener("click", function () { openDayTime(wd); });
-        } else {
-          headLabel.disabled = true;
-        }
-        head.appendChild(headLabel);
-        head.appendChild(dayCsvButton());
-        wrap.appendChild(head);
-        var block = document.createElement("div");
-        var travel = away ? travelAltFor(iso) : "";
-        block.className = "day-card" + (away ? " is-travel" : "") + ((!away && !(unit && unit.kind)) ? " is-empty" : "");
-        if (away) applyWorkoutTone(block, travel ? { kind: "alternative", label: travel } : { kind: "extra" });
-        else if (unit && unit.kind) applyWorkoutTone(block, unit);
-        else applyWorkoutTone(block, { kind: "extra" });
-        block.innerHTML = ""; /* Platzhalter für echte Bilder */
-        wrap.appendChild(block);
-        var meta = document.createElement("div");
-        meta.className = "day-card__meta";
+        wrap.dataset.title = (away ? "Reise · " : "") + DAY_NAMES[key];
+
         var main = document.createElement("button");
         main.type = "button";
         main.className = "day day-card__main";
@@ -6615,36 +6681,71 @@
           main.dataset.travel = iso;
           main.textContent = travel ? (activityEmoji({ kind: "alternative", label: travel }) + " " + travel).trim() : "Alternative wählen";
           main.classList.toggle("is-empty", !travel);
-          meta.appendChild(main);
-          var blurbA = document.createElement("p");
-          blurbA.className = "day-card__blurb";
-          blurbA.textContent = workoutBlurb(null, true, travel);
-          meta.appendChild(blurbA);
-          wrap.appendChild(meta);
-          return wrap;
+        } else {
+          main.dataset.day = key;
+          if (unit && unit.kind === "spontan") main.textContent = "Am Tag spontan";
+          else if (unit && unit.kind) main.textContent = (activityEmoji(unit) + " " + (unit.label || "")).trim();
+          else {
+            main.textContent = "Tippe, um zu planen";
+            main.classList.add("is-empty");
+          }
         }
-        main.dataset.day = key;
-        main.disabled = false;
-        if (unit && unit.kind === "spontan") main.textContent = "Am Tag spontan";
-        else if (unit && unit.kind) main.textContent = (activityEmoji(unit) + " " + (unit.label || "")).trim();
-        else {
-          main.textContent = "Tippe, um zu planen";
-          main.classList.add("is-empty");
-        }
-        meta.appendChild(main);
+        wrap.appendChild(main);
+
+        var block = document.createElement("div");
+        block.className = "day-card" + (away ? " is-travel" : "") + ((!away && !(unit && unit.kind)) ? " is-empty" : "");
+        if (away) applyWorkoutTone(block, travel ? { kind: "alternative", label: travel } : { kind: "extra" });
+        else if (unit && unit.kind) applyWorkoutTone(block, unit);
+        else applyWorkoutTone(block, { kind: "extra" });
+
+        var overlay = document.createElement("div");
+        overlay.className = "day-card__overlay";
+
         var blurb = document.createElement("p");
         blurb.className = "day-card__blurb";
-        blurb.textContent = workoutBlurb(unit, false, dayAltFor(iso));
-        meta.appendChild(blurb);
-        var place = document.createElement("button");
-        place.type = "button";
-        place.className = "day-place";
-        place.textContent = "Ort: " + placeForWeekday(wd);
-        place.setAttribute("aria-label", "Ort am " + DAY_NAMES[key] + " ändern");
-        place.addEventListener("click", function () { openDayPlace(wd); });
-        meta.appendChild(place);
-        meta.appendChild(dayInviteEl(iso));
-        wrap.appendChild(meta);
+        blurb.textContent = workoutBlurb(away ? null : unit, away, away ? travel : dayAltFor(iso));
+        overlay.appendChild(blurb);
+
+        if (!away) {
+          var place = document.createElement("button");
+          place.type = "button";
+          place.className = "day-place";
+          place.textContent = "Ort: " + placeForWeekday(wd);
+          place.setAttribute("aria-label", "Ort am " + DAY_NAMES[key] + " ändern");
+          place.addEventListener("click", function () { openDayPlace(wd); });
+          overlay.appendChild(place);
+          overlay.appendChild(dayInviteEl(iso));
+        }
+
+        var tools = document.createElement("div");
+        tools.className = "day-card__overlay-tools";
+        var timeBtn = document.createElement("button");
+        timeBtn.type = "button";
+        timeBtn.className = "day-card__time";
+        timeBtn.textContent = time ? (time + " Uhr") : "Uhrzeit setzen";
+        if (!away) {
+          timeBtn.setAttribute("aria-label", "Uhrzeit am " + DAY_NAMES[key] + " ändern");
+          timeBtn.addEventListener("click", function () { openDayTime(wd); });
+        } else {
+          timeBtn.disabled = true;
+        }
+        tools.appendChild(timeBtn);
+        var reise = document.createElement("button");
+        reise.type = "button";
+        reise.className = "day-card__reise";
+        reise.textContent = away ? "vor Ort" : "Reise";
+        reise.setAttribute("aria-label", away ? "Wieder vor Ort planen" : "Reise planen");
+        reise.addEventListener("click", function (event) {
+          event.stopPropagation();
+          var target = document.querySelector(away ? '[data-week-mode="home"]' : '[data-week-mode="travel"]');
+          if (target) target.click();
+        });
+        tools.appendChild(reise);
+        tools.appendChild(dayCsvButton());
+        overlay.appendChild(tools);
+
+        block.appendChild(overlay);
+        wrap.appendChild(block);
         return wrap;
       }
 
@@ -9304,6 +9405,7 @@
         });
         var save = document.getElementById("absence-save");
         if (save) save.textContent = range && !weekModeOpen ? "Reise ändern" : "Reise speichern";
+        if (typeof syncAbsenceEditing === "function") syncAbsenceEditing();
       }
 
       function saveAbout(about) {
@@ -10062,7 +10164,7 @@
       function railSlides(rail) {
         if (!rail) return [];
         return Array.prototype.slice.call(rail.children).filter(function (el) {
-          return el && (el.classList.contains("team-slide") || el.classList.contains("go-slide"));
+          return el && (el.classList.contains("team-slide") || el.classList.contains("go-slide") || el.classList.contains("day-block"));
         });
       }
 
@@ -10131,10 +10233,13 @@
         var pane = document.body.dataset.plan || planPane;
         var teamNav = document.getElementById("team-rail-nav");
         var goNav = document.getElementById("go-rail-nav");
+        var weekNav = document.getElementById("week-rail-nav");
         var teamRail = document.getElementById("plan-team");
         var goRail = document.getElementById("go-rail");
+        var weekRail = document.getElementById("days");
         if (teamNav) teamNav.hidden = !(sessionMode && document.body.dataset.shell === "plan" && pane === "team");
         if (goNav) goNav.hidden = !(sessionMode && document.body.dataset.shell === "plan" && pane === "training");
+        if (weekNav) weekNav.hidden = !(sessionMode && document.body.dataset.shell === "woche");
         if (pane === "team" && teamRail && teamNav) {
           bindRailNav(teamRail, teamNav);
           syncRailNav(teamRail, teamNav);
@@ -10143,6 +10248,17 @@
           bindRailNav(goRail, goNav);
           syncRailNav(goRail, goNav);
         }
+        if (document.body.dataset.shell === "woche" && weekRail && weekNav) {
+          bindRailNav(weekRail, weekNav);
+          syncRailNav(weekRail, weekNav);
+        }
+      }
+
+      function syncAbsenceEditing() {
+        var block = document.getElementById("absence-block");
+        var editor = document.getElementById("absence-editor");
+        if (!block) return;
+        block.classList.toggle("is-editing", !!(editor && !editor.hidden));
       }
 
       function syncHScrollDock() {
@@ -10152,19 +10268,11 @@
         if (!dock || !thumb) return;
         var el = activeHScrollEl();
         hScrollTarget = el;
-        var pane = document.body.dataset.plan || planPane;
-        var show = !!(el && sessionMode && document.body.dataset.shell === "woche");
-        dock.hidden = !show;
-        dock.classList.toggle("is-on", show);
-        if (!show || !el) return;
-        var max = Math.max(1, el.scrollWidth - el.clientWidth);
-        var ratio = el.clientWidth / Math.max(el.scrollWidth, 1);
-        var thumbW = Math.max(28, Math.min(100, ratio * 100));
-        thumb.style.width = thumbW + "%";
-        var left = (el.scrollLeft / max) * (100 - thumbW);
-        thumb.style.left = left + "%";
+        dock.hidden = true;
+        dock.classList.remove("is-on");
         if (document.body.dataset.plan === "team") layoutGroupEmptySlides();
         syncTeamGoRailNav();
+        syncAbsenceEditing();
       }
 
       if (!layoutGroupEmptySlides.bound) {
@@ -14556,6 +14664,7 @@
             requestAnimationFrame(function () { requestAnimationFrame(scrollAbsenceWheels); });
           }
           paintAbsenceButton();
+          syncAbsenceEditing();
         });
       });
       document.getElementById("absence-save").addEventListener("click", function () {
