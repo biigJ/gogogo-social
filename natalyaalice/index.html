@@ -1315,7 +1315,12 @@
     body.is-session[data-shell="heute"] .heute-joins { order: 3; }
     body.is-session[data-shell="heute"] .heute-start { order: 4; }
     body.is-session[data-shell="heute"] #go-today,
-    body.is-session[data-shell="heute"] #go-tomorrow { min-height: 224px; }
+    body.is-session[data-shell="heute"] #go-tomorrow {
+      min-height: 0;
+      aspect-ratio: 4 / 5;
+      width: 100%;
+      box-sizing: border-box;
+    }
     body.is-session[data-shell="heute"] #go-tomorrow { margin-top: 12px; }
     body.is-session[data-shell="heute"] .heute-events { order: 5; }
     body.is-session[data-shell="heute"][data-heute="mine"] .heute-start,
@@ -1682,7 +1687,10 @@
       flex-direction: column;
       justify-content: center;
       gap: 4px;
-      min-height: 224px;
+      min-height: 0;
+      aspect-ratio: 4 / 5;
+      width: 100%;
+      box-sizing: border-box;
       margin-top: 12px;
       padding: 16px 18px;
       border: 0;
@@ -2923,7 +2931,10 @@
       flex-direction: column;
       justify-content: center;
       gap: 4px;
-      min-height: 224px;
+      min-height: 0;
+      aspect-ratio: 4 / 5;
+      width: 100%;
+      box-sizing: border-box;
       margin: 0 0 12px;
       padding: 16px 18px;
       border: 0;
@@ -11692,15 +11703,7 @@
       var movedPick = "";
 
       function openTodayEvent() {
-        var btn = document.getElementById("go-today");
-        var kind = btn.dataset.kind || "";
-        var label = kind && kind !== "spontan" && kind !== "away" ? (btn.dataset.unitLabel || "") : "";
-        if (kind === "zirkel" && !label) label = "Zirkeltraining";
-        var place = placeForWeekday(weekdayIndex(Log.berlinToday()));
-        var heading = label || document.getElementById("today-title").textContent || "Heute";
-        requireFfc(function () {
-          FFC.openEvent({ title: label, where: isHomePlace(place) ? "" : place });
-        }, { title: heading, tagline: "Melde Dich an, um Dein Team einzuladen." });
+        openInvite(Log.berlinToday());
       }
 
       var goFlow = null;
@@ -12008,13 +12011,16 @@
           return;
         }
         if (sessionMode) {
-          var label = kind && kind !== "spontan" && kind !== "away" ? (btn.dataset.unitLabel || "") : "";
-          if (kind === "zirkel" && !label) label = "Zirkeltraining";
-          var place = placeForWeekday(weekdayIndex(iso));
-          var heading = label || (btn.querySelector(".today-card__title") || {}).textContent || "Training";
-          requireFfc(function () {
-            FFC.openEvent({ title: label, where: isHomePlace(place) ? "" : place });
-          }, { title: heading, tagline: "Melde Dich an, um Dein Team einzuladen." });
+          if (iso === Log.berlinToday() && kind && kind !== "spontan") {
+            enterWorkout(false);
+            return;
+          }
+          if (kind && kind !== "spontan") {
+            openInvite(iso);
+            return;
+          }
+          var key = DAY_KEYS[weekdayIndex(iso)];
+          if (key) choosePlanDay(key);
           return;
         }
         enterWorkout(false);
