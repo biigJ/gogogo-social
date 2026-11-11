@@ -1333,6 +1333,55 @@
     const open = evList.filter(e=> !e.is_mine && e.my_going === null).length;
     connSegEl.querySelector('[data-csub=events]').textContent = 'Events' + (open ? ' ('+open+' neu)' : '');
   }
+  const WA_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12.04 2a9.9 9.9 0 0 0-8.5 14.9L2 22l5.2-1.36A9.9 9.9 0 1 0 12.04 2zm0 1.8a8.1 8.1 0 0 1 6.85 12.2l-.34.55.4 1.47-1.5-.4-.52.32A8.1 8.1 0 1 1 12.04 3.8zm4.66 10.54c-.2-.1-1.18-.58-1.36-.65-.18-.07-.32-.1-.45.1-.13.2-.52.65-.64.78-.12.13-.24.15-.44.05-.2-.1-.84-.31-1.6-.99-.59-.53-.99-1.18-1.1-1.38-.12-.2-.01-.3.09-.4.09-.09.2-.24.3-.36.1-.12.13-.2.2-.34.07-.13.03-.25-.02-.35-.05-.1-.45-1.08-.62-1.48-.16-.38-.33-.33-.45-.34h-.38c-.13 0-.35.05-.53.25-.18.2-.7.68-.7 1.66s.72 1.93.82 2.06c.1.13 1.41 2.15 3.42 3.02 2.01.87 2.01.58 2.37.54.36-.04 1.18-.48 1.35-.95.17-.47.17-.87.12-.95-.05-.08-.18-.13-.38-.23z"/></svg>';
+  const DEL_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const HOUR_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h11M6.5 20.5h11M8 3.5v2.2c0 2.2 1.6 3.5 4 5.3 2.4-1.8 4-3.1 4-5.3V3.5M8 20.5v-2.2c0-2.2 1.6-3.5 4-5.3 2.4 1.8 4 3.1 4 5.3v2.2"/></svg>';
+
+  function eventPeopleHtml(e){
+    const going = {};
+    (e.going_names || []).forEach(n=>{ if(n) going[String(n).toLowerCase()] = true; });
+    const friends = (lbFriendList || []).map(f=>({
+      friend_id: f.friend_id, nickname: f.nickname, avatar_url: f.avatar_url || '', status: f.status
+    }));
+    const people = [];
+    const used = {};
+    function pushPerson(nick, avatar, pending){
+      const key = String(nick || '').toLowerCase();
+      if(!key || used[key]) return;
+      used[key] = true;
+      const label = String(nick || 'Freund');
+      const face = avatar
+        ? '<img class="event-people__face" alt="" src="'+esc(avatar)+'">'
+        : '<span class="event-people__ph">'+esc(label.slice(0,1))+'</span>';
+      people.push(
+        '<button type="button" class="event-people__slot'+(pending?' is-pending':'')+'" data-evname="1" aria-label="'+esc(label)+'" title="'+esc(label)+'">' +
+          face +
+          (pending ? '<span class="event-people__wait" aria-hidden="true">'+HOUR_ICON+'</span>' : '') +
+          '<span class="event-people__tip">'+esc(label)+'</span>' +
+        '</button>'
+      );
+    }
+    if(e.creator_nickname){
+      pushPerson(e.creator_nickname, e.creator_avatar_url || '', false);
+    }
+    (e.going_names || []).forEach(n=>{
+      const f = friends.find(x=> String(x.nickname||'').toLowerCase() === String(n||'').toLowerCase());
+      pushPerson(n, f && f.avatar_url, false);
+    });
+    friends.filter(f=> f && f.status === 'accepted').forEach(f=>{
+      const nick = f.nickname || '';
+      if(!nick) return;
+      if(going[String(nick).toLowerCase()]) return;
+      if(e.creator_nickname && String(e.creator_nickname).toLowerCase() === String(nick).toLowerCase()) return;
+      // Pending friends: only when everyone was invited (sonst fehlen die Invitee-Namen in der API)
+      if(e.all_friends){
+        pushPerson(nick, f.avatar_url || '', true);
+      }
+    });
+    if(!people.length) return '';
+    return '<div class="event-people">'+people.join('')+'</div>';
+  }
+
   function renderEvents(){
     updateEventsTabLabel();
     if(!evList.length){
@@ -1341,45 +1390,53 @@
     }
     evListEl.innerHTML = evList.map(e=>{
       const d = new Date(e.starts_at);
-      const day = d.toLocaleDateString('de-DE',{weekday:'short'}).replace('.','').toUpperCase();
-      const mon = d.toLocaleDateString('de-DE',{month:'short'}).replace('.','').toUpperCase();
+      const dateLong = d.toLocaleDateString('de-DE',{weekday:'long', day:'2-digit', month:'2-digit'});
       const time = d.toLocaleTimeString('de-DE',{hour:'2-digit', minute:'2-digit'}) + ' Uhr';
       const who = e.is_mine ? 'von dir' : 'von '+esc(e.creator_nickname);
       const audience = e.all_friends ? 'für alle Freunde' : ('für '+e.invite_count+' '+(e.invite_count===1?'Freund':'Freunde'));
-      const names = (e.going_names || []).map(esc).join(', ');
-      const maps = e.location ? '<a href="https://maps.google.com/?q='+encodeURIComponent(e.location)+'" target="_blank" rel="noopener">'+esc(e.location)+'</a>' : '';
-      return '<div class="ev-card'+(e.is_mine?' mine':'')+(e.image_url?' has-img':'')+'" data-ev="'+e.id+'">' +
-        (e.image_url ? '<div class="ev-banner" style="background-image:url(\''+esc(e.image_url)+'\')"></div>' : '') +
-        '<div class="ev-date"><span class="d1">'+day+'</span><span class="d2">'+d.getDate()+'</span><span class="d3">'+mon+'</span></div>' +
-        '<div class="ev-body"><b>'+esc(e.title)+'</b>' +
-          '<span class="ev-line">'+time+(maps?' · '+maps:'')+'</span>' +
-          '<span class="ev-line">'+who+' · '+(e.is_mine ? audience : (e.all_friends ? 'für alle Freunde' : 'du bist eingeladen'))+'</span>' +
-          '<span class="ev-going">'+(e.going_count ? '✓ '+e.going_count+' dabei: '+names : 'Noch keine Zusagen')+'</span>' +
-          '<div class="ev-actions">' +
-            '<button class="lb-mini'+(e.my_going===true?' go':'')+'" data-evact="yes" data-id="'+e.id+'">'+(e.my_going===true?'✓ Dabei':'Dabei')+'</button>' +
-            '<button class="lb-mini'+(e.my_going===false?' on-no':'')+'" data-evact="no" data-id="'+e.id+'">Nicht dabei</button>' +
-            '<button class="lb-mini ev-share" data-evact="share" data-id="'+e.id+'" aria-label="Auf WhatsApp teilen">'+SHARE_SVG+' WhatsApp</button>' +
-            (e.is_mine ? '<button class="lb-mini warn" data-evact="del" data-id="'+e.id+'">Löschen</button>' : '') +
-          '</div>' +
-        '</div></div>';
+      const maps = e.location ? esc(e.location) : '';
+      const line = who + ' · ' + (e.is_mine ? audience : (e.all_friends ? 'für alle Freunde' : 'du bist eingeladen')) + (maps ? ' · ' + maps : '');
+      const bg = e.image_url ? ' style="background-image:url(\''+esc(e.image_url)+'\')"' : '';
+      const yesLabel = e.my_going === true ? '✓ Zusage' : 'Zusage';
+      const noLabel = e.my_going === false ? '✓ Absage' : 'Absage';
+      return '<div class="ev-card invite-card'+(e.is_mine?' mine':'')+(e.image_url?' has-img':'')+'" data-ev="'+e.id+'"'+bg+'>' +
+        '<div class="ev-top">' +
+          '<button type="button" class="ev-wa" data-evact="share" data-id="'+e.id+'" aria-label="Auf WhatsApp teilen">'+WA_ICON+'</button>' +
+          (e.is_mine ? '<button type="button" class="ev-del" data-evact="del" data-id="'+e.id+'" aria-label="Löschen">'+DEL_ICON+'</button>' : '<span></span>') +
+        '</div>' +
+        '<span class="today-card__kicker">'+esc(dateLong)+' · '+esc(time)+'</span>' +
+        '<span class="today-card__title">'+esc(e.title)+'</span>' +
+        '<span class="today-card__line">'+line+'</span>' +
+        eventPeopleHtml(e) +
+        '<div class="invite-card__actions">' +
+          '<button type="button" data-evact="no" data-id="'+e.id+'"'+(e.my_going===false?' class="is-yes"':'')+'>'+noLabel+'</button>' +
+          '<button type="button" class="is-yes" data-evact="yes" data-id="'+e.id+'">'+yesLabel+'</button>' +
+        '</div>' +
+      '</div>';
     }).join('');
   }
   evListEl.addEventListener('click', async e=>{
+    const nameBtn = e.target.closest('button[data-evname]');
+    if(nameBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      const row = nameBtn.parentElement;
+      const on = !nameBtn.classList.contains('is-named');
+      if(row) row.querySelectorAll('.is-named').forEach(el=> el.classList.remove('is-named'));
+      if(on) nameBtn.classList.add('is-named');
+      return;
+    }
     const btn = e.target.closest('button[data-evact]');
     if(!btn) return;
     const id = Number(btn.dataset.id);
     if(btn.dataset.evact === 'share'){ shareEventWhatsApp(evList.find(x=>x.id===id)); return; }
     if(btn.dataset.evact === 'del'){
-      if(btn.dataset.armed !== '1'){
-        btn.dataset.armed = '1'; btn.textContent = 'Sicher?';
-        setTimeout(()=>{ if(btn.isConnected){ btn.dataset.armed=''; btn.textContent='Löschen'; } }, 3000);
-        return;
-      }
+      if(!window.confirm('Event wirklich löschen?')) return;
       btn.disabled = true;
       const evObj = evList.find(x=>x.id===id);
       const res = await sb.rpc('delete_event', { p_event_id: id });
       const mImg = evObj && evObj.image_url && evObj.image_url.match(/\/event-images\/(.+)$/);
-      if(!res.error && mImg){ try{ await sb.storage.from('event-images').remove([decodeURIComponent(mImg[1])]); }catch(e){} }
+      if(!res.error && mImg){ try{ await sb.storage.from('event-images').remove([decodeURIComponent(mImg[1])]); }catch(err){} }
       if(res.error){ btn.disabled = false; alertInline(res.error); return; }
       await loadEvents();
       return;
