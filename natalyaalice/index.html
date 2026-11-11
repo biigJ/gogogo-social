@@ -3104,7 +3104,7 @@
       max-height: calc(1.4em * 4);
     }
     .team-slide.is-coach .team-slide__cta.is-pt {
-      margin-top: 36px;
+      margin-top: calc(36px * 0.65);
       margin-bottom: 0;
       flex: none;
     }
@@ -3113,9 +3113,6 @@
     }
     .team-slide.is-coach .team-slide__coach-name + .team-slide__about {
       margin-top: 0;
-    }
-    .team-slide.is-coach .team-wa {
-      margin-top: 12px;
     }
     .team-slide.is-coach .coach-appointments {
       margin-top: 4px;
@@ -3137,14 +3134,14 @@
       margin-top: 12px;
     }
     .team-slide__add-friend-circle {
-      width: 64px;
-      height: 64px;
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
-      border: 1.5px solid #2A2118;
+      border: 1px solid #2A2118;
       display: grid;
       place-items: center;
       font-size: 28px;
-      font-weight: 500;
+      font-weight: 400;
       line-height: 1;
       background: transparent;
     }
@@ -3218,19 +3215,22 @@
       display: none;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
+      gap: 8px;
       width: 100%;
-      margin: 0 0 12px;
+      margin: 0 0 10px; /* wie .team-slide__head früher unter der Reiter-Linie */
       padding: 0;
       box-sizing: border-box;
     }
     body.is-session[data-shell="plan"][data-plan="team"] #team-rail-nav,
     body.is-session[data-shell="plan"][data-plan="training"] #go-rail-nav {
       display: grid;
-      grid-template-columns: 40px 1fr 40px;
+      grid-template-columns: 28px 1fr 28px;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      order: 7; /* direkt unter plan-tabs (order 1), vor den Slides */
     }
+    body.is-session[data-shell="plan"][data-plan="team"] #plan-team { order: 8; }
+    body.is-session[data-shell="plan"][data-plan="training"] #plan-training { order: 8; }
     .rail-nav__title {
       margin: 0;
       text-align: center;
@@ -3245,8 +3245,8 @@
       white-space: nowrap;
     }
     .rail-nav__btn {
-      width: 40px;
-      height: 40px;
+      width: 28px;
+      height: 28px;
       margin: 0;
       padding: 0;
       border: 0;
@@ -3256,7 +3256,7 @@
       place-items: center;
       cursor: pointer;
     }
-    .rail-nav__btn svg { width: 22px; height: 22px; display: block; }
+    .rail-nav__btn svg { width: 20px; height: 20px; display: block; }
     .rail-nav__btn.is-dim,
     .rail-nav__btn:disabled {
       color: rgba(42, 33, 24, 0.28);
@@ -3281,10 +3281,36 @@
     }
     .team-slide__coach-name .team-slide__head-action {
       flex: none;
+      width: 28px;
+      height: 28px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: #2A2118;
+      padding: 0;
+      display: grid;
+      place-items: center;
+    }
+    .team-slide__coach-name .team-slide__head-action svg {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
+    .team-slide__coach-name .team-wa {
+      flex: none;
+      width: 28px;
+      height: 28px;
+      margin: 0;
+      margin-left: 0;
+    }
+    .team-slide__coach-name .team-wa svg {
+      width: 22px;
+      height: 22px;
+      display: block;
     }
     .team-slide__art + .team-slide__cta,
     .go-slide__art + .go-slide__cta {
-      margin-top: 36px;
+      margin-top: calc(36px * 0.65);
     }
     .go-slide__cta + .go-slide__copy {
       margin-top: 36px;
@@ -3302,7 +3328,7 @@
     }
     body.is-session #plan-team.team-rail .team-slide.is-group-empty .team-slide__cta {
       position: static;
-      margin-top: 36px !important;
+      margin-top: calc(36px * 0.65) !important;
       margin-bottom: 0;
       width: 100%;
     }
@@ -3373,7 +3399,7 @@
       color: #F6F1E8;
       font-weight: 600;
     }
-    .go-slide__art + .go-slide__cta { margin-top: 36px; }
+    .go-slide__art + .go-slide__cta { margin-top: calc(36px * 0.65); }
     .go-slide__cta + .go-slide__copy { margin-top: 36px; }
     .go-slide__head { display: none; }
     .go-subpage {
@@ -9854,6 +9880,15 @@
         pick.innerHTML = PENCIL_ICON;
         pick.addEventListener("click", function () { openTeamSearch("trainer"); });
         nameRow.appendChild(pick);
+        if (trainer) {
+          var wa = document.createElement("button");
+          wa.type = "button";
+          wa.className = "team-wa";
+          wa.setAttribute("aria-label", "Sofortnachricht an Trainer");
+          wa.innerHTML = WA_ICON;
+          wa.addEventListener("click", function () { openQuickWa(); });
+          nameRow.appendChild(wa);
+        }
         coachSlide.appendChild(nameRow);
         var about = document.createElement("p");
         about.className = "team-slide__about";
@@ -9864,15 +9899,6 @@
         }
         about.textContent = aboutText || (trainer ? "" : "Noch kein Coach gewählt.");
         coachSlide.appendChild(about);
-        if (trainer) {
-          var wa = document.createElement("button");
-          wa.type = "button";
-          wa.className = "team-wa";
-          wa.setAttribute("aria-label", "Sofortnachricht an Trainer");
-          wa.innerHTML = WA_ICON;
-          wa.addEventListener("click", function () { openQuickWa(); });
-          coachSlide.appendChild(wa);
-        }
         paintCoachAppointments(coachSlide, trainer);
         box.appendChild(coachSlide);
 
