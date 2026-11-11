@@ -2608,7 +2608,7 @@
     }
     body.is-session :is(h1, h2, .welcome-title, .welcome-title *, .diary h1, .profile-name, .plan-tabs__info,
       .today-card__title, .day-card__main, .go-card__title, .go-section__head, .sand-card h2, .modal-card h2,
-      .diary-info-btn, .diary-info-btn span, .team-slide__title,
+      .diary-info-btn, .diary-info-btn span, .team-slide__title, .team-slide__head, .go-slide__head, .go-slide__title,
       .zirkel-head, .orient-lock, .diary-share-name, .crew-story .team-avatar, .profile-ph, .heute-start span,
       .ffc .summary .num, .ffc .fp-num, .ffc .kn-big, .ffc .home-ev-title, .ffc .page-head-title, .ffc .fp-name,
       .ffc .quit-title, .ffc .avatar-xl, .ffc .brand, .ffc .history-title):not(main *, #run *) {
@@ -2640,7 +2640,7 @@
     }
     .team-slide__art {
       width: 100%;
-      aspect-ratio: 5 / 3;
+      aspect-ratio: 3 / 5;
       border: 0;
       border-radius: 0;
       overflow: hidden;
@@ -2660,11 +2660,24 @@
     }
     .team-slide__art.is-upload { cursor: pointer; border: 1px dashed rgba(42, 33, 24, 0.35); }
     .team-slide__art input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .team-slide__head {
+      margin: 0 0 10px;
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1.2;
+      color: #2A2118;
+    }
     .team-slide__title {
-      margin: 12px 0 6px;
+      margin: 36px 0 6px;
       font-family: "Playfair Display", serif;
       font-size: 22px;
       font-weight: 600;
+    }
+    .team-slide__art + .team-slide__cta,
+    .team-slide__art + .team-slide__about,
+    .team-slide__art + .team-slide__title {
+      margin-top: 36px;
     }
     .team-slide__about {
       margin: 0 0 12px;
@@ -2731,15 +2744,18 @@
       background: #EDE6DA;
     }
     .go-slide__art svg { width: 100%; height: 100%; display: block; }
-    .go-slide__title {
-      margin: 10px 0 4px;
-      font-family: "Playfair Display", serif;
+    .go-slide__title,
+    .go-slide__head {
+      margin: 0 0 10px;
+      font-family: "Playfair Display", Georgia, serif;
       font-size: 22px;
       font-weight: 600;
       line-height: 1.2;
+      color: #2A2118;
     }
+    .go-slide__art { margin: 0; }
     .go-slide__copy {
-      margin: 0 0 12px;
+      margin: 36px 0 12px;
       font-size: 14px;
       line-height: 1.4;
       color: rgba(42, 33, 24, 0.78);
@@ -2803,7 +2819,7 @@
     body.is-session #plan-training .go-card,
     body.is-session #plan-training .zirkel-block.go-card { display: none !important; }
 
-    /* Profile 5:3 portrait */
+    /* Profile 3:5 portrait (Höhe:Breite = 5:3) */
     body.is-session .profile-head {
       display: block;
       margin-top: 8px;
@@ -2811,7 +2827,7 @@
     body.is-session .profile-ph {
       width: 100%;
       height: auto;
-      aspect-ratio: 5 / 3;
+      aspect-ratio: 3 / 5;
       border-radius: 0;
       border: 0;
       overflow: hidden;
@@ -2828,7 +2844,7 @@
     }
     body.is-session .profile-goal-col { margin-top: 14px; }
     body.is-session .profile-identity {
-      margin: 12px 0 0;
+      margin: 36px 0 0;
       font-family: "Playfair Display", serif;
       font-size: 22px;
       font-weight: 600;
@@ -2860,6 +2876,53 @@
       font-weight: 500;
     }
 
+
+    /* Always-visible horizontal scroller dock above bottom menu */
+    .hscroll-dock {
+      display: none;
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(68px + 22px + env(safe-area-inset-bottom, 0px));
+      z-index: 48;
+      width: min(calc(100% - 40px), 400px);
+      height: 14px;
+      padding: 4px 0;
+      pointer-events: auto;
+      background: transparent;
+    }
+    body.is-session[data-shell="plan"][data-plan="kalender"] .hscroll-dock.is-on,
+    body.is-session[data-shell="plan"][data-plan="team"] .hscroll-dock.is-on,
+    body.is-session[data-shell="plan"][data-plan="training"] .hscroll-dock.is-on {
+      display: block;
+    }
+    .hscroll-dock__track {
+      position: relative;
+      height: 6px;
+      width: 100%;
+      background: #F6F1E8;
+      border: 1px solid #2A2118;
+      border-radius: 999px;
+      box-sizing: border-box;
+    }
+    .hscroll-dock__thumb {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      min-width: 28%;
+      background: #2A2118;
+      border-radius: 999px;
+      pointer-events: none;
+    }
+    body.is-session[data-shell="plan"][data-plan="kalender"] .welcome,
+    body.is-session[data-shell="plan"][data-plan="team"] .welcome,
+    body.is-session[data-shell="plan"][data-plan="training"] .welcome,
+    body.is-session[data-shell="heute"] .welcome {
+      padding-bottom: calc(68px + 56px + env(safe-area-inset-bottom, 0px));
+    }
+    /* Keep native rail scrollbars as fallback but dock is primary cue */
+
     /* Historie filter + info */
     body.is-session .diary-bar {
       display: grid;
@@ -2880,7 +2943,7 @@
     .diary-info-btn,
     .diary-info-btn span {
       font-family: "Playfair Display", Georgia, "Times New Roman", serif !important;
-      font-size: 30px !important;
+      font-size: 24px !important;
       font-weight: 600 !important;
       font-style: normal !important;
       line-height: 1 !important;
@@ -3711,6 +3774,11 @@
     <div class="profile-block profile-notes" id="profile-notes"></div>
   </section>
   <div class="top-edge" aria-hidden="true"></div>
+  <div class="hscroll-dock" id="hscroll-dock" hidden>
+    <div class="hscroll-dock__track" id="hscroll-track">
+      <div class="hscroll-dock__thumb" id="hscroll-thumb"></div>
+    </div>
+  </div>
   <div class="app-pill">
     <nav aria-label="Bereiche">
       <button type="button" data-shell="plan" aria-label="Einstellungen">
@@ -7834,6 +7902,7 @@
       }
 
       function paintPill() {
+        window.setTimeout(syncHScrollDock, 20);
         document.querySelectorAll(".app-pill button").forEach(function (btn) {
           var on = btn.getAttribute("data-shell") === shellTab;
           btn.classList.toggle("is-on", on);
@@ -7856,6 +7925,7 @@
       }
 
       function showPlan(pane) {
+        window.setTimeout(syncHScrollDock, 30);
         closeShellModals();
         shellTab = "plan";
         planPane = pane || planPane || "kalender";
@@ -8534,6 +8604,13 @@
 
       var WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M4.2 19.8l1.1-3.9A8.3 8.3 0 1 1 8.4 19z"/><path d="M9.1 7.9c-.3 0-.7.1-.9.5-.3.5-.6 1.2-.4 2.1.4 1.6 1.9 3.6 3.9 4.6 1.2.6 2.3.7 2.9.3.5-.3.8-.8.8-1.2 0-.2-.1-.3-.3-.4l-1.6-.8c-.2-.1-.4 0-.5.1l-.6.8c-.1.1-.3.2-.5.1-.9-.4-1.8-1.2-2.3-2.1-.1-.2 0-.3.1-.5l.5-.6c.1-.1.1-.3.1-.5l-.6-1.6c-.1-.3-.3-.4-.6-.4z" fill="currentColor" stroke="none"/></svg>';
 
+      function teamSlideHead(text) {
+        var h = document.createElement("h3");
+        h.className = "team-slide__head";
+        h.textContent = text;
+        return h;
+      }
+
       function teamPortrait(person, fallback) {
         var art = document.createElement("div");
         art.className = "team-slide__art";
@@ -8590,6 +8667,7 @@
           name: personName(),
           photo_url: (sessionAccount && sessionAccount.photo_url) || ""
         });
+        meSlide.appendChild(teamSlideHead("Mein Profil"));
         meSlide.appendChild(teamPortrait(mePerson, personName().slice(0, 1)));
         var editBtn = document.createElement("button");
         editBtn.type = "button";
@@ -8609,6 +8687,7 @@
         });
         var coachSlide = document.createElement("article");
         coachSlide.className = "team-slide";
+        coachSlide.appendChild(teamSlideHead("Mein Coach"));
         coachSlide.appendChild(teamPortrait(trainer, trainer ? String(trainer.name || "?").slice(0, 1) : "C"));
         var about = document.createElement("p");
         about.className = "team-slide__about";
@@ -8641,6 +8720,7 @@
         function groupSlide(group) {
           var slide = document.createElement("article");
           slide.className = "team-slide";
+          slide.appendChild(teamSlideHead("Meine Gruppen"));
           var art = document.createElement("label");
           art.className = "team-slide__art is-upload";
           if (group && group.photo_url) {
@@ -8692,6 +8772,7 @@
         if (!groups.length) {
           var emptyGroup = document.createElement("article");
           emptyGroup.className = "team-slide";
+          emptyGroup.appendChild(teamSlideHead("Meine Gruppen"));
           var emptyArt = document.createElement("div");
           emptyArt.className = "team-slide__art";
           emptyArt.textContent = "Noch keine Gruppe";
@@ -8712,10 +8793,7 @@
         // Slide 4: coachees
         var coacheeSlide = document.createElement("article");
         coacheeSlide.className = "team-slide";
-        var coacheeHead = document.createElement("h3");
-        coacheeHead.className = "team-slide__title";
-        coacheeHead.textContent = "Meine Coachees";
-        coacheeSlide.appendChild(coacheeHead);
+        coacheeSlide.appendChild(teamSlideHead("Meine Coachees"));
         var coachees = teamPeople.filter(function (person) {
           return person && person.trainer_id && String(person.trainer_id) === mineId;
         });
@@ -8741,11 +8819,85 @@
         });
         box.appendChild(coacheeSlide);
         syncGroupOptions();
+        syncHScrollDock();
       }
 
 
       var diaryFillOnly = false;
       var goSubKind = "";
+
+
+      var hScrollTarget = null;
+      var hScrollDragging = false;
+
+      function activeHScrollEl() {
+        if (!sessionMode) return null;
+        var shell = document.body.dataset.shell;
+        var plan = document.body.dataset.plan || planPane;
+        if (shell === "plan" && plan === "kalender") return document.getElementById("days");
+        if (shell === "plan" && plan === "team") return document.getElementById("plan-team");
+        if (shell === "plan" && plan === "training") return document.getElementById("go-rail");
+        return null;
+      }
+
+      function syncHScrollDock() {
+        var dock = document.getElementById("hscroll-dock");
+        var thumb = document.getElementById("hscroll-thumb");
+        if (!dock || !thumb) return;
+        var el = activeHScrollEl();
+        hScrollTarget = el;
+        var show = !!(el && sessionMode && document.body.dataset.shell === "plan" &&
+          (document.body.dataset.plan === "kalender" || document.body.dataset.plan === "team" || document.body.dataset.plan === "training" ||
+           planPane === "kalender" || planPane === "team" || planPane === "training"));
+        // prefer dataset.plan from body if set by showPlan
+        var pane = document.body.dataset.plan || planPane;
+        show = !!(el && sessionMode && document.body.dataset.shell === "plan" && (pane === "kalender" || pane === "team" || pane === "training"));
+        dock.hidden = !show;
+        dock.classList.toggle("is-on", show);
+        if (!show || !el) return;
+        var max = Math.max(1, el.scrollWidth - el.clientWidth);
+        var ratio = el.clientWidth / Math.max(el.scrollWidth, 1);
+        var thumbW = Math.max(28, Math.min(100, ratio * 100));
+        thumb.style.width = thumbW + "%";
+        var left = (el.scrollLeft / max) * (100 - thumbW);
+        thumb.style.left = left + "%";
+      }
+
+      function bindHScrollDock() {
+        var dock = document.getElementById("hscroll-dock");
+        var track = document.getElementById("hscroll-track");
+        if (!dock || !track || dock.dataset.bound) return;
+        dock.dataset.bound = "1";
+        function jump(clientX) {
+          var el = hScrollTarget || activeHScrollEl();
+          if (!el) return;
+          var rect = track.getBoundingClientRect();
+          var x = Math.min(1, Math.max(0, (clientX - rect.left) / Math.max(rect.width, 1)));
+          var max = Math.max(0, el.scrollWidth - el.clientWidth);
+          el.scrollLeft = x * max;
+          syncHScrollDock();
+        }
+        track.addEventListener("pointerdown", function (event) {
+          hScrollDragging = true;
+          try { track.setPointerCapture(event.pointerId); } catch (e) {}
+          jump(event.clientX);
+        });
+        track.addEventListener("pointermove", function (event) {
+          if (!hScrollDragging) return;
+          jump(event.clientX);
+        });
+        function endDrag() { hScrollDragging = false; }
+        track.addEventListener("pointerup", endDrag);
+        track.addEventListener("pointercancel", endDrag);
+        ["days", "plan-team", "go-rail"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el || el.dataset.hscrollBound) return;
+          el.dataset.hscrollBound = "1";
+          el.addEventListener("scroll", syncHScrollDock, { passive: true });
+        });
+        window.addEventListener("resize", syncHScrollDock);
+      }
+
 
       function paintGoRail() {
         var rail = document.getElementById("go-rail");
@@ -8753,21 +8905,21 @@
         rail.textContent = "";
         var slides = [
           { id: "routine", title: "12-Wochen-Routine", copy: "Halte zwölf Wochen lang Deine Wochentage. Jede volle Woche wird markiert.", cta: "Routine starten", kind: "kraft" },
-          { id: "zirkel", title: "Zirkeltraining", copy: "Registriere Dich einmal und trainiere im gemeinsamen Rhythmus mit Freunden, Leaderboard und Stories.", cta: "Zum Zirkel", kind: "zirkel" },
-          { id: "coach", title: "Triff Deinen Coach", copy: "Persönliche Treffen mit Deinem Coach — klarer Rahmen, echte Begleitung.", cta: "Paket ansehen", kind: "intensiv" },
+          { id: "zirkel", title: "Zirkeltraining", copy: "Registriere Dich einmal und trainiere im gemeinsamen Rhythmus mit Freunden, Leaderboard und Stories.", cta: "Zu den Einstellungen", kind: "zirkel" },
+          { id: "coach", title: "Triff Deinen Coach", copy: "Persönliche Treffen mit Deinem Coach — klarer Rahmen, echte Begleitung.", cta: "Personal Training", kind: "intensiv" },
           { id: "group", title: "Gründe eine Gruppe", copy: "Eine eigene Gruppe mit Freunden. Sichtbar unter Historie, Heute und Coaching.", cta: "Gruppe gründen", kind: "ausdauer" }
         ];
         slides.forEach(function (slide, idx) {
           var card = document.createElement("article");
           card.className = "go-slide";
+          var title = document.createElement("h3");
+          title.className = "go-slide__head";
+          title.textContent = slide.title;
+          card.appendChild(title);
           var art = document.createElement("div");
           art.className = "go-slide__art";
           art.innerHTML = dayArtSvg(slide.kind, idx * 3 + 2);
           card.appendChild(art);
-          var title = document.createElement("h3");
-          title.className = "go-slide__title";
-          title.textContent = slide.title;
-          card.appendChild(title);
           var copy = document.createElement("p");
           copy.className = "go-slide__copy";
           copy.textContent = slide.copy;
@@ -8780,6 +8932,7 @@
           card.appendChild(cta);
           rail.appendChild(card);
         });
+        syncHScrollDock();
       }
 
       function closeGoSub() {
