@@ -918,7 +918,7 @@
       margin-bottom: 6px;
     }
     body.is-session .diary-info-btn,
-    body.is-session .diary-fill-filter { display: grid; }
+    body.is-session .diary-fill-filter { display: none !important; }
     .diary-share-pick select,
     .heute-filter-pick select {
       width: auto;
@@ -2487,9 +2487,9 @@
     }
     .day-card__suitcase {
       position: absolute;
-      top: calc(4px + env(safe-area-inset-top, 0px) + 6px);
+      top: calc(4px + env(safe-area-inset-top, 0px) + 2px);
       right: max(12px, calc((100vw - min(100vw, 440px)) / 2 + 12px));
-      z-index: 5;
+      z-index: 25;
       width: 40px;
       height: 40px;
       margin: 0;
@@ -2595,12 +2595,12 @@
     body.is-session #days .day.day-card__main.is-edit {
       position: absolute;
       left: 50%;
-      top: calc(52px + env(safe-area-inset-top, 0px));
+      top: calc(72px + env(safe-area-inset-top, 0px));
       transform: translateX(-50%);
       z-index: 4;
       display: block;
-      width: min(100% - 96px, 320px);
-      max-width: min(100% - 96px, 320px);
+      width: min(100% - 48px, 360px);
+      max-width: min(100% - 48px, 360px);
       min-height: 0;
       margin: 0;
       padding: 0;
@@ -3101,7 +3101,7 @@
     }
     body.is-session :is(h1, h2, .welcome-title, .welcome-title *, .diary h1, .profile-name, .plan-tabs__info,
       .today-card__title, .day-card__main, .go-card__title, .go-section__head, .sand-card h2, .modal-card h2,
-      .team-slide__title, .team-slide__head, .go-slide__head, .go-slide__title, .rail-nav__title,
+      .team-slide__title, .team-slide__head, .go-slide__head, .go-slide__title, .rail-nav__title:not(#week-rail-title),
       .zirkel-head, .orient-lock, .diary-share-name, .crew-story .team-avatar, .profile-ph, .heute-start span,
       .ffc .summary .num, .ffc .fp-num, .ffc .kn-big, .ffc .home-ev-title, .ffc .page-head-title, .ffc .fp-name,
       .ffc .quit-title, .ffc .avatar-xl, .ffc .brand, .ffc .history-title):not(main *, #run *) {
@@ -3357,11 +3357,11 @@
     }
     body.is-session[data-shell="woche"] #week-rail-nav {
       position: fixed;
-      top: calc(4px + env(safe-area-inset-top, 0px) + 10px);
+      top: calc(4px + env(safe-area-inset-top, 0px) + 40px);
       left: 50%;
       transform: translateX(-50%);
       width: min(100%, 440px);
-      padding: 0 52px 0 20px;
+      padding: 0 20px;
       box-sizing: border-box;
       order: 1;
       margin: 0;
@@ -3372,11 +3372,16 @@
     body.is-session[data-shell="woche"] #week-rail-nav .rail-nav__title {
       pointer-events: auto;
     }
-    body.is-session[data-shell="woche"] #week-rail-nav .rail-nav__title {
+    body.is-session[data-shell="woche"] #week-rail-nav .rail-nav__title,
+    body.is-session[data-shell="woche"] #week-rail-title {
+      margin: 0;
+      text-align: center;
       font-family: Inter, system-ui, sans-serif !important;
-      font-size: var(--t-s, 13px) !important;
+      font-size: 12px !important;
       font-weight: 600 !important;
+      font-style: normal !important;
       line-height: 1.35 !important;
+      letter-spacing: 0 !important;
       color: rgba(42, 33, 24, 0.58) !important;
       white-space: nowrap;
       overflow: hidden;
@@ -4393,7 +4398,7 @@
       <button type="button" class="rail-nav__btn rail-nav__prev" aria-label="Vorheriger Tag">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
       </button>
-      <h3 class="rail-nav__title" id="week-rail-title"></h3>
+      <p class="rail-nav__title" id="week-rail-title"></p>
       <button type="button" class="rail-nav__btn rail-nav__next" aria-label="Nächster Tag">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
       </button>
@@ -6840,7 +6845,7 @@
           var place = document.createElement("button");
           place.type = "button";
           place.className = "day-place";
-          place.textContent = "Ort: " + placeForWeekday(wd);
+          place.textContent = placeForWeekday(wd);
           place.setAttribute("aria-label", "Ort am " + DAY_NAMES[key] + " ändern");
           place.addEventListener("click", function () { openDayPlace(wd); });
           overlay.appendChild(place);
@@ -6862,11 +6867,6 @@
           timeBtn.disabled = true;
         }
         overlay.appendChild(timeBtn);
-
-        var blurb = document.createElement("p");
-        blurb.className = "day-card__blurb";
-        blurb.textContent = workoutBlurb(away ? null : unit, away, away ? travel : dayAltFor(iso));
-        overlay.appendChild(blurb);
 
         if (!away) overlay.appendChild(dayInviteEl(iso));
 
@@ -8049,16 +8049,13 @@
         if (theme) theme.setAttribute("content", "#F3EEE4");
         var list = document.getElementById("diary-list");
         var photos = workoutPhotoMap();
-        var dates = diaryDates();
-        if (diaryFillOnly) {
-          dates = dates.filter(function (iso) {
-            var entry = diaryEntry(iso) || {};
-            var photo = photos[iso];
-            var extras = Array.isArray(entry.extras) ? entry.extras : [];
-            var hasExtra = extras.some(function (ex) { return ex && (ex.note || ex.move); });
-            return !!(entry.note || entry.move || hasExtra || photo);
-          });
-        }
+        var dates = diaryDates().filter(function (iso) {
+          var entry = diaryEntry(iso) || {};
+          var photo = photos[iso];
+          var extras = Array.isArray(entry.extras) ? entry.extras : [];
+          var hasExtra = extras.some(function (ex) { return ex && (ex.note || ex.move); });
+          return !!(entry.note || entry.move || hasExtra || photo);
+        });
         list.textContent = "";
         dates.forEach(function (iso) {
           var entry = diaryEntry(iso);
