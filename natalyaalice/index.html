@@ -901,18 +901,28 @@
       justify-content: center;
       grid-template-columns: none;
     }
-    body.is-session .diary-share-pick { display: block; width: min(100%, 220px); }
-    .diary-share-pick select {
+    body.is-session .diary-share-pick,
+    body.is-session .heute-filter-pick {
+      display: flex;
+      justify-content: center;
       width: 100%;
-      min-height: 40px;
-      padding: 6px 28px 6px 12px;
-      border: 1px solid rgba(42, 33, 24, 0.45);
-      border-radius: 10px;
+      margin-top: max(42px, 7vh);
+      margin-bottom: 10px;
+    }
+    .diary-share-pick select,
+    .heute-filter-pick select {
+      width: auto;
+      max-width: 100%;
+      min-height: 0;
+      margin: 0;
+      padding: 4px 0.82em 4px 0;
+      border: 0;
+      border-radius: 0;
       background-color: transparent;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%232A2118' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
       background-repeat: no-repeat;
-      background-position: right 10px center;
-      background-size: 14px 14px;
+      background-position: right 0 center;
+      background-size: 0.65em 0.65em;
       box-shadow: none;
       appearance: none;
       -webkit-appearance: none;
@@ -920,17 +930,24 @@
       font-family: "Playfair Display", serif;
       font-size: 22px;
       font-weight: 600;
-      text-align: center;
-      text-align-last: center;
+      line-height: 1.2;
+      text-align: left;
+      text-align-last: left;
+      cursor: pointer;
     }
     .diary-share-pick select:focus,
     .diary-share-pick select:focus-visible,
-    .diary-share-pick select:active {
+    .diary-share-pick select:active,
+    .heute-filter-pick select:focus,
+    .heute-filter-pick select:focus-visible,
+    .heute-filter-pick select:active {
       outline: none;
       outline-offset: 0;
       box-shadow: none;
-      border: 1px solid rgba(42, 33, 24, 0.45);
+      border: 0;
     }
+    .heute-filter-pick { display: none; }
+    body.is-session[data-shell="heute"] .heute-filter-pick { display: flex; order: 0; }
     .diary-share-feed { margin-top: 18px; }
     .diary-share-name {
       margin: 22px 0 8px;
@@ -1278,12 +1295,15 @@
     body.is-session[data-shell="heute"] .heute-mantra,
     body.is-session[data-shell="heute"] .photo,
     body.is-session[data-shell="heute"] .heute-crew { display: none !important; }
+    body.is-session[data-shell="heute"] .heute-filter-pick { order: 0; }
     body.is-session[data-shell="heute"] .heute-stories { order: 1; }
     body.is-session[data-shell="heute"] .dock { order: 2; margin-top: 4px; }
     body.is-session[data-shell="heute"] .heute-joins { order: 3; }
     body.is-session[data-shell="heute"] .heute-start { order: 4; }
     body.is-session[data-shell="heute"] #go-today { min-height: 224px; }
     body.is-session[data-shell="heute"] .heute-events { order: 5; }
+    body.is-session[data-shell="heute"][data-heute="mine"] .heute-start,
+    body.is-session[data-shell="heute"][data-heute="mine"] .heute-events { display: none !important; }
     body.is-session[data-shell="heute"] .dock .go-row { display: none; }
     body.is-session[data-shell="plan"] .plan-tabs { order: 1; }
     body.is-session[data-shell="plan"] .absence-block { order: 2; }
@@ -2902,6 +2922,12 @@
       <p id="photo-copy">Lade Dein Motivationsbild hoch. Dich selbst, ein Vorbild, ein Ort. Egal, was Deine eigene Motivation ausmacht.</p>
       <img id="photo-img" alt="" hidden />
     </div>
+    <label class="heute-filter-pick shell-heute">
+      <select id="heute-filter-select" aria-label="Heute filtern">
+        <option value="mine">Heute Ich</option>
+        <option value="all">Alles</option>
+      </select>
+    </label>
     <div class="heute-stories shell-heute" id="heute-stories" hidden>
       <div class="heute-stories__row ffc" id="heute-stories-row"><span class="heute-stories__team" id="heute-stories-team"></span></div>
     </div>
@@ -3947,6 +3973,8 @@
       var pendingWorkoutShort = false;
       var adminDayKeys = null;
       var diaryVisibility = "private";
+      var heuteFilter = "mine";
+      var HOME_HEUTE = "gogogo_heute_filter";
       var diaryPosts = [];
       var diaryPeople = {};
       var sharedEntries = [];
@@ -9659,6 +9687,25 @@
         }
       }
 
+      function paintHeuteFilter() {
+        var select = document.getElementById("heute-filter-select");
+        if (select && document.activeElement !== select) {
+          select.value = heuteFilter === "all" ? "all" : "mine";
+        }
+        document.body.dataset.heute = heuteFilter === "all" ? "all" : "mine";
+      }
+
+      function applyHeuteFilter() {
+        paintHeuteFilter();
+        paintHeuteJoins();
+      }
+
+      function setHeuteFilter(value) {
+        heuteFilter = value === "all" ? "all" : "mine";
+        try { localStorage.setItem(HOME_HEUTE, heuteFilter); } catch (eHF) {}
+        applyHeuteFilter();
+      }
+
       function openVisibility() {
         paintVisibility();
         document.getElementById("diary-vis").hidden = false;
@@ -9818,6 +9865,12 @@
         if (!button) return;
         button.addEventListener("click", function () { openVisibility(); });
       });
+      var heuteSelect = document.getElementById("heute-filter-select");
+      if (heuteSelect) {
+        heuteSelect.addEventListener("change", function () {
+          setHeuteFilter(heuteSelect.value);
+        });
+      }
       var shareSelect = document.getElementById("diary-share-select");
       if (shareSelect) {
         shareSelect.addEventListener("change", function () {
@@ -9932,7 +9985,8 @@
         if (!box) return;
         box.textContent = "";
         if (!sessionAccount) return;
-        (ffcIncoming || []).forEach(function (req) {
+        var onlyMine = heuteFilter !== "all";
+        if (!onlyMine) (ffcIncoming || []).forEach(function (req) {
           var card = document.createElement("div");
           card.className = "invite-card is-pending";
           var kicker = document.createElement("span");
@@ -9974,7 +10028,11 @@
           if (!row || String(row.to_id) !== me) return false;
           if (row.status !== "pending" && row.status !== "accepted") return false;
           var iso = String(row.workout_date || "").slice(0, 10);
-          if (iso < today || iso > last) return false;
+          if (onlyMine) {
+            if (iso !== today || row.status !== "accepted") return false;
+          } else {
+            if (iso < today || iso > last) return false;
+          }
           var key = String(row.from_id) + ":" + iso;
           if (seen[key]) return false;
           seen[key] = true;
@@ -11272,7 +11330,12 @@
         var storedVis = readStore(HOME_VIS, "private");
         if (storedVis === "trainer" || storedVis === "friends" || storedVis === "private") diaryVisibility = storedVis;
       }
+      try {
+        var storedHeute = localStorage.getItem(HOME_HEUTE);
+        if (storedHeute === "all" || storedHeute === "mine") heuteFilter = storedHeute;
+      } catch (eSH) {}
       paintVisibility();
+      paintHeuteFilter();
       paintWelcome();
       if (sessionMode && shellTab === "plan" && planPane === "team") showPlan("team");
       if (!sessionMode) loadRoutine();
