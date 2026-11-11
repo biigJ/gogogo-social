@@ -1957,19 +1957,30 @@
       scrollbar-width: none;
     }
     .day-invite__faces::-webkit-scrollbar { display: none; }
-    .week-csv-export {
-      display: none;
+    .day-alt-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
       width: 100%;
-      min-height: 44px;
-      margin: 18px 0 0;
-      padding: 0 14px;
-      border: 1px solid #2A2118;
-      background: transparent;
-      color: #2A2118;
-      font-weight: 600;
-      text-align: left;
+      margin-top: 4px;
     }
-    body.is-session[data-shell="woche"] .week-csv-export { display: block; order: 8; }
+    .day-alt-row .day-alt {
+      flex: 1 1 auto;
+      width: auto;
+      min-width: 0;
+    }
+    .day-csv {
+      flex: none;
+      margin: 0;
+      padding: 0;
+      color: #2A2118;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: right;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
     .day-place {
       margin: 6px 2px 0;
       font-size: 13px;
@@ -2384,6 +2395,7 @@
       text-decoration: underline;
       text-underline-offset: 3px;
     }
+    .day-alt-row .day-alt { width: auto; }
     .day-alt.is-set { text-decoration: none; }
     .day-card__blurb {
       margin: 4px 0 0;
@@ -3761,7 +3773,6 @@
     <p class="tip shell-kalender">Leg Deine Tage fest bevor Du die 12 Wochen-Routine startest.</p>
     <button type="button" id="plan-week" class="plan-week shell-kalender" hidden>Meine Bewegung in der Woche planen</button>
     <div class="days shell-kalender" id="days"></div>
-    <button type="button" class="week-csv-export shell-kalender" id="week-csv-export">Export vier Wochen als csv</button>
     <div class="absence-block shell-kalender" id="absence-block">
       <div class="week-mode" role="group" aria-label="Woche">
         <button type="button" data-week-mode="home" class="is-on" aria-pressed="true">vor Ort</button>
@@ -8661,6 +8672,8 @@
       }
 
       function dayAltButton(iso) {
+        var row = document.createElement("div");
+        row.className = "day-alt-row";
         var btn = document.createElement("button");
         btn.type = "button";
         var current = dayAltFor(iso) || (awayOn(iso, absenceOf(sessionAccount)) ? travelAltFor(iso) : "");
@@ -8670,7 +8683,18 @@
           if (awayOn(iso, absenceOf(sessionAccount))) openTravelAlt(iso);
           else openDayAlt(iso);
         });
-        return btn;
+        var csv = document.createElement("button");
+        csv.type = "button";
+        csv.className = "day-csv";
+        csv.textContent = "csv";
+        csv.setAttribute("aria-label", "Export vier Wochen als csv");
+        csv.addEventListener("click", function (event) {
+          event.stopPropagation();
+          exportFourWeeksCsv();
+        });
+        row.appendChild(btn);
+        row.appendChild(csv);
+        return row;
       }
 
       function openDayAlt(iso) {
@@ -11011,8 +11035,6 @@
         openDayEventFromBtn(this);
       });
       document.getElementById("today-invite").addEventListener("click", openTodayEvent);
-      var weekCsvBtn = document.getElementById("week-csv-export");
-      if (weekCsvBtn) weekCsvBtn.addEventListener("click", exportFourWeeksCsv);
       var feedbackSend = document.getElementById("feedback-send");
       var feedbackCancel = document.getElementById("feedback-cancel");
       var feedbackModal = document.getElementById("feedback-modal");
