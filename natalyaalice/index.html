@@ -2548,6 +2548,33 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+
+    .crew-story.is-training .crew-story__ring {
+      background: conic-gradient(#C7413B, #F2B8A8, #C7413B, #E89B8F, #C7413B);
+      padding: 4px;
+      animation: training-pulse 1.05s ease-in-out infinite;
+      box-shadow: 0 0 0 0 rgba(199, 65, 59, 0.55);
+    }
+    .crew-story.is-training.is-training-active .crew-story__ring {
+      animation: training-pulse-strong 0.85s ease-in-out infinite;
+    }
+    .crew-story.is-training .crew-story__name {
+      font-weight: 700;
+      color: #C7413B;
+    }
+    @keyframes training-pulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(199, 65, 59, 0.55); }
+      50% { transform: scale(1.12); box-shadow: 0 0 0 10px rgba(199, 65, 59, 0); }
+    }
+    @keyframes training-pulse-strong {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(199, 65, 59, 0.7); filter: brightness(1); }
+      50% { transform: scale(1.18); box-shadow: 0 0 0 14px rgba(199, 65, 59, 0); filter: brightness(1.08); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .crew-story.is-training .crew-story__ring,
+      .crew-story.is-training.is-training-active .crew-story__ring { animation: none; }
+    }
+
     .heute-stories .story-hint { padding: 0 20px; }
     body.is-session #go-today,
     body.is-session #go-tomorrow {
@@ -4796,6 +4823,9 @@
       var adminDayKeys = null;
       var diaryVisibility = "private";
       var heuteFilter = "mine";
+      var trainingPresence = {};
+      var trainingPresenceTimer = 0;
+      var trainingPresenceBeat = 0;
       var HOME_HEUTE = "gogogo_heute_filter";
       var diaryPosts = [];
       var diaryPeople = {};
@@ -6592,6 +6622,15 @@
         document.getElementById("short-modal").hidden = true;
         document.getElementById("short-choice").hidden = true;
         if (sessionMode && sessionReady) applySessionExercises(when);
+        if (sessionMode) {
+          var unitLabel = "";
+          try {
+            var tb = document.getElementById("go-today");
+            unitLabel = (tb && tb.dataset.unitLabel) || "";
+          } catch (eSW) {}
+          syncTrainingPresence("active", unitLabel || "Training");
+          trainingPresenceBeat = Date.now();
+        }
         setHome(false);
         document.getElementById("short-banner").hidden = !shortMode;
         if (date !== when) {
@@ -6765,6 +6804,9 @@
         entry.move = label;
         entry.cleared = false;
         saveDiaryEntry(iso, entry);
+        if (sessionMode && String(iso || "").slice(0, 10) === Log.berlinToday()) {
+          syncTrainingPresence("done", label);
+        }
       }
 
       function ensureDiaryFrom() {
@@ -8261,6 +8303,7 @@
       }
 
       function paintPill() {
+        beatTrainingPresence();
         window.setTimeout(syncHScrollDock, 20);
         document.querySelectorAll(".app-pill button").forEach(function (btn) {
           var on = btn.getAttribute("data-shell") === shellTab;
@@ -9690,6 +9733,7 @@
             if (document.body.dataset.shell !== "workout") paintWelcome();
             attachNicknames(teamPeople).then(function (changed) {
               if (changed && document.body.dataset.shell === "heute") paintHeuteCrew();
+              loadTrainingPresence();
               if (window.FFC && FFC.user()) {
                 if (FFC.refreshFriends) return FFC.refreshFriends().then(mergeFfcFriends);
                 return mergeFfcFriends();
@@ -12303,10 +12347,100 @@
         return item;
       }
 
+
+      function presenceStale(row) {
+        if (!row || row.status !== "active") return false;
+        var t = Date.parse(row.updated_at || row.started_at || "");
+        if (!t) return false;
+        return (Date.now() - t) > 3 * 60 * 60 * 1000;
+      }
+
+      function presenceFor(id) {
+        var row = trainingPresence[String(id || "")];
+        if (!row) return null;
+        if (presenceStale(row)) return { status: "done", workout_label: row.workout_label, training_date: row.training_date };
+        return row;
+      }
+
+      function syncTrainingPresence(status, label) {
+        if (!sessionMode || !sessionAccount || !sessionAccount.id) return Promise.resolve();
+        var today = Log.berlinToday();
+        var body = {
+          account_id: sessionAccount.id,
+          training_date: today,
+          status: status === "done" ? "done" : "active",
+          workout_label: String(label || "").slice(0, 80) || null,
+          updated_at: new Date().toISOString()
+        };
+        if (status !== "done") body.started_at = body.updated_at;
+        trainingPresence[String(sessionAccount.id)] = body;
+        return rest("go_training_presence?on_conflict=account_id,training_date", {
+          method: "POST",
+          prefer: "resolution=merge-duplicates,return=minimal",
+          body: body
+        }).catch(function () {
+          return rest("go_training_presence?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&training_date=eq." + encodeURIComponent(today), {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: { status: body.status, workout_label: body.workout_label, updated_at: body.updated_at }
+          }).catch(function () {});
+        });
+      }
+
+      function loadTrainingPresence() {
+        if (!sessionMode || !sessionAccount) return Promise.resolve();
+        var today = Log.berlinToday();
+        var ids = [];
+        var seen = {};
+        function add(id) {
+          id = id ? String(id) : "";
+          if (!id || id.indexOf("ffc-") === 0 || seen[id]) return;
+          seen[id] = true;
+          ids.push(id);
+        }
+        add(sessionAccount.id);
+        (teamPeople || []).forEach(function (p) { if (p) add(p.id); });
+        if (!ids.length) return Promise.resolve();
+        return rest("go_training_presence?training_date=eq." + encodeURIComponent(today)
+          + "&account_id=in.(" + ids.map(encodeURIComponent).join(",") + ")"
+          + "&select=account_id,training_date,status,workout_label,started_at,updated_at")
+          .catch(function () { return []; })
+          .then(function (rows) {
+            var next = {};
+            (rows || []).forEach(function (row) {
+              if (!row || !row.account_id) return;
+              next[String(row.account_id)] = row;
+            });
+            trainingPresence = next;
+            if (document.body.dataset.shell === "heute") paintHeuteCrew();
+          });
+      }
+
+      function ensureTrainingPresencePoll() {
+        if (trainingPresenceTimer) return;
+        trainingPresenceTimer = window.setInterval(function () {
+          if (!sessionMode || document.body.dataset.shell !== "heute") return;
+          loadTrainingPresence();
+        }, 20000);
+      }
+
+      function beatTrainingPresence() {
+        if (!sessionMode || document.body.dataset.shell !== "workout") return;
+        if (trainingPresenceBeat && Date.now() - trainingPresenceBeat < 45000) return;
+        trainingPresenceBeat = Date.now();
+        var label = "";
+        try {
+          var btn = document.getElementById("go-today");
+          label = (btn && btn.dataset.unitLabel) || movementLabel() || "";
+        } catch (eBeat) {}
+        syncTrainingPresence("active", label);
+      }
+
       function paintHeuteCrew() {
         var box = document.getElementById("heute-stories-team");
         if (!box) return;
         if (!sessionMode || !sessionAccount) return;
+        ensureTrainingPresencePoll();
         box.textContent = "";
         var stories = ffcStoryList();
         var byNick = {};
@@ -12338,7 +12472,13 @@
         };
         var myStory = storyFor(me, true);
         if (myStory) used[myStory.index] = true;
-        box.appendChild(storyItem(me, myStory, openFor(me, myStory)));
+        var meItem = storyItem(me, myStory, openFor(me, myStory));
+        var mePresence = presenceFor(sessionAccount.id);
+        if (mePresence) {
+          meItem.classList.add("is-training");
+          if (mePresence.status === "active") meItem.classList.add("is-training-active");
+        }
+        box.appendChild(meItem);
         var seenIds = {};
         var friends = teamPeople.filter(function (person) {
           if (!person || !person.id || person.isSelf || String(person.id) === String(sessionAccount.id)) return false;
@@ -12348,23 +12488,39 @@
         }).map(function (person) {
           var story = storyFor(person, false);
           if (story) used[story.index] = true;
-          return { person: person, story: story };
+          return { person: person, story: story, presence: presenceFor(person.id) };
         });
         stories.forEach(function (story) {
           if (story.is_me || used[story.index]) return;
+          var pid = "ffc-" + story.uid;
           friends.push({
-            person: { id: "ffc-" + story.uid, name: story.nickname, nickname: story.nickname, photo_url: story.avatar_url || "" },
-            story: story
+            person: { id: pid, name: story.nickname, nickname: story.nickname, photo_url: story.avatar_url || "" },
+            story: story,
+            presence: presenceFor(pid)
           });
         });
         friends.sort(function (a, b) {
-          var sa = a.story ? (a.story.seen ? 1 : 0) : 2;
-          var sb = b.story ? (b.story.seen ? 1 : 0) : 2;
-          return sa - sb;
+          function rank(entry) {
+            var p = entry.presence;
+            if (p && p.status === "active") return 0;
+            if (p && p.status === "done") return 1;
+            if (entry.story && !entry.story.seen) return 2;
+            if (entry.story) return 3;
+            return 4;
+          }
+          var ra = rank(a), rb = rank(b);
+          if (ra !== rb) return ra - rb;
+          return String((a.person && a.person.name) || "").localeCompare(String((b.person && b.person.name) || ""), "de");
         });
         crewActive = friends.length;
         friends.forEach(function (entry) {
-          box.appendChild(storyItem(entry.person, entry.story, openFor(entry.person, entry.story)));
+          var el = storyItem(entry.person, entry.story, openFor(entry.person, entry.story));
+          if (entry.presence) {
+            el.classList.add("is-training");
+            if (entry.presence.status === "active") el.classList.add("is-training-active");
+            el.title = entry.presence.status === "active" ? "Trainiert gerade" : "Heute schon trainiert";
+          }
+          box.appendChild(el);
         });
         var add = document.createElement("button");
         add.type = "button";
@@ -12388,6 +12544,7 @@
         syncMantraRotation();
         paintHeuteJoins();
         paintHeuteCrew();
+        loadTrainingPresence();
       }
 
       function loadInvites() {
