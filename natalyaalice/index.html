@@ -3105,8 +3105,17 @@
     }
     .team-slide.is-coach .team-slide__cta.is-pt {
       margin-top: 36px;
-      margin-bottom: 12px;
+      margin-bottom: 0;
       flex: none;
+    }
+    .team-slide.is-coach .team-slide__cta.is-pt + .team-slide__coach-name {
+      margin-top: 36px;
+    }
+    .team-slide.is-coach .team-slide__coach-name + .team-slide__about {
+      margin-top: 0;
+    }
+    .team-slide.is-coach .team-wa {
+      margin-top: 12px;
     }
     .team-slide.is-coach .coach-appointments {
       margin-top: 4px;
@@ -3138,24 +3147,6 @@
       font-weight: 500;
       line-height: 1;
       background: transparent;
-    }
-    body.is-session #plan-team.team-rail .team-slide.is-group-empty {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      box-sizing: border-box;
-      min-height: 0;
-      padding-bottom: 58px; /* Platz für absolut gesetzten CTA */
-      overflow: hidden;
-    }
-    body.is-session #plan-team.team-rail .team-slide.is-group-empty .team-slide__cta {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 4px;
-      width: 100%;
-      margin: 0 !important;
-      flex: none;
     }
     .team-slide__art.is-upload-cta {
       cursor: pointer;
@@ -3223,6 +3214,103 @@
     .team-slide .team-row { margin-top: 6px; }
     .team-slide .coach-empty { margin: 8px 0; }
 
+    .rail-nav {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
+      margin: 0 0 12px;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body.is-session[data-shell="plan"][data-plan="team"] #team-rail-nav,
+    body.is-session[data-shell="plan"][data-plan="training"] #go-rail-nav {
+      display: grid;
+      grid-template-columns: 40px 1fr 40px;
+      align-items: center;
+      gap: 8px;
+    }
+    .rail-nav__title {
+      margin: 0;
+      text-align: center;
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1.2;
+      color: #2A2118;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .rail-nav__btn {
+      width: 40px;
+      height: 40px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #2A2118;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+    .rail-nav__btn svg { width: 22px; height: 22px; display: block; }
+    .rail-nav__btn.is-dim,
+    .rail-nav__btn:disabled {
+      color: rgba(42, 33, 24, 0.28);
+      cursor: default;
+    }
+    .team-slide__coach-name {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      margin: 36px 0 8px;
+      min-width: 0;
+    }
+    .team-slide__coach-name-text {
+      margin: 0;
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1.2;
+      color: #2A2118;
+      min-width: 0;
+    }
+    .team-slide__coach-name .team-slide__head-action {
+      flex: none;
+    }
+    .team-slide__art + .team-slide__cta,
+    .go-slide__art + .go-slide__cta {
+      margin-top: 36px;
+    }
+    .go-slide__cta + .go-slide__copy {
+      margin-top: 36px;
+    }
+    /* Group empty: CTA unter Bild, kein Absolut-Bottom mehr */
+    body.is-session #plan-team.team-rail .team-slide.is-group-empty {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      height: auto !important;
+      max-height: calc(100svh - 230px - env(safe-area-inset-bottom, 0px));
+      padding-bottom: 20px;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+    body.is-session #plan-team.team-rail .team-slide.is-group-empty .team-slide__cta {
+      position: static;
+      margin-top: 36px !important;
+      margin-bottom: 0;
+      width: 100%;
+    }
+    body.is-session #plan-team.team-rail .team-slide.is-group-empty .team-slide__art + .team-slide__cta + .team-slide__add-friend,
+    body.is-session #plan-team.team-rail .team-slide.is-group-empty .team-slide__cta + .team-slide__add-friend {
+      margin-top: 16px;
+    }
+
     /* Go carousel */
     body.is-session #plan-training .go-rail,
     body.is-session #plan-team.team-rail {
@@ -3285,6 +3373,9 @@
       color: #F6F1E8;
       font-weight: 600;
     }
+    .go-slide__art + .go-slide__cta { margin-top: 36px; }
+    .go-slide__cta + .go-slide__copy { margin-top: 36px; }
+    .go-slide__head { display: none; }
     .go-subpage {
       position: fixed;
       inset: 0;
@@ -3579,10 +3670,13 @@
       background: transparent;
       touch-action: none;
     }
-    body.is-session[data-shell="woche"] .hscroll-dock.is-on,
-    body.is-session[data-shell="plan"][data-plan="team"] .hscroll-dock.is-on,
-    body.is-session[data-shell="plan"][data-plan="training"] .hscroll-dock.is-on {
+    body.is-session[data-shell="woche"] .hscroll-dock.is-on {
       display: block;
+    }
+    /* Team/gogogo: kein Scrollbalken — Pfeil-Navigation oben */
+    body.is-session[data-shell="plan"][data-plan="team"] .hscroll-dock,
+    body.is-session[data-shell="plan"][data-plan="training"] .hscroll-dock {
+      display: none !important;
     }
     .hscroll-dock__track {
       position: relative;
@@ -3608,8 +3702,6 @@
     }
     .hscroll-dock__thumb:active { cursor: grabbing; }
     body.is-session[data-shell="woche"] .welcome,
-    body.is-session[data-shell="plan"][data-plan="team"] .welcome,
-    body.is-session[data-shell="plan"][data-plan="training"] .welcome,
     body.is-session[data-shell="heute"] .welcome {
       padding-bottom: calc(68px + 56px + env(safe-area-inset-bottom, 0px));
     }
@@ -3680,6 +3772,15 @@
       </button>
     </div>
     <div class="shell-plan" id="plan-profil"></div>
+    <div class="rail-nav" id="team-rail-nav" hidden>
+      <button type="button" class="rail-nav__btn rail-nav__prev" aria-label="Vorheriger Bereich">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <h3 class="rail-nav__title" id="team-rail-title"></h3>
+      <button type="button" class="rail-nav__btn rail-nav__next" aria-label="Nächster Bereich">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
     <div class="shell-plan" id="plan-team"></div>
     <div class="shell-plan settings-list" id="plan-settings">
       <button type="button" data-menu="name">Vorname ändern</button>
@@ -4035,6 +4136,15 @@
       </div>
     </div>
     <div class="shell-plan" id="plan-training">
+      <div class="rail-nav" id="go-rail-nav" hidden>
+        <button type="button" class="rail-nav__btn rail-nav__prev" aria-label="Vorheriges Angebot">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+        </button>
+        <h3 class="rail-nav__title" id="go-rail-title"></h3>
+        <button type="button" class="rail-nav__btn rail-nav__next" aria-label="Nächstes Angebot">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+      </div>
       <div class="go-rail" id="go-rail" aria-label="Go Angebote"></div>
       <div class="go-card" id="go-card-routine" hidden>
         <h3 class="go-card__title">12-Wochen-Routine</h3>
@@ -8730,7 +8840,10 @@
       }
 
       function showPlan(pane) {
-        window.setTimeout(syncHScrollDock, 30);
+        window.setTimeout(function () {
+          syncHScrollDock();
+          syncTeamGoRailNav();
+        }, 30);
         closeShellModals();
         if (pane === "kalender") { showWoche(); return; }
         shellTab = "plan";
@@ -8755,7 +8868,9 @@
         if (planPane === "training") {
           requestAnimationFrame(scrollAbsenceWheels);
           refreshZirkel();
+          paintGoRail();
         }
+        syncTeamGoRailNav();
       }
 
       function inviteStore() {
@@ -9700,35 +9815,12 @@
         });
         var coachSlide = document.createElement("article");
         coachSlide.className = "team-slide is-scroll is-coach";
-        var pick = document.createElement("button");
-        pick.type = "button";
-        pick.setAttribute("aria-label", trainer ? "Trainer ändern" : "Trainer wählen");
-        pick.innerHTML = PENCIL_ICON;
-        pick.addEventListener("click", function () { openTeamSearch("trainer"); });
-        coachSlide.appendChild(teamSlideHead("Mein Coach", pick));
+        coachSlide.dataset.title = "Mein Coach";
         coachSlide.appendChild(teamPortrait(
           trainer,
           trainer ? String(trainer.name || "?").slice(0, 1) : "C",
           { fallbackSrc: "/assets/gogogo/gogogo-Coach-small.jpg" }
         ));
-        if (trainer) {
-          var wa = document.createElement("button");
-          wa.type = "button";
-          wa.className = "team-wa";
-          wa.setAttribute("aria-label", "Sofortnachricht an Trainer");
-          wa.innerHTML = WA_ICON;
-          wa.addEventListener("click", function () { openQuickWa(); });
-          coachSlide.appendChild(wa);
-        }
-        var about = document.createElement("p");
-        about.className = "team-slide__about";
-        var aboutText = "";
-        if (trainer) {
-          var ta = profileAbout(trainer);
-          aboutText = String((ta && ta.text) || "").trim();
-        }
-        about.textContent = aboutText || (trainer ? "" : "Noch kein Coach gewählt.");
-        coachSlide.appendChild(about);
         var ptCta = document.createElement("button");
         ptCta.type = "button";
         ptCta.className = "team-slide__cta is-solid is-pt";
@@ -9749,6 +9841,38 @@
           });
         });
         coachSlide.appendChild(ptCta);
+        var nameRow = document.createElement("div");
+        nameRow.className = "team-slide__coach-name";
+        var nameEl = document.createElement("h3");
+        nameEl.className = "team-slide__coach-name-text";
+        nameEl.textContent = trainer ? (trainer.name || "Coach") : "Noch kein Coach";
+        nameRow.appendChild(nameEl);
+        var pick = document.createElement("button");
+        pick.type = "button";
+        pick.className = "team-slide__head-action";
+        pick.setAttribute("aria-label", trainer ? "Trainer ändern" : "Trainer wählen");
+        pick.innerHTML = PENCIL_ICON;
+        pick.addEventListener("click", function () { openTeamSearch("trainer"); });
+        nameRow.appendChild(pick);
+        coachSlide.appendChild(nameRow);
+        var about = document.createElement("p");
+        about.className = "team-slide__about";
+        var aboutText = "";
+        if (trainer) {
+          var ta = profileAbout(trainer);
+          aboutText = String((ta && ta.text) || "").trim();
+        }
+        about.textContent = aboutText || (trainer ? "" : "Noch kein Coach gewählt.");
+        coachSlide.appendChild(about);
+        if (trainer) {
+          var wa = document.createElement("button");
+          wa.type = "button";
+          wa.className = "team-wa";
+          wa.setAttribute("aria-label", "Sofortnachricht an Trainer");
+          wa.innerHTML = WA_ICON;
+          wa.addEventListener("click", function () { openQuickWa(); });
+          coachSlide.appendChild(wa);
+        }
         paintCoachAppointments(coachSlide, trainer);
         box.appendChild(coachSlide);
 
@@ -9757,7 +9881,7 @@
         function groupSlide(group) {
           var slide = document.createElement("article");
           slide.className = "team-slide is-scroll";
-          slide.appendChild(teamSlideHead("Meine Gruppen"));
+          slide.dataset.title = "Meine Gruppen";
           var art = document.createElement("label");
           art.className = "team-slide__art is-upload";
           var gImg = document.createElement("img");
@@ -9805,7 +9929,7 @@
         if (!groups.length) {
           var emptyGroup = document.createElement("article");
           emptyGroup.className = "team-slide is-scroll is-group-empty";
-          emptyGroup.appendChild(teamSlideHead("Meine Gruppen"));
+          emptyGroup.dataset.title = "Meine Gruppen";
           var emptyArt = document.createElement("div");
           emptyArt.className = "team-slide__art";
           var emptyImg = document.createElement("img");
@@ -9813,13 +9937,6 @@
           emptyImg.src = "/assets/gogogo/gogogo-Gruppe-small.jpg";
           emptyArt.appendChild(emptyImg);
           emptyGroup.appendChild(emptyArt);
-          var addFriend = document.createElement("button");
-          addFriend.type = "button";
-          addFriend.className = "team-slide__add-friend";
-          addFriend.setAttribute("aria-label", "Freunde hinzufügen");
-          addFriend.innerHTML = '<span class="team-slide__add-friend-circle" aria-hidden="true">+</span>';
-          addFriend.addEventListener("click", function () { openTeamSearch("friend"); });
-          emptyGroup.appendChild(addFriend);
           var createBtn = document.createElement("button");
           createBtn.type = "button";
           createBtn.className = "team-slide__cta is-solid";
@@ -9828,6 +9945,13 @@
             openGoSub("group", "Gruppe erstellen");
           });
           emptyGroup.appendChild(createBtn);
+          var addFriend = document.createElement("button");
+          addFriend.type = "button";
+          addFriend.className = "team-slide__add-friend";
+          addFriend.setAttribute("aria-label", "Freunde hinzufügen");
+          addFriend.innerHTML = '<span class="team-slide__add-friend-circle" aria-hidden="true">+</span>';
+          addFriend.addEventListener("click", function () { openTeamSearch("friend"); });
+          emptyGroup.appendChild(addFriend);
           box.appendChild(emptyGroup);
         } else {
           groups.forEach(groupSlide);
@@ -9836,7 +9960,7 @@
         // Slide 4: coachees
         var coacheeSlide = document.createElement("article");
         coacheeSlide.className = "team-slide is-scroll";
-        coacheeSlide.appendChild(teamSlideHead("Meine Coachees"));
+        coacheeSlide.dataset.title = "Meine Coachees";
         var coachees = teamPeople.filter(function (person) {
           return person && person.trainer_id && String(person.trainer_id) === mineId;
         });
@@ -9864,9 +9988,14 @@
         box.appendChild(coacheeSlide);
         syncGroupOptions();
         syncHScrollDock();
+        syncTeamGoRailNav();
         requestAnimationFrame(function () {
           layoutGroupEmptySlides();
-          requestAnimationFrame(layoutGroupEmptySlides);
+          syncTeamGoRailNav();
+          requestAnimationFrame(function () {
+            layoutGroupEmptySlides();
+            syncTeamGoRailNav();
+          });
         });
       }
 
@@ -9891,20 +10020,96 @@
       function layoutGroupEmptySlides() {
         var rail = document.getElementById("plan-team");
         if (!rail) return;
-        var dock = document.getElementById("hscroll-dock");
-        var dockTop;
-        if (dock && !dock.hidden && dock.classList.contains("is-on")) {
-          dockTop = dock.getBoundingClientRect().top;
-        } else {
-          dockTop = window.innerHeight - (68 + 22 + 18);
-        }
         rail.querySelectorAll(".team-slide.is-group-empty").forEach(function (slide) {
-          var top = slide.getBoundingClientRect().top;
-          var h = Math.floor(dockTop - top - 8);
-          if (h < 240) h = 240;
-          slide.style.height = h + "px";
-          slide.style.maxHeight = h + "px";
+          slide.style.height = "";
+          slide.style.maxHeight = "";
         });
+      }
+
+      function railSlides(rail) {
+        if (!rail) return [];
+        return Array.prototype.slice.call(rail.children).filter(function (el) {
+          return el && (el.classList.contains("team-slide") || el.classList.contains("go-slide"));
+        });
+      }
+
+      function railCurrentIndex(rail) {
+        var list = railSlides(rail);
+        if (!list.length) return 0;
+        var left = rail.scrollLeft;
+        var best = 0;
+        var bestDist = Infinity;
+        list.forEach(function (el, i) {
+          var d = Math.abs(el.offsetLeft - left);
+          if (d < bestDist) {
+            bestDist = d;
+            best = i;
+          }
+        });
+        return best;
+      }
+
+      function syncRailNav(rail, nav) {
+        if (!rail || !nav) return;
+        var titleEl = nav.querySelector(".rail-nav__title");
+        var prev = nav.querySelector(".rail-nav__prev");
+        var next = nav.querySelector(".rail-nav__next");
+        var list = railSlides(rail);
+        var i = railCurrentIndex(rail);
+        var slide = list[i];
+        var label = slide ? String(slide.dataset.title || "").trim() : "";
+        if (titleEl) titleEl.textContent = label;
+        var atStart = i <= 0;
+        var atEnd = i >= list.length - 1 || list.length <= 1;
+        if (prev) {
+          prev.disabled = atStart;
+          prev.classList.toggle("is-dim", atStart);
+        }
+        if (next) {
+          next.disabled = atEnd;
+          next.classList.toggle("is-dim", atEnd);
+        }
+        nav.hidden = list.length === 0;
+      }
+
+      function bindRailNav(rail, nav) {
+        if (!rail || !nav || nav.dataset.bound === "1") {
+          syncRailNav(rail, nav);
+          return;
+        }
+        nav.dataset.bound = "1";
+        var prev = nav.querySelector(".rail-nav__prev");
+        var next = nav.querySelector(".rail-nav__next");
+        function go(delta) {
+          var list = railSlides(rail);
+          var i = Math.min(list.length - 1, Math.max(0, railCurrentIndex(rail) + delta));
+          var slide = list[i];
+          if (!slide) return;
+          rail.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
+          window.setTimeout(function () { syncRailNav(rail, nav); }, 280);
+        }
+        if (prev) prev.addEventListener("click", function () { go(-1); });
+        if (next) next.addEventListener("click", function () { go(1); });
+        rail.addEventListener("scroll", function () { syncRailNav(rail, nav); }, { passive: true });
+        syncRailNav(rail, nav);
+      }
+
+      function syncTeamGoRailNav() {
+        var pane = document.body.dataset.plan || planPane;
+        var teamNav = document.getElementById("team-rail-nav");
+        var goNav = document.getElementById("go-rail-nav");
+        var teamRail = document.getElementById("plan-team");
+        var goRail = document.getElementById("go-rail");
+        if (teamNav) teamNav.hidden = !(sessionMode && document.body.dataset.shell === "plan" && pane === "team");
+        if (goNav) goNav.hidden = !(sessionMode && document.body.dataset.shell === "plan" && pane === "training");
+        if (pane === "team" && teamRail && teamNav) {
+          bindRailNav(teamRail, teamNav);
+          syncRailNav(teamRail, teamNav);
+        }
+        if (pane === "training" && goRail && goNav) {
+          bindRailNav(goRail, goNav);
+          syncRailNav(goRail, goNav);
+        }
       }
 
       function syncHScrollDock() {
@@ -9915,7 +10120,7 @@
         var el = activeHScrollEl();
         hScrollTarget = el;
         var pane = document.body.dataset.plan || planPane;
-        var show = !!(el && sessionMode && ((document.body.dataset.shell === "woche") || (document.body.dataset.shell === "plan" && (pane === "team" || pane === "training"))));
+        var show = !!(el && sessionMode && document.body.dataset.shell === "woche");
         dock.hidden = !show;
         dock.classList.toggle("is-on", show);
         if (!show || !el) return;
@@ -9926,6 +10131,7 @@
         var left = (el.scrollLeft / max) * (100 - thumbW);
         thumb.style.left = left + "%";
         if (document.body.dataset.plan === "team") layoutGroupEmptySlides();
+        syncTeamGoRailNav();
       }
 
       if (!layoutGroupEmptySlides.bound) {
@@ -10170,10 +10376,7 @@
         slides.forEach(function (slide) {
           var card = document.createElement("article");
           card.className = "go-slide";
-          var title = document.createElement("h3");
-          title.className = "go-slide__head";
-          title.textContent = slide.title;
-          card.appendChild(title);
+          card.dataset.title = slide.title;
           var art = document.createElement("div");
           art.className = "go-slide__art";
           art.setAttribute("aria-hidden", "true");
@@ -10184,10 +10387,6 @@
             art.appendChild(img);
           }
           card.appendChild(art);
-          var copy = document.createElement("p");
-          copy.className = "go-slide__copy";
-          copy.textContent = slide.copy;
-          card.appendChild(copy);
           var cta = document.createElement("button");
           cta.type = "button";
           cta.className = "go-slide__cta";
@@ -10201,9 +10400,14 @@
             openGoSub(slide.id, slide.title);
           });
           card.appendChild(cta);
+          var copy = document.createElement("p");
+          copy.className = "go-slide__copy";
+          copy.textContent = slide.copy;
+          card.appendChild(copy);
           rail.appendChild(card);
         });
         syncHScrollDock();
+        syncTeamGoRailNav();
       }
 
       function closeGoSub() {
