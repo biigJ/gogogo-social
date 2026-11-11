@@ -2721,6 +2721,25 @@
       white-space: pre-wrap;
     }
     .team-slide__about:empty { display: none; }
+    .coach-appointments {
+      display: grid;
+      gap: 0;
+      margin: 4px 0 8px;
+      border-top: 1px solid rgba(42, 33, 24, 0.28);
+    }
+    .coach-appointments:empty { display: none; }
+    .coach-apt {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 2px;
+      border-bottom: 1px solid rgba(42, 33, 24, 0.28);
+      font-size: 15px;
+      color: #2A2118;
+    }
+    .coach-apt__date { flex: 0 1 auto; font-weight: 500; }
+    .coach-apt__name { flex: 1 1 auto; text-align: right; min-width: 0; }
     .team-slide__cta {
       width: 100%;
       min-height: 48px;
@@ -3949,7 +3968,7 @@
     </div>
     <div class="profile-block">
       <p class="profile-label" data-hide-label="1">Mantra</p>
-      <textarea class="profile-mantra" id="profile-mantra" maxlength="220" readonly></textarea>
+      <textarea class="profile-mantra" id="profile-mantra" maxlength="220" placeholder="Mantra" readonly></textarea>
     </div>
     <div class="profile-block profile-split" id="profile-zirkel-block" hidden>
       <p class="profile-text-head">Zirkeltraining</p>
@@ -8869,9 +8888,73 @@
         return art;
       }
 
+
+      function coachAgreedSessions(coachId) {
+        var me = sessionAccount ? String(sessionAccount.id) : "";
+        var cid = String(coachId || "");
+        if (!me || !cid) return [];
+        var bookingById = {};
+        remotePtBookings.forEach(function (b) {
+          if (!b || !b.id) return;
+          if (String(b.client_id) !== me || String(b.coach_id) !== cid) return;
+          if (b.status === "cancelled") return;
+          bookingById[String(b.id)] = b;
+        });
+        return remotePtSessions.filter(function (sess) {
+          if (!sess || !bookingById[String(sess.booking_id)]) return false;
+          return sess.status === "confirmed" || sess.status === "proposed" || sess.status === "accepted";
+        }).sort(function (a, b) {
+          return String(a.session_at || "").localeCompare(String(b.session_at || ""));
+        });
+      }
+
+      function paintCoachAppointments(host, coach) {
+        if (!host) return;
+        var list = document.createElement("div");
+        list.className = "coach-appointments";
+        if (!coach || !coach.id) {
+          host.appendChild(list);
+          return list;
+        }
+        var rows = coachAgreedSessions(coach.id);
+        var today = Log.berlinToday();
+        rows.forEach(function (sess) {
+          var booking = null;
+          remotePtBookings.forEach(function (b) {
+            if (String(b.id) === String(sess.booking_id)) booking = b;
+          });
+          var iso = String(sess.session_at || "").slice(0, 10);
+          if (iso && iso < today && sess.status !== "confirmed") return;
+          var d = new Date(sess.session_at);
+          var time = isNaN(d.getTime()) ? "" : (String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"));
+          var dateLabel = (iso === today ? "Heute" : formatLong(iso)) + (time ? " · " + time + " Uhr" : "");
+          var name = (booking && booking.package_label) || "Personal Training";
+          if (sess.status === "proposed") name += " (Anfrage)";
+          var row = document.createElement("div");
+          row.className = "coach-apt";
+          var dateEl = document.createElement("span");
+          dateEl.className = "coach-apt__date";
+          dateEl.textContent = dateLabel;
+          var nameEl = document.createElement("span");
+          nameEl.className = "coach-apt__name";
+          nameEl.textContent = name;
+          row.appendChild(dateEl);
+          row.appendChild(nameEl);
+          list.appendChild(row);
+        });
+        host.appendChild(list);
+        return list;
+      }
+
       function renderTeam() {
         var box = document.getElementById("plan-team");
         if (!box) return;
+        if (!box.dataset.ptLoaded) {
+          box.dataset.ptLoaded = "1";
+          loadPtData().then(function () {
+            if (document.body.dataset.plan === "team") renderTeam();
+          });
+        }
         box.textContent = "";
         box.classList.add("team-rail");
         var today = Log.berlinToday();
@@ -8955,6 +9038,7 @@
         }
         about.textContent = aboutText || (trainer ? "" : "Noch kein Coach gewählt.");
         coachSlide.appendChild(about);
+        paintCoachAppointments(coachSlide, trainer);
         box.appendChild(coachSlide);
 
         // Slide 3: groups (one slide per group, or empty upload slide)
@@ -11622,7 +11706,7 @@
           pendingPtBooking = null;
           document.getElementById("pt-accept-modal").hidden = true;
           paintHeuteJoins();
-          if (sessionIsTrainer) renderTeam();
+          renderTeam();
         });
       }
 
