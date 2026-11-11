@@ -2105,6 +2105,40 @@
       border-radius: 50%;
       flex: none;
     }
+    .day-invite__slot {
+      position: relative;
+      width: 44px;
+      height: 44px;
+      flex: none;
+      border-radius: 50%;
+      overflow: hidden;
+    }
+    .day-invite__slot .day-invite__face,
+    .day-invite__slot .day-invite__ph {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .day-invite__slot.is-pending .day-invite__face,
+    .day-invite__slot.is-pending .day-invite__ph {
+      filter: grayscale(1);
+      opacity: 0.55;
+    }
+    .day-invite__wait {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(120, 112, 102, 0.55);
+      color: #F6F1E8;
+      pointer-events: none;
+    }
+    .day-invite__wait svg {
+      width: 20px;
+      height: 20px;
+      display: block;
+    }
     .day-invite__face, .day-invite__ph {
       object-fit: cover;
       background: #E4DDD0;
@@ -8964,25 +8998,37 @@
         var row = document.createElement("div");
         row.className = "day-invite__faces";
         var usedFace = {};
+        var HOURGLASS = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h11M6.5 20.5h11M8 3.5v2.2c0 2.2 1.6 3.5 4 5.3 2.4-1.8 4-3.1 4-5.3V3.5M8 20.5v-2.2c0-2.2 1.6-3.5 4-5.3 2.4 1.8 4 3.1 4 5.3v2.2"/></svg>';
         faces.forEach(function (person) {
           if (!person) return;
           var pid = String(person.id || "");
           if (pid && usedFace[pid]) return;
           if (pid) usedFace[pid] = true;
+          var slot = document.createElement("span");
+          slot.className = "day-invite__slot" + (person.status === "pending" ? " is-pending" : "");
+          slot.title = person.status === "pending"
+            ? ((person.name || "Freund") + " · wartet auf Annahme")
+            : (person.name || "");
           if (person.photo) {
             var img = document.createElement("img");
             img.className = "day-invite__face";
             img.alt = person.name || "";
-            img.title = person.name || "";
             img.src = person.photo;
-            row.appendChild(img);
+            slot.appendChild(img);
           } else {
             var ph = document.createElement("span");
             ph.className = "day-invite__ph";
-            ph.title = person.name || "";
             ph.textContent = String(person.name || "?").slice(0, 1);
-            row.appendChild(ph);
+            slot.appendChild(ph);
           }
+          if (person.status === "pending") {
+            var wait = document.createElement("span");
+            wait.className = "day-invite__wait";
+            wait.setAttribute("aria-hidden", "true");
+            wait.innerHTML = HOURGLASS;
+            slot.appendChild(wait);
+          }
+          row.appendChild(slot);
         });
         var plus = document.createElement("button");
         plus.type = "button";
