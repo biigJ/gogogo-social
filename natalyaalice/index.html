@@ -2502,7 +2502,7 @@
     .heute-stories__row {
       display: flex;
       gap: 17.1px;
-      padding: 4px 20px 6px;
+      padding: 12px 20px 14px; /* Platz für breiten Puls-Rand */
       overflow-x: auto;
       overflow-y: hidden;
       overscroll-behavior-x: contain;
@@ -2521,17 +2521,25 @@
       color: #2A2118;
     }
     .crew-story__ring {
+      box-sizing: border-box;
       width: var(--story-d, 64px);
       height: var(--story-d, 64px);
       padding: 1px;
       border-radius: 50%;
+      border: 0 solid transparent;
       background: rgba(42, 33, 24, 0.28);
     }
+    /* Aktive Story: nur dicker Rand, kein Puls */
     .crew-story.has-story .crew-story__ring {
-      padding: 4px;
-      background: conic-gradient(#C7413B, #2A2118, #C7413B);
+      padding: 0;
+      border: 5px solid #C7413B;
+      background: transparent;
+      animation: none;
     }
-    .crew-story.has-story.is-seen .crew-story__ring { background: #2A2118; }
+    .crew-story.has-story.is-seen .crew-story__ring {
+      border-color: #2A2118;
+      border-width: 4px;
+    }
     .crew-story--add .team-avatar { background: transparent; border-style: dashed; }
     .crew-story__ring .team-avatar {
       width: 100%;
@@ -2549,30 +2557,34 @@
       text-overflow: ellipsis;
     }
 
-    .crew-story.is-training .crew-story__ring {
-      background: conic-gradient(#C7413B, #F2B8A8, #C7413B, #E89B8F, #C7413B);
-      padding: 4px;
-      animation: training-pulse 1.05s ease-in-out infinite;
-      box-shadow: 0 0 0 0 rgba(199, 65, 59, 0.55);
+    /* Training ohne Story: Rand dunkelrot ↔ hellrot, breit pulsierend */
+    .crew-story.is-training:not(.has-story) .crew-story__ring {
+      padding: 0;
+      background: transparent;
+      border: 0;
+      box-shadow: 0 0 0 5px #7A221F;
+      animation: training-ring-pulse 1s ease-in-out infinite;
     }
-    .crew-story.is-training.is-training-active .crew-story__ring {
-      animation: training-pulse-strong 0.85s ease-in-out infinite;
+    .crew-story.is-training.is-training-active:not(.has-story) .crew-story__ring {
+      animation: training-ring-pulse-strong 0.85s ease-in-out infinite;
     }
     .crew-story.is-training .crew-story__name {
       font-weight: 700;
       color: #C7413B;
     }
-    @keyframes training-pulse {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(199, 65, 59, 0.55); }
-      50% { transform: scale(1.12); box-shadow: 0 0 0 10px rgba(199, 65, 59, 0); }
+    @keyframes training-ring-pulse {
+      0%, 100% { box-shadow: 0 0 0 3px #5C1614; }
+      50% { box-shadow: 0 0 0 12px #F8D2C8; }
     }
-    @keyframes training-pulse-strong {
-      0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(199, 65, 59, 0.7); filter: brightness(1); }
-      50% { transform: scale(1.18); box-shadow: 0 0 0 14px rgba(199, 65, 59, 0); filter: brightness(1.08); }
+    @keyframes training-ring-pulse-strong {
+      0%, 100% { box-shadow: 0 0 0 4px #4A1010; }
+      50% { box-shadow: 0 0 0 14px #FFE3DB; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .crew-story.is-training .crew-story__ring,
-      .crew-story.is-training.is-training-active .crew-story__ring { animation: none; }
+      .crew-story.is-training:not(.has-story) .crew-story__ring {
+        animation: none;
+        box-shadow: 0 0 0 7px #C7413B;
+      }
     }
 
     .heute-stories .story-hint { padding: 0 20px; }
