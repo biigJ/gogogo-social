@@ -1296,6 +1296,7 @@
     body.is-session .routine-row { grid-template-columns: 1fr; }
     body.is-session[data-shell="heute"] .shell-kalender,
     body.is-session[data-shell="plan"] #go-today,
+    body.is-session[data-shell="plan"] #go-tomorrow,
     body.is-session[data-shell="plan"] .shell-heute,
     body.is-session[data-shell="diary"] .welcome,
     body.is-session[data-shell="workout"] .welcome { display: none !important; }
@@ -1310,7 +1311,9 @@
     body.is-session[data-shell="heute"] .dock { order: 2; margin-top: 4px; }
     body.is-session[data-shell="heute"] .heute-joins { order: 3; }
     body.is-session[data-shell="heute"] .heute-start { order: 4; }
-    body.is-session[data-shell="heute"] #go-today { min-height: 224px; }
+    body.is-session[data-shell="heute"] #go-today,
+    body.is-session[data-shell="heute"] #go-tomorrow { min-height: 224px; }
+    body.is-session[data-shell="heute"] #go-tomorrow { margin-top: 12px; }
     body.is-session[data-shell="heute"] .heute-events { order: 5; }
     body.is-session[data-shell="heute"][data-heute="mine"] .heute-start,
     body.is-session[data-shell="heute"][data-heute="mine"] .heute-events { display: none !important; }
@@ -2523,7 +2526,8 @@
       text-overflow: ellipsis;
     }
     .heute-stories .story-hint { padding: 0 20px; }
-    body.is-session #go-today {
+    body.is-session #go-today,
+    body.is-session #go-tomorrow {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
@@ -2537,7 +2541,10 @@
       color: #2A2118;
       text-align: left;
     }
-    body.is-session #go-today:disabled { opacity: 1; }
+    body.is-session #go-today:disabled,
+    body.is-session #go-tomorrow:disabled { opacity: 1; }
+    #go-tomorrow { display: none; }
+    body.is-session #go-tomorrow { display: flex; }
     .today-card__kicker, .today-card__line { display: none; }
     body.is-session .today-card__kicker,
     body.is-session .today-card__line { display: block; }
@@ -3696,6 +3703,7 @@
     <div class="dock">
       <p class="heute-away" id="heute-away" hidden>Alternativer Alltag gem. Deiner Angabe unter Profil.</p>
       <button type="button" class="go-primary" id="go-today"><span class="today-card__kicker" id="today-kicker"></span><span class="today-card__title" id="today-title">Heutiges Workout</span><span class="today-card__line" id="today-line"></span></button>
+      <button type="button" class="go-primary" id="go-tomorrow"><span class="today-card__kicker" id="tomorrow-kicker"></span><span class="today-card__title" id="tomorrow-title">Morgiges Workout</span><span class="today-card__line" id="tomorrow-line"></span></button>
       <button type="button" class="today-invite" id="today-invite" hidden aria-label="Einladen"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
       <div class="go-row">
         <button type="button" class="go-quiet" id="go-shift">Schieben</button>
@@ -5934,45 +5942,38 @@
         shiftBtn.textContent = shifted && !picking ? "Nicht verschieben" : "Schieben";
         shiftBtn.disabled = picking || (!shifted && !todayPlanned);
         var todayBtn = document.getElementById("go-today");
+        var tomorrowBtn = document.getElementById("go-tomorrow");
         var todayKind = "";
         var awayToday = false;
         if (sessionMode) {
           var todayIso = Log.berlinToday();
-          awayToday = awayOn(todayIso, absenceOf(sessionAccount));
-          var todayWd = weekdayIndex(todayIso);
-          var todayUnit = displayUnit(todayWd);
-          todayKind = todayUnit && todayUnit.kind ? todayUnit.kind : "";
-          var todayPlace = placeForWeekday(todayWd);
-          if (awayToday) {
-            var todayAlt = travelAltFor(todayIso);
-            setTodayCard(todayAlt ? (activityEmoji({ kind: "alternative", label: todayAlt }) + " " + todayAlt).trim() : "Alternative wählen", "Reise");
-            todayBtn.dataset.kind = "away";
-            todayBtn.dataset.away = "1";
-            todayBtn.dataset.unitLabel = "";
-            applyWorkoutTone(todayBtn, todayAlt ? { kind: "alternative", label: todayAlt } : { kind: "extra" });
-          } else {
-            var cardTitle = todayKind === "spontan"
-              ? "Am Tag spontan"
-              : (todayUnit && todayUnit.label
-                ? (activityEmoji(todayUnit) + " " + todayUnit.label).trim()
-                : "Heute frei");
-            setTodayCard(cardTitle, todayKind && todayKind !== "spontan" ? "Ort: " + todayPlace : "", todayKind ? timeForWeekday(todayWd) : "");
-            todayBtn.dataset.kind = todayKind;
-            todayBtn.dataset.away = "";
-            todayBtn.dataset.unitLabel = todayUnit && todayUnit.label ? todayUnit.label : "";
-            applyWorkoutTone(todayBtn, todayUnit && todayUnit.kind ? todayUnit : { kind: "extra", label: "Heute frei" });
+          var tomorrowIso = addDays(todayIso, 1);
+          var todayInfo = fillDayEventBtn(todayBtn, todayIso, setTodayCard);
+          awayToday = !!(todayInfo && todayInfo.away);
+          todayKind = todayInfo && todayInfo.kind ? todayInfo.kind : "";
+          fillDayEventBtn(tomorrowBtn, tomorrowIso, setTomorrowCard);
+          if (tomorrowBtn) {
+            tomorrowBtn.disabled = false;
+            tomorrowBtn.hidden = false;
           }
           document.getElementById("today-invite").hidden = awayToday || todayKind !== "zirkel";
         } else {
           setTodayCard("Heutiges Workout", "");
           todayBtn.dataset.kind = "";
           todayBtn.dataset.away = "";
+          if (tomorrowBtn) {
+            setTomorrowCard("Morgiges Workout", "");
+            tomorrowBtn.dataset.kind = "";
+            tomorrowBtn.dataset.away = "";
+            tomorrowBtn.hidden = true;
+          }
         }
         var awayNote = document.getElementById("heute-away");
         if (awayNote) awayNote.hidden = !awayToday;
         paintAbsenceButton();
         todayBtn.disabled = sessionMode ? false : (picking || shifted || !todayPlanned);
         todayBtn.classList.toggle("is-due", !awayToday && todayPlanned && !shifted && !picking);
+        if (tomorrowBtn) tomorrowBtn.classList.toggle("is-due", false);
         document.getElementById("go-short").disabled = picking || shifted || !todayPlanned;
         paintPhoto();
         paintHeuteExtras();
@@ -6069,6 +6070,47 @@
         if (kicker) kicker.textContent = sessionMode ? "Heute" + (time ? " · " + time + " Uhr" : "") : "";
         document.getElementById("today-title").textContent = title;
         document.getElementById("today-line").textContent = line || "";
+      }
+
+      function setTomorrowCard(title, line, time) {
+        var kicker = document.getElementById("tomorrow-kicker");
+        if (kicker) kicker.textContent = sessionMode ? "Morgen" + (time ? " · " + time + " Uhr" : "") : "";
+        var titleEl = document.getElementById("tomorrow-title");
+        if (titleEl) titleEl.textContent = title;
+        var lineEl = document.getElementById("tomorrow-line");
+        if (lineEl) lineEl.textContent = line || "";
+      }
+
+      function fillDayEventBtn(btn, iso, setCard) {
+        if (!btn) return;
+        var away = awayOn(iso, absenceOf(sessionAccount));
+        var wd = weekdayIndex(iso);
+        var unit = displayUnit(wd);
+        var kind = unit && unit.kind ? unit.kind : "";
+        var place = placeForWeekday(wd);
+        if (away) {
+          var alt = travelAltFor(iso);
+          setCard(alt ? (activityEmoji({ kind: "alternative", label: alt }) + " " + alt).trim() : "Alternative wählen", "Reise");
+          btn.dataset.kind = "away";
+          btn.dataset.away = "1";
+          btn.dataset.unitLabel = "";
+          btn.dataset.iso = iso;
+          applyWorkoutTone(btn, alt ? { kind: "alternative", label: alt } : { kind: "extra" });
+        } else {
+          var emptyLabel = (btn.id === "go-today") ? "Heute frei" : "Morgen frei";
+          var cardTitle = kind === "spontan"
+            ? "Am Tag spontan"
+            : (unit && unit.label
+              ? (activityEmoji(unit) + " " + unit.label).trim()
+              : emptyLabel);
+          setCard(cardTitle, kind && kind !== "spontan" ? "Ort: " + place : "", kind ? timeForWeekday(wd) : "");
+          btn.dataset.kind = kind;
+          btn.dataset.away = "";
+          btn.dataset.unitLabel = unit && unit.label ? unit.label : "";
+          btn.dataset.iso = iso;
+          applyWorkoutTone(btn, unit && unit.kind ? unit : { kind: "extra", label: emptyLabel });
+        }
+        return { away: away, kind: kind, unit: unit };
       }
 
       function choosePlanDay(key) {
@@ -10665,11 +10707,13 @@
         markDiaryMove(Log.berlinToday(), movementLabel());
       }
 
-      document.getElementById("go-today").addEventListener("click", function () {
-        var kind = this.dataset.kind || "";
-        if (sessionMode && (this.dataset.away === "1" || kind === "away")) {
-          if (travelAltFor(Log.berlinToday())) openDiary();
-          else openTravelAlt(Log.berlinToday());
+      function openDayEventFromBtn(btn) {
+        if (!btn) return;
+        var iso = btn.dataset.iso || Log.berlinToday();
+        var kind = btn.dataset.kind || "";
+        if (sessionMode && (btn.dataset.away === "1" || kind === "away")) {
+          if (travelAltFor(iso)) openDiary();
+          else openTravelAlt(iso);
           return;
         }
         if (sessionMode && kind === "zirkel") {
@@ -10677,10 +10721,24 @@
           return;
         }
         if (sessionMode) {
-          openTodayEvent();
+          var label = kind && kind !== "spontan" && kind !== "away" ? (btn.dataset.unitLabel || "") : "";
+          if (kind === "zirkel" && !label) label = "Zirkeltraining";
+          var place = placeForWeekday(weekdayIndex(iso));
+          var heading = label || (btn.querySelector(".today-card__title") || {}).textContent || "Training";
+          requireFfc(function () {
+            FFC.openEvent({ title: label, where: isHomePlace(place) ? "" : place });
+          }, { title: heading, tagline: "Melde Dich an, um Dein Team einzuladen." });
           return;
         }
         enterWorkout(false);
+      }
+
+      document.getElementById("go-today").addEventListener("click", function () {
+        openDayEventFromBtn(this);
+      });
+      var goTomorrow = document.getElementById("go-tomorrow");
+      if (goTomorrow) goTomorrow.addEventListener("click", function () {
+        openDayEventFromBtn(this);
       });
       document.getElementById("today-invite").addEventListener("click", openTodayEvent);
       document.getElementById("heute-start").addEventListener("click", openGoPick);
@@ -11954,6 +12012,7 @@
           box.appendChild(card);
         });
         var today = Log.berlinToday();
+        var tomorrow = addDays(today, 1);
         var last = addDays(today, 6);
         var me = String(sessionAccount.id);
         if (!onlyMine) {
@@ -12026,7 +12085,7 @@
         remotePtSessions.filter(function (sess) {
           if (!sess || sess.status !== "confirmed") return false;
           var iso = String(sess.session_at || "").slice(0, 10);
-          if (onlyMine) return iso === today;
+          if (onlyMine) return iso === today || iso === tomorrow;
           return iso >= today && iso <= last;
         }).forEach(function (sess) {
           var booking = null;
@@ -12045,7 +12104,7 @@
           applyWorkoutTone(card, { kind: "extra", label: "Personal Training" });
           var kicker = document.createElement("span");
           kicker.className = "today-card__kicker";
-          kicker.textContent = (iso === today ? "Heute" : formatLong(iso)) + " · " + time + " Uhr";
+          kicker.textContent = (iso === today ? "Heute" : iso === tomorrow ? "Morgen" : formatLong(iso)) + " · " + time + " Uhr";
           var title = document.createElement("span");
           title.className = "today-card__title";
           title.textContent = "Personal Training";
@@ -12074,7 +12133,7 @@
           if (row.status !== "pending" && row.status !== "accepted") return false;
           var iso = String(row.workout_date || "").slice(0, 10);
           if (onlyMine) {
-            if (iso !== today || row.status !== "accepted") return false;
+            if ((iso !== today && iso !== tomorrow) || row.status !== "accepted") return false;
           } else {
             if (iso < today || iso > last) return false;
           }
@@ -12093,7 +12152,7 @@
           applyWorkoutTone(card, { label: row.workout_label || "Training" });
           var kicker = document.createElement("span");
           kicker.className = "today-card__kicker";
-          kicker.textContent = (iso === today ? "Heute" : formatLong(iso)) + (row.meet_time ? " · " + row.meet_time + " Uhr" : "");
+          kicker.textContent = (iso === today ? "Heute" : iso === tomorrow ? "Morgen" : formatLong(iso)) + (row.meet_time ? " · " + row.meet_time + " Uhr" : "");
           var title = document.createElement("span");
           title.className = "today-card__title";
           title.textContent = (activityEmoji({ label: row.workout_label }) + " " + (row.workout_label || "Training")).trim();
