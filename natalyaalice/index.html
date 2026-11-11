@@ -9876,25 +9876,15 @@
         var rail = document.getElementById("plan-team");
         if (!rail) return;
         var dock = document.getElementById("hscroll-dock");
-        var dockTop = (dock && !dock.hidden && dock.classList.contains("is-on"))
-          ? dock.getBoundingClientRect().top
-          : (window.innerHeight - (90 + (parseInt(getComputedStyle(document.documentElement).getPropertyValue("padding-bottom"), 10) || 0)));
-        // Fallback: dock sits at bottom: 68+22+safe ≈ 90px, height 18 → top ≈ innerHeight - 108
-        if (!(dock && !dock.hidden && dock.classList.contains("is-on"))) {
-          dockTop = window.innerHeight - 108 - (parseFloat(getComputedStyle(document.documentElement).paddingBottom) || 0);
-          var safe = 0;
-          try {
-            var probe = document.createElement("div");
-            probe.style.paddingBottom = "env(safe-area-inset-bottom)";
-            document.body.appendChild(probe);
-            safe = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
-            probe.remove();
-          } catch (eSafe) {}
-          dockTop = window.innerHeight - (68 + 22 + 18 + safe);
+        var dockTop;
+        if (dock && !dock.hidden && dock.classList.contains("is-on")) {
+          dockTop = dock.getBoundingClientRect().top;
+        } else {
+          dockTop = window.innerHeight - (68 + 22 + 18);
         }
         rail.querySelectorAll(".team-slide.is-group-empty").forEach(function (slide) {
           var top = slide.getBoundingClientRect().top;
-          var h = Math.floor(dockTop - top - 6);
+          var h = Math.floor(dockTop - top - 8);
           if (h < 240) h = 240;
           slide.style.height = h + "px";
           slide.style.maxHeight = h + "px";
