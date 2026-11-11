@@ -1356,7 +1356,7 @@
     .plan-tabs, .shell-plan, .heute-start, .heute-events, .zirkel-block { display: none; }
     body.is-session[data-shell="plan"] .plan-tabs {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 0;
       margin: 12px 0 16px;
       border-bottom: 1px solid rgba(42, 33, 24, 0.28);
@@ -1377,10 +1377,15 @@
     }
     .plan-tabs button.plan-tabs__gear.is-on { color: #2A2118; }
     body.is-session[data-shell="plan"] .shell-plan { display: block; }
-    #plan-team, #plan-orte, #plan-training, #plan-info, #plan-settings { display: none !important; }
+    #plan-profil, #plan-team, #plan-orte, #plan-training, #plan-info, #plan-settings { display: none !important; }
     body.is-session[data-shell="plan"][data-plan="info"] #plan-info,
     body.is-session[data-shell="plan"][data-plan="training"] #plan-training,
-    body.is-session[data-shell="plan"][data-plan="settings"] #plan-settings { display: block !important; }
+    body.is-session[data-shell="plan"][data-plan="settings"] #plan-settings,
+    body.is-session[data-shell="plan"][data-plan="profil"] #plan-profil { display: block !important; }
+    body.is-session[data-shell="plan"][data-plan="profil"] #plan-profil .team-slide {
+      width: 100%;
+      max-width: 100%;
+    }
     body.is-session[data-shell="plan"][data-plan="team"] #plan-team {
       display: flex !important;
       flex-direction: row;
@@ -3267,12 +3272,14 @@
 <body class="is-home">
   <section id="welcome" class="welcome">
     <div class="plan-tabs" role="tablist" aria-label="Einstellungen">
-      <button type="button" data-plan="team" class="is-on" role="tab">Team</button>
+      <button type="button" data-plan="profil" class="is-on" role="tab">Profil</button>
+      <button type="button" data-plan="team" role="tab">Team</button>
       <button type="button" data-plan="training" role="tab">gogogo</button>
       <button type="button" data-plan="settings" class="plan-tabs__gear" role="tab" aria-label="Einstellung">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
     </div>
+    <div class="shell-plan" id="plan-profil"></div>
     <div class="shell-plan" id="plan-team"></div>
     <div class="shell-plan settings-list" id="plan-settings">
       <button type="button" data-menu="name">Vorname ändern</button>
@@ -4721,7 +4728,7 @@
       }
       applyInstalledIdentity(sessionAccount);
       var shellTab = "heute";
-      var planPane = "team";
+      var planPane = "profil";
       var todayPick = null;
       var sessionIsTrainer = !!(sessionAccount && sessionAccount.is_trainer);
       try {
@@ -8297,7 +8304,7 @@
         closeShellModals();
         if (pane === "kalender") { showWoche(); return; }
         shellTab = "plan";
-        planPane = pane || planPane || "team";
+        planPane = pane || planPane || "profil";
         document.body.dataset.shell = "plan";
         document.body.dataset.plan = planPane;
         document.body.classList.add("is-home");
@@ -8309,6 +8316,7 @@
         if (theme) theme.setAttribute("content", "#F3EEE4");
         paintPill();
         paintPlanTabs();
+        if (planPane === "profil") renderProfil();
         if (planPane === "team") loadTeam();
         if (planPane === "orte") {
           loadAccountPlaces().then(function () { ensurePlaceMap(); });
@@ -9060,6 +9068,34 @@
         return list;
       }
 
+      function mePersonCard() {
+        return Object.assign({}, sessionAccount || {}, {
+          isSelf: true,
+          name: personName(),
+          photo_url: (sessionAccount && sessionAccount.photo_url) || ""
+        });
+      }
+
+      function renderProfil() {
+        var box = document.getElementById("plan-profil");
+        if (!box) return;
+        box.textContent = "";
+        var mePerson = mePersonCard();
+        var meSlide = document.createElement("article");
+        meSlide.className = "team-slide";
+        meSlide.appendChild(teamSlideHead("Mein Profil"));
+        meSlide.appendChild(teamPortrait(mePerson, personName().slice(0, 1)));
+        var editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "team-slide__cta is-solid";
+        editBtn.textContent = "Bearbeiten";
+        editBtn.addEventListener("click", function () {
+          openProfile(mePerson);
+        });
+        meSlide.appendChild(editBtn);
+        box.appendChild(meSlide);
+      }
+
       function renderTeam() {
         var box = document.getElementById("plan-team");
         if (!box) return;
@@ -9100,27 +9136,8 @@
           (parent || box).appendChild(row);
         }
 
-        // Slide 1: me
-        var meSlide = document.createElement("article");
-        meSlide.className = "team-slide";
-        var mePerson = Object.assign({}, sessionAccount || {}, {
-          isSelf: true,
-          name: personName(),
-          photo_url: (sessionAccount && sessionAccount.photo_url) || ""
-        });
-        meSlide.appendChild(teamSlideHead("Mein Profil"));
-        meSlide.appendChild(teamPortrait(mePerson, personName().slice(0, 1)));
-        var editBtn = document.createElement("button");
-        editBtn.type = "button";
-        editBtn.className = "team-slide__cta is-solid";
-        editBtn.textContent = "Bearbeiten";
-        editBtn.addEventListener("click", function () {
-          openProfile(mePerson);
-        });
-        meSlide.appendChild(editBtn);
-        box.appendChild(meSlide);
-
-        // Slide 2: trainer
+        // Coach first (Profil ist eigener Reiter)
+        // Slide: trainer
         var trainer = null;
         teamPeople.forEach(function (person) {
           if (myTrainer && String(person.id) === myTrainer) trainer = person;
@@ -10798,7 +10815,7 @@
         if (!btn) return;
         var tab = btn.getAttribute("data-shell");
         if (tab === "diary") openDiary();
-        else if (tab === "plan") showPlan(planPane === "kalender" ? "team" : planPane);
+        else if (tab === "plan") showPlan(planPane === "kalender" ? "profil" : planPane);
         else if (tab === "woche") showWoche();
         else {
           setHome(true);
@@ -12902,6 +12919,8 @@
         sheet.classList.remove("is-open");
         sheet.classList.remove("is-editing");
         window.setTimeout(function () { if (!sheet.classList.contains("is-open")) sheet.hidden = true; }, 280);
+        if (document.body.dataset.shell === "plan" && document.body.dataset.plan === "profil") renderProfil();
+        if (document.body.dataset.shell === "plan" && document.body.dataset.plan === "team") renderTeam();
       }
 
       function saveProfileFields(fields) {
