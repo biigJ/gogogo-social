@@ -102,7 +102,7 @@
   // Homescreen-PWAs cachen HTML aggressiv. Cache-Bust + Verlauf-Killer
   // (wirkt auch bei alter inline-CSS, die .top-edge auf allen Tabs zeigt).
   (function gogogoWorkoutBoot() {
-    var BUILD = "nav5-fade-7";
+    var BUILD = "nav5-fade-off";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
     if (path !== "/workout") return;
 

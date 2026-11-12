@@ -14,6 +14,12 @@
   <link rel="manifest" id="app-manifest" href="/natalyaalice/manifest.webmanifest" />
   <script>
     (function () {
+      /* Sofort: jeden Status-Verlauf killen (auch bei gecachtem CSS) */
+      var kill = document.createElement("style");
+      kill.setAttribute("data-gogogo-fade-kill", "1");
+      kill.textContent = ".top-edge,.heute-status-fade{display:none!important;opacity:0!important;height:0!important;background:none!important;visibility:hidden!important}html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before{content:none!important;display:none!important;background:none!important;height:0!important}";
+      document.documentElement.appendChild(kill);
+
       var path = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "");
       var workout = path === "/workout" || /(?:\?|&)as=workout(?:&|$)/.test(location.search);
       if (!workout) return;
@@ -49,7 +55,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-fade-7" />
+  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-fade-off" />
   <style>
     :root {
       --bg: #C7413B;
@@ -1250,9 +1256,12 @@
     html.has-vp-gap:has(body.is-session:not([data-shell="workout"])),
     html.has-vp-gap body.is-session:not([data-shell="workout"]) { overflow: hidden; }
     /* Pill bleibt im touchbaren Viewport — negativer bottom machte Tabs oft tot bis App-Wechsel */
-    /* Alte Fade-Nodes nie mehr anzeigen */
+    /* Verlauf komplett aus (auch Heute), bis klar ist was noch stört.
+       Killt alte .top-edge Nodes und body::before aus vorherigen Builds. */
     .top-edge,
-    .heute-status-fade {
+    .heute-status-fade,
+    html.is-standalone body.is-session .top-edge,
+    html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge {
       display: none !important;
       opacity: 0 !important;
       visibility: hidden !important;
@@ -1262,18 +1271,8 @@
       background: none !important;
       background-image: none !important;
     }
-    /* Verlauf NUR auf Heute — als body::before, verschwindet automatisch mit data-shell */
-    html.is-standalone body.is-session[data-shell="heute"]::before {
-      content: "";
-      position: fixed;
-      top: calc((env(safe-area-inset-top) + 10px) * -2 / 3);
-      left: 0;
-      right: 0;
-      z-index: 48;
-      height: calc(env(safe-area-inset-top) + 10px);
-      background: linear-gradient(#F3EEE4 calc(100% - 10px), rgba(243, 238, 228, 0));
-      pointer-events: none;
-    }
+    html.is-standalone body.is-session::before,
+    html.is-standalone body.is-session[data-shell="heute"]::before,
     html.is-standalone body.is-session[data-shell="woche"]::before,
     html.is-standalone body.is-session[data-shell="team"]::before,
     html.is-standalone body.is-session[data-shell="kurse"]::before,
@@ -1284,7 +1283,9 @@
       content: none !important;
       display: none !important;
       background: none !important;
+      background-image: none !important;
       height: 0 !important;
+      opacity: 0 !important;
     }
     @media (display-mode: standalone) {
       html .app-pill { padding-bottom: max(14px, calc(env(safe-area-inset-bottom) - 6px)); }
@@ -5472,7 +5473,7 @@
 </nav>
   </div>
   <!-- ffc:end -->
-  <script src="/assets/go-account-session.js?v=nav5-fade-7"></script>
+  <script src="/assets/go-account-session.js?v=nav5-fade-off"></script>
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
@@ -15197,6 +15198,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=nav5-fade-7"></script>
+  <script src="/natalyaalice/ffc.js?v=nav5-fade-off"></script>
 </body>
 </html>

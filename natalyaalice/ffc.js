@@ -2,7 +2,7 @@
 (function(){
   // Verlauf-Killer + Cache-Bust (auch wenn alte HTML-Kopie .top-edge überall zeigt)
   (function () {
-    var BUILD = "nav5-fade-7";
+    var BUILD = "nav5-fade-off";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
     if (path !== "/workout") return;
     function hide() {
