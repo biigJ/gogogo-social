@@ -122,7 +122,7 @@
 
   // Verlauf-Killer gegen gecachte Homescreen-PWA (altes .top-edge auf allen Tabs).
   (function gogogoWorkoutBoot() {
-    var BUILD = "nav5-norand-12";
+    var BUILD = "nav5-fade-deckel-13";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
     var onWorkout = path === "/workout" || path === "/natalyaalice" || path.indexOf("/natalyaalice/") === 0;
     if (!onWorkout) return;

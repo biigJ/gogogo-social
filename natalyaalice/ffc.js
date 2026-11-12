@@ -2,7 +2,7 @@
 (function(){
   // Verlauf-Killer (alte HTML mit .top-edge auf allen Tabs)
   (function () {
-    var BUILD = "nav5-norand-12";
+    var BUILD = "nav5-fade-deckel-13";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
     if (path !== "/workout" && path !== "/natalyaalice") return;
     function kill() {
