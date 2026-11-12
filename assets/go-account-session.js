@@ -1,4 +1,25 @@
 (function (global) {
+  /* Sofort: Creme-Verlaufsüberlagerung .top-edge entfernen (auch bei alter HTML). */
+  (function gogogoKillTopEdgeNow() {
+    try {
+      var css = document.createElement("style");
+      css.id = "gogogo-kill-fade-boot";
+      css.textContent = 'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,html.is-standalone body.is-session .top-edge,.top-edge,.heute-status-fade{display:none!important;opacity:0!important;visibility:hidden!important;height:0!important;max-height:0!important;background:none!important;background-image:none!important;}html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before{content:none!important;display:none!important;background:none!important;}';
+      (document.documentElement || document.head).appendChild(css);
+      var killNodes = function () {
+        document.querySelectorAll(".top-edge,.heute-status-fade").forEach(function (el) {
+          try {
+            el.style.cssText = "display:none!important;height:0!important;background:none!important;";
+            if (el.parentNode) el.parentNode.removeChild(el);
+          } catch (e0) {}
+        });
+      };
+      killNodes();
+      document.addEventListener("DOMContentLoaded", killNodes);
+      setInterval(killNodes, 250);
+    } catch (eBoot) {}
+  })();
+
   var ACCOUNT_KEY = "gogogo_go_account";
   var COOKIE_NAME = "gogogo_go_account";
   var MAX_AGE = 60 * 60 * 24 * 400;
@@ -101,7 +122,7 @@
 
   // Verlauf-Killer gegen gecachte Homescreen-PWA (altes .top-edge auf allen Tabs).
   (function gogogoWorkoutBoot() {
-    var BUILD = "nav5-kill-10";
+    var BUILD = "nav5-kill-11";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
     var onWorkout = path === "/workout" || path === "/natalyaalice" || path.indexOf("/natalyaalice/") === 0;
     if (!onWorkout) return;
