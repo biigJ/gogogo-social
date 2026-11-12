@@ -1298,6 +1298,18 @@
     body.is-session[data-shell="woche"] .shell-heute,
     body.is-session[data-shell="woche"] .plan-tabs,
     body.is-session[data-shell="woche"] .shell-plan,
+    body.is-session[data-shell="team"] .shell-heute,
+    body.is-session[data-shell="team"] .shell-kalender,
+    body.is-session[data-shell="kurse"] .shell-heute,
+    body.is-session[data-shell="kurse"] .shell-kalender,
+    body.is-session[data-shell="profil"] .shell-heute,
+    body.is-session[data-shell="profil"] .shell-kalender,
+    body.is-session[data-shell="team"] #go-today,
+    body.is-session[data-shell="team"] #go-tomorrow,
+    body.is-session[data-shell="kurse"] #go-today,
+    body.is-session[data-shell="kurse"] #go-tomorrow,
+    body.is-session[data-shell="profil"] #go-today,
+    body.is-session[data-shell="profil"] #go-tomorrow,
     body.is-session[data-shell="plan"] #go-today,
     body.is-session[data-shell="plan"] #go-tomorrow,
     body.is-session[data-shell="plan"] .shell-heute,
@@ -1305,6 +1317,9 @@
     body.is-session[data-shell="workout"] .welcome { display: none !important; }
     body.is-session[data-shell="heute"] .welcome,
     body.is-session[data-shell="woche"] .welcome,
+    body.is-session[data-shell="team"] .welcome,
+    body.is-session[data-shell="kurse"] .welcome,
+    body.is-session[data-shell="profil"] .welcome,
     body.is-session[data-shell="plan"] .welcome { display: flex; flex-direction: column; }
     body.is-session[data-shell="heute"] .heute-head,
     body.is-session[data-shell="heute"] .heute-mantra,
@@ -1324,10 +1339,12 @@
     }
     body.is-session[data-shell="heute"] #go-tomorrow { margin-top: 12px; }
     body.is-session[data-shell="heute"] .heute-events { order: 5; }
+    body.is-session[data-shell="heute"] #heute-diary-share-pick { order: 6; margin-top: 18px; display: flex; justify-content: center; width: 100%; }
+    body.is-session[data-shell="heute"] #heute-diary-feed { order: 7; margin-top: 8px; }
     body.is-session[data-shell="heute"][data-heute="mine"] .heute-start,
     body.is-session[data-shell="heute"][data-heute="mine"] .heute-events { display: none !important; }
     body.is-session[data-shell="heute"] .dock .go-row { display: none; }
-    body.is-session[data-shell="plan"] .plan-tabs { order: 1; }
+    body.is-session .plan-tabs { display: none !important; }
     body.is-session[data-shell="plan"] .absence-block { order: 2; }
     body.is-session[data-shell="plan"] .routine-row { order: 2; margin-top: 24px; }
     body.is-session[data-shell="plan"] #weeks { order: 3; }
@@ -1336,6 +1353,13 @@
     body.is-session[data-shell="plan"] #plan-week { order: 6; margin-top: 16px; }
     body.is-session[data-shell="plan"] #days { order: 7; }
     body.is-session[data-shell="plan"] .shell-plan { order: 8; }
+    body.is-session[data-shell="team"] #team-rail-nav { order: 1; }
+    body.is-session[data-shell="team"] #plan-team { order: 2; }
+    body.is-session[data-shell="kurse"] #go-rail-nav { order: 1; }
+    body.is-session[data-shell="kurse"] #plan-training { order: 2; }
+    body.is-session[data-shell="profil"] #plan-profil,
+    body.is-session[data-shell="profil"] #plan-settings,
+    body.is-session[data-shell="profil"] #plan-info { order: 1; }
     body.is-session[data-shell="woche"] #week-rail-nav { order: 1; }
     body.is-session[data-shell="woche"] #days { order: 2; }
     body.is-session[data-shell="woche"] .absence-block { order: 3; }
@@ -1361,8 +1385,14 @@
       width: min(100%, 440px);
     }
     body.is-session[data-shell="plan"] .dock,
+    body.is-session[data-shell="team"] .dock,
+    body.is-session[data-shell="kurse"] .dock,
+    body.is-session[data-shell="profil"] .dock,
     body.is-session[data-shell="woche"] .dock { display: none !important; }
-    body.is-session[data-shell="plan"] .shell-kalender { display: none !important; }
+    body.is-session[data-shell="plan"] .shell-kalender,
+    body.is-session[data-shell="team"] .shell-kalender,
+    body.is-session[data-shell="kurse"] .shell-kalender,
+    body.is-session[data-shell="profil"] .shell-kalender { display: none !important; }
     body.is-session[data-shell="woche"] .shell-kalender { display: block; }
     body.is-session[data-shell="woche"] .days.shell-kalender { display: flex; }
     body.is-session[data-shell="woche"] .absence-block { display: none; }
@@ -1391,14 +1421,8 @@
       border: 1px solid #2A2118;
       box-sizing: border-box;
     }
-    .plan-tabs, .shell-plan, .heute-start, .heute-events, .zirkel-block { display: none; }
-    body.is-session[data-shell="plan"] .plan-tabs {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0;
-      margin: 12px 0 16px;
-      border-bottom: 1px solid rgba(42, 33, 24, 0.28);
-    }
+    .plan-tabs, .shell-plan, .heute-start, .heute-events, .zirkel-block, #heute-diary-feed { display: none; }
+    body.is-session[data-shell="heute"] #heute-diary-feed { display: block; }
     .plan-tabs button {
       min-height: 40px;
       padding: 8px 2px 10px;
@@ -1414,16 +1438,25 @@
       padding: 4px 2px 8px;
     }
     .plan-tabs button.plan-tabs__gear.is-on { color: #2A2118; }
-    body.is-session[data-shell="plan"] .shell-plan { display: block; }
+    body.is-session[data-shell="plan"] .shell-plan,
+    body.is-session[data-shell="team"] .shell-plan,
+    body.is-session[data-shell="kurse"] .shell-plan,
+    body.is-session[data-shell="profil"] .shell-plan { display: block; }
     #plan-profil, #plan-team, #plan-orte, #plan-training, #plan-info, #plan-settings { display: none !important; }
+    body.is-session[data-shell="profil"][data-plan="info"] #plan-info,
     body.is-session[data-shell="plan"][data-plan="info"] #plan-info,
+    body.is-session[data-shell="kurse"][data-plan="training"] #plan-training,
     body.is-session[data-shell="plan"][data-plan="training"] #plan-training,
+    body.is-session[data-shell="profil"][data-plan="settings"] #plan-settings,
     body.is-session[data-shell="plan"][data-plan="settings"] #plan-settings,
+    body.is-session[data-shell="profil"][data-plan="profil"] #plan-profil,
     body.is-session[data-shell="plan"][data-plan="profil"] #plan-profil { display: block !important; }
+    body.is-session[data-shell="profil"][data-plan="profil"] #plan-profil .team-slide,
     body.is-session[data-shell="plan"][data-plan="profil"] #plan-profil .team-slide {
       width: 100%;
       max-width: 100%;
     }
+    body.is-session[data-shell="team"] #plan-team,
     body.is-session[data-shell="plan"][data-plan="team"] #plan-team {
       display: flex !important;
       flex-direction: row;
@@ -2279,12 +2312,12 @@
     body.is-session:not([data-shell="workout"]) .app-pill { display: flex; }
     .app-pill nav {
       pointer-events: auto;
-      width: min(100%, 390px);
+      width: min(100%, 420px);
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       align-items: center;
       height: 68px;
-      padding: 0 6px;
+      padding: 0 4px;
       margin: 0;
       background: #ececeb;
       color: rgba(52, 34, 32, 0.9);
@@ -3209,9 +3242,11 @@
       line-height: 1.2;
       color: #2A2118;
     }
+    body.is-session[data-shell="profil"][data-plan="profil"] #plan-profil .team-slide__head-row,
     body.is-session[data-shell="plan"][data-plan="profil"] #plan-profil .team-slide__head-row {
       justify-content: center;
     }
+    body.is-session[data-shell="profil"][data-plan="profil"] #plan-profil .team-slide__head,
     body.is-session[data-shell="plan"][data-plan="profil"] #plan-profil .team-slide__head {
       flex: 0 1 auto;
       text-align: center;
@@ -3357,14 +3392,16 @@
       padding: 0;
       box-sizing: border-box;
     }
+    body.is-session[data-shell="team"] #team-rail-nav,
     body.is-session[data-shell="plan"][data-plan="team"] #team-rail-nav,
+    body.is-session[data-shell="kurse"] #go-rail-nav,
     body.is-session[data-shell="plan"][data-plan="training"] #go-rail-nav,
     body.is-session[data-shell="woche"] #week-rail-nav {
       display: grid;
       grid-template-columns: 28px 1fr 28px;
       align-items: center;
       gap: 6px;
-      order: 7; /* direkt unter plan-tabs (order 1), vor den Slides */
+      order: 7;
     }
     body.is-session[data-shell="woche"] #week-rail-nav {
       position: fixed;
@@ -3398,7 +3435,9 @@
       overflow: hidden;
       text-overflow: ellipsis;
     }
+    body.is-session[data-shell="team"] #plan-team,
     body.is-session[data-shell="plan"][data-plan="team"] #plan-team { order: 8; }
+    body.is-session[data-shell="kurse"] #plan-training,
     body.is-session[data-shell="plan"][data-plan="training"] #plan-training { order: 8; }
     .rail-nav__title {
       margin: 0;
@@ -3869,6 +3908,8 @@
       display: none !important;
     }
     /* Team/gogogo/Woche: kein Scrollbalken — Pfeil-Navigation oben */
+    body.is-session[data-shell="team"] .hscroll-dock,
+    body.is-session[data-shell="kurse"] .hscroll-dock,
     body.is-session[data-shell="plan"][data-plan="team"] .hscroll-dock,
     body.is-session[data-shell="plan"][data-plan="training"] .hscroll-dock,
     body.is-session[data-shell="woche"] .hscroll-dock {
@@ -4443,6 +4484,14 @@
     <p class="heute-mantra shell-heute" id="heute-mantra"></p>
     <div class="heute-crew shell-heute" id="heute-crew"></div>
     <div class="heute-events ffc shell-heute" id="heute-events"></div>
+    <label class="diary-share-pick shell-heute" id="heute-diary-share-pick">
+      <select id="diary-share-select" aria-label="Tagebuch sichtbar für">
+        <option value="private">privat</option>
+        <option value="trainer">mit Trainer</option>
+        <option value="friends">mit Team</option>
+      </select>
+    </label>
+    <div class="heute-diary-feed shell-heute" id="heute-diary-feed"></div>
     <div class="heute-joins shell-heute" id="heute-joins"></div>
   </section>
   <section id="diary" class="diary" hidden>
@@ -4452,13 +4501,6 @@
       </button>
       <h1>Historie</h1>
       <button type="button" class="diary-info-btn" id="diary-info" aria-label="Erläuterung zur Historie"><span aria-hidden="true">I</span></button>
-      <label class="diary-share-pick">
-        <select id="diary-share-select" aria-label="Tagebuch sichtbar für">
-          <option value="private">privat</option>
-          <option value="trainer">mit Trainer</option>
-          <option value="friends">mit Team</option>
-        </select>
-      </label>
       <button type="button" class="diary-fill-filter" id="diary-fill-filter" aria-label="Nur gefüllte Tage" aria-pressed="false">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
       </button>
@@ -4790,13 +4832,6 @@
   </div>
   <div class="app-pill">
     <nav aria-label="Bereiche">
-      <button type="button" data-shell="plan" aria-label="Einstellungen">
-        <span class="pill-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.6 20.2c.6-3.9 3.7-6.3 7.4-6.3s6.8 2.4 7.4 6.3"/></svg>
-          <span class="pill-dot" hidden></span>
-        </span>
-        <small>Einstellungen</small>
-      </button>
       <button type="button" data-shell="heute" class="is-on" aria-label="Heute">
         <span class="pill-ico">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
@@ -4811,12 +4846,26 @@
         </span>
         <small>Woche</small>
       </button>
-      <button type="button" data-shell="diary" aria-label="Historie">
+      <button type="button" data-shell="team" aria-label="Team">
         <span class="pill-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.2C10.2 4.8 7.6 4.4 4 5.2V19c3.4-.7 6-.2 8 1.2 2-1.4 4.6-1.9 8-1.2V5.2c-3.6-.8-6.2-.4-8 1Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 6.2V20.2" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 19.5v-1.2a3.3 3.3 0 0 0-3.3-3.3H7.8A3.3 3.3 0 0 0 4.5 18.3v1.2"/><circle cx="10.5" cy="8.2" r="3.2"/><path d="M19.5 19.5v-1.1a2.8 2.8 0 0 0-2.1-2.7"/><path d="M15.2 5.2a3.2 3.2 0 0 1 0 6"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
-        <small>Historie</small>
+        <small>Team</small>
+      </button>
+      <button type="button" data-shell="kurse" aria-label="Kurse">
+        <span class="pill-ico">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8M8 11h6"/></svg>
+          <span class="pill-dot" hidden></span>
+        </span>
+        <small>Kurse</small>
+      </button>
+      <button type="button" data-shell="profil" aria-label="Profil">
+        <span class="pill-ico">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="8.2" r="3.7"/><path d="M4.6 20.2c.6-3.9 3.7-6.3 7.4-6.3s6.8 2.4 7.4 6.3"/></svg>
+          <span class="pill-dot" hidden></span>
+        </span>
+        <small>Profil</small>
       </button>
     </nav>
   </div>
@@ -5447,7 +5496,7 @@
       var sessionIsTrainer = !!(sessionAccount && sessionAccount.is_trainer);
       try {
         if (sessionMode && new URLSearchParams(location.search).get("plan") === "team") {
-          shellTab = "plan";
+          shellTab = "team";
           planPane = "team";
         }
       } catch (ePlan) {}
@@ -6723,6 +6772,7 @@
         document.getElementById("go-short").disabled = picking || shifted || !todayPlanned;
         paintPhoto();
         paintHeuteExtras();
+        if (sessionMode && document.body.dataset.shell === "heute") paintHeuteDiaryFeed();
         syncHScrollDock();
       }
 
@@ -7801,12 +7851,14 @@
           .then(function () {
             refreshDiaryNote();
             paintPill();
+            if (document.body.dataset.shell === "heute") paintHeuteDiaryFeed();
           })
           .catch(function () {
             diaryPosts = [];
             sharedEntries = [];
             refreshDiaryNote();
             paintPill();
+            if (document.body.dataset.shell === "heute") paintHeuteDiaryFeed();
           });
       }
 
@@ -8034,17 +8086,120 @@
         list.appendChild(box);
       }
 
+      function filledDiaryDates() {
+        var photos = workoutPhotoMap();
+        return diaryDates().filter(function (iso) {
+          var entry = diaryEntry(iso) || {};
+          var photo = photos[iso];
+          var extras = Array.isArray(entry.extras) ? entry.extras : [];
+          var hasExtra = extras.some(function (ex) { return ex && (ex.note || ex.move); });
+          return !!(entry.note || entry.move || hasExtra || photo);
+        });
+      }
+
+      function buildDiaryCard(iso, photos) {
+        var entry = diaryEntry(iso) || { note: "", extras: [] };
+        if (!Array.isArray(entry.extras)) entry.extras = [];
+        var card = document.createElement("article");
+        card.className = "diary-card";
+        card.dataset.card = iso;
+        var head = document.createElement("div");
+        head.className = "diary-head";
+        var when = document.createElement("p");
+        when.className = "diary-date";
+        when.textContent = formatLong(iso);
+        var more = document.createElement("button");
+        more.type = "button";
+        more.className = "diary-more";
+        more.textContent = "...";
+        more.setAttribute("aria-label", "Eintrag");
+        more.addEventListener("click", function (event) {
+          event.stopPropagation();
+          openDiaryMenu(iso);
+        });
+        head.appendChild(when);
+        head.appendChild(more);
+        card.appendChild(head);
+
+        var photoBtn = document.createElement("button");
+        photoBtn.type = "button";
+        photoBtn.className = "diary-photo-btn";
+        photoBtn.setAttribute("aria-label", "Foto hochladen / aufnehmen");
+        if (photos[iso]) {
+          var img = document.createElement("img");
+          img.className = "diary-photo";
+          img.alt = "";
+          img.src = photos[iso];
+          photoBtn.appendChild(img);
+        } else {
+          var frame = document.createElement("div");
+          frame.className = "diary-photo is-empty";
+          frame.textContent = "Foto hochladen / aufnehmen";
+          photoBtn.appendChild(frame);
+        }
+        photoBtn.addEventListener("click", function () {
+          diaryPhotoDate = iso;
+          document.getElementById("diary-photo-file").click();
+        });
+        card.appendChild(photoBtn);
+        card.appendChild(moveButtonEl(iso, diaryStatus(iso), -1));
+        card.appendChild(diaryNoteField(iso, entry.note, function (value) {
+          var next = diaryEntry(iso);
+          next.note = value;
+          saveDiaryEntry(iso, next);
+        }, true));
+        entry.extras.forEach(function (extra, index) {
+          card.appendChild(moveButtonEl(iso, extra.move, index));
+          card.appendChild(diaryNoteField(iso, extra.note, function (value) {
+            var next = diaryEntry(iso);
+            if (!next.extras[index]) return;
+            next.extras[index].note = value;
+            saveDiaryEntry(iso, next);
+          }, false));
+        });
+        return card;
+      }
+
+      function fillDiaryList(list) {
+        if (!list) return;
+        var photos = workoutPhotoMap();
+        var dates = filledDiaryDates();
+        list.textContent = "";
+        dates.forEach(function (iso) {
+          list.appendChild(buildDiaryCard(iso, photos));
+        });
+        renderDiaryShare(list);
+        loadDiaryShare().then(function () {
+          var shell = document.body.dataset.shell;
+          if (shell === "heute" || shell === "diary") {
+            renderDiaryShare(list);
+            markDiarySeen();
+          }
+        });
+      }
+
+      function paintHeuteDiaryFeed() {
+        var feed = document.getElementById("heute-diary-feed");
+        if (!feed || !sessionMode) return;
+        fillDiaryList(feed);
+      }
+
       function openDiary() {
         finishMoveWheel(false);
         closeShellModals();
-        if (sessionMode) {
-          shellTab = "diary";
-          document.body.dataset.shell = "diary";
-          paintPill();
-        }
         document.getElementById("diary-menu").hidden = true;
         document.getElementById("diary-delete").hidden = true;
         document.getElementById("diary-share").hidden = true;
+        if (sessionMode) {
+          setHome(true);
+          paintWelcome();
+          paintHeuteDiaryFeed();
+          var feed = document.getElementById("heute-diary-feed");
+          if (feed) requestAnimationFrame(function () {
+            feed.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+          return;
+        }
         document.body.classList.remove("is-home");
         document.body.classList.add("is-diary");
         welcomeEl.hidden = true;
@@ -8052,84 +8207,7 @@
         document.getElementById("diary").hidden = false;
         var theme = document.querySelector('meta[name="theme-color"]');
         if (theme) theme.setAttribute("content", "#F3EEE4");
-        var list = document.getElementById("diary-list");
-        var photos = workoutPhotoMap();
-        var dates = diaryDates().filter(function (iso) {
-          var entry = diaryEntry(iso) || {};
-          var photo = photos[iso];
-          var extras = Array.isArray(entry.extras) ? entry.extras : [];
-          var hasExtra = extras.some(function (ex) { return ex && (ex.note || ex.move); });
-          return !!(entry.note || entry.move || hasExtra || photo);
-        });
-        list.textContent = "";
-        dates.forEach(function (iso) {
-          var entry = diaryEntry(iso);
-          var card = document.createElement("article");
-          card.className = "diary-card";
-          card.dataset.card = iso;
-          var head = document.createElement("div");
-          head.className = "diary-head";
-          var when = document.createElement("p");
-          when.className = "diary-date";
-          when.textContent = formatLong(iso);
-          var more = document.createElement("button");
-          more.type = "button";
-          more.className = "diary-more";
-          more.textContent = "...";
-          more.setAttribute("aria-label", "Eintrag");
-          more.addEventListener("click", function (event) {
-            event.stopPropagation();
-            openDiaryMenu(iso);
-          });
-          head.appendChild(when);
-          head.appendChild(more);
-          card.appendChild(head);
-
-          var photoBtn = document.createElement("button");
-          photoBtn.type = "button";
-          photoBtn.className = "diary-photo-btn";
-          photoBtn.setAttribute("aria-label", "Foto hochladen / aufnehmen");
-          if (photos[iso]) {
-            var img = document.createElement("img");
-            img.className = "diary-photo";
-            img.alt = "";
-            img.src = photos[iso];
-            photoBtn.appendChild(img);
-          } else {
-            var frame = document.createElement("div");
-            frame.className = "diary-photo is-empty";
-            frame.textContent = "Foto hochladen / aufnehmen";
-            photoBtn.appendChild(frame);
-          }
-          photoBtn.addEventListener("click", function () {
-            diaryPhotoDate = iso;
-            document.getElementById("diary-photo-file").click();
-          });
-          card.appendChild(photoBtn);
-          card.appendChild(moveButtonEl(iso, diaryStatus(iso), -1));
-          card.appendChild(diaryNoteField(iso, entry.note, function (value) {
-            var next = diaryEntry(iso);
-            next.note = value;
-            saveDiaryEntry(iso, next);
-          }, true));
-          entry.extras.forEach(function (extra, index) {
-            card.appendChild(moveButtonEl(iso, extra.move, index));
-            card.appendChild(diaryNoteField(iso, extra.note, function (value) {
-              var next = diaryEntry(iso);
-              if (!next.extras[index]) return;
-              next.extras[index].note = value;
-              saveDiaryEntry(iso, next);
-            }, false));
-          });
-          list.appendChild(card);
-        });
-        renderDiaryShare(list);
-        loadDiaryShare().then(function () {
-          if (document.body.dataset.shell === "diary") {
-            renderDiaryShare(list);
-            markDiarySeen();
-          }
-        });
+        fillDiaryList(document.getElementById("diary-list"));
         scrollShellTop();
       }
 
@@ -9059,6 +9137,13 @@
         });
       }
 
+      function planShellForPane(pane) {
+        if (pane === "team") return "team";
+        if (pane === "training") return "kurse";
+        if (pane === "profil" || pane === "settings" || pane === "info" || pane === "orte") return "profil";
+        return "profil";
+      }
+
       function paintPill() {
         beatTrainingPresence();
         window.setTimeout(syncHScrollDock, 20);
@@ -9070,7 +9155,7 @@
           var dot = btn.querySelector(".pill-dot");
           if (!dot) return;
           var tab = btn.getAttribute("data-shell");
-          dot.hidden = tab === "heute" ? !planHasInvite() : (tab === "diary" ? !diaryNote : true);
+          dot.hidden = tab === "heute" ? !(planHasInvite() || diaryNote) : true;
         });
       }
 
@@ -9108,9 +9193,9 @@
         }, 30);
         closeShellModals();
         if (pane === "kalender") { showWoche(); return; }
-        shellTab = "plan";
         planPane = pane || planPane || "profil";
-        document.body.dataset.shell = "plan";
+        shellTab = planShellForPane(planPane);
+        document.body.dataset.shell = shellTab;
         document.body.dataset.plan = planPane;
         document.body.classList.add("is-home");
         document.body.classList.remove("is-diary");
@@ -9121,7 +9206,7 @@
         if (theme) theme.setAttribute("content", "#F3EEE4");
         paintPill();
         paintPlanTabs();
-        if (planPane === "profil") renderProfil();
+        if (planPane === "profil" || planPane === "settings") renderProfil();
         if (planPane === "team") loadTeam();
         if (planPane === "orte") {
           loadAccountPlaces().then(function () { ensurePlaceMap(); });
@@ -10027,6 +10112,14 @@
           openFeedbackForm();
         });
         meSlide.appendChild(feedbackBtn);
+        var settingsBtn = document.createElement("button");
+        settingsBtn.type = "button";
+        settingsBtn.className = "team-slide__cta is-solid";
+        settingsBtn.textContent = "Einstellungen";
+        settingsBtn.addEventListener("click", function () {
+          showPlan("settings");
+        });
+        meSlide.appendChild(settingsBtn);
         box.appendChild(meSlide);
       }
 
@@ -10275,8 +10368,8 @@
         var shell = document.body.dataset.shell;
         var plan = document.body.dataset.plan || planPane;
         if (shell === "woche") return document.getElementById("days");
-        if (shell === "plan" && plan === "team") return document.getElementById("plan-team");
-        if (shell === "plan" && plan === "training") return document.getElementById("go-rail");
+        if (shell === "team" || (shell === "plan" && plan === "team")) return document.getElementById("plan-team");
+        if (shell === "kurse" || (shell === "plan" && plan === "training")) return document.getElementById("go-rail");
         return null;
       }
 
@@ -10365,14 +10458,15 @@
         var teamRail = document.getElementById("plan-team");
         var goRail = document.getElementById("go-rail");
         var weekRail = document.getElementById("days");
-        if (teamNav) teamNav.hidden = !(sessionMode && document.body.dataset.shell === "plan" && pane === "team");
-        if (goNav) goNav.hidden = !(sessionMode && document.body.dataset.shell === "plan" && pane === "training");
-        if (weekNav) weekNav.hidden = !(sessionMode && document.body.dataset.shell === "woche");
-        if (pane === "team" && teamRail && teamNav) {
+        var shellNow = document.body.dataset.shell;
+        if (teamNav) teamNav.hidden = !(sessionMode && (shellNow === "team" || (shellNow === "plan" && pane === "team")));
+        if (goNav) goNav.hidden = !(sessionMode && (shellNow === "kurse" || (shellNow === "plan" && pane === "training")));
+        if (weekNav) weekNav.hidden = !(sessionMode && shellNow === "woche");
+        if ((shellNow === "team" || pane === "team") && teamRail && teamNav) {
           bindRailNav(teamRail, teamNav);
           syncRailNav(teamRail, teamNav);
         }
-        if (pane === "training" && goRail && goNav) {
+        if ((shellNow === "kurse" || pane === "training") && goRail && goNav) {
           bindRailNav(goRail, goNav);
           syncRailNav(goRail, goNav);
         }
@@ -10406,7 +10500,7 @@
       if (!layoutGroupEmptySlides.bound) {
         layoutGroupEmptySlides.bound = true;
         window.addEventListener("resize", function () {
-          if (document.body.dataset.shell === "plan" && document.body.dataset.plan === "team") {
+          if (document.body.dataset.shell === "team" || (document.body.dataset.shell === "plan" && document.body.dataset.plan === "team")) {
             layoutGroupEmptySlides();
           }
         });
@@ -11546,7 +11640,7 @@
                 if (row.diary_visibility) person.diary_visibility = row.diary_visibility;
               });
             });
-            if (paint !== false && document.body.dataset.plan === "team" && document.body.dataset.shell === "plan") renderTeam();
+            if (paint !== false && document.body.dataset.plan === "team" && (document.body.dataset.shell === "team" || document.body.dataset.shell === "plan")) renderTeam();
             if (paint !== false) paintWelcome();
           });
       }
@@ -12062,12 +12156,14 @@
         var btn = event.target.closest("button");
         if (!btn) return;
         var tab = btn.getAttribute("data-shell");
-        if (tab === "diary") openDiary();
-        else if (tab === "plan") showPlan(planPane === "kalender" ? "profil" : planPane);
-        else if (tab === "woche") showWoche();
+        if (tab === "woche") showWoche();
+        else if (tab === "team") showPlan("team");
+        else if (tab === "kurse") showPlan("training");
+        else if (tab === "profil") showPlan("profil");
         else {
           setHome(true);
           paintWelcome();
+          paintHeuteDiaryFeed();
           refreshFfcHeute(false);
           if (tab === "heute") markHeuteSeen();
         }
@@ -12081,7 +12177,8 @@
           if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
         });
       }
-      document.querySelector(".plan-tabs").addEventListener("click", function (event) {
+      var planTabs = document.querySelector(".plan-tabs");
+      if (planTabs) planTabs.addEventListener("click", function (event) {
         var btn = event.target.closest("[data-plan]");
         if (!btn) return;
         showPlan(btn.getAttribute("data-plan"));
@@ -12807,7 +12904,10 @@
           if (next === diaryVisibility) return;
           if (next === "private") {
             saveVisibility("private");
-            if (document.body.dataset.shell === "diary") openDiary();
+            if (document.body.dataset.shell === "heute" || document.body.dataset.shell === "diary") {
+              paintHeuteDiaryFeed();
+              if (document.body.dataset.shell === "diary") openDiary();
+            }
             return;
           }
           pendingShare = next;
@@ -12822,7 +12922,10 @@
         document.getElementById("share-ask").hidden = true;
         if (next !== "trainer" && next !== "friends") return;
         saveVisibility(next);
-        if (document.body.dataset.shell === "diary") openDiary();
+        if (document.body.dataset.shell === "heute" || document.body.dataset.shell === "diary") {
+          paintHeuteDiaryFeed();
+          if (document.body.dataset.shell === "diary") openDiary();
+        }
       });
       document.getElementById("share-ask-no").addEventListener("click", function () {
         pendingShare = "";
@@ -14314,8 +14417,8 @@
         sheet.classList.remove("is-open");
         sheet.classList.remove("is-editing");
         window.setTimeout(function () { if (!sheet.classList.contains("is-open")) sheet.hidden = true; }, 280);
-        if (document.body.dataset.shell === "plan" && document.body.dataset.plan === "profil") renderProfil();
-        if (document.body.dataset.shell === "plan" && document.body.dataset.plan === "team") renderTeam();
+        if ((document.body.dataset.shell === "profil" || document.body.dataset.shell === "plan") && (document.body.dataset.plan === "profil" || document.body.dataset.plan === "settings")) renderProfil();
+        if ((document.body.dataset.shell === "team" || document.body.dataset.shell === "plan") && document.body.dataset.plan === "team") renderTeam();
       }
 
       function saveProfileFields(fields) {
@@ -14907,7 +15010,7 @@
             if (act) act();
             else {
               refreshFfcHeute(true);
-              if (shellTab === "plan" && planPane === "training") refreshZirkel();
+              if ((shellTab === "kurse" || shellTab === "plan") && planPane === "training") refreshZirkel();
             }
             return;
           }
@@ -14933,7 +15036,7 @@
           }
           if (sessionMode && user.email && !accountEmail()) saveAccountEmail(user.email).catch(function () {});
           refreshFfcHeute(true);
-          if (shellTab === "plan" && planPane === "training") refreshZirkel();
+          if ((shellTab === "kurse" || shellTab === "plan") && planPane === "training") refreshZirkel();
           if (window.FFC && FFC.refreshFriends) FFC.refreshFriends().then(onFfcFriendsChanged).catch(function () { onFfcFriendsChanged(); });
           else onFfcFriendsChanged();
         },
@@ -15007,7 +15110,7 @@
       paintVisibility();
       paintHeuteFilter();
       paintWelcome();
-      if (sessionMode && shellTab === "plan" && planPane === "team") showPlan("team");
+      if (sessionMode && (shellTab === "team" || shellTab === "plan") && planPane === "team") showPlan("team");
       if (!sessionMode) loadRoutine();
       (sessionMode ? loadSessionPlan() : loadSharedPlan()).then(function () {
         load();
