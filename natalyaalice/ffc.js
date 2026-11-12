@@ -2,12 +2,10 @@
 (function(){
   // Verlauf-Killer + Cache-Bust (auch wenn alte HTML-Kopie .top-edge überall zeigt)
   (function () {
-    var BUILD = "nav5-fade-6";
+    var BUILD = "nav5-fade-7";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
     if (path !== "/workout") return;
     function hide() {
-      var shell = document.body ? document.body.getAttribute("data-shell") : "";
-      if (shell === "heute") return;
       document.querySelectorAll(".top-edge, .heute-status-fade").forEach(function (el) {
         try {
           el.style.setProperty("display", "none", "important");

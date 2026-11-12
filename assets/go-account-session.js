@@ -102,13 +102,12 @@
   // Homescreen-PWAs cachen HTML aggressiv. Cache-Bust + Verlauf-Killer
   // (wirkt auch bei alter inline-CSS, die .top-edge auf allen Tabs zeigt).
   (function gogogoWorkoutBoot() {
-    var BUILD = "nav5-fade-6";
+    var BUILD = "nav5-fade-7";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
     if (path !== "/workout") return;
 
     function hideStatusFadeOutsideHeute() {
-      var shell = document.body ? document.body.getAttribute("data-shell") : "";
-      if (shell === "heute") return;
+      /* Immer alle alten Fade-Nodes killen; Heute nutzt nur noch body::before */
       document.querySelectorAll(".top-edge, .heute-status-fade").forEach(function (el) {
         try {
           el.style.setProperty("display", "none", "important");
