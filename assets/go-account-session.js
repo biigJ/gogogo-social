@@ -1,42 +1,4 @@
 (function (global) {
-  /* Sofort: .top-edge echt zerstören (Klasse weg) — keine Abdeckung. */
-  (function gogogoKillTopEdgeNow() {
-    try {
-      var css = document.createElement("style");
-      css.id = "gogogo-kill-fade-boot";
-      css.textContent = [
-        'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,',
-        "html.is-standalone body.is-session .top-edge,.top-edge,.heute-status-fade{",
-        "display:none!important;opacity:0!important;visibility:hidden!important;",
-        "height:0!important;max-height:0!important;background:none!important;",
-        "background-image:none!important;pointer-events:none!important;position:static!important}",
-        "html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before,",
-        "html.is-standalone body.is-session[data-shell=\"heute\"]::before,",
-        "html.is-standalone body.is-session.gogogo-fade-off::after,html.is-standalone body.is-session[data-shell]::after{",
-        "content:none!important;display:none!important;background:none!important;height:0!important}"
-      ].join("");
-      (document.documentElement || document.head).appendChild(css);
-      var killNodes = function () {
-        document.querySelectorAll(".top-edge,.heute-status-fade").forEach(function (el) {
-          try {
-            el.className = "";
-            el.removeAttribute("class");
-            el.setAttribute("hidden", "");
-            el.style.cssText = "display:none!important;height:0!important;background:none!important;";
-            if (el.parentNode) el.parentNode.removeChild(el);
-          } catch (e0) {}
-        });
-        if (document.body) document.body.classList.remove("gogogo-fade-off");
-      };
-      killNodes();
-      document.addEventListener("DOMContentLoaded", killNodes);
-      try {
-        new MutationObserver(killNodes).observe(document.documentElement, { childList: true, subtree: true });
-      } catch (eObs) {}
-      setInterval(killNodes, 200);
-    } catch (eBoot) {}
-  })();
-
   var ACCOUNT_KEY = "gogogo_go_account";
   var COOKIE_NAME = "gogogo_go_account";
   var MAX_AGE = 60 * 60 * 24 * 400;
@@ -137,79 +99,16 @@
     persist: requestPersist
   };
 
-  // Verlauf-Killer gegen gecachte Homescreen-PWA (altes .top-edge auf allen Tabs).
-  (function gogogoWorkoutBoot() {
-    var BUILD = "nav5-glass-16";
-    var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
-    var onWorkout = path === "/workout" || path === "/natalyaalice" || path.indexOf("/natalyaalice/") === 0;
-    if (!onWorkout) return;
-
-    function killFade() {
-      var css = document.getElementById("gogogo-kill-fade");
-      if (!css) {
-        css = document.createElement("style");
-        css.id = "gogogo-kill-fade";
-        css.textContent = [
-          'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,',
-          "html.is-standalone body.is-session .top-edge,",
-          "html body.is-session .top-edge,",
-          "body .top-edge,.top-edge,.heute-status-fade,#heute-status-fade{",
-          "display:none!important;opacity:0!important;visibility:hidden!important;",
-          "pointer-events:none!important;height:0!important;max-height:0!important;",
-          "background:transparent!important;background-image:none!important;}",
-          "html.is-standalone body.is-session::before,",
-          "html.is-standalone body.is-session[data-shell]::before,",
-          'html.is-standalone body.is-session[data-shell="heute"]::before{',
-          "content:none!important;display:none!important;background:none!important;height:0!important;}"
-        ].join("");
-        (document.head || document.documentElement).appendChild(css);
-      }
-      document.querySelectorAll(".top-edge, .heute-status-fade, #heute-status-fade").forEach(function (el) {
-        try {
-          el.style.cssText = "display:none!important;opacity:0!important;height:0!important;background:transparent!important;";
-          if (el.parentNode) el.parentNode.removeChild(el);
-        } catch (eHide) {}
-      });
-    }
-
-    killFade();
-
-    try {
-      if (window.caches && caches.keys) {
-        caches.keys().then(function (keys) {
-          keys.forEach(function (k) { caches.delete(k); });
+  // Früher registrierten Cache-Service-Worker auf bestehenden Geräten wieder abmelden.
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        regs.forEach(function (reg) {
+          var sw = reg.active || reg.waiting || reg.installing;
+          if (sw && /\/natalyaalice\/sw-kill\.js/.test(sw.scriptURL)) reg.unregister();
         });
-      }
-    } catch (eCache) {}
-
-    try {
-      if (navigator.serviceWorker) {
-        navigator.serviceWorker.register("/natalyaalice/sw-kill.js?v=" + BUILD).catch(function () {});
-      }
-    } catch (eSw) {}
-
-    try {
-      var url = new URL(location.href);
-      var need = url.searchParams.get("_cb") !== BUILD;
-      if (need) {
-        localStorage.setItem("gogogo_workout_build", BUILD);
-        url.searchParams.set("_cb", BUILD);
-        url.searchParams.set("_t", String(Date.now()));
-        /* Neuer Dokument-Request — umgeht iOS-PWA-HTML-Cache */
-        location.replace(url.pathname + "?" + url.searchParams.toString() + url.hash);
-        return;
-      }
-      localStorage.setItem("gogogo_workout_build", BUILD);
-    } catch (eBuild) {}
-
-    document.addEventListener("DOMContentLoaded", killFade);
-    var ticks = 0;
-    var timer = setInterval(function () {
-      killFade();
-      if (++ticks > 100) clearInterval(timer);
-    }, 80);
-    try {
-      new MutationObserver(killFade).observe(document.documentElement, { childList: true, subtree: true });
-    } catch (eObs) {}
-  })();
+      }).catch(function () {});
+    }
+    localStorage.removeItem("gogogo_workout_build");
+  } catch (eSw) {}
 })(window);

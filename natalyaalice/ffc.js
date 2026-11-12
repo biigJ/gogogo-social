@@ -1,38 +1,5 @@
 /* Zirkeltraining aus der FFC-App (Friday Fitness Circle), eingebettet in gogogo. */
 (function(){
-  // Verlauf-Killer: .top-edge Klasse+Node weg, keine Abdeckung
-  (function () {
-    var BUILD = "nav5-glass-16";
-    var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
-    if (path !== "/workout" && path !== "/natalyaalice") return;
-    function kill() {
-      if (!document.getElementById("gogogo-kill-fade-ffc")) {
-        var css = document.createElement("style");
-        css.id = "gogogo-kill-fade-ffc";
-        css.textContent = 'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,html.is-standalone body.is-session .top-edge,.top-edge,.heute-status-fade{display:none!important;opacity:0!important;visibility:hidden!important;height:0!important;background:none!important;background-image:none!important;position:static!important;}html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before,html.is-standalone body.is-session.gogogo-fade-off::after,html.is-standalone body.is-session[data-shell]::after{content:none!important;display:none!important;}';
-        (document.head || document.documentElement).appendChild(css);
-      }
-      document.querySelectorAll(".top-edge,.heute-status-fade").forEach(function (el) {
-        try {
-          el.className = "";
-          el.removeAttribute("class");
-          el.setAttribute("hidden", "");
-          if (el.parentNode) el.parentNode.removeChild(el);
-        } catch (e) {}
-      });
-      if (document.body) document.body.classList.remove("gogogo-fade-off");
-    }
-    kill();
-    try {
-      if (navigator.serviceWorker) {
-        navigator.serviceWorker.register("/natalyaalice/sw-kill.js?v=" + BUILD).catch(function () {});
-      }
-    } catch (eSw) {}
-    document.addEventListener("DOMContentLoaded", kill);
-    var n = 0;
-    var t = setInterval(function () { kill(); if (++n > 100) clearInterval(t); }, 80);
-  })();
-
   // ---------- Supabase ----------
   const SUPABASE_URL = 'https://uxijbecqklzwxbpvsglh.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4aWpiZWNxa2x6d3hicHZzZ2xoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTY0ODksImV4cCI6MjA5OTMzMjQ4OX0.v-wxlru3EUJcFimaFD37rquZtcIJsIu0rO7gmJR2GBc';
