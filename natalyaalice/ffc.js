@@ -3342,6 +3342,15 @@
       cleanupOwnPosts();
       await Promise.all([loadFeed(), loadEvents()]);
     },
+    events(){
+      return (evList || []).map(e => Object.assign({}, e));
+    },
+    async respondEvent(id, going){
+      if(!currentUser) return { error: null };
+      const res = await sb.rpc('respond_event', { p_event_id: Number(id), p_going: !!going });
+      if(!res.error) await loadEvents();
+      return res;
+    },
     async refreshTraining(){
       if(!currentUser) return;
       refreshBackfillButton();
