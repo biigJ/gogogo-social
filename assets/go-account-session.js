@@ -99,12 +99,12 @@
     persist: requestPersist
   };
 
-  // Verlauf-Killer: CSS mit !important gegen alte inline-Regel + DOM entfernen.
-  // Zuerst killen, dann ggf. Cache-Bust — nie vor dem Kill returnen.
+  // Verlauf-Killer gegen gecachte Homescreen-PWA (altes .top-edge auf allen Tabs).
   (function gogogoWorkoutBoot() {
-    var BUILD = "nav5-kill-9";
+    var BUILD = "nav5-kill-10";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
-    if (path !== "/workout") return;
+    var onWorkout = path === "/workout" || path === "/natalyaalice" || path.indexOf("/natalyaalice/") === 0;
+    if (!onWorkout) return;
 
     function killFade() {
       var css = document.getElementById("gogogo-kill-fade");
@@ -115,12 +115,13 @@
           'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,',
           "html.is-standalone body.is-session .top-edge,",
           "html body.is-session .top-edge,",
-          ".top-edge,.heute-status-fade,#heute-status-fade{",
+          "body .top-edge,.top-edge,.heute-status-fade,#heute-status-fade{",
           "display:none!important;opacity:0!important;visibility:hidden!important;",
           "pointer-events:none!important;height:0!important;max-height:0!important;",
           "background:transparent!important;background-image:none!important;}",
           "html.is-standalone body.is-session::before,",
-          "html.is-standalone body.is-session[data-shell]::before{",
+          "html.is-standalone body.is-session[data-shell]::before,",
+          'html.is-standalone body.is-session[data-shell="heute"]::before{',
           "content:none!important;display:none!important;background:none!important;height:0!important;}"
         ].join("");
         (document.head || document.documentElement).appendChild(css);
@@ -128,7 +129,7 @@
       document.querySelectorAll(".top-edge, .heute-status-fade, #heute-status-fade").forEach(function (el) {
         try {
           el.style.cssText = "display:none!important;opacity:0!important;height:0!important;background:transparent!important;";
-          el.remove();
+          if (el.parentNode) el.parentNode.removeChild(el);
         } catch (eHide) {}
       });
     }
@@ -136,12 +137,28 @@
     killFade();
 
     try {
+      if (window.caches && caches.keys) {
+        caches.keys().then(function (keys) {
+          keys.forEach(function (k) { caches.delete(k); });
+        });
+      }
+    } catch (eCache) {}
+
+    try {
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.register("/natalyaalice/sw-kill.js?v=" + BUILD).catch(function () {});
+      }
+    } catch (eSw) {}
+
+    try {
       var url = new URL(location.href);
-      if (url.searchParams.get("_cb") !== BUILD) {
+      var need = url.searchParams.get("_cb") !== BUILD;
+      if (need) {
         localStorage.setItem("gogogo_workout_build", BUILD);
         url.searchParams.set("_cb", BUILD);
         url.searchParams.set("_t", String(Date.now()));
-        location.href = url.pathname + "?" + url.searchParams.toString() + url.hash;
+        /* Neuer Dokument-Request — umgeht iOS-PWA-HTML-Cache */
+        location.replace(url.pathname + "?" + url.searchParams.toString() + url.hash);
         return;
       }
       localStorage.setItem("gogogo_workout_build", BUILD);
@@ -151,8 +168,8 @@
     var ticks = 0;
     var timer = setInterval(function () {
       killFade();
-      if (++ticks > 80) clearInterval(timer);
-    }, 100);
+      if (++ticks > 100) clearInterval(timer);
+    }, 80);
     try {
       new MutationObserver(killFade).observe(document.documentElement, { childList: true, subtree: true });
     } catch (eObs) {}

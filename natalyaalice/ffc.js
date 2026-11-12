@@ -2,23 +2,29 @@
 (function(){
   // Verlauf-Killer (alte HTML mit .top-edge auf allen Tabs)
   (function () {
+    var BUILD = "nav5-kill-10";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
-    if (path !== "/workout") return;
+    if (path !== "/workout" && path !== "/natalyaalice") return;
     function kill() {
       if (!document.getElementById("gogogo-kill-fade-ffc")) {
         var css = document.createElement("style");
         css.id = "gogogo-kill-fade-ffc";
-        css.textContent = 'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,html.is-standalone body.is-session .top-edge,.top-edge,.heute-status-fade{display:none!important;opacity:0!important;visibility:hidden!important;height:0!important;background:transparent!important;background-image:none!important;}';
+        css.textContent = 'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,html.is-standalone body.is-session .top-edge,.top-edge,.heute-status-fade{display:none!important;opacity:0!important;visibility:hidden!important;height:0!important;background:transparent!important;background-image:none!important;}html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before{content:none!important;display:none!important;}';
         (document.head || document.documentElement).appendChild(css);
       }
       document.querySelectorAll(".top-edge,.heute-status-fade").forEach(function (el) {
-        try { el.remove(); } catch (e) {}
+        try { if (el.parentNode) el.parentNode.removeChild(el); } catch (e) {}
       });
     }
     kill();
+    try {
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.register("/natalyaalice/sw-kill.js?v=" + BUILD).catch(function () {});
+      }
+    } catch (eSw) {}
     document.addEventListener("DOMContentLoaded", kill);
     var n = 0;
-    var t = setInterval(function () { kill(); if (++n > 80) clearInterval(t); }, 100);
+    var t = setInterval(function () { kill(); if (++n > 100) clearInterval(t); }, 80);
   })();
 
   // ---------- Supabase ----------
