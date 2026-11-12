@@ -1250,19 +1250,29 @@
     html.has-vp-gap:has(body.is-session:not([data-shell="workout"])),
     html.has-vp-gap body.is-session:not([data-shell="workout"]) { overflow: hidden; }
     /* Pill bleibt im touchbaren Viewport — negativer bottom machte Tabs oft tot bis App-Wechsel */
+    /* Status-Verlauf nur per JS auf Heute; nie als dauerhaftes DOM-Element */
     .top-edge,
-    .heute-status-fade { display: none !important; }
+    .heute-status-fade {
+      display: none !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+      height: 0 !important;
+      background: none !important;
+    }
     html.is-standalone body.is-session[data-shell="heute"] .heute-status-fade.is-on {
       display: block !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      height: calc(env(safe-area-inset-top) + 10px) !important;
       position: fixed;
       /* um 2/3 der eigenen Höhe nach oben */
       top: calc((env(safe-area-inset-top) + 10px) * -2 / 3);
       left: 0;
       right: 0;
       z-index: 48;
-      height: calc(env(safe-area-inset-top) + 10px);
-      background: linear-gradient(#F3EEE4 calc(100% - 10px), rgba(243, 238, 228, 0));
-      pointer-events: none;
+      background: linear-gradient(#F3EEE4 calc(100% - 10px), rgba(243, 238, 228, 0)) !important;
+      pointer-events: none !important;
     }
     @media (display-mode: standalone) {
       html .app-pill { padding-bottom: max(14px, calc(env(safe-area-inset-bottom) - 6px)); }
@@ -4833,7 +4843,6 @@
     <div class="profile-block" id="profile-places-block" hidden></div>
     <div class="profile-block profile-notes" id="profile-notes"></div>
   </section>
-  <div class="heute-status-fade" id="heute-status-fade" aria-hidden="true"></div>
   <div class="hscroll-dock" id="hscroll-dock" hidden>
     <div class="hscroll-dock__track" id="hscroll-track">
       <div class="hscroll-dock__thumb" id="hscroll-thumb"></div>
@@ -9162,15 +9171,29 @@
         return "profil";
       }
 
+      function syncStatusFade() {
+        var show = !!(sessionMode && shellTab === "heute" && isStandaloneApp());
+        document.querySelectorAll(".top-edge, .heute-status-fade").forEach(function (el) {
+          if (!show) el.remove();
+          else if (el.id !== "heute-status-fade") el.remove();
+        });
+        var edge = document.getElementById("heute-status-fade");
+        if (!show) return;
+        if (!edge) {
+          edge = document.createElement("div");
+          edge.id = "heute-status-fade";
+          edge.className = "heute-status-fade is-on";
+          edge.setAttribute("aria-hidden", "true");
+          document.body.insertBefore(edge, document.body.firstChild);
+        } else {
+          edge.classList.add("is-on");
+        }
+      }
+
       function paintPill() {
         beatTrainingPresence();
         window.setTimeout(syncHScrollDock, 20);
-        var edge = document.getElementById("heute-status-fade");
-        if (edge) {
-          var showEdge = !!(sessionMode && shellTab === "heute" && isStandaloneApp());
-          edge.classList.toggle("is-on", showEdge);
-          edge.style.display = showEdge ? "block" : "none";
-        }
+        syncStatusFade();
         document.querySelectorAll(".app-pill button").forEach(function (btn) {
           var on = btn.getAttribute("data-shell") === shellTab;
           btn.classList.toggle("is-on", on);
