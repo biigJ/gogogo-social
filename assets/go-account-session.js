@@ -99,56 +99,62 @@
     persist: requestPersist
   };
 
-  // Homescreen-PWAs cachen HTML aggressiv. Cache-Bust + Verlauf-Killer
-  // (wirkt auch bei alter inline-CSS, die .top-edge auf allen Tabs zeigt).
+  // Verlauf-Killer: CSS mit !important gegen alte inline-Regel + DOM entfernen.
+  // Zuerst killen, dann ggf. Cache-Bust — nie vor dem Kill returnen.
   (function gogogoWorkoutBoot() {
-    var BUILD = "nav5-fade-off";
+    var BUILD = "nav5-kill-9";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
     if (path !== "/workout") return;
 
-    function hideStatusFadeOutsideHeute() {
-      /* Immer alle alten Fade-Nodes killen; Heute nutzt nur noch body::before */
-      document.querySelectorAll(".top-edge, .heute-status-fade").forEach(function (el) {
+    function killFade() {
+      var css = document.getElementById("gogogo-kill-fade");
+      if (!css) {
+        css = document.createElement("style");
+        css.id = "gogogo-kill-fade";
+        css.textContent = [
+          'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,',
+          "html.is-standalone body.is-session .top-edge,",
+          "html body.is-session .top-edge,",
+          ".top-edge,.heute-status-fade,#heute-status-fade{",
+          "display:none!important;opacity:0!important;visibility:hidden!important;",
+          "pointer-events:none!important;height:0!important;max-height:0!important;",
+          "background:transparent!important;background-image:none!important;}",
+          "html.is-standalone body.is-session::before,",
+          "html.is-standalone body.is-session[data-shell]::before{",
+          "content:none!important;display:none!important;background:none!important;height:0!important;}"
+        ].join("");
+        (document.head || document.documentElement).appendChild(css);
+      }
+      document.querySelectorAll(".top-edge, .heute-status-fade, #heute-status-fade").forEach(function (el) {
         try {
-          el.style.setProperty("display", "none", "important");
-          el.style.setProperty("opacity", "0", "important");
-          el.style.setProperty("visibility", "hidden", "important");
-          el.style.setProperty("background", "transparent", "important");
-          el.style.setProperty("height", "0px", "important");
+          el.style.cssText = "display:none!important;opacity:0!important;height:0!important;background:transparent!important;";
           el.remove();
         } catch (eHide) {}
       });
     }
+
+    killFade();
 
     try {
       var url = new URL(location.href);
       if (url.searchParams.get("_cb") !== BUILD) {
         localStorage.setItem("gogogo_workout_build", BUILD);
         url.searchParams.set("_cb", BUILD);
-        location.replace(url.pathname + url.search + url.hash);
+        url.searchParams.set("_t", String(Date.now()));
+        location.href = url.pathname + "?" + url.searchParams.toString() + url.hash;
         return;
       }
       localStorage.setItem("gogogo_workout_build", BUILD);
     } catch (eBuild) {}
 
-    hideStatusFadeOutsideHeute();
-    document.addEventListener("DOMContentLoaded", hideStatusFadeOutsideHeute);
-    function watchShell() {
-      if (!document.body || document.body.dataset.gogogoFadeWatch) return;
-      document.body.dataset.gogogoFadeWatch = "1";
-      new MutationObserver(hideStatusFadeOutsideHeute).observe(document.body, {
-        attributes: true,
-        attributeFilter: ["data-shell"]
-      });
-      hideStatusFadeOutsideHeute();
-    }
-    watchShell();
-    document.addEventListener("DOMContentLoaded", watchShell);
+    document.addEventListener("DOMContentLoaded", killFade);
     var ticks = 0;
     var timer = setInterval(function () {
-      hideStatusFadeOutsideHeute();
-      watchShell();
-      if (++ticks > 40) clearInterval(timer);
-    }, 200);
+      killFade();
+      if (++ticks > 80) clearInterval(timer);
+    }, 100);
+    try {
+      new MutationObserver(killFade).observe(document.documentElement, { childList: true, subtree: true });
+    } catch (eObs) {}
   })();
 })(window);

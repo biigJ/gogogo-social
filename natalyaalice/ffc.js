@@ -1,33 +1,24 @@
 /* Zirkeltraining aus der FFC-App (Friday Fitness Circle), eingebettet in gogogo. */
 (function(){
-  // Verlauf-Killer + Cache-Bust (auch wenn alte HTML-Kopie .top-edge überall zeigt)
+  // Verlauf-Killer (alte HTML mit .top-edge auf allen Tabs)
   (function () {
-    var BUILD = "nav5-fade-off";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
     if (path !== "/workout") return;
-    function hide() {
-      document.querySelectorAll(".top-edge, .heute-status-fade").forEach(function (el) {
-        try {
-          el.style.setProperty("display", "none", "important");
-          el.style.setProperty("opacity", "0", "important");
-          el.style.setProperty("background", "transparent", "important");
-          el.remove();
-        } catch (e) {}
+    function kill() {
+      if (!document.getElementById("gogogo-kill-fade-ffc")) {
+        var css = document.createElement("style");
+        css.id = "gogogo-kill-fade-ffc";
+        css.textContent = 'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,html.is-standalone body.is-session .top-edge,.top-edge,.heute-status-fade{display:none!important;opacity:0!important;visibility:hidden!important;height:0!important;background:transparent!important;background-image:none!important;}';
+        (document.head || document.documentElement).appendChild(css);
+      }
+      document.querySelectorAll(".top-edge,.heute-status-fade").forEach(function (el) {
+        try { el.remove(); } catch (e) {}
       });
     }
-    try {
-      var url = new URL(location.href);
-      if (url.searchParams.get("_cb") !== BUILD) {
-        localStorage.setItem("gogogo_workout_build", BUILD);
-        url.searchParams.set("_cb", BUILD);
-        location.replace(url.pathname + url.search + url.hash);
-        return;
-      }
-    } catch (e2) {}
-    hide();
-    document.addEventListener("DOMContentLoaded", hide);
+    kill();
+    document.addEventListener("DOMContentLoaded", kill);
     var n = 0;
-    var t = setInterval(function () { hide(); if (++n > 40) clearInterval(t); }, 200);
+    var t = setInterval(function () { kill(); if (++n > 80) clearInterval(t); }, 100);
   })();
 
   // ---------- Supabase ----------
