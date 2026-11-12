@@ -385,6 +385,9 @@ create policy "courses_write_coach"
 
 -- Anon-Schreibzugriff wie bei anderen go_*-Tabellen (Publishable Key der App),
 -- bis Account-Header durchgängig gesetzt ist. Lesen bleibt über Select-Policy.
+-- OFFEN (nach Test-Start, noch nicht umsetzen): RLS von Header x-go-account-id
+-- auf echte Auth umstellen (Hendriks JWT in diesem Projekt verifizieren → auth.uid()),
+-- Boot-Klauseln (go_current_account_id() is null / *_anon_boot) entfernen.
 drop policy if exists "courses_write_anon_boot" on courses;
 create policy "courses_write_anon_boot"
   on courses for all to anon
