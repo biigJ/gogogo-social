@@ -4868,12 +4868,12 @@
         </span>
         <small>Team</small>
       </button>
-      <button type="button" data-shell="kurse" aria-label="Kurse">
+      <button type="button" data-shell="kurse" aria-label="Support">
         <span class="pill-ico">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h8M8 11h6"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
-        <small>Kurse</small>
+        <small>Support</small>
       </button>
       <button type="button" data-shell="profil" aria-label="Profil">
         <span class="pill-ico">
@@ -5615,6 +5615,7 @@
           Authorization: "Bearer " + SUPABASE_KEY,
           "Content-Type": "application/json"
         };
+        if (sessionAccount && sessionAccount.id) headers["x-go-account-id"] = String(sessionAccount.id);
         if (opts && opts.prefer) headers.Prefer = opts.prefer;
         return fetch(apiBase + "/rest/v1/" + path, {
           method: (opts && opts.method) || "GET",
@@ -5628,6 +5629,21 @@
             return JSON.parse(text);
           });
         });
+      }
+
+      /* Eigene Events: course_id XOR category=alternative (DB-Check + Formular). */
+      function validateOwnEvent(input) {
+        var cat = String((input && input.category) || "").toLowerCase();
+        var courseId = input && input.course_id ? String(input.course_id) : "";
+        if (["kraft", "ausdauer", "zirkel", "alternative"].indexOf(cat) < 0) {
+          return "Kategorie fehlt oder ist ungültig (kraft | ausdauer | zirkel | alternative).";
+        }
+        if (cat === "alternative") {
+          if (courseId) return "Alternative-Tage haben keinen Kurs (course_id muss leer sein).";
+          return null;
+        }
+        if (!courseId) return "Kurs fehlt — oder Kategorie auf alternative setzen.";
+        return null;
       }
 
       function logQuery() {
