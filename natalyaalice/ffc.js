@@ -1,20 +1,26 @@
 /* Zirkeltraining aus der FFC-App (Friday Fitness Circle), eingebettet in gogogo. */
 (function(){
-  // Verlauf-Killer (alte HTML mit .top-edge auf allen Tabs)
+  // Verlauf-Killer: .top-edge Klasse+Node weg, keine Abdeckung
   (function () {
-    var BUILD = "nav5-fade-deckel-13";
+    var BUILD = "nav5-no-cover-14";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
     if (path !== "/workout" && path !== "/natalyaalice") return;
     function kill() {
       if (!document.getElementById("gogogo-kill-fade-ffc")) {
         var css = document.createElement("style");
         css.id = "gogogo-kill-fade-ffc";
-        css.textContent = 'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,html.is-standalone body.is-session .top-edge,.top-edge,.heute-status-fade{display:none!important;opacity:0!important;visibility:hidden!important;height:0!important;background:transparent!important;background-image:none!important;}html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before{content:none!important;display:none!important;}';
+        css.textContent = 'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,html.is-standalone body.is-session .top-edge,.top-edge,.heute-status-fade{display:none!important;opacity:0!important;visibility:hidden!important;height:0!important;background:none!important;background-image:none!important;position:static!important;}html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before,html.is-standalone body.is-session.gogogo-fade-off::after,html.is-standalone body.is-session[data-shell]::after{content:none!important;display:none!important;}';
         (document.head || document.documentElement).appendChild(css);
       }
       document.querySelectorAll(".top-edge,.heute-status-fade").forEach(function (el) {
-        try { if (el.parentNode) el.parentNode.removeChild(el); } catch (e) {}
+        try {
+          el.className = "";
+          el.removeAttribute("class");
+          el.setAttribute("hidden", "");
+          if (el.parentNode) el.parentNode.removeChild(el);
+        } catch (e) {}
       });
+      if (document.body) document.body.classList.remove("gogogo-fade-off");
     }
     kill();
     try {

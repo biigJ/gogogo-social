@@ -18,17 +18,18 @@
       var kill = document.createElement("style");
       kill.setAttribute("data-gogogo-fade-kill", "1");
       kill.textContent = [
-        ".top-edge,.heute-status-fade,html.is-standalone body.is-session .top-edge,html.is-standalone body.is-session:not([data-shell=\"workout\"]) .top-edge{",
-        "display:none!important;opacity:0!important;height:0!important;background:none!important;background-image:none!important;visibility:hidden!important}",
-        "html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before{",
-        "content:none!important;display:none!important;background:none!important;height:0!important}",
-        "html.is-standalone body.is-session[data-shell=\"woche\"].gogogo-fade-off::after,",
-        "html.is-standalone body.is-session[data-shell=\"team\"].gogogo-fade-off::after,",
-        "html.is-standalone body.is-session[data-shell=\"kurse\"].gogogo-fade-off::after,",
-        "html.is-standalone body.is-session[data-shell=\"profil\"].gogogo-fade-off::after{",
-        "content:\"\"!important;position:fixed!important;top:0!important;left:0!important;right:0!important;",
-        "height:calc(env(safe-area-inset-top,0px) + 40px)!important;background:var(--shell-surface,#F3EEE4)!important;",
-        "z-index:60!important;pointer-events:none!important}"
+        ".top-edge,.heute-status-fade,",
+        "html.is-standalone body.is-session .top-edge,",
+        "html.is-standalone body.is-session:not([data-shell=\"workout\"]) .top-edge{",
+        "display:none!important;opacity:0!important;height:0!important;max-height:0!important;",
+        "background:none!important;background-image:none!important;visibility:hidden!important;",
+        "pointer-events:none!important;position:static!important}",
+        "html.is-standalone body.is-session::before,",
+        "html.is-standalone body.is-session[data-shell]::before,",
+        "html.is-standalone body.is-session[data-shell=\"heute\"]::before,",
+        "html.is-standalone body.is-session.gogogo-fade-off::after,",
+        "html.is-standalone body.is-session[data-shell]::after{",
+        "content:none!important;display:none!important;background:none!important;height:0!important}"
       ].join("");
       document.documentElement.appendChild(kill);
 
@@ -67,7 +68,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-fade-deckel-13" />
+  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-no-cover-14" />
   <style>
     :root {
       --bg: #C7413B;
@@ -5485,7 +5486,7 @@
 </nav>
   </div>
   <!-- ffc:end -->
-  <script src="/assets/go-account-session.js?v=nav5-fade-deckel-13"></script>
+  <script src="/assets/go-account-session.js?v=nav5-no-cover-14"></script>
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
@@ -9197,64 +9198,24 @@
       }
 
       function syncStatusFade() {
-        /* .top-edge killen; Deckel nur außerhalb Heute (Dropdown bleibt frei). */
+        /* Verlauf echt entfernen — Klasse weg, Node weg, keine Abdeckung. */
         document.querySelectorAll(".top-edge, .heute-status-fade").forEach(function (el) {
           try {
-            el.style.cssText = "display:none!important;opacity:0!important;height:0!important;background:none!important;";
+            el.className = "";
+            el.removeAttribute("class");
+            el.style.cssText = "display:none!important;height:0!important;opacity:0!important;background:none!important;";
+            el.setAttribute("hidden", "");
             if (el.parentNode) el.parentNode.removeChild(el);
           } catch (eFade) {}
         });
-        if (!document.getElementById("gogogo-kill-fade-inline")) {
-          var st = document.createElement("style");
-          st.id = "gogogo-kill-fade-inline";
-          st.textContent = [
-            ".top-edge,.heute-status-fade,html.is-standalone body.is-session .top-edge{",
-            "display:none!important;opacity:0!important;height:0!important;background:none!important;}",
-            "html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before{",
-            "content:none!important;display:none!important;}",
-            "html.is-standalone body.is-session[data-shell=\"woche\"].gogogo-fade-off::after,",
-            "html.is-standalone body.is-session[data-shell=\"team\"].gogogo-fade-off::after,",
-            "html.is-standalone body.is-session[data-shell=\"kurse\"].gogogo-fade-off::after,",
-            "html.is-standalone body.is-session[data-shell=\"profil\"].gogogo-fade-off::after{",
-            "content:\"\"!important;position:fixed!important;top:0!important;left:0!important;right:0!important;",
-            "height:calc(env(safe-area-inset-top,0px) + 40px)!important;",
-            "background:var(--shell-surface,#F3EEE4)!important;z-index:60!important;pointer-events:none!important}"
-          ].join("");
-          (document.head || document.documentElement).appendChild(st);
-        }
-        var shell = document.body ? document.body.dataset.shell : "";
-        var surface = "#F3EEE4";
-        if (shell === "woche") {
-          var days = document.getElementById("days");
-          if (days) {
-            var blocks = days.querySelectorAll(".day-block");
-            var idx = 0;
-            var best = Infinity;
-            for (var bi = 0; bi < blocks.length; bi++) {
-              var dist = Math.abs(blocks[bi].offsetLeft - days.scrollLeft);
-              if (dist < best) { best = dist; idx = bi; }
-            }
-            var card = blocks[idx] && blocks[idx].querySelector(".day-card");
-            if (card) {
-              var bg = window.getComputedStyle(card).backgroundColor;
-              if (bg && bg !== "transparent" && bg !== "rgba(0, 0, 0, 0)") surface = bg;
-            }
-          }
-        }
-        document.documentElement.style.setProperty("--shell-surface", surface);
         if (document.body) {
-          if (shell && shell !== "heute" && shell !== "workout") {
-            document.body.classList.add("gogogo-fade-off");
-            document.documentElement.style.background = surface;
-            document.body.style.background = surface;
-          } else {
-            document.body.classList.remove("gogogo-fade-off");
-            document.documentElement.style.background = "";
-            document.body.style.background = "";
-          }
+          document.body.classList.remove("gogogo-fade-off");
+          document.body.style.background = "";
         }
+        document.documentElement.style.removeProperty("--shell-surface");
+        document.documentElement.style.background = "";
         var theme = document.querySelector('meta[name="theme-color"]');
-        if (theme) theme.setAttribute("content", shell === "woche" ? surface : "#F3EEE4");
+        if (theme) theme.setAttribute("content", "#F3EEE4");
       }
 
       function paintPill() {
@@ -15266,6 +15227,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=nav5-fade-deckel-13"></script>
+  <script src="/natalyaalice/ffc.js?v=nav5-no-cover-14"></script>
 </body>
 </html>

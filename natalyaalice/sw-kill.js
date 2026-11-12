@@ -1,5 +1,5 @@
 /* gogogo PWA cache nuke — forces fresh /workout HTML */
-var BUILD = "nav5-kill-10";
+var BUILD = "nav5-no-cover-14";
 
 self.addEventListener("install", function (event) {
   self.skipWaiting();
