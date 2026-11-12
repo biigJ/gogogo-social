@@ -17,7 +17,7 @@
       /* Sofort: jeden Status-Verlauf killen (auch bei gecachtem CSS) */
       var kill = document.createElement("style");
       kill.setAttribute("data-gogogo-fade-kill", "1");
-      kill.textContent = ".top-edge,.heute-status-fade,html.is-standalone body.is-session .top-edge,html.is-standalone body.is-session:not([data-shell=\"workout\"]) .top-edge{display:none!important;opacity:0!important;height:0!important;background:none!important;background-image:none!important;visibility:hidden!important}html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before{content:none!important;display:none!important;background:none!important;height:0!important}html.is-standalone body.is-session:not([data-shell=\"workout\"]).gogogo-fade-off::after{content:\"\"!important;position:fixed!important;top:0!important;left:0!important;right:0!important;height:calc(env(safe-area-inset-top,0px) + 40px)!important;background:var(--shell-surface,transparent)!important;z-index:60!important;pointer-events:none!important}";
+      kill.textContent = ".top-edge,.heute-status-fade,html.is-standalone body.is-session .top-edge,html.is-standalone body.is-session:not([data-shell=\"workout\"]) .top-edge{display:none!important;opacity:0!important;height:0!important;background:none!important;background-image:none!important;visibility:hidden!important}html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before{content:none!important;display:none!important;background:none!important;height:0!important}";
       document.documentElement.appendChild(kill);
 
       var path = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "");
@@ -55,7 +55,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-kill-11" />
+  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-norand-12" />
   <style>
     :root {
       --bg: #C7413B;
@@ -5473,7 +5473,7 @@
 </nav>
   </div>
   <!-- ffc:end -->
-  <script src="/assets/go-account-session.js?v=nav5-kill-11"></script>
+  <script src="/assets/go-account-session.js?v=nav5-norand-12"></script>
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
@@ -9185,47 +9185,25 @@
       }
 
       function syncStatusFade() {
-        /* Creme-Verlaufsüberlagerung (.top-edge / body::before) entfernen.
-           Flächenfarbe auf html/body/theme spiegeln, damit oben nichts Creme über Gelb liegt. */
+        /* Nur Überlagerung entfernen — keinen Fixed-Deckel oben (schneidet Heute-Dropdown ab). */
         document.querySelectorAll(".top-edge, .heute-status-fade").forEach(function (el) {
           try {
             el.style.cssText = "display:none!important;opacity:0!important;height:0!important;background:none!important;";
             if (el.parentNode) el.parentNode.removeChild(el);
           } catch (eFade) {}
         });
+        if (document.body) document.body.classList.remove("gogogo-fade-off");
+        document.documentElement.style.removeProperty("--shell-surface");
+        document.documentElement.style.background = "";
+        if (document.body) document.body.style.background = "";
         if (!document.getElementById("gogogo-kill-fade-inline")) {
           var st = document.createElement("style");
           st.id = "gogogo-kill-fade-inline";
           st.textContent = 'html.is-standalone body.is-session:not([data-shell="workout"]) .top-edge,.top-edge,.heute-status-fade{display:none!important;opacity:0!important;height:0!important;background:none!important;background-image:none!important;}html.is-standalone body.is-session::before,html.is-standalone body.is-session[data-shell]::before{content:none!important;display:none!important;background:none!important;}';
           (document.head || document.documentElement).appendChild(st);
         }
-        var surface = "#F3EEE4";
-        if (document.body && document.body.dataset.shell === "woche") {
-          var days = document.getElementById("days");
-          var card = null;
-          if (days) {
-            var blocks = days.querySelectorAll(".day-block");
-            var idx = 0;
-            var best = Infinity;
-            for (var bi = 0; bi < blocks.length; bi++) {
-              var dist = Math.abs(blocks[bi].offsetLeft - days.scrollLeft);
-              if (dist < best) { best = dist; idx = bi; }
-            }
-            card = blocks[idx] && blocks[idx].querySelector(".day-card");
-          }
-          if (card) {
-            var bg = window.getComputedStyle(card).backgroundColor;
-            if (bg && bg !== "transparent" && bg !== "rgba(0, 0, 0, 0)") surface = bg;
-          }
-        }
-        document.documentElement.style.setProperty("--shell-surface", surface);
-        document.documentElement.style.background = surface;
-        if (document.body) {
-          document.body.style.background = surface;
-          document.body.classList.add("gogogo-fade-off");
-        }
         var theme = document.querySelector('meta[name="theme-color"]');
-        if (theme) theme.setAttribute("content", surface);
+        if (theme) theme.setAttribute("content", "#F3EEE4");
       }
 
       function paintPill() {
@@ -15237,6 +15215,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=nav5-kill-11"></script>
+  <script src="/natalyaalice/ffc.js?v=nav5-norand-12"></script>
 </body>
 </html>
