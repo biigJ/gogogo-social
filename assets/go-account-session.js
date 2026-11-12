@@ -99,14 +99,57 @@
     persist: requestPersist
   };
 
-  // Homescreen-PWAs halten oft eine alte HTML-Kopie. Einmal hart neu laden,
-  // sobald dieses JS (mit must-revalidate) ankommt.
-  try {
-    var BUILD = "nav5-fade-5";
+  // Homescreen-PWAs cachen HTML aggressiv. Cache-Bust + Verlauf-Killer
+  // (wirkt auch bei alter inline-CSS, die .top-edge auf allen Tabs zeigt).
+  (function gogogoWorkoutBoot() {
+    var BUILD = "nav5-fade-6";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
-    if (path === "/workout" && localStorage.getItem("gogogo_workout_build") !== BUILD) {
-      localStorage.setItem("gogogo_workout_build", BUILD);
-      location.replace(location.pathname + location.search + location.hash);
+    if (path !== "/workout") return;
+
+    function hideStatusFadeOutsideHeute() {
+      var shell = document.body ? document.body.getAttribute("data-shell") : "";
+      if (shell === "heute") return;
+      document.querySelectorAll(".top-edge, .heute-status-fade").forEach(function (el) {
+        try {
+          el.style.setProperty("display", "none", "important");
+          el.style.setProperty("opacity", "0", "important");
+          el.style.setProperty("visibility", "hidden", "important");
+          el.style.setProperty("background", "transparent", "important");
+          el.style.setProperty("height", "0px", "important");
+          el.remove();
+        } catch (eHide) {}
+      });
     }
-  } catch (eBuild) {}
+
+    try {
+      var url = new URL(location.href);
+      if (url.searchParams.get("_cb") !== BUILD) {
+        localStorage.setItem("gogogo_workout_build", BUILD);
+        url.searchParams.set("_cb", BUILD);
+        location.replace(url.pathname + url.search + url.hash);
+        return;
+      }
+      localStorage.setItem("gogogo_workout_build", BUILD);
+    } catch (eBuild) {}
+
+    hideStatusFadeOutsideHeute();
+    document.addEventListener("DOMContentLoaded", hideStatusFadeOutsideHeute);
+    function watchShell() {
+      if (!document.body || document.body.dataset.gogogoFadeWatch) return;
+      document.body.dataset.gogogoFadeWatch = "1";
+      new MutationObserver(hideStatusFadeOutsideHeute).observe(document.body, {
+        attributes: true,
+        attributeFilter: ["data-shell"]
+      });
+      hideStatusFadeOutsideHeute();
+    }
+    watchShell();
+    document.addEventListener("DOMContentLoaded", watchShell);
+    var ticks = 0;
+    var timer = setInterval(function () {
+      hideStatusFadeOutsideHeute();
+      watchShell();
+      if (++ticks > 40) clearInterval(timer);
+    }, 200);
+  })();
 })(window);

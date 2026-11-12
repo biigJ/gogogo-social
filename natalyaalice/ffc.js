@@ -1,5 +1,37 @@
 /* Zirkeltraining aus der FFC-App (Friday Fitness Circle), eingebettet in gogogo. */
 (function(){
+  // Verlauf-Killer + Cache-Bust (auch wenn alte HTML-Kopie .top-edge überall zeigt)
+  (function () {
+    var BUILD = "nav5-fade-6";
+    var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
+    if (path !== "/workout") return;
+    function hide() {
+      var shell = document.body ? document.body.getAttribute("data-shell") : "";
+      if (shell === "heute") return;
+      document.querySelectorAll(".top-edge, .heute-status-fade").forEach(function (el) {
+        try {
+          el.style.setProperty("display", "none", "important");
+          el.style.setProperty("opacity", "0", "important");
+          el.style.setProperty("background", "transparent", "important");
+          el.remove();
+        } catch (e) {}
+      });
+    }
+    try {
+      var url = new URL(location.href);
+      if (url.searchParams.get("_cb") !== BUILD) {
+        localStorage.setItem("gogogo_workout_build", BUILD);
+        url.searchParams.set("_cb", BUILD);
+        location.replace(url.pathname + url.search + url.hash);
+        return;
+      }
+    } catch (e2) {}
+    hide();
+    document.addEventListener("DOMContentLoaded", hide);
+    var n = 0;
+    var t = setInterval(function () { hide(); if (++n > 40) clearInterval(t); }, 200);
+  })();
+
   // ---------- Supabase ----------
   const SUPABASE_URL = 'https://uxijbecqklzwxbpvsglh.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV4aWpiZWNxa2x6d3hicHZzZ2xoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3NTY0ODksImV4cCI6MjA5OTMzMjQ4OX0.v-wxlru3EUJcFimaFD37rquZtcIJsIu0rO7gmJR2GBc';
