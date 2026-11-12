@@ -68,7 +68,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-no-cover-14" />
+  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-statusbg-15" />
   <style>
     :root {
       --bg: #C7413B;
@@ -5486,7 +5486,7 @@
 </nav>
   </div>
   <!-- ffc:end -->
-  <script src="/assets/go-account-session.js?v=nav5-no-cover-14"></script>
+  <script src="/assets/go-account-session.js?v=nav5-statusbg-15"></script>
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
@@ -9208,14 +9208,46 @@
             if (el.parentNode) el.parentNode.removeChild(el);
           } catch (eFade) {}
         });
-        if (document.body) {
-          document.body.classList.remove("gogogo-fade-off");
-          document.body.style.background = "";
+        if (document.body) document.body.classList.remove("gogogo-fade-off");
+        /* iOS zeichnet unter der Statusleiste selbst einen Verlauf in der Seitenfarbe.
+           Ein fixer Streifen exakt in Statusleisten-Höhe in der aktuellen Flächenfarbe
+           unterdrückt ihn, ohne Inhalt zu überdecken. */
+        var shell = document.body ? document.body.dataset.shell : "";
+        var surface = "#F3EEE4";
+        if (shell === "woche") {
+          var days = document.getElementById("days");
+          if (days) {
+            var blocks = days.querySelectorAll(".day-block");
+            var idx = 0;
+            var best = Infinity;
+            for (var bi = 0; bi < blocks.length; bi++) {
+              var dist = Math.abs(blocks[bi].offsetLeft - days.scrollLeft);
+              if (dist < best) { best = dist; idx = bi; }
+            }
+            var card = blocks[idx] && blocks[idx].querySelector(".day-card");
+            if (card) {
+              var bg = window.getComputedStyle(card).backgroundColor;
+              if (bg && bg !== "transparent" && bg !== "rgba(0, 0, 0, 0)") surface = bg;
+            }
+          }
         }
-        document.documentElement.style.removeProperty("--shell-surface");
-        document.documentElement.style.background = "";
+        var bar = document.getElementById("gogogo-status-bg");
+        if (!bar && document.body) {
+          bar = document.createElement("div");
+          bar.id = "gogogo-status-bg";
+          bar.setAttribute("aria-hidden", "true");
+          bar.style.cssText = "position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);z-index:9999;pointer-events:none;";
+          document.body.appendChild(bar);
+        }
+        var active = !!(sessionMode && shell && shell !== "workout");
+        if (bar) {
+          bar.style.background = surface;
+          bar.style.display = active ? "block" : "none";
+        }
+        document.documentElement.style.background = active ? surface : "";
+        if (document.body) document.body.style.background = active ? surface : "";
         var theme = document.querySelector('meta[name="theme-color"]');
-        if (theme) theme.setAttribute("content", "#F3EEE4");
+        if (theme) theme.setAttribute("content", active ? surface : "#F3EEE4");
       }
 
       function paintPill() {
@@ -15227,6 +15259,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=nav5-no-cover-14"></script>
+  <script src="/natalyaalice/ffc.js?v=nav5-statusbg-15"></script>
 </body>
 </html>
