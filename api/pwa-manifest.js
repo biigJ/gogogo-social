@@ -36,7 +36,7 @@ module.exports = function handler(req, res) {
     sendJson(res, 400, { error: "missing identity" });
     return;
   }
-  var start = "/workout/?_cb=nav5-statusbg-15&home=" + encodeURIComponent(id);
+  var start = "/workout/?_cb=nav5-glass-16&home=" + encodeURIComponent(id);
   sendJson(res, 200, {
     name: name,
     short_name: name,

@@ -2,7 +2,7 @@
 (function(){
   // Verlauf-Killer: .top-edge Klasse+Node weg, keine Abdeckung
   (function () {
-    var BUILD = "nav5-statusbg-15";
+    var BUILD = "nav5-glass-16";
     var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
     if (path !== "/workout" && path !== "/natalyaalice") return;
     function kill() {
