@@ -1250,8 +1250,9 @@
     html.has-vp-gap:has(body.is-session:not([data-shell="workout"])),
     html.has-vp-gap body.is-session:not([data-shell="workout"]) { overflow: hidden; }
     /* Pill bleibt im touchbaren Viewport — negativer bottom machte Tabs oft tot bis App-Wechsel */
-    .top-edge { display: none !important; }
-    html.is-standalone body.is-session[data-shell="heute"] .top-edge:not([hidden]) {
+    .top-edge,
+    .heute-status-fade { display: none !important; }
+    html.is-standalone body.is-session[data-shell="heute"] .heute-status-fade.is-on {
       display: block !important;
       position: fixed;
       /* um 2/3 der eigenen Höhe nach oben */
@@ -2297,23 +2298,26 @@
     .app-pill {
       display: none;
       position: fixed;
-      left: 0;
-      right: 0;
+      left: 50%;
+      right: auto;
       bottom: 0;
       z-index: 120;
-      width: 100%;
+      width: min(calc(100% - 32px), 420px);
       justify-content: center;
       align-items: flex-end;
-      padding: 0 16px 0;
+      padding: 0;
       margin: 0;
-      pointer-events: none;
+      /* iOS: pointer-events:none am Parent macht Pill-Taps unzuverlässig */
+      pointer-events: auto;
+      touch-action: manipulation;
       background: transparent;
+      transform: translateX(-50%);
     }
     body.is-session:not([data-shell="workout"]) .app-pill { display: flex; }
     .app-pill nav {
       pointer-events: auto;
       touch-action: manipulation;
-      width: min(100%, 420px);
+      width: 100%;
       display: grid;
       grid-template-columns: repeat(5, 1fr);
       align-items: center;
@@ -4829,7 +4833,7 @@
     <div class="profile-block" id="profile-places-block" hidden></div>
     <div class="profile-block profile-notes" id="profile-notes"></div>
   </section>
-  <div class="top-edge" aria-hidden="true" hidden></div>
+  <div class="heute-status-fade" id="heute-status-fade" aria-hidden="true"></div>
   <div class="hscroll-dock" id="hscroll-dock" hidden>
     <div class="hscroll-dock__track" id="hscroll-track">
       <div class="hscroll-dock__thumb" id="hscroll-thumb"></div>
@@ -9161,8 +9165,12 @@
       function paintPill() {
         beatTrainingPresence();
         window.setTimeout(syncHScrollDock, 20);
-        var edge = document.querySelector(".top-edge");
-        if (edge) edge.hidden = !(sessionMode && shellTab === "heute" && isStandaloneApp());
+        var edge = document.getElementById("heute-status-fade");
+        if (edge) {
+          var showEdge = !!(sessionMode && shellTab === "heute" && isStandaloneApp());
+          edge.classList.toggle("is-on", showEdge);
+          edge.style.display = showEdge ? "block" : "none";
+        }
         document.querySelectorAll(".app-pill button").forEach(function (btn) {
           var on = btn.getAttribute("data-shell") === shellTab;
           btn.classList.toggle("is-on", on);
@@ -12168,22 +12176,38 @@
       document.getElementById("go-modal").addEventListener("click", function (event) {
         if (event.target.id === "go-modal") closeGoPick();
       });
-      document.querySelector(".app-pill").addEventListener("click", function (event) {
-        var btn = event.target.closest("button");
-        if (!btn) return;
-        var tab = btn.getAttribute("data-shell");
-        if (tab === "woche") showWoche();
-        else if (tab === "team") showPlan("team");
-        else if (tab === "kurse") showPlan("training");
-        else if (tab === "profil") showPlan("profil");
-        else {
-          setHome(true);
-          paintWelcome();
-          paintHeuteDiaryFeed();
-          refreshFfcHeute(false);
-          if (tab === "heute") markHeuteSeen();
+      (function bindAppPill() {
+        var pill = document.querySelector(".app-pill");
+        if (!pill) return;
+        var lastAt = 0;
+        function goTab(tab) {
+          if (!tab) return;
+          var now = Date.now();
+          if (now - lastAt < 280) return;
+          lastAt = now;
+          if (tab === "woche") showWoche();
+          else if (tab === "team") showPlan("team");
+          else if (tab === "kurse") showPlan("training");
+          else if (tab === "profil") showPlan("profil");
+          else {
+            setHome(true);
+            paintWelcome();
+            paintHeuteDiaryFeed();
+            refreshFfcHeute(false);
+            if (tab === "heute") markHeuteSeen();
+          }
         }
-      });
+        function fromEvent(event) {
+          var btn = event.target.closest("button");
+          if (!btn || !pill.contains(btn)) return;
+          goTab(btn.getAttribute("data-shell"));
+        }
+        pill.addEventListener("click", fromEvent);
+        pill.addEventListener("pointerup", function (event) {
+          if (event.pointerType && event.pointerType !== "touch") return;
+          fromEvent(event);
+        });
+      })();
       var bookNav = document.getElementById("book-nav");
       if (bookNav) {
         bookNav.addEventListener("click", function (event) {

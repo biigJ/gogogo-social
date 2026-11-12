@@ -98,4 +98,15 @@
     clear: clearAccount,
     persist: requestPersist
   };
+
+  // Homescreen-PWAs halten oft eine alte HTML-Kopie. Einmal hart neu laden,
+  // sobald dieses JS (mit must-revalidate) ankommt.
+  try {
+    var BUILD = "nav5-pill-3";
+    var path = String(location.pathname || "").replace(/\/index\.html$/, "").replace(/\/+$/, "");
+    if (path === "/workout" && localStorage.getItem("gogogo_workout_build") !== BUILD) {
+      localStorage.setItem("gogogo_workout_build", BUILD);
+      location.replace(location.pathname + location.search + location.hash);
+    }
+  } catch (eBuild) {}
 })(window);
