@@ -31,7 +31,8 @@
       showOwnFfc: true,
       showAcceptedFfc: true,
       showPendingFfcInvites: level >= 1,
-      showOwnHistory: level >= 2,
+      /* Eigene Historie immer (Ich inkl.); Freunde erst ab Alles */
+      showOwnHistory: true,
       showFriendsHistory: level >= 3,
       showOthersUpcoming: level >= 1,
       showRsvpdUpcoming: true,
@@ -249,7 +250,7 @@
     var fromIso = from.toISOString();
     var toIso = to.toISOString();
     return rest(
-      "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,note,photo_url&starts_at=gte." +
+      "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title&starts_at=gte." +
         encodeURIComponent(fromIso) +
         "&starts_at=lte." +
         encodeURIComponent(toIso) +
@@ -1313,13 +1314,16 @@
     if (String(postId).indexOf("diary:") === 0) {
       var parts = String(postId).split(":");
       var ownerId = parts[1] || me();
+      var day = parts[2] || todayIso();
+      var tagged =
+        "⟦ix:" + day + "⟧" + temp.text.slice(0, Math.max(0, 144 - (12 + String(day).length)));
       save = rest("go_community_posts", {
         method: "POST",
         prefer: "return=representation",
         body: {
           author_id: me(),
           kind: "text",
-          body: temp.text.slice(0, 144),
+          body: tagged,
           reply_to_id: ownerId
         }
       });

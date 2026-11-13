@@ -5622,7 +5622,7 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-3"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-4"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -5741,7 +5741,7 @@
       var diaryPosts = [];
       var diaryPeople = {};
       var sharedEntries = [];
-      var diaryBuddyIds = {};
+      var diaryFriendIds = {};
       var diaryNote = false;
       var pendingShare = "";
       var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
@@ -7966,7 +7966,7 @@
         var vis = person.diary_visibility || "private";
         if (vis === "trainer" && String(person.trainer_id || "") === String(sessionAccount.id)) return true;
         /* Freunde-Historie folgt deren Profil-Setting „Historie mit Freunden teilen“ */
-        if (vis === "friends" && diaryBuddyIds[String(person.id)]) return true;
+        if (vis === "friends" && diaryFriendIds[String(person.id)]) return true;
         return false;
       }
 
@@ -7988,7 +7988,7 @@
           level: level,
           groupOnly: view === "gruppe",
           showIncomingInvites: level >= 1,
-          showOwnHistory: level >= 2,
+          showOwnHistory: true,
           showFriendsHistory: level >= 3
         };
       }
@@ -8004,28 +8004,33 @@
         if (author && author.is_trainer && fromId !== me && toId !== me) return false;
         if (toId) {
           if (toId === me || fromId === me) return true;
-          if (diaryBuddyIds[fromId] && diaryBuddyIds[toId]) return true;
+          if (diaryFriendIds[fromId] && diaryFriendIds[toId]) return true;
           return canReadDiary(diaryPeople[toId]);
         }
-        return fromId === me || !!diaryBuddyIds[fromId] || canReadDiary(author);
+        return fromId === me || !!diaryFriendIds[fromId] || canReadDiary(author);
       }
 
       function loadDiaryShare() {
         if (!sessionMode || !sessionAccount) return Promise.resolve();
         var me = String(sessionAccount.id);
-        return rest("go_buddies?account_id=eq." + encodeURIComponent(me) + "&select=buddy_id")
-          .catch(function () { return []; })
-          .then(function (links) {
-            diaryBuddyIds = {};
-            (links || []).forEach(function (row) {
-              if (row && row.buddy_id) diaryBuddyIds[String(row.buddy_id)] = true;
+        return Promise.all([
+          rest("go_friends?account_id=eq." + encodeURIComponent(me) + "&select=friend_id").catch(function () { return []; }),
+          rest("go_friends?friend_id=eq." + encodeURIComponent(me) + "&select=account_id").catch(function () { return []; })
+        ])
+          .then(function (pack) {
+            diaryFriendIds = {};
+            (pack[0] || []).forEach(function (row) {
+              if (row && row.friend_id) diaryFriendIds[String(row.friend_id)] = true;
+            });
+            (pack[1] || []).forEach(function (row) {
+              if (row && row.account_id) diaryFriendIds[String(row.account_id)] = true;
             });
             return rest("go_accounts?trainer_id=eq." + encodeURIComponent(me) + "&select=id")
               .catch(function () { return []; });
           })
           .then(function (trainees) {
             var ids = [me];
-            Object.keys(diaryBuddyIds).forEach(function (id) { ids.push(id); });
+            Object.keys(diaryFriendIds).forEach(function (id) { ids.push(id); });
             (trainees || []).forEach(function (row) { if (row && row.id) ids.push(String(row.id)); });
             if (sessionAccount.trainer_id) ids.push(String(sessionAccount.trainer_id));
             var seen = {};
@@ -8056,7 +8061,7 @@
             diaryPeople[me].diary_visibility = diaryVisibility;
             var ids = pack.ids;
             return rest(
-              "go_community_posts?or=(author_id.in.(" + ids.join(",") + "),reply_to_id.in.(" + ids.join(",") + "))&select=id,author_id,kind,body,photo_url,reply_to_id,created_at&order=created_at.asc&limit=200"
+              "go_community_posts?or=(author_id.in.(" + ids.join(",") + "),reply_to_id.in.(" + ids.join(",") + "))&select=id,author_id,kind,body,photo_url,reply_to_id,created_at&order=created_at.asc&limit=500"
             ).catch(function () { return []; });
           })
           .then(function (rows) {
@@ -8069,7 +8074,7 @@
               return;
             }
             return rest(
-              "go_diary_entries?account_id=in.(" + others.map(encodeURIComponent).join(",") + ")&select=account_id,entry_date,note,move&order=entry_date.desc&limit=80"
+              "go_diary_entries?account_id=in.(" + others.map(encodeURIComponent).join(",") + ")&select=account_id,entry_date,note,move,extras,cleared&order=entry_date.desc&limit=200"
             ).catch(function () { return []; }).then(function (entries) {
               sharedEntries = entries || [];
             });
@@ -8491,6 +8496,16 @@
         });
       }
 
+      var remoteOwnDiaryRows = [];
+
+      function diaryEntryPhoto(extras) {
+        if (!Array.isArray(extras)) return "";
+        for (var i = 0; i < extras.length; i++) {
+          if (extras[i] && extras[i].photo) return String(extras[i].photo);
+        }
+        return "";
+      }
+
       function heuteHistoryItems(opts) {
         opts = opts || {};
         if (!sessionMode || !sessionAccount) return [];
@@ -8503,17 +8518,18 @@
           seen[key] = true;
           out.push(item);
         }
-        function pushOwn(iso) {
+        function pushOwn(iso, entryOverride, photoOverride) {
           if (!iso) return;
-          var entry = diaryEntry(iso) || {};
-          var move = diaryStatus(iso) || entry.move || "";
-          var note = String(entry.note || "").trim();
+          var entry = entryOverride || diaryEntry(iso) || {};
+          var move = (entryOverride && entryOverride.move) || diaryStatus(iso) || entry.move || "";
+          var note = String((entryOverride && entryOverride.note != null ? entryOverride.note : entry.note) || "").trim();
           var extras = Array.isArray(entry.extras) ? entry.extras : [];
           extras.forEach(function (ex) {
             if (ex && ex.note) note = (note ? note + "\n" : "") + String(ex.note);
             if (ex && ex.move && !move) move = ex.move;
           });
-          var photo = photos[iso] || "";
+          var photo = photoOverride || photos[iso] || diaryEntryPhoto(extras) || "";
+          if (entry.cleared) return;
           if (!move && !note && !photo) return;
           if (!move) move = "Training";
           pushItem("own:" + iso, {
@@ -8529,35 +8545,83 @@
           });
         }
         if (opts.showOwn) {
-          filledDiaryDates().forEach(pushOwn);
-          Object.keys(photos).forEach(pushOwn);
+          (remoteOwnDiaryRows || []).forEach(function (row) {
+            if (!row || !row.entry_date || row.cleared) return;
+            var iso = String(row.entry_date).slice(0, 10);
+            var parsed = typeof splitDiaryExtras === "function" ? splitDiaryExtras(row.extras) : { extras: [], photo: "" };
+            pushOwn(iso, {
+              note: row.note || "",
+              move: row.move || "",
+              extras: parsed.extras || [],
+              cleared: !!row.cleared
+            }, parsed.photo || "");
+          });
+          filledDiaryDates().forEach(function (iso) { pushOwn(iso); });
+          Object.keys(photos).forEach(function (iso) { pushOwn(iso); });
           Object.keys(diaryMap()).forEach(function (iso) {
             var row = diaryMap()[iso];
             if (row && row.cleared && !row.note && !row.move && !(row.extras && row.extras.length) && !photos[iso]) return;
             pushOwn(iso);
           });
           if (typeof Log !== "undefined" && Log.historyDates) {
-            Log.historyDates(serverLogs).forEach(pushOwn);
+            Log.historyDates(serverLogs).forEach(function (iso) { pushOwn(iso); });
           }
+          /* Legacy Community-Posts ohne reply_to als eigene Historie-Karten */
+          (diaryPosts || []).forEach(function (post) {
+            if (!post || String(post.author_id) !== String(sessionAccount.id)) return;
+            if (post.reply_to_id) return;
+            var body = String(post.body || "").trim();
+            if (!body && !post.photo_url) return;
+            var day = "";
+            try {
+              day = new Date(post.created_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+            } catch (eP) {
+              day = String(post.created_at || "").slice(0, 10);
+            }
+            if (!day || seen["own:" + day]) return;
+            var lines = body.split(/\n+/);
+            var title = lines[0] || "Training";
+            var note = lines.slice(1).join("\n");
+            pushItem("own-post:" + post.id, {
+              id: "post-" + post.id,
+              user_id: sessionAccount.id,
+              starts_at: post.created_at || day + "T12:00:00+01:00",
+              title: title,
+              note: note,
+              photo_url: post.photo_url || "",
+              category: historyCategoryFromLabel(title),
+              location: "",
+              commentKey: "diary:" + String(sessionAccount.id) + ":" + day
+            });
+          });
         }
         if (opts.showFriends && Array.isArray(sharedEntries)) {
           sharedEntries.forEach(function (entry) {
-            if (!entry || !entry.entry_date) return;
+            if (!entry || !entry.entry_date || entry.cleared) return;
             var pid = String(entry.account_id || "");
             if (!pid || pid === String(sessionAccount.id)) return;
             if (opts.groupOnly && groupMemberIds().indexOf(pid) < 0) return;
             if (!canReadDiary(diaryPeople[pid])) return;
             var iso = String(entry.entry_date).slice(0, 10);
-            var move = entry.move || "Training";
+            var move = entry.move || "";
             var note = String(entry.note || "").trim();
-            if (!move && !note) return;
+            var friendParsed = typeof splitDiaryExtras === "function" ? splitDiaryExtras(entry.extras) : { extras: [], photo: "" };
+            var photo = friendParsed.photo || diaryEntryPhoto(entry.extras) || "";
+            if (Array.isArray(friendParsed.extras)) {
+              friendParsed.extras.forEach(function (ex) {
+                if (ex && ex.note) note = (note ? note + "\n" : "") + String(ex.note);
+                if (ex && ex.move && !move) move = ex.move;
+              });
+            }
+            if (!move && !note && !photo) return;
+            if (!move) move = "Training";
             pushItem("friend:" + pid + ":" + iso, {
               id: pid + "-" + iso,
               user_id: pid,
               starts_at: iso + "T12:00:00+01:00",
               title: move,
               note: note,
-              photo_url: "",
+              photo_url: photo,
               category: historyCategoryFromLabel(move),
               location: "",
               commentKey: "diary:" + pid + ":" + iso
@@ -8572,33 +8636,53 @@
 
       function heuteDiaryComments() {
         var map = {};
-        (diaryPosts || []).forEach(function (post) {
-          if (!post) return;
-          var owner = String(post.reply_to_id || post.author_id || "");
-          if (!owner) return;
-          var day = "";
-          try {
-            day = new Date(post.created_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
-          } catch (eDay) {
-            day = String(post.created_at || "").slice(0, 10);
-          }
-          if (!day) return;
-          var key = "diary:" + owner + ":" + day;
+        function add(key, post) {
+          if (!key || !post) return;
           if (!map[key]) map[key] = [];
+          var text = String(post.body || "").replace(/⟦ix:[^⟧]+⟧/g, "").trim();
+          if (!text && !post.photo_url) return;
           map[key].push({
             id: post.id,
             account_id: post.author_id,
-            text: post.body || "",
+            text: text,
             created_at: post.created_at
           });
+        }
+        (diaryPosts || []).forEach(function (post) {
+          if (!post || !post.reply_to_id) return;
+          var tagged = String(post.body || "").match(/⟦ix:(\d{4}-\d{2}-\d{2})/);
+          var day = tagged && tagged[1] ? tagged[1] : "";
+          if (!day) {
+            try {
+              day = new Date(post.created_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+            } catch (eDay) {
+              day = String(post.created_at || "").slice(0, 10);
+            }
+          }
+          if (!day) return;
+          add("diary:" + String(post.reply_to_id) + ":" + day, post);
         });
         return map;
       }
 
       function prepareHeuteHistory() {
+        diarySyncReady = null;
         return Promise.resolve()
           .then(function () { return loadOwnDiary ? loadOwnDiary() : null; })
-          .then(function () { return loadDiaryShare(); })
+          .then(function () {
+            var map = typeof diaryMap === "function" ? diaryMap() : {};
+            remoteOwnDiaryRows = Object.keys(map || {}).map(function (iso) {
+              var row = map[iso] || {};
+              return {
+                entry_date: iso,
+                note: row.note || "",
+                move: row.move || "",
+                extras: row.extras || [],
+                cleared: !!row.cleared
+              };
+            });
+            return loadDiaryShare();
+          })
           .catch(function () {});
       }
 
@@ -11505,8 +11589,8 @@
               if (!selfIds.length) selfIds.push(id);
               var selfFilter = "in.(" + selfIds.map(encodeURIComponent).join(",") + ")";
               return Promise.all([
-                rest("go_buddies?account_id=" + selfFilter + "&select=account_id,buddy_id").catch(function () { return []; }),
-                rest("go_buddies?buddy_id=" + selfFilter + "&select=account_id,buddy_id").catch(function () { return []; }),
+                rest("go_friends?account_id=" + selfFilter + "&select=account_id,friend_id").catch(function () { return []; }),
+                rest("go_friends?friend_id=" + selfFilter + "&select=account_id,friend_id").catch(function () { return []; }),
                 rest("go_accounts?trainer_id=" + selfFilter + "&select=" + personSelect).catch(function () { return []; })
               ]).then(function (pack) {
                 var ids = [];
@@ -11517,7 +11601,7 @@
                   seenBuddy[pid] = true;
                   ids.push(pid);
                 }
-                (pack[0] || []).forEach(function (row) { addPerson(row && row.buddy_id); });
+                (pack[0] || []).forEach(function (row) { addPerson(row && row.friend_id); });
                 (pack[1] || []).forEach(function (row) { addPerson(row && row.account_id); });
                 if (trainerId) addPerson(trainerId);
                 var peopleQuery = ids.length
@@ -11563,17 +11647,17 @@
       var ffcIncoming = [];
       var ffcFriendSyncing = false;
 
-      function ensureBuddyLink(buddyId) {
-        if (!sessionAccount || !buddyId || String(buddyId) === String(sessionAccount.id)) return Promise.resolve();
-        return rest("go_buddies", {
+      function ensureFriendLink(friendId) {
+        if (!sessionAccount || !friendId || String(friendId) === String(sessionAccount.id)) return Promise.resolve();
+        return rest("go_friends", {
           method: "POST",
           prefer: "return=minimal",
-          body: { account_id: sessionAccount.id, buddy_id: buddyId }
+          body: { account_id: sessionAccount.id, friend_id: friendId }
         }).catch(function () {}).then(function () {
-          return rest("go_buddies", {
+          return rest("go_friends", {
             method: "POST",
             prefer: "return=minimal",
-            body: { account_id: buddyId, buddy_id: sessionAccount.id }
+            body: { account_id: friendId, friend_id: sessionAccount.id }
           }).catch(function () {});
         });
       }
@@ -11609,7 +11693,7 @@
             accepted.forEach(function (f) {
               var hit = byNick[String(f.nickname).toLowerCase()];
               if (hit && String(hit.id) !== String(sessionAccount.id)) {
-                jobs.push(ensureBuddyLink(hit.id));
+                jobs.push(ensureFriendLink(hit.id));
                 if (!seen[String(hit.id)]) {
                   hit.isTrainerPerson = !!hit.is_trainer || String(hit.id) === String(sessionAccount.trainer_id || "");
                   teamPeople.push(hit);
@@ -11811,7 +11895,7 @@
               done();
               return;
             }
-            ensureBuddyLink(found.id).then(done);
+            ensureFriendLink(found.id).then(done);
           })
           .catch(function () {
             if (!serial && window.FFC && FFC.user() && FFC.friendRequest) {
