@@ -173,19 +173,30 @@ create policy "event_rsvps_select"
     )
   );
 
-drop policy if exists "event_comments_select" on event_comments;
-create policy "event_comments_select"
-  on event_comments for select to anon, authenticated
-  using (
-    exists (
-      select 1 from events e
-      where e.id = event_id
-        and (
-          e.user_id = go_current_account_id()
-          or go_is_coach_of(e.user_id)
-          or (e.visibility = 'team' and go_shares_group_with(e.user_id))
-          or (e.visibility = 'gruppe' and go_is_group_member(e.group_id))
-          or go_current_account_id() is null
+-- event_comments optional (kommt aus go-event-comments.sql)
+do $$
+begin
+  if to_regclass('public.event_comments') is null then
+    raise notice 'event_comments fehlt — Policy übersprungen (go-event-comments.sql danach ausführen).';
+    return;
+  end if;
+
+  execute 'drop policy if exists "event_comments_select" on event_comments';
+  execute $pol$
+    create policy "event_comments_select"
+      on event_comments for select to anon, authenticated
+      using (
+        exists (
+          select 1 from events e
+          where e.id = event_id
+            and (
+              e.user_id = go_current_account_id()
+              or go_is_coach_of(e.user_id)
+              or (e.visibility = 'team' and go_shares_group_with(e.user_id))
+              or (e.visibility = 'gruppe' and go_is_group_member(e.group_id))
+              or go_current_account_id() is null
+            )
         )
-    )
-  );
+      )
+  $pol$;
+end $$;
