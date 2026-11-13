@@ -13,7 +13,7 @@
     filter: "ich",
     observer: null,
     viewed: {},
-    pendingVis: "gruppe"
+    pendingVis: "team"
   };
 
   var FILTER_KEY = "gogogo_heute_filter_v3";
@@ -35,9 +35,18 @@
       /* Historie */
       showOwnHistory: level >= 2,
       showFriendsHistory: level >= 3,
-      /* Accountability-Events anderer (Gruppe/alle) ab Team */
-      showOthersUpcoming: level >= 1
+      /* Accountability-Events anderer (visibility team/gruppe) ab Team-Ansicht */
+      showOthersUpcoming: level >= 1,
+      /* Zugesagte Events anderer auch in Ich */
+      showRsvpdUpcoming: true
     };
+  }
+
+  function normalizeVisibility(v) {
+    /* Legacy-UI/DB: alle|gruppe (Buddy-Kreis) → team. Neu: gruppe = groups.group_id (ohne UI). */
+    if (v === "alle" || v === "all" || v === "friends") return "team";
+    if (v === "privat" || v === "team" || v === "gruppe") return v;
+    return "team";
   }
 
   global.HeuteViewFlags = viewFlags;
@@ -345,8 +354,9 @@
     if (!ev) return false;
     var uid = me();
     var mine = String(ev.user_id) === uid;
+    var vis = normalizeVisibility(ev.visibility);
     /* privat: immer nur für den Ersteller */
-    if (ev.visibility === "privat" && !mine) return false;
+    if (vis === "privat" && !mine) return false;
     if (ev.status === "ausgefallen") return false;
     var now = Date.now();
     var week = now + 7 * 86400000;
@@ -354,12 +364,16 @@
     if (ev.status === "geplant") {
       if (t < now - 3600000 || t > week) return false;
       if (mine) return true;
-      return !!flags.showOthersUpcoming;
+      /* Nach Zusage auch in Ich */
+      if (flags.showRsvpdUpcoming && iAmGoing(ev.id)) return true;
+      /* Fremde team/gruppe-Events ab Team-Ansicht */
+      if (!flags.showOthersUpcoming) return false;
+      return vis === "team" || vis === "gruppe";
     }
     if (ev.status === "erledigt") {
       if (mine) return !!flags.showOwnHistory;
       /* Freunde-Historie nur in Alles; privat bleibt draußen (oben) */
-      return !!flags.showFriendsHistory;
+      return !!flags.showFriendsHistory && (vis === "team" || vis === "gruppe");
     }
     return false;
   }
@@ -740,8 +754,10 @@
     if (!modal) return;
     modal.hidden = false;
     modal.dataset.eventId = String(eventId);
-    var g = modal.querySelector('[name="acc-vis"][value="' + (ev.visibility || "gruppe") + '"]');
-    if (!g) g = modal.querySelector('[name="acc-vis"][value="gruppe"]');
+    var want = normalizeVisibility(ev.visibility || "team");
+    if (want === "gruppe") want = "team"; /* keine Gruppen-UI → Team */
+    var g = modal.querySelector('[name="acc-vis"][value="' + want + '"]');
+    if (!g) g = modal.querySelector('[name="acc-vis"][value="team"]');
     if (g) g.checked = true;
     var note = $("acc-done-note");
     if (note) note.value = ev.note || "";
@@ -780,7 +796,7 @@
     var eventId = modal.dataset.eventId;
     if (!eventId) return;
     var visEl = modal.querySelector('[name="acc-vis"]:checked');
-    var vis = visEl ? visEl.value : "gruppe";
+    var vis = normalizeVisibility(visEl ? visEl.value : "team");
     var note = ($("acc-done-note") && $("acc-done-note").value) || "";
     readDonePhoto()
       .then(function (photo) {
@@ -931,7 +947,7 @@
       enrollment_id: payload.enrollment_id || null,
       starts_at: new Date().toISOString(),
       location: payload.location || null,
-      visibility: payload.visibility || state.pendingVis || "gruppe",
+      visibility: normalizeVisibility(payload.visibility || state.pendingVis || "team"),
       is_unplanned: true,
       status: "geplant",
       title: payload.title || payload.category
@@ -954,10 +970,11 @@
   }
 
   function visPickerHtml() {
-    var cur = state.pendingVis || "gruppe";
+    var cur = normalizeVisibility(state.pendingVis || "team");
+    if (cur === "gruppe") cur = "team";
     return (
       '<div class="acc-vis" role="group" aria-label="Sichtbarkeit">' +
-      ["privat", "gruppe", "alle"]
+      ["privat", "team"]
         .map(function (v) {
           return (
             '<label><input type="radio" name="acc-create-vis" value="' +
@@ -965,7 +982,7 @@
             '"' +
             (v === cur ? " checked" : "") +
             " /> " +
-            (v === "gruppe" ? "Gruppe" : v) +
+            (v === "team" ? "Team" : "privat") +
             "</label>"
           );
         })
@@ -976,7 +993,7 @@
 
   function readCreateVis(box) {
     var el = box && box.querySelector('[name="acc-create-vis"]:checked');
-    state.pendingVis = el ? el.value : "gruppe";
+    state.pendingVis = normalizeVisibility(el ? el.value : "team");
     return state.pendingVis;
   }
 

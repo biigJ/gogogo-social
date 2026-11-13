@@ -72,7 +72,7 @@ begin
       location, visibility, is_unplanned, status, title
     ) values (
       en.user_id, en.course_id, en.id, tmpl.category, v_starts,
-      null, 'gruppe', false, 'geplant', tmpl.title
+      null, 'team', false, 'geplant', tmpl.title
     );
     v_inserted := v_inserted + 1;
   end loop;
@@ -189,7 +189,7 @@ select
   'kraft',
   ((d.workout_date::text || ' 13:00:00')::timestamp at time zone 'Europe/Berlin'),
   null,
-  'gruppe',
+  'team',
   false,
   'erledigt',
   'Einfache Basics · übernommen'

@@ -95,6 +95,7 @@ create policy "event_comments_select"
         )
     )
   );
+  -- Visibility privat|team|gruppe: danach go-visibility-team.sql ausführen (ersetzt diese Policy).
 
 drop policy if exists "event_comments_insert_own" on event_comments;
 create policy "event_comments_insert_own"
