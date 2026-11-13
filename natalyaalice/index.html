@@ -5679,6 +5679,8 @@
         }
       } catch (ePlan) {}
       var teamPeople = [];
+      var myGroupsCache = [];
+      var myGroupsMigrateTried = false;
       var remoteInvites = [];
       var remotePtBookings = [];
       var remotePtSessions = [];
@@ -10441,14 +10443,190 @@
 
 
       function myGroups() {
+        return myGroupsCache;
+      }
+
+      function isUuid(value) {
+        return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(value || ""));
+      }
+
+      function stripLocalAboutGroups() {
+        if (!sessionAccount) return;
         var about = profileAbout(sessionAccount) || {};
-        return Array.isArray(about.groups) ? about.groups : [];
+        if (!Object.prototype.hasOwnProperty.call(about, "groups")) return;
+        delete about.groups;
+        sessionAccount.about_me = about;
+        if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+      }
+
+      function migrateAboutGroupsOnce() {
+        if (!sessionAccount || !sessionAccount.id || myGroupsMigrateTried) return Promise.resolve();
+        myGroupsMigrateTried = true;
+        return rest("rpc/go_migrate_about_groups", {
+          method: "POST",
+          body: {}
+        }).then(function () {
+          stripLocalAboutGroups();
+        }).catch(function () {});
+      }
+
+      function loadMyGroups() {
+        if (!sessionAccount || !sessionAccount.id) {
+          myGroupsCache = [];
+          return Promise.resolve([]);
+        }
+        var me = String(sessionAccount.id);
+        var selectFull = "id,name,description,photo_url,created_by,created_at,legacy_key";
+        var selectBasic = "id,name,created_by,created_at";
+        function fetchGroupsByIds(ids, select) {
+          if (!ids.length) return Promise.resolve([]);
+          return rest("groups?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=" + select);
+        }
+        return rest("group_members?account_id=eq." + encodeURIComponent(me) + "&select=group_id,role")
+          .catch(function () { return []; })
+          .then(function (memberships) {
+            var idMap = {};
+            (memberships || []).forEach(function (row) {
+              if (row && row.group_id) idMap[String(row.group_id)] = true;
+            });
+            return rest("groups?created_by=eq." + encodeURIComponent(me) + "&select=" + selectFull)
+              .catch(function () {
+                return rest("groups?created_by=eq." + encodeURIComponent(me) + "&select=" + selectBasic)
+                  .catch(function () { return []; });
+              })
+              .then(function (created) {
+                (created || []).forEach(function (g) {
+                  if (g && g.id) idMap[String(g.id)] = true;
+                });
+                var ids = Object.keys(idMap);
+                if (!ids.length) {
+                  myGroupsCache = [];
+                  syncGroupOptions();
+                  return [];
+                }
+                return fetchGroupsByIds(ids, selectFull)
+                  .catch(function () { return fetchGroupsByIds(ids, selectBasic).catch(function () { return created || []; }); })
+                  .then(function (rows) {
+                    var groupRows = rows || [];
+                    return rest(
+                      "group_members?group_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=group_id,account_id,role"
+                    ).catch(function () { return memberships || []; }).then(function (memberRows) {
+                      var byGroup = {};
+                      (memberRows || []).forEach(function (m) {
+                        if (!m || !m.group_id || !m.account_id) return;
+                        var gid = String(m.group_id);
+                        if (!byGroup[gid]) byGroup[gid] = [];
+                        byGroup[gid].push(String(m.account_id));
+                      });
+                      myGroupsCache = groupRows.map(function (g) {
+                        if (!g || !g.id) return null;
+                        var gid = String(g.id);
+                        var owner = g.created_by ? String(g.created_by) : me;
+                        var memberIds = [];
+                        var seen = {};
+                        (byGroup[gid] || []).forEach(function (aid) {
+                          if (!aid || aid === owner || seen[aid]) return;
+                          seen[aid] = true;
+                          memberIds.push(aid);
+                        });
+                        return {
+                          id: g.id,
+                          name: g.name || "",
+                          description: g.description || "",
+                          photo_url: g.photo_url || "",
+                          members: memberIds,
+                          legacy_key: g.legacy_key || null
+                        };
+                      }).filter(Boolean);
+                      syncGroupOptions();
+                      return myGroupsCache;
+                    });
+                  });
+              });
+          })
+          .catch(function () {
+            myGroupsCache = [];
+            return [];
+          });
       }
 
       function saveMyGroups(groups) {
-        var about = profileAbout(sessionAccount) || {};
-        about.groups = groups || [];
-        return saveAbout(about).then(function () {
+        if (!sessionAccount || !sessionAccount.id) return Promise.resolve();
+        var me = String(sessionAccount.id);
+        var list = Array.isArray(groups) ? groups : [];
+        var tasks = list.map(function (g) {
+          if (!g || !String(g.name || "").trim()) return Promise.resolve();
+          var name = String(g.name || "").trim();
+          var description = String(g.description || "").trim();
+          var photo = String(g.photo_url || "").trim();
+          var memberIds = (g.members || []).map(String).filter(function (aid) {
+            return aid && aid !== me && isUuid(aid);
+          });
+          var known = isUuid(g.id);
+          if (!known) {
+            var body = {
+              name: name,
+              description: description || null,
+              photo_url: photo || null,
+              created_by: me
+            };
+            if (g.id && String(g.id).indexOf("g-") === 0) body.legacy_key = String(g.id);
+            return rest("groups", {
+              method: "POST",
+              prefer: "return=representation",
+              body: body
+            }).catch(function () {
+              var basic = { name: name, created_by: me };
+              if (body.legacy_key) basic.legacy_key = body.legacy_key;
+              return rest("groups", {
+                method: "POST",
+                prefer: "return=representation",
+                body: basic
+              });
+            }).then(function (rows) {
+              var row = Array.isArray(rows) ? rows[0] : rows;
+              if (!row || !row.id) return;
+              g.id = row.id;
+              var memberRows = [{ group_id: row.id, account_id: me, role: "owner" }];
+              memberIds.forEach(function (aid) {
+                memberRows.push({ group_id: row.id, account_id: aid, role: "member" });
+              });
+              return rest("group_members", {
+                method: "POST",
+                prefer: "resolution=merge-duplicates,return=minimal",
+                body: memberRows
+              }).catch(function () {});
+            });
+          }
+          return rest("groups?id=eq." + encodeURIComponent(g.id), {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: {
+              name: name,
+              description: description || null,
+              photo_url: photo || null
+            }
+          }).catch(function () {
+            return rest("groups?id=eq." + encodeURIComponent(g.id), {
+              method: "PATCH",
+              prefer: "return=minimal",
+              body: { name: name }
+            }).catch(function () {});
+          }).then(function () {
+            var memberRows = [{ group_id: g.id, account_id: me, role: "owner" }];
+            memberIds.forEach(function (aid) {
+              memberRows.push({ group_id: g.id, account_id: aid, role: "member" });
+            });
+            return rest("group_members", {
+              method: "POST",
+              prefer: "resolution=merge-duplicates,return=minimal",
+              body: memberRows
+            }).catch(function () {});
+          });
+        });
+        return Promise.all(tasks).then(function () {
+          return loadMyGroups();
+        }).then(function () {
           syncHeuteFilterOptions();
           if (window.HeuteAccountability) HeuteAccountability.refresh();
         });
@@ -11558,6 +11736,9 @@
         if (!sessionMode || !sessionAccount) return Promise.resolve();
         var id = String(sessionAccount.id);
         var personSelect = "id,name,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id";
+        return migrateAboutGroupsOnce()
+          .then(function () { return loadMyGroups(); })
+          .then(function () {
         return rest("go_accounts?id=eq." + encodeURIComponent(id) + "&select=id,name,trainer_id,photo_url,is_trainer")
           .catch(function () { return []; })
           .then(function (rows) {
@@ -11643,6 +11824,7 @@
             });
           })
           .catch(function () { renderTeam(); });
+          });
       }
 
       var ffcIncoming = [];
