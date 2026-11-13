@@ -1,4 +1,4 @@
-/* Heute Accountability (Schritt 3): Ich / Team / Tagebuch / Alles */
+/* Heute Accountability (Schritt 3): Ich ⊂ Team ⊂ Tagebuch ⊂ Alles */
 (function (global) {
   var host = null;
   var state = {
@@ -17,6 +17,30 @@
   };
 
   var FILTER_KEY = "gogogo_heute_filter_v3";
+  var VIEW_LEVEL = { ich: 0, team: 1, tagebuch: 2, alles: 3 };
+
+  /* Eine Filterfunktion mit Parametern — Ich ⊂ Team ⊂ Tagebuch ⊂ Alles */
+  function viewFlags(view) {
+    view = normalizeFilter(view) || "ich";
+    var level = VIEW_LEVEL[view] != null ? VIEW_LEVEL[view] : 0;
+    return {
+      view: view,
+      level: level,
+      /* Team+: offene Fremd-Einladungen / Anfragen */
+      showIncomingInvites: level >= 1,
+      /* FFC: (a) eigene immer; zugesagte immer; (b) offene Einladungen ab Team */
+      showOwnFfc: true,
+      showAcceptedFfc: true,
+      showPendingFfcInvites: level >= 1,
+      /* Historie */
+      showOwnHistory: level >= 2,
+      showFriendsHistory: level >= 3,
+      /* Accountability-Events anderer (Gruppe/alle) ab Team */
+      showOthersUpcoming: level >= 1
+    };
+  }
+
+  global.HeuteViewFlags = viewFlags;
 
   function $(id) {
     return document.getElementById(id);
@@ -51,7 +75,7 @@
   }
 
   function normalizeFilter(v) {
-    if (v === "crew") return "team";
+    if (v === "crew") return "team"; /* Alias: Crew = Team */
     if (v === "all") return "alles";
     if (v === "mine") return "ich";
     if (["ich", "team", "tagebuch", "alles"].indexOf(v) >= 0) return v;
@@ -317,39 +341,36 @@
       });
   }
 
-  function crewEvents() {
+  function eventVisibleToMe(ev, flags) {
+    if (!ev) return false;
     var uid = me();
+    var mine = String(ev.user_id) === uid;
+    /* privat: immer nur für den Ersteller */
+    if (ev.visibility === "privat" && !mine) return false;
+    if (ev.status === "ausgefallen") return false;
     var now = Date.now();
     var week = now + 7 * 86400000;
-    return state.events
-      .filter(function (e) {
-        if (String(e.user_id) === uid) return false;
-        if (e.visibility === "privat") return false;
-        var t = new Date(e.starts_at).getTime();
-        if (e.status === "geplant") return t >= now - 3600000 && t <= week;
-        if (e.status === "erledigt") return t >= now - 30 * 86400000;
-        return false;
-      })
-      .sort(function (a, b) {
-        var aDone = a.status === "erledigt";
-        var bDone = b.status === "erledigt";
-        if (aDone !== bDone) return aDone ? 1 : -1;
-        if (!aDone) return String(a.starts_at).localeCompare(String(b.starts_at));
-        return String(b.starts_at).localeCompare(String(a.starts_at));
-      });
+    var t = new Date(ev.starts_at).getTime();
+    if (ev.status === "geplant") {
+      if (t < now - 3600000 || t > week) return false;
+      if (mine) return true;
+      return !!flags.showOthersUpcoming;
+    }
+    if (ev.status === "erledigt") {
+      if (mine) return !!flags.showOwnHistory;
+      /* Freunde-Historie nur in Alles; privat bleibt draußen (oben) */
+      return !!flags.showFriendsHistory;
+    }
+    return false;
   }
 
-  function feedEventsForAlles() {
-    var uid = me();
-    var now = Date.now();
-    var week = now + 7 * 86400000;
+  function filterOwnEvents(flags) {
     var upcoming = [];
     var past = [];
     state.events.forEach(function (e) {
-      if (e.visibility === "privat" && String(e.user_id) !== uid) return;
-      var t = new Date(e.starts_at).getTime();
-      if (e.status === "geplant" && t >= now - 3600000 && t <= week) upcoming.push(e);
-      else if (e.status === "erledigt") past.push(e);
+      if (!eventVisibleToMe(e, flags)) return;
+      if (e.status === "geplant") upcoming.push(e);
+      else past.push(e);
     });
     upcoming.sort(function (a, b) {
       return String(a.starts_at).localeCompare(String(b.starts_at));
@@ -357,7 +378,24 @@
     past.sort(function (a, b) {
       return String(b.starts_at).localeCompare(String(a.starts_at));
     });
-    return upcoming.concat(past);
+    return { upcoming: upcoming, past: past, all: upcoming.concat(past) };
+  }
+
+  function filterFfcEvents(flags) {
+    var now = Date.now();
+    var week = now + 7 * 86400000;
+    return (state.ffcEvents || []).filter(function (e) {
+      if (!e || !e.starts_at) return false;
+      var t = new Date(e.starts_at).getTime();
+      if (t < now - 3600000 || t > week) return false;
+      /* (a) selbst erstellt */
+      if (e.is_mine && flags.showOwnFfc) return true;
+      /* bereits zugesagt — auch in Ich */
+      if (e.my_going === true && flags.showAcceptedFfc) return true;
+      /* (b) eingeladen, noch nicht zugesagt — ab Team */
+      if (e.my_going === null && flags.showPendingFfcInvites) return true;
+      return false;
+    });
   }
 
   function avatarHtml(person, cls) {
@@ -606,7 +644,7 @@
   function emptyTeamHtml() {
     return (
       '<div class="acc-empty">' +
-      "<p>Noch keine Team-Beiträge. Lade deine Gruppe ein.</p>" +
+      "<p>Noch keine Beiträge vom Team. Lade deine Gruppe ein.</p>" +
       '<button type="button" class="acc-btn" data-invite-group="1">Gruppe einladen</button>' +
       "</div>"
     );
@@ -645,25 +683,12 @@
     });
   }
 
-  function ffcForFilter(f) {
-    var now = Date.now();
-    var week = now + 7 * 86400000;
-    return (state.ffcEvents || []).filter(function (e) {
-      if (!e || !e.starts_at) return false;
-      var t = new Date(e.starts_at).getTime();
-      if (t < now - 3600000 || t > week) return false;
-      /* Ich: nur selbst erstellte FFC-Events */
-      if (f === "ich") return !!e.is_mine;
-      /* Team/Tagebuch/Alles: eigene + offene Zusagen + angenommene */
-      return !!e.is_mine || e.my_going === null || e.my_going === true;
-    });
-  }
-
   function render() {
     var root = $("heute-acc");
     if (!root) return;
     paintStreak();
     var f = state.filter;
+    var flags = viewFlags(f);
     document.body.dataset.heute = f;
 
     var share = $("heute-diary-share-pick");
@@ -673,7 +698,7 @@
     }
 
     var diary = $("heute-diary-feed");
-    if (f === "tagebuch" || f === "alles") {
+    if (flags.showOwnHistory || flags.showFriendsHistory) {
       if (diary) diary.hidden = false;
       if (host.paintHeuteDiaryFeed) host.paintHeuteDiaryFeed();
     } else if (diary) {
@@ -681,33 +706,29 @@
       diary.textContent = "";
     }
 
-    if (host.paintHeuteJoins) host.paintHeuteJoins();
+    if (host.paintHeuteJoins) host.paintHeuteJoins(flags);
 
     root.hidden = false;
     var html = renderStartTile();
 
-    var ffcList = ffcForFilter(f);
+    var ffcList = filterFfcEvents(flags);
     html += ffcList.map(renderFfcPost).join("");
 
-    if (f === "team") {
-      var teamPosts = crewEvents();
-      if (!ffcList.length && !teamPosts.length) html += emptyTeamHtml();
-      else html += teamPosts.map(renderPost).join("");
-    } else if (f === "ich") {
-      var feedIch = feedEventsForAlles().filter(function (e) {
-        return String(e.user_id) === me() && e.status === "geplant";
-      });
-      html += feedIch.map(renderPost).join("");
-    } else if (f === "alles") {
-      var feed = feedEventsForAlles().filter(function (e) {
-        return e.status === "geplant";
-      });
-      html += feed.map(renderPost).join("");
+    var pack = filterOwnEvents(flags);
+    /* In Ich/Team nur kommende Accountability-Events; Historie über Tagebuch-Feed */
+    var posts = flags.showOwnHistory || flags.showFriendsHistory
+      ? pack.upcoming
+      : pack.upcoming;
+
+    if (f === "team" && !ffcList.length && !posts.length) {
+      html += emptyTeamHtml();
+    } else {
+      html += posts.map(renderPost).join("");
     }
-    /* tagebuch: Historie kommt aus #heute-diary-feed, keine Event-Historie hier */
 
     root.innerHTML = html;
     bindObserver(root);
+    if (host.maybeAskHistoryShare) host.maybeAskHistoryShare();
   }
 
   function openDoneModal(eventId) {
