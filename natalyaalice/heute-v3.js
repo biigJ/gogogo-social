@@ -1695,6 +1695,7 @@
   global.HeuteAccountability = {
     install: install,
     refresh: refresh,
+    openDone: openDoneModal,
     setFilter: function (v) {
       saveFilter(v);
       refresh();

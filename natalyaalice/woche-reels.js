@@ -1,0 +1,1618 @@
+/* Woche Reels: Instagram-Stil, 7 Tage, Swipe Mo–So */
+(function (global) {
+  var host = null;
+  var state = {
+    weekOffset: 0, /* 0 = diese, 1 = nächste */
+    dayIndex: 0,
+    eventIndex: 0,
+    events: [],
+    ffcEvents: [],
+    rsvps: {},
+    comments: {},
+    people: {},
+    enrollments: [],
+    courses: [],
+    travelUntil: null,
+    editMode: false,
+    touch: null
+  };
+
+  var ROOT_ID = "woche-reels";
+  var REST_DAYS = ["Spaziergang", "Mobility", "Radfahren", "Sauna"];
+  var TRAIN_CATS = { kraft: 1, ausdauer: 1, zirkel: 1 };
+
+  function $(id) {
+    return document.getElementById(id);
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function me() {
+    return host && host.sessionAccount && host.sessionAccount.id
+      ? String(host.sessionAccount.id)
+      : "";
+  }
+
+  function rest(path, opts) {
+    return host.rest(path, opts || {});
+  }
+
+  function berlinToday() {
+    return host.todayIso ? host.todayIso() : new Date().toISOString().slice(0, 10);
+  }
+
+  function mondayOf(iso) {
+    var d = new Date(iso + "T12:00:00");
+    var day = (d.getDay() + 6) % 7; /* 0=Mo */
+    d.setDate(d.getDate() - day);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function addDays(iso, n) {
+    var d = new Date(iso + "T12:00:00");
+    d.setDate(d.getDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function weekStart() {
+    return addDays(mondayOf(berlinToday()), state.weekOffset * 7);
+  }
+
+  function weekDays() {
+    var start = weekStart();
+    var out = [];
+    for (var i = 0; i < 7; i++) out.push(addDays(start, i));
+    return out;
+  }
+
+  function dayKey(ts) {
+    try {
+      return new Date(ts).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+    } catch (e) {
+      return String(ts || "").slice(0, 10);
+    }
+  }
+
+  function formatDayLong(iso) {
+    try {
+      return new Date(iso + "T12:00:00").toLocaleDateString("de-DE", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        timeZone: "Europe/Berlin"
+      });
+    } catch (e) {
+      return iso;
+    }
+  }
+
+  function formatTime(ts) {
+    try {
+      return new Date(ts).toLocaleTimeString("de-DE", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: "Europe/Berlin"
+      });
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function toneClass(cat) {
+    if (cat === "zirkel") return "tone-zirkel";
+    if (cat === "ausdauer") return "tone-ausdauer";
+    if (cat === "alternative") return "tone-alternative";
+    return "tone-kraft-basics";
+  }
+
+  function emojiFor(cat, title) {
+    if (host && host.activityEmoji) {
+      return host.activityEmoji({ kind: cat, label: title || cat }) || "";
+    }
+    if (cat === "zirkel") return "🔥";
+    if (cat === "ausdauer") return "🏃";
+    if (cat === "alternative") return "🌿";
+    return "🏋️";
+  }
+
+  function loadTravelPref() {
+    try {
+      var raw = localStorage.getItem("gogogo_woche_travel_" + me());
+      state.travelUntil = raw || null;
+    } catch (e) {
+      state.travelUntil = null;
+    }
+  }
+
+  function saveTravelPref(iso) {
+    state.travelUntil = iso || null;
+    try {
+      var key = "gogogo_woche_travel_" + me();
+      if (iso) localStorage.setItem(key, iso);
+      else localStorage.removeItem(key);
+    } catch (e) {}
+  }
+
+  function travelActive() {
+    return !!(state.travelUntil && state.travelUntil >= berlinToday());
+  }
+
+  function ensurePeople(ids) {
+    var uniq = [];
+    var seen = {};
+    (ids || []).forEach(function (id) {
+      id = String(id || "");
+      if (!id || seen[id] || state.people[id]) return;
+      seen[id] = true;
+      uniq.push(id);
+    });
+    if (!uniq.length) return Promise.resolve();
+    return rest(
+      "go_accounts?id=in.(" +
+        uniq.map(encodeURIComponent).join(",") +
+        ")&select=id,name,photo_url"
+    )
+      .then(function (rows) {
+        (rows || []).forEach(function (r) {
+          if (r && r.id) {
+            state.people[String(r.id)] = {
+              id: String(r.id),
+              name: r.name || "?",
+              photo: r.photo_url || ""
+            };
+          }
+        });
+      })
+      .catch(function () {});
+  }
+
+  function personOf(id) {
+    id = String(id || "");
+    if (state.people[id]) return state.people[id];
+    if (host && host.sessionAccount && String(host.sessionAccount.id) === id) {
+      return {
+        id: id,
+        name: host.sessionAccount.name || "Ich",
+        photo: host.sessionAccount.photo_url || ""
+      };
+    }
+    var tp = (host.teamPeople || []).filter(function (p) {
+      return p && String(p.id) === id;
+    })[0];
+    if (tp) {
+      return { id: id, name: tp.name || "?", photo: tp.photo_url || tp.photo || "" };
+    }
+    return { id: id, name: "?", photo: "" };
+  }
+
+  function loadEvents() {
+    var id = me();
+    if (!id) {
+      state.events = [];
+      return Promise.resolve();
+    }
+    var start = weekStart();
+    var end = addDays(start, 7);
+    return rest(
+      "events?user_id=eq." +
+        encodeURIComponent(id) +
+        "&select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,travel_auto,group_id&starts_at=gte." +
+        encodeURIComponent(start + "T00:00:00+01:00") +
+        "&starts_at=lt." +
+        encodeURIComponent(end + "T00:00:00+01:00") +
+        "&order=starts_at.asc&limit=200"
+    )
+      .then(function (rows) {
+        state.events = rows || [];
+        return ensurePeople(state.events.map(function (e) {
+          return e.user_id;
+        }));
+      })
+      .catch(function () {
+        /* Fallback ohne neue Spalten */
+        return rest(
+          "events?user_id=eq." +
+            encodeURIComponent(id) +
+            "&select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title&starts_at=gte." +
+            encodeURIComponent(start + "T00:00:00+01:00") +
+            "&starts_at=lt." +
+            encodeURIComponent(end + "T00:00:00+01:00") +
+            "&order=starts_at.asc&limit=200"
+        )
+          .then(function (rows) {
+            state.events = rows || [];
+          })
+          .catch(function () {
+            state.events = [];
+          });
+      });
+  }
+
+  function loadFfc() {
+    state.ffcEvents = [];
+    if (!global.FFC || !FFC.user || !FFC.user() || !FFC.events) return Promise.resolve();
+    try {
+      var start = weekStart();
+      var end = addDays(start, 7);
+      state.ffcEvents = (FFC.events() || []).filter(function (ev) {
+        var d = dayKey(ev.starts_at);
+        return d >= start && d < end;
+      });
+    } catch (e) {
+      state.ffcEvents = [];
+    }
+    return Promise.resolve();
+  }
+
+  function loadRsvps(ids) {
+    state.rsvps = {};
+    if (!ids.length) return Promise.resolve();
+    return rest(
+      "event_rsvps?event_id=in.(" +
+        ids.map(encodeURIComponent).join(",") +
+        ")&status=eq.zugesagt&select=event_id,user_id"
+    )
+      .then(function (rows) {
+        var pids = [];
+        (rows || []).forEach(function (r) {
+          var eid = String(r.event_id);
+          if (!state.rsvps[eid]) state.rsvps[eid] = [];
+          state.rsvps[eid].push(String(r.user_id));
+          pids.push(String(r.user_id));
+        });
+        return ensurePeople(pids);
+      })
+      .catch(function () {});
+  }
+
+  function loadComments(ids) {
+    state.comments = {};
+    if (!ids.length) return Promise.resolve();
+    return rest(
+      "event_comments?event_id=in.(" +
+        ids.map(encodeURIComponent).join(",") +
+        ")&select=id,event_id,account_id,text,created_at&order=created_at.asc&limit=500"
+    )
+      .then(function (rows) {
+        (rows || []).forEach(function (c) {
+          var eid = String(c.event_id);
+          if (!state.comments[eid]) state.comments[eid] = [];
+          state.comments[eid].push(c);
+        });
+        return ensurePeople(
+          (rows || []).map(function (c) {
+            return c.account_id;
+          })
+        );
+      })
+      .catch(function () {});
+  }
+
+  function loadEnrollments() {
+    var id = me();
+    if (!id) {
+      state.enrollments = [];
+      return Promise.resolve();
+    }
+    return rest(
+      "enrollments?user_id=eq." +
+        encodeURIComponent(id) +
+        "&status=eq.aktiv&select=id,course_id,status,start_date,weekdays,payment_status,courses(id,title,duration_weeks,sessions_per_week,price_eur,category_default,level)"
+    )
+      .then(function (rows) {
+        state.enrollments = rows || [];
+      })
+      .catch(function () {
+        return rest(
+          "enrollments?user_id=eq." +
+            encodeURIComponent(id) +
+            "&status=eq.aktiv&select=id,course_id,status,start_date,weekdays,courses(id,title,duration_weeks,sessions_per_week,price_eur,category_default,level)"
+        )
+          .then(function (rows) {
+            state.enrollments = rows || [];
+          })
+          .catch(function () {
+            state.enrollments = [];
+          });
+      });
+  }
+
+  function loadCourses() {
+    var id = me();
+    return rest(
+      "courses?is_active=eq.true&or=(private_for.is.null,private_for.eq." +
+        encodeURIComponent(id) +
+        ")&select=id,title,level,duration_weeks,sessions_per_week,category_default,price_eur,description,private_for&order=title.asc&limit=80"
+    )
+      .then(function (rows) {
+        state.courses = rows || [];
+      })
+      .catch(function () {
+        state.courses = [];
+      });
+  }
+
+  function itemsForDay(iso) {
+    var list = [];
+    state.events.forEach(function (ev) {
+      if (dayKey(ev.starts_at) === iso) {
+        list.push({ kind: "event", starts_at: ev.starts_at, ev: ev });
+      }
+    });
+    state.ffcEvents.forEach(function (ev) {
+      if (dayKey(ev.starts_at) === iso) {
+        list.push({ kind: "ffc", starts_at: ev.starts_at, ev: ev });
+      }
+    });
+    list.sort(function (a, b) {
+      return String(a.starts_at).localeCompare(String(b.starts_at));
+    });
+    return list;
+  }
+
+  function weekStats() {
+    var days = weekDays();
+    var planned = 0;
+    var trainings = 0;
+    days.forEach(function (iso) {
+      var items = itemsForDay(iso);
+      if (items.length) planned += 1;
+      items.forEach(function (it) {
+        var cat = it.ev && it.ev.category;
+        if (TRAIN_CATS[cat]) trainings += 1;
+      });
+    });
+    return { planned: planned, trainings: trainings };
+  }
+
+  function avatarHtml(p) {
+    if (p && p.photo) {
+      return '<img class="wr-avatar" src="' + esc(p.photo) + '" alt="" />';
+    }
+    var ch = ((p && p.name) || "?").slice(0, 1).toUpperCase();
+    return '<span class="wr-avatar wr-avatar--ph">' + esc(ch) + "</span>";
+  }
+
+  function goingLine(ev) {
+    var ids = state.rsvps[String(ev.id)] || [];
+    if (!ids.length) return "";
+    var names = ids.map(function (id) {
+      return personOf(id).name;
+    });
+    var first = names[0] || "Jemand";
+    if (names.length === 1) return esc(first) + " ist dabei";
+    return esc(first) + " und " + (names.length - 1) + " weitere sind dabei";
+  }
+
+  function facesHtml(ev) {
+    var ids = (state.rsvps[String(ev.id)] || []).slice(0, 5);
+    if (!ids.length) return "";
+    return (
+      '<div class="wr-faces">' +
+      ids
+        .map(function (id) {
+          return avatarHtml(personOf(id));
+        })
+        .join("") +
+      "</div>"
+    );
+  }
+
+  function coursePill(ev) {
+    if (ev.enrollment_id || ev.item_type === "course_session") {
+      var en = state.enrollments.filter(function (e) {
+        return String(e.id) === String(ev.enrollment_id);
+      })[0];
+      var title = (en && en.courses && en.courses.title) || "Kurs";
+      return '<span class="wr-pill">' + esc(title) + "</span>";
+    }
+    if (ev.is_unplanned) return '<span class="wr-pill">Spontan</span>';
+    try {
+      var wd = new Date(ev.starts_at).toLocaleDateString("de-DE", {
+        weekday: "short",
+        timeZone: "Europe/Berlin"
+      });
+      return '<span class="wr-pill">Jeden ' + esc(wd) + "</span>";
+    } catch (e) {
+      return "";
+    }
+  }
+
+  function truncNote(note, lines) {
+    var full = String(note || "").trim();
+    if (!full) return { text: "", more: false, full: "" };
+    var parts = full.split(/\n+/);
+    if (parts.length <= lines && full.length <= 120) {
+      return { text: full, more: false, full: full };
+    }
+    var cut = parts.slice(0, lines).join("\n");
+    if (cut.length > 120) cut = cut.slice(0, 117) + "…";
+    return { text: cut, more: cut !== full, full: full };
+  }
+
+  function actionColHtml(item) {
+    if (!item || !item.ev) return "";
+    var ev = item.ev;
+    var id = String(ev.id);
+    var mine = item.kind !== "ffc" && String(ev.user_id) === me();
+    var today = berlinToday() === dayKey(ev.starts_at);
+    var count = (state.comments[id] || []).length;
+    var going = (state.rsvps[id] || []).indexOf(me()) >= 0;
+    var checkLabel = mine && today && ev.status === "geplant" ? "Erledigt" : going ? "Zugesagt" : "Zusagen";
+    var checkAttr =
+      mine && today && ev.status === "geplant"
+        ? ' data-wr-done="' + esc(id) + '"'
+        : item.kind === "ffc"
+          ? ' data-wr-ffc-rsvp="' + esc(id) + '"'
+          : ' data-wr-rsvp="' + esc(id) + '"';
+    return (
+      '<div class="wr-actions">' +
+      '<button type="button" class="wr-act"' +
+      checkAttr +
+      ' aria-label="' +
+      esc(checkLabel) +
+      '"><span class="wr-act__icon">✓</span><span class="wr-act__n">' +
+      (going || (mine && ev.status === "erledigt") ? "1" : "") +
+      "</span></button>" +
+      '<button type="button" class="wr-act" data-wr-comments="' +
+      esc(id) +
+      '" aria-label="Kommentare"><span class="wr-act__icon">💬</span><span class="wr-act__n">' +
+      (count || "") +
+      "</span></button>" +
+      '<button type="button" class="wr-act" data-wr-invite="' +
+      esc(dayKey(ev.starts_at)) +
+      '" data-wr-event="' +
+      esc(id) +
+      '" aria-label="Einladen"><span class="wr-act__icon">➤</span><span class="wr-act__n"></span></button>' +
+      "</div>"
+    );
+  }
+
+  function emptyCardHtml(iso) {
+    return (
+      '<div class="wr-slide wr-slide--empty" data-day="' +
+      esc(iso) +
+      '">' +
+      '<div class="wr-media tone-neutral">' +
+      '<div class="wr-overlay wr-overlay--empty">' +
+      '<p class="wr-empty-title">Noch nichts geplant</p>' +
+      '<div class="wr-empty-btns">' +
+      '<button type="button" class="wr-pill-btn" data-wr-add-train="' +
+      esc(iso) +
+      '">Training</button>' +
+      '<button type="button" class="wr-pill-btn" data-wr-add-rest="' +
+      esc(iso) +
+      '">Rest Day</button>' +
+      "</div></div></div></div>"
+    );
+  }
+
+  function eventCardHtml(item, iso) {
+    var ev = item.ev;
+    var p = personOf(ev.user_id || (ev.is_mine ? me() : ""));
+    if (item.kind === "ffc") {
+      p = { name: ev.creator_nickname || "FFC", photo: "" };
+    }
+    var cat = ev.category || "kraft";
+    var title = (emojiFor(cat, ev.title) + " " + (ev.title || cat)).trim();
+    var when =
+      formatDayLong(iso) + (ev.starts_at ? " · " + formatTime(ev.starts_at) : "");
+    var notePack = truncNote(ev.note || ev.description || "", 2);
+    var place = ev.location || "";
+    var travelHint = "";
+    if (
+      travelActive() &&
+      item.kind === "event" &&
+      !ev.travel_auto &&
+      (String(place).toLowerCase().indexOf("studio") >= 0 || cat === "zirkel") &&
+      !ev.enrollment_id
+    ) {
+      travelHint =
+        '<button type="button" class="wr-travel-swap" data-wr-swap="' +
+        esc(ev.id) +
+        '">Unterwegs? Tausch gegen Hotel-Workout</button>';
+    }
+    var desc =
+      (place ? '<p class="wr-place">' + esc(place) + (notePack.text ? " · " : "") : "") +
+      (notePack.text
+        ? (place ? "" : '<p class="wr-place">') +
+          esc(notePack.text) +
+          (notePack.more
+            ? ' <button type="button" class="wr-more" data-wr-more="1">mehr</button>'
+            : "") +
+          "</p>"
+        : place
+          ? "</p>"
+          : "");
+    var going = goingLine(ev);
+    return (
+      '<div class="wr-slide" data-day="' +
+      esc(iso) +
+      '" data-event-id="' +
+      esc(ev.id) +
+      '">' +
+      '<div class="wr-media ' +
+      toneClass(cat) +
+      (ev.photo_url ? " has-photo" : "") +
+      '">' +
+      (ev.photo_url
+        ? '<img class="wr-photo" src="' + esc(ev.photo_url) + '" alt="" />'
+        : '<span class="wr-emoji" aria-hidden="true">' +
+          esc(emojiFor(cat, ev.title)) +
+          "</span>") +
+      '<div class="wr-overlay">' +
+      '<div class="wr-author">' +
+      avatarHtml(p) +
+      "<span>" +
+      esc(p.name || "?") +
+      "</span>" +
+      coursePill(ev) +
+      "</div>" +
+      '<p class="wr-when">' +
+      esc(when) +
+      "</p>" +
+      '<h2 class="wr-title">' +
+      esc(title) +
+      "</h2>" +
+      desc +
+      (going
+        ? '<div class="wr-going">' + facesHtml(ev) + "<span>" + going + "</span></div>"
+        : "") +
+      travelHint +
+      "</div>" +
+      actionColHtml(item) +
+      (state.editMode && item.kind === "event" && String(ev.user_id) === me()
+        ? '<div class="wr-edit-bar">' +
+          '<button type="button" data-wr-edit-time="' +
+          esc(ev.id) +
+          '">Zeit</button>' +
+          '<button type="button" data-wr-delete="' +
+          esc(ev.id) +
+          '">Löschen</button></div>'
+        : "") +
+      "</div></div>"
+    );
+  }
+
+  function dayReelHtml(iso) {
+    var items = itemsForDay(iso);
+    if (!items.length) return emptyCardHtml(iso);
+    var slides = items
+      .map(function (it) {
+        return eventCardHtml(it, iso);
+      })
+      .join("");
+    var dots =
+      items.length > 1
+        ? '<div class="wr-dots">' +
+          items
+            .map(function (_, i) {
+              return '<span class="wr-dot' + (i === 0 ? " is-on" : "") + '"></span>';
+            })
+            .join("") +
+          "</div>"
+        : "";
+    return (
+      '<div class="wr-day" data-day="' +
+      esc(iso) +
+      '">' +
+      '<div class="wr-htrack">' +
+      slides +
+      "</div>" +
+      dots +
+      "</div>"
+    );
+  }
+
+  function headerHtml() {
+    var label = state.weekOffset === 0 ? "Diese Woche" : "Nächste Woche";
+    var travelOn = travelActive();
+    var travelHint = "";
+    if (travelOn) {
+      travelHint =
+        '<button type="button" class="wr-travel-banner" data-wr-end-travel="1">Unterwegs bis ' +
+        esc(formatDayLong(state.travelUntil).replace(/^[^,]*,\s*/, "") || state.travelUntil) +
+        " · beenden</button>";
+    }
+    return (
+      '<header class="wr-top">' +
+      '<button type="button" class="wr-icon-btn' +
+      (travelOn ? " is-on" : "") +
+      '" data-wr-travel="1" aria-label="Reisemodus">' +
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 16l9-2.5L21 6l1 2-7.5 6.5L21 18l-1 1-6-2-4 4H8l2-5L2 16z"/></svg>' +
+      "</button>" +
+      '<div class="wr-week-nav">' +
+      '<button type="button" class="wr-icon-btn" data-wr-week="-1" aria-label="Vorherige Woche">‹</button>' +
+      '<button type="button" class="wr-week-label" data-wr-week-menu="1">' +
+      esc(label) +
+      " ⌄</button>" +
+      '<button type="button" class="wr-icon-btn" data-wr-week="1" aria-label="Nächste Woche">›</button>' +
+      "</div>" +
+      '<button type="button" class="wr-icon-btn' +
+      (state.editMode ? " is-on" : "") +
+      '" data-wr-edit="1" aria-label="Bearbeiten">' +
+      '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20h4L18 10l-4-4L4 16v4zM13 7l4 4"/></svg>' +
+      "</button>" +
+      "</header>" +
+      travelHint
+    );
+  }
+
+  function progressHtml() {
+    var st = weekStats();
+    var pct = Math.round((st.planned / 7) * 100);
+    return (
+      '<div class="wr-progress" role="status">' +
+      '<div class="wr-progress__bar"><span style="width:' +
+      pct +
+      '%"></span></div>' +
+      "<p>" +
+      st.planned +
+      " von 7 Tagen geplant · " +
+      st.trainings +
+      " Trainings</p></div>"
+    );
+  }
+
+  function editPanelHtml() {
+    if (!state.editMode) return "";
+    var list = state.enrollments
+      .map(function (en) {
+        var c = en.courses || {};
+        var weeks = c.duration_weeks || 12;
+        var start = en.start_date || "";
+        var weekNo = 1;
+        if (start) {
+          var diff = Math.floor(
+            (new Date(berlinToday() + "T12:00:00") - new Date(start + "T12:00:00")) /
+              (7 * 86400000)
+          );
+          weekNo = Math.min(weeks, Math.max(1, diff + 1));
+        }
+        return (
+          '<div class="wr-enroll" data-enroll="' +
+          esc(en.id) +
+          '"><div><strong>' +
+          esc(c.title || "Kurs") +
+          "</strong><span>Woche " +
+          weekNo +
+          " von " +
+          weeks +
+          '</span></div><button type="button" data-wr-enroll-menu="' +
+          esc(en.id) +
+          '">⋯</button></div>'
+        );
+      })
+      .join("");
+    return (
+      '<div class="wr-edit-panel">' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-book="1">Kurs hinzufügen</button>' +
+      (list ? '<div class="wr-enroll-list">' + list + "</div>" : "") +
+      "</div>"
+    );
+  }
+
+  function render() {
+    var root = $(ROOT_ID);
+    if (!root) return;
+    var days = weekDays();
+    if (state.dayIndex < 0) state.dayIndex = 0;
+    if (state.dayIndex > 6) state.dayIndex = 6;
+    /* Default: heutiger Wochentag wenn diese Woche */
+    root.innerHTML =
+      headerHtml() +
+      editPanelHtml() +
+      '<div class="wr-vtrack" id="wr-vtrack">' +
+      days
+        .map(function (iso) {
+          return dayReelHtml(iso);
+        })
+        .join("") +
+      "</div>" +
+      progressHtml() +
+      sheetHtml();
+    var track = $("wr-vtrack");
+    if (track) {
+      track.scrollTop = state.dayIndex * track.clientHeight;
+    }
+  }
+
+  function sheetHtml() {
+    return (
+      '<div class="wr-sheet" id="wr-sheet" hidden>' +
+      '<div class="wr-sheet__card" id="wr-sheet-card"></div></div>'
+    );
+  }
+
+  function openSheet(html) {
+    var sheet = $("wr-sheet");
+    var card = $("wr-sheet-card");
+    if (!sheet || !card) return;
+    card.innerHTML = html;
+    sheet.hidden = false;
+  }
+
+  function closeSheet() {
+    var sheet = $("wr-sheet");
+    if (sheet) sheet.hidden = true;
+  }
+
+  function openTravelSheet() {
+    openSheet(
+      '<h3>Unterwegs bis</h3>' +
+        '<div class="wr-chips">' +
+        '<button type="button" class="wr-chip" data-wr-travel-days="1">Morgen</button>' +
+        '<button type="button" class="wr-chip is-on" data-wr-travel-days="3">3 Tage</button>' +
+        '<button type="button" class="wr-chip" data-wr-travel-days="7">1 Woche</button>' +
+        "</div>" +
+        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-travel-go="3">Los</button>' +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+  }
+
+  function openRestSheet(iso) {
+    openSheet(
+      "<h3>Rest Day</h3>" +
+        '<div class="wr-chips">' +
+        REST_DAYS.map(function (t) {
+          return (
+            '<button type="button" class="wr-chip" data-wr-rest-pick="' +
+            esc(t) +
+            '" data-iso="' +
+            esc(iso) +
+            '">' +
+            esc(t) +
+            "</button>"
+          );
+        }).join("") +
+        "</div>" +
+        '<label class="wr-field">Freier Titel<input type="text" id="wr-rest-title" maxlength="80" placeholder="z. B. Spaziergang" /></label>' +
+        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-rest-save="' +
+        esc(iso) +
+        '">Speichern</button>' +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+  }
+
+  function openTrainSheet(iso) {
+    openSheet(
+      "<h3>Training</h3>" +
+        '<div class="wr-chips">' +
+        ["kraft", "ausdauer", "zirkel"]
+          .map(function (c) {
+            var label = c === "kraft" ? "Kraft" : c === "ausdauer" ? "Ausdauer" : "Zirkel";
+            return (
+              '<button type="button" class="wr-chip" data-wr-train-cat="' +
+              esc(c) +
+              '" data-iso="' +
+              esc(iso) +
+              '">' +
+              esc(label) +
+              "</button>"
+            );
+          })
+          .join("") +
+        "</div>" +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+  }
+
+  function openBookSheet(step, draft) {
+    draft = draft || { course: null, start: null, weekdays: [] };
+    state.bookDraft = draft;
+    if (step === 1 || !step) {
+      var cards = state.courses
+        .map(function (c) {
+          return (
+            '<button type="button" class="wr-course-card" data-wr-pick-course="' +
+            esc(c.id) +
+            '"><strong>' +
+            esc(c.title) +
+            "</strong><span>" +
+            esc(c.level || "–") +
+            " · " +
+            (c.duration_weeks || "?") +
+            " Wo · " +
+            (c.sessions_per_week || "?") +
+            "×/Wo · " +
+            (c.price_eur != null ? Number(c.price_eur).toFixed(0) + " €" : "–") +
+            "</span></button>"
+          );
+        })
+        .join("");
+      openSheet(
+        "<h3>Kurs wählen</h3>" +
+          '<div class="wr-course-list">' +
+          (cards || "<p>Keine Kurse verfügbar.</p>") +
+          "</div>" +
+          '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+      );
+      return;
+    }
+    if (step === 2) {
+      var nextMo = addDays(mondayOf(berlinToday()), 7);
+      if (mondayOf(berlinToday()) >= berlinToday()) nextMo = mondayOf(berlinToday());
+      draft.start = draft.start || nextMo;
+      var spw = (draft.course && draft.course.sessions_per_week) || 3;
+      if (!draft.weekdays.length) {
+        draft.weekdays = [0, 2, 4].slice(0, spw);
+      }
+      var days = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+        .map(function (label, i) {
+          var on = draft.weekdays.indexOf(i) >= 0;
+          return (
+            '<button type="button" class="wr-chip' +
+            (on ? " is-on" : "") +
+            '" data-wr-wd="' +
+            i +
+            '">' +
+            label +
+            "</button>"
+          );
+        })
+        .join("");
+      openSheet(
+        "<h3>Start & Tage</h3>" +
+          '<label class="wr-field">Startdatum (Montag)<input type="date" id="wr-start-date" value="' +
+          esc(draft.start) +
+          '" /></label>' +
+          '<div class="wr-chips">' +
+          days +
+          "</div>" +
+          '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-book-step="3">Weiter</button>' +
+          '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+      );
+      return;
+    }
+    if (step === 3) {
+      var preview = weekDaysPreview(draft);
+      openSheet(
+        "<h3>Vorschau</h3>" +
+          "<p>" +
+          esc((draft.course && draft.course.title) || "Kurs") +
+          " ab " +
+          esc(draft.start) +
+          "</p>" +
+          '<ul class="wr-preview">' +
+          preview
+            .map(function (line) {
+              return "<li>" + esc(line) + "</li>";
+            })
+            .join("") +
+          "</ul>" +
+          '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-book-confirm="1">Kurs buchen</button>' +
+          '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+      );
+    }
+  }
+
+  function weekDaysPreview(draft) {
+    var labels = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+    return (draft.weekdays || [])
+      .slice()
+      .sort()
+      .map(function (wd) {
+        return labels[wd] + " · " + addDays(draft.start, wd);
+      });
+  }
+
+  function createEvent(payload) {
+    var body = {
+      user_id: me(),
+      category: payload.category,
+      course_id: payload.course_id || null,
+      enrollment_id: payload.enrollment_id || null,
+      starts_at: payload.starts_at,
+      location: payload.location || null,
+      visibility: payload.visibility || "team",
+      is_unplanned: !!payload.is_unplanned,
+      status: "geplant",
+      title: payload.title || payload.category,
+      item_type: payload.item_type || (payload.is_unplanned ? "spontaneous" : "event"),
+      travel_auto: !!payload.travel_auto
+    };
+    return rest("events", {
+      method: "POST",
+      prefer: "return=representation",
+      body: body
+    }).catch(function () {
+      delete body.item_type;
+      delete body.travel_auto;
+      return rest("events", {
+        method: "POST",
+        prefer: "return=representation",
+        body: body
+      });
+    });
+  }
+
+  function applyTravel(days) {
+    var until = addDays(berlinToday(), days);
+    saveTravelPref(until);
+    var jobs = [];
+    weekDays().forEach(function (iso) {
+      if (iso > until || iso < berlinToday()) return;
+      var items = itemsForDay(iso);
+      if (!items.length) {
+        jobs.push(
+          createEvent({
+            category: "alternative",
+            title: "Hotel-Workout · 20 min",
+            starts_at: iso + "T08:00:00+01:00",
+            is_unplanned: true,
+            item_type: "hotel_workout",
+            travel_auto: true
+          })
+        );
+      }
+    });
+    return Promise.all(jobs).then(function () {
+      closeSheet();
+      return refresh();
+    });
+  }
+
+  function endTravel() {
+    var id = me();
+    var autos = state.events.filter(function (ev) {
+      return (
+        ev.travel_auto &&
+        ev.status === "geplant" &&
+        (ev.item_type === "hotel_workout" ||
+          String(ev.title || "").indexOf("Hotel-Workout") === 0)
+      );
+    });
+    var jobs = autos.map(function (ev) {
+      return rest("events?id=eq." + encodeURIComponent(ev.id), {
+        method: "DELETE",
+        prefer: "return=minimal"
+      }).catch(function () {});
+    });
+    saveTravelPref(null);
+    return Promise.all(jobs).then(refresh);
+  }
+
+  function swapToHotel(eventId) {
+    var ev = state.events.filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    if (!ev) return;
+    var iso = dayKey(ev.starts_at);
+    return rest("events?id=eq." + encodeURIComponent(eventId), {
+      method: "PATCH",
+      prefer: "return=minimal",
+      body: {
+        title: "Hotel-Workout · 20 min",
+        category: "alternative",
+        course_id: null,
+        location: null,
+        is_unplanned: true,
+        item_type: "hotel_workout",
+        travel_auto: true
+      }
+    })
+      .catch(function () {
+        return rest("events?id=eq." + encodeURIComponent(eventId), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: {
+            title: "Hotel-Workout · 20 min",
+            category: "alternative",
+            course_id: null,
+            location: null,
+            is_unplanned: true
+          }
+        });
+      })
+      .then(refresh);
+  }
+
+  function retargetEnrollment() {
+    var draft = state.bookDraft;
+    if (!draft || !draft.enrollId) return;
+    var startEl = $("wr-start-date");
+    if (startEl && startEl.value) draft.start = startEl.value;
+    return rest("enrollments?id=eq." + encodeURIComponent(draft.enrollId), {
+      method: "PATCH",
+      prefer: "return=minimal",
+      body: {
+        start_date: draft.start,
+        weekdays: draft.weekdays.slice().sort(),
+        status: "aktiv"
+      }
+    })
+      .then(function () {
+        /* Nur künftige Events neu erzeugen: Generator skippt bestehende starts_at */
+        return rest("rpc/go_generate_events", {
+          method: "POST",
+          body: { p_enrollment_id: draft.enrollId }
+        }).catch(function () {
+          return rest("rpc/go_generate_events", {
+            method: "POST",
+            body: { enrollment_id: draft.enrollId }
+          });
+        });
+      })
+      .then(function () {
+        closeSheet();
+        return refresh();
+      })
+      .catch(function () {
+        if (host.toast) host.toast("Tage konnten nicht geändert werden");
+      });
+  }
+
+  function bookCourse() {
+    var draft = state.bookDraft;
+    if (!draft || !draft.course || !me()) return;
+    var price = Number(draft.course.price_eur || 0);
+    var payment = price === 0 ? "gratis" : "offen";
+    var body = {
+      user_id: me(),
+      course_id: draft.course.id,
+      status: "aktiv",
+      start_date: draft.start,
+      weekdays: draft.weekdays.slice().sort(),
+      payment_status: payment
+    };
+    return rest("enrollments", {
+      method: "POST",
+      prefer: "return=representation",
+      body: body
+    })
+      .catch(function () {
+        delete body.payment_status;
+        return rest("enrollments", {
+          method: "POST",
+          prefer: "return=representation",
+          body: body
+        });
+      })
+      .then(function (rows) {
+        var en = Array.isArray(rows) ? rows[0] : rows;
+        if (!en || !en.id) throw new Error("enrollment");
+        rest("activity_log", {
+          method: "POST",
+          prefer: "return=minimal",
+          body: {
+            account_id: me(),
+            kind: "enrollment_request",
+            ref_id: String(en.id),
+            meta: {
+              course_id: draft.course.id,
+              title: draft.course.title,
+              start_date: draft.start,
+              payment_status: payment
+            }
+          }
+        }).catch(function () {});
+        return rest("rpc/go_generate_events", {
+          method: "POST",
+          body: { p_enrollment_id: en.id }
+        })
+          .catch(function () {
+            return rest("rpc/go_generate_events", {
+              method: "POST",
+              body: { enrollment_id: en.id }
+            });
+          })
+          .then(function () {
+            return en;
+          });
+      })
+      .then(function (en) {
+        closeSheet();
+        showPayHint(draft.course, draft.start);
+        return refresh();
+      })
+      .catch(function () {
+        if (host.toast) host.toast("Buchung fehlgeschlagen");
+      });
+  }
+
+  function showPayHint(course, start) {
+    var trainerId = host.sessionAccount && host.sessionAccount.trainer_id;
+    var waBtn = trainerId
+      ? '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-coach-wa="1" data-course="' +
+        esc(course.title) +
+        '" data-start="' +
+        esc(start) +
+        '">Coach schreiben</button>'
+      : "";
+    openSheet(
+      "<h3>Gebucht</h3>" +
+        "<p>Dein Coach meldet sich wegen der Zahlung.</p>" +
+        waBtn +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button>'
+    );
+  }
+
+  function deleteEvent(id) {
+    var ev = state.events.filter(function (e) {
+      return String(e.id) === String(id);
+    })[0];
+    var iso = ev ? dayKey(ev.starts_at) : "";
+    return rest("events?id=eq." + encodeURIComponent(id), {
+      method: "DELETE",
+      prefer: "return=minimal"
+    })
+      .then(function () {
+        return refresh();
+      })
+      .then(function () {
+        if (!iso) return;
+        if (!itemsForDay(iso).length) {
+          openSheet(
+            "<h3>Tag ist leer</h3>" +
+              '<div class="wr-empty-btns">' +
+              '<button type="button" class="wr-pill-btn" data-wr-add-train="' +
+              esc(iso) +
+              '">Training</button>' +
+              '<button type="button" class="wr-pill-btn" data-wr-add-rest="' +
+              esc(iso) +
+              '">Rest Day</button></div>' +
+              '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Später</button>'
+          );
+        }
+      });
+  }
+
+  function inviteWhatsApp(iso, eventId) {
+    var ev = state.events.filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    var title = (ev && ev.title) || "Training";
+    var when = formatDayLong(iso) + (ev ? " · " + formatTime(ev.starts_at) : "");
+    var text =
+      "Komm mit zu gogogo: " + title + " · " + when + " https://gogogo-social.vercel.app/natalyaalice/";
+    var url = "https://wa.me/?text=" + encodeURIComponent(text);
+    try {
+      window.open(url, "_blank");
+    } catch (e) {
+      location.href = url;
+    }
+    if (host.openInviteForPost) host.openInviteForPost(iso);
+  }
+
+  function onRootClick(e) {
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-edit],[data-wr-end-travel],[data-wr-add-train],[data-wr-add-rest],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-train-cat],[data-wr-travel-days],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-swap],[data-wr-invite],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    if (!t) {
+      if (e.target && e.target.id === "wr-sheet") closeSheet();
+      return;
+    }
+    if (t.getAttribute("data-wr-sheet-close")) {
+      closeSheet();
+      return;
+    }
+    if (t.getAttribute("data-wr-travel")) {
+      openTravelSheet();
+      return;
+    }
+    if (t.getAttribute("data-wr-end-travel")) {
+      endTravel();
+      return;
+    }
+    if (t.hasAttribute("data-wr-week")) {
+      var dir = Number(t.getAttribute("data-wr-week"));
+      state.weekOffset = Math.max(0, Math.min(1, state.weekOffset + dir));
+      refresh();
+      return;
+    }
+    if (t.getAttribute("data-wr-week-menu")) {
+      state.weekOffset = state.weekOffset === 0 ? 1 : 0;
+      refresh();
+      return;
+    }
+    if (t.getAttribute("data-wr-edit")) {
+      state.editMode = !state.editMode;
+      render();
+      return;
+    }
+    if (t.getAttribute("data-wr-add-train")) {
+      openTrainSheet(t.getAttribute("data-wr-add-train"));
+      return;
+    }
+    if (t.getAttribute("data-wr-add-rest")) {
+      openRestSheet(t.getAttribute("data-wr-add-rest"));
+      return;
+    }
+    if (t.getAttribute("data-wr-rest-pick")) {
+      var input = $("wr-rest-title");
+      if (input) input.value = t.getAttribute("data-wr-rest-pick");
+      t.parentNode.querySelectorAll(".wr-chip").forEach(function (c) {
+        c.classList.toggle("is-on", c === t);
+      });
+      return;
+    }
+    if (t.getAttribute("data-wr-rest-save")) {
+      var isoR = t.getAttribute("data-wr-rest-save");
+      var titleR = (($("wr-rest-title") && $("wr-rest-title").value) || "Rest Day").trim();
+      createEvent({
+        category: "alternative",
+        title: titleR,
+        starts_at: isoR + "T10:00:00+01:00",
+        is_unplanned: true,
+        item_type: "event"
+      }).then(function () {
+        closeSheet();
+        return refresh();
+      });
+      return;
+    }
+    if (t.getAttribute("data-wr-train-cat")) {
+      var cat = t.getAttribute("data-wr-train-cat");
+      var isoT = t.getAttribute("data-iso");
+      var labels = { kraft: "Kraft", ausdauer: "Ausdauer", zirkel: "Zirkel" };
+      createEvent({
+        category: cat,
+        title: labels[cat] || cat,
+        starts_at: isoT + "T18:00:00+01:00",
+        is_unplanned: true,
+        item_type: "spontaneous"
+      }).then(function () {
+        closeSheet();
+        return refresh();
+      });
+      return;
+    }
+    if (t.hasAttribute("data-wr-travel-days")) {
+      var d = t.getAttribute("data-wr-travel-days");
+      t.parentNode.querySelectorAll(".wr-chip").forEach(function (c) {
+        c.classList.toggle("is-on", c === t);
+      });
+      var go = document.querySelector("[data-wr-travel-go]");
+      if (go) go.setAttribute("data-wr-travel-go", d);
+      return;
+    }
+    if (t.hasAttribute("data-wr-travel-go")) {
+      applyTravel(Number(t.getAttribute("data-wr-travel-go") || 3));
+      return;
+    }
+    if (t.getAttribute("data-wr-book")) {
+      loadCourses().then(function () {
+        openBookSheet(1, { course: null, start: null, weekdays: [] });
+      });
+      return;
+    }
+    if (t.getAttribute("data-wr-pick-course")) {
+      var cid = t.getAttribute("data-wr-pick-course");
+      var course = state.courses.filter(function (c) {
+        return String(c.id) === String(cid);
+      })[0];
+      openBookSheet(2, { course: course, start: null, weekdays: [] });
+      return;
+    }
+    if (t.hasAttribute("data-wr-wd")) {
+      var wd = Number(t.getAttribute("data-wr-wd"));
+      var draft = state.bookDraft || { weekdays: [] };
+      var ix = draft.weekdays.indexOf(wd);
+      if (ix >= 0) draft.weekdays.splice(ix, 1);
+      else draft.weekdays.push(wd);
+      t.classList.toggle("is-on");
+      return;
+    }
+    if (t.getAttribute("data-wr-book-step") === "3") {
+      var d2 = state.bookDraft || {};
+      var startEl = $("wr-start-date");
+      if (startEl && startEl.value) d2.start = startEl.value;
+      if (!d2.weekdays || !d2.weekdays.length) {
+        if (host.toast) host.toast("Bitte Wochentage wählen");
+        return;
+      }
+      openBookSheet(3, d2);
+      return;
+    }
+    if (t.getAttribute("data-wr-book-confirm")) {
+      if (state.bookDraft && state.bookDraft.retarget && state.bookDraft.enrollId) {
+        retargetEnrollment();
+        return;
+      }
+      bookCourse();
+      return;
+    }
+    if (t.getAttribute("data-wr-delete")) {
+      deleteEvent(t.getAttribute("data-wr-delete"));
+      return;
+    }
+    if (t.getAttribute("data-wr-swap")) {
+      swapToHotel(t.getAttribute("data-wr-swap"));
+      return;
+    }
+    if (t.getAttribute("data-wr-invite")) {
+      inviteWhatsApp(t.getAttribute("data-wr-invite"), t.getAttribute("data-wr-event"));
+      return;
+    }
+    if (t.getAttribute("data-wr-done")) {
+      if (host && host.openDoneModal) host.openDoneModal(t.getAttribute("data-wr-done"));
+      else {
+        rest("events?id=eq." + encodeURIComponent(t.getAttribute("data-wr-done")), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { status: "erledigt" }
+        }).then(refresh);
+      }
+      return;
+    }
+    if (t.getAttribute("data-wr-rsvp")) {
+      toggleRsvp(t.getAttribute("data-wr-rsvp"));
+      return;
+    }
+    if (t.getAttribute("data-wr-ffc-rsvp")) {
+      if (global.FFC && FFC.toggleGoing) {
+        Promise.resolve(FFC.toggleGoing(t.getAttribute("data-wr-ffc-rsvp"))).then(refresh);
+      }
+      return;
+    }
+    if (t.getAttribute("data-wr-comments")) {
+      openComments(t.getAttribute("data-wr-comments"));
+      return;
+    }
+    if (t.getAttribute("data-wr-coach-wa")) {
+      if (host.openCoachWhatsApp) {
+        host.openCoachWhatsApp(
+          "Kurs: " + t.getAttribute("data-course") + " · Start: " + t.getAttribute("data-start")
+        );
+      }
+      return;
+    }
+    if (t.getAttribute("data-wr-enroll-menu")) {
+      openEnrollMenu(t.getAttribute("data-wr-enroll-menu"));
+      return;
+    }
+    if (t.getAttribute("data-wr-enroll-end")) {
+      rest("enrollments?id=eq." + encodeURIComponent(t.getAttribute("data-wr-enroll-end")), {
+        method: "PATCH",
+        prefer: "return=minimal",
+        body: { status: "beendet" }
+      }).then(function () {
+        closeSheet();
+        return refresh();
+      });
+      return;
+    }
+    if (t.getAttribute("data-wr-enroll-pause")) {
+      /* Pause = status angefragt (kein Generator), künftige Events bleiben bis Coach reaktiviert */
+      rest("enrollments?id=eq." + encodeURIComponent(t.getAttribute("data-wr-enroll-pause")), {
+        method: "PATCH",
+        prefer: "return=minimal",
+        body: { status: "angefragt" }
+      }).then(function () {
+        closeSheet();
+        return refresh();
+      });
+      return;
+    }
+    if (t.getAttribute("data-wr-enroll-days")) {
+      var enId = t.getAttribute("data-wr-enroll-days");
+      var en = state.enrollments.filter(function (e) {
+        return String(e.id) === String(enId);
+      })[0];
+      if (!en) return;
+      state.bookDraft = {
+        course: en.courses || { id: en.course_id, title: "Kurs", sessions_per_week: 3 },
+        start: en.start_date || mondayOf(berlinToday()),
+        weekdays: (en.weekdays || []).slice(),
+        enrollId: enId,
+        retarget: true
+      };
+      openBookSheet(2, state.bookDraft);
+      return;
+    }
+    if (t.getAttribute("data-wr-more")) {
+      var p = t.closest(".wr-place");
+      if (p) p.textContent = p.textContent.replace(/\s*mehr$/, "");
+      return;
+    }
+  }
+
+  function openEnrollMenu(enrollId) {
+    openSheet(
+      "<h3>Kurs</h3>" +
+        '<button type="button" class="wr-pill-btn" data-wr-enroll-days="' +
+        esc(enrollId) +
+        '">Tage ändern</button>' +
+        '<button type="button" class="wr-pill-btn" data-wr-enroll-pause="' +
+        esc(enrollId) +
+        '">Pausieren</button>' +
+        '<button type="button" class="wr-pill-btn" data-wr-enroll-end="' +
+        esc(enrollId) +
+        '">Beenden</button>' +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+  }
+
+  function openComments(eventId) {
+    var list = state.comments[eventId] || [];
+    var body = list
+      .map(function (c) {
+        var p = personOf(c.account_id);
+        return (
+          '<div class="wr-comment"><strong>' +
+          esc(p.name) +
+          "</strong> " +
+          esc(c.text || "") +
+          "</div>"
+        );
+      })
+      .join("");
+    openSheet(
+      "<h3>Kommentare</h3>" +
+        '<div class="wr-comment-list">' +
+        (body || "<p>Noch keine Kommentare.</p>") +
+        "</div>" +
+        '<form class="wr-comment-form" data-wr-comment-form="' +
+        esc(eventId) +
+        '"><input type="text" maxlength="500" placeholder="Kommentieren" /><button type="submit">Senden</button></form>' +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button>'
+    );
+  }
+
+  function toggleRsvp(eventId) {
+    var uid = me();
+    var list = state.rsvps[eventId] || [];
+    var going = list.indexOf(uid) >= 0;
+    if (going) {
+      return rest(
+        "event_rsvps?event_id=eq." +
+          encodeURIComponent(eventId) +
+          "&user_id=eq." +
+          encodeURIComponent(uid),
+        { method: "DELETE", prefer: "return=minimal" }
+      ).then(refresh);
+    }
+    return rest("event_rsvps", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: { event_id: eventId, user_id: uid, status: "zugesagt" }
+    }).then(refresh);
+  }
+
+  function onSubmit(e) {
+    var form = e.target && e.target.closest ? e.target.closest("[data-wr-comment-form]") : null;
+    if (!form) return;
+    e.preventDefault();
+    var eventId = form.getAttribute("data-wr-comment-form");
+    var input = form.querySelector("input");
+    var text = input ? String(input.value || "").trim() : "";
+    if (!text) return;
+    rest("event_comments", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: { event_id: eventId, account_id: me(), text: text.slice(0, 500) }
+    }).then(function () {
+      if (input) input.value = "";
+      return loadComments([eventId]).then(function () {
+        openComments(eventId);
+      });
+    });
+  }
+
+  function bindSwipe(root) {
+    var track = null;
+    root.addEventListener(
+      "touchstart",
+      function (e) {
+        if (!e.touches || !e.touches[0]) return;
+        if (e.target.closest && e.target.closest(".wr-sheet")) return;
+        track = {
+          x: e.touches[0].clientX,
+          y: e.touches[0].clientY,
+          day: state.dayIndex
+        };
+      },
+      { passive: true }
+    );
+    root.addEventListener(
+      "touchend",
+      function (e) {
+        if (!track || !e.changedTouches || !e.changedTouches[0]) return;
+        var dx = e.changedTouches[0].clientX - track.x;
+        var dy = e.changedTouches[0].clientY - track.y;
+        var vtrack = $("wr-vtrack");
+        if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 48) {
+          if (dy < 0 && state.dayIndex < 6) state.dayIndex += 1;
+          if (dy > 0 && state.dayIndex > 0) state.dayIndex -= 1;
+          if (vtrack) {
+            vtrack.scrollTo({
+              top: state.dayIndex * vtrack.clientHeight,
+              behavior: "smooth"
+            });
+          }
+        } else if (Math.abs(dx) > 48) {
+          var dayEl = root.querySelectorAll(".wr-day")[state.dayIndex];
+          if (dayEl) {
+            var h = dayEl.querySelector(".wr-htrack");
+            if (h) {
+              var w = h.clientWidth;
+              var cur = Math.round(h.scrollLeft / Math.max(w, 1));
+              var next = dx < 0 ? cur + 1 : cur - 1;
+              var max = h.querySelectorAll(".wr-slide").length - 1;
+              next = Math.max(0, Math.min(max, next));
+              h.scrollTo({ left: next * w, behavior: "smooth" });
+              var dots = dayEl.querySelectorAll(".wr-dot");
+              dots.forEach(function (d, i) {
+                d.classList.toggle("is-on", i === next);
+              });
+            }
+          }
+        }
+        track = null;
+      },
+      { passive: true }
+    );
+  }
+
+  function syncDayFromScroll() {
+    var vtrack = $("wr-vtrack");
+    if (!vtrack || !vtrack.clientHeight) return;
+    state.dayIndex = Math.round(vtrack.scrollTop / vtrack.clientHeight);
+  }
+
+  function refresh() {
+    if (!host || !me()) return Promise.resolve();
+    loadTravelPref();
+    return Promise.all([loadEvents(), loadFfc(), loadEnrollments()])
+      .then(function () {
+        var ids = state.events.map(function (e) {
+          return String(e.id);
+        });
+        return Promise.all([loadRsvps(ids), loadComments(ids)]);
+      })
+      .then(function () {
+        /* Heute-Wochentag als Start */
+        if (state.weekOffset === 0) {
+          var today = berlinToday();
+          var days = weekDays();
+          var ix = days.indexOf(today);
+          if (ix >= 0) state.dayIndex = ix;
+        }
+        render();
+      });
+  }
+
+  function show() {
+    var root = $(ROOT_ID);
+    if (root) root.hidden = false;
+    document.body.classList.add("is-woche-reels");
+    return refresh();
+  }
+
+  function hide() {
+    var root = $(ROOT_ID);
+    if (root) root.hidden = true;
+    document.body.classList.remove("is-woche-reels");
+    closeSheet();
+  }
+
+  function install(h) {
+    host = h || host || {};
+    var root = $(ROOT_ID);
+    if (!root) return;
+    if (!root._wrBound) {
+      root._wrBound = true;
+      root.addEventListener("click", onRootClick);
+      root.addEventListener("submit", onSubmit);
+      bindSwipe(root);
+      root.addEventListener(
+        "scroll",
+        function (e) {
+          if (e.target && e.target.id === "wr-vtrack") syncDayFromScroll();
+        },
+        true
+      );
+    }
+  }
+
+  global.WocheReels = {
+    install: install,
+    show: show,
+    hide: hide,
+    refresh: refresh
+  };
+})(window);
