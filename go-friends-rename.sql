@@ -1,6 +1,10 @@
 -- Freunde statt Buddies: go_buddies → go_friends, buddy_id → friend_id
 -- Idempotent. Team bleibt UI-Aggregation (Freunde + Coach + Coachees + Gruppen).
 -- Im Supabase SQL Editor ausführen (gleiche Instanz: agpysewcsakdpmpftndp).
+--
+-- Am Ende: read-only Kompatibilitäts-Views go_buddies / go_buddy_challenges
+-- für alte gecachte Clients (friend_id als buddy_id aliased). Die Views werden
+-- erst nach DROP/Rename der Tabellen angelegt.
 
 -- ---------------------------------------------------------------------------
 -- 1) Tabelle umbenennen (bestehend) oder neu anlegen
@@ -163,3 +167,31 @@ create policy "go_friend_challenges_insert_anon"
 
 create policy "go_friend_challenges_update_anon"
   on go_friend_challenges for update to anon, authenticated using (true) with check (true);
+
+-- ---------------------------------------------------------------------------
+-- 4) Übergangs-Views für alte gecachte Clients (read-only)
+--    Laufen NACH dem DROP/Rename der Tabellen go_buddies / go_buddy_challenges.
+--    friend_id wird als buddy_id aliased; Challenges: Spalten 1:1 aliasiert.
+-- ---------------------------------------------------------------------------
+drop view if exists go_buddies cascade;
+create or replace view go_buddies as
+  select id, account_id, friend_id as buddy_id, created_at
+  from go_friends;
+
+grant select on go_buddies to anon, authenticated;
+
+drop view if exists go_buddy_challenges cascade;
+create or replace view go_buddy_challenges as
+  select
+    id,
+    from_account_id,
+    to_account_id,
+    days,
+    message,
+    status,
+    created_at,
+    seen_at,
+    accepted_at
+  from go_friend_challenges;
+
+grant select on go_buddy_challenges to anon, authenticated;

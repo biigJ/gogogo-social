@@ -2037,7 +2037,7 @@
         <hr class="admin-rule admin-role-rule" />
         <section class="admin-role" id="admin-role" aria-label="Funktion">
           <h2 class="admin-plan__title">Funktion</h2>
-          <p class="admin-role__status" id="trainer-status">Funktion: Buddy</p>
+          <p class="admin-role__status" id="trainer-status">Funktion: Freund</p>
           <button class="btn admin-plan__save" type="button" id="trainer-toggle">Als Trainer markieren</button>
           <p class="msg" id="trainer-msg" role="status"></p>
         </section>
@@ -5494,7 +5494,7 @@
         return coachAccount;
       }
 
-      async function loadUserBuddyIds(accountId) {
+      async function loadUserFriendIds(accountId) {
         if (!accountId || String(accountId).indexOf("local-") === 0) return [];
         try {
           var res = await fetch(
@@ -5753,10 +5753,10 @@
         try {
           var coach = await resolveCoachAccount();
           var coachId = coach && coach.id ? String(coach.id) : null;
-          var buddyIds = await loadUserBuddyIds(ids[0]);
+          var friendIds = await loadUserFriendIds(ids[0]);
           var authorIds = [];
           var seenAuth = {};
-          ids.concat(buddyIds || []).forEach(function (id) {
+          ids.concat(friendIds || []).forEach(function (id) {
             if (!id || seenAuth[id] || (coachId && String(id) === coachId)) return;
             seenAuth[id] = true;
             authorIds.push(String(id));
@@ -6008,7 +6008,7 @@
           }
         }
         var isTrainer = !!(activeAccount && activeAccount.is_trainer);
-        if (status) status.textContent = "Funktion: " + (isTrainer ? "Trainer" : "Buddy");
+        if (status) status.textContent = "Funktion: " + (isTrainer ? "Trainer" : "Freund");
         if (btn) {
           btn.disabled = !activeAccount || !activeAccount.id || trainerSchemaOk === false;
           btn.textContent = isTrainer ? "Trainer-Status entfernen" : "Als Trainer markieren";
