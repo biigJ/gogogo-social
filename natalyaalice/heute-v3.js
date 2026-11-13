@@ -502,33 +502,89 @@
     );
   }
 
-  function commentsHtml(eventId) {
-    if (!eventId) return "";
-    var list = state.comments[eventId] || [];
-    var show = list.slice(0, 2);
-    var more = list.length - show.length;
-    var body = show.map(commentLineHtml).join("");
-    if (more > 0) {
-      body +=
-        '<button type="button" class="acc-comment-more" data-more-comments="' +
-        esc(eventId) +
-        '">+' +
-        more +
-        " weitere</button>";
-      body +=
-        '<div class="acc-comments-rest" hidden data-rest-comments="' +
-        esc(eventId) +
-        '">' +
-        list.slice(2).map(commentLineHtml).join("") +
-        "</div>";
+  function myCommentText(postId) {
+    var list = state.comments[postId] || [];
+    var uid = me();
+    for (var i = list.length - 1; i >= 0; i--) {
+      if (String(list[i].account_id) === uid && list[i].text) return String(list[i].text);
     }
+    return "";
+  }
+
+  function bubbleSvg() {
+    return (
+      '<svg class="acc-bubble-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M5.5 6.5h13a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H11l-3.8 2.7V16.5H5.5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2Z"/>' +
+      "</svg>"
+    );
+  }
+
+  function inviteFaceRowHtml(postId, inviteIso) {
+    var mePerson = personOf(me());
+    return (
+      '<div class="acc-card__faces">' +
+      avatarHtml(mePerson, "acc-face") +
+      '<button type="button" class="acc-face acc-face--add" data-invite-post="' +
+      esc(postId || "") +
+      '" data-invite-iso="' +
+      esc(inviteIso || "") +
+      '" aria-label="Einladen">+</button>' +
+      "</div>"
+    );
+  }
+
+  function commentsPanelHtml(postId, open) {
+    if (!postId) return "";
+    var list = state.comments[postId] || [];
+    var body = list.map(commentLineHtml).join("");
     body +=
       '<form class="acc-comment-form" data-comment-form="' +
-      esc(eventId) +
+      esc(postId) +
       '">' +
       '<input type="text" class="acc-comment-input" maxlength="500" placeholder="Kommentieren" aria-label="Kommentieren" />' +
       "</form>";
-    return '<div class="acc-comments" data-comments="' + esc(eventId) + '">' + body + "</div>";
+    return (
+      '<div class="acc-comments' +
+      (open ? " is-open" : "") +
+      '" data-comments="' +
+      esc(postId) +
+      '"' +
+      (open ? "" : " hidden") +
+      ">" +
+      body +
+      "</div>"
+    );
+  }
+
+  function postBarHtml(opts) {
+    opts = opts || {};
+    var postId = opts.postId || "";
+    if (!postId) return opts.actions || "";
+    var mine = myCommentText(postId);
+    var count = (state.comments[postId] || []).length;
+    var teaser = mine ? mine : "...";
+    return (
+      '<div class="acc-card__bar">' +
+      (opts.actions || "") +
+      inviteFaceRowHtml(postId, opts.inviteIso || "") +
+      '<div class="acc-card__teaser">' +
+      '<button type="button" class="acc-card__my-line" data-open-comments="' +
+      esc(postId) +
+      '">' +
+      esc(teaser) +
+      "</button>" +
+      '<button type="button" class="acc-card__bubble' +
+      (count ? " has-comments" : "") +
+      '" data-open-comments="' +
+      esc(postId) +
+      '" aria-label="Kommentare">' +
+      bubbleSvg() +
+      (count ? '<span class="acc-card__bubble-n">' + count + "</span>" : "") +
+      "</button>" +
+      "</div>" +
+      commentsPanelHtml(postId, false) +
+      "</div>"
+    );
   }
 
   function toneClass(cat) {
@@ -671,6 +727,16 @@
   }
 
   function renderCardShell(opts) {
+    var bar = "";
+    if (opts.postId) {
+      bar = postBarHtml({
+        postId: opts.postId,
+        inviteIso: opts.inviteIso || "",
+        actions: opts.actions || ""
+      });
+    } else {
+      bar = opts.actions || "";
+    }
     return (
       '<article class="acc-card' +
       (opts.extraClass ? " " + opts.extraClass : "") +
@@ -678,8 +744,7 @@
       (opts.attrs || "") +
       ">" +
       mediaHtml(opts) +
-      (opts.actions || "") +
-      (opts.comments || "") +
+      bar +
       "</article>"
     );
   }
@@ -703,26 +768,14 @@
     var uid = me();
     var mine = String(ev.user_id) === uid;
     var upcoming = ev.status === "geplant";
-    var past = ev.status === "erledigt";
     var p = personOf(ev.user_id);
     var emoji = emojiFor(ev.category, ev.title);
     var title = (emoji + " " + (ev.title || ev.category)).trim();
     var actions = "";
     if (upcoming && mine && dayKey(ev.starts_at) === todayIso()) {
-      actions = actionRowHtml({
-        doneBtn: ev.id,
-        facesHtml: rsvpRowHtml(ev.id)
-      });
+      actions = actionRowHtml({ doneBtn: ev.id });
     } else if (upcoming && !mine) {
-      actions = actionRowHtml({
-        rsvpId: ev.id,
-        going: iAmGoing(ev.id),
-        facesHtml: rsvpRowHtml(ev.id)
-      });
-    } else if (upcoming && mine) {
-      actions = actionRowHtml({ facesHtml: rsvpRowHtml(ev.id) });
-    } else if (past) {
-      actions = actionRowHtml({ facesHtml: rsvpRowHtml(ev.id) });
+      actions = actionRowHtml({ rsvpId: ev.id, going: iAmGoing(ev.id) });
     }
     return renderCardShell({
       attrs:
@@ -740,7 +793,8 @@
       title: title,
       place: ev.location || "",
       desc: descHtml(ev.note),
-      comments: commentsHtml(ev.id)
+      postId: String(ev.id),
+      inviteIso: dayKey(ev.starts_at)
     });
   }
 
@@ -751,22 +805,14 @@
     var authorName = ev.creator_nickname || "Team";
     var authorPerson = { name: authorName, photo: "" };
     var actions = "";
-    if (upcoming && mine && dayKey(ev.starts_at) === todayIso()) {
-      /* FFC-eigene: kein Erledigt-Modal der Accountability — nur Faces */
-      actions = actionRowHtml({ facesHtml: ffcFacesHtml(ev) });
-    } else if (upcoming && !mine) {
-      actions = actionRowHtml({
-        ffcRsvpId: ev.id,
-        going: going,
-        facesHtml: ffcFacesHtml(ev)
-      });
-    } else if (upcoming) {
-      actions = actionRowHtml({ facesHtml: ffcFacesHtml(ev) });
+    if (upcoming && !mine) {
+      actions = actionRowHtml({ ffcRsvpId: ev.id, going: going });
     }
+    var postId = "ffc-" + String(ev.id);
     return renderCardShell({
       attrs:
-        ' data-post-id="ffc-' +
-        esc(ev.id) +
+        ' data-post-id="' +
+        esc(postId) +
         '" data-ffc-id="' +
         esc(ev.id) +
         '"',
@@ -779,7 +825,8 @@
       title: "🔥 " + (ev.title || "Zirkeltraining"),
       place: ev.location || "",
       desc: "",
-      comments: ""
+      postId: postId,
+      inviteIso: dayKey(ev.starts_at)
     });
   }
 
@@ -788,8 +835,16 @@
     var mine = String(item.user_id) === me();
     var emoji = emojiFor(item.category || "kraft", item.title);
     var title = (emoji + " " + (item.title || "Training")).trim();
+    var commentKey =
+      item.commentKey ||
+      "diary:" + String(item.user_id) + ":" + dayKey(item.starts_at);
     return renderCardShell({
-      attrs: ' data-post-id="diary-' + esc(item.id) + '" data-diary-id="' + esc(item.id) + '"',
+      attrs:
+        ' data-post-id="' +
+        esc(commentKey) +
+        '" data-diary-id="' +
+        esc(item.id) +
+        '"',
       category: item.category || "kraft",
       photo: item.photo_url || "",
       emoji: emoji,
@@ -799,7 +854,8 @@
       title: title,
       place: item.location || "",
       desc: descHtml(item.note),
-      comments: item.commentKey ? commentsHtml(item.commentKey) : ""
+      postId: commentKey,
+      inviteIso: dayKey(item.starts_at)
     });
   }
 
@@ -814,10 +870,11 @@
     var emoji = emojiFor(item.category || "kraft", item.title);
     var title = item.title || "Training";
     if (emoji && title.indexOf(emoji) !== 0) title = (emoji + " " + title).trim();
+    var postId = "plan:" + String(item.iso || item.id);
     return renderCardShell({
       attrs:
-        ' data-post-id="plan-' +
-        esc(item.id) +
+        ' data-post-id="' +
+        esc(postId) +
         '" data-plan-iso="' +
         esc(item.iso || "") +
         '"',
@@ -830,7 +887,8 @@
       title: title,
       place: item.location || "",
       desc: descHtml(item.note || ""),
-      comments: ""
+      postId: postId,
+      inviteIso: item.iso || dayKey(item.starts_at)
     });
   }
 
@@ -1186,50 +1244,117 @@
       });
   }
 
-  function paintCommentsBox(eventId) {
-    var box = document.querySelector('[data-comments="' + eventId + '"]');
-    if (!box) return;
-    var html = commentsHtml(eventId);
+  function paintPostBar(postId) {
+    var card = document.querySelector('[data-post-id="' + postId + '"]');
+    if (!card) return;
+    var bar = card.querySelector(".acc-card__bar");
+    var actions = "";
+    var done = card.querySelector("[data-done]");
+    var rsvp = card.querySelector("[data-rsvp]");
+    var ffc = card.querySelector("[data-ffc-rsvp]");
+    if (done) actions = actionRowHtml({ doneBtn: done.getAttribute("data-done") });
+    else if (rsvp) {
+      actions = actionRowHtml({
+        rsvpId: rsvp.getAttribute("data-rsvp"),
+        going: rsvp.classList.contains("is-on")
+      });
+    } else if (ffc) {
+      actions = actionRowHtml({
+        ffcRsvpId: ffc.getAttribute("data-ffc-rsvp"),
+        going: ffc.classList.contains("is-on")
+      });
+    }
+    var inviteIso = "";
+    var addBtn = card.querySelector("[data-invite-iso]");
+    if (addBtn) inviteIso = addBtn.getAttribute("data-invite-iso") || "";
+    var html = postBarHtml({ postId: postId, inviteIso: inviteIso, actions: actions });
     var tmp = document.createElement("div");
     tmp.innerHTML = html;
     var next = tmp.firstChild;
-    if (next) box.replaceWith(next);
+    if (!next) return;
+    if (bar) bar.replaceWith(next);
+    else card.appendChild(next);
+    var panel = next.querySelector(".acc-comments");
+    if (panel) {
+      panel.hidden = false;
+      panel.classList.add("is-open");
+      var input = panel.querySelector(".acc-comment-input");
+      if (input) input.focus();
+    }
   }
 
-  function addComment(eventId, text) {
+  function openComments(postId) {
+    var panel = document.querySelector('[data-comments="' + postId + '"]');
+    if (!panel) {
+      paintPostBar(postId);
+      return;
+    }
+    panel.hidden = false;
+    panel.classList.add("is-open");
+    var input = panel.querySelector(".acc-comment-input");
+    if (input) input.focus();
+  }
+
+  function addComment(postId, text) {
     text = String(text || "").trim();
-    if (!text || !eventId || !me()) return;
+    if (!text || !postId || !me()) return;
     var temp = {
       id: "local-" + Date.now(),
-      event_id: eventId,
       account_id: me(),
       text: text.slice(0, 500),
       created_at: new Date().toISOString()
     };
-    if (!state.comments[eventId]) state.comments[eventId] = [];
-    state.comments[eventId].push(temp);
+    if (!state.comments[postId]) state.comments[postId] = [];
+    state.comments[postId].push(temp);
     personOf(me());
-    paintCommentsBox(eventId);
-    rest("event_comments", {
-      method: "POST",
-      prefer: "return=representation",
-      body: {
-        event_id: eventId,
-        account_id: me(),
-        text: temp.text
-      }
-    })
+    paintPostBar(postId);
+
+    var save;
+    if (String(postId).indexOf("diary:") === 0) {
+      var parts = String(postId).split(":");
+      var ownerId = parts[1] || me();
+      save = rest("go_community_posts", {
+        method: "POST",
+        prefer: "return=representation",
+        body: {
+          author_id: me(),
+          kind: "text",
+          body: temp.text.slice(0, 144),
+          reply_to_id: ownerId
+        }
+      });
+    } else if (String(postId).indexOf("ffc-") === 0 || String(postId).indexOf("plan:") === 0) {
+      /* lokal / ohne Event-Tabelle — nur Anzeige */
+      save = Promise.resolve([temp]);
+    } else {
+      save = rest("event_comments", {
+        method: "POST",
+        prefer: "return=representation",
+        body: {
+          event_id: postId,
+          account_id: me(),
+          text: temp.text
+        }
+      });
+    }
+
+    save
       .then(function (rows) {
         var saved = Array.isArray(rows) ? rows[0] : rows;
         if (saved && saved.id) {
-          var list = state.comments[eventId] || [];
+          var list = state.comments[postId] || [];
           for (var i = 0; i < list.length; i++) {
             if (list[i].id === temp.id) {
-              list[i] = saved;
+              list[i] = {
+                id: saved.id,
+                account_id: saved.account_id || saved.author_id || me(),
+                text: saved.text || saved.body || temp.text,
+                created_at: saved.created_at || temp.created_at
+              };
               break;
             }
           }
-          paintCommentsBox(eventId);
+          paintPostBar(postId);
         }
       })
       .catch(function () {});
@@ -1417,8 +1542,24 @@
       if (full) full.hidden = false;
       return;
     }
+    var openC = t.closest("[data-open-comments]");
+    if (openC) {
+      openComments(openC.getAttribute("data-open-comments"));
+      return;
+    }
+    var invitePost = t.closest("[data-invite-post]");
+    if (invitePost) {
+      var invIso = invitePost.getAttribute("data-invite-iso") || "";
+      if (host.openInviteForPost) host.openInviteForPost(invIso);
+      else if (host.openPlanDay && invIso) host.openPlanDay(invIso);
+      return;
+    }
     var planCard = t.closest("[data-plan-iso]");
-    if (planCard && !t.closest(".acc-card__actions") && !t.closest(".acc-comments")) {
+    if (
+      planCard &&
+      !t.closest(".acc-card__bar") &&
+      !t.closest(".acc-comments")
+    ) {
       var iso = planCard.getAttribute("data-plan-iso");
       if (iso && host.openPlanDay) host.openPlanDay(iso);
       return;
@@ -1443,14 +1584,26 @@
       toggleRsvp(rsvp.getAttribute("data-rsvp"));
       return;
     }
-    var more = t.closest("[data-more-comments]");
-    if (more) {
-      var restBox = document.querySelector(
-        '[data-rest-comments="' + more.getAttribute("data-more-comments") + '"]'
-      );
-      if (restBox) restBox.hidden = !restBox.hidden;
-      more.hidden = true;
-    }
+  }
+
+  function mergeDiaryComments(map) {
+    if (!map || typeof map !== "object") return;
+    Object.keys(map).forEach(function (key) {
+      if (!state.comments[key]) state.comments[key] = [];
+      (map[key] || []).forEach(function (c) {
+        if (!c) return;
+        state.comments[key].push({
+          id: c.id,
+          account_id: c.account_id || c.author_id,
+          text: c.text || c.body || "",
+          created_at: c.created_at
+        });
+      });
+      var pids = state.comments[key].map(function (c) {
+        return String(c.account_id);
+      });
+      ensurePeople(pids);
+    });
   }
 
   function onRootSubmit(e) {
@@ -1470,6 +1623,10 @@
     if (global.FFC && FFC.refreshHeute && FFC.user && FFC.user()) {
       ffcReady = Promise.resolve(FFC.refreshHeute()).catch(function () {});
     }
+    var histReady =
+      host.prepareHeuteHistory
+        ? Promise.resolve(host.prepareHeuteHistory()).catch(function () {})
+        : Promise.resolve();
     return ffcReady
       .then(function () {
         return Promise.all([
@@ -1477,7 +1634,8 @@
           loadEigenCourse(),
           loadEnrollments(),
           loadEvents(),
-          loadFfcEvents()
+          loadFfcEvents(),
+          histReady
         ]);
       })
       .then(function () {
@@ -1485,6 +1643,11 @@
           return String(e.id);
         });
         return Promise.all([loadRsvps(ids), loadComments(ids)]);
+      })
+      .then(function () {
+        if (host.heuteDiaryComments) {
+          mergeDiaryComments(host.heuteDiaryComments() || {});
+        }
       })
       .then(render);
   }

@@ -1312,14 +1312,19 @@
     body.is-session[data-shell="heute"] .photo,
     body.is-session[data-shell="heute"] .heute-crew { display: none !important; }
     body.is-session[data-shell="heute"] .heute-filter-row {
-      order: 0; display: flex; align-items: center; justify-content: flex-start;
-      gap: 12px; width: 100%; margin-top: 12px; box-sizing: border-box;
+      order: 0; display: flex; align-items: center; justify-content: center;
+      gap: 14px; width: 100%; margin-top: 12px; box-sizing: border-box;
     }
     body.is-session[data-shell="heute"] .heute-filter-pick { display: flex; margin: 0; width: auto; }
+    body.is-session[data-shell="heute"] .heute-filter-pick select {
+      font-size: calc(22px * 1.3);
+      font-weight: 600;
+      line-height: 1.2;
+    }
     body.is-session[data-shell="heute"] .heute-streak {
-      display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 8px;
-      margin-left: auto; font-family: "Playfair Display", Georgia, serif;
-      font-size: 18px; font-weight: 700; color: #2A2118;
+      display: inline-grid; place-items: center; min-width: 28px; height: auto; padding: 0;
+      margin: 0; font-family: "Playfair Display", Georgia, serif;
+      font-size: calc(22px * 1.3); font-weight: 700; color: #2A2118; line-height: 1.2;
     }
     /* Einheitlicher Instagram-Feed: kein Dock-/Stories-Karussell unter Heute */
     body.is-session[data-shell="heute"] .heute-stories { display: none !important; }
@@ -1370,9 +1375,38 @@
     .tone-spontan { background: #E8E2D6 !important; }
     .acc-card--spontan { cursor: pointer; }
     .acc-card--spontan:focus-visible { outline: 2px solid #2A2118; outline-offset: 3px; }
+    .acc-card__bar { padding: 10px 4px 0; }
     .acc-card__actions {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      padding: 10px 0 0; min-height: 40px;
+      margin: 0 0 8px; min-height: 0;
+    }
+    .acc-card__faces {
+      display: flex; align-items: center; gap: 8px; margin: 0 0 8px;
+    }
+    .acc-face--add {
+      border: 1.5px solid rgba(42,33,24,.35); background: transparent; color: #2A2118;
+      font-size: 18px; font-weight: 500; line-height: 1; cursor: pointer; padding: 0;
+    }
+    .acc-card__teaser {
+      display: flex; align-items: center; gap: 10px; width: 100%;
+    }
+    .acc-card__my-line {
+      flex: 1; min-width: 0; border: 0; background: none; padding: 0;
+      text-align: left; font: inherit; font-size: 14px; font-weight: 500;
+      color: rgba(42,33,24,.72); cursor: pointer; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .acc-card__bubble {
+      position: relative; flex: none; width: 36px; height: 36px; border: 0;
+      background: none; color: #2A2118; padding: 0; cursor: pointer;
+      display: inline-grid; place-items: center;
+    }
+    .acc-card__bubble.has-comments { color: #2A2118; }
+    .acc-bubble-icon { width: 22px; height: 22px; display: block; }
+    .acc-card__bubble-n {
+      position: absolute; top: -2px; right: -2px; min-width: 16px; height: 16px;
+      padding: 0 4px; border-radius: 999px; background: #2A2118; color: #F6F1E8;
+      font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
     }
     .acc-card__author {
       display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -1393,7 +1427,7 @@
       color: rgba(42,33,24,.55); cursor: pointer;
     }
     .acc-face, .acc-avatar {
-      width: 28px; height: 28px; border-radius: 50%; object-fit: cover; background: rgba(42,33,24,.12);
+      width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: rgba(42,33,24,.12);
       display: inline-grid; place-items: center; font-size: 12px; font-weight: 700; flex: none;
     }
     .acc-rsvp {
@@ -5588,7 +5622,7 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-2"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-3"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -8464,9 +8498,13 @@
         var photos = workoutPhotoMap();
         var out = [];
         var seen = {};
+        function pushItem(key, item) {
+          if (!item || !item.starts_at || seen[key]) return;
+          seen[key] = true;
+          out.push(item);
+        }
         function pushOwn(iso) {
-          if (!iso || seen[iso]) return;
-          seen[iso] = true;
+          if (!iso) return;
           var entry = diaryEntry(iso) || {};
           var move = diaryStatus(iso) || entry.move || "";
           var note = String(entry.note || "").trim();
@@ -8478,7 +8516,7 @@
           var photo = photos[iso] || "";
           if (!move && !note && !photo) return;
           if (!move) move = "Training";
-          out.push({
+          pushItem("own:" + iso, {
             id: iso,
             user_id: sessionAccount.id,
             starts_at: iso + "T12:00:00+01:00",
@@ -8486,18 +8524,90 @@
             note: note,
             photo_url: photo,
             category: historyCategoryFromLabel(move),
-            location: ""
+            location: "",
+            commentKey: "diary:" + String(sessionAccount.id) + ":" + iso
           });
         }
         if (opts.showOwn) {
           filledDiaryDates().forEach(pushOwn);
           Object.keys(photos).forEach(pushOwn);
-          Object.keys(diaryMap()).forEach(pushOwn);
+          Object.keys(diaryMap()).forEach(function (iso) {
+            var row = diaryMap()[iso];
+            if (row && row.cleared && !row.note && !row.move && !(row.extras && row.extras.length) && !photos[iso]) return;
+            pushOwn(iso);
+          });
           if (typeof Log !== "undefined" && Log.historyDates) {
             Log.historyDates(serverLogs).forEach(pushOwn);
           }
         }
+        if (opts.showFriends && Array.isArray(sharedEntries)) {
+          sharedEntries.forEach(function (entry) {
+            if (!entry || !entry.entry_date) return;
+            var pid = String(entry.account_id || "");
+            if (!pid || pid === String(sessionAccount.id)) return;
+            if (opts.groupOnly && groupMemberIds().indexOf(pid) < 0) return;
+            if (!canReadDiary(diaryPeople[pid])) return;
+            var iso = String(entry.entry_date).slice(0, 10);
+            var move = entry.move || "Training";
+            var note = String(entry.note || "").trim();
+            if (!move && !note) return;
+            pushItem("friend:" + pid + ":" + iso, {
+              id: pid + "-" + iso,
+              user_id: pid,
+              starts_at: iso + "T12:00:00+01:00",
+              title: move,
+              note: note,
+              photo_url: "",
+              category: historyCategoryFromLabel(move),
+              location: "",
+              commentKey: "diary:" + pid + ":" + iso
+            });
+          });
+        }
+        out.sort(function (a, b) {
+          return String(b.starts_at).localeCompare(String(a.starts_at));
+        });
         return out;
+      }
+
+      function heuteDiaryComments() {
+        var map = {};
+        (diaryPosts || []).forEach(function (post) {
+          if (!post) return;
+          var owner = String(post.reply_to_id || post.author_id || "");
+          if (!owner) return;
+          var day = "";
+          try {
+            day = new Date(post.created_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+          } catch (eDay) {
+            day = String(post.created_at || "").slice(0, 10);
+          }
+          if (!day) return;
+          var key = "diary:" + owner + ":" + day;
+          if (!map[key]) map[key] = [];
+          map[key].push({
+            id: post.id,
+            account_id: post.author_id,
+            text: post.body || "",
+            created_at: post.created_at
+          });
+        });
+        return map;
+      }
+
+      function prepareHeuteHistory() {
+        return Promise.resolve()
+          .then(function () { return loadOwnDiary ? loadOwnDiary() : null; })
+          .then(function () { return loadDiaryShare(); })
+          .catch(function () {});
+      }
+
+      function openInviteForPost(iso) {
+        if (iso && typeof openInvite === "function") {
+          openInvite(iso);
+          return;
+        }
+        openTeamSearch("friend");
       }
 
       function openPlanDay(iso) {
@@ -14433,6 +14543,9 @@
             paintHeuteJoins: paintHeuteJoins,
             heuteHistoryItems: heuteHistoryItems,
             heutePlanItems: heutePlanItems,
+            heuteDiaryComments: heuteDiaryComments,
+            prepareHeuteHistory: prepareHeuteHistory,
+            openInviteForPost: openInviteForPost,
             groupMemberIds: groupMemberIds,
             syncHeuteFilterOptions: syncHeuteFilterOptions,
             maybeAskHistoryShare: maybeAskHistoryShare,
