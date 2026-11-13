@@ -1,4 +1,4 @@
-/* Heute Accountability (Schritt 3): Ich / Crew / Tagebuch / Alles */
+/* Heute Accountability (Schritt 3): Ich / Team / Tagebuch / Alles */
 (function (global) {
   var host = null;
   var state = {
@@ -50,24 +50,32 @@
     return "🏋️";
   }
 
+  function normalizeFilter(v) {
+    if (v === "crew") return "team";
+    if (v === "all") return "alles";
+    if (v === "mine") return "ich";
+    if (["ich", "team", "tagebuch", "alles"].indexOf(v) >= 0) return v;
+    return "";
+  }
+
   function loadFilter() {
     try {
-      var v = localStorage.getItem(FILTER_KEY) || "";
-      if (["ich", "crew", "tagebuch", "alles"].indexOf(v) >= 0) return v;
-      var legacy = localStorage.getItem("gogogo_heute_filter");
-      if (legacy === "all") return "alles";
-      if (legacy === "mine") return "ich";
+      var v = normalizeFilter(localStorage.getItem(FILTER_KEY) || "");
+      if (v) return v;
+      var legacy = normalizeFilter(localStorage.getItem("gogogo_heute_filter") || "");
+      if (legacy) return legacy;
     } catch (e) {}
     return "ich";
   }
 
   function saveFilter(v) {
-    if (["ich", "crew", "tagebuch", "alles"].indexOf(v) < 0) v = "ich";
+    v = normalizeFilter(v) || "ich";
     state.filter = v;
     try { localStorage.setItem(FILTER_KEY, v); } catch (e) {}
     document.body.dataset.heute = v;
     var sel = $("heute-filter-select");
     if (sel && document.activeElement !== sel) sel.value = v;
+    if (host && host.onFilterChange) host.onFilterChange(v);
   }
 
   function rest(path, opts) {
@@ -595,10 +603,10 @@
     );
   }
 
-  function emptyCrewHtml() {
+  function emptyTeamHtml() {
     return (
       '<div class="acc-empty">' +
-      "<p>Noch keine Crew-Beiträge. Lade deine Gruppe ein.</p>" +
+      "<p>Noch keine Team-Beiträge. Lade deine Gruppe ein.</p>" +
       '<button type="button" class="acc-btn" data-invite-group="1">Gruppe einladen</button>' +
       "</div>"
     );
@@ -637,6 +645,20 @@
     });
   }
 
+  function ffcForFilter(f) {
+    var now = Date.now();
+    var week = now + 7 * 86400000;
+    return (state.ffcEvents || []).filter(function (e) {
+      if (!e || !e.starts_at) return false;
+      var t = new Date(e.starts_at).getTime();
+      if (t < now - 3600000 || t > week) return false;
+      /* Ich: nur selbst erstellte FFC-Events */
+      if (f === "ich") return !!e.is_mine;
+      /* Team/Tagebuch/Alles: eigene + offene Zusagen + angenommene */
+      return !!e.is_mine || e.my_going === null || e.my_going === true;
+    });
+  }
+
   function render() {
     var root = $("heute-acc");
     if (!root) return;
@@ -644,97 +666,48 @@
     var f = state.filter;
     document.body.dataset.heute = f;
 
-    if (f === "tagebuch") {
-      root.innerHTML = "";
-      root.hidden = true;
-      var diary = $("heute-diary-feed");
-      if (diary) diary.hidden = false;
-      var share = $("heute-diary-share-pick");
-      if (share) share.hidden = false;
-      if (host.paintHeuteDiaryFeed) host.paintHeuteDiaryFeed();
-      hideLegacy(true);
-      return;
+    var share = $("heute-diary-share-pick");
+    if (share) {
+      share.hidden = true;
+      share.style.display = "none";
     }
 
     var diary = $("heute-diary-feed");
-    if (diary) diary.hidden = true;
-    var share = $("heute-diary-share-pick");
-    if (share) share.hidden = true;
+    if (f === "tagebuch" || f === "alles") {
+      if (diary) diary.hidden = false;
+      if (host.paintHeuteDiaryFeed) host.paintHeuteDiaryFeed();
+    } else if (diary) {
+      diary.hidden = true;
+      diary.textContent = "";
+    }
+
+    if (host.paintHeuteJoins) host.paintHeuteJoins();
+
     root.hidden = false;
-    hideLegacy(false);
+    var html = renderStartTile();
 
-    var html = "";
-    var heroId = null;
-    if (f === "ich" || f === "alles") {
-      var mine = myTodayEvents().filter(function (e) {
-        return e.status === "geplant";
-      });
-      if (mine[0]) {
-        heroId = String(mine[0].id);
-        html += renderHero(mine[0]);
-      } else if (f === "ich") {
-        html +=
-          '<article class="acc-hero tone-neutral"><p class="acc-hero__kicker">Heute</p><h2 class="acc-hero__title">Noch nichts geplant</h2></article>';
-      }
-      html += renderStartTile();
-    }
+    var ffcList = ffcForFilter(f);
+    html += ffcList.map(renderFfcPost).join("");
 
-    function ffcForFilter() {
-      var now = Date.now();
-      var week = now + 7 * 86400000;
-      return (state.ffcEvents || []).filter(function (e) {
-        if (!e || !e.starts_at) return false;
-        var t = new Date(e.starts_at).getTime();
-        if (f === "ich") return e.is_mine && t >= now - 3600000 && t <= week;
-        if (f === "crew") return !e.is_mine && t >= now - 30 * 86400000;
-        return t >= now - 30 * 86400000 && t <= week;
-      });
-    }
-
-    if (f === "crew") {
-      var crew = crewEvents();
-      var ffcCrew = ffcForFilter();
-      if (!crew.length && !ffcCrew.length) html += emptyCrewHtml();
-      else {
-        html += ffcCrew.map(renderFfcPost).join("");
-        html += crew.map(renderPost).join("");
-      }
+    if (f === "team") {
+      var teamPosts = crewEvents();
+      if (!ffcList.length && !teamPosts.length) html += emptyTeamHtml();
+      else html += teamPosts.map(renderPost).join("");
     } else if (f === "ich") {
       var feedIch = feedEventsForAlles().filter(function (e) {
-        if (heroId && String(e.id) === heroId) return false;
-        return String(e.user_id) === me();
+        return String(e.user_id) === me() && e.status === "geplant";
       });
-      html += ffcForFilter().map(renderFfcPost).join("");
       html += feedIch.map(renderPost).join("");
     } else if (f === "alles") {
       var feed = feedEventsForAlles().filter(function (e) {
-        if (heroId && String(e.id) === heroId) return false;
-        return true;
+        return e.status === "geplant";
       });
-      html += ffcForFilter().map(renderFfcPost).join("");
       html += feed.map(renderPost).join("");
     }
+    /* tagebuch: Historie kommt aus #heute-diary-feed, keine Event-Historie hier */
 
     root.innerHTML = html;
     bindObserver(root);
-  }
-
-  function hideLegacy(tagebuchOnly) {
-    var dock = document.querySelector("body.is-session[data-shell='heute'] .dock");
-    var start = $("heute-start");
-    var joins = $("heute-joins");
-    var events = $("heute-events");
-    if (tagebuchOnly) {
-      if (dock) dock.style.display = "none";
-      if (start) start.style.display = "none";
-      if (joins) joins.style.display = "none";
-      if (events) events.style.display = "none";
-      return;
-    }
-    if (dock) dock.style.display = "none";
-    if (start) start.style.display = "none";
-    if (joins) joins.style.display = "none";
-    if (events) events.style.display = "none";
   }
 
   function openDoneModal(eventId) {
@@ -1162,14 +1135,17 @@
     if (sel) {
       sel.innerHTML =
         '<option value="ich">Ich</option>' +
-        '<option value="crew">Crew</option>' +
+        '<option value="team">Team</option>' +
         '<option value="tagebuch">Tagebuch</option>' +
         '<option value="alles">Alles</option>';
       sel.value = state.filter;
-      sel.addEventListener("change", function () {
-        saveFilter(sel.value);
-        refresh();
-      });
+      if (sel.dataset.accBound !== "1") {
+        sel.dataset.accBound = "1";
+        sel.addEventListener("change", function () {
+          saveFilter(sel.value);
+          refresh();
+        });
+      }
     }
     var root = $("heute-acc");
     if (root && root.dataset.bound !== "1") {

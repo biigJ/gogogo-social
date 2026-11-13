@@ -1318,17 +1318,17 @@
       font-family: "Playfair Display", Georgia, serif; font-size: 16px; font-weight: 600; color: #2A2118;
     }
     body.is-session[data-shell="heute"] .heute-stories { order: 1; }
-    body.is-session[data-shell="heute"] #heute-acc { order: 2; margin-top: 8px; width: 100%; }
-    body.is-session[data-shell="heute"] .dock,
-    body.is-session[data-shell="heute"] .heute-joins,
+    body.is-session[data-shell="heute"] .dock { order: 2; margin-top: 4px; display: flex; }
+    body.is-session[data-shell="heute"] #heute-acc { order: 3; margin-top: 8px; width: 100%; }
+    body.is-session[data-shell="heute"] .heute-joins { order: 4; display: block; }
     body.is-session[data-shell="heute"] .heute-start { display: none !important; }
-    /* Zirkel (Hendrik) bleibt im DOM für FFC-Daten; UI läuft über #heute-acc */
+    /* FFC-Karten laufen über #heute-acc; Dom-Host bleibt für Daten */
     body.is-session[data-shell="heute"] .heute-events { display: none !important; }
-    body.is-session[data-shell="heute"] #heute-diary-share-pick { order: 6; margin-top: 18px; display: none; justify-content: center; width: 100%; }
+    /* Teilen-Schalter gehört ins Profil — nicht unter Heute */
+    body.is-session[data-shell="heute"] #heute-diary-share-pick { display: none !important; }
     body.is-session[data-shell="heute"] #heute-diary-feed { order: 7; margin-top: 8px; display: none; }
-    body.is-session[data-shell="heute"][data-heute="tagebuch"] #heute-diary-share-pick { display: flex; }
-    body.is-session[data-shell="heute"][data-heute="tagebuch"] #heute-diary-feed { display: block; }
-    body.is-session[data-shell="heute"][data-heute="tagebuch"] #heute-acc { display: none; }
+    body.is-session[data-shell="heute"][data-heute="tagebuch"] #heute-diary-feed,
+    body.is-session[data-shell="heute"][data-heute="alles"] #heute-diary-feed { display: block; }
     .acc-photo-pick { display: block; margin: 0 0 12px; font-size: 14px; font-weight: 600; }
     .acc-photo-pick input { display: block; margin-top: 6px; width: 100%; }
     .acc-hero {
@@ -1381,7 +1381,11 @@
       border: 1px solid rgba(42,33,24,.2); background: transparent; color: #2A2118; font: inherit;
     }
     #go-pick .acc-vis { margin: 0 0 12px; }
-    body.is-session[data-shell="heute"] .dock .go-row { display: none; }
+    body.is-session[data-shell="heute"] .dock .go-row {
+      display: grid;
+      gap: 12px;
+      width: 100%;
+    }
     body.is-session .plan-tabs { display: none !important; }
     body.is-session[data-shell="plan"] .absence-block { order: 2; }
     body.is-session[data-shell="plan"] .routine-row { order: 2; margin-top: 24px; }
@@ -4497,7 +4501,7 @@
       <label class="heute-filter-pick">
         <select id="heute-filter-select" aria-label="Heute filtern">
           <option value="ich">Ich</option>
-          <option value="crew">Crew</option>
+          <option value="team">Team</option>
           <option value="tagebuch">Tagebuch</option>
           <option value="alles">Alles</option>
         </select>
@@ -4573,7 +4577,7 @@
     <p class="heute-mantra shell-heute" id="heute-mantra"></p>
     <div class="heute-crew shell-heute" id="heute-crew"></div>
     <div class="heute-events ffc shell-heute" id="heute-events"></div>
-    <label class="diary-share-pick shell-heute" id="heute-diary-share-pick">
+    <label class="diary-share-pick shell-heute" id="heute-diary-share-pick" hidden>
       <select id="diary-share-select" aria-label="Tagebuch sichtbar für">
         <option value="private">privat</option>
         <option value="trainer">mit Trainer</option>
@@ -5534,7 +5538,7 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=acc-2"></script>
+  <script src="/natalyaalice/heute-v3.js?v=acc-3"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -7877,8 +7881,18 @@
         if (String(person.id) === String(sessionAccount.id)) return true;
         var vis = person.diary_visibility || "private";
         if (vis === "trainer" && String(person.trainer_id || "") === String(sessionAccount.id)) return true;
-        if (diaryVisibility === "friends" && vis === "friends" && diaryBuddyIds[String(person.id)]) return true;
+        /* Freunde-Historie folgt deren Profil-Setting „Historie mit Freunden teilen“ */
+        if (vis === "friends" && diaryBuddyIds[String(person.id)]) return true;
         return false;
+      }
+
+      function heuteView() {
+        var fromBody = document.body.dataset.heute;
+        if (fromBody === "team" || fromBody === "crew") return "team";
+        if (fromBody === "tagebuch" || fromBody === "alles" || fromBody === "ich") return fromBody;
+        if (heuteFilter === "team" || heuteFilter === "crew") return "team";
+        if (heuteFilter === "tagebuch" || heuteFilter === "alles") return heuteFilter;
+        return "ich";
       }
 
       function diaryPostVisible(post) {
@@ -8035,16 +8049,18 @@
         });
         var selected = selectedTeamIds();
         var teamSeen = laterStamp(readStore(storePrefix + "diary_team_seen", ""), remoteSeen);
-        var fromTeam = diaryVisibility === "friends" && diaryPosts.some(function (post) {
+        var fromTeam = diaryPosts.some(function (post) {
           var from = String((post && post.author_id) || "");
           if (!from || from === me || !selected[from]) return false;
           if (String(post.reply_to_id || "") === me) return false;
+          if (!canReadDiary(diaryPeople[from])) return false;
           if (teamSeen && String(post.created_at || "") <= teamSeen) return false;
           return true;
         });
         var teamDay = teamSeen.slice(0, 10);
-        var fromEntries = diaryVisibility === "friends" && sharedEntries.some(function (entry) {
+        var fromEntries = sharedEntries.some(function (entry) {
           if (!entry || !selected[String(entry.account_id)] || !(entry.note || entry.move)) return false;
+          if (!canReadDiary(diaryPeople[String(entry.account_id)])) return false;
           var stamp = String(entry.updated_at || "");
           if (stamp && teamSeen) return stamp > teamSeen;
           if (!teamDay) return true;
@@ -8159,7 +8175,7 @@
         return bubble;
       }
 
-      function renderDiaryShare(list) {
+      function renderDiaryShare(list, includeFriends) {
         if (!sessionMode || !sessionAccount) return;
         var old = list.querySelector(".diary-share-feed");
         if (old) old.remove();
@@ -8168,35 +8184,37 @@
         var me = String(sessionAccount.id);
         postsForOwner(me).forEach(function (post) { box.appendChild(diaryCommentEl(post)); });
         if (diaryVisibility !== "private") box.appendChild(diaryComposer(me));
-        Object.keys(diaryPeople).forEach(function (id) {
-          if (id === me || !canReadDiary(diaryPeople[id])) return;
-          var person = diaryPeople[id];
-          var title = document.createElement("h2");
-          title.className = "diary-share-name";
-          title.textContent = person.name || "Team";
-          box.appendChild(title);
-          sharedEntries.filter(function (entry) { return String(entry.account_id) === id; }).forEach(function (entry) {
-            if (!entry.note && !entry.move) return;
-            var card = document.createElement("article");
-            card.className = "diary-foreign";
-            var when = document.createElement("strong");
-            when.textContent = formatLong(entry.entry_date);
-            card.appendChild(when);
-            if (entry.move) {
-              var move = document.createElement("p");
-              move.textContent = entry.move;
-              card.appendChild(move);
-            }
-            if (entry.note) {
-              var note = document.createElement("p");
-              note.textContent = entry.note;
-              card.appendChild(note);
-            }
-            card.appendChild(diaryReplyButton(id));
-            box.appendChild(card);
+        if (includeFriends) {
+          Object.keys(diaryPeople).forEach(function (id) {
+            if (id === me || !canReadDiary(diaryPeople[id])) return;
+            var person = diaryPeople[id];
+            var title = document.createElement("h2");
+            title.className = "diary-share-name";
+            title.textContent = person.name || "Team";
+            box.appendChild(title);
+            sharedEntries.filter(function (entry) { return String(entry.account_id) === id; }).forEach(function (entry) {
+              if (!entry.note && !entry.move) return;
+              var card = document.createElement("article");
+              card.className = "diary-foreign";
+              var when = document.createElement("strong");
+              when.textContent = formatLong(entry.entry_date);
+              card.appendChild(when);
+              if (entry.move) {
+                var move = document.createElement("p");
+                move.textContent = entry.move;
+                card.appendChild(move);
+              }
+              if (entry.note) {
+                var note = document.createElement("p");
+                note.textContent = entry.note;
+                card.appendChild(note);
+              }
+              card.appendChild(diaryReplyButton(id));
+              box.appendChild(card);
+            });
+            postsForOwner(id).forEach(function (post) { box.appendChild(diaryCommentEl(post)); });
           });
-          postsForOwner(id).forEach(function (post) { box.appendChild(diaryCommentEl(post)); });
-        });
+        }
         list.appendChild(box);
       }
 
@@ -8274,19 +8292,32 @@
         return card;
       }
 
-      function fillDiaryList(list) {
+      function fillDiaryList(list, opts) {
         if (!list) return;
+        opts = opts || {};
+        var includeFriends = opts.includeFriends !== false;
+        if (opts.includeFriends === false) includeFriends = false;
+        if (list.id === "heute-diary-feed") {
+          var view = heuteView();
+          includeFriends = view === "alles";
+          if (view !== "alles" && view !== "tagebuch") {
+            list.textContent = "";
+            list.hidden = true;
+            return;
+          }
+          list.hidden = false;
+        }
         var photos = workoutPhotoMap();
         var dates = filledDiaryDates();
         list.textContent = "";
         dates.forEach(function (iso) {
           list.appendChild(buildDiaryCard(iso, photos));
         });
-        renderDiaryShare(list);
+        renderDiaryShare(list, includeFriends);
         loadDiaryShare().then(function () {
           var shell = document.body.dataset.shell;
           if (shell === "heute" || shell === "diary") {
-            renderDiaryShare(list);
+            renderDiaryShare(list, includeFriends);
             markDiarySeen();
           }
         });
@@ -8295,7 +8326,13 @@
       function paintHeuteDiaryFeed() {
         var feed = document.getElementById("heute-diary-feed");
         if (!feed || !sessionMode) return;
-        fillDiaryList(feed);
+        var view = heuteView();
+        if (view !== "alles" && view !== "tagebuch") {
+          feed.textContent = "";
+          feed.hidden = true;
+          return;
+        }
+        fillDiaryList(feed, { includeFriends: view === "alles" });
       }
 
       function openDiary() {
@@ -10096,10 +10133,10 @@
         }
         fill(share, [["private"], ["trainer"], ["friends"]]);
         if (heute) {
-          var curH = heute.value;
+          var curH = heute.value === "crew" ? "team" : heute.value;
           heute.innerHTML =
             '<option value="ich">Ich</option>' +
-            '<option value="crew">Crew</option>' +
+            '<option value="team">Team</option>' +
             '<option value="tagebuch">Tagebuch</option>' +
             '<option value="alles">Alles</option>';
           if (curH && [].some.call(heute.options, function (o) { return o.value === curH; })) heute.value = curH;
@@ -12900,24 +12937,32 @@
       function paintHeuteFilter() {
         if (window.HeuteAccountability) return;
         var select = document.getElementById("heute-filter-select");
-        if (select && document.activeElement !== select) {
-          select.value = heuteFilter === "alles" || heuteFilter === "all" ? "alles" : "ich";
-        }
-        document.body.dataset.heute = heuteFilter || "ich";
+        var view = heuteView();
+        if (select && document.activeElement !== select) select.value = view;
+        document.body.dataset.heute = view;
+        heuteFilter = view;
       }
 
       function applyHeuteFilter() {
         paintHeuteFilter();
         paintHeuteJoins();
+        paintHeuteDiaryFeed();
         if (window.HeuteAccountability) HeuteAccountability.refresh();
       }
 
       function setHeuteFilter(value) {
+        if (value === "crew") value = "team";
+        if (value === "all") value = "alles";
+        if (value === "mine") value = "ich";
         if (window.HeuteAccountability) {
           HeuteAccountability.setFilter(value);
+          heuteFilter = value === "team" || value === "tagebuch" || value === "alles" ? value : "ich";
+          document.body.dataset.heute = heuteFilter;
+          paintHeuteJoins();
+          paintHeuteDiaryFeed();
           return;
         }
-        heuteFilter = value === "alles" || value === "all" ? "alles" : "ich";
+        heuteFilter = value === "team" || value === "tagebuch" || value === "alles" ? value : "ich";
         try { localStorage.setItem(HOME_HEUTE, heuteFilter); } catch (eHF) {}
         applyHeuteFilter();
       }
@@ -13572,8 +13617,10 @@
         if (!box) return;
         box.textContent = "";
         if (!sessionAccount) return;
-        var onlyMine = heuteFilter === "ich" || heuteFilter === "tagebuch" || heuteFilter === "mine";
-        if (!onlyMine) (ffcIncoming || []).forEach(function (req) {
+        var view = heuteView();
+        /* Ich: keine fremden Einladungen/Anfragen. Team/Tagebuch/Alles: ja. */
+        var showIncoming = view !== "ich";
+        if (showIncoming) (ffcIncoming || []).forEach(function (req) {
           var card = document.createElement("div");
           card.className = "invite-card is-pending";
           applyWorkoutTone(card, { kind: "neutral", label: "Freundesanfrage" });
@@ -13612,7 +13659,7 @@
         var tomorrow = addDays(today, 1);
         var last = addDays(today, 6);
         var me = String(sessionAccount.id);
-        if (!onlyMine) {
+        if (showIncoming) {
           var started = routineStart();
           if (started) {
             var rCard = document.createElement("div");
@@ -13682,7 +13729,9 @@
         remotePtSessions.filter(function (sess) {
           if (!sess || sess.status !== "confirmed") return false;
           var iso = String(sess.session_at || "").slice(0, 10);
-          if (onlyMine) return iso === today || iso === tomorrow;
+          /* Heute + Morgen immer; sonst Woche wenn nicht nur Ich */
+          if (iso === today || iso === tomorrow) return true;
+          if (view === "ich") return false;
           return iso >= today && iso <= last;
         }).forEach(function (sess) {
           var booking = null;
@@ -13729,11 +13778,9 @@
           if (!row || String(row.to_id) !== me) return false;
           if (row.status !== "pending" && row.status !== "accepted") return false;
           var iso = String(row.workout_date || "").slice(0, 10);
-          if (onlyMine) {
-            if ((iso !== today && iso !== tomorrow) || row.status !== "accepted") return false;
-          } else {
-            if (iso < today || iso > last) return false;
-          }
+          if (iso < today || iso > last) return false;
+          /* Ich: nur angenommene Einladungen, keine offenen von Freunden */
+          if (view === "ich" && row.status !== "accepted") return false;
           var key = String(row.from_id) + ":" + iso;
           if (seen[key]) return false;
           seen[key] = true;
@@ -14112,6 +14159,14 @@
             closeGoPick: closeGoPick,
             openGruppen: openGruppen,
             paintHeuteDiaryFeed: paintHeuteDiaryFeed,
+            paintHeuteJoins: paintHeuteJoins,
+            onFilterChange: function (v) {
+              heuteFilter = v === "team" || v === "tagebuch" || v === "alles" ? v : "ich";
+              document.body.dataset.heute = heuteFilter;
+              try { localStorage.setItem(HOME_HEUTE, heuteFilter); } catch (eHF2) {}
+              paintHeuteJoins();
+              paintHeuteDiaryFeed();
+            },
             toast: function (msg) { window.alert(msg); }
           };
           if (!document.body.dataset.accInstalled) {
@@ -15328,7 +15383,8 @@
         var storedHeute = localStorage.getItem("gogogo_heute_filter_v3") || localStorage.getItem(HOME_HEUTE);
         if (storedHeute === "all" || storedHeute === "alles") heuteFilter = "alles";
         else if (storedHeute === "mine" || storedHeute === "ich") heuteFilter = "ich";
-        else if (storedHeute === "crew" || storedHeute === "tagebuch") heuteFilter = storedHeute;
+        else if (storedHeute === "crew" || storedHeute === "team") heuteFilter = "team";
+        else if (storedHeute === "tagebuch") heuteFilter = "tagebuch";
       } catch (eSH) {}
       paintVisibility();
       paintHeuteFilter();
