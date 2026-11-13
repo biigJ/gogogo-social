@@ -35,42 +35,51 @@ create index if not exists group_members_account_idx
 alter table groups enable row level security;
 alter table group_members enable row level security;
 
--- Lesen: Mitglieder der Gruppe (+ Boot ohne Account-Header)
-drop policy if exists "groups_select_member" on groups;
-create policy "groups_select_member"
-  on groups for select to anon, authenticated
-  using (
-    go_current_account_id() is null
-    or exists (
+-- Helper zuerst (security definer → kein RLS-Loop über group_members)
+create or replace function go_is_group_member(p_group_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_group_id is not null
+    and exists (
       select 1 from group_members gm
-      where gm.group_id = id
+      where gm.group_id = p_group_id
         and gm.account_id = go_current_account_id()
-    )
-    or created_by = go_current_account_id()
-  );
+    );
+$$;
 
-drop policy if exists "groups_write_boot" on groups;
-create policy "groups_write_boot"
-  on groups for all to anon
-  using (true)
-  with check (true);
+grant execute on function go_is_group_member(uuid) to anon, authenticated;
 
+-- Lesen: eigene Membership-Zeilen (+ Boot). Kein Self-Join → keine Rekursion.
 drop policy if exists "group_members_select_member" on group_members;
 create policy "group_members_select_member"
   on group_members for select to anon, authenticated
   using (
     go_current_account_id() is null
     or account_id = go_current_account_id()
-    or exists (
-      select 1 from group_members gm
-      where gm.group_id = group_members.group_id
-        and gm.account_id = go_current_account_id()
-    )
   );
 
 drop policy if exists "group_members_write_boot" on group_members;
 create policy "group_members_write_boot"
   on group_members for all to anon
+  using (true)
+  with check (true);
+
+drop policy if exists "groups_select_member" on groups;
+create policy "groups_select_member"
+  on groups for select to anon, authenticated
+  using (
+    go_current_account_id() is null
+    or created_by = go_current_account_id()
+    or go_is_group_member(id)
+  );
+
+drop policy if exists "groups_write_boot" on groups;
+create policy "groups_write_boot"
+  on groups for all to anon
   using (true)
   with check (true);
 
@@ -123,27 +132,7 @@ alter table events
   alter column visibility set default 'team';
 
 -- ---------------------------------------------------------------------------
--- 4) Helper: Mitglied einer konkreten Gruppe?
--- ---------------------------------------------------------------------------
-create or replace function go_is_group_member(p_group_id uuid)
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select p_group_id is not null
-    and exists (
-      select 1 from group_members gm
-      where gm.group_id = p_group_id
-        and gm.account_id = go_current_account_id()
-    );
-$$;
-
-grant execute on function go_is_group_member(uuid) to anon, authenticated;
-
--- ---------------------------------------------------------------------------
--- 5) RLS events / event_rsvps / event_comments
+-- 4) RLS events / event_rsvps / event_comments
 -- ---------------------------------------------------------------------------
 drop policy if exists "events_select_visible" on events;
 create policy "events_select_visible"

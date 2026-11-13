@@ -39,7 +39,10 @@ async function main() {
 
   const groups = await rest("groups?select=id&limit=1");
   if (!groups.ok) {
-    fail("Tabelle groups fehlt — bitte go-visibility-team.sql ausführen.", groups);
+    fail(
+      "groups nicht lesbar — go-visibility-team.sql ausführen (RLS/Tabelle).",
+      groups
+    );
   }
   console.log("groups table ok");
 
@@ -77,9 +80,13 @@ async function main() {
     console.log("Constraint-Probe: insert visibility=team …");
   }
 
-  const course = await rest("courses?slug=eq.eigenes-training&select=id&limit=1");
-  const courseId = course.data?.[0]?.id;
-  if (!courseId) fail("Systemkurs eigenes-training fehlt — go-event-comments.sql?");
+  let course = await rest("courses?slug=eq.eigenes-training&select=id&limit=1");
+  let courseId = course.data?.[0]?.id;
+  if (!courseId) {
+    course = await rest("courses?select=id,slug&limit=1");
+    courseId = course.data?.[0]?.id;
+  }
+  if (!courseId) fail("Kein Kurs gefunden");
 
   const created = await rest("events", {
     method: "POST",
