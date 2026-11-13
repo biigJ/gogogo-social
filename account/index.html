@@ -5969,7 +5969,7 @@
       /* Absage/Ablehnung im Chat: ⟦ix:YYYY-MM-DD|c|d|x⟧ (Parteien = author + reply_to). */
       var INVITE_RESP_RE = /⟦ix:([^|⟧]+)\|([cdx])⟧/i;
       var INVITE_RESP_STRIP_RE = /\n?⟦ix:[^⟧]*⟧/g;
-      var BUDDIES_KEY = "gogogo_go_buddies";
+      var FRIENDS_KEY = "gogogo_go_friends";
       var BUDDY_SEARCH_FAILS_KEY = "gogogo_go_buddy_search_fails";
       var BUDDY_SEARCH_LOCK_KEY = "gogogo_go_buddy_search_lock_until";
       var WHATSAPP_NUMBER = "+491747015500";
@@ -7644,8 +7644,14 @@
       }
       var buddyList = [];
       try {
-        var rawBuddies = JSON.parse(localStorage.getItem(BUDDIES_KEY) || "[]");
+        var rawBuddies = JSON.parse(localStorage.getItem(FRIENDS_KEY) || "null");
+        if (!Array.isArray(rawBuddies)) {
+          rawBuddies = JSON.parse(localStorage.getItem("gogogo_go_buddies") || "[]");
+        }
         buddyList = Array.isArray(rawBuddies) ? rawBuddies : [];
+        if (buddyList.length) {
+          try { localStorage.setItem(FRIENDS_KEY, JSON.stringify(buddyList)); } catch (eMig) {}
+        }
       } catch (e3) { buddyList = []; }
 
       if (!account || !account.name) {
@@ -7666,7 +7672,7 @@
 
       function saveBuddies() {
         buddyList = buddyList.slice(0, maxBuddiesAllowed());
-        try { localStorage.setItem(BUDDIES_KEY, JSON.stringify(buddyList)); } catch (e) {}
+        try { localStorage.setItem(FRIENDS_KEY, JSON.stringify(buddyList)); } catch (e) {}
       }
 
       function maxBuddiesAllowed() {
@@ -11335,16 +11341,16 @@
         if (!hasCloudAccount()) return mutualBuddyIds;
         try {
           var outgoing = await restGet(
-            "go_buddies?account_id=eq." + encodeURIComponent(account.id) +
-            "&select=buddy_id&limit=20"
+            "go_friends?account_id=eq." + encodeURIComponent(account.id) +
+            "&select=friend_id&limit=20"
           );
           var incoming = await restGet(
-            "go_buddies?buddy_id=eq." + encodeURIComponent(account.id) +
+            "go_friends?friend_id=eq." + encodeURIComponent(account.id) +
             "&select=account_id&limit=20"
           );
           var outSet = {};
           (outgoing || []).forEach(function (row) {
-            if (row && row.buddy_id) outSet[String(row.buddy_id)] = true;
+            if (row && row.friend_id) outSet[String(row.friend_id)] = true;
           });
           (incoming || []).forEach(function (row) {
             if (row && row.account_id && outSet[String(row.account_id)]) {
@@ -11682,7 +11688,7 @@
         if (!hasCloudAccount() || !account || !account.id) return;
         try {
           var q =
-            "go_buddy_challenges?or=(from_account_id.eq." + encodeURIComponent(account.id) +
+            "go_friend_challenges?or=(from_account_id.eq." + encodeURIComponent(account.id) +
             ",to_account_id.eq." + encodeURIComponent(account.id) +
             ")&status=eq.accepted&order=created_at.desc&limit=20";
           var rows = await restGet(q);
@@ -11739,7 +11745,7 @@
         if (popupOpen && !popupOpen.hidden) return;
         try {
           var rows = await restGet(
-            "go_buddy_challenges?to_account_id=eq." + encodeURIComponent(account.id) +
+            "go_friend_challenges?to_account_id=eq." + encodeURIComponent(account.id) +
             "&status=eq.pending&order=created_at.desc&limit=5"
           );
           if (!rows || !rows.length) return;
@@ -11770,7 +11776,7 @@
         var ch = pendingBuddyChallengeRow;
         if (!ch || !ch.id) return;
         try {
-          await fetch(SUPABASE_URL + "/rest/v1/go_buddy_challenges?id=eq." + encodeURIComponent(ch.id), {
+          await fetch(SUPABASE_URL + "/rest/v1/go_friend_challenges?id=eq." + encodeURIComponent(ch.id), {
             method: "PATCH",
             headers: {
               apikey: SUPABASE_KEY,
@@ -11797,7 +11803,7 @@
         var ch = pendingBuddyChallengeRow;
         if (!ch || !ch.id) return;
         try {
-          await fetch(SUPABASE_URL + "/rest/v1/go_buddy_challenges?id=eq." + encodeURIComponent(ch.id), {
+          await fetch(SUPABASE_URL + "/rest/v1/go_friend_challenges?id=eq." + encodeURIComponent(ch.id), {
             method: "PATCH",
             headers: {
               apikey: SUPABASE_KEY,
@@ -11845,7 +11851,7 @@
         if (feedBody.length > 144) feedBody = feedBody.slice(0, 141) + "…";
         if (msg) { msg.hidden = true; msg.textContent = ""; msg.classList.remove("is-error"); }
         try {
-          var chRow = await restInsert("go_buddy_challenges", {
+          var chRow = await restInsert("go_friend_challenges", {
             from_account_id: account.id,
             to_account_id: targetId,
             days: days,
@@ -13718,10 +13724,10 @@
         if (hasCloudAccount()) {
           try {
             await restDelete(
-              "go_buddies?or=(and(account_id.eq." + encodeURIComponent(account.id) +
-              ",buddy_id.eq." + encodeURIComponent(buddy.id) +
+              "go_friends?or=(and(account_id.eq." + encodeURIComponent(account.id) +
+              ",friend_id.eq." + encodeURIComponent(buddy.id) +
               "),and(account_id.eq." + encodeURIComponent(buddy.id) +
-              ",buddy_id.eq." + encodeURIComponent(account.id) + "))"
+              ",friend_id.eq." + encodeURIComponent(account.id) + "))"
             );
           } catch (e) {}
         }
@@ -14324,20 +14330,20 @@
         if (!hasCloudAccount() || !buddy || !buddy.id) return;
         /* Paarweise gegenseitig (Nummer = Einwilligung), aber nicht transitiv:
            A fügt B und C hinzu → A↔B und A↔C; B und C sehen sich nicht. */
-        await restInsert("go_buddies", { account_id: account.id, buddy_id: buddy.id });
-        await restInsert("go_buddies", { account_id: buddy.id, buddy_id: account.id });
+        await restInsert("go_friends", { account_id: account.id, friend_id: buddy.id });
+        await restInsert("go_friends", { account_id: buddy.id, friend_id: account.id });
       }
 
       async function loadBuddiesFromCloud() {
         if (!hasCloudAccount()) return false;
         var rows = await restGet(
-          "go_buddies?account_id=eq." + encodeURIComponent(account.id) +
-          "&select=buddy_id&limit=8"
+          "go_friends?account_id=eq." + encodeURIComponent(account.id) +
+          "&select=friend_id&limit=8"
         );
         if (!rows || !rows.length) return false;
         var ids = [];
         for (var i = 0; i < rows.length; i++) {
-          if (rows[i] && rows[i].buddy_id) ids.push(String(rows[i].buddy_id));
+          if (rows[i] && rows[i].friend_id) ids.push(String(rows[i].friend_id));
         }
         if (!ids.length) return false;
         var inList = "(" + ids.join(",") + ")";
@@ -16574,7 +16580,7 @@
 
       function clearLocalAccountData() {
         try { localStorage.removeItem(DAY_ENTRIES_KEY); } catch (e0) {}
-        try { localStorage.removeItem(BUDDIES_KEY); } catch (e1) {}
+        try { localStorage.removeItem(FRIENDS_KEY); } catch (e1) {}
         try { localStorage.removeItem(BUDDY_SEARCH_FAILS_KEY); } catch (e2) {}
         try { localStorage.removeItem(BUDDY_SEARCH_LOCK_KEY); } catch (e3) {}
         if (window.GoAccountSession) GoAccountSession.clear();
