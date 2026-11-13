@@ -338,6 +338,46 @@
     }
   }
 
+  function whenLine(isoTs) {
+    var day = dayKey(isoTs);
+    var today = todayIso();
+    var tom = (function () {
+      try {
+        var d = new Date(today + "T12:00:00");
+        d.setDate(d.getDate() + 1);
+        return d.toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+      } catch (e) {
+        return "";
+      }
+    })();
+    var t = timeLabel(isoTs);
+    if (day === today) return "Heute · " + t;
+    if (day === tom) return "Morgen · " + t;
+    try {
+      var label = new Date(isoTs).toLocaleDateString("de-DE", {
+        timeZone: "Europe/Berlin",
+        weekday: "short",
+        day: "numeric",
+        month: "short"
+      });
+      return label.replace(/\.$/, "") + " · " + t;
+    } catch (e) {
+      return day + " · " + t;
+    }
+  }
+
+  function truncNote(text, maxLines) {
+    var raw = String(text || "").trim();
+    if (!raw) return { text: "", more: false };
+    var lines = raw.split(/\n+/);
+    maxLines = maxLines || 2;
+    if (lines.length <= maxLines && raw.length <= 140) return { text: raw, more: false };
+    var cut = lines.slice(0, maxLines).join("\n");
+    if (cut.length > 140) cut = cut.slice(0, 137).trim() + "…";
+    else if (lines.length > maxLines) cut = cut + "…";
+    return { text: cut, more: true, full: raw };
+  }
+
   function myTodayEvents() {
     var day = todayIso();
     var uid = me();
@@ -436,31 +476,23 @@
     );
   }
 
+  function commentLineHtml(c) {
+    var p = personOf(c.account_id);
+    return (
+      '<div class="acc-comment"><strong>' +
+      esc(p.name) +
+      "</strong> " +
+      esc(c.text) +
+      "</div>"
+    );
+  }
+
   function commentsHtml(eventId) {
+    if (!eventId) return "";
     var list = state.comments[eventId] || [];
-    if (!list.length) {
-      return (
-        '<div class="acc-comments" data-comments="' +
-        esc(eventId) +
-        '"><button type="button" class="acc-comment-add" data-add-comment="' +
-        esc(eventId) +
-        '">Kommentar</button></div>'
-      );
-    }
     var show = list.slice(0, 2);
     var more = list.length - show.length;
-    var body = show
-      .map(function (c) {
-        var p = personOf(c.account_id);
-        return (
-          '<div class="acc-comment"><strong>' +
-          esc(p.name) +
-          "</strong> " +
-          esc(c.text) +
-          "</div>"
-        );
-      })
-      .join("");
+    var body = show.map(commentLineHtml).join("");
     if (more > 0) {
       body +=
         '<button type="button" class="acc-comment-more" data-more-comments="' +
@@ -472,25 +504,15 @@
         '<div class="acc-comments-rest" hidden data-rest-comments="' +
         esc(eventId) +
         '">' +
-        list
-          .slice(2)
-          .map(function (c) {
-            var p = personOf(c.account_id);
-            return (
-              '<div class="acc-comment"><strong>' +
-              esc(p.name) +
-              "</strong> " +
-              esc(c.text) +
-              "</div>"
-            );
-          })
-          .join("") +
+        list.slice(2).map(commentLineHtml).join("") +
         "</div>";
     }
     body +=
-      '<button type="button" class="acc-comment-add" data-add-comment="' +
+      '<form class="acc-comment-form" data-comment-form="' +
       esc(eventId) +
-      '">Kommentar</button>';
+      '">' +
+      '<input type="text" class="acc-comment-input" maxlength="500" placeholder="Kommentieren" aria-label="Kommentieren" />' +
+      "</form>";
     return '<div class="acc-comments" data-comments="' + esc(eventId) + '">' + body + "</div>";
   }
 
@@ -498,38 +520,8 @@
     if (cat === "zirkel") return "tone-zirkel";
     if (cat === "ausdauer") return "tone-ausdauer";
     if (cat === "alternative") return "tone-alternative";
+    if (cat === "spontan") return "tone-spontan";
     return "tone-kraft-basics";
-  }
-
-  function renderHero(ev) {
-    var title = (emojiFor(ev.category, ev.title) + " " + (ev.title || ev.category)).trim();
-    var when = "Heute · " + timeLabel(ev.starts_at) + " Uhr";
-    var done = ev.status === "erledigt";
-    return (
-      '<article class="acc-hero ' +
-      toneClass(ev.category) +
-      '" data-event-id="' +
-      esc(ev.id) +
-      '">' +
-      '<p class="acc-hero__kicker">' +
-      esc(when) +
-      "</p>" +
-      '<h2 class="acc-hero__title">' +
-      esc(title) +
-      "</h2>" +
-      (ev.location ? '<p class="acc-hero__place">' + esc(ev.location) + "</p>" : "") +
-      (done
-        ? '<p class="acc-hero__done">Erledigt</p>'
-        : '<button type="button" class="acc-btn" data-done="' + esc(ev.id) + '">Erledigt</button>') +
-      "</article>"
-    );
-  }
-
-  function renderStartTile() {
-    return (
-      '<button type="button" class="acc-start" id="heute-acc-start">' +
-      "<span>Jetzt starten</span></button>"
-    );
   }
 
   function iAmGoing(eventId) {
@@ -542,9 +534,13 @@
     if (ev.creator_nickname && names.indexOf(ev.creator_nickname) < 0) {
       names = [ev.creator_nickname].concat(names);
     }
-    if (!names.length) return '<div class="acc-rsvp-faces"></div>';
+    if (!names.length) {
+      return '<div class="acc-rsvp-faces" data-faces="ffc-' + esc(ev.id) + '"></div>';
+    }
     return (
-      '<div class="acc-rsvp-faces">' +
+      '<div class="acc-rsvp-faces" data-faces="ffc-' +
+      esc(ev.id) +
+      '">' +
       names
         .map(function (n) {
           return (
@@ -560,99 +556,228 @@
     );
   }
 
-  function renderFfcPost(ev) {
-    var upcoming = new Date(ev.starts_at).getTime() >= Date.now() - 3600000;
-    var going = ev.my_going === true;
-    var author = ev.creator_nickname || "Crew";
-    var mediaStyle = ev.image_url
-      ? ' style="background-image:url(\'' + esc(ev.image_url) + '\');background-size:cover;background-position:center"'
-      : "";
+  function mediaHtml(opts) {
+    var photo = opts.photo || "";
+    var emoji = opts.emoji || "";
+    var tone = toneClass(opts.category);
+    if (photo) {
+      return (
+        '<div class="acc-card__media ' +
+        tone +
+        ' has-photo" style="background-image:url(\'' +
+        esc(photo) +
+        "')\"></div>"
+      );
+    }
     return (
-      '<article class="acc-post" data-post-id="ffc-' +
-      esc(ev.id) +
-      '" data-ffc-id="' +
-      esc(ev.id) +
+      '<div class="acc-card__media ' +
+      tone +
       '">' +
-      '<div class="acc-post__media tone-zirkel"' +
-      mediaStyle +
-      "></div>" +
-      '<div class="acc-post__meta">' +
-      '<span class="acc-post__time">' +
-      esc(timeLabel(ev.starts_at)) +
-      " Uhr</span>" +
-      '<strong class="acc-post__title">🔥 ' +
-      esc(ev.title || "Zirkeltraining") +
-      "</strong>" +
-      (ev.location ? '<span class="acc-post__place">' + esc(ev.location) + "</span>" : "") +
-      '<div class="acc-post__author"><span class="acc-face acc-face--ph">' +
-      esc(String(author).slice(0, 1)) +
-      "</span><span>" +
-      esc(author) +
-      "</span></div>" +
-      (upcoming
-        ? '<button type="button" class="acc-rsvp' +
-          (going ? " is-on" : "") +
-          '" data-ffc-rsvp="' +
-          esc(ev.id) +
-          '">' +
-          (going ? "Zugesagt" : "Bin dabei") +
-          "</button>" +
-          ffcFacesHtml(ev)
-        : "") +
-      "</div></article>"
+      (opts.plus
+        ? '<span class="acc-card__plus">+</span>'
+        : '<span class="acc-card__emoji" aria-hidden="true">' + esc(emoji) + "</span>") +
+      "</div>"
     );
   }
 
-  function renderPost(ev) {
-    var p = personOf(ev.user_id);
-    var title = (emojiFor(ev.category, ev.title) + " " + (ev.title || ev.category)).trim();
-    var upcoming = ev.status === "geplant";
-    var going = iAmGoing(ev.id);
-    var mediaStyle = ev.photo_url
-      ? ' style="background-image:url(\'' + esc(ev.photo_url) + '\');background-size:cover;background-position:center"'
-      : "";
-    var noteHtml =
-      !upcoming && (ev.note || "").trim()
-        ? '<p class="acc-post__note">' + esc(ev.note) + "</p>"
-        : "";
+  function descHtml(note) {
+    var pack = truncNote(note, 2);
+    if (!pack.text) return "";
+    if (!pack.more) return '<p class="acc-card__desc">' + esc(pack.text) + "</p>";
     return (
-      '<article class="acc-post" data-post-id="' +
-      esc(ev.id) +
-      '" data-event-id="' +
-      esc(ev.id) +
-      '">' +
-      '<div class="acc-post__media ' +
-      toneClass(ev.category) +
-      '"' +
-      mediaStyle +
-      "></div>" +
-      '<div class="acc-post__meta">' +
-      '<span class="acc-post__time">' +
-      esc(timeLabel(ev.starts_at)) +
-      " Uhr</span>" +
-      '<strong class="acc-post__title">' +
-      esc(title) +
-      "</strong>" +
-      (ev.location ? '<span class="acc-post__place">' + esc(ev.location) + "</span>" : "") +
-      noteHtml +
-      '<div class="acc-post__author">' +
-      avatarHtml(p, "acc-face") +
-      "<span>" +
-      esc(p.name) +
-      "</span></div>" +
-      (upcoming
-        ? '<button type="button" class="acc-rsvp' +
-          (going ? " is-on" : "") +
-          '" data-rsvp="' +
-          esc(ev.id) +
-          '">' +
-          (going ? "Zugesagt" : "Bin dabei") +
-          "</button>" +
-          rsvpRowHtml(ev.id)
-        : "") +
-      commentsHtml(ev.id) +
-      "</div></article>"
+      '<p class="acc-card__desc">' +
+      esc(pack.text) +
+      ' <button type="button" class="acc-card__more" data-more-desc="1">mehr</button></p>' +
+      '<p class="acc-card__desc-full" hidden>' +
+      esc(pack.full) +
+      "</p>"
     );
+  }
+
+  function authorHtml(person, show) {
+    if (!show || !person) return "";
+    return (
+      '<div class="acc-card__author">' +
+      avatarHtml(person, "acc-face") +
+      "<span>" +
+      esc(person.name || "?") +
+      "</span></div>"
+    );
+  }
+
+  function actionRowHtml(opts) {
+    var btn = "";
+    if (opts.doneBtn) {
+      btn =
+        '<button type="button" class="acc-rsvp" data-done="' +
+        esc(opts.doneBtn) +
+        '">Erledigt</button>';
+    } else if (opts.rsvpId) {
+      btn =
+        '<button type="button" class="acc-rsvp' +
+        (opts.going ? " is-on" : "") +
+        '" data-rsvp="' +
+        esc(opts.rsvpId) +
+        '">' +
+        (opts.going ? "Zugesagt" : "Bin dabei") +
+        "</button>";
+    } else if (opts.ffcRsvpId) {
+      btn =
+        '<button type="button" class="acc-rsvp' +
+        (opts.going ? " is-on" : "") +
+        '" data-ffc-rsvp="' +
+        esc(opts.ffcRsvpId) +
+        '">' +
+        (opts.going ? "Zugesagt" : "Bin dabei") +
+        "</button>";
+    }
+    var faces = opts.facesHtml || "";
+    if (!btn && !faces) return "";
+    return '<div class="acc-card__actions">' + btn + faces + "</div>";
+  }
+
+  function renderCardShell(opts) {
+    return (
+      '<article class="acc-card' +
+      (opts.extraClass ? " " + opts.extraClass : "") +
+      '"' +
+      (opts.attrs || "") +
+      ">" +
+      mediaHtml(opts) +
+      (opts.actions || "") +
+      '<div class="acc-card__body">' +
+      (opts.author || "") +
+      '<p class="acc-card__when">' +
+      esc(opts.when || "") +
+      "</p>" +
+      (opts.title
+        ? '<h2 class="acc-card__title">' + esc(opts.title) + "</h2>"
+        : "") +
+      (opts.place ? '<p class="acc-card__place">' + esc(opts.place) + "</p>" : "") +
+      (opts.desc || "") +
+      "</div>" +
+      (opts.comments || "") +
+      "</article>"
+    );
+  }
+
+  function renderSpontanCard() {
+    return renderCardShell({
+      extraClass: "acc-card--spontan",
+      attrs: ' data-spontan="1" role="button" tabindex="0"',
+      category: "spontan",
+      plus: true,
+      when: "Jetzt · Spontanes Event loggen",
+      title: "",
+      place: "",
+      desc: "",
+      actions: "",
+      comments: ""
+    });
+  }
+
+  function renderEventCard(ev) {
+    var uid = me();
+    var mine = String(ev.user_id) === uid;
+    var upcoming = ev.status === "geplant";
+    var past = ev.status === "erledigt";
+    var p = personOf(ev.user_id);
+    var emoji = emojiFor(ev.category, ev.title);
+    var title = (emoji + " " + (ev.title || ev.category)).trim();
+    var actions = "";
+    if (upcoming && mine && dayKey(ev.starts_at) === todayIso()) {
+      actions = actionRowHtml({
+        doneBtn: ev.id,
+        facesHtml: rsvpRowHtml(ev.id)
+      });
+    } else if (upcoming && !mine) {
+      actions = actionRowHtml({
+        rsvpId: ev.id,
+        going: iAmGoing(ev.id),
+        facesHtml: rsvpRowHtml(ev.id)
+      });
+    } else if (upcoming && mine) {
+      actions = actionRowHtml({ facesHtml: rsvpRowHtml(ev.id) });
+    } else if (past) {
+      actions = actionRowHtml({ facesHtml: rsvpRowHtml(ev.id) });
+    }
+    return renderCardShell({
+      attrs:
+        ' data-post-id="' +
+        esc(ev.id) +
+        '" data-event-id="' +
+        esc(ev.id) +
+        '"',
+      category: ev.category,
+      photo: ev.photo_url || "",
+      emoji: emoji,
+      actions: actions,
+      author: authorHtml(p, !mine),
+      when: whenLine(ev.starts_at),
+      title: title,
+      place: ev.location || "",
+      desc: descHtml(ev.note),
+      comments: commentsHtml(ev.id)
+    });
+  }
+
+  function renderFfcCard(ev) {
+    var upcoming = new Date(ev.starts_at).getTime() >= Date.now() - 3600000;
+    var going = ev.my_going === true;
+    var mine = !!ev.is_mine;
+    var authorName = ev.creator_nickname || "Team";
+    var authorPerson = { name: authorName, photo: "" };
+    var actions = "";
+    if (upcoming && mine && dayKey(ev.starts_at) === todayIso()) {
+      /* FFC-eigene: kein Erledigt-Modal der Accountability — nur Faces */
+      actions = actionRowHtml({ facesHtml: ffcFacesHtml(ev) });
+    } else if (upcoming && !mine) {
+      actions = actionRowHtml({
+        ffcRsvpId: ev.id,
+        going: going,
+        facesHtml: ffcFacesHtml(ev)
+      });
+    } else if (upcoming) {
+      actions = actionRowHtml({ facesHtml: ffcFacesHtml(ev) });
+    }
+    return renderCardShell({
+      attrs:
+        ' data-post-id="ffc-' +
+        esc(ev.id) +
+        '" data-ffc-id="' +
+        esc(ev.id) +
+        '"',
+      category: "zirkel",
+      photo: ev.image_url || "",
+      emoji: "🔥",
+      actions: actions,
+      author: authorHtml(authorPerson, !mine),
+      when: whenLine(ev.starts_at),
+      title: "🔥 " + (ev.title || "Zirkeltraining"),
+      place: ev.location || "",
+      desc: "",
+      comments: ""
+    });
+  }
+
+  function renderDiaryCard(item) {
+    var p = personOf(item.user_id);
+    var mine = String(item.user_id) === me();
+    var emoji = emojiFor(item.category || "kraft", item.title);
+    var title = (emoji + " " + (item.title || "Training")).trim();
+    return renderCardShell({
+      attrs: ' data-post-id="diary-' + esc(item.id) + '" data-diary-id="' + esc(item.id) + '"',
+      category: item.category || "kraft",
+      photo: item.photo_url || "",
+      emoji: emoji,
+      actions: "",
+      author: authorHtml(p, !mine),
+      when: whenLine(item.starts_at),
+      title: title,
+      place: item.location || "",
+      desc: descHtml(item.note),
+      comments: item.commentKey ? commentsHtml(item.commentKey) : ""
+    });
   }
 
   function emptyTeamHtml() {
@@ -662,6 +787,93 @@
       '<button type="button" class="acc-btn" data-invite-group="1">Gruppe einladen</button>' +
       "</div>"
     );
+  }
+
+  function sortOwnFirst(a, b) {
+    var uid = me();
+    var aMine = a._mine ? 1 : 0;
+    var bMine = b._mine ? 1 : 0;
+    if (aMine !== bMine) return bMine - aMine;
+    return String(a.starts_at || "").localeCompare(String(b.starts_at || ""));
+  }
+
+  function buildFeedItems(flags) {
+    var today = todayIso();
+    var pack = filterOwnEvents(flags);
+    var ffc = filterFfcEvents(flags);
+    var myToday = [];
+    var upcoming = [];
+    var history = [];
+
+    pack.upcoming.forEach(function (ev) {
+      var item = {
+        kind: "event",
+        starts_at: ev.starts_at,
+        _mine: String(ev.user_id) === me(),
+        ev: ev
+      };
+      if (item._mine && dayKey(ev.starts_at) === today) myToday.push(item);
+      else upcoming.push(item);
+    });
+
+    ffc.forEach(function (ev) {
+      var item = {
+        kind: "ffc",
+        starts_at: ev.starts_at,
+        _mine: !!ev.is_mine,
+        ev: ev
+      };
+      if (item._mine && dayKey(ev.starts_at) === today) myToday.push(item);
+      else upcoming.push(item);
+    });
+
+    pack.past.forEach(function (ev) {
+      history.push({
+        kind: "event",
+        starts_at: ev.starts_at,
+        _mine: String(ev.user_id) === me(),
+        ev: ev
+      });
+    });
+
+    if (flags.showOwnHistory || flags.showFriendsHistory) {
+      var diaryItems =
+        host && host.heuteHistoryItems
+          ? host.heuteHistoryItems({
+              showOwn: !!flags.showOwnHistory,
+              showFriends: !!flags.showFriendsHistory
+            }) || []
+          : [];
+      diaryItems.forEach(function (d) {
+        if (!d || !d.starts_at) return;
+        history.push({
+          kind: "diary",
+          starts_at: d.starts_at,
+          _mine: String(d.user_id) === me(),
+          item: d
+        });
+      });
+    }
+
+    myToday.sort(sortOwnFirst);
+    upcoming.sort(function (a, b) {
+      var c = String(a.starts_at).localeCompare(String(b.starts_at));
+      if (c) return c;
+      return sortOwnFirst(a, b);
+    });
+    history.sort(function (a, b) {
+      var c = String(b.starts_at).localeCompare(String(a.starts_at));
+      if (c) return c;
+      return sortOwnFirst(a, b);
+    });
+
+    return { myToday: myToday, upcoming: upcoming, history: history };
+  }
+
+  function renderFeedItem(item) {
+    if (item.kind === "ffc") return renderFfcCard(item.ev);
+    if (item.kind === "diary") return renderDiaryCard(item.item);
+    return renderEventCard(item.ev);
   }
 
   function bindObserver(root) {
@@ -711,33 +923,36 @@
       share.style.display = "none";
     }
 
+    /* Historie läuft im einheitlichen Feed — alter Diary-Block bleibt leer */
     var diary = $("heute-diary-feed");
-    if (flags.showOwnHistory || flags.showFriendsHistory) {
-      if (diary) diary.hidden = false;
-      if (host.paintHeuteDiaryFeed) host.paintHeuteDiaryFeed();
-    } else if (diary) {
+    if (diary) {
       diary.hidden = true;
       diary.textContent = "";
     }
 
     if (host.paintHeuteJoins) host.paintHeuteJoins(flags);
 
+    var feed = buildFeedItems(flags);
     root.hidden = false;
-    var html = renderStartTile();
+    var html = "";
+    feed.myToday.forEach(function (item) {
+      html += renderFeedItem(item);
+    });
+    html += renderSpontanCard();
+    feed.upcoming.forEach(function (item) {
+      html += renderFeedItem(item);
+    });
+    feed.history.forEach(function (item) {
+      html += renderFeedItem(item);
+    });
 
-    var ffcList = filterFfcEvents(flags);
-    html += ffcList.map(renderFfcPost).join("");
-
-    var pack = filterOwnEvents(flags);
-    /* In Ich/Team nur kommende Accountability-Events; Historie über Tagebuch-Feed */
-    var posts = flags.showOwnHistory || flags.showFriendsHistory
-      ? pack.upcoming
-      : pack.upcoming;
-
-    if (f === "team" && !ffcList.length && !posts.length) {
+    if (
+      f === "team" &&
+      !feed.myToday.length &&
+      !feed.upcoming.length &&
+      !feed.history.length
+    ) {
       html += emptyTeamHtml();
-    } else {
-      html += posts.map(renderPost).join("");
     }
 
     root.innerHTML = html;
@@ -914,19 +1129,52 @@
       });
   }
 
-  function addComment(eventId) {
-    var text = global.prompt("Kommentar");
-    if (!text || !String(text).trim()) return;
+  function paintCommentsBox(eventId) {
+    var box = document.querySelector('[data-comments="' + eventId + '"]');
+    if (!box) return;
+    var html = commentsHtml(eventId);
+    var tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    var next = tmp.firstChild;
+    if (next) box.replaceWith(next);
+  }
+
+  function addComment(eventId, text) {
+    text = String(text || "").trim();
+    if (!text || !eventId || !me()) return;
+    var temp = {
+      id: "local-" + Date.now(),
+      event_id: eventId,
+      account_id: me(),
+      text: text.slice(0, 500),
+      created_at: new Date().toISOString()
+    };
+    if (!state.comments[eventId]) state.comments[eventId] = [];
+    state.comments[eventId].push(temp);
+    personOf(me());
+    paintCommentsBox(eventId);
     rest("event_comments", {
       method: "POST",
-      prefer: "return=minimal",
+      prefer: "return=representation",
       body: {
         event_id: eventId,
         account_id: me(),
-        text: String(text).trim().slice(0, 500)
+        text: temp.text
       }
     })
-      .then(refresh)
+      .then(function (rows) {
+        var saved = Array.isArray(rows) ? rows[0] : rows;
+        if (saved && saved.id) {
+          var list = state.comments[eventId] || [];
+          for (var i = 0; i < list.length; i++) {
+            if (list[i].id === temp.id) {
+              list[i] = saved;
+              break;
+            }
+          }
+          paintCommentsBox(eventId);
+        }
+      })
       .catch(function () {});
   }
 
@@ -1103,7 +1351,17 @@
 
   function onRootClick(e) {
     var t = e.target;
-    if (t.closest("#heute-acc-start") || t.id === "heute-acc-start") {
+    var moreDesc = t.closest("[data-more-desc]");
+    if (moreDesc) {
+      var card = moreDesc.closest(".acc-card");
+      var short = card && card.querySelector(".acc-card__desc");
+      var full = card && card.querySelector(".acc-card__desc-full");
+      if (short) short.hidden = true;
+      if (full) full.hidden = false;
+      return;
+    }
+    var spontan = t.closest("[data-spontan]");
+    if (spontan) {
       if (host.openGoPick) host.openGoPick();
       return;
     }
@@ -1133,12 +1391,19 @@
         '[data-rest-comments="' + more.getAttribute("data-more-comments") + '"]'
       );
       if (restBox) restBox.hidden = !restBox.hidden;
-      return;
+      more.hidden = true;
     }
-    var add = t.closest("[data-add-comment]");
-    if (add) {
-      addComment(add.getAttribute("data-add-comment"));
-    }
+  }
+
+  function onRootSubmit(e) {
+    var form = e.target && e.target.closest ? e.target.closest("[data-comment-form]") : null;
+    if (!form) return;
+    e.preventDefault();
+    var eventId = form.getAttribute("data-comment-form");
+    var input = form.querySelector(".acc-comment-input");
+    var text = input ? input.value : "";
+    if (input) input.value = "";
+    addComment(eventId, text);
   }
 
   function refresh() {
@@ -1167,7 +1432,7 @@
   }
 
   function install(h) {
-    host = h || {};
+    host = h || host || {};
     saveFilter(loadFilter());
     var sel = $("heute-filter-select");
     if (sel) {
@@ -1189,6 +1454,7 @@
     if (root && root.dataset.bound !== "1") {
       root.dataset.bound = "1";
       root.addEventListener("click", onRootClick);
+      root.addEventListener("submit", onRootSubmit);
     }
     var doneOk = $("acc-done-ok");
     if (doneOk) doneOk.addEventListener("click", submitDone);
