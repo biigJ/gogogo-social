@@ -99,3 +99,65 @@ create policy "activity_log_insert_anon"
 
 create index if not exists activity_log_account_idx
   on activity_log (account_id, created_at desc);
+
+-- ---------------------------------------------------------------------------
+-- 4) support_orders: status aktiv + payment_status (nullable → main bleibt ok)
+-- ---------------------------------------------------------------------------
+alter table support_orders
+  add column if not exists payment_status text;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'support_orders_payment_status_check'
+  ) then
+    alter table support_orders
+      add constraint support_orders_payment_status_check
+      check (
+        payment_status is null
+        or payment_status in ('offen', 'bezahlt', 'gratis')
+      );
+  end if;
+end $$;
+
+-- Status-Constraint erweitern: angefragt | freigeschaltet | aktiv
+do $$
+declare
+  cname text;
+begin
+  select con.conname into cname
+  from pg_constraint con
+  join pg_class rel on rel.oid = con.conrelid
+  join pg_namespace nsp on nsp.oid = rel.relnamespace
+  where nsp.nspname = 'public'
+    and rel.relname = 'support_orders'
+    and con.contype = 'c'
+    and pg_get_constraintdef(con.oid) ilike '%status%';
+
+  if cname is not null then
+    execute format('alter table support_orders drop constraint %I', cname);
+  end if;
+
+  alter table support_orders
+    add constraint support_orders_status_check
+    check (status in ('angefragt', 'freigeschaltet', 'aktiv'));
+exception
+  when duplicate_object then null;
+end $$;
+
+update support_orders
+set status = 'aktiv'
+where status = 'freigeschaltet';
+
+update support_orders o
+set payment_status = case
+  when coalesce((select p.price_eur from support_products p where p.id = o.product_id), 0) = 0
+    then 'gratis'
+  else coalesce(o.payment_status, 'offen')
+end
+where o.payment_status is null;
+
+-- Meta für Heute-Karten (z. B. geplantes Call-Datum)
+alter table support_orders
+  add column if not exists meta jsonb not null default '{}'::jsonb;

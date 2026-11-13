@@ -933,6 +933,21 @@
       else upcoming.push(item);
     });
 
+    /* Support / Ernährung / PT / Web-Call (GoSupport) */
+    if (host && host.heuteSupportItems) {
+      (host.heuteSupportItems() || []).forEach(function (s) {
+        if (!s || !s.starts_at) return;
+        var item = {
+          kind: s.nutrition ? "nutrition" : "support",
+          starts_at: s.starts_at,
+          _mine: true,
+          item: s
+        };
+        if (dayKey(s.starts_at) === today) myToday.push(item);
+        else upcoming.push(item);
+      });
+    }
+
     ffc.forEach(function (ev) {
       if (flags.groupOnly && !ev.is_mine && ev.my_going !== true) return;
       var item = {
@@ -994,7 +1009,53 @@
     if (item.kind === "ffc") return renderFfcCard(item.ev);
     if (item.kind === "diary") return renderDiaryCard(item.item);
     if (item.kind === "plan") return renderPlanCard(item.item);
+    if (item.kind === "nutrition") return renderNutritionCard(item.item);
+    if (item.kind === "support") return renderSupportCard(item.item);
     return renderEventCard(item.ev);
+  }
+
+  function renderSupportCard(item) {
+    var emoji = emojiFor(item.category, item.title);
+    return renderCardShell({
+      extraClass: "acc-card--support",
+      attrs:
+        ' data-post-id="' +
+        esc(item.id) +
+        '" data-support="' +
+        esc(item.supportType || item.item_type || "") +
+        '"',
+      category: item.category || "alternative",
+      photo: item.photo_url || "",
+      emoji: emoji,
+      author: authorHtml(personOf(me()), false),
+      when: whenLine(item.starts_at),
+      title: item.title || "Support",
+      place: item.location || "",
+      desc: descHtml(item.note),
+      postId: String(item.id),
+      actions: ""
+    });
+  }
+
+  function renderNutritionCard(item) {
+    var form =
+      '<form class="acc-nutrition-form" data-nutrition-form="1">' +
+      '<textarea maxlength="500" placeholder="Abendessen diktieren oder tippen (privat)…" enterkeyhint="done" autocomplete="off"></textarea>' +
+      '<button type="submit">Speichern</button></form>';
+    return renderCardShell({
+      extraClass: "acc-card--nutrition",
+      attrs: ' data-post-id="' + esc(item.id) + '" data-nutrition="1"',
+      category: "alternative",
+      emoji: "🥗",
+      when: "Heute · ab 19:00 · privat",
+      title: "Ernährung",
+      place: "Coach-Plan",
+      desc:
+        (item.note
+          ? '<p class="acc-card__desc">' + esc(item.note) + "</p>"
+          : "") + form,
+      actions: ""
+    });
   }
 
   function bindObserver(root) {
@@ -1611,6 +1672,23 @@
   }
 
   function onRootSubmit(e) {
+    var nutri = e.target && e.target.closest ? e.target.closest("[data-nutrition-form]") : null;
+    if (nutri) {
+      e.preventDefault();
+      var ta = nutri.querySelector("textarea");
+      var text = ta ? ta.value : "";
+      if (!String(text || "").trim()) return;
+      var save =
+        host && host.saveNutritionLog
+          ? Promise.resolve(host.saveNutritionLog(text))
+          : Promise.resolve();
+      save.then(function () {
+        if (ta) ta.value = "";
+        if (host && host.toast) host.toast("Ernährung gespeichert (privat)");
+        refresh();
+      });
+      return;
+    }
     var form = e.target && e.target.closest ? e.target.closest("[data-comment-form]") : null;
     if (!form) return;
     e.preventDefault();
