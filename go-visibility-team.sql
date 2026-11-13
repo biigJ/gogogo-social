@@ -5,13 +5,20 @@
 
 -- ---------------------------------------------------------------------------
 -- 1) groups + group_members (vorbereitet, ohne UI)
+-- Bestehende Tabelle public.groups (z. B. „Joschas Kreis“) wird erweitert,
+-- nicht neu angelegt.
 -- ---------------------------------------------------------------------------
 create table if not exists groups (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  created_by uuid references go_accounts(id) on delete set null,
   created_at timestamptz not null default now()
 );
+
+alter table groups
+  add column if not exists created_by uuid references go_accounts(id) on delete set null;
+
+alter table groups
+  add column if not exists created_at timestamptz not null default now();
 
 create table if not exists group_members (
   group_id uuid not null references groups(id) on delete cascade,
