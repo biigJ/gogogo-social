@@ -17,28 +17,25 @@
   };
 
   var FILTER_KEY = "gogogo_heute_filter_v3";
-  var VIEW_LEVEL = { ich: 0, team: 1, tagebuch: 2, alles: 3 };
+  /* Ich ⊂ Team ⊂ Gruppe ⊂ Tagebuch ⊂ Alles — Gruppe nur wenn vorhanden */
+  var VIEW_LEVEL = { ich: 0, team: 1, gruppe: 1, tagebuch: 2, alles: 3 };
 
-  /* Eine Filterfunktion mit Parametern — Ich ⊂ Team ⊂ Tagebuch ⊂ Alles */
   function viewFlags(view) {
     view = normalizeFilter(view) || "ich";
     var level = VIEW_LEVEL[view] != null ? VIEW_LEVEL[view] : 0;
     return {
       view: view,
       level: level,
-      /* Team+: offene Fremd-Einladungen / Anfragen */
+      groupOnly: view === "gruppe",
       showIncomingInvites: level >= 1,
-      /* FFC: (a) eigene immer; zugesagte immer; (b) offene Einladungen ab Team */
       showOwnFfc: true,
       showAcceptedFfc: true,
       showPendingFfcInvites: level >= 1,
-      /* Historie */
       showOwnHistory: level >= 2,
       showFriendsHistory: level >= 3,
-      /* Accountability-Events anderer (visibility team/gruppe) ab Team-Ansicht */
       showOthersUpcoming: level >= 1,
-      /* Zugesagte Events anderer auch in Ich */
-      showRsvpdUpcoming: true
+      showRsvpdUpcoming: true,
+      showPlanDays: true
     };
   }
 
@@ -84,11 +81,28 @@
   }
 
   function normalizeFilter(v) {
-    if (v === "crew") return "team"; /* Alias: Crew = Team */
+    if (v === "crew") return "team";
     if (v === "all") return "alles";
     if (v === "mine") return "ich";
-    if (["ich", "team", "tagebuch", "alles"].indexOf(v) >= 0) return v;
+    if (String(v || "").indexOf("group:") === 0) return "gruppe";
+    if (["ich", "team", "gruppe", "tagebuch", "alles"].indexOf(v) >= 0) return v;
     return "";
+  }
+
+  function groupMemberIdSet() {
+    var ids = host && host.groupMemberIds ? host.groupMemberIds() || [] : [];
+    var set = {};
+    ids.forEach(function (id) {
+      if (id) set[String(id)] = true;
+    });
+    return set;
+  }
+
+  function inGroupFilter(userId, flags) {
+    if (!flags || !flags.groupOnly) return true;
+    var uid = String(userId || "");
+    if (!uid || uid === me()) return true;
+    return !!groupMemberIdSet()[uid];
   }
 
   function loadFilter() {
@@ -229,9 +243,9 @@
       return Promise.resolve();
     }
     var from = new Date();
-    from.setDate(from.getDate() - 30);
+    from.setDate(from.getDate() - 180);
     var to = new Date();
-    to.setDate(to.getDate() + 8);
+    to.setDate(to.getDate() + 14);
     var fromIso = from.toISOString();
     var toIso = to.toISOString();
     return rest(
@@ -239,7 +253,7 @@
         encodeURIComponent(fromIso) +
         "&starts_at=lte." +
         encodeURIComponent(toIso) +
-        "&order=starts_at.asc&limit=200"
+        "&order=starts_at.desc&limit=500"
     )
       .then(function (rows) {
         state.events = rows || [];
@@ -404,16 +418,17 @@
     if (ev.status === "geplant") {
       if (t < now - 3600000 || t > week) return false;
       if (mine) return true;
-      /* Nach Zusage auch in Ich */
-      if (flags.showRsvpdUpcoming && iAmGoing(ev.id)) return true;
-      /* Fremde team/gruppe-Events ab Team-Ansicht */
+      if (flags.showRsvpdUpcoming && iAmGoing(ev.id)) {
+        return inGroupFilter(ev.user_id, flags);
+      }
       if (!flags.showOthersUpcoming) return false;
-      return vis === "team" || vis === "gruppe";
+      if (!(vis === "team" || vis === "gruppe")) return false;
+      return inGroupFilter(ev.user_id, flags);
     }
     if (ev.status === "erledigt") {
       if (mine) return !!flags.showOwnHistory;
-      /* Freunde-Historie nur in Alles; privat bleibt draußen (oben) */
-      return !!flags.showFriendsHistory && (vis === "team" || vis === "gruppe");
+      if (!flags.showFriendsHistory || !(vis === "team" || vis === "gruppe")) return false;
+      return inGroupFilter(ev.user_id, flags);
     }
     return false;
   }
@@ -556,26 +571,45 @@
     );
   }
 
-  function mediaHtml(opts) {
-    var photo = opts.photo || "";
-    var emoji = opts.emoji || "";
-    var tone = toneClass(opts.category);
-    if (photo) {
-      return (
-        '<div class="acc-card__media ' +
-        tone +
-        ' has-photo" style="background-image:url(\'' +
-        esc(photo) +
-        "')\"></div>"
-      );
+  function mediaInnerHtml(opts) {
+    if (opts.photo) {
+      return '<img class="acc-card__photo" src="' + esc(opts.photo) + '" alt="" />';
     }
+    if (opts.plus) return '<span class="acc-card__plus">+</span>';
+    return (
+      '<span class="acc-card__emoji" aria-hidden="true">' +
+      esc(opts.emoji || "") +
+      "</span>"
+    );
+  }
+
+  function overlayHtml(opts) {
+    return (
+      '<div class="acc-card__overlay">' +
+      (opts.author || "") +
+      (opts.when
+        ? '<p class="acc-card__when">' + esc(opts.when) + "</p>"
+        : "") +
+      (opts.title
+        ? '<h2 class="acc-card__title">' + esc(opts.title) + "</h2>"
+        : "") +
+      (opts.place
+        ? '<p class="acc-card__place">' + esc(opts.place) + "</p>"
+        : "") +
+      (opts.desc || "") +
+      "</div>"
+    );
+  }
+
+  function mediaHtml(opts) {
+    var tone = toneClass(opts.category);
     return (
       '<div class="acc-card__media ' +
       tone +
+      (opts.photo ? " has-photo" : "") +
       '">' +
-      (opts.plus
-        ? '<span class="acc-card__plus">+</span>'
-        : '<span class="acc-card__emoji" aria-hidden="true">' + esc(emoji) + "</span>") +
+      mediaInnerHtml(opts) +
+      overlayHtml(opts) +
       "</div>"
     );
   }
@@ -645,17 +679,6 @@
       ">" +
       mediaHtml(opts) +
       (opts.actions || "") +
-      '<div class="acc-card__body">' +
-      (opts.author || "") +
-      '<p class="acc-card__when">' +
-      esc(opts.when || "") +
-      "</p>" +
-      (opts.title
-        ? '<h2 class="acc-card__title">' + esc(opts.title) + "</h2>"
-        : "") +
-      (opts.place ? '<p class="acc-card__place">' + esc(opts.place) + "</p>" : "") +
-      (opts.desc || "") +
-      "</div>" +
       (opts.comments || "") +
       "</article>"
     );
@@ -780,23 +803,42 @@
     });
   }
 
-  function emptyTeamHtml() {
-    return (
-      '<div class="acc-empty">' +
-      "<p>Noch keine Beiträge vom Team. Lade deine Gruppe ein.</p>" +
-      '<button type="button" class="acc-btn" data-invite-group="1">Gruppe einladen</button>' +
-      "</div>"
-    );
-  }
-
   function sortOwnFirst(a, b) {
-    var uid = me();
     var aMine = a._mine ? 1 : 0;
     var bMine = b._mine ? 1 : 0;
     if (aMine !== bMine) return bMine - aMine;
     return String(a.starts_at || "").localeCompare(String(b.starts_at || ""));
   }
 
+  function renderPlanCard(item) {
+    var emoji = emojiFor(item.category || "kraft", item.title);
+    var title = item.title || "Training";
+    if (emoji && title.indexOf(emoji) !== 0) title = (emoji + " " + title).trim();
+    return renderCardShell({
+      attrs:
+        ' data-post-id="plan-' +
+        esc(item.id) +
+        '" data-plan-iso="' +
+        esc(item.iso || "") +
+        '"',
+      category: item.category || "kraft",
+      photo: item.photo_url || "",
+      emoji: emoji,
+      actions: "",
+      author: "",
+      when: item.when || whenLine(item.starts_at),
+      title: title,
+      place: item.location || "",
+      desc: descHtml(item.note || ""),
+      comments: ""
+    });
+  }
+
+  /* Reihenfolge-Regel:
+     1) Meine Events von heute (Plan + eigene Events/FFC)
+     2) Spontan-Karte
+     3) Kommende (morgen zuerst, dann später; eigene vor fremden bei Gleichstand)
+     4) Historie (Tagebuch+), neueste zuerst */
   function buildFeedItems(flags) {
     var today = todayIso();
     var pack = filterOwnEvents(flags);
@@ -804,6 +846,22 @@
     var myToday = [];
     var upcoming = [];
     var history = [];
+    var seenPlan = {};
+
+    if (flags.showPlanDays && host && host.heutePlanItems) {
+      (host.heutePlanItems() || []).forEach(function (p) {
+        if (!p || !p.starts_at) return;
+        var item = {
+          kind: "plan",
+          starts_at: p.starts_at,
+          _mine: true,
+          item: p
+        };
+        seenPlan[dayKey(p.starts_at)] = true;
+        if (dayKey(p.starts_at) === today) myToday.push(item);
+        else upcoming.push(item);
+      });
+    }
 
     pack.upcoming.forEach(function (ev) {
       var item = {
@@ -817,6 +875,7 @@
     });
 
     ffc.forEach(function (ev) {
+      if (flags.groupOnly && !ev.is_mine && ev.my_going !== true) return;
       var item = {
         kind: "ffc",
         starts_at: ev.starts_at,
@@ -841,11 +900,13 @@
         host && host.heuteHistoryItems
           ? host.heuteHistoryItems({
               showOwn: !!flags.showOwnHistory,
-              showFriends: !!flags.showFriendsHistory
+              showFriends: !!flags.showFriendsHistory,
+              groupOnly: !!flags.groupOnly
             }) || []
           : [];
       diaryItems.forEach(function (d) {
         if (!d || !d.starts_at) return;
+        if (flags.groupOnly && !inGroupFilter(d.user_id, flags)) return;
         history.push({
           kind: "diary",
           starts_at: d.starts_at,
@@ -867,12 +928,13 @@
       return sortOwnFirst(a, b);
     });
 
-    return { myToday: myToday, upcoming: upcoming, history: history };
+    return { myToday: myToday, upcoming: upcoming, history: history, seenPlan: seenPlan };
   }
 
   function renderFeedItem(item) {
     if (item.kind === "ffc") return renderFfcCard(item.ev);
     if (item.kind === "diary") return renderDiaryCard(item.item);
+    if (item.kind === "plan") return renderPlanCard(item.item);
     return renderEventCard(item.ev);
   }
 
@@ -935,25 +997,20 @@
     var feed = buildFeedItems(flags);
     root.hidden = false;
     var html = "";
+    /* 1) Heute (meine) */
     feed.myToday.forEach(function (item) {
       html += renderFeedItem(item);
     });
+    /* 2) Spontan direkt unter Heute-Event(s) */
     html += renderSpontanCard();
+    /* 3) Kommende */
     feed.upcoming.forEach(function (item) {
       html += renderFeedItem(item);
     });
+    /* 4) Historie */
     feed.history.forEach(function (item) {
       html += renderFeedItem(item);
     });
-
-    if (
-      f === "team" &&
-      !feed.myToday.length &&
-      !feed.upcoming.length &&
-      !feed.history.length
-    ) {
-      html += emptyTeamHtml();
-    }
 
     root.innerHTML = html;
     bindObserver(root);
@@ -1360,14 +1417,15 @@
       if (full) full.hidden = false;
       return;
     }
+    var planCard = t.closest("[data-plan-iso]");
+    if (planCard && !t.closest(".acc-card__actions") && !t.closest(".acc-comments")) {
+      var iso = planCard.getAttribute("data-plan-iso");
+      if (iso && host.openPlanDay) host.openPlanDay(iso);
+      return;
+    }
     var spontan = t.closest("[data-spontan]");
     if (spontan) {
       if (host.openGoPick) host.openGoPick();
-      return;
-    }
-    var invite = t.closest("[data-invite-group]");
-    if (invite) {
-      if (host.openGruppen) host.openGruppen();
       return;
     }
     var done = t.closest("[data-done]");
@@ -1436,12 +1494,16 @@
     saveFilter(loadFilter());
     var sel = $("heute-filter-select");
     if (sel) {
-      sel.innerHTML =
-        '<option value="ich">Ich</option>' +
-        '<option value="team">Team</option>' +
-        '<option value="tagebuch">Tagebuch</option>' +
-        '<option value="alles">Alles</option>';
-      sel.value = state.filter;
+      if (host && host.syncHeuteFilterOptions) host.syncHeuteFilterOptions();
+      else {
+        sel.innerHTML =
+          '<option value="ich">Ich</option>' +
+          '<option value="team">Team</option>' +
+          '<option value="tagebuch">Tagebuch</option>' +
+          '<option value="alles">Alles</option>';
+      }
+      if (!normalizeFilter(sel.value)) sel.value = state.filter || "ich";
+      else state.filter = normalizeFilter(sel.value) || "ich";
       if (sel.dataset.accBound !== "1") {
         sel.dataset.accBound = "1";
         sel.addEventListener("change", function () {
