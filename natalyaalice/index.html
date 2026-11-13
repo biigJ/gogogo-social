@@ -5545,7 +5545,7 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=acc-5"></script>
+  <script src="/natalyaalice/heute-v3.js?v=friends-1"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -5664,7 +5664,7 @@
       var diaryPosts = [];
       var diaryPeople = {};
       var sharedEntries = [];
-      var diaryBuddyIds = {};
+      var diaryFriendIds = {};
       var diaryNote = false;
       var pendingShare = "";
       var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
@@ -7889,7 +7889,7 @@
         var vis = person.diary_visibility || "private";
         if (vis === "trainer" && String(person.trainer_id || "") === String(sessionAccount.id)) return true;
         /* Freunde-Historie folgt deren Profil-Setting „Historie mit Freunden teilen“ */
-        if (vis === "friends" && diaryBuddyIds[String(person.id)]) return true;
+        if (vis === "friends" && diaryFriendIds[String(person.id)]) return true;
         return false;
       }
 
@@ -7925,28 +7925,28 @@
         if (author && author.is_trainer && fromId !== me && toId !== me) return false;
         if (toId) {
           if (toId === me || fromId === me) return true;
-          if (diaryBuddyIds[fromId] && diaryBuddyIds[toId]) return true;
+          if (diaryFriendIds[fromId] && diaryFriendIds[toId]) return true;
           return canReadDiary(diaryPeople[toId]);
         }
-        return fromId === me || !!diaryBuddyIds[fromId] || canReadDiary(author);
+        return fromId === me || !!diaryFriendIds[fromId] || canReadDiary(author);
       }
 
       function loadDiaryShare() {
         if (!sessionMode || !sessionAccount) return Promise.resolve();
         var me = String(sessionAccount.id);
-        return rest("go_buddies?account_id=eq." + encodeURIComponent(me) + "&select=buddy_id")
+        return rest("go_friends?account_id=eq." + encodeURIComponent(me) + "&select=friend_id")
           .catch(function () { return []; })
           .then(function (links) {
-            diaryBuddyIds = {};
+            diaryFriendIds = {};
             (links || []).forEach(function (row) {
-              if (row && row.buddy_id) diaryBuddyIds[String(row.buddy_id)] = true;
+              if (row && row.friend_id) diaryFriendIds[String(row.friend_id)] = true;
             });
             return rest("go_accounts?trainer_id=eq." + encodeURIComponent(me) + "&select=id")
               .catch(function () { return []; });
           })
           .then(function (trainees) {
             var ids = [me];
-            Object.keys(diaryBuddyIds).forEach(function (id) { ids.push(id); });
+            Object.keys(diaryFriendIds).forEach(function (id) { ids.push(id); });
             (trainees || []).forEach(function (row) { if (row && row.id) ids.push(String(row.id)); });
             if (sessionAccount.trainer_id) ids.push(String(sessionAccount.trainer_id));
             var seen = {};
@@ -11205,19 +11205,19 @@
               if (!selfIds.length) selfIds.push(id);
               var selfFilter = "in.(" + selfIds.map(encodeURIComponent).join(",") + ")";
               return Promise.all([
-                rest("go_buddies?account_id=" + selfFilter + "&select=account_id,buddy_id").catch(function () { return []; }),
-                rest("go_buddies?buddy_id=" + selfFilter + "&select=account_id,buddy_id").catch(function () { return []; }),
+                rest("go_friends?account_id=" + selfFilter + "&select=account_id,friend_id").catch(function () { return []; }),
+                rest("go_friends?friend_id=" + selfFilter + "&select=account_id,friend_id").catch(function () { return []; }),
                 rest("go_accounts?trainer_id=" + selfFilter + "&select=" + personSelect).catch(function () { return []; })
               ]).then(function (pack) {
                 var ids = [];
-                var seenBuddy = {};
+                var seenFriend = {};
                 function addPerson(pid) {
                   pid = pid ? String(pid) : "";
-                  if (!pid || selfIds.indexOf(pid) >= 0 || seenBuddy[pid]) return;
-                  seenBuddy[pid] = true;
+                  if (!pid || selfIds.indexOf(pid) >= 0 || seenFriend[pid]) return;
+                  seenFriend[pid] = true;
                   ids.push(pid);
                 }
-                (pack[0] || []).forEach(function (row) { addPerson(row && row.buddy_id); });
+                (pack[0] || []).forEach(function (row) { addPerson(row && row.friend_id); });
                 (pack[1] || []).forEach(function (row) { addPerson(row && row.account_id); });
                 if (trainerId) addPerson(trainerId);
                 var peopleQuery = ids.length
@@ -11263,17 +11263,17 @@
       var ffcIncoming = [];
       var ffcFriendSyncing = false;
 
-      function ensureBuddyLink(buddyId) {
-        if (!sessionAccount || !buddyId || String(buddyId) === String(sessionAccount.id)) return Promise.resolve();
-        return rest("go_buddies", {
+      function ensureFriendLink(friendId) {
+        if (!sessionAccount || !friendId || String(friendId) === String(sessionAccount.id)) return Promise.resolve();
+        return rest("go_friends", {
           method: "POST",
           prefer: "return=minimal",
-          body: { account_id: sessionAccount.id, buddy_id: buddyId }
+          body: { account_id: sessionAccount.id, friend_id: friendId }
         }).catch(function () {}).then(function () {
-          return rest("go_buddies", {
+          return rest("go_friends", {
             method: "POST",
             prefer: "return=minimal",
-            body: { account_id: buddyId, buddy_id: sessionAccount.id }
+            body: { account_id: friendId, friend_id: sessionAccount.id }
           }).catch(function () {});
         });
       }
@@ -11309,7 +11309,7 @@
             accepted.forEach(function (f) {
               var hit = byNick[String(f.nickname).toLowerCase()];
               if (hit && String(hit.id) !== String(sessionAccount.id)) {
-                jobs.push(ensureBuddyLink(hit.id));
+                jobs.push(ensureFriendLink(hit.id));
                 if (!seen[String(hit.id)]) {
                   hit.isTrainerPerson = !!hit.is_trainer || String(hit.id) === String(sessionAccount.trainer_id || "");
                   teamPeople.push(hit);
@@ -11511,7 +11511,7 @@
               done();
               return;
             }
-            ensureBuddyLink(found.id).then(done);
+            ensureFriendLink(found.id).then(done);
           })
           .catch(function () {
             if (!serial && window.FFC && FFC.user() && FFC.friendRequest) {

@@ -46,9 +46,9 @@ security definer
 set search_path = public
 as $$
   select exists (
-    select 1 from go_buddies b
-    where (b.account_id = go_current_account_id() and b.buddy_id = p_owner_id)
-       or (b.buddy_id = go_current_account_id() and b.account_id = p_owner_id)
+    select 1 from go_friends f
+    where (f.account_id = go_current_account_id() and f.friend_id = p_owner_id)
+       or (f.friend_id = go_current_account_id() and f.account_id = p_owner_id)
   )
   or exists (
     select 1

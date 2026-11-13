@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Prüft go-visibility-team.sql + Sichtbarkeit team für 2 Accounts (wenn Buddy). */
+/** Prüft go-visibility-team.sql + Sichtbarkeit team für 2 Accounts (wenn Freunde). */
 const URL = process.env.SUPABASE_URL || "https://agpysewcsakdpmpftndp.supabase.co";
 const KEY =
   process.env.SUPABASE_ANON_KEY ||
@@ -61,12 +61,12 @@ async function main() {
   let b = null;
   for (const acc of accounts.data) {
     const links = await rest(
-      `go_buddies?or=(and(account_id.eq.${acc.id},buddy_id.neq.${acc.id}),and(buddy_id.eq.${acc.id}))&select=account_id,buddy_id&limit=5`,
+      `go_friends?or=(and(account_id.eq.${acc.id},friend_id.neq.${acc.id}),and(friend_id.eq.${acc.id}))&select=account_id,friend_id&limit=5`,
       { accountId: acc.id }
     );
     if (!links.ok || !links.data?.length) continue;
     const row = links.data[0];
-    const other = String(row.account_id) === String(acc.id) ? row.buddy_id : row.account_id;
+    const other = String(row.account_id) === String(acc.id) ? row.friend_id : row.account_id;
     const otherAcc = accounts.data.find((x) => String(x.id) === String(other));
     if (otherAcc) {
       a = acc;
@@ -76,7 +76,7 @@ async function main() {
   }
 
   if (!b) {
-    console.log("SKIP 2-Account-Test: kein Buddy-Paar gefunden.");
+    console.log("SKIP 2-Account-Test: kein Freundes-Paar gefunden.");
     console.log("Constraint-Probe: insert visibility=team …");
   }
 
@@ -116,7 +116,7 @@ async function main() {
       accountId: b.id
     });
     if (!asB.ok || !asB.data?.length) {
-      fail("B sieht Event von A nicht (RLS team / Buddy?)", asB);
+      fail("B sieht Event von A nicht (RLS team / Freunde?)", asB);
     }
     console.log("B sieht Event in REST (Team-Sicht) ok");
 

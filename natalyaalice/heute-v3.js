@@ -43,7 +43,7 @@
   }
 
   function normalizeVisibility(v) {
-    /* Legacy-UI/DB: alle|gruppe (Buddy-Kreis) → team. Neu: gruppe = groups.group_id (ohne UI). */
+    /* Legacy-UI/DB: alle|gruppe (Freundeskreis) → team. Neu: gruppe = groups.group_id. */
     if (v === "alle" || v === "all" || v === "friends") return "team";
     if (v === "privat" || v === "team" || v === "gruppe") return v;
     return "team";
