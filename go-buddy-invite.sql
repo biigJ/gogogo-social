@@ -1,4 +1,4 @@
--- Buddy-Einladungen: wer hat eingeladen + Quelle
+-- Freundes-/Einladungs-Codes: wer hat eingeladen + Quelle
 alter table go_invite_codes
   add column if not exists invited_by_account_id uuid references go_accounts(id) on delete set null;
 

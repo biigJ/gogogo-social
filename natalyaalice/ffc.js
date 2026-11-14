@@ -221,7 +221,7 @@
     } else {
       authSubmitBtn.textContent = 'Link zum Zurücksetzen senden';
       authToggleBtn.textContent = '← Zurück zur Anmeldung';
-      authTaglineEl.textContent = 'Gib deine E-Mail ein – wir schicken dir einen Link für einen neuen Login-Code';
+      authTaglineEl.textContent = 'Gib deine E-Mail ein – wir schicken dir einen Link für ein neues Passwort';
     }
   }
   authForgotBtn.addEventListener('click', ()=>{
@@ -259,14 +259,14 @@
   newPassBtn.addEventListener('click', async ()=>{
     const p1 = newPass1El.value, p2 = newPass2El.value;
     newPassStatus.style.color = '';
-    if(p1.length < 6){ newPassStatus.textContent = 'Der Login-Code muss mindestens 6 Zeichen haben.'; return; }
+    if(p1.length < 6){ newPassStatus.textContent = 'Das Passwort muss mindestens 6 Zeichen haben.'; return; }
     if(p1 !== p2){ newPassStatus.textContent = 'Die beiden Passwörter stimmen nicht überein.'; return; }
     newPassBtn.disabled = true;
     const { error } = await sb.auth.updateUser({ password: p1 });
     newPassBtn.disabled = false;
     if(error){
       newPassStatus.textContent = /same|different from the old/i.test(error.message)
-        ? 'Der neue Login-Code muss sich vom alten unterscheiden.'
+        ? 'Das neue Passwort muss sich vom alten unterscheiden.'
         : /expired|invalid|session/i.test(error.message)
           ? 'Der Link ist abgelaufen. Bitte fordere auf der Anmeldeseite einen neuen an.'
           : 'Nicht gespeichert: ' + friendlyAuthError(error);
@@ -275,7 +275,7 @@
     recoveryMode = false;
     history.replaceState(null, '', location.pathname);   // Token aus der Adresszeile entfernen
     newPassStatus.style.color = 'var(--chalk)';
-    newPassStatus.textContent = 'Login-Code geändert – du bist angemeldet.';
+    newPassStatus.textContent = 'Passwort geändert – du bist angemeldet.';
     setTimeout(()=> showScreen('home'), 1200);
   });
 
@@ -285,13 +285,13 @@
       return 'Verbindung zu Supabase fehlgeschlagen. Öffne die Datei in einem echten Browser-Tab (nicht in der Chat-Vorschau) und prüfe deine Internetverbindung.';
     }
     if(/invalid login credentials/i.test(msg)){
-      return 'E-Mail oder Login-Code ist falsch.';
+      return 'E-Mail oder Passwort ist falsch.';
     }
     if(/user already registered|already registered/i.test(msg)){
       return 'Für diese E-Mail existiert bereits ein Account. Bitte anmelden.';
     }
     if(/password should be at least/i.test(msg)){
-      return 'Der Login-Code ist zu kurz (mind. 6 Zeichen).';
+      return 'Das Passwort ist zu kurz (mind. 6 Zeichen).';
     }
     return msg;
   }
@@ -316,7 +316,7 @@
     }
 
     if(!email || !password){
-      authErrorEl.textContent = 'Bitte E-Mail und Login-Code eingeben.';
+      authErrorEl.textContent = 'Bitte E-Mail und Passwort eingeben.';
       return;
     }
 
@@ -1014,6 +1014,7 @@
     }
     lbFriendList = data || [];
     renderFriends();
+    host('onFriends');
   }
 
   function renderFriends(){
@@ -1332,6 +1333,55 @@
     const open = evList.filter(e=> !e.is_mine && e.my_going === null).length;
     connSegEl.querySelector('[data-csub=events]').textContent = 'Events' + (open ? ' ('+open+' neu)' : '');
   }
+  const WA_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12.04 2a9.9 9.9 0 0 0-8.5 14.9L2 22l5.2-1.36A9.9 9.9 0 1 0 12.04 2zm0 1.8a8.1 8.1 0 0 1 6.85 12.2l-.34.55.4 1.47-1.5-.4-.52.32A8.1 8.1 0 1 1 12.04 3.8zm4.66 10.54c-.2-.1-1.18-.58-1.36-.65-.18-.07-.32-.1-.45.1-.13.2-.52.65-.64.78-.12.13-.24.15-.44.05-.2-.1-.84-.31-1.6-.99-.59-.53-.99-1.18-1.1-1.38-.12-.2-.01-.3.09-.4.09-.09.2-.24.3-.36.1-.12.13-.2.2-.34.07-.13.03-.25-.02-.35-.05-.1-.45-1.08-.62-1.48-.16-.38-.33-.33-.45-.34h-.38c-.13 0-.35.05-.53.25-.18.2-.7.68-.7 1.66s.72 1.93.82 2.06c.1.13 1.41 2.15 3.42 3.02 2.01.87 2.01.58 2.37.54.36-.04 1.18-.48 1.35-.95.17-.47.17-.87.12-.95-.05-.08-.18-.13-.38-.23z"/></svg>';
+  const DEL_ICON = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+  const HOUR_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h11M6.5 20.5h11M8 3.5v2.2c0 2.2 1.6 3.5 4 5.3 2.4-1.8 4-3.1 4-5.3V3.5M8 20.5v-2.2c0-2.2 1.6-3.5 4-5.3 2.4 1.8 4 3.1 4 5.3v2.2"/></svg>';
+
+  function eventPeopleHtml(e){
+    const going = {};
+    (e.going_names || []).forEach(n=>{ if(n) going[String(n).toLowerCase()] = true; });
+    const friends = (lbFriendList || []).map(f=>({
+      friend_id: f.friend_id, nickname: f.nickname, avatar_url: f.avatar_url || '', status: f.status
+    }));
+    const people = [];
+    const used = {};
+    function pushPerson(nick, avatar, pending){
+      const key = String(nick || '').toLowerCase();
+      if(!key || used[key]) return;
+      used[key] = true;
+      const label = String(nick || 'Freund');
+      const face = avatar
+        ? '<img class="event-people__face" alt="" src="'+esc(avatar)+'">'
+        : '<span class="event-people__ph">'+esc(label.slice(0,1))+'</span>';
+      people.push(
+        '<button type="button" class="event-people__slot'+(pending?' is-pending':'')+'" data-evname="1" aria-label="'+esc(label)+'" title="'+esc(label)+'">' +
+          face +
+          (pending ? '<span class="event-people__wait" aria-hidden="true">'+HOUR_ICON+'</span>' : '') +
+          '<span class="event-people__tip">'+esc(label)+'</span>' +
+        '</button>'
+      );
+    }
+    if(e.creator_nickname){
+      pushPerson(e.creator_nickname, e.creator_avatar_url || '', false);
+    }
+    (e.going_names || []).forEach(n=>{
+      const f = friends.find(x=> String(x.nickname||'').toLowerCase() === String(n||'').toLowerCase());
+      pushPerson(n, f && f.avatar_url, false);
+    });
+    friends.filter(f=> f && f.status === 'accepted').forEach(f=>{
+      const nick = f.nickname || '';
+      if(!nick) return;
+      if(going[String(nick).toLowerCase()]) return;
+      if(e.creator_nickname && String(e.creator_nickname).toLowerCase() === String(nick).toLowerCase()) return;
+      // Pending friends: only when everyone was invited (sonst fehlen die Invitee-Namen in der API)
+      if(e.all_friends){
+        pushPerson(nick, f.avatar_url || '', true);
+      }
+    });
+    if(!people.length) return '';
+    return '<div class="event-people">'+people.join('')+'</div>';
+  }
+
   function renderEvents(){
     updateEventsTabLabel();
     if(!evList.length){
@@ -1340,45 +1390,53 @@
     }
     evListEl.innerHTML = evList.map(e=>{
       const d = new Date(e.starts_at);
-      const day = d.toLocaleDateString('de-DE',{weekday:'short'}).replace('.','').toUpperCase();
-      const mon = d.toLocaleDateString('de-DE',{month:'short'}).replace('.','').toUpperCase();
+      const dateLong = d.toLocaleDateString('de-DE',{weekday:'long', day:'2-digit', month:'2-digit'});
       const time = d.toLocaleTimeString('de-DE',{hour:'2-digit', minute:'2-digit'}) + ' Uhr';
       const who = e.is_mine ? 'von dir' : 'von '+esc(e.creator_nickname);
       const audience = e.all_friends ? 'für alle Freunde' : ('für '+e.invite_count+' '+(e.invite_count===1?'Freund':'Freunde'));
-      const names = (e.going_names || []).map(esc).join(', ');
-      const maps = e.location ? '<a href="https://maps.google.com/?q='+encodeURIComponent(e.location)+'" target="_blank" rel="noopener">'+esc(e.location)+'</a>' : '';
-      return '<div class="ev-card'+(e.is_mine?' mine':'')+(e.image_url?' has-img':'')+'" data-ev="'+e.id+'">' +
-        (e.image_url ? '<div class="ev-banner" style="background-image:url(\''+esc(e.image_url)+'\')"></div>' : '') +
-        '<div class="ev-date"><span class="d1">'+day+'</span><span class="d2">'+d.getDate()+'</span><span class="d3">'+mon+'</span></div>' +
-        '<div class="ev-body"><b>'+esc(e.title)+'</b>' +
-          '<span class="ev-line">'+time+(maps?' · '+maps:'')+'</span>' +
-          '<span class="ev-line">'+who+' · '+(e.is_mine ? audience : (e.all_friends ? 'für alle Freunde' : 'du bist eingeladen'))+'</span>' +
-          '<span class="ev-going">'+(e.going_count ? '✓ '+e.going_count+' dabei: '+names : 'Noch keine Zusagen')+'</span>' +
-          '<div class="ev-actions">' +
-            '<button class="lb-mini'+(e.my_going===true?' go':'')+'" data-evact="yes" data-id="'+e.id+'">'+(e.my_going===true?'✓ Dabei':'Dabei')+'</button>' +
-            '<button class="lb-mini'+(e.my_going===false?' on-no':'')+'" data-evact="no" data-id="'+e.id+'">Nicht dabei</button>' +
-            '<button class="lb-mini ev-share" data-evact="share" data-id="'+e.id+'" aria-label="Auf WhatsApp teilen">'+SHARE_SVG+' WhatsApp</button>' +
-            (e.is_mine ? '<button class="lb-mini warn" data-evact="del" data-id="'+e.id+'">Löschen</button>' : '') +
-          '</div>' +
-        '</div></div>';
+      const maps = e.location ? esc(e.location) : '';
+      const line = who + ' · ' + (e.is_mine ? audience : (e.all_friends ? 'für alle Freunde' : 'du bist eingeladen')) + (maps ? ' · ' + maps : '');
+      const bg = e.image_url ? ' style="background-image:url(\''+esc(e.image_url)+'\')"' : '';
+      const yesLabel = e.my_going === true ? '✓ Zusage' : 'Zusage';
+      const noLabel = e.my_going === false ? '✓ Absage' : 'Absage';
+      return '<div class="ev-card invite-card'+(e.is_mine?' mine':'')+(e.image_url?' has-img':'')+'" data-ev="'+e.id+'"'+bg+'>' +
+        '<div class="ev-top">' +
+          '<button type="button" class="ev-wa" data-evact="share" data-id="'+e.id+'" aria-label="Auf WhatsApp teilen">'+WA_ICON+'</button>' +
+          (e.is_mine ? '<button type="button" class="ev-del" data-evact="del" data-id="'+e.id+'" aria-label="Löschen">'+DEL_ICON+'</button>' : '<span></span>') +
+        '</div>' +
+        '<span class="today-card__kicker">'+esc(dateLong)+' · '+esc(time)+'</span>' +
+        '<span class="today-card__title">'+esc(e.title)+'</span>' +
+        '<span class="today-card__line">'+line+'</span>' +
+        eventPeopleHtml(e) +
+        '<div class="invite-card__actions">' +
+          '<button type="button" data-evact="no" data-id="'+e.id+'"'+(e.my_going===false?' class="is-yes"':'')+'>'+noLabel+'</button>' +
+          '<button type="button" class="is-yes" data-evact="yes" data-id="'+e.id+'">'+yesLabel+'</button>' +
+        '</div>' +
+      '</div>';
     }).join('');
   }
   evListEl.addEventListener('click', async e=>{
+    const nameBtn = e.target.closest('button[data-evname]');
+    if(nameBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      const row = nameBtn.parentElement;
+      const on = !nameBtn.classList.contains('is-named');
+      if(row) row.querySelectorAll('.is-named').forEach(el=> el.classList.remove('is-named'));
+      if(on) nameBtn.classList.add('is-named');
+      return;
+    }
     const btn = e.target.closest('button[data-evact]');
     if(!btn) return;
     const id = Number(btn.dataset.id);
     if(btn.dataset.evact === 'share'){ shareEventWhatsApp(evList.find(x=>x.id===id)); return; }
     if(btn.dataset.evact === 'del'){
-      if(btn.dataset.armed !== '1'){
-        btn.dataset.armed = '1'; btn.textContent = 'Sicher?';
-        setTimeout(()=>{ if(btn.isConnected){ btn.dataset.armed=''; btn.textContent='Löschen'; } }, 3000);
-        return;
-      }
+      if(!window.confirm('Event wirklich löschen?')) return;
       btn.disabled = true;
       const evObj = evList.find(x=>x.id===id);
       const res = await sb.rpc('delete_event', { p_event_id: id });
       const mImg = evObj && evObj.image_url && evObj.image_url.match(/\/event-images\/(.+)$/);
-      if(!res.error && mImg){ try{ await sb.storage.from('event-images').remove([decodeURIComponent(mImg[1])]); }catch(e){} }
+      if(!res.error && mImg){ try{ await sb.storage.from('event-images').remove([decodeURIComponent(mImg[1])]); }catch(err){} }
       if(res.error){ btn.disabled = false; alertInline(res.error); return; }
       await loadEvents();
       return;
@@ -2705,6 +2763,7 @@
         '<span class="story-name'+(seen?' dim':'')+'">'+esc(u.nickname)+'</span></button>';
     });
     postStripEl.innerHTML = html;
+    host('onStories');
   }
 
   // eigene abgelaufene Bilder aus dem Speicher löschen (falls kein Aufräum-Job läuft)
@@ -3283,6 +3342,15 @@
       cleanupOwnPosts();
       await Promise.all([loadFeed(), loadEvents()]);
     },
+    events(){
+      return (evList || []).map(e => Object.assign({}, e));
+    },
+    async respondEvent(id, going){
+      if(!currentUser) return { error: null };
+      const res = await sb.rpc('respond_event', { p_event_id: Number(id), p_going: !!going });
+      if(!res.error) await loadEvents();
+      return res;
+    },
     async refreshTraining(){
       if(!currentUser) return;
       refreshBackfillButton();
@@ -3292,14 +3360,76 @@
       ]);
     },
     async openProfile(){ await openTab('profile'); },
+    stories(){
+      return storyUsers.map((u,i)=>({ index:i, uid:u.uid, nickname:u.nickname, avatar_url:u.avatar_url, is_me:!!u.is_me, seen:u.posts.every(p=>p.seen) }));
+    },
+    openStory(index){
+      const u = storyUsers[index];
+      if(!u) return false;
+      const firstUnseen = u.is_me ? 0 : u.posts.findIndex(p=>!p.seen);
+      openStory(index, firstUnseen < 0 ? 0 : firstUnseen);
+      return true;
+    },
+    async weeklyPoints(){
+      if(!currentUser) return null;
+      const { data, error } = await sb.rpc('weekly_leaderboard', { p_group_id: null });
+      if(error) return null;
+      return (data || []).map(r=>({ user_id:r.user_id, nickname:r.nickname, points:r.points, workouts:r.workouts, is_me:!!r.is_me }));
+    },
+    async signUp(email, password){
+      try{
+        const { data, error } = await sb.auth.signUp({ email, password });
+        if(!error && data && data.session && data.user) currentUser = data.user;
+        return { data, error };
+      }catch(err){ return { data:null, error: err }; }
+    },
+    async nicknameTaken(nickname){
+      const nick = String(nickname || '').trim();
+      if(!nick) return { taken:false, error:null };
+      try{
+        const { data, error } = await sb.from('profiles').select('user_id,nickname').ilike('nickname', nick).limit(5);
+        if(error) return { taken:false, error };
+        const me = currentUser && currentUser.id;
+        const taken = (data || []).some(row => row && String(row.user_id) !== String(me || ''));
+        return { taken, error:null };
+      }catch(err){ return { taken:false, error: err }; }
+    },
     async setNickname(nickname){
       if(!currentUser) return { error:null };
       return sb.from('profiles').upsert({ user_id: currentUser.id, nickname: nickname }, { onConflict:'user_id' });
     },
+    friends(){
+      return (lbFriendList || []).map(f=>({
+        friendship_id: f.friendship_id,
+        friend_id: f.friend_id,
+        nickname: f.nickname,
+        avatar_url: f.avatar_url || '',
+        status: f.status,
+        incoming: !!f.incoming
+      }));
+    },
+    async refreshFriends(){
+      if(!currentUser) return [];
+      await loadFriends();
+      host('onFriends');
+      return this.friends();
+    },
     async friendRequest(query){
       if(!currentUser) return { error:null };
       const res = await sb.rpc('send_friend_request', { p_query: query });
-      if(!res.error) loadFriends();
+      if(!res.error){ await loadFriends(); host('onFriends'); }
+      return res;
+    },
+    async respondFriend(id, accept){
+      if(!currentUser) return { error:null };
+      const res = await sb.rpc('respond_friend_request', { p_id: Number(id), p_accept: !!accept });
+      if(!res.error){ await loadFriends(); host('onFriends'); }
+      return res;
+    },
+    async removeFriend(id){
+      if(!currentUser) return { error:null };
+      const res = await sb.rpc('remove_friend', { p_id: Number(id) });
+      if(!res.error){ await loadFriends(); host('onFriends'); }
       return res;
     },
     async logout(){

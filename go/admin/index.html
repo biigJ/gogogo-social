@@ -2037,7 +2037,7 @@
         <hr class="admin-rule admin-role-rule" />
         <section class="admin-role" id="admin-role" aria-label="Funktion">
           <h2 class="admin-plan__title">Funktion</h2>
-          <p class="admin-role__status" id="trainer-status">Funktion: Buddy</p>
+          <p class="admin-role__status" id="trainer-status">Funktion: Freund</p>
           <button class="btn admin-plan__save" type="button" id="trainer-toggle">Als Trainer markieren</button>
           <p class="msg" id="trainer-msg" role="status"></p>
         </section>
@@ -2298,7 +2298,7 @@
       var adminNameBtn = document.getElementById("admin-name");
       var adminOpenProfileBtn = document.getElementById("admin-open-profile");
       var DAY_ENTRIES_KEY = "gogogo_go_day_entries";
-      var BUDDIES_KEY = "gogogo_go_buddies";
+      var FRIENDS_KEY = "gogogo_go_friends";
       var BUDDY_SEARCH_FAILS_KEY = "gogogo_go_buddy_search_fails";
       var BUDDY_SEARCH_LOCK_KEY = "gogogo_go_buddy_search_lock_until";
 
@@ -4436,7 +4436,7 @@
       function clearLocalUserCaches() {
         try {
           localStorage.removeItem(DAY_ENTRIES_KEY);
-          localStorage.removeItem(BUDDIES_KEY);
+          localStorage.removeItem(FRIENDS_KEY);
           localStorage.removeItem(BUDDY_SEARCH_FAILS_KEY);
           localStorage.removeItem(BUDDY_SEARCH_LOCK_KEY);
         } catch (e) {}
@@ -5494,16 +5494,16 @@
         return coachAccount;
       }
 
-      async function loadUserBuddyIds(accountId) {
+      async function loadUserFriendIds(accountId) {
         if (!accountId || String(accountId).indexOf("local-") === 0) return [];
         try {
           var res = await fetch(
-            SUPABASE_URL + "/rest/v1/go_buddies?account_id=eq." + encodeURIComponent(accountId) +
-            "&select=buddy_id&limit=8",
+            SUPABASE_URL + "/rest/v1/go_friends?account_id=eq." + encodeURIComponent(accountId) +
+            "&select=friend_id&limit=8",
             { headers: apiHeaders() }
           );
           var rows = res.ok ? await res.json() : [];
-          return (rows || []).map(function (r) { return r && r.buddy_id; }).filter(Boolean);
+          return (rows || []).map(function (r) { return r && r.friend_id; }).filter(Boolean);
         } catch (e) {
           return [];
         }
@@ -5753,10 +5753,10 @@
         try {
           var coach = await resolveCoachAccount();
           var coachId = coach && coach.id ? String(coach.id) : null;
-          var buddyIds = await loadUserBuddyIds(ids[0]);
+          var friendIds = await loadUserFriendIds(ids[0]);
           var authorIds = [];
           var seenAuth = {};
-          ids.concat(buddyIds || []).forEach(function (id) {
+          ids.concat(friendIds || []).forEach(function (id) {
             if (!id || seenAuth[id] || (coachId && String(id) === coachId)) return;
             seenAuth[id] = true;
             authorIds.push(String(id));
@@ -6008,7 +6008,7 @@
           }
         }
         var isTrainer = !!(activeAccount && activeAccount.is_trainer);
-        if (status) status.textContent = "Funktion: " + (isTrainer ? "Trainer" : "Buddy");
+        if (status) status.textContent = "Funktion: " + (isTrainer ? "Trainer" : "Freund");
         if (btn) {
           btn.disabled = !activeAccount || !activeAccount.id || trainerSchemaOk === false;
           btn.textContent = isTrainer ? "Trainer-Status entfernen" : "Als Trainer markieren";
