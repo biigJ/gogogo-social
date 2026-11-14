@@ -767,8 +767,16 @@
     return '<span class="wr-avatar wr-avatar--ph">' + esc(ch) + "</span>";
   }
 
+  /* Zusagen nur auf Heute — Owner zählt hier nicht als Teilnehmer */
+  function goingIds(ev) {
+    var owner = String((ev && ev.user_id) || "");
+    return (state.rsvps[String(ev && ev.id)] || []).filter(function (id) {
+      return id && id !== owner;
+    });
+  }
+
   function goingLine(ev) {
-    var ids = state.rsvps[String(ev.id)] || [];
+    var ids = goingIds(ev);
     if (!ids.length) return "";
     var names = ids.map(function (id) {
       return personOf(id).name;
@@ -779,7 +787,7 @@
   }
 
   function facesHtml(ev) {
-    var ids = (state.rsvps[String(ev.id)] || []).slice(0, 5);
+    var ids = goingIds(ev).slice(0, 5);
     if (!ids.length) return "";
     return (
       '<div class="wr-faces">' +
@@ -812,20 +820,24 @@
 
   function coursePill(ev) {
     var linked = courseTitleOf(ev);
-    if (linked) return '<span class="wr-pill">' + esc(linked) + "</span>";
+    var title = String((ev && ev.title) || "").trim();
+    /* Kursname nicht doppelt neben der Workout-Überschrift */
+    if (linked) {
+      if (
+        !title ||
+        (title !== linked &&
+          title.indexOf(linked) < 0 &&
+          linked.indexOf(title) < 0)
+      ) {
+        return '<span class="wr-pill">' + esc(linked) + "</span>";
+      }
+      return "";
+    }
     if (ev.enrollment_id || ev.item_type === "course_session") {
       return '<span class="wr-pill">Kurs</span>';
     }
     if (ev.is_unplanned) return '<span class="wr-pill">Spontan</span>';
-    try {
-      var wd = new Date(ev.starts_at).toLocaleDateString("de-DE", {
-        weekday: "short",
-        timeZone: "Europe/Berlin"
-      });
-      return '<span class="wr-pill">Jeden ' + esc(wd) + "</span>";
-    } catch (e) {
-      return "";
-    }
+    return "";
   }
 
   function truncNote(note, lines) {
@@ -847,25 +859,26 @@
     var mine = item.kind !== "ffc" && String(ev.user_id) === me();
     var today = berlinToday() === dayKey(ev.starts_at);
     var count = (state.comments[id] || []).length;
-    var going = (state.rsvps[id] || []).indexOf(me()) >= 0;
-    var checkLabel = mine && today && ev.status === "geplant" ? "Erledigt" : going ? "Zugesagt" : "Zusagen";
-    var checkAttr =
-      mine && today && ev.status === "geplant"
-        ? ' data-wr-done="' + esc(id) + '"'
-        : item.kind === "ffc"
-          ? ' data-wr-ffc-rsvp="' + esc(id) + '"'
-          : ' data-wr-rsvp="' + esc(id) + '"';
+    var canDone = mine && today && ev.status === "geplant";
+    var isDone = mine && ev.status === "erledigt";
+    /* Zusagen nur auf Heute — in der Woche höchstens „Erledigt“ */
+    var checkBtn = "";
+    if (canDone) {
+      checkBtn =
+        '<button type="button" class="wr-act" data-wr-done="' +
+        esc(id) +
+        '" aria-label="Erledigt"><span class="wr-act__icon">' +
+        ICON_CHECK +
+        '</span><span class="wr-act__n"></span></button>';
+    } else if (isDone) {
+      checkBtn =
+        '<button type="button" class="wr-act is-done" disabled aria-label="Erledigt"><span class="wr-act__icon">' +
+        ICON_CHECK +
+        '</span><span class="wr-act__n">1</span></button>';
+    }
     return (
       '<div class="wr-actions">' +
-      '<button type="button" class="wr-act"' +
-      checkAttr +
-      ' aria-label="' +
-      esc(checkLabel) +
-      '"><span class="wr-act__icon">' +
-      ICON_CHECK +
-      '</span><span class="wr-act__n">' +
-      (going || (mine && ev.status === "erledigt") ? "1" : "") +
-      "</span></button>" +
+      checkBtn +
       '<button type="button" class="wr-act" data-wr-comments="' +
       esc(id) +
       '" aria-label="Kommentare"><span class="wr-act__icon">' +
@@ -917,8 +930,7 @@
     }
     var cat = ev.category || "kraft";
     var title = (emojiFor(cat, ev.title) + " " + (ev.title || cat)).trim();
-    var when =
-      formatDayLong(iso) + (ev.starts_at ? " · " + formatTime(ev.starts_at) : "");
+    var when = ev.starts_at ? formatTime(ev.starts_at) : "";
     var notePack = truncNote(ev.note || ev.description || "", 2);
     var place = ev.location || "";
     var travelHint = "";
@@ -971,9 +983,7 @@
       "</span>" +
       coursePill(ev) +
       "</div>" +
-      '<p class="wr-when">' +
-      esc(when) +
-      "</p>" +
+      (when ? '<p class="wr-when">' + esc(when) + "</p>" : "") +
       '<h2 class="wr-title">' +
       esc(title) +
       "</h2>" +
