@@ -695,17 +695,26 @@
       travelHint +
       "</div>" +
       actionColHtml(item) +
-      (state.editMode && item.kind === "event" && String(ev.user_id) === me()
-        ? '<div class="wr-edit-bar">' +
-          '<button type="button" data-wr-edit-time="' +
-          esc(ev.id) +
-          '">Zeit</button>' +
-          '<button type="button" data-wr-delete="' +
-          esc(ev.id) +
-          '">Löschen</button></div>'
-        : "") +
       "</div></div>"
     );
+  }
+
+  function currentOwnEvent() {
+    var days;
+    try {
+      days = weekDays();
+    } catch (e) {
+      return null;
+    }
+    var iso = days[state.dayIndex];
+    if (!iso) return null;
+    var items = itemsForDay(iso);
+    if (!items.length) return null;
+    var ix = Math.max(0, Math.min(items.length - 1, state.eventIndex || 0));
+    var it = items[ix];
+    if (!it || it.kind !== "event" || !it.ev) return null;
+    if (String(it.ev.user_id) !== me()) return null;
+    return it.ev;
   }
 
   function dayReelHtml(iso) {
@@ -822,12 +831,76 @@
         );
       })
       .join("");
+    var own = currentOwnEvent();
+    var evRow = own
+      ? '<div class="wr-edit-panel__row">' +
+        '<button type="button" class="wr-pill-btn" data-wr-edit-time="' +
+        esc(own.id) +
+        '">Zeit</button>' +
+        '<button type="button" class="wr-pill-btn" data-wr-delete="' +
+        esc(own.id) +
+        '">Löschen</button></div>'
+      : "";
     return (
       '<div class="wr-edit-panel">' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark wr-pill-btn--center" data-wr-book="1">Kurs hinzufügen</button>' +
+      evRow +
       (list ? '<div class="wr-enroll-list">' + list + "</div>" : "") +
       "</div>"
     );
+  }
+
+  function syncSurface() {
+    if (host && typeof host.syncStatusFade === "function") {
+      try {
+        host.syncStatusFade();
+      } catch (e) {}
+    }
+  }
+
+  function openTimeSheet(eventId) {
+    var ev = state.events.filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    if (!ev) return;
+    var hhmm = formatTime(ev.starts_at) || "18:00";
+    openSheet(
+      "<h3>Zeit ändern</h3>" +
+        '<label class="wr-field">Uhrzeit<input type="time" id="wr-edit-time" value="' +
+        esc(hhmm) +
+        '" /></label>' +
+        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-time-save="' +
+        esc(eventId) +
+        '">Speichern</button>' +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+  }
+
+  function saveEventTime(eventId) {
+    var input = $("wr-edit-time");
+    var val = input && input.value ? input.value : "";
+    if (!/^\d{2}:\d{2}$/.test(val)) {
+      if (host.toast) host.toast("Bitte Uhrzeit wählen");
+      return;
+    }
+    var ev = state.events.filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    if (!ev) return;
+    var iso = dayKey(ev.starts_at);
+    var starts = iso + "T" + val + ":00+01:00";
+    return rest("events?id=eq." + encodeURIComponent(eventId), {
+      method: "PATCH",
+      prefer: "return=minimal",
+      body: { starts_at: starts }
+    })
+      .then(function () {
+        closeSheet();
+        return refresh();
+      })
+      .catch(function () {
+        if (host.toast) host.toast("Zeit konnte nicht gespeichert werden");
+      });
   }
 
   function render() {
@@ -866,6 +939,7 @@
     if (track && track.clientHeight) {
       track.scrollTop = state.dayIndex * track.clientHeight;
     }
+    requestAnimationFrame(syncSurface);
   }
 
   function sheetHtml() {
@@ -1509,7 +1583,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-train],[data-wr-add-rest],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-day-course],[data-wr-travel-days],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-train],[data-wr-add-rest],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-day-course],[data-wr-travel-days],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-edit-time],[data-wr-time-save],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") closeSheet();
       return;
@@ -1641,6 +1715,14 @@
     }
     if (t.getAttribute("data-wr-delete")) {
       deleteEvent(t.getAttribute("data-wr-delete"));
+      return;
+    }
+    if (t.getAttribute("data-wr-edit-time")) {
+      openTimeSheet(t.getAttribute("data-wr-edit-time"));
+      return;
+    }
+    if (t.getAttribute("data-wr-time-save")) {
+      saveEventTime(t.getAttribute("data-wr-time-save"));
       return;
     }
     if (t.getAttribute("data-wr-swap")) {
@@ -1880,10 +1962,12 @@
               var max = h.querySelectorAll(".wr-slide").length - 1;
               next = Math.max(0, Math.min(max, next));
               h.scrollTo({ left: next * w, behavior: "smooth" });
+              state.eventIndex = next;
               var dots = dayEl.querySelectorAll(".wr-dot");
               dots.forEach(function (d, i) {
                 d.classList.toggle("is-on", i === next);
               });
+              if (state.editMode) patchEditPanelEvRow();
             }
           }
         }
@@ -1893,10 +1977,38 @@
     );
   }
 
+  function patchEditPanelEvRow() {
+    var panel = document.querySelector("#" + ROOT_ID + " .wr-edit-panel");
+    if (!panel) return;
+    var existing = panel.querySelector(".wr-edit-panel__row");
+    var own = currentOwnEvent();
+    var html = own
+      ? '<div class="wr-edit-panel__row">' +
+        '<button type="button" class="wr-pill-btn" data-wr-edit-time="' +
+        esc(own.id) +
+        '">Zeit</button>' +
+        '<button type="button" class="wr-pill-btn" data-wr-delete="' +
+        esc(own.id) +
+        '">Löschen</button></div>'
+      : "";
+    if (existing) existing.outerHTML = html || "";
+    else if (html) {
+      var book = panel.querySelector("[data-wr-book]");
+      if (book) book.insertAdjacentHTML("afterend", html);
+      else panel.insertAdjacentHTML("beforeend", html);
+    }
+  }
+
   function syncDayFromScroll() {
     var vtrack = $("wr-vtrack");
     if (!vtrack || !vtrack.clientHeight) return;
-    state.dayIndex = Math.round(vtrack.scrollTop / vtrack.clientHeight);
+    var next = Math.round(vtrack.scrollTop / vtrack.clientHeight);
+    if (next !== state.dayIndex) {
+      state.dayIndex = next;
+      state.eventIndex = 0;
+      if (state.editMode) patchEditPanelEvRow();
+      syncSurface();
+    }
   }
 
   function refresh() {
@@ -1981,6 +2093,9 @@
     install: install,
     show: show,
     hide: hide,
-    refresh: refresh
+    refresh: refresh,
+    dayIndex: function () {
+      return state.dayIndex;
+    }
   };
 })(window);
