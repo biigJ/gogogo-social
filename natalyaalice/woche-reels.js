@@ -19,7 +19,9 @@
     loadError: "",
     sharePick: {},
     shareIso: "",
-    shareEventId: ""
+    shareEventId: "",
+    lastDeleted: null,
+    undoTimer: null
   };
 
   var ROOT_ID = "woche-reels";
@@ -255,7 +257,8 @@
     /* Basis-Select zuerst (kompatibel ohne SQL-Migration) */
     var baseSelect =
       "id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title";
-    var richSelect = baseSelect + ",item_type,travel_auto,group_id";
+    var richSelect =
+      baseSelect + ",item_type,travel_auto,group_id,note,photo_url,courses(id,title,category_default)";
     function query(select) {
       return rest(
         "events?user_id=eq." +
@@ -271,7 +274,9 @@
     }
     return query(richSelect)
       .catch(function () {
-        return query(baseSelect);
+        return query(baseSelect + ",courses(id,title)").catch(function () {
+          return query(baseSelect);
+        });
       })
       .then(function (rows) {
         state.events = rows || [];
@@ -523,13 +528,29 @@
     );
   }
 
-  function coursePill(ev) {
-    if (ev.enrollment_id || ev.item_type === "course_session") {
+  function courseTitleOf(ev) {
+    if (!ev) return "";
+    if (ev.courses && ev.courses.title) return ev.courses.title;
+    if (ev.course_id) {
+      var c = state.courses.filter(function (row) {
+        return String(row.id) === String(ev.course_id);
+      })[0];
+      if (c && c.title) return c.title;
+    }
+    if (ev.enrollment_id) {
       var en = state.enrollments.filter(function (e) {
         return String(e.id) === String(ev.enrollment_id);
       })[0];
-      var title = (en && en.courses && en.courses.title) || "Kurs";
-      return '<span class="wr-pill">' + esc(title) + "</span>";
+      if (en && en.courses && en.courses.title) return en.courses.title;
+    }
+    return "";
+  }
+
+  function coursePill(ev) {
+    var linked = courseTitleOf(ev);
+    if (linked) return '<span class="wr-pill">' + esc(linked) + "</span>";
+    if (ev.enrollment_id || ev.item_type === "course_session") {
+      return '<span class="wr-pill">Kurs</span>';
     }
     if (ev.is_unplanned) return '<span class="wr-pill">Spontan</span>';
     try {
@@ -608,12 +629,12 @@
       '<div class="wr-overlay wr-overlay--empty">' +
       '<p class="wr-empty-title">Noch nichts geplant</p>' +
       '<div class="wr-empty-btns">' +
-      '<button type="button" class="wr-pill-btn" data-wr-add-train="' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-train="' +
       esc(iso) +
       '">Training</button>' +
-      '<button type="button" class="wr-pill-btn" data-wr-add-rest="' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-rest="' +
       esc(iso) +
-      '">Rest Day</button>' +
+      '">Bewegung</button>' +
       "</div></div></div></div>"
     );
   }
@@ -745,9 +766,20 @@
     );
   }
 
+  function currentDayIso() {
+    try {
+      var days = weekDays();
+      return days[state.dayIndex] || berlinToday();
+    } catch (e) {
+      return berlinToday();
+    }
+  }
+
   function headerHtml() {
     var label = weekModeMeta().label;
     var travelOn = travelActive();
+    var dayIso = currentDayIso();
+    var dayLabel = formatDayLong(dayIso);
     var travelHint = "";
     if (travelOn) {
       travelHint =
@@ -759,24 +791,37 @@
       ? '<p class="wr-error" role="status">' + esc(state.loadError) + "</p>"
       : "";
     return (
-      '<header class="wr-top">' +
+      '<header class="wr-top' +
+      (state.editMode ? " is-edit" : "") +
+      '">' +
+      '<div class="wr-top__row">' +
       '<button type="button" class="wr-icon-btn' +
       (travelOn ? " is-on" : "") +
       '" data-wr-travel="1" aria-label="Reisemodus">' +
       '<span class="wr-travel-emoji" aria-hidden="true">🛫</span>' +
       "</button>" +
       '<div class="wr-week-nav">' +
-      '<button type="button" class="wr-icon-btn" data-wr-week="-1" aria-label="Vorheriger Zeitraum">‹</button>' +
-      '<button type="button" class="wr-week-label" data-wr-week-menu="1">' +
+      '<button type="button" class="wr-icon-btn" data-wr-week="-1" aria-label="Vorheriger Zeitraum"' +
+      (state.editMode ? " disabled" : "") +
+      ">‹</button>" +
+      '<button type="button" class="wr-week-label" data-wr-week-menu="1"' +
+      (state.editMode ? " disabled" : "") +
+      ">" +
       esc(label) +
       " ⌄</button>" +
-      '<button type="button" class="wr-icon-btn" data-wr-week="1" aria-label="Nächster Zeitraum">›</button>' +
+      '<button type="button" class="wr-icon-btn" data-wr-week="1" aria-label="Nächster Zeitraum"' +
+      (state.editMode ? " disabled" : "") +
+      ">›</button>" +
       "</div>" +
       '<button type="button" class="wr-icon-btn' +
       (state.editMode ? " is-on" : "") +
       '" data-wr-edit="1" aria-label="Bearbeiten">' +
       '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20h4L18 10l-4-4L4 16v4zM13 7l4 4"/></svg>' +
       "</button>" +
+      "</div>" +
+      '<p class="wr-day-label">' +
+      esc(dayLabel) +
+      "</p>" +
       "</header>" +
       travelHint +
       err
@@ -856,6 +901,65 @@
     }
   }
 
+  function timeWheelHtml(hhmm) {
+    var parts = String(hhmm || "18:00").split(":");
+    var h0 = Math.max(0, Math.min(23, parseInt(parts[0], 10) || 18));
+    var m0 = Math.max(0, Math.min(59, parseInt(parts[1], 10) || 0));
+    m0 = Math.round(m0 / 5) * 5;
+    if (m0 >= 60) m0 = 55;
+    var hours = "";
+    for (var h = 0; h < 24; h++) {
+      hours +=
+        '<button type="button" class="wr-time-opt' +
+        (h === h0 ? " is-on" : "") +
+        '" data-wr-time-h="' +
+        h +
+        '">' +
+        pad2(h) +
+        "</button>";
+    }
+    var mins = "";
+    for (var m = 0; m < 60; m += 5) {
+      mins +=
+        '<button type="button" class="wr-time-opt' +
+        (m === m0 ? " is-on" : "") +
+        '" data-wr-time-m="' +
+        m +
+        '">' +
+        pad2(m) +
+        "</button>";
+    }
+    return (
+      '<div class="wr-time-wheel" id="wr-time-wheel" data-h="' +
+      h0 +
+      '" data-m="' +
+      m0 +
+      '">' +
+      '<div class="wr-time-col" id="wr-time-h">' +
+      hours +
+      "</div>" +
+      '<span class="wr-time-sep" aria-hidden="true">:</span>' +
+      '<div class="wr-time-col" id="wr-time-m">' +
+      mins +
+      "</div>" +
+      '<div class="wr-time-fade wr-time-fade--top" aria-hidden="true"></div>' +
+      '<div class="wr-time-fade wr-time-fade--bot" aria-hidden="true"></div>' +
+      '<div class="wr-time-center" aria-hidden="true"></div>' +
+      "</div>"
+    );
+  }
+
+  function scrollTimeColsToSelection() {
+    ["wr-time-h", "wr-time-m"].forEach(function (id) {
+      var col = $(id);
+      if (!col) return;
+      var on = col.querySelector(".wr-time-opt.is-on");
+      if (on) {
+        col.scrollTop = Math.max(0, on.offsetTop - col.clientHeight / 2 + on.clientHeight / 2);
+      }
+    });
+  }
+
   function openTimeSheet(eventId) {
     var ev = state.events.filter(function (e) {
       return String(e.id) === String(eventId);
@@ -863,24 +967,23 @@
     if (!ev) return;
     var hhmm = formatTime(ev.starts_at) || "18:00";
     openSheet(
-      "<h3>Zeit ändern</h3>" +
-        '<label class="wr-field">Uhrzeit<input type="time" id="wr-edit-time" value="' +
-        esc(hhmm) +
-        '" /></label>' +
+      '<p class="wr-sheet-hint">Uhrzeit drehen</p>' +
+        timeWheelHtml(hhmm) +
         '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-time-save="' +
         esc(eventId) +
         '">Speichern</button>' +
         '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
     );
+    requestAnimationFrame(function () {
+      requestAnimationFrame(scrollTimeColsToSelection);
+    });
   }
 
   function saveEventTime(eventId) {
-    var input = $("wr-edit-time");
-    var val = input && input.value ? input.value : "";
-    if (!/^\d{2}:\d{2}$/.test(val)) {
-      if (host.toast) host.toast("Bitte Uhrzeit wählen");
-      return;
-    }
+    var wheel = $("wr-time-wheel");
+    var h = wheel ? Number(wheel.getAttribute("data-h") || 18) : 18;
+    var m = wheel ? Number(wheel.getAttribute("data-m") || 0) : 0;
+    var val = pad2(h) + ":" + pad2(m);
     var ev = state.events.filter(function (e) {
       return String(e.id) === String(eventId);
     })[0];
@@ -917,6 +1020,7 @@
     if (state.dayIndex < 0) state.dayIndex = 0;
     if (state.dayIndex > 6) state.dayIndex = 6;
     root.hidden = false;
+    root.classList.toggle("is-edit", !!state.editMode);
     root.innerHTML =
       headerHtml() +
       editPanelHtml() +
@@ -933,6 +1037,7 @@
       "</div>" +
       progressHtml() +
       sheetHtml();
+    if (state.lastDeleted) showUndoBar();
     var track = $("wr-vtrack");
     if (track && track.clientHeight) {
       track.scrollTop = state.dayIndex * track.clientHeight;
@@ -975,7 +1080,7 @@
 
   function openRestSheet(iso) {
     openSheet(
-      "<h3>Rest Day</h3>" +
+      "<h3>Bewegung</h3>" +
         '<div class="wr-chips">' +
         REST_DAYS.map(function (t) {
           return (
@@ -1204,14 +1309,34 @@
       course_id: course.id,
       title: course.title,
       starts_at: iso + "T18:00:00+01:00",
-      is_unplanned: true,
-      item_type: "spontaneous"
-    }).then(function () {
-      closeSheet();
-      return refresh();
-    }).catch(function () {
-      if (host.toast) host.toast("Event konnte nicht angelegt werden");
-    });
+      is_unplanned: false,
+      item_type: "course_session"
+    })
+      .then(function (rows) {
+        var row = Array.isArray(rows) ? rows[0] : rows;
+        if (row && !row.course_id) {
+          throw new Error("course_id missing");
+        }
+        closeSheet();
+        return refresh();
+      })
+      .catch(function () {
+        /* Fallback: erneut mit course_id, falls item_type unbekannt */
+        return createEvent({
+          category: cat,
+          course_id: course.id,
+          title: course.title,
+          starts_at: iso + "T18:00:00+01:00",
+          is_unplanned: false
+        })
+          .then(function () {
+            closeSheet();
+            return refresh();
+          })
+          .catch(function () {
+            if (host.toast) host.toast("Kurs konnte nicht verknüpft werden");
+          });
+      });
   }
 
   function openBookSheet(step, draft) {
@@ -1548,11 +1673,78 @@
     );
   }
 
+  function confirmDeleteEvent(id) {
+    openSheet(
+      "<h3>Löschen?</h3>" +
+        "<p>Dieser Eintrag wird entfernt.</p>" +
+        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-delete-confirm="' +
+        esc(id) +
+        '">Löschen</button>' +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+  }
+
+  function showUndoBar() {
+    var root = $(ROOT_ID);
+    if (!root) return;
+    var bar = root.querySelector(".wr-undo");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.className = "wr-undo";
+      root.appendChild(bar);
+    }
+    bar.hidden = false;
+    bar.innerHTML =
+      '<span>Gelöscht</span><button type="button" data-wr-undo-go="1">Rückgängig</button>';
+    if (state.undoTimer) clearTimeout(state.undoTimer);
+    state.undoTimer = setTimeout(function () {
+      state.lastDeleted = null;
+      if (bar) bar.hidden = true;
+    }, 6000);
+  }
+
+  function undoDelete() {
+    var snap = state.lastDeleted;
+    if (!snap) return Promise.resolve();
+    state.lastDeleted = null;
+    if (state.undoTimer) clearTimeout(state.undoTimer);
+    var bar = document.querySelector("#" + ROOT_ID + " .wr-undo");
+    if (bar) bar.hidden = true;
+    return createEvent({
+      category: snap.category,
+      course_id: snap.course_id,
+      enrollment_id: snap.enrollment_id,
+      title: snap.title,
+      starts_at: snap.starts_at,
+      location: snap.location,
+      visibility: snap.visibility || "team",
+      is_unplanned: !!snap.is_unplanned,
+      item_type: snap.item_type || "event",
+      travel_auto: !!snap.travel_auto
+    }).then(function () {
+      return refresh();
+    });
+  }
+
   function deleteEvent(id) {
     var ev = state.events.filter(function (e) {
       return String(e.id) === String(id);
     })[0];
-    var iso = ev ? dayKey(ev.starts_at) : "";
+    if (!ev) return Promise.resolve();
+    var iso = dayKey(ev.starts_at);
+    state.lastDeleted = {
+      category: ev.category,
+      course_id: ev.course_id,
+      enrollment_id: ev.enrollment_id,
+      title: ev.title,
+      starts_at: ev.starts_at,
+      location: ev.location,
+      visibility: ev.visibility,
+      is_unplanned: ev.is_unplanned,
+      item_type: ev.item_type,
+      travel_auto: ev.travel_auto
+    };
+    closeSheet();
     return rest("events?id=eq." + encodeURIComponent(id), {
       method: "DELETE",
       prefer: "return=minimal"
@@ -1561,27 +1753,34 @@
         return refresh();
       })
       .then(function () {
+        showUndoBar();
         if (!iso) return;
-        if (!itemsForDay(iso).length) {
-          openSheet(
-            "<h3>Tag ist leer</h3>" +
-              '<div class="wr-empty-btns">' +
-              '<button type="button" class="wr-pill-btn" data-wr-add-train="' +
-              esc(iso) +
-              '">Training</button>' +
-              '<button type="button" class="wr-pill-btn" data-wr-add-rest="' +
-              esc(iso) +
-              '">Rest Day</button></div>' +
-              '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Später</button>'
-          );
+        if (!itemsForDay(iso).length && state.editMode) {
+          /* leer — Edit bleibt, kein Extra-Sheet (Undo ist da) */
         }
       });
   }
 
+  function exitEditMode() {
+    if (!state.editMode) return;
+    state.editMode = false;
+    render();
+  }
+
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-train],[data-wr-add-rest],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-day-course],[data-wr-travel-days],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-edit-time],[data-wr-time-save],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-train],[data-wr-add-rest],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-day-course],[data-wr-travel-days],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
-      if (e.target && e.target.id === "wr-sheet") closeSheet();
+      if (e.target && e.target.id === "wr-sheet") {
+        closeSheet();
+        return;
+      }
+      if (
+        state.editMode &&
+        e.target &&
+        !e.target.closest(".wr-edit-panel, .wr-top, .wr-sheet, .wr-undo, .wr-travel-banner")
+      ) {
+        exitEditMode();
+      }
       return;
     }
     if (t.getAttribute("data-wr-sheet-close")) {
@@ -1597,11 +1796,13 @@
       return;
     }
     if (t.hasAttribute("data-wr-week")) {
+      if (state.editMode || t.disabled) return;
       cycleWeekMode(Number(t.getAttribute("data-wr-week")));
       refresh();
       return;
     }
     if (t.getAttribute("data-wr-week-menu")) {
+      if (state.editMode || t.disabled) return;
       openWeekMenu();
       return;
     }
@@ -1634,7 +1835,7 @@
     }
     if (t.getAttribute("data-wr-rest-save")) {
       var isoR = t.getAttribute("data-wr-rest-save");
-      var titleR = (($("wr-rest-title") && $("wr-rest-title").value) || "Rest Day").trim();
+      var titleR = (($("wr-rest-title") && $("wr-rest-title").value) || "Bewegung").trim();
       createEvent({
         category: "alternative",
         title: titleR,
@@ -1710,11 +1911,36 @@
       return;
     }
     if (t.getAttribute("data-wr-delete")) {
-      deleteEvent(t.getAttribute("data-wr-delete"));
+      confirmDeleteEvent(t.getAttribute("data-wr-delete"));
+      return;
+    }
+    if (t.getAttribute("data-wr-delete-confirm")) {
+      deleteEvent(t.getAttribute("data-wr-delete-confirm"));
+      return;
+    }
+    if (t.getAttribute("data-wr-undo-go")) {
+      undoDelete();
       return;
     }
     if (t.getAttribute("data-wr-edit-time")) {
       openTimeSheet(t.getAttribute("data-wr-edit-time"));
+      return;
+    }
+    if (t.hasAttribute("data-wr-time-h") || t.hasAttribute("data-wr-time-m")) {
+      var wheel = $("wr-time-wheel");
+      if (!wheel) return;
+      if (t.hasAttribute("data-wr-time-h")) {
+        wheel.setAttribute("data-h", t.getAttribute("data-wr-time-h"));
+        t.parentNode.querySelectorAll(".wr-time-opt").forEach(function (b) {
+          b.classList.toggle("is-on", b === t);
+        });
+      } else {
+        wheel.setAttribute("data-m", t.getAttribute("data-wr-time-m"));
+        t.parentNode.querySelectorAll(".wr-time-opt").forEach(function (b) {
+          b.classList.toggle("is-on", b === t);
+        });
+      }
+      t.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
     if (t.getAttribute("data-wr-time-save")) {
@@ -1922,7 +2148,7 @@
       "touchstart",
       function (e) {
         if (!e.touches || !e.touches[0]) return;
-        if (e.target.closest && e.target.closest(".wr-sheet")) return;
+        if (e.target.closest && e.target.closest(".wr-sheet, .wr-time-col, .wr-edit-panel")) return;
         track = {
           x: e.touches[0].clientX,
           y: e.touches[0].clientY,
@@ -1939,6 +2165,10 @@
         var dy = e.changedTouches[0].clientY - track.y;
         var vtrack = $("wr-vtrack");
         if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 48) {
+          if (state.editMode) {
+            track = null;
+            return;
+          }
           if (dy < 0 && state.dayIndex < 6) state.dayIndex += 1;
           if (dy > 0 && state.dayIndex > 0) state.dayIndex -= 1;
           if (vtrack) {
@@ -1947,6 +2177,7 @@
               behavior: "smooth"
             });
           }
+          syncSurface();
         } else if (Math.abs(dx) > 48) {
           var dayEl = root.querySelectorAll(".wr-day")[state.dayIndex];
           if (dayEl) {
@@ -2020,7 +2251,8 @@
         state.loadError = "Events konnten nicht geladen werden.";
       }),
       loadFfc().catch(function () {}),
-      loadEnrollments().catch(function () {})
+      loadEnrollments().catch(function () {}),
+      loadCourses().catch(function () {})
     ])
       .then(function () {
         var ids = (state.events || []).map(function (e) {

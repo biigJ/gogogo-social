@@ -1431,7 +1431,12 @@
       --wr-progress-h: calc(48px + var(--wr-dock));
       /* Header-Zeile unter Statusleiste; darunter liegen Edit-Panel / Banner */
       --wr-safe-top: env(safe-area-inset-top, 0px);
-      --wr-top-h: calc(var(--wr-safe-top) + 52px);
+      /* Safe Area + eine Zeile Abstand + Icon-Zeile + Tag-Label */
+      --wr-top-h: calc(var(--wr-safe-top) + 12px + 44px + 36px);
+    }
+    .woche-reels.is-edit .wr-vtrack {
+      overflow-y: hidden;
+      touch-action: pan-x;
     }
     .wr-error {
       position: absolute; top: calc(var(--wr-top-h) + 6px); left: 12px; right: 12px; z-index: 6;
@@ -1441,21 +1446,30 @@
     }
     .wr-top {
       position: absolute; top: 0; left: 0; right: 0; z-index: 8;
-      display: flex; align-items: center; justify-content: space-between;
-      gap: 8px; padding: 8px 12px 10px;
-      padding-top: max(8px, var(--wr-safe-top));
-      /* Kein Abdunkel-Verlauf über den Icons — klare Fläche */
-      background: rgba(26, 21, 16, 0.42);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      display: flex; flex-direction: column; align-items: stretch; gap: 2px;
+      padding: 0 12px 10px;
+      padding-top: calc(var(--wr-safe-top) + 12px);
+      background: transparent;
       pointer-events: none;
     }
     .wr-top > * { pointer-events: auto; }
+    .wr-top__row {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .wr-day-label {
+      margin: 2px 0 0; text-align: center;
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: clamp(22px, 5.5vw, 28px); font-weight: 600;
+      color: #F6F1E8; letter-spacing: 0.01em;
+      text-shadow: 0 1px 8px rgba(0,0,0,.35);
+      pointer-events: none;
+    }
     .wr-week-nav { display: flex; align-items: center; gap: 4px; }
     .wr-week-label {
       border: 0; background: none; color: #fff; font: inherit; font-weight: 700;
       font-size: 15px; cursor: pointer; padding: 6px 8px;
     }
+    .wr-week-label:disabled, .wr-icon-btn:disabled { opacity: .4; pointer-events: none; }
     .wr-icon-btn {
       width: 40px; height: 40px; border: 0; border-radius: 50%;
       background: rgba(255,255,255,.12); color: #fff; cursor: pointer;
@@ -1618,18 +1632,79 @@
     .wr-sheet__card {
       width: min(100%, 480px); max-height: 78%; overflow: auto;
       background: #F3EEE4; color: #2A2118; border-radius: 18px 18px 0 0;
-      padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+      padding: 18px 16px calc(28px + env(safe-area-inset-bottom, 0px) + 68px);
       box-sizing: border-box;
     }
     .wr-sheet__card h3 {
       margin: 0 0 12px; font-family: "Playfair Display", Georgia, serif; font-size: 22px;
+    }
+    .wr-sheet-hint {
+      margin: 0 0 10px; text-align: center; font-size: 13px; font-weight: 600;
+      color: rgba(42,33,24,.55);
+    }
+    .wr-time-wheel {
+      position: relative; display: grid;
+      grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+      height: 168px; margin: 0 0 18px;
+      border-radius: 14px; background: #fff;
+      border: 1px solid rgba(42,33,24,.12);
+      overflow: hidden;
+    }
+    .wr-time-col {
+      height: 100%; overflow-y: auto; scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch; padding: 60px 0;
+      scrollbar-width: none;
+    }
+    .wr-time-col::-webkit-scrollbar { display: none; }
+    .wr-time-opt {
+      display: flex; align-items: center; justify-content: center;
+      height: 44px; scroll-snap-align: center;
+      border: 0; background: none; width: 100%;
+      font: inherit; font-size: 22px; font-weight: 600;
+      color: rgba(42,33,24,.35); cursor: pointer;
+    }
+    .wr-time-opt.is-on { color: #111; font-size: 26px; }
+    .wr-time-sep {
+      font-size: 28px; font-weight: 700; color: #111; pointer-events: none;
+    }
+    .wr-time-center {
+      position: absolute; left: 10px; right: 10px; top: 50%;
+      height: 44px; margin-top: -22px; border-radius: 10px;
+      border: 1.5px solid rgba(42,33,24,.2);
+      pointer-events: none;
+    }
+    .wr-time-fade {
+      position: absolute; left: 0; right: 0; height: 56px; pointer-events: none; z-index: 1;
+    }
+    .wr-time-fade--top {
+      top: 0; background: linear-gradient(#fff, rgba(255,255,255,0));
+    }
+    .wr-time-fade--bot {
+      bottom: 0; background: linear-gradient(rgba(255,255,255,0), #fff);
+    }
+    .wr-undo {
+      position: absolute; left: 12px; right: 12px; z-index: 25;
+      bottom: calc(var(--wr-dock) + 56px);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 12px 14px; border-radius: 12px;
+      background: #111; color: #fff; font-size: 14px; font-weight: 600;
+      box-shadow: 0 8px 20px rgba(0,0,0,.25);
+    }
+    .wr-undo[hidden] { display: none !important; }
+    .wr-undo button {
+      border: 0; background: transparent; color: #fff;
+      font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer;
+      min-height: 44px; padding: 0 6px;
     }
     .wr-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
     .wr-chip, .wr-pill-btn {
       border: 1px solid #2A2118; background: transparent; color: #2A2118;
       border-radius: 999px; min-height: 40px; padding: 0 14px; font: inherit; font-weight: 600; cursor: pointer;
     }
-    .wr-chip.is-on, .wr-pill-btn--dark { background: #2A2118; color: #F6F1E8; }
+    .wr-chip.is-on, .wr-pill-btn--dark {
+      background: #111; color: #fff; border-color: #111;
+    }
+    .wr-empty-btns .wr-pill-btn--dark { background: #111; color: #fff; border-color: #111; }
     .wr-field { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; font-size: 13px; font-weight: 600; }
     .wr-field input {
       min-height: 44px; border: 1px solid rgba(42,33,24,.25); border-radius: 10px;
@@ -5945,7 +6020,7 @@
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-5"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-5"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-6"></script>
   <script src="/natalyaalice/support.js?v=support-1"></script>
   <script>
     (function () {
