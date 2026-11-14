@@ -1342,11 +1342,7 @@
     body.is-session[data-shell="heute"] .heute-stories { display: none !important; }
     body.is-session[data-shell="heute"] .dock { display: none !important; }
     body.is-session[data-shell="heute"] #heute-acc { order: 1; margin-top: 8px; width: 100%; }
-    body.is-session[data-shell="heute"] #heute-acc.is-centering {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-    }
+    /* Kein opacity-Hide mehr — das verursachte das Aktuell-Flackern bei jedem Refresh */
     body.is-session[data-shell="heute"] .heute-joins { order: 2; display: block; }
     body.is-session[data-shell="heute"] .heute-start { display: none !important; }
     body.is-session[data-shell="heute"] .heute-events { display: none !important; }
@@ -6804,7 +6800,7 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-27"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-28"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-25"></script>
   <script src="/natalyaalice/support.js?v=support-8"></script>
   <script>
@@ -11002,6 +10998,9 @@
 
       function goToAktuellShell() {
         if (window.WocheReels) WocheReels.hide();
+        if (window.HeuteAccountability && HeuteAccountability.resetAktuellPaint) {
+          HeuteAccountability.resetAktuellPaint();
+        }
         setHome(true);
         paintWelcome();
         paintHeuteDiaryFeed();
@@ -15504,6 +15503,13 @@
           else if (tab === "profil") showPlan("profil");
           else {
             if (window.WocheReels) WocheReels.hide();
+            if (
+              tab === "heute" &&
+              window.HeuteAccountability &&
+              HeuteAccountability.resetAktuellPaint
+            ) {
+              HeuteAccountability.resetAktuellPaint();
+            }
             setHome(true);
             paintWelcome();
             paintHeuteDiaryFeed();
