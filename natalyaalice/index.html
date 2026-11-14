@@ -1318,9 +1318,9 @@
     }
     body.is-session[data-shell="heute"] .heute-filter-row {
       --heute-filter-line: calc(22px * 1.3 * 1.2 * 0.5);
-      order: 0; display: flex; align-items: center; justify-content: space-between;
+      order: 0; display: flex; align-items: center; justify-content: center;
       gap: 8px; width: 100%; box-sizing: border-box;
-      /* Sticky; eine halbe Font-Zeile unter Safe Area */
+      /* Sticky; eine halbe Font-Zeile unter Safe Area — nur Filter, keine Woche-Icons */
       position: sticky; top: 0; z-index: 6; background: #F3EEE4;
       margin: 0;
       padding: calc(max(6px, env(safe-area-inset-top, 0px)) + var(--heute-filter-line)) 12px 8px;
@@ -1332,32 +1332,11 @@
       transform: translateY(-10px);
       /* sticky behalten — soft ausfaden statt abrupt visibility:hidden */
     }
-    body.is-session[data-shell="heute"] .heute-filter-row__mid {
-      display: inline-flex; align-items: center; justify-content: center; gap: 10px;
-      flex: 1; min-width: 0;
-    }
-    body.is-session[data-shell="heute"] .heute-filter-icon {
-      flex: none; width: 40px; height: 40px; margin: 0; padding: 0;
-      border: 0; border-radius: 0; background: transparent; color: #2A2118;
-      display: inline-grid; place-items: center; cursor: pointer;
-    }
-    body.is-session[data-shell="heute"] .heute-filter-icon .heute-travel-emoji {
-      font-size: 22px; line-height: 1;
-      filter: grayscale(1) brightness(0);
-    }
-    body.is-session[data-shell="heute"] .heute-filter-icon svg {
-      width: 20px; height: 20px; display: block;
-    }
     body.is-session[data-shell="heute"] .heute-filter-pick { display: flex; margin: 0; width: auto; }
     body.is-session[data-shell="heute"] .heute-filter-pick select {
       font-size: calc(22px * 1.3);
       font-weight: 600;
       line-height: 1.2;
-    }
-    body.is-session[data-shell="heute"] .heute-streak {
-      display: inline-grid; place-items: center; min-width: 28px; height: auto; padding: 0;
-      margin: 0; font-family: "Playfair Display", Georgia, serif;
-      font-size: calc(22px * 1.3); font-weight: 700; color: #2A2118; line-height: 1.2;
     }
     /* Einheitlicher Instagram-Feed: kein Dock-/Stories-Karussell unter Heute */
     body.is-session[data-shell="heute"] .heute-stories { display: none !important; }
@@ -5355,23 +5334,14 @@
       <img id="photo-img" alt="" hidden />
     </div>
     <div class="heute-filter-row shell-heute">
-      <button type="button" class="heute-filter-icon" id="heute-travel-btn" aria-label="Reisemodus">
-        <span class="heute-travel-emoji" aria-hidden="true">🛫</span>
-      </button>
-      <div class="heute-filter-row__mid">
-        <label class="heute-filter-pick">
-          <select id="heute-filter-select" aria-label="Heute filtern">
-            <option value="ich">Ich</option>
-            <option value="team">Team</option>
-            <option value="tagebuch">Tagebuch</option>
-            <option value="alles">Alles</option>
-          </select>
-        </label>
-        <span class="heute-streak" id="heute-streak" title="Streak: Tage in Folge" aria-label="Streak Tage in Folge" hidden>0</span>
-      </div>
-      <button type="button" class="heute-filter-icon" id="heute-edit-btn" aria-label="Woche bearbeiten">
-        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20h4L18 10l-4-4L4 16v4zM13 7l4 4"/></svg>
-      </button>
+      <label class="heute-filter-pick">
+        <select id="heute-filter-select" aria-label="Heute filtern">
+          <option value="ich">Ich</option>
+          <option value="team">Team</option>
+          <option value="tagebuch">Tagebuch</option>
+          <option value="alles">Alles</option>
+        </select>
+      </label>
     </div>
     <div class="heute-stories shell-heute" id="heute-stories" hidden>
       <div class="heute-stories__row ffc" id="heute-stories-row"><span class="heute-stories__team" id="heute-stories-team"></span></div>
@@ -6439,7 +6409,7 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-21"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-22"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-20"></script>
   <script src="/natalyaalice/support.js?v=support-4"></script>
   <script>
@@ -14866,22 +14836,6 @@
         heuteSelect.addEventListener("change", function () {
           if (window.HeuteAccountability) return;
           setHeuteFilter(heuteSelect.value);
-        });
-      }
-      var heuteTravel = document.getElementById("heute-travel-btn");
-      if (heuteTravel && !heuteTravel.dataset.bound) {
-        heuteTravel.dataset.bound = "1";
-        heuteTravel.addEventListener("click", function () {
-          if (window.WocheReels && WocheReels.armTravel) WocheReels.armTravel();
-          showWoche();
-        });
-      }
-      var heuteEdit = document.getElementById("heute-edit-btn");
-      if (heuteEdit && !heuteEdit.dataset.bound) {
-        heuteEdit.dataset.bound = "1";
-        heuteEdit.addEventListener("click", function () {
-          if (window.WocheReels && WocheReels.armEdit) WocheReels.armEdit();
-          showWoche();
         });
       }
       var shareSelect = document.getElementById("diary-share-select");
