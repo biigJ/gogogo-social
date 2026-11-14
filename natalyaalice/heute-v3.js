@@ -1593,11 +1593,29 @@
     });
     html += "</div>";
 
+    root.classList.add("is-centering");
     root.innerHTML = html;
     bindObserver(root);
     bindHeuteScrollFilter();
-    /* Direkt mittig auf heutiges Event — kein Soft-Scroll von Zukunft-oben */
+    /* Sofort mittig — Feed unsichtbar bis Position steht (kein Flash von oben) */
+    function revealCentered() {
+      scrollCurrentToCenter({ soft: false });
+      root.classList.remove("is-centering");
+    }
     scrollCurrentToCenter({ soft: false });
+    requestAnimationFrame(function () {
+      scrollCurrentToCenter({ soft: false });
+      requestAnimationFrame(function () {
+        scrollCurrentToCenter({ soft: false });
+        revealCentered();
+        setTimeout(function () {
+          scrollCurrentToCenter({ soft: false });
+        }, 80);
+        setTimeout(function () {
+          scrollCurrentToCenter({ soft: false });
+        }, 220);
+      });
+    });
     if (host.maybeAskHistoryShare) host.maybeAskHistoryShare();
   }
 
@@ -1629,13 +1647,16 @@
       if (document.body.dataset.shell !== "heute") return;
       var row = document.querySelector(".heute-filter-row");
       if (row) row.classList.remove("is-scroll-hide");
+      /* Frisch gelayoutetes Element holen (nach HTML-Replace) */
+      el = currentEventCard() || el;
+      if (!el) return;
       var rect = el.getBoundingClientRect();
       if (!rect.height && !rect.width) return;
       var headerH = row ? row.getBoundingClientRect().height || 0 : 0;
       var mid = headerH + (window.innerHeight - headerH) / 2;
       var elMid = rect.top + rect.height / 2;
       var delta = elMid - mid;
-      if (Math.abs(delta) < 6) return;
+      if (Math.abs(delta) < 4) return;
       var next = Math.max(0, (scroller.scrollTop || 0) + delta);
       if (soft && typeof scroller.scrollTo === "function") {
         scroller.scrollTo({ top: next, behavior: "smooth" });

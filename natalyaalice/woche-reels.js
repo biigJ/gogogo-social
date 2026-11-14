@@ -1067,10 +1067,14 @@
     var notePack = truncNote(ev.note || ev.description || "", 2);
     var place = ev.location || "";
     var travelHint = "";
+    var supportType =
+      String(ev.item_type || "") === "support_session" ||
+      String(ev.item_type || "") === "nutrition_log";
     if (
       travelActive() &&
       item.kind === "event" &&
       !ev.travel_auto &&
+      !supportType &&
       (String(place).toLowerCase().indexOf("studio") >= 0 || cat === "zirkel") &&
       !ev.enrollment_id
     ) {
@@ -1095,12 +1099,19 @@
         "</p>";
     }
     var going = goingLine(ev);
+    var isNutrition =
+      String(ev.item_type || "") === "nutrition_log" ||
+      /ernährung|ernaehrung/i.test(String(ev.title || ""));
     return (
-      '<div class="wr-slide" data-day="' +
+      '<div class="wr-slide' +
+      (isNutrition ? " is-nutrition" : "") +
+      '" data-day="' +
       esc(iso) +
       '" data-event-id="' +
       esc(ev.id) +
-      '">' +
+      '"' +
+      (isNutrition ? ' data-wr-nutrition="1"' : "") +
+      ">" +
       '<div class="wr-media ' +
       toneClass(cat) +
       (ev.photo_url ? " has-photo" : "") +
@@ -1109,7 +1120,9 @@
         ? '<img class="wr-photo" src="' + esc(ev.photo_url) + '" alt="" />'
         : "") +
       '<div class="wr-bottom">' +
-      '<div class="wr-bottom__main">' +
+      '<div class="wr-bottom__main"' +
+      (isNutrition ? ' data-wr-nutrition-open="1"' : "") +
+      ">" +
       '<div class="wr-author">' +
       avatarHtml(p) +
       inviteAvatarsHtml(iso) +
@@ -1336,9 +1349,29 @@
     );
   }
 
+  function isSupportOnlyDay(iso) {
+    var items = itemsForDay(iso).filter(function (it) {
+      return it && it.kind === "event" && it.ev && String(it.ev.user_id) === me();
+    });
+    if (!items.length) return false;
+    return items.every(function (it) {
+      var t = String((it.ev && it.ev.item_type) || "");
+      return t === "support_session" || t === "nutrition_log";
+    });
+  }
+
   function travelAltHtml(iso) {
     if (!travelDayActive(iso)) return "";
+    /* Web-Call / Ernährung brauchen keine Reise-Alternative */
+    if (isSupportOnlyDay(iso)) return "";
     var alt = alternativeEventForDay(iso);
+    if (
+      alt &&
+      alt.ev &&
+      (alt.ev.item_type === "support_session" || alt.ev.item_type === "nutrition_log")
+    ) {
+      alt = null;
+    }
     var title = alt && alt.ev ? alt.ev.title || "Alternative" : "Alternative wählen";
     var copy = alt
       ? "Reise-Tag · tippen zum Ändern"
@@ -2484,7 +2517,6 @@
   }
 
   function endTravel() {
-    var id = me();
     var autos = state.events.filter(function (ev) {
       return (
         ev.travel_auto &&
@@ -2500,7 +2532,37 @@
       }).catch(function () {});
     });
     saveTravelPref(null);
-    return Promise.all(jobs).then(refresh);
+    if (host.toast) host.toast("Reise beendet");
+    return Promise.all(jobs).then(function () {
+      return refreshKeepDay(berlinToday());
+    });
+  }
+
+  function openTravelMenu() {
+    var on = travelActive();
+    openSheet(
+      "<h3>Reisemodus</h3>" +
+        (on
+          ? "<p>Aktiv bis " +
+            esc(formatDayLong(state.travelUntil).replace(/^[^,]*,\s*/, "") || state.travelUntil) +
+            ".</p>" +
+            '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-end-travel="1">Reise beenden / löschen</button>'
+          : "<p>Abwesenheit wählen — Trainingstage brauchen eine Alternative (nicht für Ernährung/Web-Call).</p>" +
+            '<div class="wr-chips">' +
+            [3, 5, 7, 10, 14]
+              .map(function (d) {
+                return (
+                  '<button type="button" class="wr-chip" data-wr-travel-go="' +
+                  d +
+                  '">' +
+                  d +
+                  " Tage</button>"
+                );
+              })
+              .join("") +
+            "</div>") +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
   }
 
   function swapToHotel(eventId) {
@@ -2770,7 +2832,18 @@
       return;
     }
     if (t.getAttribute("data-wr-travel")) {
-      openTravelSheet();
+      openTravelMenu();
+      return;
+    }
+    if (t.closest && t.closest("[data-wr-nutrition-open], [data-wr-nutrition]")) {
+      var slideN = t.closest(".wr-slide");
+      var dayN = slideN ? slideN.getAttribute("data-day") : currentDayIso();
+      var evN = slideN ? slideN.getAttribute("data-event-id") : "";
+      if (host && typeof host.openNutritionLogModal === "function") {
+        host.openNutritionLogModal({ day: dayN, eventId: evN });
+      } else if (typeof window.openNutritionLogModal === "function") {
+        window.openNutritionLogModal({ day: dayN, eventId: evN });
+      }
       return;
     }
     if (t.getAttribute("data-wr-end-travel")) {
@@ -2865,9 +2938,10 @@
     }
     if (t.hasAttribute("data-wr-travel-go")) {
       var wheelGo = $("wr-travel-wheel");
+      var attrDays = Number(t.getAttribute("data-wr-travel-go") || 0);
       var nDays = wheelGo
         ? Number(wheelGo.getAttribute("data-days") || 3)
-        : 3;
+        : attrDays || 3;
       applyTravel(Math.max(1, Math.min(TRAVEL_MAX_DAYS, nDays || 3)));
       return;
     }
@@ -3346,7 +3420,7 @@
     ]).then(function () {
       if (armedTravel) {
         try {
-          openTravelSheet();
+          openTravelMenu();
         } catch (eT) {}
       }
     });

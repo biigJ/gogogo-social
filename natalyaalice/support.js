@@ -156,6 +156,28 @@
     if (existing && (existing.status === "aktiv" || existing.status === "freigeschaltet")) {
       return Promise.resolve(existing);
     }
+    if (existing && existing.status === "angefragt" && existing.id) {
+      return rest("support_orders?id=eq." + encodeURIComponent(existing.id), {
+        method: "PATCH",
+        prefer: "return=representation",
+        body: {
+          status: "freigeschaltet",
+          payment_status: paymentFor(product),
+          meta: meta || existing.meta || {}
+        }
+      })
+        .catch(function () {
+          return rest("support_orders?id=eq." + encodeURIComponent(existing.id), {
+            method: "PATCH",
+            prefer: "return=representation",
+            body: { status: "freigeschaltet" }
+          });
+        })
+        .then(function (rows) {
+          var order = Array.isArray(rows) ? rows[0] : rows || existing;
+          return afterBook(product, order);
+        });
+    }
     var body = {
       user_id: me(),
       product_id: product.id,
@@ -356,7 +378,7 @@
       title: "Stempelkarte",
       price: "25 € Spende",
       description:
-        "10er-Stempelkarte. Event erstellen, Freund macht mit und scannt — beide erhalten einen Stempel. Volle Karte: T-Shirt oder Selfiestick."
+        "12er-Stempelkarte. Event erstellen, Freund macht mit und scannt — beide erhalten einen Stempel. Volle Karte: T-Shirt oder Selfiestick."
     }
   ];
   var PAY_HINT =
@@ -698,12 +720,16 @@
 
   function openStampCard() {
     var order = activeOrderFor("stempelkarte");
+    if (host.openStampCardModal) {
+      host.openStampCardModal(order);
+      return;
+    }
     var stamps = 0;
     try {
       stamps = Number((order && order.meta && order.meta.stamps) || 0) || 0;
     } catch (e) {}
     if (host.toast) {
-      host.toast("Stempelkarte: " + stamps + "/10 — Freund scannt nach gemeinsamem Event.");
+      host.toast("Stempelkarte: " + stamps + "/12 — Freund scannt nach gemeinsamem Event.");
     }
   }
 
