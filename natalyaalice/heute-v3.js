@@ -13,7 +13,10 @@
     filter: "ich",
     observer: null,
     viewed: {},
-    pendingVis: "team"
+    pendingVis: "team",
+    userScrolledAktuell: false,
+    paintedAktuell: false,
+    refreshSeq: 0
   };
 
   var FILTER_KEY = "gogogo_heute_filter_v3";
@@ -943,13 +946,13 @@
     return (
       '<div class="acc-card__bar">' +
       (opts.actions || "") +
+      teaserBlock +
       inviteFaceRowHtml(
         postId,
         opts.inviteIso || "",
         canInvite,
         opts.eventId || postId
       ) +
-      teaserBlock +
       "</div>"
     );
   }
@@ -1593,28 +1596,22 @@
     });
     html += "</div>";
 
-    root.classList.add("is-centering");
+    var firstPaint = !state.paintedAktuell;
+    var scroller = welcomeScrollEl();
+    var keepScroll = !firstPaint && state.userScrolledAktuell ? scroller.scrollTop || 0 : null;
+    /* Feed sichtbar lassen — kein opacity-Flash bei Refresh */
+    root.classList.remove("is-centering");
     root.innerHTML = html;
+    state.paintedAktuell = true;
     bindObserver(root);
     bindHeuteScrollFilter();
-    /* Sofort mittig — Feed unsichtbar bis Position steht (kein Flash von oben) */
-    function revealCentered() {
-      scrollCurrentToCenter({ soft: false });
-      root.classList.remove("is-centering");
-    }
-    scrollCurrentToCenter({ soft: false });
     requestAnimationFrame(function () {
-      scrollCurrentToCenter({ soft: false });
-      requestAnimationFrame(function () {
-        scrollCurrentToCenter({ soft: false });
-        revealCentered();
-        setTimeout(function () {
-          scrollCurrentToCenter({ soft: false });
-        }, 80);
-        setTimeout(function () {
-          scrollCurrentToCenter({ soft: false });
-        }, 220);
-      });
+      if (keepScroll != null) {
+        scroller.scrollTop = keepScroll;
+        return;
+      }
+      /* Nur beim ersten Paint / ohne User-Scroll zentrieren */
+      scrollCurrentToCenter({ soft: false, force: true });
     });
     if (host.maybeAskHistoryShare) host.maybeAskHistoryShare();
   }
@@ -1639,12 +1636,15 @@
   function scrollCurrentToCenter(opts) {
     opts = opts || {};
     var soft = opts.soft === true;
+    var force = opts.force === true;
+    if (!force && state.userScrolledAktuell) return;
     var scroller = welcomeScrollEl();
     var el = currentEventCard();
     if (!scroller || !el) return;
 
     function run() {
       if (document.body.dataset.shell !== "heute") return;
+      if (!force && state.userScrolledAktuell) return;
       var row = document.querySelector(".heute-filter-row");
       if (row) row.classList.remove("is-scroll-hide");
       /* Frisch gelayoutetes Element holen (nach HTML-Replace) */
@@ -1682,6 +1682,7 @@
       function () {
         if (document.body.dataset.shell !== "heute") return;
         var y = scroller.scrollTop || 0;
+        if (Math.abs(y - last) > 8) state.userScrolledAktuell = true;
         var todayEl = $("acc-feed-today");
         var goingDown = y > last + 2;
         var goingUp = y < last - 2;
@@ -2533,28 +2534,36 @@
     addComment(eventId, text);
   }
 
+  function softTimeout(promise, ms) {
+    return Promise.race([
+      Promise.resolve(promise).catch(function () {}),
+      new Promise(function (resolve) {
+        setTimeout(resolve, ms || 2500);
+      })
+    ]);
+  }
+
   function refresh() {
     if (!host || !me()) return Promise.resolve();
-    var ffcReady = Promise.resolve();
-    if (global.FFC && FFC.refreshHeute && FFC.user && FFC.user()) {
-      ffcReady = Promise.resolve(FFC.refreshHeute()).catch(function () {});
+    var seq = ++state.refreshSeq;
+    function stillCurrent() {
+      return seq === state.refreshSeq;
     }
     var histReady =
       host.prepareHeuteHistory
         ? Promise.resolve(host.prepareHeuteHistory()).catch(function () {})
         : Promise.resolve();
-    return ffcReady
+    /* Kern-Feed zuerst — nicht auf FFC warten (sonst bleibt Aktuell leer) */
+    return Promise.all([
+      loadStreak(),
+      loadEigenCourse(),
+      loadEnrollments(),
+      loadEvents(),
+      loadFfcEvents(),
+      histReady
+    ])
       .then(function () {
-        return Promise.all([
-          loadStreak(),
-          loadEigenCourse(),
-          loadEnrollments(),
-          loadEvents(),
-          loadFfcEvents(),
-          histReady
-        ]);
-      })
-      .then(function () {
+        if (!stillCurrent()) return null;
         var ids = state.events.map(function (e) {
           return String(e.id);
         });
@@ -2575,12 +2584,30 @@
           loadSyntheticCommentKeys(synthetic)
         ]);
       })
-      .then(function () {
+      .then(function (ok) {
+        if (ok == null || !stillCurrent()) return;
         if (host.heuteDiaryComments) {
           mergeDiaryComments(host.heuteDiaryComments() || {});
         }
+        render();
       })
-      .then(render);
+      .then(function () {
+        if (!stillCurrent()) return;
+        if (!(global.FFC && FFC.refreshHeute && FFC.user && FFC.user())) return;
+        /* FFC nachziehen — mit Timeout, damit nichts hängen bleibt */
+        return softTimeout(FFC.refreshHeute(), 2800).then(function () {
+          if (!stillCurrent()) return;
+          return loadFfcEvents().then(function () {
+            if (!stillCurrent()) return;
+            render();
+          });
+        });
+      });
+  }
+
+  function resetAktuellPaint() {
+    state.paintedAktuell = false;
+    state.userScrolledAktuell = false;
   }
 
   function install(h) {
@@ -2668,6 +2695,12 @@
       }
     }
     interceptGoKinds();
+    /* Sofort Plan-Karten zeigen — nicht auf langsames Netzwerk warten */
+    if (me()) {
+      try {
+        render();
+      } catch (ePaint) {}
+    }
   }
 
   global.HeuteAccountability = {
@@ -2675,6 +2708,7 @@
     refresh: refresh,
     openDone: openDoneModal,
     scrollCurrentToCenter: scrollCurrentToCenter,
+    resetAktuellPaint: resetAktuellPaint,
     setFilter: function (v) {
       saveFilter(v);
       refresh();
