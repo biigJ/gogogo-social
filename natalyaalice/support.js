@@ -505,6 +505,7 @@
   }
 
   function offerOwned(type) {
+    if (type === "zirkel" && global.FFC && FFC.user && FFC.user()) return true;
     return !!(activeOrderFor(type) || (type === "routine" && host && host.routineActive && host.routineActive()));
   }
 
@@ -588,8 +589,11 @@
       });
     }
     if (key === "zirkel") {
-      return bookStaticOffer("zirkel").then(function () {
-        if (host.openZirkel) host.openZirkel();
+      /* Nur buchen — Workout startet über Event/spontan, nicht unter Plus */
+      return bookStaticOffer("zirkel").then(function (order) {
+        if (host.paintProfil) host.paintProfil();
+        if (host.onOffersReady) host.onOffersReady(STATIC_OFFERS.slice());
+        return order;
       });
     }
     if (

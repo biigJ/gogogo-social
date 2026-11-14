@@ -1547,6 +1547,23 @@
       display: block;
     }
     .wr-travel-banner {
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: calc(100% - 24px);
+      margin: 8px 12px 0;
+      min-height: 44px;
+      border: 1px solid #2A2118;
+      background: #F6F1E8;
+      color: #2A2118;
+      font: inherit;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 5;
+    }
+    .wr-travel-banner--legacy {
       position: absolute; top: calc(var(--wr-top-h) + 6px); left: 12px; right: 12px; z-index: 7;
       border: 0; border-radius: 999px; padding: 8px 12px;
       background: #F3EEE4; color: #2A2118;
@@ -1760,6 +1777,13 @@
     }
     .wr-travel-card__body h3 { margin: 0; font-size: 16px; font-weight: 700; }
     .wr-travel-card__body p { margin: 0; font-size: 13px; line-height: 1.35; color: rgba(42,33,24,.75); }
+    .wr-zirkel-cd {
+      margin: 0 0 4px;
+      font-size: 13px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.02em;
+      color: #C7413B;
+    }
     .wr-edit-panel {
       position: absolute;
       top: calc(var(--wr-top-h) + 8px);
@@ -4487,14 +4511,25 @@
       overflow: hidden;
       background: var(--tone-neutral);
     }
-    .go-slide__title,
-    .go-slide__head {
-      margin: 0 0 10px;
-      font-family: "Playfair Display", Georgia, serif;
-      font-size: 22px;
-      font-weight: 600;
-      line-height: 1.2;
-      color: #2A2118;
+    /* Plus-Headlines: Klasse go-slide__title — nie display:none (früher .go-slide__head) */
+    body.is-session #go-rail .go-slide > h2.go-slide__title,
+    body.is-session #go-rail .go-slide > .go-slide__title,
+    .go-slide__title {
+      display: block !important;
+      margin: 0 0 12px !important;
+      padding: 0 !important;
+      font-family: "Playfair Display", Georgia, serif !important;
+      font-size: 22px !important;
+      font-weight: 600 !important;
+      line-height: 1.2 !important;
+      color: #2A2118 !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      height: auto !important;
+      min-height: 1.2em !important;
+      overflow: visible !important;
+      position: relative !important;
+      z-index: 2 !important;
     }
     .go-slide__art { margin: 0; }
     .go-slide__copy {
@@ -4512,36 +4547,46 @@
       color: #F6F1E8;
       font-weight: 600;
     }
-    .go-slide__head {
-      display: block !important;
-      margin: 0 0 12px !important;
-      padding: 0 !important;
+    .go-slide__ffc {
+      margin-top: 28px;
+      display: grid;
+      gap: 18px;
+    }
+    .go-slide__ffc h3 {
+      margin: 0 0 8px;
       font-family: "Playfair Display", Georgia, serif !important;
-      font-size: 22px !important;
+      font-size: 18px !important;
       font-weight: 600 !important;
-      line-height: 1.2 !important;
-      color: #2A2118 !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      height: auto !important;
-      min-height: 1.2em !important;
-      overflow: visible !important;
-      position: relative !important;
-      z-index: 1 !important;
+      color: #2A2118;
     }
-    body.is-session[data-shell="kurse"] .go-slide__head,
-    body.is-session[data-shell="kurse"] #go-rail .go-slide > .go-slide__head {
-      display: block !important;
+    .go-slide__ffc-box {
+      border: 1px solid #2A2118;
+      background: #F6F1E8;
+      padding: 12px;
+      min-height: 72px;
+      color: #2A2118;
+      font-size: 14px !important;
     }
+    .go-slide__ffc-box .lb-table,
+    .go-slide__ffc-box .history-list,
+    .go-slide__ffc-box #lbTable,
+    .go-slide__ffc-box #historyList {
+      width: 100%;
+    }
+    .go-slide__title + .go-slide__art,
     .go-slide__head + .go-slide__art { margin-top: 0; }
     .go-slide__art + .go-slide__cta { margin-top: calc(36px * 0.65); }
     .go-slide__cta + .go-slide__copy { margin-top: 36px; }
     /* Stempelkarte (Spazierclub-Layout, gogogo) */
     #stamp-card-modal {
+      z-index: 96;
       align-items: center;
       justify-content: center;
       padding: 16px;
       background: rgba(42, 33, 24, 0.55);
+    }
+    #stamp-card-modal:not([hidden]) {
+      display: grid !important;
     }
     .stamp-pass {
       position: relative;
@@ -5810,14 +5855,14 @@
   </div>
   <div class="sand-modal" id="zirkel-register" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="zirkel-register-title">
-      <h2 class="ask" id="zirkel-register-title">Zirkeltraining registrieren</h2>
-      <p class="team-msg" id="zirkel-register-hint">E-Mail, Passwort und Nickname. Der Nickname muss bei gogogo und FFC frei sein.</p>
+      <h2 class="ask" id="zirkel-register-title">Zirkeltraining buchen</h2>
+      <p class="team-msg" id="zirkel-register-hint">Nutzername, E-Mail und Passwort (zweimal). Danach ist Zirkeltraining gebucht — starten tust Du über ein Event oder spontan.</p>
+      <input id="zirkel-reg-nick" type="text" maxlength="20" placeholder="Nutzername / Nickname" autocomplete="username" autocapitalize="off" spellcheck="false" />
       <input id="zirkel-reg-email" type="email" placeholder="E-Mail" autocomplete="email" />
       <input id="zirkel-reg-pass" type="password" placeholder="Passwort (mind. 6 Zeichen)" autocomplete="new-password" />
       <input id="zirkel-reg-pass2" type="password" placeholder="Passwort wiederholen" autocomplete="new-password" />
-      <input id="zirkel-reg-nick" type="text" maxlength="20" placeholder="Nickname" autocomplete="off" autocapitalize="off" spellcheck="false" />
       <p class="team-msg" id="zirkel-register-msg"></p>
-      <button type="button" id="zirkel-register-save">Registrieren</button>
+      <button type="button" id="zirkel-register-save">Buchen</button>
       <button type="button" class="sand-quiet" id="zirkel-register-cancel">Abbrechen</button>
     </div>
   </div>
@@ -6625,9 +6670,9 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-25"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-23"></script>
-  <script src="/natalyaalice/support.js?v=support-7"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-26"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-24"></script>
+  <script src="/natalyaalice/support.js?v=support-8"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -10918,6 +10963,42 @@
           onEventsChanged: notifyAktuellEventsChanged,
           openDoneModal: openDoneFromAnywhere,
           openNutritionLogModal: openNutritionLogModal,
+          getTravelUntil: function () {
+            var range = absenceOf(sessionAccount);
+            return range && range.end ? String(range.end) : null;
+          },
+          setTravelUntil: function (iso) {
+            var about = profileAbout(sessionAccount) || {};
+            if (!iso) {
+              if (about.absence) {
+                about.absence.active = false;
+                about.absence.end = null;
+              }
+              return saveAbout(about).then(function () {
+                paintAbsenceButton();
+                paintWelcome();
+              });
+            }
+            var today = Log.berlinToday();
+            var abs = about.absence && typeof about.absence === "object" ? about.absence : {};
+            abs.start = abs.start && abs.start <= today ? abs.start : today;
+            abs.end = iso;
+            abs.active = true;
+            about.absence = abs;
+            return saveAbout(about).then(function () {
+              paintAbsenceButton();
+              paintWelcome();
+            });
+          },
+          openZirkelWorkout: function (eventId) {
+            requireFfc(function () {
+              if (window.FFC && FFC.openSetup) FFC.openSetup();
+              else if (window.FFC && FFC.go) FFC.go("run");
+            }, { title: "Zirkeltraining" });
+          },
+          requireFfc: function (fn, opts) {
+            if (typeof requireFfc === "function") requireFfc(fn || function () {}, opts || {});
+          },
           showHeute: function () {
             goToAktuellShell();
             if (window.HeuteAccountability && HeuteAccountability.refresh) {
@@ -11378,13 +11459,23 @@
         return hit;
       }
 
+      function dayIsSupportOnlyForTravel(iso) {
+        /* Web-Call / Ernährung brauchen keine Reise-Alternative */
+        try {
+          if (window.WocheReels && WocheReels.dayNeedsTravelAlt) {
+            return !WocheReels.dayNeedsTravelAlt(iso);
+          }
+        } catch (eS) {}
+        return false;
+      }
+
       function firstTravelAltIso(range) {
         if (!range) return "";
         var today = Log.berlinToday();
         var iso = range.start < today ? today : range.start;
         if (iso > range.end) iso = range.start;
         while (iso <= range.end) {
-          if (!travelAltFor(iso)) return iso;
+          if (!dayIsSupportOnlyForTravel(iso) && !travelAltFor(iso)) return iso;
           iso = addDays(iso, 1);
         }
         return range.start;
@@ -12054,13 +12145,16 @@
 
       function openStampCardModal(order) {
         var modal = document.getElementById("stamp-card-modal");
-        if (!modal) return;
+        if (!modal) {
+          try { window.alert("Stempelkarte ist noch nicht geladen. Bitte Seite neu laden."); } catch (eM) {}
+          return;
+        }
         var stamps = 0;
         try {
           stamps = Number((order && order.meta && order.meta.stamps) || 0) || 0;
         } catch (eS) {}
         stamps = Math.max(0, Math.min(12, stamps));
-        var name = personName() || "Du";
+        var name = (typeof personName === "function" ? personName() : "") || "Du";
         var brand = document.getElementById("stamp-card-brand");
         var count = document.getElementById("stamp-card-count");
         var member = document.getElementById("stamp-card-member");
@@ -12083,17 +12177,56 @@
         var sid = stampCardId();
         if (code) code.textContent = sid;
         if (qr) {
+          var payload = "gogogo:stamp:" + sid;
           qr.src =
-            "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" +
-            encodeURIComponent("gogogo:stamp:" + sid);
+            "https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=" +
+            encodeURIComponent(payload);
           qr.alt = "QR " + sid;
+          qr.onerror = function () {
+            qr.removeAttribute("src");
+            qr.alt = sid;
+          };
         }
         modal.hidden = false;
+        modal.removeAttribute("hidden");
+        modal.style.display = "grid";
       }
 
       function closeStampCardModal() {
         var modal = document.getElementById("stamp-card-modal");
-        if (modal) modal.hidden = true;
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute("hidden", "");
+        modal.style.display = "";
+      }
+
+      function mountGoZirkelPanels(lbBox, recBox) {
+        if (!window.FFC || !FFC.user || !FFC.user()) return;
+        try {
+          if (FFC.refreshTraining) FFC.refreshTraining();
+        } catch (eR) {}
+        var board = document.getElementById("zirkel-board");
+        var records = document.getElementById("zirkel-records");
+        if (lbBox) {
+          lbBox.textContent = "";
+          if (board && board.childNodes && board.childNodes.length) {
+            lbBox.appendChild(board.cloneNode(true));
+          } else {
+            var lbTable = document.getElementById("lbTable");
+            if (lbTable) lbBox.appendChild(lbTable.cloneNode(true));
+            else lbBox.textContent = "Noch keine Leaderboard-Daten.";
+          }
+        }
+        if (recBox) {
+          recBox.textContent = "";
+          if (records && records.childNodes && records.childNodes.length) {
+            recBox.appendChild(records.cloneNode(true));
+          } else {
+            var hist = document.getElementById("historyList");
+            if (hist) recBox.appendChild(hist.cloneNode(true));
+            else recBox.textContent = "Noch keine Aufzeichnungen.";
+          }
+        }
       }
 
       function saveStampCardToWallet() {
@@ -12691,8 +12824,15 @@
         stampBtn.type = "button";
         stampBtn.className = "team-slide__cta is-solid";
         stampBtn.textContent = "Stempelkarte";
-        stampBtn.addEventListener("click", function () {
-          openStampCardModal(stampOrder);
+        stampBtn.setAttribute("aria-label", "Stempelkarte öffnen");
+        stampBtn.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          try {
+            openStampCardModal(stampOrder || null);
+          } catch (eStamp) {
+            try { window.alert("Stempelkarte konnte nicht geöffnet werden."); } catch (eA) {}
+          }
         });
         meSlide.appendChild(stampBtn);
         var feedbackBtn = document.createElement("button");
@@ -13399,7 +13539,7 @@
           card.dataset.title = offer.title;
           card.dataset.offer = offer.key;
           var head = document.createElement("h2");
-          head.className = "go-slide__head";
+          head.className = "go-slide__title";
           head.textContent = offer.title;
           card.appendChild(head);
           var art = document.createElement("div");
@@ -13413,12 +13553,19 @@
           var cta = document.createElement("button");
           cta.type = "button";
           cta.className = "go-slide__cta" + (owned ? " is-owned" : "");
+          var isZirkel = offer.key === "zirkel" || offer.type === "zirkel";
+          var ffcLogged = !!(window.FFC && FFC.user && FFC.user());
+          if (isZirkel && ffcLogged) owned = true;
           cta.textContent = owned ? "Gebucht ✔️" : "Buchen";
           if (owned) {
             cta.disabled = true;
             cta.setAttribute("aria-disabled", "true");
           } else {
             cta.addEventListener("click", function () {
+              if (isZirkel) {
+                openZirkelRegister();
+                return;
+              }
               cta.disabled = true;
               var book =
                 window.GoSupport && GoSupport.bookOffer
@@ -13442,6 +13589,36 @@
           copy.className = "go-slide__copy";
           copy.textContent = offer.description || "";
           card.appendChild(copy);
+          if (isZirkel) {
+            var ffcWrap = document.createElement("div");
+            ffcWrap.className = "go-slide__ffc";
+            var lbSec = document.createElement("section");
+            lbSec.innerHTML = "<h3>Leaderboard</h3>";
+            var lbBox = document.createElement("div");
+            lbBox.className = "go-slide__ffc-box";
+            lbBox.id = "go-zirkel-board";
+            lbBox.textContent = ffcLogged
+              ? "Lade Leaderboard …"
+              : "Nach dem Buchen siehst Du hier das Leaderboard.";
+            lbSec.appendChild(lbBox);
+            var recSec = document.createElement("section");
+            recSec.innerHTML = "<h3>Aufzeichnungen</h3>";
+            var recBox = document.createElement("div");
+            recBox.className = "go-slide__ffc-box";
+            recBox.id = "go-zirkel-records";
+            recBox.textContent = ffcLogged
+              ? "Lade Aufzeichnungen …"
+              : "Nach dem Buchen erscheinen hier Deine Aufzeichnungen.";
+            recSec.appendChild(recBox);
+            ffcWrap.appendChild(lbSec);
+            ffcWrap.appendChild(recSec);
+            card.appendChild(ffcWrap);
+            if (ffcLogged) {
+              requestAnimationFrame(function () {
+                mountGoZirkelPanels(lbBox, recBox);
+              });
+            }
+          }
           rail.appendChild(card);
         });
         syncHScrollDock();
@@ -13897,6 +14074,14 @@
                 throw new Error("23505");
               }
               document.getElementById("zirkel-register").hidden = true;
+              if (window.GoSupport && GoSupport.bookOffer) {
+                GoSupport.bookOffer("zirkel").catch(function () {});
+              }
+              paintGoRail();
+              if (typeof renderProfil === "function") renderProfil();
+              try {
+                window.alert("Zirkeltraining gebucht. Start über ein Event oder spontan — nicht unter Plus.");
+              } catch (eZ) {}
               paintZirkelState();
               refreshZirkel();
               onFfcFriendsChanged();
