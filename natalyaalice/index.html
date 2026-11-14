@@ -4474,7 +4474,8 @@
       margin-top: 16px;
     }
 
-    /* Go carousel */
+    /* Go carousel — #go-rail ist Sibling von #plan-training, nicht Kind */
+    body.is-session #go-rail.go-rail,
     body.is-session #plan-training .go-rail,
     body.is-session #plan-team.team-rail {
       display: flex;
@@ -4487,6 +4488,7 @@
       overflow-x: auto;
       overflow-y: hidden;
       scroll-snap-type: x mandatory;
+      scroll-padding-inline: 0;
       scroll-behavior: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
@@ -4498,11 +4500,13 @@
       touch-action: pan-x pan-y;
       overscroll-behavior: contain;
     }
+    body.is-session #go-rail.go-rail::-webkit-scrollbar,
     body.is-session #plan-training .go-rail::-webkit-scrollbar,
     body.is-session #plan-team.team-rail::-webkit-scrollbar { display: none; height: 0; }
     .go-slide {
       flex: 0 0 100%;
       width: 100%;
+      max-width: 100%;
       box-sizing: border-box;
       scroll-snap-align: start;
       scroll-snap-stop: always;
@@ -4674,25 +4678,30 @@
       border: 1px solid #F6F1E8; background: transparent; color: #F6F1E8;
       font: inherit; font-weight: 700; cursor: pointer;
     }
-    /* Plus: fester Viewport — kein vertikales Scrollen der Shell wenn Inhalt passt */
+    /* Plus: fester Viewport — Padding nicht doppelt zur Rail-Höhe zählen */
     body.is-session[data-shell="kurse"] .welcome {
-      overflow-x: hidden;
-      overflow-y: hidden;
+      overflow: hidden !important;
+      overscroll-behavior: none;
       height: var(--screen-h, 100dvh);
       max-height: var(--screen-h, 100dvh);
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      padding-top: env(safe-area-inset-top, 0px) !important;
+      padding-bottom: 0 !important;
     }
     body.is-session[data-shell="kurse"] #go-rail {
       flex: 1 1 auto;
-      height: calc(var(--screen-h, 100dvh) - 96px - env(safe-area-inset-bottom, 0px));
-      max-height: calc(var(--screen-h, 100dvh) - 96px - env(safe-area-inset-bottom, 0px));
+      width: 100%;
+      height: auto;
+      max-height: none;
       min-height: 0;
       overflow-x: auto;
       overflow-y: hidden;
-      overscroll-behavior: contain;
+      overscroll-behavior: none;
       align-items: stretch;
       gap: 0;
       scroll-snap-type: x mandatory;
-      scroll-padding: 0;
+      scroll-padding-inline: 0;
     }
     body.is-session[data-shell="kurse"] .go-slide {
       height: 100%;
@@ -13679,7 +13688,7 @@
         closeFeedbackForm();
       }
 
-      function paintGoRail() {
+      function paintGoRail(force) {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
         rail.hidden = false;
@@ -13690,7 +13699,6 @@
           var curIx = railCurrentIndex(rail);
           keepOffer = curSlides[curIx] ? String(curSlides[curIx].dataset.offer || "") : "";
         } catch (eKeep) {}
-        rail.textContent = "";
         var supportRoot = document.getElementById("support-root");
         if (supportRoot) supportRoot.hidden = true;
         var IMG = {
@@ -13742,6 +13750,47 @@
                   description: "12er-Karte für 25 € Spende — Stempel mit Freunden."
                 }
               ];
+        /* Kein Full-Rebuild wenn Offer-Keys + FFC-Login gleich — verhindert FFC-Flackern */
+        if (!force) {
+          var existing = rail.querySelectorAll(".go-slide");
+          var ffcLoggedNow = !!(window.FFC && FFC.user && FFC.user());
+          var paintedFfc = rail.dataset.ffcLogged || "0";
+          var ffcMismatch =
+            existing.length > 0 && paintedFfc !== (ffcLoggedNow ? "1" : "0");
+          if (!ffcMismatch && existing.length === offers.length) {
+            var same = true;
+            var ei;
+            for (ei = 0; ei < offers.length; ei++) {
+              if (String(existing[ei].dataset.offer || "") !== String(offers[ei].key || "")) {
+                same = false;
+                break;
+              }
+            }
+            if (same) {
+              for (ei = 0; ei < offers.length; ei++) {
+                var of = offers[ei];
+                var ownedNow =
+                  window.GoSupport && GoSupport.offerOwned
+                    ? GoSupport.offerOwned(of.type || of.key)
+                    : false;
+                var isZ = of.key === "zirkel" || of.type === "zirkel";
+                if (isZ && ffcLoggedNow) ownedNow = true;
+                var btn = existing[ei].querySelector(".go-slide__cta");
+                if (!btn) continue;
+                btn.textContent = ownedNow ? "Gebucht ✔️" : "Buchen";
+                btn.disabled = !!ownedNow;
+                btn.classList.toggle("is-owned", !!ownedNow);
+                if (ownedNow) btn.setAttribute("aria-disabled", "true");
+                else btn.removeAttribute("aria-disabled");
+              }
+              syncHScrollDock();
+              syncTeamGoRailNav();
+              return;
+            }
+          }
+        }
+        rail.dataset.ffcLogged = !!(window.FFC && FFC.user && FFC.user()) ? "1" : "0";
+        rail.textContent = "";
         offers.forEach(function (offer) {
           var owned =
             window.GoSupport && GoSupport.offerOwned
@@ -13835,6 +13884,9 @@
           rail.appendChild(card);
         });
         requestAnimationFrame(function () {
+          /* Snap kurz aus — sonst Korrektur-Sprung nach scrollLeft-Restore */
+          var prevSnap = rail.style.scrollSnapType;
+          rail.style.scrollSnapType = "none";
           var list = railSlides(rail);
           var target = null;
           if (keepOffer) {
@@ -13844,8 +13896,11 @@
           }
           if (target) rail.scrollLeft = target.offsetLeft;
           else rail.scrollLeft = keepLeft;
-          syncHScrollDock();
-          syncTeamGoRailNav();
+          requestAnimationFrame(function () {
+            rail.style.scrollSnapType = prevSnap || "";
+            syncHScrollDock();
+            syncTeamGoRailNav();
+          });
         });
       }
 
