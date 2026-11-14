@@ -1473,22 +1473,23 @@
     }
     .wr-week-label:disabled, .wr-icon-btn:disabled { opacity: .4; pointer-events: none; }
     .wr-icon-btn {
-      width: 40px; height: 40px; border: 0; border-radius: 50%;
-      background: rgba(255,255,255,.14); color: #fff; cursor: pointer;
+      width: 40px; height: 40px; border: 0; border-radius: 0;
+      background: transparent; color: #fff; cursor: pointer;
       display: inline-grid; place-items: center; font-size: 22px; line-height: 1;
-      transition: background .15s ease, color .15s ease;
+      transition: color .15s ease, opacity .15s ease;
     }
-    .wr-icon-btn.is-on { background: #fff; color: #111; }
+    .wr-icon-btn.is-on { background: transparent; color: #fff; opacity: 1; }
+    .wr-icon-btn.is-on svg { stroke-width: 2.2; }
     /* Komplementär S/W zum Tageshintergrund */
     .woche-reels.is-light-day .wr-day-label {
       color: #111; text-shadow: none;
     }
     .woche-reels.is-light-day .wr-week-label { color: #111; }
     .woche-reels.is-light-day .wr-icon-btn {
-      background: rgba(0,0,0,.1); color: #111;
+      background: transparent; color: #111;
     }
     .woche-reels.is-light-day .wr-icon-btn.is-on {
-      background: #111; color: #fff;
+      background: transparent; color: #111;
     }
     .woche-reels.is-light-day .wr-travel-emoji { filter: grayscale(1) brightness(0); }
     .woche-reels.is-light-day .wr-progress p { color: rgba(17,17,17,.85); }
@@ -1556,6 +1557,11 @@
     }
     .wr-slide--empty .wr-media::after { display: none; }
     .wr-empty-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .wr-empty-btns--grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+      width: min(100%, 320px); margin: 0 auto;
+    }
+    .wr-empty-btns--grid .wr-pill-btn { width: 100%; justify-self: stretch; }
     .wr-author { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 600; }
     .wr-pill {
       display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px;
@@ -6049,7 +6055,7 @@
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-5"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-7"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-8"></script>
   <script src="/natalyaalice/support.js?v=support-1"></script>
   <script>
     (function () {
@@ -10218,6 +10224,11 @@
           activityEmoji: activityEmoji,
           openInviteForPost: openInviteForPost,
           syncStatusFade: syncStatusFade,
+          kraftChoices: kraftChoices,
+          ausdauerChoices: ausdauerChoices,
+          hasZirkelAccess: function () {
+            return !!(trainerZirkel || (typeof userOwned !== "undefined" && !userOwned && trainerZirkel));
+          },
           loadInvites: function () {
             return loadInvites().then(function () {
               try {

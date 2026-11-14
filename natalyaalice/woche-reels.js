@@ -21,7 +21,10 @@
     shareIso: "",
     shareEventId: "",
     lastDeleted: null,
-    undoTimer: null
+    undoTimer: null,
+    kraftTrainings: [],
+    ausdauerTrainings: [],
+    zirkelOk: false
   };
 
   var ROOT_ID = "woche-reels";
@@ -392,7 +395,7 @@
     return rest(
       "enrollments?user_id=eq." +
         encodeURIComponent(id) +
-        "&status=eq.aktiv&select=id,course_id,status,start_date,weekdays,payment_status,courses(id,title,duration_weeks,sessions_per_week,price_eur,category_default,level)"
+        "&status=eq.aktiv&select=id,course_id,status,start_date,weekdays,payment_status,courses(id,title,slug,duration_weeks,sessions_per_week,price_eur,category_default,level)"
     )
       .then(function (rows) {
         state.enrollments = rows || [];
@@ -401,7 +404,7 @@
         return rest(
           "enrollments?user_id=eq." +
             encodeURIComponent(id) +
-            "&status=eq.aktiv&select=id,course_id,status,start_date,weekdays,courses(id,title,duration_weeks,sessions_per_week,price_eur,category_default,level)"
+            "&status=eq.aktiv&select=id,course_id,status,start_date,weekdays,courses(id,title,slug,duration_weeks,sessions_per_week,price_eur,category_default,level)"
         )
           .then(function (rows) {
             state.enrollments = rows || [];
@@ -444,60 +447,234 @@
       });
   }
 
-  function ensureTrainingCourses() {
-    var coachId = me();
-    if (!coachId) return loadCourses();
-    var slugList = TRAINING_DEFS.map(function (d) {
-      return d.slug;
-    }).join(",");
-    return rest(
-      "courses?slug=in.(" +
-        slugList +
-        ")&select=id,slug,is_active,title,category_default"
-    )
-      .catch(function () {
+  function kraftNameMap() {
+    var names = {
+      krafttraining: "Einfache Basics",
+      full: "Ganzkörpertraining",
+      upper: "Oberkörpertraining",
+      lower: "Unterkörpertraining",
+      legs: "Beintraining",
+      glutes: "Glutes/Legs",
+      athletic: "Athletic Day",
+      push: "Push Day",
+      pull: "Pull Day"
+    };
+    var cat = global.GOGOGO_KRAFT;
+    if (cat && cat.SYSTEMS) {
+      cat.SYSTEMS.forEach(function (sys) {
+        if (sys && sys.id && sys.name) names[sys.id] = sys.name;
+      });
+    }
+    return names;
+  }
+
+  function ausdauerTechName(tech) {
+    var map = {
+      run: "Laufen",
+      bike: "Radfahren",
+      indoor: "Radfahren",
+      row: "Rudern",
+      swim: "Schwimmen",
+      walk: "Gehen",
+      hike: "Wandern",
+      xc: "Crosstrainer"
+    };
+    return map[tech] || tech || "Ausdauer";
+  }
+
+  function loadTrainingLists() {
+    var id = me();
+    if (!id) {
+      state.kraftTrainings = [];
+      state.ausdauerTrainings = [];
+      state.zirkelOk = false;
+      return Promise.resolve();
+    }
+    if (host && typeof host.kraftChoices === "function") {
+      try {
+        state.kraftTrainings = (host.kraftChoices() || []).map(function (c) {
+          return {
+            label: c.label,
+            systemId: c.systemId || "krafttraining",
+            slug: "training-" + (c.systemId || "krafttraining")
+          };
+        });
+      } catch (eK) {}
+    }
+    if (host && typeof host.ausdauerChoices === "function") {
+      try {
+        state.ausdauerTrainings = (host.ausdauerChoices() || []).map(function (c) {
+          var tech = c.technique || "run";
+          return {
+            label: c.label,
+            technique: tech,
+            presetId: c.presetId || "",
+            slug: c.presetId
+              ? "ausdauer-preset-" + String(c.presetId).slice(0, 8)
+              : "ausdauer-" + tech
+          };
+        });
+      } catch (eA) {}
+    }
+    return Promise.all([
+      rest(
+        "go_kraft_presets?account_id=eq." +
+          encodeURIComponent(id) +
+          "&select=system_id,exercise_ids"
+      ).catch(function () {
+        return [];
+      }),
+      rest(
+        "go_ausdauer_presets?account_id=eq." +
+          encodeURIComponent(id) +
+          "&select=id,technique,incline,duration_min,speed,distance_km,source"
+      ).catch(function () {
         return [];
       })
-      .then(function (existing) {
-        var have = {};
-        (existing || []).forEach(function (c) {
-          if (c && c.slug) have[c.slug] = c;
+    ]).then(function (pack) {
+      var names = kraftNameMap();
+      var kraftRows = pack[0] || [];
+      var fromDb = [];
+      kraftRows.forEach(function (row) {
+        if (!row || !row.system_id) return;
+        var ids = row.exercise_ids;
+        if (typeof ids === "string") {
+          try {
+            ids = JSON.parse(ids);
+          } catch (e) {
+            ids = [];
+          }
+        }
+        if (!Array.isArray(ids) || !ids.length) return;
+        var sid = String(row.system_id);
+        fromDb.push({
+          label: names[sid] || sid,
+          systemId: sid,
+          slug: "training-" + sid
         });
-        var jobs = TRAINING_DEFS.map(function (d) {
-          var row = have[d.slug];
-          if (row && row.is_active === false) {
+      });
+      if (fromDb.length) state.kraftTrainings = fromDb;
+      if (!state.kraftTrainings.length) {
+        /* Fallback: Katalog wie kraftChoices() */
+        state.kraftTrainings = Object.keys(names).map(function (sid) {
+          return {
+            label: names[sid],
+            systemId: sid,
+            slug: "training-" + sid
+          };
+        });
+      }
+
+      var ausRows = pack[1] || [];
+      var ausList = [];
+      ausRows.forEach(function (row) {
+        if (!row) return;
+        var tech = String(row.technique || "");
+        var name = ausdauerTechName(tech);
+        var bits = [];
+        if (row.duration_min != null && row.duration_min !== "") {
+          bits.push(String(row.duration_min) + " min");
+        }
+        if (row.distance_km != null && row.distance_km !== "") {
+          bits.push(String(row.distance_km) + " km");
+        }
+        ausList.push({
+          label: bits.length ? name + " · " + bits.join(" · ") : name,
+          technique: tech,
+          presetId: String(row.id || ""),
+          slug: row.id
+            ? "ausdauer-preset-" + String(row.id).replace(/-/g, "").slice(0, 12)
+            : "ausdauer-" + (tech || "run")
+        });
+      });
+      if (ausList.length) state.ausdauerTrainings = ausList;
+      if (!state.ausdauerTrainings.length) {
+        state.ausdauerTrainings = ["run", "bike", "row", "swim", "walk", "hike"].map(
+          function (tech) {
+            return {
+              label: ausdauerTechName(tech),
+              technique: tech,
+              presetId: "",
+              slug: "ausdauer-" + tech
+            };
+          }
+        );
+      }
+      syncZirkelAccess();
+    });
+  }
+
+  function syncZirkelAccess() {
+    state.zirkelOk = (state.enrollments || []).some(function (en) {
+      var c = en.courses || {};
+      var slug = String(c.slug || "");
+      return (
+        slug === "zirkeltraining" ||
+        slug === "training-zirkel" ||
+        c.category_default === "zirkel"
+      );
+    });
+    if (host && host.hasZirkelAccess) {
+      try {
+        if (host.hasZirkelAccess()) state.zirkelOk = true;
+      } catch (eZ) {}
+    }
+  }
+
+  function ensureCourseByDef(def) {
+    if (!def || !def.slug) return Promise.resolve(null);
+    var found = (state.courses || []).filter(function (c) {
+      return c && c.slug === def.slug;
+    })[0];
+    if (found) return Promise.resolve(found);
+    return rest(
+      "courses?slug=eq." + encodeURIComponent(def.slug) + "&select=id,title,slug,category_default,is_active&limit=1"
+    )
+      .then(function (rows) {
+        var row = rows && rows[0];
+        if (row) {
+          if (row.is_active === false) {
             return rest("courses?id=eq." + encodeURIComponent(row.id), {
               method: "PATCH",
-              prefer: "return=minimal",
-              body: { is_active: true, title: d.title, category_default: d.category }
-            }).catch(function () {
-              return null;
+              prefer: "return=representation",
+              body: { is_active: true }
+            }).then(function (updated) {
+              var u = Array.isArray(updated) ? updated[0] : updated;
+              return u || row;
             });
           }
-          if (row) return Promise.resolve(null);
-          return rest("courses", {
-            method: "POST",
-            prefer: "return=representation",
-            body: {
-              title: d.title,
-              slug: d.slug,
-              category_default: d.category,
-              duration_weeks: 1,
-              sessions_per_week: 1,
-              price_eur: 0,
-              description: "Training → Kurs",
-              coach_id: coachId,
-              source: "own",
-              is_active: true
-            }
-          }).catch(function () {
-            return null;
-          });
+          return row;
+        }
+        return rest("courses", {
+          method: "POST",
+          prefer: "return=representation",
+          body: {
+            title: def.title || def.label,
+            slug: def.slug,
+            category_default: def.category || "kraft",
+            duration_weeks: 1,
+            sessions_per_week: 1,
+            price_eur: 0,
+            description: "Training → Kurs",
+            coach_id: me(),
+            source: "own",
+            is_active: true
+          }
+        }).then(function (created) {
+          return Array.isArray(created) ? created[0] : created;
         });
-        return Promise.all(jobs);
       })
-      .then(function () {
-        return loadCourses();
+      .then(function (course) {
+        if (course && course.id) {
+          var exists = state.courses.some(function (c) {
+            return String(c.id) === String(course.id);
+          });
+          if (!exists) state.courses.push(course);
+        }
+        return course;
+      })
+      .catch(function () {
+        return null;
       });
   }
 
@@ -715,13 +892,19 @@
       '<div class="wr-media tone-neutral">' +
       '<div class="wr-overlay wr-overlay--empty">' +
       '<p class="wr-empty-title">Noch nichts geplant</p>' +
-      '<div class="wr-empty-btns">' +
-      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-train="' +
+      '<div class="wr-empty-btns wr-empty-btns--grid">' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-kind="kraft" data-iso="' +
       esc(iso) +
-      '">Training</button>' +
-      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-rest="' +
+      '">Kraft</button>' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-kind="ausdauer" data-iso="' +
       esc(iso) +
-      '">Bewegung</button>' +
+      '">Ausdauer</button>' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-kind="alternative" data-iso="' +
+      esc(iso) +
+      '">Alternative</button>' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-kind="zirkel" data-iso="' +
+      esc(iso) +
+      '">Zirkeltraining</button>' +
       "</div></div></div></div>"
     );
   }
@@ -1241,88 +1424,165 @@
     });
   }
 
-  function openRestSheet(iso) {
-    var altBlock =
-      '<div class="wr-cat-block"><h4>Alternative</h4><div class="wr-chips">' +
-      ALTERNATIVE_CHOICES.map(function (t) {
-        return (
-          '<button type="button" class="wr-chip" data-wr-rest-pick="' +
-          esc(t) +
-          '" data-iso="' +
-          esc(iso) +
-          '">' +
-          esc(t) +
-          "</button>"
-        );
-      }).join("") +
-      "</div></div>";
-    var restBlock =
-      '<div class="wr-cat-block"><h4>Erholung</h4><div class="wr-chips">' +
-      REST_DAYS.map(function (t) {
-        return (
-          '<button type="button" class="wr-chip" data-wr-rest-pick="' +
-          esc(t) +
-          '" data-iso="' +
-          esc(iso) +
-          '">' +
-          esc(t) +
-          "</button>"
-        );
-      }).join("") +
-      "</div></div>";
-    openSheet(
-      "<h3>Bewegung</h3>" +
-        altBlock +
-        restBlock +
-        '<label class="wr-field">Freier Titel<input type="text" id="wr-rest-title" maxlength="80" placeholder="z. B. Spaziergang" /></label>' +
-        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-rest-save="' +
-        esc(iso) +
-        '">Speichern</button>' +
-        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
-    );
-  }
-
-  function openTrainSheet(iso) {
-    function paint() {
-      var groups = coursesByCategory();
-      var order = ["kraft", "ausdauer", "zirkel"];
-      var body = order
-        .map(function (cat) {
-          var list = groups[cat] || [];
-          if (!list.length) return "";
-          return (
-            '<div class="wr-cat-block">' +
-            "<h4>" +
-            esc(CAT_LABELS[cat] || cat) +
-            "</h4>" +
-            '<div class="wr-course-list">' +
-            list
-              .map(function (c) {
-                return (
-                  '<button type="button" class="wr-course-card" data-wr-day-course="' +
-                  esc(c.id) +
-                  '" data-iso="' +
-                  esc(iso) +
-                  '"><strong>' +
-                  esc(c.title) +
-                  "</strong><span>" +
-                  esc(CAT_LABELS[c.category_default] || c.category_default || "") +
-                  "</span></button>"
-                );
-              })
-              .join("") +
-            "</div></div>"
-          );
-        })
-        .join("");
+  function openKindSheet(kind, iso) {
+    if (kind === "alternative") {
       openSheet(
-        "<h3>Kurs wählen</h3>" +
-          (body || "<p>Trainingskurse werden vorbereitet… Bitte erneut tippen.</p>") +
+        "<h3>Alternative</h3>" +
+          '<div class="wr-chips">' +
+          ALTERNATIVE_CHOICES.concat(REST_DAYS)
+            .map(function (t) {
+              return (
+                '<button type="button" class="wr-chip" data-wr-rest-pick="' +
+                esc(t) +
+                '" data-iso="' +
+                esc(iso) +
+                '">' +
+                esc(t) +
+                "</button>"
+              );
+            })
+            .join("") +
+          "</div>" +
+          '<label class="wr-field">Freier Titel<input type="text" id="wr-rest-title" maxlength="80" placeholder="z. B. Spaziergang" /></label>' +
+          '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-rest-save="' +
+          esc(iso) +
+          '">Speichern</button>' +
           '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
       );
+      return;
     }
-    openSheet("<h3>Kurs wählen</h3><p>Lade…</p>");
-    ensureTrainingCourses().then(paint).catch(paint);
+    if (kind === "zirkel") {
+      if (!state.zirkelOk) {
+        openSheet(
+          "<h3>Zirkeltraining</h3>" +
+            "<p>Bitte zuerst unter Support für Zirkeltraining anmelden.</p>" +
+            '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button>'
+        );
+        return;
+      }
+      var en = (state.enrollments || []).filter(function (e) {
+        var c = e.courses || {};
+        return (
+          c.slug === "zirkeltraining" ||
+          c.slug === "training-zirkel" ||
+          c.category_default === "zirkel"
+        );
+      })[0];
+      var courseId = en && (en.course_id || (en.courses && en.courses.id));
+      if (!courseId) {
+        ensureCourseByDef({
+          slug: "training-zirkel",
+          title: "Zirkeltraining",
+          category: "zirkel",
+          label: "Zirkeltraining"
+        }).then(function (course) {
+          if (!course || !course.id) {
+            if (host.toast) host.toast("Zirkel-Kurs fehlt");
+            return;
+          }
+          return createEvent({
+            category: "zirkel",
+            course_id: course.id,
+            enrollment_id: en && en.id,
+            title: "Zirkeltraining",
+            starts_at: iso + "T18:00:00+01:00",
+            is_unplanned: false,
+            item_type: "course_session"
+          }).then(function () {
+            closeSheet();
+            return refresh();
+          });
+        });
+        return;
+      }
+      createEvent({
+        category: "zirkel",
+        course_id: courseId,
+        enrollment_id: en && en.id,
+        title: "Zirkeltraining",
+        starts_at: iso + "T18:00:00+01:00",
+        is_unplanned: false,
+        item_type: "course_session"
+      }).then(function () {
+        closeSheet();
+        return refresh();
+      });
+      return;
+    }
+
+    openSheet("<h3>" + esc(kind === "kraft" ? "Kraft" : "Ausdauer") + "</h3><p>Lade…</p>");
+    loadTrainingLists().then(function () {
+      var list =
+        kind === "kraft" ? state.kraftTrainings : state.ausdauerTrainings;
+      if (!list.length) {
+        openSheet(
+          "<h3>" +
+            esc(kind === "kraft" ? "Kraft" : "Ausdauer") +
+            "</h3><p>Keine Trainings hinterlegt.</p>" +
+            '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button>'
+        );
+        return;
+      }
+      openSheet(
+        "<h3>" +
+          esc(kind === "kraft" ? "Kraft" : "Ausdauer") +
+          "</h3>" +
+          '<div class="wr-course-list">' +
+          list
+            .map(function (t) {
+              return (
+                '<button type="button" class="wr-course-card" data-wr-pick-training="1" data-kind="' +
+                esc(kind) +
+                '" data-slug="' +
+                esc(t.slug) +
+                '" data-title="' +
+                esc(t.label) +
+                '" data-system="' +
+                esc(t.systemId || "") +
+                '" data-tech="' +
+                esc(t.technique || "") +
+                '" data-iso="' +
+                esc(iso) +
+                '"><strong>' +
+                esc(t.label) +
+                "</strong></button>"
+              );
+            })
+            .join("") +
+          "</div>" +
+          '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+      );
+    });
+  }
+
+  function pickTraining(btn) {
+    var kind = btn.getAttribute("data-kind");
+    var iso = btn.getAttribute("data-iso");
+    var slug = btn.getAttribute("data-slug");
+    var title = btn.getAttribute("data-title") || kind;
+    var cat = kind === "ausdauer" ? "ausdauer" : "kraft";
+    return ensureCourseByDef({
+      slug: slug,
+      title: title,
+      label: title,
+      category: cat
+    }).then(function (course) {
+      if (!course || !course.id) {
+        if (host.toast) host.toast("Kurs konnte nicht verknüpft werden");
+        return;
+      }
+      return createEvent({
+        category: cat,
+        course_id: course.id,
+        title: title,
+        starts_at: iso + "T18:00:00+01:00",
+        is_unplanned: false,
+        item_type: "course_session"
+      }).then(function () {
+        closeSheet();
+        return refresh();
+      });
+    });
   }
 
   function openWeekMenu() {
@@ -1943,7 +2203,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-train],[data-wr-add-rest],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -1992,12 +2252,12 @@
       render();
       return;
     }
-    if (t.getAttribute("data-wr-add-train")) {
-      openTrainSheet(t.getAttribute("data-wr-add-train"));
+    if (t.getAttribute("data-wr-add-kind")) {
+      openKindSheet(t.getAttribute("data-wr-add-kind"), t.getAttribute("data-iso"));
       return;
     }
-    if (t.getAttribute("data-wr-add-rest")) {
-      openRestSheet(t.getAttribute("data-wr-add-rest"));
+    if (t.getAttribute("data-wr-pick-training")) {
+      pickTraining(t);
       return;
     }
     if (t.getAttribute("data-wr-rest-pick")) {
@@ -2049,7 +2309,7 @@
       return;
     }
     if (t.getAttribute("data-wr-book")) {
-      ensureTrainingCourses().then(function () {
+      loadCourses().then(function () {
         openBookSheet(1, { course: null, start: null, weekdays: [] });
       });
       return;
@@ -2435,11 +2695,11 @@
       }),
       loadFfc().catch(function () {}),
       loadEnrollments().catch(function () {}),
-      ensureTrainingCourses().catch(function () {
-        return loadCourses().catch(function () {});
-      })
+      loadCourses().catch(function () {}),
+      loadTrainingLists().catch(function () {})
     ])
       .then(function () {
+        syncZirkelAccess();
         var ids = (state.events || []).map(function (e) {
           return String(e.id);
         });
@@ -2474,9 +2734,8 @@
       } catch (e2) {}
     }
     return Promise.all([
-      ensureTrainingCourses().catch(function () {
-        return loadCourses().catch(function () {});
-      }),
+      loadCourses().catch(function () {}),
+      loadTrainingLists().catch(function () {}),
       refresh()
     ]);
   }
