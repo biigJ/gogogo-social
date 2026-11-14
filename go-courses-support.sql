@@ -273,21 +273,22 @@ insert into courses (
   price_eur, description, coach_id, source, is_active
 )
 select v.title, v.slug, v.level, v.duration_weeks, v.sessions_per_week, v.category_default,
-       v.price_eur, v.description, v.coach_id, v.source, true
+       v.price_eur, v.description, v.coach_id, v.source, v.is_active
 from (values
+  -- Fit for Run / Bulletproof: inaktiv bis Inhalte da (siehe go-trainings-to-courses.sql)
   ('Fit for Run L1', 'fit-for-run-l1', 1, 8, 3, 'ausdauer', 0::numeric,
-   'Laufkurs Level 1', '2d3ab029-0a5f-4388-8da7-52501a87dc8c'::uuid, 'own'),
+   'Laufkurs Level 1', '2d3ab029-0a5f-4388-8da7-52501a87dc8c'::uuid, 'own', false),
   ('Fit for Run L2', 'fit-for-run-l2', 2, 8, 3, 'ausdauer', 0::numeric,
-   'Laufkurs Level 2', '2d3ab029-0a5f-4388-8da7-52501a87dc8c'::uuid, 'own'),
+   'Laufkurs Level 2', '2d3ab029-0a5f-4388-8da7-52501a87dc8c'::uuid, 'own', false),
   ('Fit for Run L3', 'fit-for-run-l3', 3, 8, 3, 'ausdauer', 0::numeric,
-   'Laufkurs Level 3', '2d3ab029-0a5f-4388-8da7-52501a87dc8c'::uuid, 'own'),
+   'Laufkurs Level 3', '2d3ab029-0a5f-4388-8da7-52501a87dc8c'::uuid, 'own', false),
   ('Bulletproof Knee', 'bulletproof-knee', null, 6, 2, 'kraft', 0::numeric,
-   'Knie-Stabilität und Kraft', '2d3ab029-0a5f-4388-8da7-52501a87dc8c'::uuid, 'own'),
+   'Knie-Stabilität und Kraft', '2d3ab029-0a5f-4388-8da7-52501a87dc8c'::uuid, 'own', false),
   ('12-Wochen-Routine', '12-wochen-routine', null, 12, 3, 'kraft', 0::numeric,
-   'Die gogogo 12-Wochen-Routine', '2d3ab029-0a5f-4388-8da7-52501a87dc8c'::uuid, 'own'),
+   'Die gogogo 12-Wochen-Routine', '2d3ab029-0a5f-4388-8da7-52501a87dc8c'::uuid, 'own', true),
   ('Zirkeltraining', 'zirkeltraining', null, null, null, 'zirkel', 0::numeric,
-   'Termine bleiben gespiegelt aus Hendriks Supabase', null::uuid, 'hendrik')
-) as v(title, slug, level, duration_weeks, sessions_per_week, category_default, price_eur, description, coach_id, source)
+   'Termine bleiben gespiegelt aus Hendriks Supabase', null::uuid, 'hendrik', true)
+) as v(title, slug, level, duration_weeks, sessions_per_week, category_default, price_eur, description, coach_id, source, is_active)
 on conflict (slug) do update set
   title = excluded.title,
   level = excluded.level,
@@ -297,7 +298,7 @@ on conflict (slug) do update set
   description = excluded.description,
   coach_id = excluded.coach_id,
   source = excluded.source,
-  is_active = true;
+  is_active = excluded.is_active;
 
 -- Minimale Templates (Woche 1) für eigene Kurse
 insert into course_templates (course_id, week_no, session_no, title, category, description)

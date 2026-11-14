@@ -1425,8 +1425,11 @@
     .woche-reels {
       display: none; flex-direction: column;
       position: relative; width: 100%;
-      height: calc(100dvh - 64px); max-height: calc(100dvh - 64px);
+      height: calc(100dvh - 68px - env(safe-area-inset-bottom, 0px));
+      max-height: calc(100dvh - 68px - env(safe-area-inset-bottom, 0px));
       background: #1a1510; color: #F6F1E8; overflow: hidden;
+      --wr-dock: calc(68px + env(safe-area-inset-bottom, 0px));
+      --wr-progress-h: 48px;
     }
     .wr-error {
       position: absolute; top: 52px; left: 12px; right: 12px; z-index: 6;
@@ -1451,6 +1454,11 @@
       display: inline-grid; place-items: center; font-size: 22px; line-height: 1;
     }
     .wr-icon-btn.is-on { background: #fff; color: #1a1510; }
+    .wr-travel-emoji {
+      font-size: 20px; line-height: 1;
+      filter: grayscale(1);
+      display: block;
+    }
     .wr-travel-banner {
       position: absolute; top: 54px; left: 12px; right: 12px; z-index: 5;
       border: 0; border-radius: 999px; padding: 8px 12px;
@@ -1482,11 +1490,12 @@
       pointer-events: none;
     }
     .wr-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-    .wr-emoji { font-size: clamp(64px, 18vw, 96px); z-index: 0; }
     .wr-overlay {
-      position: absolute; left: 0; right: 72px; bottom: 72px; z-index: 2;
+      position: absolute; left: 0; right: 64px; bottom: var(--wr-progress-h);
+      z-index: 2;
       display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
-      padding: 0 16px; text-align: left; color: #F6F1E8;
+      padding: 0 16px 8px; text-align: left; color: #F6F1E8;
+      max-height: 46%; overflow: hidden;
     }
     .wr-overlay--empty {
       inset: 0; right: 0; bottom: 0; align-items: center; justify-content: center;
@@ -1509,7 +1518,12 @@
       margin: 0; font-family: "Playfair Display", Georgia, serif;
       font-size: clamp(22px, 6vw, 30px); font-weight: 600; line-height: 1.15;
     }
-    .wr-place { margin: 0; font-size: 14px; line-height: 1.35; opacity: .92; max-width: 36em; }
+    .wr-place {
+      margin: 0; font-size: 14px; line-height: 1.35; opacity: .92; max-width: 36em;
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+      overflow: hidden;
+    }
+    .wr-place:has(.wr-more) { -webkit-line-clamp: unset; max-height: 4.2em; }
     .wr-more { border: 0; background: none; color: rgba(246,241,232,.7); font: inherit; font-weight: 700; cursor: pointer; padding: 0; }
     .wr-going { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 4px; }
     .wr-faces { display: flex; gap: -4px; }
@@ -1519,16 +1533,21 @@
       display: inline-grid; place-items: center; font-size: 11px; font-weight: 700;
     }
     .wr-actions {
-      position: absolute; right: 10px; bottom: 88px; z-index: 3;
-      display: flex; flex-direction: column; gap: 14px; align-items: center;
+      position: absolute; right: 6px; bottom: var(--wr-progress-h); z-index: 3;
+      display: flex; flex-direction: column; gap: 4px; align-items: center;
+      padding-bottom: 4px;
     }
     .wr-act {
       border: 0; background: none; color: #fff; cursor: pointer; padding: 0;
-      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      min-width: 44px; min-height: 44px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0;
       text-shadow: 0 1px 4px rgba(0,0,0,.45);
     }
-    .wr-act__icon { font-size: 26px; line-height: 1; }
-    .wr-act__n { font-size: 12px; font-weight: 700; min-height: 14px; }
+    .wr-act__icon {
+      width: 30px; height: 30px; display: grid; place-items: center; line-height: 1;
+    }
+    .wr-act__icon .wr-ico { width: 30px; height: 30px; display: block; }
+    .wr-act__n { font-size: 11px; font-weight: 700; min-height: 12px; }
     .wr-dots {
       position: absolute; top: 58px; left: 0; right: 0; z-index: 4;
       display: flex; justify-content: center; gap: 5px; pointer-events: none;
@@ -1537,8 +1556,11 @@
     .wr-dot.is-on { background: #fff; }
     .wr-progress {
       position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
-      padding: 8px 14px calc(10px + env(safe-area-inset-bottom));
+      height: var(--wr-progress-h); box-sizing: border-box;
+      padding: 8px 14px 10px;
       background: linear-gradient(0deg, rgba(0,0,0,.55), transparent);
+      display: flex; flex-direction: column; justify-content: flex-end;
+      pointer-events: none;
     }
     .wr-progress__bar {
       height: 3px; border-radius: 999px; background: rgba(255,255,255,.25); overflow: hidden; margin-bottom: 6px;
@@ -1547,10 +1569,14 @@
     .wr-progress p { margin: 0; font-size: 12px; font-weight: 600; color: rgba(246,241,232,.9); }
     .wr-edit-panel {
       position: absolute; top: 56px; left: 12px; right: 12px; z-index: 6;
-      display: flex; flex-direction: column; gap: 8px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
       padding: 10px; border-radius: 14px; background: rgba(246,241,232,.95); color: #2A2118;
     }
-    .wr-enroll-list { display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow: auto; }
+    .wr-pill-btn--center { align-self: center; }
+    .wr-enroll-list {
+      width: 100%; display: flex; flex-direction: column; gap: 6px;
+      max-height: 160px; overflow: auto;
+    }
     .wr-enroll {
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
       padding: 6px 0; border-bottom: 1px solid rgba(42,33,24,.1); font-size: 13px;
@@ -1599,12 +1625,27 @@
       font: inherit; font-weight: 600; color: rgba(42,33,24,.6); cursor: pointer; min-height: 40px;
     }
     .wr-course-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    .wr-cat-block { margin-bottom: 12px; }
+    .wr-cat-block h4 {
+      margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing: .02em;
+      text-transform: uppercase; opacity: .7;
+    }
     .wr-course-card {
       display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
       width: 100%; text-align: left; border: 1px solid rgba(42,33,24,.18);
       background: #fff; border-radius: 12px; padding: 12px; font: inherit; cursor: pointer;
+      margin-bottom: 8px;
     }
+    .wr-course-card.is-on { border-color: #2A2118; background: #2A2118; color: #F6F1E8; }
     .wr-course-card span { font-size: 13px; opacity: .75; }
+    .wr-share-block { margin-bottom: 16px; }
+    .wr-share-block h4 { margin: 0 0 8px; font-size: 15px; font-weight: 700; }
+    .wr-friend-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; max-height: 220px; overflow: auto; }
+    .wr-friend-row {
+      display: flex; align-items: center; gap: 10px; min-height: 44px;
+      padding: 6px 4px; font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    .wr-friend-row input { width: 20px; height: 20px; accent-color: #2A2118; }
     .wr-preview { margin: 0 0 12px; padding-left: 18px; }
     .wr-comment-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; max-height: 240px; overflow: auto; }
     .wr-comment { font-size: 14px; line-height: 1.35; }
@@ -1737,7 +1778,7 @@
       display: flex !important;
       position: fixed;
       inset: 0;
-      bottom: 64px;
+      bottom: calc(68px + env(safe-area-inset-bottom, 0px));
       width: 100%;
       height: auto;
       max-height: none;
@@ -5888,7 +5929,7 @@
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-5"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-2"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-3"></script>
   <script src="/natalyaalice/support.js?v=support-1"></script>
   <script>
     (function () {
@@ -10032,6 +10073,13 @@
           todayIso: function () { return Log.berlinToday(); },
           activityEmoji: activityEmoji,
           openInviteForPost: openInviteForPost,
+          loadInvites: function () {
+            return loadInvites().then(function () {
+              try {
+                paintHeuteJoins(heuteFlags());
+              } catch (eHJ) {}
+            });
+          },
           openDoneModal: function (eventId) {
             if (window.HeuteAccountability && HeuteAccountability.openDone) {
               HeuteAccountability.openDone(eventId);

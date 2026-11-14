@@ -1,8 +1,8 @@
-/* Woche Reels: Instagram-Stil, 7 Tage, Swipe Mo–So */
+/* Woche Reels: Instagram-Stil, 7 Tage, Swipe Zeitraum */
 (function (global) {
   var host = null;
   var state = {
-    weekOffset: 0, /* 0 = diese, 1 = nächste */
+    weekMode: "from_today", /* from_today | next_week | week_after */
     dayIndex: 0,
     eventIndex: 0,
     events: [],
@@ -10,17 +10,34 @@
     rsvps: {},
     comments: {},
     people: {},
+    friends: [],
     enrollments: [],
     courses: [],
     travelUntil: null,
     editMode: false,
     touch: null,
-    loadError: ""
+    loadError: "",
+    sharePick: {},
+    shareIso: "",
+    shareEventId: ""
   };
 
   var ROOT_ID = "woche-reels";
   var REST_DAYS = ["Spaziergang", "Mobility", "Radfahren", "Sauna"];
   var TRAIN_CATS = { kraft: 1, ausdauer: 1, zirkel: 1 };
+  var WEEK_MODES = [
+    { id: "from_today", label: "Ab heute" },
+    { id: "next_week", label: "Nächste Woche" },
+    { id: "week_after", label: "Übernächste Woche" }
+  ];
+  var CAT_LABELS = { kraft: "Kraft", ausdauer: "Ausdauer", zirkel: "Zirkel" };
+
+  var ICON_CHECK =
+    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>';
+  var ICON_COMMENT =
+    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3v-3H7.5A2.5 2.5 0 0 1 5 13.5v-7z"/></svg>';
+  var ICON_SHARE =
+    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="M8 7l4-4 4 4"/><path d="M5 14v4.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V14"/></svg>';
 
   function $(id) {
     return document.getElementById(id);
@@ -69,8 +86,18 @@
     return localIso(d);
   }
 
+  function weekModeMeta() {
+    for (var i = 0; i < WEEK_MODES.length; i++) {
+      if (WEEK_MODES[i].id === state.weekMode) return WEEK_MODES[i];
+    }
+    return WEEK_MODES[0];
+  }
+
   function weekStart() {
-    return addDays(mondayOf(berlinToday()), state.weekOffset * 7);
+    var today = berlinToday();
+    if (state.weekMode === "next_week") return addDays(mondayOf(today), 7);
+    if (state.weekMode === "week_after") return addDays(mondayOf(today), 14);
+    return today; /* Ab heute: rollend heute + 6 */
   }
 
   function weekDays() {
@@ -78,6 +105,25 @@
     var out = [];
     for (var i = 0; i < 7; i++) out.push(addDays(start, i));
     return out;
+  }
+
+  function setWeekMode(mode) {
+    var ok = false;
+    for (var i = 0; i < WEEK_MODES.length; i++) {
+      if (WEEK_MODES[i].id === mode) ok = true;
+    }
+    if (!ok) mode = "from_today";
+    state.weekMode = mode;
+    state.dayIndex = 0;
+  }
+
+  function cycleWeekMode(dir) {
+    var ix = 0;
+    for (var i = 0; i < WEEK_MODES.length; i++) {
+      if (WEEK_MODES[i].id === state.weekMode) ix = i;
+    }
+    ix = (ix + dir + WEEK_MODES.length) % WEEK_MODES.length;
+    setWeekMode(WEEK_MODES[ix].id);
   }
 
   function dayKey(ts) {
@@ -335,17 +381,82 @@
 
   function loadCourses() {
     var id = me();
+    var select =
+      "id,title,slug,level,duration_weeks,sessions_per_week,category_default,price_eur,description,private_for,is_system";
+    function ok(rows) {
+      state.courses = (rows || []).filter(function (c) {
+        return !c.is_system;
+      });
+    }
     return rest(
       "courses?is_active=eq.true&or=(private_for.is.null,private_for.eq." +
         encodeURIComponent(id) +
-        ")&select=id,title,level,duration_weeks,sessions_per_week,category_default,price_eur,description,private_for&order=title.asc&limit=80"
+        ")&select=" +
+        select +
+        "&order=category_default.asc,title.asc&limit=80"
     )
-      .then(function (rows) {
-        state.courses = rows || [];
-      })
+      .then(ok)
       .catch(function () {
-        state.courses = [];
+        return rest(
+          "courses?is_active=eq.true&or=(private_for.is.null,private_for.eq." +
+            encodeURIComponent(id) +
+            ")&select=id,title,slug,level,duration_weeks,sessions_per_week,category_default,price_eur,description,private_for&order=title.asc&limit=80"
+        )
+          .then(function (rows) {
+            state.courses = rows || [];
+          })
+          .catch(function () {
+            state.courses = [];
+          });
       });
+  }
+
+  function loadFriends() {
+    var id = me();
+    if (!id) {
+      state.friends = [];
+      return Promise.resolve();
+    }
+    return Promise.all([
+      rest(
+        "go_friends?account_id=eq." +
+          encodeURIComponent(id) +
+          "&select=friend_id"
+      ).catch(function () {
+        return [];
+      }),
+      rest(
+        "go_friends?friend_id=eq." +
+          encodeURIComponent(id) +
+          "&select=account_id"
+      ).catch(function () {
+        return [];
+      })
+    ]).then(function (parts) {
+      var ids = [];
+      (parts[0] || []).forEach(function (r) {
+        if (r && r.friend_id) ids.push(String(r.friend_id));
+      });
+      (parts[1] || []).forEach(function (r) {
+        if (r && r.account_id) ids.push(String(r.account_id));
+      });
+      var uniq = [];
+      ids.forEach(function (fid) {
+        if (fid && fid !== id && uniq.indexOf(fid) < 0) uniq.push(fid);
+      });
+      state.friends = uniq;
+      return ensurePeople(uniq);
+    });
+  }
+
+  function coursesByCategory() {
+    var groups = { kraft: [], ausdauer: [], zirkel: [] };
+    (state.courses || []).forEach(function (c) {
+      var cat = c.category_default || "kraft";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(c);
+    });
+    return groups;
   }
 
   function itemsForDay(iso) {
@@ -467,19 +578,25 @@
       checkAttr +
       ' aria-label="' +
       esc(checkLabel) +
-      '"><span class="wr-act__icon">✓</span><span class="wr-act__n">' +
+      '"><span class="wr-act__icon">' +
+      ICON_CHECK +
+      '</span><span class="wr-act__n">' +
       (going || (mine && ev.status === "erledigt") ? "1" : "") +
       "</span></button>" +
       '<button type="button" class="wr-act" data-wr-comments="' +
       esc(id) +
-      '" aria-label="Kommentare"><span class="wr-act__icon">💬</span><span class="wr-act__n">' +
+      '" aria-label="Kommentare"><span class="wr-act__icon">' +
+      ICON_COMMENT +
+      '</span><span class="wr-act__n">' +
       (count || "") +
       "</span></button>" +
-      '<button type="button" class="wr-act" data-wr-invite="' +
+      '<button type="button" class="wr-act" data-wr-share="' +
       esc(dayKey(ev.starts_at)) +
       '" data-wr-event="' +
       esc(id) +
-      '" aria-label="Einladen"><span class="wr-act__icon">➤</span><span class="wr-act__n"></span></button>' +
+      '" aria-label="Teilen"><span class="wr-act__icon">' +
+      ICON_SHARE +
+      '</span><span class="wr-act__n"></span></button>' +
       "</div>"
     );
   }
@@ -528,18 +645,21 @@
         esc(ev.id) +
         '">Unterwegs? Tausch gegen Hotel-Workout</button>';
     }
-    var desc =
-      (place ? '<p class="wr-place">' + esc(place) + (notePack.text ? " · " : "") : "") +
-      (notePack.text
-        ? (place ? "" : '<p class="wr-place">') +
-          esc(notePack.text) +
-          (notePack.more
-            ? ' <button type="button" class="wr-more" data-wr-more="1">mehr</button>'
-            : "") +
-          "</p>"
-        : place
-          ? "</p>"
-          : "");
+    var fullNote = notePack.full || "";
+    var placePrefix = place ? esc(place) + (notePack.text ? " · " : "") : "";
+    var desc = "";
+    if (place || notePack.text) {
+      desc =
+        '<p class="wr-place"' +
+        (notePack.more ? ' data-full="' + esc(placePrefix + fullNote) + '"' : "") +
+        ">" +
+        placePrefix +
+        (notePack.text ? esc(notePack.text) : "") +
+        (notePack.more
+          ? ' <button type="button" class="wr-more" data-wr-more="1">mehr</button>'
+          : "") +
+        "</p>";
+    }
     var going = goingLine(ev);
     return (
       '<div class="wr-slide" data-day="' +
@@ -553,9 +673,7 @@
       '">' +
       (ev.photo_url
         ? '<img class="wr-photo" src="' + esc(ev.photo_url) + '" alt="" />'
-        : '<span class="wr-emoji" aria-hidden="true">' +
-          esc(emojiFor(cat, ev.title)) +
-          "</span>") +
+        : "") +
       '<div class="wr-overlay">' +
       '<div class="wr-author">' +
       avatarHtml(p) +
@@ -621,7 +739,7 @@
   }
 
   function headerHtml() {
-    var label = state.weekOffset === 0 ? "Diese Woche" : "Nächste Woche";
+    var label = weekModeMeta().label;
     var travelOn = travelActive();
     var travelHint = "";
     if (travelOn) {
@@ -638,14 +756,14 @@
       '<button type="button" class="wr-icon-btn' +
       (travelOn ? " is-on" : "") +
       '" data-wr-travel="1" aria-label="Reisemodus">' +
-      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 16l9-2.5L21 6l1 2-7.5 6.5L21 18l-1 1-6-2-4 4H8l2-5L2 16z"/></svg>' +
+      '<span class="wr-travel-emoji" aria-hidden="true">🛫</span>' +
       "</button>" +
       '<div class="wr-week-nav">' +
-      '<button type="button" class="wr-icon-btn" data-wr-week="-1" aria-label="Vorherige Woche">‹</button>' +
+      '<button type="button" class="wr-icon-btn" data-wr-week="-1" aria-label="Vorheriger Zeitraum">‹</button>' +
       '<button type="button" class="wr-week-label" data-wr-week-menu="1">' +
       esc(label) +
       " ⌄</button>" +
-      '<button type="button" class="wr-icon-btn" data-wr-week="1" aria-label="Nächste Woche">›</button>' +
+      '<button type="button" class="wr-icon-btn" data-wr-week="1" aria-label="Nächster Zeitraum">›</button>' +
       "</div>" +
       '<button type="button" class="wr-icon-btn' +
       (state.editMode ? " is-on" : "") +
@@ -706,7 +824,7 @@
       .join("");
     return (
       '<div class="wr-edit-panel">' +
-      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-book="1">Kurs hinzufügen</button>' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark wr-pill-btn--center" data-wr-book="1">Kurs hinzufügen</button>' +
       (list ? '<div class="wr-enroll-list">' + list + "</div>" : "") +
       "</div>"
     );
@@ -808,48 +926,254 @@
   }
 
   function openTrainSheet(iso) {
+    function paint() {
+      var groups = coursesByCategory();
+      var order = ["kraft", "ausdauer", "zirkel"];
+      var body = order
+        .map(function (cat) {
+          var list = groups[cat] || [];
+          if (!list.length) return "";
+          return (
+            '<div class="wr-cat-block">' +
+            "<h4>" +
+            esc(CAT_LABELS[cat] || cat) +
+            "</h4>" +
+            '<div class="wr-course-list">' +
+            list
+              .map(function (c) {
+                return (
+                  '<button type="button" class="wr-course-card" data-wr-day-course="' +
+                  esc(c.id) +
+                  '" data-iso="' +
+                  esc(iso) +
+                  '"><strong>' +
+                  esc(c.title) +
+                  "</strong><span>" +
+                  esc(CAT_LABELS[c.category_default] || c.category_default || "") +
+                  "</span></button>"
+                );
+              })
+              .join("") +
+            "</div></div>"
+          );
+        })
+        .join("");
+      openSheet(
+        "<h3>Kurs wählen</h3>" +
+          (body ||
+            "<p>Keine aktiven Kurse. Bitte go-trainings-to-courses.sql ausführen.</p>") +
+          '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+      );
+    }
+    if (state.courses && state.courses.length) {
+      paint();
+      return;
+    }
+    openSheet("<h3>Kurs wählen</h3><p>Lade…</p>");
+    loadCourses().then(paint);
+  }
+
+  function openWeekMenu() {
     openSheet(
-      "<h3>Training</h3>" +
-        '<div class="wr-chips">' +
-        ["kraft", "ausdauer", "zirkel"]
-          .map(function (c) {
-            var label = c === "kraft" ? "Kraft" : c === "ausdauer" ? "Ausdauer" : "Zirkel";
-            return (
-              '<button type="button" class="wr-chip" data-wr-train-cat="' +
-              esc(c) +
-              '" data-iso="' +
-              esc(iso) +
-              '">' +
-              esc(label) +
-              "</button>"
-            );
-          })
-          .join("") +
+      "<h3>Zeitraum</h3>" +
+        '<div class="wr-course-list">' +
+        WEEK_MODES.map(function (m) {
+          var on = m.id === state.weekMode;
+          return (
+            '<button type="button" class="wr-course-card' +
+            (on ? " is-on" : "") +
+            '" data-wr-set-mode="' +
+            esc(m.id) +
+            '"><strong>' +
+            esc(m.label) +
+            "</strong><span>" +
+            (m.id === "from_today"
+              ? "Heute + 6 Tage"
+              : m.id === "next_week"
+                ? "Mo–So nächste Kalenderwoche"
+                : "Mo–So übernächste Kalenderwoche") +
+            "</span></button>"
+          );
+        }).join("") +
         "</div>" +
         '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
     );
+  }
+
+  function openShareSheet(iso, eventId) {
+    state.shareIso = iso;
+    state.shareEventId = eventId;
+    state.sharePick = {};
+    function paint() {
+      var friends = state.friends || [];
+      var list = friends
+        .map(function (fid) {
+          var p = personOf(fid);
+          var on = !!state.sharePick[fid];
+          return (
+            '<label class="wr-friend-row" data-wr-friend-pick="' +
+            esc(fid) +
+            '">' +
+            '<input type="checkbox"' +
+            (on ? " checked" : "") +
+            " />" +
+            avatarHtml(p) +
+            "<span>" +
+            esc(p.name || "?") +
+            "</span></label>"
+          );
+        })
+        .join("");
+      openSheet(
+        "<h3>Teilen</h3>" +
+          '<div class="wr-share-block">' +
+          "<h4>Freunde einladen</h4>" +
+          (list
+            ? '<div class="wr-friend-list">' + list + "</div>"
+            : "<p>Noch keine Freunde.</p>") +
+          '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-invite-friends="1"' +
+          (friends.length ? "" : " disabled") +
+          ">Einladen</button>" +
+          "</div>" +
+          '<div class="wr-share-block">' +
+          "<h4>Extern teilen</h4>" +
+          '<button type="button" class="wr-pill-btn" data-wr-share-ext="1">Teilen…</button>' +
+          "</div>" +
+          '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+      );
+    }
+    loadFriends().then(paint);
+  }
+
+  function shareTextFor(iso, eventId) {
+    var ev = state.events.filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    var title = (ev && ev.title) || "Training";
+    var when = formatDayLong(iso) + (ev ? " · " + formatTime(ev.starts_at) : "");
+    return "Komm mit zu gogogo: " + title + " · " + when;
+  }
+
+  function shareExternal(iso, eventId) {
+    var text = shareTextFor(iso, eventId);
+    var url = "https://gogogo-social.vercel.app/workout/";
+    if (navigator.share) {
+      navigator
+        .share({ title: "gogogo", text: text, url: url })
+        .catch(function () {});
+      return;
+    }
+    var wa =
+      "https://wa.me/?text=" + encodeURIComponent(text + " " + url);
+    try {
+      window.open(wa, "_blank");
+    } catch (e) {
+      location.href = wa;
+    }
+  }
+
+  function inviteFriendsSelected() {
+    var iso = state.shareIso;
+    var eventId = state.shareEventId;
+    var ids = Object.keys(state.sharePick).filter(function (k) {
+      return state.sharePick[k];
+    });
+    if (!ids.length) {
+      if (host.toast) host.toast("Bitte Freunde auswählen");
+      return Promise.resolve();
+    }
+    var ev = state.events.filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    var label = (ev && ev.title) || "Training";
+    var place = (ev && ev.location) || "";
+    var time = ev ? formatTime(ev.starts_at) : "";
+    var fromName =
+      (host.sessionAccount && host.sessionAccount.name) || "gogogo";
+    var jobs = ids.map(function (fid) {
+      return rest("go_workout_invites", {
+        method: "POST",
+        prefer: "return=representation",
+        body: {
+          from_id: me(),
+          to_id: fid,
+          workout_date: iso,
+          workout_label: label,
+          from_name: fromName,
+          place: place,
+          meet_time: time,
+          status: "pending"
+        }
+      }).catch(function () {
+        return null;
+      });
+    });
+    return Promise.all(jobs).then(function () {
+      closeSheet();
+      if (host.toast) host.toast("Einladung gesendet");
+      if (host.loadInvites) {
+        try {
+          host.loadInvites();
+        } catch (e) {}
+      }
+    });
+  }
+
+  function addCourseOnDay(courseId, iso) {
+    var course = state.courses.filter(function (c) {
+      return String(c.id) === String(courseId);
+    })[0];
+    if (!course) {
+      if (host.toast) host.toast("Kurs nicht gefunden");
+      return Promise.resolve();
+    }
+    var cat = course.category_default || "kraft";
+    if (!TRAIN_CATS[cat]) cat = "kraft";
+    return createEvent({
+      category: cat,
+      course_id: course.id,
+      title: course.title,
+      starts_at: iso + "T18:00:00+01:00",
+      is_unplanned: true,
+      item_type: "spontaneous"
+    }).then(function () {
+      closeSheet();
+      return refresh();
+    }).catch(function () {
+      if (host.toast) host.toast("Event konnte nicht angelegt werden");
+    });
   }
 
   function openBookSheet(step, draft) {
     draft = draft || { course: null, start: null, weekdays: [] };
     state.bookDraft = draft;
     if (step === 1 || !step) {
-      var cards = state.courses
-        .map(function (c) {
+      var groups = coursesByCategory();
+      var order = ["kraft", "ausdauer", "zirkel"];
+      var cards = order
+        .map(function (cat) {
+          var list = groups[cat] || [];
+          if (!list.length) return "";
           return (
-            '<button type="button" class="wr-course-card" data-wr-pick-course="' +
-            esc(c.id) +
-            '"><strong>' +
-            esc(c.title) +
-            "</strong><span>" +
-            esc(c.level || "–") +
-            " · " +
-            (c.duration_weeks || "?") +
-            " Wo · " +
-            (c.sessions_per_week || "?") +
-            "×/Wo · " +
-            (c.price_eur != null ? Number(c.price_eur).toFixed(0) + " €" : "–") +
-            "</span></button>"
+            '<div class="wr-cat-block"><h4>' +
+            esc(CAT_LABELS[cat] || cat) +
+            "</h4>" +
+            list
+              .map(function (c) {
+                return (
+                  '<button type="button" class="wr-course-card" data-wr-pick-course="' +
+                  esc(c.id) +
+                  '"><strong>' +
+                  esc(c.title) +
+                  "</strong><span>" +
+                  (c.duration_weeks || "?") +
+                  " Wo · " +
+                  (c.sessions_per_week || "?") +
+                  "×/Wo</span></button>"
+                );
+              })
+              .join("") +
+            "</div>"
           );
         })
         .join("");
@@ -1184,25 +1508,8 @@
       });
   }
 
-  function inviteWhatsApp(iso, eventId) {
-    var ev = state.events.filter(function (e) {
-      return String(e.id) === String(eventId);
-    })[0];
-    var title = (ev && ev.title) || "Training";
-    var when = formatDayLong(iso) + (ev ? " · " + formatTime(ev.starts_at) : "");
-    var text =
-      "Komm mit zu gogogo: " + title + " · " + when + " https://gogogo-social.vercel.app/natalyaalice/";
-    var url = "https://wa.me/?text=" + encodeURIComponent(text);
-    try {
-      window.open(url, "_blank");
-    } catch (e) {
-      location.href = url;
-    }
-    if (host.openInviteForPost) host.openInviteForPost(iso);
-  }
-
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-edit],[data-wr-end-travel],[data-wr-add-train],[data-wr-add-rest],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-train-cat],[data-wr-travel-days],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-swap],[data-wr-invite],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-train],[data-wr-add-rest],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-day-course],[data-wr-travel-days],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") closeSheet();
       return;
@@ -1220,13 +1527,17 @@
       return;
     }
     if (t.hasAttribute("data-wr-week")) {
-      var dir = Number(t.getAttribute("data-wr-week"));
-      state.weekOffset = Math.max(0, Math.min(1, state.weekOffset + dir));
+      cycleWeekMode(Number(t.getAttribute("data-wr-week")));
       refresh();
       return;
     }
     if (t.getAttribute("data-wr-week-menu")) {
-      state.weekOffset = state.weekOffset === 0 ? 1 : 0;
+      openWeekMenu();
+      return;
+    }
+    if (t.getAttribute("data-wr-set-mode")) {
+      setWeekMode(t.getAttribute("data-wr-set-mode"));
+      closeSheet();
       refresh();
       return;
     }
@@ -1266,20 +1577,11 @@
       });
       return;
     }
-    if (t.getAttribute("data-wr-train-cat")) {
-      var cat = t.getAttribute("data-wr-train-cat");
-      var isoT = t.getAttribute("data-iso");
-      var labels = { kraft: "Kraft", ausdauer: "Ausdauer", zirkel: "Zirkel" };
-      createEvent({
-        category: cat,
-        title: labels[cat] || cat,
-        starts_at: isoT + "T18:00:00+01:00",
-        is_unplanned: true,
-        item_type: "spontaneous"
-      }).then(function () {
-        closeSheet();
-        return refresh();
-      });
+    if (t.getAttribute("data-wr-day-course")) {
+      addCourseOnDay(
+        t.getAttribute("data-wr-day-course"),
+        t.getAttribute("data-iso")
+      );
       return;
     }
     if (t.hasAttribute("data-wr-travel-days")) {
@@ -1345,8 +1647,26 @@
       swapToHotel(t.getAttribute("data-wr-swap"));
       return;
     }
-    if (t.getAttribute("data-wr-invite")) {
-      inviteWhatsApp(t.getAttribute("data-wr-invite"), t.getAttribute("data-wr-event"));
+    if (t.getAttribute("data-wr-share")) {
+      openShareSheet(
+        t.getAttribute("data-wr-share"),
+        t.getAttribute("data-wr-event")
+      );
+      return;
+    }
+    if (t.hasAttribute("data-wr-friend-pick")) {
+      var fidPick = t.getAttribute("data-wr-friend-pick");
+      var boxPick = t.querySelector ? t.querySelector("input[type=checkbox]") : null;
+      /* native toggle already happened on label click */
+      state.sharePick[fidPick] = boxPick ? !!boxPick.checked : !state.sharePick[fidPick];
+      return;
+    }
+    if (t.getAttribute("data-wr-invite-friends")) {
+      inviteFriendsSelected();
+      return;
+    }
+    if (t.getAttribute("data-wr-share-ext")) {
+      shareExternal(state.shareIso, state.shareEventId);
       return;
     }
     if (t.getAttribute("data-wr-done")) {
@@ -1426,8 +1746,12 @@
       return;
     }
     if (t.getAttribute("data-wr-more")) {
-      var p = t.closest(".wr-place");
-      if (p) p.textContent = p.textContent.replace(/\s*mehr$/, "");
+      var pMore = t.closest(".wr-place");
+      if (pMore) {
+        var full = pMore.getAttribute("data-full") || "";
+        if (full) pMore.textContent = full;
+        else t.remove();
+      }
       return;
     }
   }
@@ -1600,12 +1924,7 @@
         ]);
       })
       .then(function () {
-        if (state.weekOffset === 0) {
-          var today = berlinToday();
-          var days = weekDays();
-          var ix = days.indexOf(today);
-          if (ix >= 0) state.dayIndex = ix;
-        }
+        if (state.weekMode === "from_today") state.dayIndex = 0;
       })
       .catch(function () {
         state.loadError = state.loadError || "Woche teilweise nicht geladen.";
@@ -1621,12 +1940,7 @@
     document.body.classList.add("is-woche-reels");
     /* Sofort 7 Tageskarten — nie leerer Screen während Load */
     try {
-      if (state.weekOffset === 0) {
-        var today = berlinToday();
-        var days = weekDays();
-        var ix = days.indexOf(today);
-        if (ix >= 0) state.dayIndex = ix;
-      }
+      if (state.weekMode === "from_today") state.dayIndex = 0;
       render();
     } catch (eShow) {
       state.loadError = "Woche konnte nicht gezeichnet werden.";
@@ -1634,7 +1948,7 @@
         render();
       } catch (e2) {}
     }
-    return refresh();
+    return Promise.all([loadCourses().catch(function () {}), refresh()]);
   }
 
   function hide() {
