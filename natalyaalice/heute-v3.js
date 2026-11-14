@@ -16,6 +16,7 @@
     pendingVis: "team",
     userScrolledAktuell: false,
     paintedAktuell: false,
+    bootNeedsCenter: true,
     refreshSeq: 0
   };
 
@@ -1598,8 +1599,9 @@
 
     var firstPaint = !state.paintedAktuell;
     var scroller = welcomeScrollEl();
-    /* Nach dem ersten Paint Scroll immer behalten — kein erneutes Zentrieren (FFC-Nachzug) */
-    var keepScroll = !firstPaint ? scroller.scrollTop || 0 : null;
+    /* Boot: auf Heute zentrieren — sonst bleibt man auf Zukunft (z. B. 25.11.) */
+    var keepScroll =
+      !firstPaint && !state.bootNeedsCenter ? scroller.scrollTop || 0 : null;
     /* Feed sichtbar lassen — kein opacity-Flash bei Refresh */
     root.classList.remove("is-centering");
     root.innerHTML = html;
@@ -1611,8 +1613,14 @@
         scroller.scrollTop = keepScroll;
         return;
       }
-      /* Nur beim ersten Paint zentrieren */
       scrollCurrentToCenter({ soft: false, force: true });
+      /* Nochmals nach Layout — Heute-Karte erst nach Event-Load da */
+      requestAnimationFrame(function () {
+        scrollCurrentToCenter({ soft: false, force: true });
+        if (state.bootNeedsCenter && currentEventCard()) {
+          state.bootNeedsCenter = false;
+        }
+      });
     });
     if (host.maybeAskHistoryShare) host.maybeAskHistoryShare();
   }
@@ -2600,8 +2608,8 @@
           if (!stillCurrent()) return;
           return loadFfcEvents().then(function () {
             if (!stillCurrent()) return;
-            /* Nur neu malen wenn FFC-Events dazugekommen sind und User noch nicht scrollt */
-            if (state.userScrolledAktuell) return;
+            /* Boot: nach FFC noch einmal zentrieren; sonst nur wenn User nicht scrollt */
+            if (state.userScrolledAktuell && !state.bootNeedsCenter) return;
             render();
           });
         });
@@ -2611,6 +2619,7 @@
   function resetAktuellPaint() {
     state.paintedAktuell = false;
     state.userScrolledAktuell = false;
+    state.bootNeedsCenter = true;
   }
 
   function install(h) {
