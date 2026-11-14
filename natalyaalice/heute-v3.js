@@ -600,16 +600,26 @@
     return "";
   }
 
-  function inviteFaceRowHtml(postId, inviteIso) {
+  function canInviteOnDay(iso) {
+    var day = String(iso || "").slice(0, 10);
+    if (!day) return false;
+    return day >= todayIso();
+  }
+
+  function inviteFaceRowHtml(postId, inviteIso, canInvite) {
     var mePerson = personOf(me());
+    var add =
+      canInvite !== false && canInviteOnDay(inviteIso)
+        ? '<button type="button" class="acc-face acc-face--add" data-invite-post="' +
+          esc(postId || "") +
+          '" data-invite-iso="' +
+          esc(inviteIso || "") +
+          '" aria-label="Einladen">+</button>'
+        : "";
     return (
       '<div class="acc-card__faces">' +
       avatarHtml(mePerson, "acc-face") +
-      '<button type="button" class="acc-face acc-face--add" data-invite-post="' +
-      esc(postId || "") +
-      '" data-invite-iso="' +
-      esc(inviteIso || "") +
-      '" aria-label="Einladen">+</button>' +
+      add +
       "</div>"
     );
   }
@@ -650,7 +660,8 @@
     var postId = opts.postId || "";
     if (!postId) return opts.actions || "";
     var mine = myCommentText(postId);
-    /* Kommentar-Feld erst nach Tippen auf Sprechblase; teaser nur mit Text */
+    var canInvite = opts.canInvite !== false;
+    /* Kommentar nur über Dialog (Sprechblase); teaser nur mit Text */
     var teaserBlock = mine
       ? '<div class="acc-card__teaser">' +
         '<button type="button" class="acc-card__my-line" data-open-comments="' +
@@ -662,16 +673,8 @@
     return (
       '<div class="acc-card__bar">' +
       (opts.actions || "") +
-      inviteFaceRowHtml(postId, opts.inviteIso || "") +
+      inviteFaceRowHtml(postId, opts.inviteIso || "", canInvite) +
       teaserBlock +
-      '<div class="acc-comments" data-comments="' +
-      esc(postId) +
-      '" hidden>' +
-      '<form class="acc-comment-form" data-comment-form="' +
-      esc(postId) +
-      '">' +
-      '<input type="text" class="acc-comment-input" maxlength="500" placeholder="Kommentar" aria-label="Kommentar" />' +
-      "</form></div>" +
       "</div>"
     );
   }
@@ -856,6 +859,7 @@
       bar = postBarHtml({
         postId: opts.postId,
         inviteIso: opts.inviteIso || "",
+        canInvite: opts.canInvite !== false,
         actions: opts.actions || ""
       });
     } else {
@@ -899,6 +903,7 @@
     var uid = me();
     var mine = String(ev.user_id) === uid;
     var upcoming = ev.status === "geplant";
+    var day = dayKey(ev.starts_at);
     var p = personOf(ev.user_id);
     var emoji = emojiFor(ev.category, ev.title);
     var title = (emoji + " " + (ev.title || ev.category)).trim();
@@ -910,7 +915,7 @@
       ? eventToolRowHtml({
           eventId: ev.id,
           postId: String(ev.id),
-          canDone: upcoming && dayKey(ev.starts_at) === todayIso(),
+          canDone: upcoming && day === todayIso(),
           isDone: ev.status === "erledigt",
           badge: eventBadgeKind(ev)
         })
@@ -932,7 +937,8 @@
       place: ev.location || "",
       desc: descHtml(ev.note),
       postId: String(ev.id),
-      inviteIso: dayKey(ev.starts_at)
+      inviteIso: day,
+      canInvite: canInviteOnDay(day)
     });
   }
 
@@ -964,7 +970,8 @@
       place: ev.location || "",
       desc: "",
       postId: postId,
-      inviteIso: dayKey(ev.starts_at)
+      inviteIso: dayKey(ev.starts_at),
+      canInvite: canInviteOnDay(dayKey(ev.starts_at))
     });
   }
 
@@ -973,9 +980,10 @@
     var mine = String(item.user_id) === me();
     var emoji = emojiFor(item.category || "kraft", item.title);
     var title = (emoji + " " + (item.title || "Training")).trim();
+    var day = dayKey(item.starts_at);
     var commentKey =
       item.commentKey ||
-      "diary:" + String(item.user_id) + ":" + dayKey(item.starts_at);
+      "diary:" + String(item.user_id) + ":" + day;
     return renderCardShell({
       attrs:
         ' data-post-id="' +
@@ -993,7 +1001,8 @@
       place: item.location || "",
       desc: descHtml(item.note),
       postId: commentKey,
-      inviteIso: dayKey(item.starts_at)
+      inviteIso: day,
+      canInvite: canInviteOnDay(day)
     });
   }
 
@@ -1033,13 +1042,14 @@
       place: item.location || "",
       desc: descHtml(item.note || ""),
       postId: postId,
-      inviteIso: item.iso || dayKey(item.starts_at)
+      inviteIso: item.iso || dayKey(item.starts_at),
+      canInvite: canInviteOnDay(item.iso || dayKey(item.starts_at))
     });
   }
 
   /* Reihenfolge-Regel:
-     1) Meine Events von heute (Plan + eigene Events/FFC)
-     2) Spontan-Karte
+     1) Spontan-Karte über heutigen Events
+     2) Meine Events von heute (Plan + eigene Events/FFC)
      3) Kommende (morgen zuerst, dann später; eigene vor fremden bei Gleichstand)
      4) Historie (Tagebuch+), neueste zuerst */
   function buildFeedItems(flags) {
@@ -1284,10 +1294,11 @@
     });
     html += "</div>";
     html += '<div class="acc-feed-today" data-acc-zone="today" id="acc-feed-today">';
+    /* Spontan über dem aktuellen Event */
+    html += renderSpontanCard();
     feed.myToday.forEach(function (item) {
       html += renderFeedItem(item);
     });
-    html += renderSpontanCard();
     html += "</div>";
     html += '<div class="acc-feed-past" data-acc-zone="past">';
     feed.history.forEach(function (item) {
@@ -1569,7 +1580,15 @@
     var inviteIso = "";
     var addBtn = card.querySelector("[data-invite-iso]");
     if (addBtn) inviteIso = addBtn.getAttribute("data-invite-iso") || "";
-    var html = postBarHtml({ postId: postId, inviteIso: inviteIso, actions: actions });
+    if (!inviteIso && card.getAttribute("data-plan-iso")) {
+      inviteIso = card.getAttribute("data-plan-iso") || "";
+    }
+    var html = postBarHtml({
+      postId: postId,
+      inviteIso: inviteIso,
+      canInvite: canInviteOnDay(inviteIso),
+      actions: actions
+    });
     var tmp = document.createElement("div");
     tmp.innerHTML = html;
     var next = tmp.firstChild;
@@ -1578,28 +1597,40 @@
     else card.appendChild(next);
   }
 
+  function closeCommentModal() {
+    var modal = $("acc-comment-modal");
+    if (modal) {
+      modal.hidden = true;
+      modal.dataset.postId = "";
+    }
+    document.body.classList.remove("is-comment-open");
+    var input = $("acc-comment-text");
+    if (input) input.value = "";
+  }
+
+  function paintCommentModalList(postId) {
+    var listEl = $("acc-comment-list");
+    if (!listEl) return;
+    var list = state.comments[postId] || [];
+    listEl.innerHTML = list.length
+      ? list.map(commentLineHtml).join("")
+      : '<p class="acc-comment-modal__empty">Noch keine Kommentare.</p>';
+  }
+
   function openComments(postId) {
-    var card = document.querySelector('[data-post-id="' + postId + '"]');
-    var panel = card
-      ? card.querySelector('[data-comments="' + postId + '"]')
-      : document.querySelector('[data-comments="' + postId + '"]');
-    if (!panel) {
-      paintPostBar(postId);
-      card = document.querySelector('[data-post-id="' + postId + '"]');
-      panel = card && card.querySelector('[data-comments="' + postId + '"]');
-    }
-    if (!panel) return;
-    var teaser = card && card.querySelector(".acc-card__teaser");
-    if (teaser) {
-      teaser.hidden = true;
-      teaser.classList.add("is-composing");
-    }
-    panel.hidden = false;
-    panel.classList.add("is-open");
-    var input = panel.querySelector(".acc-comment-input");
+    if (!postId) return;
+    var modal = $("acc-comment-modal");
+    if (!modal) return;
+    modal.dataset.postId = postId;
+    modal.hidden = false;
+    document.body.classList.add("is-comment-open");
+    paintCommentModalList(postId);
+    var input = $("acc-comment-text");
     if (input) {
       input.value = "";
-      input.focus();
+      requestAnimationFrame(function () {
+        input.focus();
+      });
     }
   }
 
@@ -1616,6 +1647,10 @@
     state.comments[postId].push(temp);
     personOf(me());
     paintPostBar(postId);
+    paintCommentModalList(postId);
+    var modalInput = $("acc-comment-text");
+    if (modalInput) modalInput.value = "";
+    closeCommentModal();
 
     var save;
     if (String(postId).indexOf("diary:") === 0) {
@@ -2008,6 +2043,30 @@
       root.dataset.bound = "1";
       root.addEventListener("click", onRootClick);
       root.addEventListener("submit", onRootSubmit);
+    }
+    var commentForm = $("acc-comment-form");
+    if (commentForm && commentForm.dataset.bound !== "1") {
+      commentForm.dataset.bound = "1";
+      commentForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var modal = $("acc-comment-modal");
+        var postId = modal && modal.dataset.postId;
+        var textEl = $("acc-comment-text");
+        if (!postId || !textEl) return;
+        addComment(postId, textEl.value);
+      });
+    }
+    var commentCancel = $("acc-comment-cancel");
+    if (commentCancel && commentCancel.dataset.bound !== "1") {
+      commentCancel.dataset.bound = "1";
+      commentCancel.addEventListener("click", closeCommentModal);
+    }
+    var commentModal = $("acc-comment-modal");
+    if (commentModal && commentModal.dataset.bound !== "1") {
+      commentModal.dataset.bound = "1";
+      commentModal.addEventListener("click", function (e) {
+        if (e.target === commentModal) closeCommentModal();
+      });
     }
     var doneOk = $("acc-done-ok");
     if (doneOk) doneOk.addEventListener("click", submitDone);

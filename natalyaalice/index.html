@@ -1311,11 +1311,17 @@
     body.is-session[data-shell="heute"] .heute-mantra,
     body.is-session[data-shell="heute"] .photo,
     body.is-session[data-shell="heute"] .heute-crew { display: none !important; }
+    body.is-session[data-shell="heute"] .welcome {
+      background: #F3EEE4;
+    }
     body.is-session[data-shell="heute"] .heute-filter-row {
       order: 0; display: flex; align-items: center; justify-content: center;
-      gap: 14px; width: 100%; margin-top: 12px; box-sizing: border-box;
-      position: sticky; top: 0; z-index: 6; background: #F3EEE4;
-      padding: 8px 0 6px; transition: opacity .15s ease, transform .15s ease;
+      gap: 14px; width: 100%; box-sizing: border-box;
+      position: relative; z-index: 6; background: #F3EEE4;
+      /* Bis Screen-Oberkante füllen; nicht sticky — scrollt nach unten weg */
+      margin: calc(-1 * (4px + env(safe-area-inset-top, 0px))) 0 0;
+      padding: calc(10px + env(safe-area-inset-top, 0px)) 0 10px;
+      transition: opacity .15s ease, transform .15s ease;
     }
     body.is-session[data-shell="heute"] .heute-filter-row.is-scroll-hide {
       opacity: 0; pointer-events: none; transform: translateY(-8px);
@@ -2017,6 +2023,15 @@
     .acc-vis .invite-person:last-child { border-bottom: 0; }
     #acc-done-modal .sand-card { text-align: left; }
     #acc-done-modal .sand-card h2 { text-align: center; }
+    #acc-comment-modal .sand-card { text-align: left; }
+    #acc-comment-modal .sand-card h2 { text-align: center; }
+    #acc-comment-modal textarea {
+      width: 100%; box-sizing: border-box; min-height: 110px; margin: 8px 0 12px;
+      padding: 12px; border: 1px solid rgba(42,33,24,.2); border-radius: 12px;
+      background: #F6F1E8; color: #2A2118; font: inherit; resize: vertical;
+    }
+    #acc-comment-list { max-height: 28vh; overflow: auto; margin: 0 0 8px; }
+    .acc-comment-modal__empty { margin: 0; font-size: 14px; color: rgba(42,33,24,.55); }
     #acc-done-note {
       width: 100%; box-sizing: border-box; min-height: 72px; margin: 0 0 12px; padding: 10px 12px;
       border: 1px solid rgba(42,33,24,.2); background: transparent; color: #2A2118; font: inherit;
@@ -3070,9 +3085,13 @@
       font-size: calc(9px * 0.7); line-height: 1; letter-spacing: 0.01em;
     }
     .pill-ico { position: relative; display: block; width: 26px; height: 26px; }
+    .pill-ico.has-face svg { display: none !important; }
+    .app-pill button img.pill-face { opacity: 0.55; }
+    .app-pill button.is-on img.pill-face { opacity: 1; }
     .pill-ico img.pill-face {
       width: 26px; height: 26px; border-radius: 50%; object-fit: cover; display: block;
     }
+    body.is-comment-open .app-pill { display: none !important; }
     .pill-dot {
       position: absolute;
       top: -3px;
@@ -4221,19 +4240,20 @@
       margin: 36px 0 8px;
       min-width: 0;
     }
-    .team-slide__coach-name-text {
+    .team-slide__coach-name-text,
+    .team-slide__group-name {
       margin: 0;
-      font-family: "Playfair Display", Georgia, serif;
-      font-size: 22px;
-      font-weight: 600;
-      line-height: 1.2;
-      color: #2A2118;
+      font-family: "Playfair Display", Georgia, serif !important;
+      font-size: var(--t-l, 24px) !important;
+      font-weight: 600 !important;
+      line-height: 1.2 !important;
+      color: #2A2118 !important;
       min-width: 0;
     }
     .team-slide__coach-name .team-slide__head-action {
       flex: none;
-      width: 28px;
-      height: 28px;
+      width: 36px;
+      height: 36px;
       border: 0;
       border-radius: 0;
       background: transparent;
@@ -4243,21 +4263,29 @@
       place-items: center;
     }
     .team-slide__coach-name .team-slide__head-action svg {
-      width: 16px;
-      height: 16px;
+      width: 22px;
+      height: 22px;
       display: block;
     }
     .team-slide__coach-name .team-wa {
       flex: none;
-      width: 28px;
-      height: 28px;
+      width: 36px;
+      height: 36px;
       margin: 0;
       margin-left: 0;
     }
     .team-slide__coach-name .team-wa svg {
-      width: 22px;
-      height: 22px;
+      width: 28px;
+      height: 28px;
       display: block;
+    }
+    .team-slide__cta + .team-slide__group-name,
+    .team-slide__cta + .team-slide__coach-name {
+      margin-top: 20px;
+    }
+    .team-slide__group-name + .team-slide__add-friend,
+    .team-slide__coach-name + .team-slide__add-friend {
+      margin-top: 14px;
     }
     .team-slide__art + .team-slide__cta,
     .go-slide__art + .go-slide__cta {
@@ -5210,6 +5238,17 @@
       <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
       <span>Jetzt starten</span>
     </button>
+    <div class="sand-modal" id="acc-comment-modal" hidden>
+      <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="acc-comment-title">
+        <h2 class="ask" id="acc-comment-title">Kommentar</h2>
+        <div class="acc-comment-modal__list" id="acc-comment-list"></div>
+        <form id="acc-comment-form">
+          <textarea id="acc-comment-text" rows="4" maxlength="500" placeholder="Schreiben…" aria-label="Kommentar"></textarea>
+          <button type="submit" class="routine-start" id="acc-comment-send">Senden</button>
+          <button type="button" class="routine-start" id="acc-comment-cancel" style="background:transparent;color:#2A2118;margin-top:8px;">Abbrechen</button>
+        </form>
+      </div>
+    </div>
     <div class="sand-modal" id="acc-done-modal" hidden>
       <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="acc-done-title">
         <h2 class="ask" id="acc-done-title">Erledigt</h2>
@@ -5637,7 +5676,7 @@
     <nav aria-label="Bereiche">
       <button type="button" data-shell="heute" class="is-on" aria-label="Aktuell">
         <span class="pill-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 11.2 12 6l6 5.2V19a1 1 0 0 1-1 1h-3.6v-5.2h-2.8V20H7a1 1 0 0 1-1-1v-7.8z"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10.8 12 4.5l6 6.3V19.5a1 1 0 0 1-1 1h-3.6v-5h-2.8v5H7a1 1 0 0 1-1-1v-8.7z"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
         <small>Aktuell</small>
@@ -6249,7 +6288,7 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-10"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-11"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-15"></script>
   <script src="/natalyaalice/support.js?v=support-4"></script>
   <script>
@@ -10388,10 +10427,19 @@
             }
             face.src = photo;
             face.hidden = false;
-            if (svg) svg.hidden = true;
+            if (svg) {
+              svg.hidden = true;
+              svg.setAttribute("aria-hidden", "true");
+              svg.style.display = "none";
+            }
+            profilIco.classList.add("has-face");
           } else {
             if (face) face.hidden = true;
-            if (svg) svg.hidden = false;
+            if (svg) {
+              svg.hidden = false;
+              svg.style.display = "";
+            }
+            profilIco.classList.remove("has-face");
           }
         }
       }
@@ -11763,10 +11811,25 @@
           });
           art.appendChild(file);
           slide.appendChild(art);
-          var title = document.createElement("h3");
-          title.className = "team-slide__title";
-          title.textContent = (group && group.name) || "Gruppe";
-          slide.appendChild(title);
+          var createBtn = document.createElement("button");
+          createBtn.type = "button";
+          createBtn.className = "team-slide__cta is-solid";
+          createBtn.textContent = "Gruppe erstellen";
+          createBtn.addEventListener("click", function () {
+            openGoSub("group", "Gruppe erstellen");
+          });
+          slide.appendChild(createBtn);
+          var nameEl = document.createElement("h3");
+          nameEl.className = "team-slide__group-name";
+          nameEl.textContent = (group && group.name) || "Gruppe";
+          slide.appendChild(nameEl);
+          var addFriend = document.createElement("button");
+          addFriend.type = "button";
+          addFriend.className = "team-slide__add-friend";
+          addFriend.setAttribute("aria-label", "Freunde einladen");
+          addFriend.innerHTML = '<span class="team-slide__add-friend-circle" aria-hidden="true">+</span>';
+          addFriend.addEventListener("click", function () { openTeamSearch("friend"); });
+          slide.appendChild(addFriend);
           var desc = document.createElement("p");
           desc.className = "team-slide__about";
           desc.textContent = String((group && group.description) || "").trim();
@@ -11806,19 +11869,6 @@
             openGoSub("group", "Gruppe erstellen");
           });
           emptyGroup.appendChild(createBtn);
-          var inviteBtn = document.createElement("button");
-          inviteBtn.type = "button";
-          inviteBtn.className = "team-slide__cta";
-          inviteBtn.textContent = "Freunde einladen";
-          inviteBtn.addEventListener("click", function () { openTeamSearch("friend"); });
-          emptyGroup.appendChild(inviteBtn);
-          var addFriend = document.createElement("button");
-          addFriend.type = "button";
-          addFriend.className = "team-slide__add-friend";
-          addFriend.setAttribute("aria-label", "Freunde hinzufügen");
-          addFriend.innerHTML = '<span class="team-slide__add-friend-circle" aria-hidden="true">+</span>';
-          addFriend.addEventListener("click", function () { openTeamSearch("friend"); });
-          emptyGroup.appendChild(addFriend);
           box.appendChild(emptyGroup);
         } else {
           groups.forEach(groupSlide);
