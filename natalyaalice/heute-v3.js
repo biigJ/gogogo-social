@@ -943,13 +943,13 @@
     return (
       '<div class="acc-card__bar">' +
       (opts.actions || "") +
+      teaserBlock +
       inviteFaceRowHtml(
         postId,
         opts.inviteIso || "",
         canInvite,
         opts.eventId || postId
       ) +
-      teaserBlock +
       "</div>"
     );
   }
@@ -1593,28 +1593,18 @@
     });
     html += "</div>";
 
+    state.userScrolledAktuell = false;
     root.classList.add("is-centering");
     root.innerHTML = html;
     bindObserver(root);
     bindHeuteScrollFilter();
-    /* Sofort mittig — Feed unsichtbar bis Position steht (kein Flash von oben) */
+    /* Einmal mittig — danach nicht erneut springen (kein Flash / Scroll-Trap) */
     function revealCentered() {
-      scrollCurrentToCenter({ soft: false });
+      scrollCurrentToCenter({ soft: false, force: true });
       root.classList.remove("is-centering");
     }
-    scrollCurrentToCenter({ soft: false });
     requestAnimationFrame(function () {
-      scrollCurrentToCenter({ soft: false });
-      requestAnimationFrame(function () {
-        scrollCurrentToCenter({ soft: false });
-        revealCentered();
-        setTimeout(function () {
-          scrollCurrentToCenter({ soft: false });
-        }, 80);
-        setTimeout(function () {
-          scrollCurrentToCenter({ soft: false });
-        }, 220);
-      });
+      revealCentered();
     });
     if (host.maybeAskHistoryShare) host.maybeAskHistoryShare();
   }
@@ -1639,12 +1629,15 @@
   function scrollCurrentToCenter(opts) {
     opts = opts || {};
     var soft = opts.soft === true;
+    var force = opts.force === true;
+    if (!force && state.userScrolledAktuell) return;
     var scroller = welcomeScrollEl();
     var el = currentEventCard();
     if (!scroller || !el) return;
 
     function run() {
       if (document.body.dataset.shell !== "heute") return;
+      if (!force && state.userScrolledAktuell) return;
       var row = document.querySelector(".heute-filter-row");
       if (row) row.classList.remove("is-scroll-hide");
       /* Frisch gelayoutetes Element holen (nach HTML-Replace) */
@@ -1682,6 +1675,7 @@
       function () {
         if (document.body.dataset.shell !== "heute") return;
         var y = scroller.scrollTop || 0;
+        if (Math.abs(y - last) > 8) state.userScrolledAktuell = true;
         var todayEl = $("acc-feed-today");
         var goingDown = y > last + 2;
         var goingUp = y < last - 2;
