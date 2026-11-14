@@ -31,9 +31,9 @@
       showOwnFfc: true,
       showAcceptedFfc: true,
       showPendingFfcInvites: level >= 1,
-      /* Eigene Historie immer (Ich inkl.); Freunde erst ab Alles */
+      /* Eigene Historie immer; Team-Posts von Freunden ab Team-Filter */
       showOwnHistory: true,
-      showFriendsHistory: level >= 3,
+      showFriendsHistory: level >= 1,
       showOthersUpcoming: level >= 1,
       showRsvpdUpcoming: true,
       showPlanDays: true
@@ -130,13 +130,15 @@
     return host.rest(path, opts);
   }
 
-  function logActivity(type, refId) {
+  function logActivity(type, refId, meta) {
     var id = me();
     if (!id) return Promise.resolve();
+    var body = { user_id: id, type: type, ref_id: refId || null };
+    if (meta && typeof meta === "object") body.meta = meta;
     return rest("activity_log", {
       method: "POST",
       prefer: "return=minimal",
-      body: { user_id: id, type: type, ref_id: refId || null }
+      body: body
     }).catch(function () {});
   }
 
@@ -307,14 +309,101 @@
       })
       .then(function (rows) {
         state.events = dedupeEvents(rows || []);
-        var ids = state.events.map(function (e) {
-          return String(e.user_id);
+        return mergeEventMediaFromActivity(state.events).then(function () {
+          var ids = state.events.map(function (e) {
+            return String(e.user_id);
+          });
+          return ensurePeople(ids);
         });
-        return ensurePeople(ids);
       })
       .catch(function () {
         state.events = [];
       });
+  }
+
+  function eventMediaMarker(eventId) {
+    return "[[e:" + String(eventId) + "]]";
+  }
+
+  function unpackEventMediaPayload(raw) {
+    if (!raw) return null;
+    var s = String(raw);
+    if (s.charAt(0) === "{") {
+      try {
+        var o = JSON.parse(s);
+        if (o && (o.note != null || o.photo || o.photo_url)) {
+          return {
+            note: o.note != null ? String(o.note) : "",
+            photo_url: o.photo_url || o.photo || ""
+          };
+        }
+      } catch (e) {}
+    }
+    if (s.indexOf("data:image") === 0 || /^https?:\/\//i.test(s)) {
+      return { note: "", photo_url: s };
+    }
+    return null;
+  }
+
+  function mergeEventMediaFromPosts(events) {
+    var list = events || [];
+    var need = list.filter(function (e) {
+      return e && e.status === "erledigt" && e.id && (!(e.note && String(e.note).trim()) || !e.photo_url);
+    });
+    if (!need.length) return Promise.resolve();
+    return rest(
+      "go_community_posts?body=like." +
+        encodeURIComponent("*[[e:*") +
+        "&select=id,author_id,body,photo_url,created_at&order=created_at.desc&limit=300"
+    )
+      .then(function (rows) {
+        var byRef = {};
+        (rows || []).forEach(function (r) {
+          var body = String(r.body || "");
+          var m = body.match(/\[\[e:([0-9a-f-]{36})\]\]/i);
+          if (!m) return;
+          var rid = String(m[1]);
+          if (byRef[rid]) return;
+          var packed = unpackEventMediaPayload(r.photo_url);
+          var noteFromBody = body.replace(/\[\[e:[0-9a-f-]{36}\]\]/i, "").trim();
+          byRef[rid] = {
+            note: (packed && packed.note) || noteFromBody || "",
+            photo_url: (packed && packed.photo_url) || (!packed && r.photo_url) || ""
+          };
+        });
+        list.forEach(function (e) {
+          var meta = byRef[String(e.id)];
+          if (!meta) return;
+          if (!(e.note && String(e.note).trim()) && meta.note) e.note = meta.note;
+          if (!e.photo_url && meta.photo_url) e.photo_url = meta.photo_url;
+        });
+      })
+      .catch(function () {});
+  }
+
+  function saveEventMediaFallback(eventId, note, photo) {
+    var id = me();
+    if (!id || !eventId) return Promise.resolve();
+    if (!note && !photo) return Promise.resolve();
+    var marker = eventMediaMarker(eventId);
+    var payload = JSON.stringify({
+      note: note || "",
+      photo: photo || ""
+    });
+    return rest("go_community_posts", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: {
+        author_id: id,
+        kind: photo ? "photo" : "text",
+        body: marker.slice(0, 144),
+        photo_url: payload
+      }
+    }).catch(function () {});
+  }
+
+  function mergeEventMediaFromActivity(events) {
+    return mergeEventMediaFromPosts(events);
   }
 
   function loadFfcEvents() {
@@ -570,7 +659,15 @@
     );
   }
 
-  function checkSvg() {
+  function checkSvg(done) {
+    if (done) {
+      return (
+        '<svg class="acc-act-ico wr-ico acc-act-ico--done" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">' +
+        '<circle cx="12" cy="12" r="9" fill="#111"/>' +
+        '<path d="M8 12.5l2.5 2.5L16 9.5" fill="none" stroke="#F6F1E8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+        "</svg>"
+      );
+    }
     return (
       '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
       '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>'
@@ -750,17 +847,14 @@
     var postId = opts.postId || eventId;
     var done = !!opts.canDone;
     var isDone = !!opts.isDone;
-    var count = goingCount(eventId);
     var check =
       '<button type="button" class="acc-tool acc-tool--check' +
       (isDone ? " is-done" : "") +
       '"' +
       (done ? ' data-done="' + esc(eventId) + '"' : isDone ? " disabled" : "") +
       ' aria-label="Erledigt">' +
-      checkSvg() +
-      '<span class="acc-tool__n">' +
-      count +
-      "</span></button>";
+      checkSvg(isDone) +
+      "</button>";
     var bubble =
       '<button type="button" class="acc-tool acc-tool--bubble" data-open-comments="' +
       esc(postId) +
@@ -1201,12 +1295,15 @@
     });
 
     pack.past.forEach(function (ev) {
-      history.push({
+      var item = {
         kind: "event",
         starts_at: ev.starts_at,
         _mine: String(ev.user_id) === me(),
         ev: ev
-      });
+      };
+      /* Heute erledigt (mit Foto/Text) bleibt im Heute-Feed sichtbar */
+      if (dayKey(ev.starts_at) === today) myToday.push(item);
+      else history.push(item);
     });
 
     if (flags.showOwnHistory || flags.showFriendsHistory) {
@@ -1501,6 +1598,45 @@
     if (modal) modal.hidden = true;
   }
 
+  function compressDonePhoto(dataUrl) {
+    return new Promise(function (resolve) {
+      if (!dataUrl || dataUrl.indexOf("data:image") !== 0) {
+        resolve(dataUrl || "");
+        return;
+      }
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var max = 1280;
+          var w = img.naturalWidth || img.width || 1;
+          var h = img.naturalHeight || img.height || 1;
+          var scale = Math.min(1, max / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w * scale));
+          var ch = Math.max(1, Math.round(h * scale));
+          var canvas = document.createElement("canvas");
+          canvas.width = cw;
+          canvas.height = ch;
+          var ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(dataUrl);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, cw, ch);
+          var out = canvas.toDataURL("image/jpeg", 0.82);
+          if (out && out.length > 900000) out = canvas.toDataURL("image/jpeg", 0.65);
+          if (out && out.length > 900000) out = canvas.toDataURL("image/jpeg", 0.5);
+          resolve(out || dataUrl);
+        } catch (e) {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = function () {
+        resolve(dataUrl);
+      };
+      img.src = dataUrl;
+    });
+  }
+
   function readDonePhoto() {
     var input = $("acc-done-photo");
     if (!input || !input.files || !input.files[0]) return Promise.resolve("");
@@ -1518,7 +1654,64 @@
         resolve("");
       };
       reader.readAsDataURL(file);
-    });
+    }).then(compressDonePhoto);
+  }
+
+  function patchEventDone(eventId, body) {
+    var wantedNote = body.note;
+    var wantedPhoto = body.photo_url;
+    function attempt(payload) {
+      return rest("events?id=eq." + encodeURIComponent(eventId), {
+        method: "PATCH",
+        prefer: "return=representation",
+        body: payload
+      });
+    }
+    function errMsg(err) {
+      try {
+        if (typeof err === "string") return err;
+        if (err && err.message) return String(err.message);
+        return JSON.stringify(err || {});
+      } catch (e) {
+        return String(err || "");
+      }
+    }
+    return attempt(body)
+      .catch(function (err) {
+        var msg = errMsg(err);
+        var next = Object.assign({}, body);
+        var stripped = false;
+        if (/note/i.test(msg) && Object.prototype.hasOwnProperty.call(next, "note")) {
+          delete next.note;
+          stripped = true;
+        }
+        if (/photo_url/i.test(msg) && Object.prototype.hasOwnProperty.call(next, "photo_url")) {
+          delete next.photo_url;
+          stripped = true;
+        }
+        if (!stripped) throw err;
+        return attempt(next).catch(function (err2) {
+          var msg2 = errMsg(err2);
+          var bare = { status: body.status, visibility: body.visibility };
+          if (/note|photo_url/i.test(msg2)) return attempt(bare);
+          throw err2;
+        });
+      })
+      .then(function (rows) {
+        var row = Array.isArray(rows) ? rows[0] : rows;
+        if (!row) row = { id: eventId, status: body.status, visibility: body.visibility };
+        var storedOnEvent = {
+          note: row.note != null && String(row.note).length ? String(row.note) : "",
+          photo_url: row.photo_url || ""
+        };
+        var needMeta = {};
+        if (wantedNote && !storedOnEvent.note) needMeta.note = wantedNote;
+        if (wantedPhoto && !storedOnEvent.photo_url) needMeta.photo_url = wantedPhoto;
+        row.note = storedOnEvent.note || wantedNote || "";
+        row.photo_url = storedOnEvent.photo_url || wantedPhoto || "";
+        row._mediaMeta = needMeta;
+        return row;
+      });
   }
 
   function submitDone() {
@@ -1527,23 +1720,38 @@
     var eventId = modal.dataset.eventId;
     if (!eventId) return;
     var vis = normalizeVisibility(modal.dataset.vis || "team");
-    var note = ($("acc-done-note") && $("acc-done-note").value) || "";
+    if (vis === "gruppe") vis = "team";
+    var note = (($("acc-done-note") && $("acc-done-note").value) || "").trim().slice(0, 500);
     readDonePhoto()
       .then(function (photo) {
         var body = {
           status: "erledigt",
-          visibility: vis,
-          note: note.trim().slice(0, 500)
+          visibility: vis
         };
+        if (note) body.note = note;
         if (photo) body.photo_url = photo;
-        return rest("events?id=eq." + encodeURIComponent(eventId), {
-          method: "PATCH",
-          prefer: "return=minimal",
-          body: body
-        });
+        return patchEventDone(eventId, body);
       })
-      .then(function () {
-        return logActivity("checkin", eventId);
+      .then(function (updated) {
+        var photo = (updated && updated.photo_url) || "";
+        var savedNote = (updated && updated.note) || note || "";
+        state.events = state.events.map(function (e) {
+          if (String(e.id) !== String(eventId)) return e;
+          return Object.assign({}, e, updated || {}, {
+            status: "erledigt",
+            visibility: vis,
+            note: savedNote,
+            photo_url: photo || e.photo_url || ""
+          });
+        });
+        var meta = (updated && updated._mediaMeta) || {};
+        var tasks = [logActivity("checkin", eventId)];
+        if (Object.keys(meta).length) {
+          tasks.push(
+            saveEventMediaFallback(eventId, meta.note || note || "", meta.photo_url || photo || "")
+          );
+        }
+        return Promise.all(tasks);
       })
       .then(function () {
         closeDoneModal();
@@ -1565,7 +1773,12 @@
         return refresh();
       })
       .catch(function (err) {
-        if (host.toast) host.toast(String(err && err.message ? err.message : err));
+        var msg = "Speichern fehlgeschlagen";
+        try {
+          if (err && err.message) msg = String(err.message);
+          else if (typeof err === "string") msg = err;
+        } catch (e) {}
+        if (host.toast) host.toast(msg);
       });
   }
 

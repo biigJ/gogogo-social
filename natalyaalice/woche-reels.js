@@ -72,6 +72,8 @@
 
   var ICON_CHECK =
     '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>';
+  var ICON_CHECK_DONE =
+    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="#111"/><path d="M8 12.5l2.5 2.5L16 9.5" fill="none" stroke="#F6F1E8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var ICON_COMMENT =
     '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3v-3H7.5A2.5 2.5 0 0 1 5 13.5v-7z"/></svg>';
   var ICON_SHARE =
@@ -317,17 +319,63 @@
       })
       .then(function (rows) {
         state.events = rows || [];
-        return ensurePeople(
-          state.events.map(function (e) {
-            return e.user_id;
-          })
-        );
+        return mergeEventMediaFromActivity(state.events).then(function () {
+          return ensurePeople(
+            state.events.map(function (e) {
+              return e.user_id;
+            })
+          );
+        });
       })
       .catch(function (err) {
         state.events = [];
         state.loadError = state.loadError || "Events konnten nicht geladen werden.";
         return null;
       });
+  }
+
+  function mergeEventMediaFromActivity(events) {
+    var list = events || [];
+    var need = list.filter(function (e) {
+      return e && e.status === "erledigt" && e.id && (!(e.note && String(e.note).trim()) || !e.photo_url);
+    });
+    if (!need.length) return Promise.resolve();
+    return rest(
+      "go_community_posts?body=like." +
+        encodeURIComponent("*[[e:*") +
+        "&select=id,author_id,body,photo_url,created_at&order=created_at.desc&limit=300"
+    )
+      .then(function (rows) {
+        var byRef = {};
+        (rows || []).forEach(function (r) {
+          var body = String(r.body || "");
+          var m = body.match(/\[\[e:([0-9a-f-]{36})\]\]/i);
+          if (!m) return;
+          var rid = String(m[1]);
+          if (byRef[rid]) return;
+          var raw = String(r.photo_url || "");
+          var packed = null;
+          if (raw.charAt(0) === "{") {
+            try {
+              packed = JSON.parse(raw);
+            } catch (e) {
+              packed = null;
+            }
+          }
+          byRef[rid] = {
+            note: (packed && packed.note) || body.replace(/\[\[e:[0-9a-f-]{36}\]\]/i, "").trim() || "",
+            photo_url:
+              (packed && (packed.photo_url || packed.photo)) || (!packed ? raw : "") || ""
+          };
+        });
+        list.forEach(function (e) {
+          var meta = byRef[String(e.id)];
+          if (!meta) return;
+          if (!(e.note && String(e.note).trim()) && meta.note) e.note = meta.note;
+          if (!e.photo_url && meta.photo_url) e.photo_url = meta.photo_url;
+        });
+      })
+      .catch(function () {});
   }
 
   function loadFfc() {
@@ -877,8 +925,8 @@
     } else if (isDone) {
       checkBtn =
         '<button type="button" class="wr-act is-done" disabled aria-label="Erledigt"><span class="wr-act__icon wr-act__icon--done">' +
-        ICON_CHECK +
-        '</span><span class="wr-act__n"></span></button>';
+        ICON_CHECK_DONE +
+        "</span></button>";
     }
     return (
       '<div class="wr-actions">' +
