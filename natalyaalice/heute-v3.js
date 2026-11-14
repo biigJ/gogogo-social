@@ -1137,24 +1137,44 @@
     if (host.maybeAskHistoryShare) host.maybeAskHistoryShare();
   }
 
+  function setDoneVis(want) {
+    var modal = $("acc-done-modal");
+    if (!modal) return;
+    want = normalizeVisibility(want || "team");
+    if (want === "gruppe") want = "team";
+    if (want !== "privat") want = "team";
+    modal.dataset.vis = want;
+    modal.querySelectorAll("[data-acc-vis]").forEach(function (row) {
+      var on = row.getAttribute("data-acc-vis") === want;
+      row.classList.toggle("is-on", on);
+      var check = row.querySelector(".invite-check");
+      if (check) {
+        check.classList.toggle("is-on", on);
+        check.setAttribute("aria-pressed", on ? "true" : "false");
+      }
+    });
+  }
+
   function openDoneModal(eventId) {
     var ev = state.events.find(function (e) {
       return String(e.id) === String(eventId);
     });
-    if (!ev) return;
     var modal = $("acc-done-modal");
     if (!modal) return;
     modal.hidden = false;
     modal.dataset.eventId = String(eventId);
-    var want = normalizeVisibility(ev.visibility || "team");
-    if (want === "gruppe") want = "team"; /* keine Gruppen-UI → Team */
-    var g = modal.querySelector('[name="acc-vis"][value="' + want + '"]');
-    if (!g) g = modal.querySelector('[name="acc-vis"][value="team"]');
-    if (g) g.checked = true;
+    var want = normalizeVisibility((ev && ev.visibility) || "team");
+    if (want === "gruppe") want = "team";
+    setDoneVis(want);
     var note = $("acc-done-note");
-    if (note) note.value = ev.note || "";
+    if (note) note.value = (ev && ev.note) || "";
     var photo = $("acc-done-photo");
     if (photo) photo.value = "";
+    var fileLabel = $("acc-done-file-label");
+    if (fileLabel) {
+      fileLabel.textContent = "Datei auswählen";
+      fileLabel.classList.remove("is-picked");
+    }
   }
 
   function closeDoneModal() {
@@ -1187,8 +1207,7 @@
     if (!modal) return;
     var eventId = modal.dataset.eventId;
     if (!eventId) return;
-    var visEl = modal.querySelector('[name="acc-vis"]:checked');
-    var vis = normalizeVisibility(visEl ? visEl.value : "team");
+    var vis = normalizeVisibility(modal.dataset.vis || "team");
     var note = ($("acc-done-note") && $("acc-done-note").value) || "";
     readDonePhoto()
       .then(function (photo) {
@@ -1209,6 +1228,10 @@
       })
       .then(function () {
         closeDoneModal();
+        if (host && typeof host.showHeute === "function") {
+          host.showHeute();
+          return;
+        }
         return refresh();
       })
       .catch(function (err) {
@@ -1767,6 +1790,33 @@
     if (doneOk) doneOk.addEventListener("click", submitDone);
     var doneCancel = $("acc-done-cancel");
     if (doneCancel) doneCancel.addEventListener("click", closeDoneModal);
+    var doneModal = $("acc-done-modal");
+    if (doneModal && doneModal.dataset.visBound !== "1") {
+      doneModal.dataset.visBound = "1";
+      doneModal.addEventListener("click", function (e) {
+        var row = e.target && e.target.closest ? e.target.closest("[data-acc-vis]") : null;
+        if (row) {
+          setDoneVis(row.getAttribute("data-acc-vis"));
+          return;
+        }
+        if (e.target === doneModal) closeDoneModal();
+      });
+      var photo = $("acc-done-photo");
+      if (photo) {
+        photo.addEventListener("change", function () {
+          var label = $("acc-done-file-label");
+          if (!label) return;
+          var file = photo.files && photo.files[0];
+          if (file) {
+            label.textContent = file.name || "Datei gewählt";
+            label.classList.add("is-picked");
+          } else {
+            label.textContent = "Datei auswählen";
+            label.classList.remove("is-picked");
+          }
+        });
+      }
+    }
     interceptGoKinds();
   }
 

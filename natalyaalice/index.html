@@ -1335,8 +1335,6 @@
     body.is-session[data-shell="heute"] .heute-events { display: none !important; }
     body.is-session[data-shell="heute"] #heute-diary-share-pick { display: none !important; }
     body.is-session[data-shell="heute"] #heute-diary-feed { display: none !important; }
-    .acc-photo-pick { display: block; margin: 0 0 12px; font-size: 14px; font-weight: 600; }
-    .acc-photo-pick input { display: block; margin-top: 6px; width: 100%; }
     .acc-btn {
       align-self: flex-start; min-height: 44px; margin-top: 8px; padding: 0 16px;
       border: 1px solid #2A2118; background: #2A2118; color: #F6F1E8; font-weight: 600; cursor: pointer;
@@ -1431,8 +1429,8 @@
       --wr-progress-h: calc(48px + var(--wr-dock));
       /* Header-Zeile unter Statusleiste; darunter liegen Edit-Panel / Banner */
       --wr-safe-top: env(safe-area-inset-top, 0px);
-      /* Safe Area + eine Zeile Abstand + Icon-Zeile + Tag-Label */
-      --wr-top-h: calc(var(--wr-safe-top) + 12px + 44px + 36px);
+      /* Safe Area + 2× Abstand + Icon-Zeile + Tag-Label */
+      --wr-top-h: calc(var(--wr-safe-top) + 24px + 44px + 48px);
     }
     .woche-reels.is-edit .wr-vtrack {
       overflow-y: hidden;
@@ -1446,9 +1444,9 @@
     }
     .wr-top {
       position: absolute; top: 0; left: 0; right: 0; z-index: 8;
-      display: flex; flex-direction: column; align-items: stretch; gap: 2px;
+      display: flex; flex-direction: column; align-items: stretch; gap: 0;
       padding: 0 12px 10px;
-      padding-top: calc(var(--wr-safe-top) + 12px);
+      padding-top: calc(var(--wr-safe-top) + 24px);
       background: transparent;
       pointer-events: none;
     }
@@ -1457,9 +1455,10 @@
       display: flex; align-items: center; justify-content: space-between; gap: 8px;
     }
     .wr-day-label {
-      margin: 2px 0 0; text-align: center;
+      margin: 16px 0 0; text-align: center;
       font-family: "Playfair Display", Georgia, serif;
       font-size: clamp(22px, 5.5vw, 28px); font-weight: 600;
+      line-height: 1.2;
       color: #fff; letter-spacing: 0.01em;
       text-shadow: 0 1px 8px rgba(0,0,0,.35);
       pointer-events: none;
@@ -1548,18 +1547,20 @@
       max-height: 46%; overflow: hidden;
     }
     .wr-overlay--empty {
-      inset: 0; right: 0; bottom: 0; align-items: center; justify-content: center;
-      text-align: center; padding: 24px;
+      inset: 0; right: 0; bottom: 0; align-items: center; justify-content: flex-start;
+      text-align: center;
+      /* 1.5 Zeilen unter dem Tag-Label */
+      padding: calc(var(--wr-top-h) + 1.5em) 24px 24px;
     }
     .wr-empty-title {
-      margin: 0 0 16px; font-family: "Playfair Display", Georgia, serif;
-      font-size: 28px; font-weight: 600; color: #2A2118;
+      margin: 0 0 1.25em; font-family: "Playfair Display", Georgia, serif;
+      font-size: 28px; font-weight: 600; line-height: 1.2; color: #2A2118;
     }
     .wr-slide--empty .wr-media::after { display: none; }
     .wr-empty-btns { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
     .wr-empty-btns--grid {
       display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-      width: min(100%, 320px); margin: 0 auto;
+      width: min(100%, 320px); margin: 0.5em auto 0;
     }
     .wr-empty-btns--grid .wr-pill-btn { width: 100%; justify-self: stretch; }
     .wr-author { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 600; }
@@ -1861,12 +1862,29 @@
     .acc-comment-input::placeholder { color: rgba(42,33,24,.42); }
     .acc-empty { padding: 28px 8px; text-align: center; }
     .acc-empty p { font-family: "Playfair Display", Georgia, serif; font-size: 22px; margin: 0 0 14px; }
-    .acc-vis { display: flex; gap: 14px; flex-wrap: wrap; margin: 8px 0 14px; }
+    .acc-vis { display: flex; flex-direction: column; gap: 0; margin: 8px 0 14px; text-align: left; }
     .acc-vis label { font-size: 14px; font-weight: 600; }
+    .acc-vis .invite-person {
+      width: 100%; margin: 0; box-sizing: border-box;
+      border-bottom: 1px solid rgba(42, 33, 24, 0.14);
+    }
+    .acc-vis .invite-person:last-child { border-bottom: 0; }
+    #acc-done-modal .sand-card { text-align: left; }
+    #acc-done-modal .sand-card h2 { text-align: center; }
     #acc-done-note {
       width: 100%; box-sizing: border-box; min-height: 72px; margin: 0 0 12px; padding: 10px 12px;
       border: 1px solid rgba(42,33,24,.2); background: transparent; color: #2A2118; font: inherit;
     }
+    .acc-file-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 100%; min-height: 50px; margin: 0 0 4px; box-sizing: border-box;
+      border: 1.5px solid #2A2118; border-radius: 999px;
+      background: transparent; color: #2A2118;
+      font: inherit; font-weight: 700; cursor: pointer;
+    }
+    .acc-file-btn.is-picked { background: #2A2118; color: #F6F1E8; }
+    #acc-done-photo { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+    .acc-photo-pick { position: relative; display: block; margin: 0 0 12px; }
     #go-pick .acc-vis { margin: 0 0 12px; }
     body.is-session[data-shell="heute"] .dock .go-row {
       display: grid;
@@ -5029,11 +5047,20 @@
         <h2 class="ask" id="acc-done-title">Erledigt</h2>
         <p>Sichtbarkeit</p>
         <div class="acc-vis" role="group" aria-label="Sichtbarkeit">
-          <label><input type="radio" name="acc-vis" value="privat" /> privat</label>
-          <label><input type="radio" name="acc-vis" value="team" checked /> Team</label>
+          <div class="invite-person" data-acc-vis="privat" role="button" tabindex="0">
+            <span class="invite-person__name">privat</span>
+            <button type="button" class="invite-check" data-acc-vis-check="privat" aria-label="privat" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+          <div class="invite-person is-on" data-acc-vis="team" role="button" tabindex="0">
+            <span class="invite-person__name">Team</span>
+            <button type="button" class="invite-check is-on" data-acc-vis-check="team" aria-label="Team" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
         </div>
         <textarea id="acc-done-note" rows="3" maxlength="500" placeholder="Kurznotiz (optional)"></textarea>
-        <label class="acc-photo-pick">Foto (optional)<input type="file" id="acc-done-photo" accept="image/*" /></label>
+        <label class="acc-photo-pick">
+          <span class="acc-file-btn" id="acc-done-file-label">Datei auswählen</span>
+          <input type="file" id="acc-done-photo" accept="image/*" />
+        </label>
         <button type="button" class="routine-start" id="acc-done-ok">Speichern</button>
         <button type="button" class="sand-quiet" id="acc-done-cancel">Abbrechen</button>
       </div>
@@ -6054,8 +6081,8 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-5"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-8"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-6"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-9"></script>
   <script src="/natalyaalice/support.js?v=support-1"></script>
   <script>
     (function () {
@@ -10246,8 +10273,24 @@
               prefer: "return=minimal",
               body: { status: "erledigt" }
             }).then(function () {
-              if (window.WocheReels) WocheReels.refresh();
+              if (window.WocheReels) WocheReels.hide();
+              setHome(true);
+              paintWelcome();
+              paintHeuteDiaryFeed();
+              refreshFfcHeute(false);
+              markHeuteSeen();
             });
+          },
+          showHeute: function () {
+            if (window.WocheReels) WocheReels.hide();
+            setHome(true);
+            paintWelcome();
+            paintHeuteDiaryFeed();
+            refreshFfcHeute(false);
+            markHeuteSeen();
+            if (window.HeuteAccountability && HeuteAccountability.refresh) {
+              HeuteAccountability.refresh();
+            }
           },
           openCoachWhatsApp: function (prefill) {
             var trainerId = sessionAccount && sessionAccount.trainer_id;
@@ -15386,7 +15429,18 @@
               try { localStorage.setItem(HOME_HEUTE, heuteFilter); } catch (eHF2) {}
               paintHeuteJoins(heuteFlags());
             },
-            toast: function (msg) { window.alert(msg); }
+            toast: function (msg) { window.alert(msg); },
+            showHeute: function () {
+              if (window.WocheReels) WocheReels.hide();
+              setHome(true);
+              paintWelcome();
+              paintHeuteDiaryFeed();
+              refreshFfcHeute(false);
+              markHeuteSeen();
+              if (window.HeuteAccountability && HeuteAccountability.refresh) {
+                HeuteAccountability.refresh();
+              }
+            }
           };
           HeuteAccountability.install(accHost);
           HeuteAccountability.refresh();
