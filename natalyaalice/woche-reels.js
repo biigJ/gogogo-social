@@ -293,6 +293,69 @@
     } catch (eH2) {}
   }
 
+  function travelSnapKey() {
+    return "gogogo_travel_snap_" + me();
+  }
+
+  function loadTravelSnap() {
+    try {
+      var raw = localStorage.getItem(travelSnapKey());
+      if (!raw) return { events: {}, plan: {} };
+      var parsed = JSON.parse(raw);
+      return {
+        events: (parsed && parsed.events) || {},
+        plan: (parsed && parsed.plan) || {}
+      };
+    } catch (e) {
+      return { events: {}, plan: {} };
+    }
+  }
+
+  function saveTravelSnap(snap) {
+    try {
+      localStorage.setItem(travelSnapKey(), JSON.stringify(snap || { events: {}, plan: {} }));
+    } catch (e) {}
+  }
+
+  function clearTravelSnap() {
+    try {
+      localStorage.removeItem(travelSnapKey());
+    } catch (e) {}
+  }
+
+  function rememberEventBeforeTravel(ev) {
+    if (!ev || !ev.id) return;
+    var snap = loadTravelSnap();
+    var id = String(ev.id);
+    if (snap.events[id]) return;
+    snap.events[id] = {
+      category: ev.category,
+      course_id: ev.course_id,
+      enrollment_id: ev.enrollment_id,
+      title: ev.title,
+      starts_at: ev.starts_at,
+      location: ev.location,
+      visibility: ev.visibility || "team",
+      is_unplanned: !!ev.is_unplanned,
+      item_type: ev.item_type || "event",
+      travel_auto: false,
+      note: ev.note || null,
+      status: ev.status || "geplant"
+    };
+    saveTravelSnap(snap);
+  }
+
+  function snapshotPlanForTravel() {
+    if (!host || typeof host.getPlanUnits !== "function") return;
+    try {
+      var units = host.getPlanUnits() || {};
+      var snap = loadTravelSnap();
+      if (snap.plan && Object.keys(snap.plan).length) return;
+      snap.plan = JSON.parse(JSON.stringify(units));
+      saveTravelSnap(snap);
+    } catch (e) {}
+  }
+
   function travelActive() {
     return !!(state.travelUntil && state.travelUntil >= berlinToday());
   }
@@ -918,7 +981,30 @@
     var hasOwn = list.some(function (it) {
       return it.kind === "event" && it.ev && String(it.ev.user_id) === me();
     });
-    if (!hasOwn && host && host.planItemForDay) {
+    var hasOwnTraining = list.some(function (it) {
+      return (
+        it.kind === "event" &&
+        it.ev &&
+        String(it.ev.user_id) === me() &&
+        !isSupportEvent(it.ev) &&
+        !it.ev.travel_auto &&
+        it.ev.item_type !== "hotel_workout" &&
+        !it._fromPlan
+      );
+    });
+    var hasTravelAlt = list.some(function (it) {
+      return (
+        it.kind === "event" &&
+        it.ev &&
+        String(it.ev.user_id) === me() &&
+        (it.ev.travel_auto || it.ev.item_type === "hotel_workout")
+      );
+    });
+    /* Reise: Wochenplan zusätzlich im Reel zeigen, auch wenn schon Alternative da ist */
+    var wantPlan =
+      (!hasOwn && host && host.planItemForDay) ||
+      (travelDayActive(iso) && hasTravelAlt && !hasOwnTraining && host && host.planItemForDay);
+    if (wantPlan) {
       var plan = host.planItemForDay(iso);
       if (plan && plan.title) {
         list.push({
@@ -1444,7 +1530,34 @@
     });
     /* Nur Support/Web-Call/Ernährung → keine Reise-Alternative */
     if (items.length && !training.length) return false;
+    /* Aktuell sichtbarer Slide ist Plus/Support → Dialog nicht darüber legen */
+    var focused = null;
+    try {
+      var ix = Math.max(0, Math.min(items.length - 1, state.eventIndex || 0));
+      focused = items[ix];
+    } catch (eF) {}
+    if (focused && focused.ev && isSupportEvent(focused.ev)) return false;
     return true;
+  }
+
+  function planTitleForTravelDay(iso) {
+    if (host && host.planItemForDay) {
+      var plan = host.planItemForDay(iso);
+      if (plan && plan.title) return String(plan.title);
+    }
+    var items = itemsForDay(iso).filter(function (it) {
+      return (
+        it &&
+        it.kind === "event" &&
+        it.ev &&
+        String(it.ev.user_id) === me() &&
+        !isSupportEvent(it.ev) &&
+        !it.ev.travel_auto &&
+        it.ev.item_type !== "hotel_workout"
+      );
+    });
+    if (items[0] && items[0].ev) return items[0].ev.title || "Wochenplan";
+    return "Wochenplan";
   }
 
   function travelAltHtml(iso) {
@@ -1453,10 +1566,11 @@
     if (alt && alt.ev && isSupportEvent(alt.ev)) {
       alt = null;
     }
+    var planTitle = planTitleForTravelDay(iso);
     var title = alt && alt.ev ? alt.ev.title || "Alternative" : "Alternative wählen";
     var copy = alt
-      ? "Reise-Tag · tippen zum Ändern"
-      : "Für diesen Tag eine Alternative festlegen";
+      ? "Statt " + planTitle + " · tippen zum Ändern"
+      : "Wochenplan: " + planTitle + " · Alternative festlegen";
     return (
       '<button type="button" class="wr-travel-card" data-wr-travel-alt="' +
       esc(iso) +
@@ -2020,6 +2134,8 @@
     }
 
     function syncPlanAfterSave(body) {
+      /* Reise-Alternativen dürfen den Wochenplan nicht überschreiben */
+      if (body && body.travel_auto) return Promise.resolve();
       if (!host || !host.syncPlanDay || !p.iso) return Promise.resolve();
       return Promise.resolve(
         host.syncPlanDay(p.iso, {
@@ -2035,6 +2151,10 @@
         return syncPlanAfterSave(body).then(finish);
       }
       if (replaceId) {
+        var prev = state.events.filter(function (e) {
+          return String(e.id) === String(replaceId);
+        })[0];
+        if (prev && body && body.travel_auto) rememberEventBeforeTravel(prev);
         return rest("events?id=eq." + encodeURIComponent(replaceId), {
           method: "PATCH",
           prefer: "return=minimal",
@@ -2615,6 +2735,7 @@
 
   function applyTravel(days) {
     var until = addDays(berlinToday(), days);
+    snapshotPlanForTravel();
     saveTravelPref(until);
     closeSheet();
     if (host.toast) {
@@ -2624,22 +2745,65 @@
   }
 
   function endTravel() {
-    var autos = state.events.filter(function (ev) {
-      return (
-        ev.travel_auto &&
-        ev.status === "geplant" &&
-        (ev.item_type === "hotel_workout" ||
-          String(ev.title || "").indexOf("Hotel-Workout") === 0)
+    var snap = loadTravelSnap();
+    var restoredIds = {};
+    var jobs = [];
+    Object.keys(snap.events || {}).forEach(function (id) {
+      var original = snap.events[id];
+      if (!original) return;
+      restoredIds[id] = true;
+      var body = {
+        category: original.category,
+        course_id: original.course_id || null,
+        enrollment_id: original.enrollment_id || null,
+        title: original.title,
+        starts_at: original.starts_at,
+        location: original.location || null,
+        visibility: original.visibility || "team",
+        is_unplanned: !!original.is_unplanned,
+        item_type: original.item_type || "event",
+        travel_auto: false,
+        status: original.status || "geplant"
+      };
+      if (original.note != null) body.note = original.note;
+      jobs.push(
+        rest("events?id=eq." + encodeURIComponent(id), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: body
+        }).catch(function () {
+          var bare = Object.assign({}, body);
+          delete bare.item_type;
+          delete bare.travel_auto;
+          return rest("events?id=eq." + encodeURIComponent(id), {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: bare
+          }).catch(function () {});
+        })
       );
     });
-    var jobs = autos.map(function (ev) {
-      return rest("events?id=eq." + encodeURIComponent(ev.id), {
-        method: "DELETE",
-        prefer: "return=minimal"
-      }).catch(function () {});
+    /* Neue Reise-Events (ohne Snapshot) entfernen */
+    state.events.forEach(function (ev) {
+      if (!ev || !ev.id || restoredIds[String(ev.id)]) return;
+      var isTravel =
+        ev.travel_auto ||
+        ev.item_type === "hotel_workout" ||
+        String(ev.title || "").indexOf("Hotel-Workout") === 0;
+      if (!isTravel || ev.status !== "geplant") return;
+      jobs.push(
+        rest("events?id=eq." + encodeURIComponent(ev.id), {
+          method: "DELETE",
+          prefer: "return=minimal"
+        }).catch(function () {})
+      );
     });
+    if (snap.plan && Object.keys(snap.plan).length && host && host.restorePlanUnits) {
+      jobs.push(Promise.resolve(host.restorePlanUnits(snap.plan)).catch(function () {}));
+    }
     saveTravelPref(null);
-    if (host.toast) host.toast("Reise beendet");
+    clearTravelSnap();
+    if (host.toast) host.toast("Reise beendet — Wochenplan wiederhergestellt");
     return Promise.all(jobs).then(function () {
       return refreshKeepDay(berlinToday());
     });
@@ -2677,7 +2841,7 @@
       return String(e.id) === String(eventId);
     })[0];
     if (!ev) return;
-    var iso = dayKey(ev.starts_at);
+    rememberEventBeforeTravel(ev);
     return rest("events?id=eq." + encodeURIComponent(eventId), {
       method: "PATCH",
       prefer: "return=minimal",
@@ -3445,6 +3609,7 @@
               dots.forEach(function (d, i) {
                 d.classList.toggle("is-on", i === next);
               });
+              patchTravelAlt();
               if (state.editMode) patchEditPanelEvRow();
             }
           }
