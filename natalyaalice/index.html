@@ -1721,6 +1721,19 @@
       display: inline-flex; align-items: center; gap: 4px; margin-left: 4px;
     }
     .wr-invite-faces .wr-avatar { margin: 0; }
+    .wr-invite-slot {
+      position: relative; flex: none; width: 28px; height: 28px;
+      border-radius: 50%; overflow: hidden; display: inline-grid; place-items: center;
+    }
+    .wr-invite-slot.is-pending .wr-avatar {
+      filter: grayscale(0.55); opacity: 0.82;
+    }
+    .wr-invite-wait {
+      position: absolute; inset: 0; display: grid; place-items: center;
+      border-radius: 50%; background: rgba(170, 160, 148, 0.32); color: #fff;
+      pointer-events: none;
+    }
+    .wr-invite-wait svg { width: 14px; height: 14px; display: block; }
     .wr-author { gap: 6px; }
     .wr-travel-card {
       position: absolute; top: calc(var(--wr-top-h) + 44px); left: 12px; right: 12px; z-index: 7;
@@ -1944,11 +1957,29 @@
       margin: 0 0 8px; min-height: 0;
     }
     .acc-card__faces {
-      display: flex; align-items: center; gap: 8px; margin: 0 0 8px;
+      display: flex; align-items: center; gap: 8px; margin: 0 0 8px; flex-wrap: wrap;
     }
+    .acc-face-slot {
+      position: relative; flex: none; width: 32px; height: 32px;
+      border-radius: 50%; overflow: hidden; display: inline-grid; place-items: center;
+    }
+    .acc-face-slot .acc-face {
+      width: 32px; height: 32px; border-radius: 50%; object-fit: cover;
+      display: grid; place-items: center;
+    }
+    .acc-face-slot.is-pending .acc-face {
+      filter: grayscale(0.55); opacity: 0.82;
+    }
+    .acc-face-wait {
+      position: absolute; inset: 0; display: grid; place-items: center;
+      border-radius: 50%; background: rgba(170, 160, 148, 0.32); color: #2A2118;
+      pointer-events: none;
+    }
+    .acc-face-wait svg { width: 16px; height: 16px; display: block; }
     .acc-face--add {
       border: 1.5px solid rgba(42,33,24,.35); background: transparent; color: #2A2118;
       font-size: 18px; font-weight: 500; line-height: 1; cursor: pointer; padding: 0;
+      width: 32px; height: 32px; border-radius: 50%; display: inline-grid; place-items: center;
     }
     .acc-card__teaser {
       display: flex; align-items: center; gap: 10px; width: 100%;
@@ -3890,7 +3921,8 @@
     }
     body.is-session :is(h1, h2, .welcome-title, .welcome-title *, .diary h1, .profile-name, .plan-tabs__info,
       .today-card__title, .day-card__main, .go-card__title, .go-section__head, .support-h, .sand-card h2, .modal-card h2,
-      .team-slide__title, .team-slide__head, .go-slide__head, .go-slide__title, .rail-nav__title:not(#week-rail-title),
+      .team-slide__title, .team-slide__head, .team-slide__coach-name-text, .team-slide__group-name,
+      .go-slide__head, .go-slide__title, .rail-nav__title:not(#week-rail-title),
       .zirkel-head, .orient-lock, .diary-share-name, .crew-story .team-avatar, .profile-ph, .heute-start span,
       .ffc .summary .num, .ffc .fp-num, .ffc .kn-big, .ffc .home-ev-title, .ffc .page-head-title, .ffc .fp-name,
       .ffc .quit-title, .ffc .avatar-xl, .ffc .brand, .ffc .history-title):not(main *, #run *) {
@@ -4241,7 +4273,11 @@
       min-width: 0;
     }
     .team-slide__coach-name-text,
-    .team-slide__group-name {
+    .team-slide__group-name,
+    body.is-session[data-shell="team"] .team-slide__coach-name-text,
+    body.is-session[data-shell="team"] .team-slide__group-name,
+    body.is-session[data-shell="team"] #plan-team .team-slide__coach-name-text,
+    body.is-session[data-shell="team"] #plan-team .team-slide__group-name {
       margin: 0;
       font-family: "Playfair Display", Georgia, serif !important;
       font-size: var(--t-l, 24px) !important;
@@ -4249,6 +4285,49 @@
       line-height: 1.2 !important;
       color: #2A2118 !important;
       min-width: 0;
+      display: block;
+    }
+    .team-slide__members {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin: 12px 0 0;
+    }
+    .team-slide__member {
+      flex: none;
+      width: 56px;
+      height: 56px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      border-radius: 50%;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .team-slide__member .team-avatar {
+      width: 56px;
+      height: 56px;
+    }
+    .team-slide__group-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .team-slide__group-remove {
+      border: 0;
+      background: none;
+      color: rgba(42,33,24,.55);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+      padding: 0;
     }
     .team-slide__coach-name .team-slide__head-action {
       flex: none;
@@ -6288,8 +6367,8 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-12"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-15"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-13"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-16"></script>
   <script src="/natalyaalice/support.js?v=support-4"></script>
   <script>
     (function () {
@@ -10497,6 +10576,9 @@
               try {
                 paintHeuteJoins(heuteFlags());
               } catch (eHJ) {}
+              if (window.HeuteAccountability && HeuteAccountability.refresh) {
+                return HeuteAccountability.refresh();
+              }
             });
           },
           openDoneModal: function (eventId) {
@@ -11394,6 +11476,31 @@
           });
       }
 
+      function deleteMyGroup(group) {
+        if (!sessionAccount || !group || !group.id) return Promise.resolve();
+        var gid = String(group.id);
+        return rest("group_members?group_id=eq." + encodeURIComponent(gid), {
+          method: "DELETE",
+          prefer: "return=minimal"
+        })
+          .catch(function () {})
+          .then(function () {
+            return rest("groups?id=eq." + encodeURIComponent(gid), {
+              method: "DELETE",
+              prefer: "return=minimal"
+            }).catch(function () {});
+          })
+          .then(function () {
+            return loadMyGroups();
+          })
+          .then(function () {
+            syncHeuteFilterOptions();
+            if (document.body.dataset.plan === "team" || document.body.dataset.shell === "team") {
+              renderTeam();
+            }
+          });
+      }
+
       function saveMyGroups(groups) {
         if (!sessionAccount || !sessionAccount.id) return Promise.resolve();
         var me = String(sessionAccount.id);
@@ -11823,13 +11930,26 @@
           nameEl.className = "team-slide__group-name";
           nameEl.textContent = (group && group.name) || "Gruppe";
           slide.appendChild(nameEl);
+          var actions = document.createElement("div");
+          actions.className = "team-slide__group-actions";
           var addFriend = document.createElement("button");
           addFriend.type = "button";
           addFriend.className = "team-slide__add-friend";
           addFriend.setAttribute("aria-label", "Freunde einladen");
           addFriend.innerHTML = '<span class="team-slide__add-friend-circle" aria-hidden="true">+</span>';
           addFriend.addEventListener("click", function () { openTeamSearch("friend"); });
-          slide.appendChild(addFriend);
+          actions.appendChild(addFriend);
+          var removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "team-slide__group-remove";
+          removeBtn.textContent = "Gruppe entfernen";
+          removeBtn.addEventListener("click", function () {
+            var label = (group && group.name) || "Gruppe";
+            if (!window.confirm('Gruppe „' + label + '“ wirklich entfernen?')) return;
+            deleteMyGroup(group);
+          });
+          actions.appendChild(removeBtn);
+          slide.appendChild(actions);
           var desc = document.createElement("p");
           desc.className = "team-slide__about";
           desc.textContent = String((group && group.description) || "").trim();
@@ -11842,7 +11962,18 @@
             empty.textContent = "Noch keine Freunde in dieser Gruppe.";
             slide.appendChild(empty);
           } else {
-            people.forEach(function (person) { personRow(person, null, slide); });
+            var membersRow = document.createElement("div");
+            membersRow.className = "team-slide__members";
+            people.forEach(function (person) {
+              var btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = "team-slide__member";
+              btn.setAttribute("aria-label", person.name || "Mitglied");
+              btn.appendChild(personFace(person));
+              btn.addEventListener("click", function () { openProfile(person); });
+              membersRow.appendChild(btn);
+            });
+            slide.appendChild(membersRow);
           }
           box.appendChild(slide);
         }
@@ -13373,6 +13504,12 @@
           paintWelcome();
           refreshDiaryNote();
           paintPill();
+          if (window.HeuteAccountability && HeuteAccountability.refresh) {
+            HeuteAccountability.refresh();
+          }
+          if (window.WocheReels && WocheReels.refreshKeepDay) {
+            try { WocheReels.refreshKeepDay(); } catch (eWR) {}
+          }
         });
       }
 
@@ -13806,11 +13943,20 @@
             paintHeuteDiaryFeed();
             refreshFfcHeute(false);
             if (tab === "heute") markHeuteSeen();
-            if (window.HeuteAccountability) {
-              if (HeuteAccountability.refresh) HeuteAccountability.refresh();
-              else if (HeuteAccountability.scrollCurrentToCenter) {
+            function centerAktuell() {
+              if (
+                window.HeuteAccountability &&
+                HeuteAccountability.scrollCurrentToCenter
+              ) {
                 HeuteAccountability.scrollCurrentToCenter({ soft: true });
               }
+            }
+            if (window.HeuteAccountability && HeuteAccountability.refresh) {
+              Promise.resolve(HeuteAccountability.refresh())
+                .then(centerAktuell)
+                .catch(centerAktuell);
+            } else {
+              centerAktuell();
             }
           }
         }
@@ -15674,6 +15820,7 @@
                 : Promise.resolve();
             },
             openInviteForPost: openInviteForPost,
+            inviteFacesForIso: inviteFacesForIso,
             groupMemberIds: groupMemberIds,
             syncHeuteFilterOptions: syncHeuteFilterOptions,
             maybeAskHistoryShare: maybeAskHistoryShare,

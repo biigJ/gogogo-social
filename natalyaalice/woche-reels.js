@@ -1000,20 +1000,33 @@
     );
   }
 
+  var WR_HOURGLASS =
+    '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h11M6.5 20.5h11M8 3.5v2.2c0 2.2 1.6 3.5 4 5.3 2.4-1.8 4-3.1 4-5.3V3.5M8 20.5v-2.2c0-2.2 1.6-3.5 4-5.3 2.4 1.8 4 3.1 4 5.3v2.2"/></svg>';
+
   function inviteAvatarsHtml(iso) {
     var list = (state.invites || []).filter(function (inv) {
-      return (
-        inv &&
-        String(inv.workout_date) === String(iso) &&
-        String(inv.status || "pending") === "pending"
-      );
+      if (!inv || String(inv.workout_date) !== String(iso)) return false;
+      var st = String(inv.status || "pending");
+      return st === "pending" || st === "accepted";
     });
     if (!list.length) return "";
     return (
-      '<div class="wr-invite-faces" aria-label="Angefragt">' +
+      '<div class="wr-invite-faces" aria-label="Eingeladen">' +
       list
         .map(function (inv) {
-          return avatarHtml(personOf(inv.to_id));
+          var pending = String(inv.status || "pending") === "pending";
+          return (
+            '<span class="wr-invite-slot' +
+            (pending ? " is-pending" : "") +
+            '">' +
+            avatarHtml(personOf(inv.to_id)) +
+            (pending
+              ? '<span class="wr-invite-wait" aria-hidden="true">' +
+                WR_HOURGLASS +
+                "</span>"
+              : "") +
+            "</span>"
+          );
         })
         .join("") +
       "</div>"
@@ -1033,7 +1046,9 @@
     )
       .then(function (rows) {
         state.invites = (rows || []).filter(function (r) {
-          return r && String(r.status || "pending") === "pending";
+          if (!r) return false;
+          var st = String(r.status || "pending");
+          return st === "pending" || st === "accepted";
         });
         return ensurePeople(
           state.invites.map(function (r) {

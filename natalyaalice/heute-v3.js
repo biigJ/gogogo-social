@@ -606,8 +606,72 @@
     return day >= todayIso();
   }
 
-  function inviteFaceRowHtml(postId, inviteIso, canInvite) {
+  var FACE_HOURGLASS =
+    '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h11M6.5 20.5h11M8 3.5v2.2c0 2.2 1.6 3.5 4 5.3 2.4-1.8 4-3.1 4-5.3V3.5M8 20.5v-2.2c0-2.2 1.6-3.5 4-5.3 2.4 1.8 4 3.1 4 5.3v2.2"/></svg>';
+
+  function faceSlotHtml(person, pending) {
+    var label = (person && person.name) || "?";
+    var cls = "acc-face-slot" + (pending ? " is-pending" : "");
+    return (
+      '<span class="' +
+      cls +
+      '" title="' +
+      esc(pending ? label + " · wartet" : label) +
+      '">' +
+      avatarHtml(person, "acc-face") +
+      (pending
+        ? '<span class="acc-face-wait" aria-hidden="true">' + FACE_HOURGLASS + "</span>"
+        : "") +
+      "</span>"
+    );
+  }
+
+  /* Eingeladene Freunde (pending=Sanduhr) + zugesagte RSVPs (voll) */
+  function guestFacesFor(iso, eventId) {
+    var seen = {};
+    var out = [];
+    var uid = me();
+    function pushFace(id, name, photo, status) {
+      id = String(id || "");
+      if (!id || id === uid || seen[id]) return;
+      seen[id] = true;
+      out.push({
+        id: id,
+        name: name || "?",
+        photo: photo || "",
+        status: status || "pending"
+      });
+    }
+    if (host && typeof host.inviteFacesForIso === "function") {
+      (host.inviteFacesForIso(iso) || []).forEach(function (f) {
+        if (!f) return;
+        pushFace(
+          f.id,
+          f.name || f.nickname,
+          f.photo || f.photo_url || "",
+          f.status || "pending"
+        );
+      });
+    }
+    if (eventId && state.rsvps[String(eventId)]) {
+      state.rsvps[String(eventId)].forEach(function (rid) {
+        var p = personOf(rid);
+        pushFace(rid, p.name, p.photo, "accepted");
+      });
+    }
+    return out;
+  }
+
+  function inviteFaceRowHtml(postId, inviteIso, canInvite, eventId) {
     var mePerson = personOf(me());
+    var guests = guestFacesFor(inviteIso, eventId || postId)
+      .map(function (g) {
+        return faceSlotHtml(
+          { name: g.name, photo: g.photo },
+          String(g.status || "") === "pending"
+        );
+      })
+      .join("");
     var add =
       canInvite !== false && canInviteOnDay(inviteIso)
         ? '<button type="button" class="acc-face acc-face--add" data-invite-post="' +
@@ -618,7 +682,8 @@
         : "";
     return (
       '<div class="acc-card__faces">' +
-      avatarHtml(mePerson, "acc-face") +
+      faceSlotHtml(mePerson, false) +
+      guests +
       add +
       "</div>"
     );
@@ -673,7 +738,12 @@
     return (
       '<div class="acc-card__bar">' +
       (opts.actions || "") +
-      inviteFaceRowHtml(postId, opts.inviteIso || "", canInvite) +
+      inviteFaceRowHtml(
+        postId,
+        opts.inviteIso || "",
+        canInvite,
+        opts.eventId || postId
+      ) +
       teaserBlock +
       "</div>"
     );
@@ -858,6 +928,7 @@
     if (opts.postId) {
       bar = postBarHtml({
         postId: opts.postId,
+        eventId: opts.eventId || opts.postId,
         inviteIso: opts.inviteIso || "",
         canInvite: opts.canInvite !== false,
         actions: opts.actions || ""
@@ -937,6 +1008,7 @@
       place: ev.location || "",
       desc: descHtml(ev.note),
       postId: String(ev.id),
+      eventId: String(ev.id),
       inviteIso: day,
       canInvite: canInviteOnDay(day)
     });
@@ -1287,11 +1359,11 @@
     var feed = buildFeedItems(flags);
     root.hidden = false;
     var html = "";
-    /* Oben = Zukunft (Scroll nach oben), Mitte = Heute, Unten = Vergangenheit */
+    /* Oben = Zukunft: weiter weg oben, nah an heute unten (umgekehrt zur Zeit) */
     html += '<div class="acc-feed-future" data-acc-zone="future">';
-    feed.upcoming.forEach(function (item) {
-      html += renderFeedItem(item);
-    });
+    for (var ui = feed.upcoming.length - 1; ui >= 0; ui--) {
+      html += renderFeedItem(feed.upcoming[ui]);
+    }
     html += "</div>";
     html += '<div class="acc-feed-today" data-acc-zone="today" id="acc-feed-today">';
     /* Spontan über dem aktuellen Event */
@@ -1615,8 +1687,12 @@
     if (!inviteIso && card.getAttribute("data-plan-iso")) {
       inviteIso = card.getAttribute("data-plan-iso") || "";
     }
+    var eventId =
+      (card.getAttribute("data-event-id") || "").trim() ||
+      (/^[0-9a-f-]{36}$/i.test(String(postId)) ? postId : "");
     var html = postBarHtml({
       postId: postId,
+      eventId: eventId,
       inviteIso: inviteIso,
       canInvite: canInviteOnDay(inviteIso),
       actions: actions
