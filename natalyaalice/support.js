@@ -313,18 +313,18 @@
   }
 
   var TYPE_ORDER = [
-    "routine",
     "zirkel",
-    "ernaehrung",
+    "stempelkarte",
     "web_call",
-    "coach_offer",
-    "stempelkarte"
+    "routine",
+    "ernaehrung",
+    "coach_offer"
   ];
   var TYPE_LABELS = {
     routine: "12-Wochen-Routine",
     zirkel: "Friday Fitness Circle",
     ernaehrung: "Ernährungscoaching",
-    web_call: "Trainingsplan individualisieren",
+    web_call: "Initialgespräch",
     coach_offer: "Selbst Coaching anbieten",
     stempelkarte: "Stempelkarte",
     personal_training: "Personal Training",
@@ -333,20 +333,36 @@
   /* Einheitlicher Katalog — Headlines bleiben auch ohne DB-Produkte sichtbar */
   var STATIC_OFFERS = [
     {
+      key: "zirkel",
+      type: "zirkel",
+      title: "Friday Fitness Circle",
+      price: "gratis",
+      description:
+        "Werde Teil der Gruppe für ein Zirkeltraining. Du kannst vor Ort trainieren oder die Aufzeichnung hier für Dein eigenes Training nutzen. Du trackst über Eingabe und am Ende landen Deine Daten in einer Datenbank damit Du Deine Trainings von Woche zu Woche vergleichen kannst. Login über E-Mail-Adresse und einem Passwort."
+    },
+    {
+      key: "stempelkarte",
+      type: "stempelkarte",
+      title: "Stempelkarte",
+      price: "25 € Spende",
+      description:
+        "12er-Stempelkarte. Event erstellen, Freund macht mit und scannt — beide erhalten einen Stempel. Volle Karte: T-Shirt oder Selfiestick."
+    },
+    {
+      key: "web_call",
+      type: "web_call",
+      title: "Initialgespräch",
+      price: "Web-Call",
+      description:
+        "Initialtreffen mit Gründer oder zertifiziertem Coach: Alltag analysieren, Plan schärfen. Optional ACT-basiertes Coaching zum Aufbau im Alltag."
+    },
+    {
       key: "routine",
       type: "routine",
       title: "12-Wochen-Routine",
       price: "x € Einzahlung",
       description:
         "Zahle einen Betrag ein, logge Deine Events über 12 Wochen und erhalte 90 % zurück. Regel und Berechnung sind im System hinterlegt — Freischaltung nach Zahlung."
-    },
-    {
-      key: "zirkel",
-      type: "zirkel",
-      title: "Friday Fitness Circle",
-      price: "gratis",
-      description:
-        "Zirkeltraining tracken und im Leaderboard festhalten — IRL oder online. Login mit Deiner FFC-E-Mail und Passwort."
     },
     {
       key: "ernaehrung",
@@ -357,28 +373,12 @@
         "Tägliches Event über 4 Wochen: KI nimmt Dein Protokoll auf und rechnet am Tagesende zusammen. Coach-Feedback und Ernährungsplan auf Wunsch."
     },
     {
-      key: "web_call",
-      type: "web_call",
-      title: "Trainingsplan individualisieren",
-      price: "Web-Call",
-      description:
-        "Initialtreffen mit Gründer oder zertifiziertem Coach: Alltag analysieren, Plan schärfen. Optional ACT-basiertes Coaching zum Aufbau im Alltag."
-    },
-    {
       key: "coach_offer",
       type: "coach_offer",
       title: "Selbst Coaching anbieten",
       price: "Zugang",
       description:
         "Zugang zum Admin-Bereich. Freunde finden Dich in der Coach-Liste. Inklusive Playbook: was gogogo fördert und warum die Trainingspläne so aufgebaut sind."
-    },
-    {
-      key: "stempelkarte",
-      type: "stempelkarte",
-      title: "Stempelkarte",
-      price: "25 € Spende",
-      description:
-        "12er-Stempelkarte. Event erstellen, Freund macht mit und scannt — beide erhalten einen Stempel. Volle Karte: T-Shirt oder Selfiestick."
     }
   ];
   var PAY_HINT =
