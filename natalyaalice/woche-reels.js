@@ -1133,6 +1133,16 @@
     '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h11M6.5 20.5h11M8 3.5v2.2c0 2.2 1.6 3.5 4 5.3 2.4-1.8 4-3.1 4-5.3V3.5M8 20.5v-2.2c0-2.2 1.6-3.5 4-5.3 2.4 1.8 4 3.1 4 5.3v2.2"/></svg>';
 
   function inviteAvatarsHtml(iso) {
+    /* Keine Einladungs-Gesichter, wenn eigenes Event an dem Tag schon erledigt */
+    var doneOwn = (state.events || []).some(function (ev) {
+      return (
+        ev &&
+        String(ev.user_id) === me() &&
+        dayKey(ev.starts_at) === String(iso) &&
+        ev.status === "erledigt"
+      );
+    });
+    if (doneOwn) return "";
     var list = (state.invites || []).filter(function (inv) {
       if (!inv || String(inv.workout_date) !== String(iso)) return false;
       var st = String(inv.status || "pending");
@@ -3382,6 +3392,7 @@
     show: show,
     hide: hide,
     refresh: refresh,
+    loadInvites: loadInvites,
     armTravel: armTravel,
     armEdit: armEdit,
     dayIndex: function () {

@@ -816,6 +816,26 @@
     var seen = {};
     var out = [];
     var uid = me();
+    /* Nach Erledigt: keine Invite-/RSVP-Gesichter mehr */
+    if (eventId) {
+      var doneEv = (state.events || []).filter(function (e) {
+        return String(e.id) === String(eventId);
+      })[0];
+      if (doneEv && doneEv.status === "erledigt") return out;
+    }
+    if (
+      iso &&
+      (state.events || []).some(function (e) {
+        return (
+          e &&
+          String(e.user_id) === uid &&
+          dayKey(e.starts_at) === String(iso) &&
+          e.status === "erledigt"
+        );
+      })
+    ) {
+      return out;
+    }
     function pushFace(id, name, photo, status) {
       id = String(id || "");
       if (!id || id === uid || seen[id]) return;
@@ -1822,6 +1842,60 @@
       });
   }
 
+  function clearInvitesForDoneEvent(eventId) {
+    var uid = me();
+    var ev = (state.events || []).filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    var day = ev && ev.starts_at ? dayKey(ev.starts_at) : "";
+    var tasks = [];
+    /* RSVPs zum Event entfernen */
+    if (eventId) {
+      tasks.push(
+        rest("event_rsvps?event_id=eq." + encodeURIComponent(eventId), {
+          method: "DELETE",
+          prefer: "return=minimal"
+        }).catch(function () {})
+      );
+      delete state.rsvps[String(eventId)];
+    }
+    /* Buddy-Invites für denselben Tag (ausgehend + eingehend) canceln */
+    if (day && uid) {
+      tasks.push(
+        rest(
+          "go_workout_invites?from_id=eq." +
+            encodeURIComponent(uid) +
+            "&workout_date=eq." +
+            encodeURIComponent(day) +
+            "&status=in.(pending,accepted)",
+          {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: { status: "cancelled" }
+          }
+        ).catch(function () {})
+      );
+      tasks.push(
+        rest(
+          "go_workout_invites?to_id=eq." +
+            encodeURIComponent(uid) +
+            "&workout_date=eq." +
+            encodeURIComponent(day) +
+            "&status=in.(pending,accepted)",
+          {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: { status: "cancelled" }
+          }
+        ).catch(function () {})
+      );
+    }
+    if (host && typeof host.clearInvitesForDay === "function") {
+      tasks.push(Promise.resolve(host.clearInvitesForDay(day, eventId)));
+    }
+    return Promise.all(tasks);
+  }
+
   function submitDone() {
     var modal = $("acc-done-modal");
     if (!modal) return;
@@ -1853,7 +1927,7 @@
           });
         });
         var meta = (updated && updated._mediaMeta) || {};
-        var tasks = [logActivity("checkin", eventId)];
+        var tasks = [logActivity("checkin", eventId), clearInvitesForDoneEvent(eventId)];
         if (Object.keys(meta).length) {
           tasks.push(
             saveEventMediaFallback(eventId, meta.note || note || "", meta.photo_url || photo || "")

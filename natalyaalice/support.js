@@ -536,6 +536,14 @@
   function render() {
     var root = document.getElementById("support-root");
     if (!root) return;
+    /* Katalog lebt in den Plus-Slides — Root nur noch für „Gebucht“-Hinweis optional */
+    if (host && host.slidesOnly) {
+      root.innerHTML = "";
+      root.hidden = true;
+      if (host.onOffersReady) host.onOffersReady(STATIC_OFFERS.slice());
+      return;
+    }
+    root.hidden = false;
     root.innerHTML =
       '<section class="support-section">' +
       '<h2 class="support-h">Gebucht</h2>' +
@@ -544,6 +552,48 @@
       esc(PAY_HINT) +
       "</p></section>" +
       catalogByType();
+  }
+
+  function getOffers() {
+    return STATIC_OFFERS.slice();
+  }
+
+  function bookOffer(key) {
+    key = String(key || "");
+    if (key === "routine") {
+      return bookStaticOffer("routine").then(function () {
+        return bookRoutine();
+      });
+    }
+    if (key === "zirkel") {
+      return bookStaticOffer("zirkel").then(function () {
+        if (host.openZirkel) host.openZirkel();
+      });
+    }
+    if (
+      key === "ernaehrung" ||
+      key === "web_call" ||
+      key === "stempelkarte" ||
+      key === "coach_offer" ||
+      key === "nutrition"
+    ) {
+      var type = key === "nutrition" ? "ernaehrung" : key;
+      return bookStaticOffer(type).then(function (order) {
+        if (type === "web_call" && host.openCalendlyPt) host.openCalendlyPt();
+        if (host.paintProfil) host.paintProfil();
+        if (host.toast) {
+          host.toast(
+            type === "coach_offer"
+              ? "Angefragt — Freischaltung nach Freigabe."
+              : type === "zirkel"
+                ? "FFC bereit."
+                : "Gebucht — Zahlung per PayPal, danach Freischaltung."
+          );
+        }
+        return order;
+      });
+    }
+    return Promise.resolve();
   }
 
   function onClick(e) {
@@ -769,10 +819,13 @@
     refresh: refresh,
     render: render,
     bookProduct: bookProduct,
+    bookOffer: bookOffer,
+    getOffers: getOffers,
     heuteSupportItems: heuteSupportItems,
     saveNutritionLog: saveNutritionLog,
     activeOrderFor: activeOrderFor,
     openStampCard: openStampCard,
-    cancelAllOrdersForUser: cancelAllOrdersForUser
+    cancelAllOrdersForUser: cancelAllOrdersForUser,
+    offerOwned: offerOwned
   };
 })(window);

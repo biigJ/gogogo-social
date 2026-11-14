@@ -49,7 +49,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-clean-17" />
+  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-clean-18" />
   <style>
     :root {
       --bg: #C7413B;
@@ -2102,7 +2102,14 @@
     body.is-session[data-shell="team"] #team-rail-nav { order: 1; }
     body.is-session[data-shell="team"] #plan-team { order: 2; }
     body.is-session[data-shell="kurse"] #go-rail-nav { display: none !important; }
-    body.is-session[data-shell="kurse"] #support-root { order: 1; }
+    body.is-session[data-shell="kurse"] #support-root { display: none !important; }
+    body.is-session[data-shell="kurse"] #go-rail { order: 0; }
+    .go-slide__cta.is-owned,
+    .go-slide__cta.is-owned:disabled {
+      background: #D8D0C4 !important;
+      color: #6B6358 !important;
+      cursor: default;
+    }
     body.is-session[data-shell="kurse"] #plan-training { order: 2; }
     body.is-session[data-shell="profil"] #plan-profil,
     body.is-session[data-shell="profil"] #plan-settings,
@@ -6417,9 +6424,9 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-23"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-21"></script>
-  <script src="/natalyaalice/support.js?v=support-5"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-24"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-22"></script>
+  <script src="/natalyaalice/support.js?v=support-6"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -10696,12 +10703,15 @@
             }
           },
           afterDone: function () {
-            /* Nach Erledigt immer auf Aktuell bleiben (Dialog war dort) */
+            /* Nach Erledigt: Invites schon in submitDone bereinigt — Feed neu laden */
             goToAktuellShell();
-            if (window.HeuteAccountability && HeuteAccountability.refresh) {
-              return HeuteAccountability.refresh();
-            }
+            return loadInvites().then(function () {
+              if (window.HeuteAccountability && HeuteAccountability.refresh) {
+                return HeuteAccountability.refresh();
+              }
+            });
           },
+          clearInvitesForDay: clearInvitesForDay,
           /* Woche-Edit → go_coach_plans, damit Plan-Ghosts nicht zurückkehren */
           syncPlanDay: function (iso, unit) {
             if (!iso || !unit || !sessionAccount) return Promise.resolve();
@@ -10815,6 +10825,10 @@
           rest: rest,
           get sessionAccount() { return sessionAccount; },
           todayIso: function () { return Log.berlinToday(); },
+          slidesOnly: true,
+          onOffersReady: function () {
+            paintGoRail();
+          },
           openCalendlyPt: typeof openCalendlyPt === "function" ? openCalendlyPt : null,
           startRoutine: function () {
             var btn = document.getElementById("routine-start");
@@ -10822,11 +10836,26 @@
             else openGoSub("routine", "12-Wochen-Routine");
           },
           openZirkel: function () {
-            openGoSub("zirkel", "Friday Fitness Circle");
+            /* Erst Login sichtbar, dann Tracking — Subpage nicht über Login legen */
             if (typeof requireFfc === "function") {
-              requireFfc(function () {
-                refreshZirkel();
-              }, { title: "FFC Login", tagline: "Mit Deiner FFC-E-Mail und Passwort anmelden." });
+              requireFfc(
+                function () {
+                  closeGoSub();
+                  openGoSub("zirkel", "Friday Fitness Circle");
+                  refreshZirkel();
+                  if (window.FFC && FFC.openSetup) {
+                    try {
+                      FFC.openSetup();
+                    } catch (eS) {}
+                  }
+                },
+                {
+                  title: "FFC Login",
+                  tagline: "Mit Deiner Friday-Fitness-Circle E-Mail und Passwort anmelden (nicht der gogogo-Code)."
+                }
+              );
+            } else {
+              openGoSub("zirkel", "Friday Fitness Circle");
             }
           },
           requireFfc: function (fn, opts) {
@@ -10844,6 +10873,7 @@
             if (typeof renderProfil === "function") renderProfil();
           },
           onSupportChanged: function () {
+            paintGoRail();
             if (window.HeuteAccountability) HeuteAccountability.refresh();
             if (typeof renderProfil === "function") renderProfil();
           },
@@ -11387,6 +11417,41 @@
         var me = String(sessionAccount.id);
         return remoteInvites.filter(function (row) {
           return row && String(row.from_id) === me && (row.status === "pending" || row.status === "accepted") && String(row.workout_date || "").slice(0, 10) === iso;
+        });
+      }
+
+      /* Nach Erledigt: Invites lokal + Store + UI bereinigen */
+      function clearInvitesForDay(iso) {
+        iso = String(iso || "").slice(0, 10);
+        if (!iso) return Promise.resolve();
+        remoteInvites = (remoteInvites || []).map(function (row) {
+          if (!row) return row;
+          if (String(row.workout_date || "").slice(0, 10) !== iso) return row;
+          var st = String(row.status || "");
+          if (st === "pending" || st === "accepted") {
+            return Object.assign({}, row, { status: "cancelled" });
+          }
+          return row;
+        });
+        try {
+          var map = inviteStore();
+          if (map && map[iso]) delete map[iso];
+          writeStore(storePrefix + "day_invites", map);
+        } catch (eInv) {}
+        try {
+          paintHeuteJoins(heuteFlags());
+        } catch (eHJ) {}
+        if (window.WocheReels && WocheReels.loadInvites) {
+          try {
+            WocheReels.loadInvites();
+          } catch (eWR) {}
+        }
+        return loadInvites().then(function () {
+          if (window.WocheReels && WocheReels.refreshKeepDay) {
+            try {
+              return WocheReels.refreshKeepDay(iso);
+            } catch (eR) {}
+          }
         });
       }
 
@@ -12636,71 +12701,107 @@
       function paintGoRail() {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
+        rail.hidden = false;
         rail.textContent = "";
-        var slides = [
-          {
-            id: "routine",
-            title: "12-Wochen-Routine",
-            copy: "Poste 12 Wochen lang jeden Tag ein Event. Egal ob Du krank bist oder einen Marathon gelaufen bist. Egal, es geht um das Engagement und dass Freunde sehen, dass Du commitet bist. Und Du wirst eine Gewohnheit entwickeln. Nutz es, um so viele Events als Training oder andere Bewegung zu gestalten. Klick unten, um zu starten. Vorher noch die Trainings in der Woche setzen und dann geht es los. Wer die Wochen voll bekommt, erhält ein Personal Training for free!",
-            cta: "Routine starten",
-            kind: "kraft",
-            image: "/assets/gogogo/gogogo-12wochen-routine.jpg"
-          },
-          {
-            id: "zirkel",
-            title: "Zirkeltraining",
-            copy: "Registriere Dich einmal und trainiere im gemeinsamen Rhythmus mit Freunden, Leaderboard und Stories.",
-            cta: "Zu den Einstellungen",
-            kind: "zirkel",
-            image: "/assets/gogogo/gogogo-Zirkeltraining.jpg"
-          },
-          {
-            id: "nutrition",
-            title: "Ernährung",
-            copy: "Einfache Prinzipien für Alltag und Training: Protein, Rhythmus, ohne Überoptimierung.",
-            cta: "Mehr erfahren",
-            kind: "alternative",
-            image: "/assets/gogogo/gogogo-Ernaehrung.jpg"
-          },
-          {
-            id: "webcall",
-            title: "Web-Call Trainingsplan",
-            copy: "Persönliches Meeting mit dem Gründer oder einem zertifizierten Trainer über Deinen Wochenplan.",
-            cta: "Call buchen",
-            kind: "intensiv",
-            image: "/assets/gogogo/gogogo-Web-Call.jpg"
-          }
-        ];
-        slides.forEach(function (slide) {
+        var supportRoot = document.getElementById("support-root");
+        if (supportRoot) supportRoot.hidden = true;
+        var IMG = {
+          routine: "/assets/gogogo/gogogo-12wochen-routine.jpg",
+          zirkel: "/assets/gogogo/gogogo-Zirkeltraining.jpg",
+          ernaehrung: "/assets/gogogo/gogogo-Ernaehrung.jpg",
+          web_call: "/assets/gogogo/gogogo-Web-Call.jpg",
+          coach_offer: "/assets/gogogo/gogogo-Web-Call.jpg",
+          stempelkarte: "/assets/gogogo/gogogo-12wochen-routine.jpg"
+        };
+        var offers =
+          window.GoSupport && GoSupport.getOffers
+            ? GoSupport.getOffers()
+            : [
+                {
+                  key: "routine",
+                  type: "routine",
+                  title: "12-Wochen-Routine",
+                  description: "Einzahlung, Events loggen, 90 % zurück."
+                },
+                {
+                  key: "zirkel",
+                  type: "zirkel",
+                  title: "Friday Fitness Circle",
+                  description: "Zirkel tracken und Leaderboard — Login mit FFC-Konto."
+                },
+                {
+                  key: "ernaehrung",
+                  type: "ernaehrung",
+                  title: "Ernährungscoaching",
+                  description: "Tägliches Protokoll über 4 Wochen mit Coach-Feedback."
+                },
+                {
+                  key: "web_call",
+                  type: "web_call",
+                  title: "Trainingsplan individualisieren",
+                  description: "Web-Call zur Analyse und zum individuellen Plan."
+                },
+                {
+                  key: "coach_offer",
+                  type: "coach_offer",
+                  title: "Coaching anbieten",
+                  description: "Admin-Zugang und Playbook für Coaches."
+                },
+                {
+                  key: "stempelkarte",
+                  type: "stempelkarte",
+                  title: "Stempelkarte",
+                  description: "10er-Karte für 25 € Spende — Stempel mit Freunden."
+                }
+              ];
+        offers.forEach(function (offer) {
+          var owned =
+            window.GoSupport && GoSupport.offerOwned
+              ? GoSupport.offerOwned(offer.type || offer.key)
+              : false;
           var card = document.createElement("article");
           card.className = "go-slide";
-          card.dataset.title = slide.title;
+          card.dataset.title = offer.title;
+          card.dataset.offer = offer.key;
           var art = document.createElement("div");
           art.className = "go-slide__art";
           art.setAttribute("aria-hidden", "true");
-          if (slide.image) {
-            var img = document.createElement("img");
-            img.src = slide.image;
-            img.alt = "";
-            art.appendChild(img);
-          }
+          var img = document.createElement("img");
+          img.src = IMG[offer.type] || IMG.routine;
+          img.alt = "";
+          art.appendChild(img);
           card.appendChild(art);
           var cta = document.createElement("button");
           cta.type = "button";
-          cta.className = "go-slide__cta";
-          cta.textContent = slide.cta;
-          cta.addEventListener("click", function () {
-            if (slide.id === "webcall") {
-              if (typeof openCalendlyPt === "function") openCalendlyPt();
-              else window.open(CALENDLY_PT_URL, "_blank", "noopener");
-              return;
-            }
-            openGoSub(slide.id, slide.title);
-          });
+          cta.className = "go-slide__cta" + (owned ? " is-owned" : "");
+          cta.textContent = owned ? "Gebucht ✔️" : "Buchen";
+          if (owned) {
+            cta.disabled = true;
+            cta.setAttribute("aria-disabled", "true");
+          } else {
+            cta.addEventListener("click", function () {
+              cta.disabled = true;
+              var book =
+                window.GoSupport && GoSupport.bookOffer
+                  ? GoSupport.bookOffer(offer.key)
+                  : Promise.resolve();
+              Promise.resolve(book)
+                .then(function () {
+                  paintGoRail();
+                  if (typeof renderProfil === "function") renderProfil();
+                })
+                .catch(function () {
+                  cta.disabled = false;
+                  try {
+                    window.alert("Buchung fehlgeschlagen");
+                  } catch (eB) {}
+                });
+            });
+          }
           card.appendChild(cta);
           var copy = document.createElement("p");
           copy.className = "go-slide__copy";
-          copy.textContent = slide.copy;
+          copy.textContent = offer.description || "";
           card.appendChild(copy);
           rail.appendChild(card);
         });
@@ -16002,6 +16103,7 @@
             },
             openInviteForPost: openInviteForPost,
             inviteFacesForIso: inviteFacesForIso,
+            clearInvitesForDay: clearInvitesForDay,
             groupMemberIds: groupMemberIds,
             syncHeuteFilterOptions: syncHeuteFilterOptions,
             maybeAskHistoryShare: maybeAskHistoryShare,
@@ -16025,9 +16127,12 @@
             },
             afterDone: function () {
               goToAktuellShell();
-              if (window.HeuteAccountability && HeuteAccountability.refresh) {
-                return HeuteAccountability.refresh();
-              }
+              /* Invites bereits in submitDone/clearInvitesForDay bereinigt */
+              return loadInvites().then(function () {
+                if (window.HeuteAccountability && HeuteAccountability.refresh) {
+                  return HeuteAccountability.refresh();
+                }
+              });
             }
           };
           HeuteAccountability.install(accHost);
@@ -17059,7 +17164,7 @@
       var ffcPending = null;
       var ffcAuthWanted = false;
       var ffcHeuteAt = 0;
-      var FFC_OVERLAY = ["setup", "run", "finish", "newpass", "profile"];
+      var FFC_OVERLAY = ["auth", "setup", "run", "finish", "newpass", "profile"];
 
       function requireFfc(action, opts) {
         if (!window.FFC) return;
@@ -17067,12 +17172,18 @@
         opts = opts || {};
         var email = accountEmail();
         function askLogin() {
+          /* Subpage schließen, sonst liegt sie über dem Login */
+          try {
+            closeGoSub();
+          } catch (eClose) {}
           ffcPending = action;
           ffcAuthWanted = true;
           document.body.classList.add("ffc-open");
           FFC.showAuth("login", {
             title: opts.title || "FFC Login",
-            tagline: opts.tagline || "Mit Deiner Friday-Fitness-Circle E-Mail und Passwort anmelden.",
+            tagline:
+              opts.tagline ||
+              "Mit Deiner Friday-Fitness-Circle E-Mail und Passwort anmelden (nicht der gogogo-Code).",
             email: email
           });
         }
