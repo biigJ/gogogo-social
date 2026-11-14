@@ -38,9 +38,9 @@ module.exports = function handler(req, res) {
   }
   var start = "/workout/?home=" + encodeURIComponent(id);
   sendJson(res, 200, {
-    name: name,
-    short_name: name,
-    id: start,
+    name: "gogogo · " + name,
+    short_name: name.slice(0, 12) || "gogogo",
+    id: "/workout/" + id,
     start_url: start,
     scope: "/workout/",
     display: "standalone",

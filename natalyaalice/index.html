@@ -8,15 +8,16 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Natalya" />
+  <meta name="apple-mobile-web-app-title" content="gogogo" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <title>gogogo · Natalya</title>
-  <link rel="manifest" id="app-manifest" href="/natalyaalice/manifest.webmanifest" />
+  <title>gogogo</title>
+  <!-- Manifest erst nach Identity-Script setzen — sonst greift iOS Natalya-start_url -->
+  <link rel="manifest" id="app-manifest" />
   <script>
     (function () {
       var path = location.pathname.replace(/\/index\.html$/, "").replace(/\/+$/, "");
       var workout = path === "/workout" || /(?:\?|&)as=workout(?:&|$)/.test(location.search);
-      if (!workout) return;
+      var natalyaPath = path === "/natalyaalice" || path.indexOf("/natalyaalice/") === 0;
       var account = null;
       try { account = JSON.parse(localStorage.getItem("gogogo_go_account") || "null"); } catch (e) {}
       if (!account || !account.name) {
@@ -32,15 +33,39 @@
       if (home && account && String(account.id) !== String(home)) account = null;
       var id = (account && account.id) || home;
       var name = account && String(account.name || "").trim();
-      var link = document.getElementById("app-manifest");
-      if (!id || !name) {
-        if (link) link.removeAttribute("href");
+      var isNatalyaAcc =
+        account &&
+        (String(account.phone || "").toLowerCase() === "natalya" ||
+          String(account.serial_number || "") === "24011901");
+      /* Falsch gespeichertes Home-Icon /natalyaalice → zurück zu /workout */
+      if (natalyaPath && account && account.id && name && !isNatalyaAcc) {
+        location.replace("/workout/?home=" + encodeURIComponent(account.id));
         return;
       }
-      document.title = "gogogo · " + name;
+      var link = document.getElementById("app-manifest");
       var apple = document.querySelector('meta[name="apple-mobile-web-app-title"]');
-      if (apple) apple.setAttribute("content", name);
-      if (link) link.href = "/api/pwa-manifest?id=" + encodeURIComponent(id) + "&name=" + encodeURIComponent(name);
+      if (workout) {
+        document.title = name ? "gogogo · " + name : "gogogo";
+        if (apple) apple.setAttribute("content", name || "gogogo");
+        if (link) {
+          if (id && name) {
+            link.href =
+              "/api/pwa-manifest?id=" +
+              encodeURIComponent(id) +
+              "&name=" +
+              encodeURIComponent(name);
+          } else {
+            /* Nie Natalya-Manifest unter /workout — sonst startet Home-Icon falsch */
+            link.href = "/assets/gogogo-workout.webmanifest";
+          }
+        }
+        return;
+      }
+      if (natalyaPath) {
+        document.title = "gogogo · Natalya";
+        if (apple) apple.setAttribute("content", "Natalya");
+        if (link) link.href = "/natalyaalice/manifest.webmanifest";
+      }
     })();
   </script>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -5671,7 +5696,7 @@
       <button type="button" id="heute-wa" class="heute-wa" aria-label="Sofortnachricht an Trainer">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"><path d="M6 6.5h12a2 2 0 0 1 2 2v6.2a2 2 0 0 1-2 2H10l-3.6 2.6V16.7H6a2 2 0 0 1-2-2V8.5a2 2 0 0 1 2-2Z"/></svg>
       </button>
-      <h1 class="welcome-title"><span class="welcome-name">gogogo Natalya</span><span class="welcome-bang">!</span></h1>
+      <h1 class="welcome-title"><span class="welcome-name">gogogo</span><span class="welcome-bang">!</span></h1>
     </div>
     <div class="photo shell-heute" id="photo" role="button" tabindex="0">
       <input id="photo-file" type="file" accept="image/*" />
