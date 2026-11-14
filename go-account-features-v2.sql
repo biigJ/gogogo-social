@@ -37,8 +37,8 @@ drop policy if exists "go_training_goal_profiles_select_anon" on go_training_goa
 create policy "go_training_goal_profiles_select_anon"
   on go_training_goal_profiles for select to anon, authenticated using (true);
 
--- Buddy-/Trainer-Challenges
-create table if not exists go_buddy_challenges (
+-- Freund-/Trainer-Challenges (bestehende DBs: go-friends-rename.sql)
+create table if not exists go_friend_challenges (
   id uuid primary key default gen_random_uuid(),
   from_account_id uuid not null references go_accounts(id) on delete cascade,
   to_account_id uuid not null references go_accounts(id) on delete cascade,
@@ -50,25 +50,25 @@ create table if not exists go_buddy_challenges (
   accepted_at timestamptz
 );
 
-alter table go_buddy_challenges
+alter table go_friend_challenges
   add column if not exists accepted_at timestamptz;
 
-create index if not exists go_buddy_challenges_to_idx
-  on go_buddy_challenges (to_account_id, status, created_at desc);
+create index if not exists go_friend_challenges_to_idx
+  on go_friend_challenges (to_account_id, status, created_at desc);
 
-alter table go_buddy_challenges enable row level security;
+alter table go_friend_challenges enable row level security;
 
-drop policy if exists "go_buddy_challenges_select_anon" on go_buddy_challenges;
-create policy "go_buddy_challenges_select_anon"
-  on go_buddy_challenges for select to anon, authenticated using (true);
+drop policy if exists "go_friend_challenges_select_anon" on go_friend_challenges;
+create policy "go_friend_challenges_select_anon"
+  on go_friend_challenges for select to anon, authenticated using (true);
 
-drop policy if exists "go_buddy_challenges_insert_anon" on go_buddy_challenges;
-create policy "go_buddy_challenges_insert_anon"
-  on go_buddy_challenges for insert to anon, authenticated with check (true);
+drop policy if exists "go_friend_challenges_insert_anon" on go_friend_challenges;
+create policy "go_friend_challenges_insert_anon"
+  on go_friend_challenges for insert to anon, authenticated with check (true);
 
-drop policy if exists "go_buddy_challenges_update_anon" on go_buddy_challenges;
-create policy "go_buddy_challenges_update_anon"
-  on go_buddy_challenges for update to anon, authenticated using (true) with check (true);
+drop policy if exists "go_friend_challenges_update_anon" on go_friend_challenges;
+create policy "go_friend_challenges_update_anon"
+  on go_friend_challenges for update to anon, authenticated using (true) with check (true);
 
 -- Neue Orte
 insert into go_workout_places (name, lat, lng, map_source, external_id)

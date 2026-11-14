@@ -98,4 +98,17 @@
     clear: clearAccount,
     persist: requestPersist
   };
+
+  // Früher registrierten Cache-Service-Worker auf bestehenden Geräten wieder abmelden.
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        regs.forEach(function (reg) {
+          var sw = reg.active || reg.waiting || reg.installing;
+          if (sw && /\/natalyaalice\/sw-kill\.js/.test(sw.scriptURL)) reg.unregister();
+        });
+      }).catch(function () {});
+    }
+    localStorage.removeItem("gogogo_workout_build");
+  } catch (eSw) {}
 })(window);
