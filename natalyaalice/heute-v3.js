@@ -678,13 +678,13 @@
     if (kind === "plan") {
       /* Gleich wie Pill-Woche: breites Kalenderblatt + eine Linie */
       return (
-        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
         '<rect x="3.5" y="4.5" width="17" height="15.5" rx="2.5"/><path d="M3.5 15.5h17"/></svg>'
       );
     }
     if (kind === "zirkel") {
       return (
-        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
         '<path d="M19 12a7 7 0 1 1-2-4.9"/><path d="M19 5v5h-5"/></svg>'
       );
     }

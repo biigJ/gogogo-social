@@ -1358,11 +1358,14 @@
         })
         .join("") +
       "</div>";
+    var canTime = own && eventIsStillUpcoming(own);
     var evRow = own
       ? '<div class="wr-edit-panel__row">' +
-        '<button type="button" class="wr-pill-btn" data-wr-edit-time="' +
-        esc(own.id) +
-        '">Uhrzeit</button>' +
+        (canTime
+          ? '<button type="button" class="wr-pill-btn" data-wr-edit-time="' +
+            esc(own.id) +
+            '">Uhrzeit</button>'
+          : "") +
         '<button type="button" class="wr-pill-btn" data-wr-delete="' +
         esc(own.id) +
         '">Löschen</button></div>'
@@ -1487,6 +1490,10 @@
       return String(e.id) === String(eventId);
     })[0];
     if (!ev) return;
+    if (!eventIsStillUpcoming(ev)) {
+      if (host.toast) host.toast("Vergangene Events können nicht mehr verschoben werden");
+      return;
+    }
     var hhmm = formatTime(ev.starts_at) || "18:00";
     openSheet(
       '<p class="wr-sheet-hint">Uhrzeit drehen</p>' +
@@ -1574,6 +1581,33 @@
     });
   }
 
+  function eventIsStillUpcoming(ev) {
+    if (!ev || !ev.starts_at) return false;
+    try {
+      return new Date(ev.starts_at).getTime() > Date.now() - 60 * 1000;
+    } catch (e) {
+      return true;
+    }
+  }
+
+  function notifyAktuell() {
+    if (host && typeof host.onEventsChanged === "function") {
+      try {
+        return Promise.resolve(host.onEventsChanged());
+      } catch (e) {
+        return Promise.resolve();
+      }
+    }
+    if (global.HeuteAccountability && HeuteAccountability.refresh) {
+      try {
+        return Promise.resolve(HeuteAccountability.refresh());
+      } catch (e2) {
+        return Promise.resolve();
+      }
+    }
+    return Promise.resolve();
+  }
+
   function saveEventTime(eventId) {
     syncTimeWheelFromScroll();
     var wheel = $("wr-time-wheel");
@@ -1584,8 +1618,19 @@
       return String(e.id) === String(eventId);
     })[0];
     if (!ev) return;
+    /* Nur solange Start noch in der Zukunft (bzw. gerade eben) */
+    if (!eventIsStillUpcoming(ev)) {
+      if (host.toast) host.toast("Vergangene Events können nicht mehr verschoben werden");
+      closeSheet();
+      return;
+    }
     var iso = dayKey(ev.starts_at);
     var starts = iso + "T" + val + ":00" + berlinOffsetSuffix(iso);
+    var newTs = new Date(starts).getTime();
+    if (!(newTs > Date.now() - 60 * 1000)) {
+      if (host.toast) host.toast("Bitte eine Uhrzeit in der Zukunft wählen");
+      return;
+    }
     return rest("events?id=eq." + encodeURIComponent(eventId), {
       method: "PATCH",
       prefer: "return=representation",
@@ -1602,6 +1647,9 @@
         }
         closeSheet();
         return refreshKeepDay(iso);
+      })
+      .then(function () {
+        return notifyAktuell();
       })
       .catch(function () {
         if (host.toast) host.toast("Zeit konnte nicht gespeichert werden");
@@ -1761,7 +1809,9 @@
       state.pendingCreate = null;
       state.editMode = false;
       closeSheet();
-      return refreshKeepDay(keepIso);
+      return refreshKeepDay(keepIso).then(function () {
+        return notifyAktuell();
+      });
     }
 
     function saveOrReplace(body) {
@@ -2563,6 +2613,9 @@
         if (!itemsForDay(iso).length && state.editMode) {
           /* leer — Edit bleibt, kein Extra-Sheet (Undo ist da) */
         }
+      })
+      .then(function () {
+        return notifyAktuell();
       });
   }
 
@@ -2800,13 +2853,12 @@
       return;
     }
     if (t.getAttribute("data-wr-done")) {
-      if (host && host.openDoneModal) host.openDoneModal(t.getAttribute("data-wr-done"));
-      else {
-        rest("events?id=eq." + encodeURIComponent(t.getAttribute("data-wr-done")), {
-          method: "PATCH",
-          prefer: "return=minimal",
-          body: { status: "erledigt" }
-        }).then(refresh);
+      var doneId = t.getAttribute("data-wr-done");
+      /* Immer nach Aktuell + Erledigt-Dialog — nie still PATCH ohne Dialog */
+      if (host && typeof host.openDoneModal === "function") {
+        host.openDoneModal(doneId);
+      } else if (host && typeof host.showHeute === "function") {
+        host.showHeute();
       }
       return;
     }
