@@ -582,7 +582,7 @@
       /* Gleich wie Pill-Woche: breites Kalenderblatt + eine Linie */
       return (
         '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
-        '<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M5 9h14"/></svg>'
+        '<rect x="3.5" y="4.5" width="17" height="15.5" rx="2.5"/><path d="M3.5 15.5h17"/></svg>'
       );
     }
     if (kind === "zirkel") {

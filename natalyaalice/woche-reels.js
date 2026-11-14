@@ -1719,7 +1719,7 @@
         starts_at: starts,
         course_id: null,
         enrollment_id: null,
-        is_unplanned: true,
+        is_unplanned: false,
         item_type: travelDayActive(p.iso) ? "hotel_workout" : "event",
         travel_auto: !!travelDayActive(p.iso),
         status: "geplant"
