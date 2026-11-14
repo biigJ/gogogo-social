@@ -1309,13 +1309,8 @@
     root.innerHTML = html;
     bindObserver(root);
     requestAnimationFrame(function () {
-      var todayEl = $("acc-feed-today");
-      var scroller = welcomeScrollEl();
-      if (todayEl && scroller) {
-        var top = todayEl.offsetTop - 12;
-        if (top > 0) scroller.scrollTop = top;
-      }
       bindHeuteScrollFilter();
+      scrollCurrentToCenter({ soft: true });
     });
     if (host.maybeAskHistoryShare) host.maybeAskHistoryShare();
   }
@@ -1326,6 +1321,43 @@
       document.scrollingElement ||
       document.documentElement
     );
+  }
+
+  function currentEventCard() {
+    var today = $("acc-feed-today");
+    if (!today) return null;
+    var cards = today.querySelectorAll(".acc-card:not(.acc-card--spontan)");
+    if (cards && cards.length) return cards[0];
+    return today.querySelector(".acc-card") || today;
+  }
+
+  /* Aktuelles Event exakt in Screen-Mitte; soft wenn woanders */
+  function scrollCurrentToCenter(opts) {
+    opts = opts || {};
+    var soft = opts.soft !== false;
+    var scroller = welcomeScrollEl();
+    var el = currentEventCard();
+    if (!scroller || !el) return;
+
+    function run() {
+      if (document.body.dataset.shell !== "heute") return;
+      var rect = el.getBoundingClientRect();
+      if (!rect.height && !rect.width) return;
+      var mid = window.innerHeight / 2;
+      var elMid = rect.top + rect.height / 2;
+      var delta = elMid - mid;
+      if (Math.abs(delta) < 6) return;
+      var next = Math.max(0, (scroller.scrollTop || 0) + delta);
+      if (soft && typeof scroller.scrollTo === "function") {
+        scroller.scrollTo({ top: next, behavior: "smooth" });
+      } else {
+        scroller.scrollTop = next;
+      }
+    }
+
+    requestAnimationFrame(function () {
+      requestAnimationFrame(run);
+    });
   }
 
   function bindHeuteScrollFilter() {
@@ -2106,6 +2138,7 @@
     install: install,
     refresh: refresh,
     openDone: openDoneModal,
+    scrollCurrentToCenter: scrollCurrentToCenter,
     setFilter: function (v) {
       saveFilter(v);
       refresh();
