@@ -37,9 +37,13 @@
         account &&
         (String(account.phone || "").toLowerCase() === "natalya" ||
           String(account.serial_number || "") === "24011901");
-      /* Falsch gespeichertes Home-Icon /natalyaalice → zurück zu /workout */
-      if (natalyaPath && account && account.id && name && !isNatalyaAcc) {
-        location.replace("/workout/?home=" + encodeURIComponent(account.id));
+      /* Jeder Aufruf von /natalyaalice → /workout (altes Home-Icon) */
+      if (natalyaPath) {
+        if (account && account.id && name) {
+          location.replace("/workout/?home=" + encodeURIComponent(account.id));
+        } else {
+          location.replace("/workout/");
+        }
         return;
       }
       var link = document.getElementById("app-manifest");
@@ -60,11 +64,6 @@
           }
         }
         return;
-      }
-      if (natalyaPath) {
-        document.title = "gogogo · Natalya";
-        if (apple) apple.setAttribute("content", "Natalya");
-        if (link) link.href = "/natalyaalice/manifest.webmanifest";
       }
     })();
   </script>
@@ -7064,9 +7063,11 @@
       }
 
       function personName() {
-        if (!sessionMode || !sessionAccount) return "Natalya";
-        var name = String(sessionAccount.name || "").trim();
-        return name || "Natalya";
+        if (sessionMode) {
+          var sessionName = String((sessionAccount && sessionAccount.name) || "").trim();
+          return sessionName || "Du";
+        }
+        return "Natalya";
       }
 
       function explainError(err) {
@@ -8519,7 +8520,7 @@
         title.textContent = "";
         var nameEl = document.createElement("span");
         nameEl.className = "welcome-name";
-        nameEl.textContent = "gogogo " + (name || "Natalya");
+        nameEl.textContent = "gogogo " + (name || (sessionMode ? "Du" : "Natalya"));
         var bang = document.createElement("span");
         bang.className = "welcome-bang";
         bang.textContent = "!";
