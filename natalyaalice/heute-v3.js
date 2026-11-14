@@ -1625,12 +1625,15 @@
         if (document.body.dataset.shell !== "heute") return;
         var y = scroller.scrollTop || 0;
         var todayEl = $("acc-feed-today");
+        var goingDown = y > last + 2;
         var goingUp = y < last - 2;
         var aboveToday = todayEl ? y + 40 < todayEl.offsetTop : false;
-        /* Nach oben in die Zukunft: Dropdown ausblenden, nicht sticky mitscrollen */
-        if (goingUp && aboveToday) {
+        /* Ganz oben: Header zeigen. Runterscrollen oder in die Zukunft: ausblenden. */
+        if (y <= 6) {
+          row.classList.remove("is-scroll-hide");
+        } else if (goingDown || (goingUp && aboveToday)) {
           row.classList.add("is-scroll-hide");
-        } else if (!aboveToday) {
+        } else if (goingUp && !aboveToday) {
           row.classList.remove("is-scroll-hide");
         }
         last = y;
