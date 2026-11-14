@@ -1499,10 +1499,6 @@
     }
     .woche-reels.is-light-day .wr-travel-emoji { filter: grayscale(1) brightness(0); }
     .woche-reels.is-light-day .wr-progress p { color: rgba(17,17,17,.85); }
-    .woche-reels.is-light-day .wr-progress__bar {
-      background: rgba(0,0,0,.18);
-    }
-    .woche-reels.is-light-day .wr-progress__bar > span { background: #111; }
     .woche-reels.is-light-day .wr-progress {
       background: linear-gradient(0deg, rgba(255,255,255,.55), transparent);
     }
@@ -1628,11 +1624,54 @@
       display: flex; flex-direction: column; justify-content: flex-start;
       pointer-events: none;
     }
-    .wr-progress__bar {
-      height: 3px; border-radius: 999px; background: rgba(255,255,255,.25); overflow: hidden; margin-bottom: 6px;
+    .wr-progress__days {
+      display: flex; align-items: center; gap: 0;
+      height: 6px; margin-bottom: 6px; width: 100%;
     }
-    .wr-progress__bar > span { display: block; height: 100%; background: #F6F1E8; }
+    .wr-seg {
+      flex: 1 1 0; height: 3px; border-radius: 999px;
+      background: rgba(255,255,255,.22); align-self: center;
+    }
+    .wr-seg.is-on { background: #F6F1E8; }
+    .wr-seg.is-done { height: 6px; background: #F6F1E8; }
+    .wr-seg-gap { flex: none; width: 1px; height: 6px; }
+    .woche-reels.is-light-day .wr-seg { background: rgba(0,0,0,.18); }
+    .woche-reels.is-light-day .wr-seg.is-on,
+    .woche-reels.is-light-day .wr-seg.is-done { background: #111; }
     .wr-progress p { margin: 0; font-size: 12px; font-weight: 600; color: rgba(246,241,232,.9); }
+    .wr-act.is-done { opacity: 1; }
+    .wr-act__icon--done {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: #fff; color: transparent;
+    }
+    .wr-act__icon--done .wr-ico {
+      opacity: 0.28; color: #111; stroke: #111;
+    }
+    .wr-invite-faces {
+      display: inline-flex; align-items: center; gap: 4px; margin-left: 4px;
+    }
+    .wr-invite-faces .wr-avatar { margin: 0; }
+    .wr-author { gap: 6px; }
+    .wr-travel-card {
+      position: absolute; top: calc(var(--wr-top-h) + 44px); left: 12px; right: 12px; z-index: 7;
+      display: grid; grid-template-columns: 96px 1fr; gap: 12px;
+      background: #fff; border-radius: 14px; overflow: hidden;
+      border: 1px solid rgba(42,33,24,.1);
+      padding: 0; text-align: left; cursor: pointer; color: #2A2118;
+      box-shadow: 0 6px 18px rgba(0,0,0,.14);
+    }
+    .woche-reels:has(.wr-travel-banner) .wr-travel-card {
+      top: calc(var(--wr-top-h) + 52px);
+    }
+    .wr-travel-card__art { min-height: 96px; background: #EDE6DA; }
+    .wr-travel-card__art img {
+      width: 100%; height: 100%; object-fit: cover; display: block; min-height: 96px;
+    }
+    .wr-travel-card__body {
+      padding: 10px 12px 12px 0; display: flex; flex-direction: column; gap: 4px; justify-content: center;
+    }
+    .wr-travel-card__body h3 { margin: 0; font-size: 16px; font-weight: 700; }
+    .wr-travel-card__body p { margin: 0; font-size: 13px; line-height: 1.35; color: rgba(42,33,24,.75); }
     .wr-edit-panel {
       position: absolute;
       top: calc(var(--wr-top-h) + 8px);
@@ -6088,8 +6127,8 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-6"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-11"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-7"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-12"></script>
   <script src="/natalyaalice/support.js?v=support-1"></script>
   <script>
     (function () {
@@ -10289,6 +10328,22 @@
             });
           },
           showHeute: function () {
+            if (window.WocheReels) WocheReels.hide();
+            setHome(true);
+            paintWelcome();
+            paintHeuteDiaryFeed();
+            refreshFfcHeute(false);
+            markHeuteSeen();
+            if (window.HeuteAccountability && HeuteAccountability.refresh) {
+              HeuteAccountability.refresh();
+            }
+          },
+          afterDone: function () {
+            if (window.WocheReels && document.body.classList.contains("is-woche-reels")) {
+              return WocheReels.refreshKeepDay
+                ? WocheReels.refreshKeepDay()
+                : WocheReels.refresh();
+            }
             if (window.WocheReels) WocheReels.hide();
             setHome(true);
             paintWelcome();
@@ -15438,6 +15493,22 @@
             },
             toast: function (msg) { window.alert(msg); },
             showHeute: function () {
+              if (window.WocheReels) WocheReels.hide();
+              setHome(true);
+              paintWelcome();
+              paintHeuteDiaryFeed();
+              refreshFfcHeute(false);
+              markHeuteSeen();
+              if (window.HeuteAccountability && HeuteAccountability.refresh) {
+                HeuteAccountability.refresh();
+              }
+            },
+            afterDone: function () {
+              if (window.WocheReels && document.body.classList.contains("is-woche-reels")) {
+                return WocheReels.refreshKeepDay
+                  ? WocheReels.refreshKeepDay()
+                  : WocheReels.refresh();
+              }
               if (window.WocheReels) WocheReels.hide();
               setHome(true);
               paintWelcome();

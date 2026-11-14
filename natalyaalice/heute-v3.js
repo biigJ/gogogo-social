@@ -1228,6 +1228,17 @@
       })
       .then(function () {
         closeDoneModal();
+        /* Von Woche: Dialog wie Heute, danach auf dem Tag bleiben */
+        if (host && typeof host.afterDone === "function") {
+          return host.afterDone(eventId);
+        }
+        if (
+          document.body.classList.contains("is-woche-reels") &&
+          global.WocheReels &&
+          WocheReels.refresh
+        ) {
+          return WocheReels.refresh();
+        }
         if (host && typeof host.showHeute === "function") {
           host.showHeute();
           return;

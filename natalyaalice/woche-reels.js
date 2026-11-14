@@ -24,8 +24,12 @@
     undoTimer: null,
     kraftTrainings: [],
     ausdauerTrainings: [],
-    zirkelOk: false
+    zirkelOk: false,
+    invites: [],
+    pendingCreate: null
   };
+
+  var TRAVEL_ALT_IMG = "/assets/gogogo/JumpRope.png";
 
   var ROOT_ID = "woche-reels";
   var REST_DAYS = ["Spaziergang", "Mobility", "Radfahren", "Sauna"];
@@ -872,9 +876,9 @@
         '</span><span class="wr-act__n"></span></button>';
     } else if (isDone) {
       checkBtn =
-        '<button type="button" class="wr-act is-done" disabled aria-label="Erledigt"><span class="wr-act__icon">' +
+        '<button type="button" class="wr-act is-done" disabled aria-label="Erledigt"><span class="wr-act__icon wr-act__icon--done">' +
         ICON_CHECK +
-        '</span><span class="wr-act__n">1</span></button>';
+        '</span><span class="wr-act__n"></span></button>';
     }
     return (
       '<div class="wr-actions">' +
@@ -978,9 +982,7 @@
       '<div class="wr-overlay">' +
       '<div class="wr-author">' +
       avatarHtml(p) +
-      "<span>" +
-      esc(p.name || "?") +
-      "</span>" +
+      inviteAvatarsHtml(iso) +
       coursePill(ev) +
       "</div>" +
       (when ? '<p class="wr-when">' + esc(when) + "</p>" : "") +
@@ -989,13 +991,59 @@
       "</h2>" +
       desc +
       (going
-        ? '<div class="wr-going">' + facesHtml(ev) + "<span>" + going + "</span></div>"
+        ? '<div class="wr-going">' + facesHtml(ev) + "</div>"
         : "") +
       travelHint +
       "</div>" +
       actionColHtml(item) +
       "</div></div>"
     );
+  }
+
+  function inviteAvatarsHtml(iso) {
+    var list = (state.invites || []).filter(function (inv) {
+      return (
+        inv &&
+        String(inv.workout_date) === String(iso) &&
+        String(inv.status || "pending") === "pending"
+      );
+    });
+    if (!list.length) return "";
+    return (
+      '<div class="wr-invite-faces" aria-label="Angefragt">' +
+      list
+        .map(function (inv) {
+          return avatarHtml(personOf(inv.to_id));
+        })
+        .join("") +
+      "</div>"
+    );
+  }
+
+  function loadInvites() {
+    var id = me();
+    if (!id) {
+      state.invites = [];
+      return Promise.resolve();
+    }
+    return rest(
+      "go_workout_invites?from_id=eq." +
+        encodeURIComponent(id) +
+        "&select=id,to_id,workout_date,workout_label,status&order=created_at.desc&limit=120"
+    )
+      .then(function (rows) {
+        state.invites = (rows || []).filter(function (r) {
+          return r && String(r.status || "pending") === "pending";
+        });
+        return ensurePeople(
+          state.invites.map(function (r) {
+            return r.to_id;
+          })
+        );
+      })
+      .catch(function () {
+        state.invites = [];
+      });
   }
 
   function currentOwnEvent() {
@@ -1098,18 +1146,117 @@
       "</p>" +
       "</header>" +
       travelHint +
+      travelAltHtml(dayIso) +
       err
     );
   }
 
+  function dayHasAlternative(iso) {
+    return itemsForDay(iso).some(function (it) {
+      return (
+        it.ev &&
+        (it.ev.category === "alternative" ||
+          it.ev.item_type === "hotel_workout" ||
+          it.ev.travel_auto)
+      );
+    });
+  }
+
+  function alternativeEventForDay(iso) {
+    return itemsForDay(iso).filter(function (it) {
+      return (
+        it.ev &&
+        (it.ev.category === "alternative" ||
+          it.ev.item_type === "hotel_workout" ||
+          it.ev.travel_auto)
+      );
+    })[0];
+  }
+
+  function travelDayActive(iso) {
+    return !!(
+      travelActive() &&
+      iso &&
+      iso >= berlinToday() &&
+      iso <= state.travelUntil
+    );
+  }
+
+  function travelAltHtml(iso) {
+    if (!travelDayActive(iso)) return "";
+    var alt = alternativeEventForDay(iso);
+    var title = alt && alt.ev ? alt.ev.title || "Alternative" : "Alternative wählen";
+    var copy = alt
+      ? "Reise-Tag · tippen zum Ändern"
+      : "Für diesen Tag eine Alternative festlegen";
+    return (
+      '<button type="button" class="wr-travel-card" data-wr-travel-alt="' +
+      esc(iso) +
+      '" aria-label="Reise-Alternative">' +
+      '<div class="wr-travel-card__art"><img src="' +
+      esc(TRAVEL_ALT_IMG) +
+      '" alt="" /></div>' +
+      '<div class="wr-travel-card__body"><h3>' +
+      esc(title) +
+      "</h3><p>" +
+      esc(copy) +
+      "</p></div></button>"
+    );
+  }
+
+  function patchTravelAlt() {
+    var root = $(ROOT_ID);
+    if (!root) return;
+    var iso = currentDayIso();
+    var next = travelAltHtml(iso);
+    var existing = root.querySelector(".wr-travel-card");
+    var banner = root.querySelector(".wr-travel-banner");
+    if (!next) {
+      if (existing) existing.remove();
+      return;
+    }
+    if (existing) {
+      existing.outerHTML = next;
+      return;
+    }
+    if (banner) banner.insertAdjacentHTML("afterend", next);
+    else {
+      var top = root.querySelector(".wr-top");
+      if (top) top.insertAdjacentHTML("afterend", next);
+    }
+  }
+
   function progressHtml() {
+    var days;
+    try {
+      days = weekDays();
+    } catch (e) {
+      days = [];
+    }
+    while (days.length < 7) days.push(addDays(berlinToday(), days.length));
+    var segs = days
+      .map(function (iso) {
+        var items = itemsForDay(iso);
+        var planned = items.length > 0;
+        var done = items.some(function (it) {
+          return it.ev && it.ev.status === "erledigt";
+        });
+        return (
+          '<span class="wr-seg' +
+          (planned ? " is-on" : "") +
+          (done ? " is-done" : "") +
+          '" title="' +
+          esc(iso) +
+          '"></span>'
+        );
+      })
+      .join('<span class="wr-seg-gap" aria-hidden="true"></span>');
     var st = weekStats();
-    var pct = Math.round((st.planned / 7) * 100);
     return (
       '<div class="wr-progress" role="status">' +
-      '<div class="wr-progress__bar"><span style="width:' +
-      pct +
-      '%"></span></div>' +
+      '<div class="wr-progress__days" aria-hidden="true">' +
+      segs +
+      "</div>" +
       "<p>" +
       st.planned +
       " von 7 Tagen geplant · " +
@@ -1311,7 +1458,7 @@
     })
       .then(function () {
         closeSheet();
-        return refresh();
+        return refreshKeepDay(iso);
       })
       .catch(function () {
         if (host.toast) host.toast("Zeit konnte nicht gespeichert werden");
@@ -1428,6 +1575,98 @@
     });
   }
 
+  function openCreateTimeSheet() {
+    var p = state.pendingCreate;
+    if (!p) return;
+    openSheet(
+      "<h3>" +
+        esc(p.title || "Uhrzeit") +
+        "</h3>" +
+        '<p class="wr-sheet-hint">Uhrzeit drehen</p>' +
+        timeWheelHtml("18:00") +
+        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-create-confirm="1">Speichern</button>' +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+    requestAnimationFrame(function () {
+      requestAnimationFrame(scrollTimeColsToSelection);
+    });
+  }
+
+  function confirmPendingCreate() {
+    var p = state.pendingCreate;
+    if (!p || !p.iso) return Promise.resolve();
+    var wheel = $("wr-time-wheel");
+    var h = wheel ? Number(wheel.getAttribute("data-h") || 18) : 18;
+    var m = wheel ? Number(wheel.getAttribute("data-m") || 0) : 0;
+    var starts = p.iso + "T" + pad2(h) + ":" + pad2(m) + ":00+01:00";
+    var keepIso = p.iso;
+
+    function finish(rows) {
+      state.pendingCreate = null;
+      closeSheet();
+      return refreshKeepDay(keepIso);
+    }
+
+    if (p.kind === "alternative") {
+      return createEvent({
+        category: "alternative",
+        title: p.title || "Bewegung",
+        starts_at: starts,
+        is_unplanned: true,
+        item_type: travelDayActive(p.iso) ? "hotel_workout" : "event",
+        travel_auto: !!travelDayActive(p.iso)
+      }).then(finish);
+    }
+
+    if (p.kind === "zirkel") {
+      var payload = {
+        category: "zirkel",
+        course_id: p.courseId || null,
+        enrollment_id: p.enrollmentId || null,
+        title: p.title || "Zirkeltraining",
+        starts_at: starts,
+        is_unplanned: false,
+        item_type: "course_session"
+      };
+      if (p.courseId) {
+        return createEvent(payload).then(finish);
+      }
+      return ensureCourseByDef({
+        slug: "training-zirkel",
+        title: "Zirkeltraining",
+        category: "zirkel",
+        label: "Zirkeltraining"
+      }).then(function (course) {
+        if (!course || !course.id) {
+          if (host.toast) host.toast("Zirkel-Kurs fehlt");
+          return;
+        }
+        payload.course_id = course.id;
+        return createEvent(payload).then(finish);
+      });
+    }
+
+    return ensureCourseByDef({
+      slug: p.slug,
+      title: p.title,
+      label: p.title,
+      category: p.category || "kraft"
+    }).then(function (course) {
+      if (!course || !course.id) {
+        if (host.toast) host.toast("Kurs konnte nicht verknüpft werden");
+        return;
+      }
+      return createEvent({
+        category: p.category || "kraft",
+        course_id: course.id,
+        title: p.title,
+        starts_at: starts,
+        is_unplanned: false,
+        item_type: "course_session"
+      }).then(finish);
+    });
+  }
+
   function openKindSheet(kind, iso) {
     if (kind === "alternative") {
       openSheet(
@@ -1450,7 +1689,7 @@
           '<label class="wr-field">Freier Titel<input type="text" id="wr-rest-title" maxlength="80" placeholder="z. B. Spaziergang" /></label>' +
           '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-rest-save="' +
           esc(iso) +
-          '">Speichern</button>' +
+          '">Weiter</button>' +
           '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
       );
       return;
@@ -1473,44 +1712,14 @@
         );
       })[0];
       var courseId = en && (en.course_id || (en.courses && en.courses.id));
-      if (!courseId) {
-        ensureCourseByDef({
-          slug: "training-zirkel",
-          title: "Zirkeltraining",
-          category: "zirkel",
-          label: "Zirkeltraining"
-        }).then(function (course) {
-          if (!course || !course.id) {
-            if (host.toast) host.toast("Zirkel-Kurs fehlt");
-            return;
-          }
-          return createEvent({
-            category: "zirkel",
-            course_id: course.id,
-            enrollment_id: en && en.id,
-            title: "Zirkeltraining",
-            starts_at: iso + "T18:00:00+01:00",
-            is_unplanned: false,
-            item_type: "course_session"
-          }).then(function () {
-            closeSheet();
-            return refresh();
-          });
-        });
-        return;
-      }
-      createEvent({
-        category: "zirkel",
-        course_id: courseId,
-        enrollment_id: en && en.id,
+      state.pendingCreate = {
+        kind: "zirkel",
+        iso: iso,
         title: "Zirkeltraining",
-        starts_at: iso + "T18:00:00+01:00",
-        is_unplanned: false,
-        item_type: "course_session"
-      }).then(function () {
-        closeSheet();
-        return refresh();
-      });
+        courseId: courseId || null,
+        enrollmentId: en && en.id
+      };
+      openCreateTimeSheet();
       return;
     }
 
@@ -1565,28 +1774,14 @@
     var slug = btn.getAttribute("data-slug");
     var title = btn.getAttribute("data-title") || kind;
     var cat = kind === "ausdauer" ? "ausdauer" : "kraft";
-    return ensureCourseByDef({
+    state.pendingCreate = {
+      kind: kind,
+      category: cat,
+      iso: iso,
       slug: slug,
-      title: title,
-      label: title,
-      category: cat
-    }).then(function (course) {
-      if (!course || !course.id) {
-        if (host.toast) host.toast("Kurs konnte nicht verknüpft werden");
-        return;
-      }
-      return createEvent({
-        category: cat,
-        course_id: course.id,
-        title: title,
-        starts_at: iso + "T18:00:00+01:00",
-        is_unplanned: false,
-        item_type: "course_session"
-      }).then(function () {
-        closeSheet();
-        return refresh();
-      });
-    });
+      title: title
+    };
+    openCreateTimeSheet();
   }
 
   function openWeekMenu() {
@@ -1730,6 +1925,7 @@
           host.loadInvites();
         } catch (e) {}
       }
+      return refreshKeepDay(iso);
     });
   }
 
@@ -1920,27 +2116,11 @@
   function applyTravel(days) {
     var until = addDays(berlinToday(), days);
     saveTravelPref(until);
-    var jobs = [];
-    weekDays().forEach(function (iso) {
-      if (iso > until || iso < berlinToday()) return;
-      var items = itemsForDay(iso);
-      if (!items.length) {
-        jobs.push(
-          createEvent({
-            category: "alternative",
-            title: "Hotel-Workout · 20 min",
-            starts_at: iso + "T08:00:00+01:00",
-            is_unplanned: true,
-            item_type: "hotel_workout",
-            travel_auto: true
-          })
-        );
-      }
-    });
-    return Promise.all(jobs).then(function () {
-      closeSheet();
-      return refresh();
-    });
+    closeSheet();
+    if (host.toast) {
+      host.toast("Reise aktiv — bitte pro Tag eine Alternative wählen");
+    }
+    return refreshKeepDay(berlinToday());
   }
 
   function endTravel() {
@@ -2207,7 +2387,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -2275,16 +2455,20 @@
     if (t.getAttribute("data-wr-rest-save")) {
       var isoR = t.getAttribute("data-wr-rest-save");
       var titleR = (($("wr-rest-title") && $("wr-rest-title").value) || "Bewegung").trim();
-      createEvent({
-        category: "alternative",
-        title: titleR,
-        starts_at: isoR + "T10:00:00+01:00",
-        is_unplanned: true,
-        item_type: "event"
-      }).then(function () {
-        closeSheet();
-        return refresh();
-      });
+      state.pendingCreate = {
+        kind: "alternative",
+        iso: isoR,
+        title: titleR
+      };
+      openCreateTimeSheet();
+      return;
+    }
+    if (t.getAttribute("data-wr-create-confirm")) {
+      confirmPendingCreate();
+      return;
+    }
+    if (t.getAttribute("data-wr-travel-alt")) {
+      openKindSheet("alternative", t.getAttribute("data-wr-travel-alt"));
       return;
     }
     if (t.getAttribute("data-wr-day-course")) {
@@ -2678,10 +2862,12 @@
       state.dayIndex = next;
       state.eventIndex = 0;
       patchDayLabel();
+      patchTravelAlt();
       if (state.editMode) patchEditPanelEvRow();
       syncSurface();
     } else {
       patchDayLabel();
+      patchTravelAlt();
     }
   }
 
@@ -2700,7 +2886,8 @@
       loadFfc().catch(function () {}),
       loadEnrollments().catch(function () {}),
       loadCourses().catch(function () {}),
-      loadTrainingLists().catch(function () {})
+      loadTrainingLists().catch(function () {}),
+      loadInvites().catch(function () {})
     ])
       .then(function () {
         syncZirkelAccess();
@@ -2712,15 +2899,30 @@
           loadComments(ids).catch(function () {})
         ]);
       })
-      .then(function () {
-        if (state.weekMode === "from_today") state.dayIndex = 0;
-      })
       .catch(function () {
         state.loadError = state.loadError || "Woche teilweise nicht geladen.";
       })
       .then(function () {
         render();
       });
+  }
+
+  function refreshKeepDay(iso) {
+    var keep = iso || currentDayIso();
+    return refresh().then(function () {
+      try {
+        var days = weekDays();
+        var ix = days.indexOf(keep);
+        if (ix >= 0) state.dayIndex = ix;
+      } catch (e) {}
+      var track = $("wr-vtrack");
+      if (track && track.clientHeight) {
+        track.scrollTop = state.dayIndex * track.clientHeight;
+      }
+      patchDayLabel();
+      patchTravelAlt();
+      syncSurface();
+    });
   }
 
   function show() {
@@ -2771,6 +2973,7 @@
   }
 
   global.WocheReels = {
+    refreshKeepDay: refreshKeepDay,
     install: install,
     show: show,
     hide: hide,
