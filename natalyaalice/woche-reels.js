@@ -2,7 +2,7 @@
 (function (global) {
   var host = null;
   var state = {
-    weekMode: "from_today", /* from_today | next_week | week_after */
+    weekMode: "from_today", /* from_today | next_week */
     dayIndex: 0,
     eventIndex: 0,
     events: [],
@@ -27,8 +27,7 @@
   var TRAIN_CATS = { kraft: 1, ausdauer: 1, zirkel: 1 };
   var WEEK_MODES = [
     { id: "from_today", label: "Ab heute" },
-    { id: "next_week", label: "Nächste Woche" },
-    { id: "week_after", label: "Übernächste Woche" }
+    { id: "next_week", label: "Nächste Woche" }
   ];
   var CAT_LABELS = { kraft: "Kraft", ausdauer: "Ausdauer", zirkel: "Zirkel" };
 
@@ -96,7 +95,6 @@
   function weekStart() {
     var today = berlinToday();
     if (state.weekMode === "next_week") return addDays(mondayOf(today), 7);
-    if (state.weekMode === "week_after") return addDays(mondayOf(today), 14);
     return today; /* Ab heute: rollend heute + 6 */
   }
 
@@ -1063,9 +1061,7 @@
             "</strong><span>" +
             (m.id === "from_today"
               ? "Heute + 6 Tage"
-              : m.id === "next_week"
-                ? "Mo–So nächste Kalenderwoche"
-                : "Mo–So übernächste Kalenderwoche") +
+              : "Mo–So nächste Kalenderwoche") +
             "</span></button>"
           );
         }).join("") +
