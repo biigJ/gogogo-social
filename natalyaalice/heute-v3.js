@@ -591,12 +591,7 @@
         '<path d="M19 12a7 7 0 1 1-2-4.9"/><path d="M19 5v5h-5"/></svg>'
       );
     }
-    if (kind === "booked") {
-      return (
-        '<svg class="acc-badge-ico acc-badge-ico--booked" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">' +
-        '<circle cx="12" cy="12" r="9" fill="#111"/><path d="M12 8v8M8 12h8" fill="none" stroke="#F6F1E8" stroke-width="1.8" stroke-linecap="round"/></svg>'
-      );
-    }
+    /* Kein Plus-auf-Schwarz-Badge mehr */
     return "";
   }
 
@@ -966,7 +961,10 @@
   function eventBadgeKind(ev) {
     if (!ev) return "";
     if (ev.category === "zirkel") return "zirkel";
-    if (ev.enrollment_id || ev.course_id) return "booked";
+    /* Wochenplanung / Kurs-Session → Kalender-Icon wie Pill-Woche */
+    if (ev.enrollment_id || ev.course_id || ev.item_type === "course_session") {
+      return "plan";
+    }
     return "";
   }
 

@@ -1977,9 +1977,10 @@
     }
     .acc-face-wait svg { width: 19px; height: 19px; display: block; opacity: .72; }
     .acc-face--add {
-      border: 1.5px solid rgba(42,33,24,.35); background: transparent; color: #2A2118;
+      border: 1.5px solid rgba(42,33,24,.35); background: transparent !important; color: #2A2118;
       font-size: 18px; font-weight: 500; line-height: 1; cursor: pointer; padding: 0;
       width: 32px; height: 32px; border-radius: 50%; display: inline-grid; place-items: center;
+      box-shadow: none;
     }
     .acc-card__teaser {
       display: flex; align-items: center; gap: 10px; width: 100%;
@@ -4311,24 +4312,46 @@
       width: 56px;
       height: 56px;
     }
-    .team-slide__group-actions {
+    .team-slide__members .team-slide__add-friend {
+      margin: 0;
+      width: 56px;
+      height: 56px;
+    }
+    .team-slide__members .team-slide__add-friend-circle {
+      width: 56px;
+      height: 56px;
+      background: transparent;
+    }
+    .team-slide__group-name-row {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-top: 12px;
-      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      width: 100%;
+      min-width: 0;
+    }
+    .team-slide__group-name-row .team-slide__group-name {
+      flex: 1;
+      min-width: 0;
     }
     .team-slide__group-remove {
-      border: 0;
-      background: none;
-      color: rgba(42,33,24,.55);
-      font: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      text-decoration: underline;
-      text-underline-offset: 3px;
-      cursor: pointer;
+      flex: none;
+      width: 36px;
+      height: 36px;
+      margin: 0;
       padding: 0;
+      border: 1px solid #2A2118;
+      border-radius: 50%;
+      background: transparent;
+      color: #2A2118;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+    .team-slide__group-remove svg {
+      width: 14px;
+      height: 14px;
+      display: block;
     }
     .team-slide__coach-name .team-slide__head-action {
       flex: none;
@@ -4359,12 +4382,16 @@
       height: 28px;
       display: block;
     }
+    .team-slide__cta + .team-slide__group-name-row {
+      margin-top: 60px; /* 3× bisheriger Abstand (20px) */
+    }
     .team-slide__cta + .team-slide__group-name,
     .team-slide__cta + .team-slide__coach-name {
-      margin-top: 20px;
+      margin-top: 60px;
     }
     .team-slide__group-name + .team-slide__add-friend,
-    .team-slide__coach-name + .team-slide__add-friend {
+    .team-slide__coach-name + .team-slide__add-friend,
+    .team-slide__group-name-row + .team-slide__members {
       margin-top: 14px;
     }
     .team-slide__art + .team-slide__cta,
@@ -5327,6 +5354,14 @@
           <button type="submit" class="routine-start" id="acc-comment-send">Senden</button>
           <button type="button" class="routine-start" id="acc-comment-cancel" style="background:transparent;color:#2A2118;margin-top:8px;">Abbrechen</button>
         </form>
+      </div>
+    </div>
+    <div class="sand-modal" id="group-delete-modal" hidden>
+      <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="group-delete-title">
+        <h2 class="ask" id="group-delete-title">Gruppe entfernen</h2>
+        <p id="group-delete-msg">Gruppe wirklich entfernen?</p>
+        <button type="button" class="routine-start" id="group-delete-ok">Entfernen</button>
+        <button type="button" class="routine-start sand-quiet" id="group-delete-cancel">Abbrechen</button>
       </div>
     </div>
     <div class="sand-modal" id="acc-done-modal" hidden>
@@ -6368,7 +6403,7 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-13"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-14"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-16"></script>
   <script src="/natalyaalice/support.js?v=support-4"></script>
   <script>
@@ -7968,7 +8003,7 @@
 
       function closeShellModals() {
         closeDaysPrompt();
-        ["moved-modal", "team-modal", "invite-modal", "time-modal", "invite-in-modal", "goal-modal", "ausdauer-modal", "photo-modal", "short-modal", "quick-wa", "go-modal", "pt-accept-modal", "pt-day-modal"].forEach(function (id) {
+        ["moved-modal", "team-modal", "invite-modal", "time-modal", "invite-in-modal", "goal-modal", "ausdauer-modal", "photo-modal", "short-modal", "quick-wa", "go-modal", "pt-accept-modal", "pt-day-modal", "group-delete-modal"].forEach(function (id) {
           var el = document.getElementById(id);
           if (el) el.hidden = true;
         });
@@ -11477,6 +11512,26 @@
           });
       }
 
+      var pendingDeleteGroup = null;
+
+      function openGroupDeleteConfirm(group) {
+        pendingDeleteGroup = group || null;
+        var modal = document.getElementById("group-delete-modal");
+        var msg = document.getElementById("group-delete-msg");
+        if (!modal) return;
+        if (msg) {
+          var label = (group && group.name) || "Gruppe";
+          msg.textContent = 'Gruppe „' + label + '“ wirklich entfernen?';
+        }
+        modal.hidden = false;
+      }
+
+      function closeGroupDeleteConfirm() {
+        pendingDeleteGroup = null;
+        var modal = document.getElementById("group-delete-modal");
+        if (modal) modal.hidden = true;
+      }
+
       function deleteMyGroup(group) {
         if (!sessionAccount || !group || !group.id) return Promise.resolve();
         var gid = String(group.id);
@@ -11496,6 +11551,7 @@
           })
           .then(function () {
             syncHeuteFilterOptions();
+            closeGroupDeleteConfirm();
             if (document.body.dataset.plan === "team" || document.body.dataset.shell === "team") {
               renderTeam();
             }
@@ -11927,55 +11983,48 @@
             openGoSub("group", "Gruppe erstellen");
           });
           slide.appendChild(createBtn);
+          var nameRow = document.createElement("div");
+          nameRow.className = "team-slide__group-name-row";
           var nameEl = document.createElement("h3");
           nameEl.className = "team-slide__group-name";
           nameEl.textContent = (group && group.name) || "Gruppe";
-          slide.appendChild(nameEl);
-          var actions = document.createElement("div");
-          actions.className = "team-slide__group-actions";
-          var addFriend = document.createElement("button");
-          addFriend.type = "button";
-          addFriend.className = "team-slide__add-friend";
-          addFriend.setAttribute("aria-label", "Freunde einladen");
-          addFriend.innerHTML = '<span class="team-slide__add-friend-circle" aria-hidden="true">+</span>';
-          addFriend.addEventListener("click", function () { openTeamSearch("friend"); });
-          actions.appendChild(addFriend);
+          nameRow.appendChild(nameEl);
           var removeBtn = document.createElement("button");
           removeBtn.type = "button";
           removeBtn.className = "team-slide__group-remove";
-          removeBtn.textContent = "Gruppe entfernen";
+          removeBtn.setAttribute("aria-label", "Gruppe entfernen");
+          removeBtn.innerHTML =
+            '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>';
           removeBtn.addEventListener("click", function () {
-            var label = (group && group.name) || "Gruppe";
-            if (!window.confirm('Gruppe „' + label + '“ wirklich entfernen?')) return;
-            deleteMyGroup(group);
+            openGroupDeleteConfirm(group);
           });
-          actions.appendChild(removeBtn);
-          slide.appendChild(actions);
+          nameRow.appendChild(removeBtn);
+          slide.appendChild(nameRow);
           var desc = document.createElement("p");
           desc.className = "team-slide__about";
           desc.textContent = String((group && group.description) || "").trim();
           slide.appendChild(desc);
           var members = ((group && group.members) || []).map(String);
           var people = teamPeople.filter(function (person) { return person && members.indexOf(String(person.id)) >= 0; });
-          if (!people.length) {
-            var empty = document.createElement("p");
-            empty.className = "coach-empty";
-            empty.textContent = "Noch keine Freunde in dieser Gruppe.";
-            slide.appendChild(empty);
-          } else {
-            var membersRow = document.createElement("div");
-            membersRow.className = "team-slide__members";
-            people.forEach(function (person) {
-              var btn = document.createElement("button");
-              btn.type = "button";
-              btn.className = "team-slide__member";
-              btn.setAttribute("aria-label", person.name || "Mitglied");
-              btn.appendChild(personFace(person));
-              btn.addEventListener("click", function () { openProfile(person); });
-              membersRow.appendChild(btn);
-            });
-            slide.appendChild(membersRow);
-          }
+          var membersRow = document.createElement("div");
+          membersRow.className = "team-slide__members";
+          var addFriend = document.createElement("button");
+          addFriend.type = "button";
+          addFriend.className = "team-slide__add-friend";
+          addFriend.setAttribute("aria-label", "Freunde einladen");
+          addFriend.innerHTML = '<span class="team-slide__add-friend-circle" aria-hidden="true">+</span>';
+          addFriend.addEventListener("click", function () { openTeamSearch("friend"); });
+          membersRow.appendChild(addFriend);
+          people.forEach(function (person) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "team-slide__member";
+            btn.setAttribute("aria-label", person.name || "Mitglied");
+            btn.appendChild(personFace(person));
+            btn.addEventListener("click", function () { openProfile(person); });
+            membersRow.appendChild(btn);
+          });
+          slide.appendChild(membersRow);
           box.appendChild(slide);
         }
         if (!groups.length) {
@@ -16418,6 +16467,26 @@
       document.getElementById("profile-back").addEventListener("click", closeProfile);
       var goSubBack = document.getElementById("go-sub-back");
       if (goSubBack) goSubBack.addEventListener("click", closeGoSub);
+      (function bindGroupDeleteUi() {
+        var ok = document.getElementById("group-delete-ok");
+        if (ok) {
+          ok.addEventListener("click", function () {
+            if (!pendingDeleteGroup) {
+              closeGroupDeleteConfirm();
+              return;
+            }
+            deleteMyGroup(pendingDeleteGroup);
+          });
+        }
+        var cancel = document.getElementById("group-delete-cancel");
+        if (cancel) cancel.addEventListener("click", closeGroupDeleteConfirm);
+        var modal = document.getElementById("group-delete-modal");
+        if (modal) {
+          modal.addEventListener("click", function (event) {
+            if (event.target.id === "group-delete-modal") closeGroupDeleteConfirm();
+          });
+        }
+      })();
       (function bindPtUi() {
         var add = document.getElementById("pt-pick-add");
         if (add) add.addEventListener("click", function () {
