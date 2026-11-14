@@ -1628,10 +1628,12 @@
         var goingDown = y > last + 2;
         var goingUp = y < last - 2;
         var aboveToday = todayEl ? y + 40 < todayEl.offsetTop : false;
-        /* Ganz oben: Header zeigen. Runterscrollen oder in die Zukunft: ausblenden. */
+        /* Ganz oben zeigen; nach oben (Zukunft) soft weg; nach unten weg; zurück aus Historie wieder da */
         if (y <= 6) {
           row.classList.remove("is-scroll-hide");
-        } else if (goingDown || (goingUp && aboveToday)) {
+        } else if (goingUp && aboveToday) {
+          row.classList.add("is-scroll-hide");
+        } else if (goingDown) {
           row.classList.add("is-scroll-hide");
         } else if (goingUp && !aboveToday) {
           row.classList.remove("is-scroll-hide");
