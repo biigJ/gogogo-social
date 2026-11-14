@@ -13,7 +13,10 @@
     filter: "ich",
     observer: null,
     viewed: {},
-    pendingVis: "team"
+    pendingVis: "team",
+    userScrolledAktuell: false,
+    paintedAktuell: false,
+    refreshSeq: 0
   };
 
   var FILTER_KEY = "gogogo_heute_filter_v3";
@@ -1593,18 +1596,22 @@
     });
     html += "</div>";
 
-    state.userScrolledAktuell = false;
-    root.classList.add("is-centering");
+    var firstPaint = !state.paintedAktuell;
+    var scroller = welcomeScrollEl();
+    var keepScroll = !firstPaint && state.userScrolledAktuell ? scroller.scrollTop || 0 : null;
+    /* Feed sichtbar lassen — kein opacity-Flash bei Refresh */
+    root.classList.remove("is-centering");
     root.innerHTML = html;
+    state.paintedAktuell = true;
     bindObserver(root);
     bindHeuteScrollFilter();
-    /* Einmal mittig — danach nicht erneut springen (kein Flash / Scroll-Trap) */
-    function revealCentered() {
-      scrollCurrentToCenter({ soft: false, force: true });
-      root.classList.remove("is-centering");
-    }
     requestAnimationFrame(function () {
-      revealCentered();
+      if (keepScroll != null) {
+        scroller.scrollTop = keepScroll;
+        return;
+      }
+      /* Nur beim ersten Paint / ohne User-Scroll zentrieren */
+      scrollCurrentToCenter({ soft: false, force: true });
     });
     if (host.maybeAskHistoryShare) host.maybeAskHistoryShare();
   }
@@ -2529,6 +2536,7 @@
 
   function refresh() {
     if (!host || !me()) return Promise.resolve();
+    var seq = ++state.refreshSeq;
     var ffcReady = Promise.resolve();
     if (global.FFC && FFC.refreshHeute && FFC.user && FFC.user()) {
       ffcReady = Promise.resolve(FFC.refreshHeute()).catch(function () {});
@@ -2539,6 +2547,7 @@
         : Promise.resolve();
     return ffcReady
       .then(function () {
+        if (seq !== state.refreshSeq) return null;
         return Promise.all([
           loadStreak(),
           loadEigenCourse(),
@@ -2548,7 +2557,8 @@
           histReady
         ]);
       })
-      .then(function () {
+      .then(function (loaded) {
+        if (loaded == null || seq !== state.refreshSeq) return null;
         var ids = state.events.map(function (e) {
           return String(e.id);
         });
@@ -2569,12 +2579,21 @@
           loadSyntheticCommentKeys(synthetic)
         ]);
       })
-      .then(function () {
+      .then(function (ok) {
+        if (ok == null || seq !== state.refreshSeq) return;
         if (host.heuteDiaryComments) {
           mergeDiaryComments(host.heuteDiaryComments() || {});
         }
       })
-      .then(render);
+      .then(function () {
+        if (seq !== state.refreshSeq) return;
+        render();
+      });
+  }
+
+  function resetAktuellPaint() {
+    state.paintedAktuell = false;
+    state.userScrolledAktuell = false;
   }
 
   function install(h) {
@@ -2669,6 +2688,7 @@
     refresh: refresh,
     openDone: openDoneModal,
     scrollCurrentToCenter: scrollCurrentToCenter,
+    resetAktuellPaint: resetAktuellPaint,
     setFilter: function (v) {
       saveFilter(v);
       refresh();
