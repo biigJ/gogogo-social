@@ -312,14 +312,14 @@
   function descHtml(text) {
     var full = String(text || "").trim();
     if (!full) return "";
-    var lines = full.split(/\n+/);
-    var short = lines.slice(0, 5).join("\n");
-    if (short.length > 280) short = short.slice(0, 277) + "…";
-    var needsMore = short !== full || lines.length > 5;
-    if (!needsMore) return "<p>" + esc(full) + "</p>";
+    /* 5 Zeilen per CSS; (mehr) zum Aufklappen */
+    var approxLong = full.length > 160 || full.split(/\n+/).length > 5;
+    if (!approxLong) {
+      return '<p class="support-desc support-desc--short">' + esc(full) + "</p>";
+    }
     return (
-      '<p class="support-desc">' +
-      esc(short) +
+      '<p class="support-desc is-clamped">' +
+      esc(full) +
       ' <button type="button" class="support-more" data-support-more="1">mehr</button></p>' +
       '<p class="support-desc-full" hidden>' +
       esc(full) +
@@ -462,36 +462,32 @@
       if (!groups[t]) groups[t] = [];
       groups[t].push(p);
     });
-    groups.routine = (groups.routine || []).concat([{ _static: "routine" }]);
-    groups.zirkel = (groups.zirkel || []).concat([{ _static: "zirkel" }]);
+    /* Keine Extra-Kacheln (Routine/Zirkel) — nur buchbare Produkte */
     var html = "";
     TYPE_ORDER.forEach(function (t) {
       var list = groups[t] || [];
       if (!list.length) return;
       html +=
-        '<section class="support-section">' +
-        '<h2 class="support-h">' +
-        esc(TYPE_LABELS[t] || t) +
-        '</h2><div class="support-grid">';
-      list.forEach(function (p) {
-        if (p && p._static) html += staticCard(p._static);
-        else html += productCard(p);
-      });
-      html += "</div></section>";
-    });
-    Object.keys(groups).forEach(function (t) {
-      if (TYPE_ORDER.indexOf(t) >= 0) return;
-      var list = groups[t] || [];
-      if (!list.length) return;
-      html +=
-        '<section class="support-section">' +
+        '<section class="support-section support-section--cat">' +
         '<h2 class="support-h">' +
         esc(TYPE_LABELS[t] || t) +
         '</h2><div class="support-grid">' +
         list.map(productCard).join("") +
         "</div></section>";
     });
-    return html;
+    Object.keys(groups).forEach(function (t) {
+      if (TYPE_ORDER.indexOf(t) >= 0) return;
+      var list = groups[t] || [];
+      if (!list.length) return;
+      html +=
+        '<section class="support-section support-section--cat">' +
+        '<h2 class="support-h">' +
+        esc(TYPE_LABELS[t] || t) +
+        '</h2><div class="support-grid">' +
+        list.map(productCard).join("") +
+        "</div></section>";
+    });
+    return html || '<p class="support-empty">Noch keine Angebote geladen.</p>';
   }
 
   function render() {
@@ -510,7 +506,10 @@
     if (more) {
       var short = more.closest(".support-desc");
       var full = short && short.parentNode ? short.parentNode.querySelector(".support-desc-full") : null;
-      if (short) short.hidden = true;
+      if (short) {
+        short.classList.remove("is-clamped");
+        short.hidden = true;
+      }
       if (full) full.hidden = false;
       return;
     }

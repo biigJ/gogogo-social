@@ -1314,6 +1314,12 @@
     body.is-session[data-shell="heute"] .heute-filter-row {
       order: 0; display: flex; align-items: center; justify-content: center;
       gap: 14px; width: 100%; margin-top: 12px; box-sizing: border-box;
+      position: sticky; top: 0; z-index: 6; background: #F3EEE4;
+      padding: 8px 0 6px; transition: opacity .15s ease, transform .15s ease;
+    }
+    body.is-session[data-shell="heute"] .heute-filter-row.is-scroll-hide {
+      opacity: 0; pointer-events: none; transform: translateY(-8px);
+      position: absolute; visibility: hidden;
     }
     body.is-session[data-shell="heute"] .heute-filter-pick { display: flex; margin: 0; width: auto; }
     body.is-session[data-shell="heute"] .heute-filter-pick select {
@@ -1376,10 +1382,15 @@
     .support-root { padding: 8px 0 24px; }
     body.is-session[data-shell="kurse"] .support-root { display: block; }
     .support-section { margin: 0 0 22px; }
-    .support-h {
-      margin: 0 0 10px; font-family: "Playfair Display", Georgia, serif;
-      font-size: 22px; font-weight: 600; color: #2A2118;
-      display: block !important;
+    .support-h,
+    body.is-session[data-shell="kurse"] .support-h,
+    body.is-session[data-shell="kurse"] #support-root .support-h {
+      margin: 18px 0 10px !important;
+      font-family: "Playfair Display", Georgia, serif !important;
+      font-size: 22px !important; font-weight: 600 !important;
+      color: #2A2118 !important;
+      display: block !important; visibility: visible !important; opacity: 1 !important;
+      line-height: 1.2 !important;
     }
     .support-subh {
       margin: 12px 0 6px; font-size: 14px; font-weight: 700; color: #2A2118;
@@ -1388,6 +1399,11 @@
     .support-desc, .support-desc-full {
       margin: 0; font-size: 13px; line-height: 1.35; color: rgba(42,33,24,.75);
       white-space: pre-wrap;
+    }
+    .support-desc.is-clamped {
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5;
+      overflow: hidden; white-space: normal;
+      position: relative;
     }
     .support-more {
       border: 0; background: none; color: #2A2118; font: inherit; font-weight: 700;
@@ -1562,15 +1578,34 @@
       padding: 0 16px 8px; text-align: left; color: #F6F1E8;
       max-height: 46%; overflow: hidden;
     }
-    .wr-overlay > .wr-author {
-      min-height: 36px;
-      align-items: center;
+    .wr-bottom {
+      position: absolute; left: 0; right: 0; bottom: var(--wr-progress-h);
+      z-index: 3;
+      display: grid;
+      grid-template-columns: 1fr 52px;
+      align-items: start;
+      gap: 8px;
+      padding: 0 6px 8px 16px;
+      color: #F6F1E8;
+      pointer-events: none;
     }
-    .wr-overlay > .wr-when { margin: 0; }
-    .wr-overlay > .wr-title {
+    .wr-bottom > * { pointer-events: auto; }
+    .wr-bottom__main {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+      min-width: 0; padding-right: 4px;
+    }
+    .wr-bottom .wr-author {
+      min-height: 36px; align-items: center;
+    }
+    .wr-bottom .wr-when { margin: 0; }
+    .wr-bottom .wr-title {
       margin: 0;
       display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
       overflow: hidden;
+    }
+    .wr-bottom .wr-actions {
+      position: static; right: auto; bottom: auto;
+      padding-bottom: 0; margin-top: -3px;
     }
     .wr-overlay--empty {
       inset: 0; right: 0; bottom: 0; align-items: center; justify-content: flex-start;
@@ -1881,7 +1916,18 @@
     .acc-tool.is-done .acc-act-ico { opacity: .35; }
     .acc-tool__n { font-size: 13px; font-weight: 700; min-width: 1ch; }
     .acc-tool--bubble { color: #2A2118; }
+    .acc-tool--bubble .acc-bubble-icon,
+    .acc-tool--bubble .wr-ico { width: 30px; height: 30px; display: block; }
     .acc-badge-ico { display: block; color: #2A2118; }
+    .acc-card__emoji { display: none !important; }
+    .acc-card__teaser.is-empty { display: none; }
+    .acc-card__bar:not(:has(.acc-card__teaser:not([hidden]):not(.is-empty))) .acc-card__faces {
+      margin-bottom: 0;
+    }
+    .acc-comments[hidden] { display: none !important; }
+    .acc-comments:not([hidden]) {
+      margin-top: 8px; padding-top: 0; border-top: 0;
+    }
     .acc-card__actions {
       display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       margin: 0 0 8px; min-height: 0;
@@ -3019,6 +3065,9 @@
       font-size: calc(9px * 0.7); line-height: 1; letter-spacing: 0.01em;
     }
     .pill-ico { position: relative; display: block; width: 26px; height: 26px; }
+    .pill-ico img.pill-face {
+      width: 26px; height: 26px; border-radius: 50%; object-fit: cover; display: block;
+    }
     .pill-dot {
       position: absolute;
       top: -3px;
@@ -5129,7 +5178,7 @@
           <option value="alles">Alles</option>
         </select>
       </label>
-      <span class="heute-streak" id="heute-streak" title="Streak" hidden>0</span>
+      <span class="heute-streak" id="heute-streak" title="Streak: Tage in Folge" aria-label="Streak Tage in Folge" hidden>0</span>
     </div>
     <div class="heute-stories shell-heute" id="heute-stories" hidden>
       <div class="heute-stories__row ffc" id="heute-stories-row"><span class="heute-stories__team" id="heute-stories-team"></span></div>
@@ -5566,35 +5615,35 @@
     <nav aria-label="Bereiche">
       <button type="button" data-shell="heute" class="is-on" aria-label="Aktuell">
         <span class="pill-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.2 12 4.5l8 6.7"/><path d="M6.5 10.5V19.5h11V10.5"/><path d="M10 19.5v-5h4v5"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 10.5 12 5l7 5.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-3V20H6a1 1 0 0 1-1-1v-8.5z"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
         <small>Aktuell</small>
       </button>
       <button type="button" data-shell="woche" aria-label="Woche">
         <span class="pill-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3.5" width="10" height="17" rx="1.6"/><path d="M9.5 7h5M9.5 10.5h5M9.5 14h3.5"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M5 9h14"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
         <small>Woche</small>
       </button>
       <button type="button" data-shell="team" aria-label="Team">
         <span class="pill-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8.2" r="2.5"/><path d="M2.8 19c.5-3 2.7-4.8 5.2-4.8"/><circle cx="16" cy="8.2" r="2.5"/><path d="M21.2 19c-.5-3-2.7-4.8-5.2-4.8"/><circle cx="12" cy="7.4" r="2.7"/><path d="M5.4 19.2c.6-3.6 3.2-5.7 6.6-5.7s6 2.1 6.6 5.7"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="8" r="2.4"/><path d="M2.2 18.5c.4-2.6 2.2-4.1 3.8-4.1s3.4 1.5 3.8 4.1"/><circle cx="18" cy="8" r="2.4"/><path d="M14.2 18.5c.4-2.6 2.2-4.1 3.8-4.1s3.4 1.5 3.8 4.1"/><circle cx="12" cy="7.2" r="2.6"/><path d="M7.4 18.8c.5-3.1 2.7-4.9 4.6-4.9s4.1 1.8 4.6 4.9"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
         <small>Team</small>
       </button>
       <button type="button" data-shell="kurse" aria-label="Plus">
         <span class="pill-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 6v12M6 12h12"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
         <small>Plus</small>
       </button>
       <button type="button" data-shell="profil" aria-label="Profil">
-        <span class="pill-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linejoin="round" stroke-linecap="round"><circle cx="12" cy="8.2" r="3.4"/><path d="M5 19.5c.6-3.5 3.3-5.6 7-5.6s6.4 2.1 7 5.6"/></svg>
+        <span class="pill-ico" id="pill-profil-ico">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.2"/><path d="M5.2 19c.5-3.2 3-5.1 6.8-5.1s6.3 1.9 6.8 5.1"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
         <small>Profil</small>
@@ -6178,9 +6227,9 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-8"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-13"></script>
-  <script src="/natalyaalice/support.js?v=support-2"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-9"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-14"></script>
+  <script src="/natalyaalice/support.js?v=support-3"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -10303,6 +10352,26 @@
           var tab = btn.getAttribute("data-shell");
           dot.hidden = tab === "heute" ? !(planHasInvite() || diaryNote) : true;
         });
+        var profilIco = document.getElementById("pill-profil-ico");
+        if (profilIco) {
+          var photo = sessionAccount && sessionAccount.photo_url;
+          var face = profilIco.querySelector("img.pill-face");
+          var svg = profilIco.querySelector("svg");
+          if (photo) {
+            if (!face) {
+              face = document.createElement("img");
+              face.className = "pill-face";
+              face.alt = "";
+              profilIco.insertBefore(face, profilIco.firstChild);
+            }
+            face.src = photo;
+            face.hidden = false;
+            if (svg) svg.hidden = true;
+          } else {
+            if (face) face.hidden = true;
+            if (svg) svg.hidden = false;
+          }
+        }
       }
 
       function paintPlanTabs() {
@@ -11642,76 +11711,7 @@
           (parent || box).appendChild(row);
         }
 
-        // Coach first (Profil ist eigener Reiter)
-        // Slide: trainer
-        var trainer = null;
-        teamPeople.forEach(function (person) {
-          if (myTrainer && String(person.id) === myTrainer) trainer = person;
-        });
-        var coachSlide = document.createElement("article");
-        coachSlide.className = "team-slide is-scroll is-coach";
-        coachSlide.dataset.title = "Mein Coach";
-        coachSlide.appendChild(teamPortrait(
-          trainer,
-          trainer ? String(trainer.name || "?").slice(0, 1) : "C",
-          { fallbackSrc: "/assets/gogogo/gogogo-Coach-small.jpg" }
-        ));
-        var ptCta = document.createElement("button");
-        ptCta.type = "button";
-        ptCta.className = "team-slide__cta is-solid is-pt";
-        ptCta.textContent = "Personal Training";
-        ptCta.addEventListener("click", function () {
-          if (!trainer) {
-            openTeamSearch("trainer");
-            return;
-          }
-          requestPersonalTraining(trainer).then(function () {
-            setHome(true);
-            paintWelcome();
-            refreshFfcHeute(false);
-            setHeuteFilter("all");
-            paintHeuteJoins();
-          }).catch(function (err) {
-            alert((err && err.message) || "Anfrage fehlgeschlagen.");
-          });
-        });
-        coachSlide.appendChild(ptCta);
-        var nameRow = document.createElement("div");
-        nameRow.className = "team-slide__coach-name";
-        var nameEl = document.createElement("h3");
-        nameEl.className = "team-slide__coach-name-text";
-        nameEl.textContent = trainer ? (trainer.name || "Coach") : "Noch kein Coach";
-        nameRow.appendChild(nameEl);
-        var pick = document.createElement("button");
-        pick.type = "button";
-        pick.className = "team-slide__head-action";
-        pick.setAttribute("aria-label", trainer ? "Trainer ändern" : "Trainer wählen");
-        pick.innerHTML = PENCIL_ICON;
-        pick.addEventListener("click", function () { openTeamSearch("trainer"); });
-        nameRow.appendChild(pick);
-        if (trainer) {
-          var wa = document.createElement("button");
-          wa.type = "button";
-          wa.className = "team-wa";
-          wa.setAttribute("aria-label", "Sofortnachricht an Trainer");
-          wa.innerHTML = WA_ICON;
-          wa.addEventListener("click", function () { openQuickWa(); });
-          nameRow.appendChild(wa);
-        }
-        coachSlide.appendChild(nameRow);
-        var about = document.createElement("p");
-        about.className = "team-slide__about";
-        var aboutText = "";
-        if (trainer) {
-          var ta = profileAbout(trainer);
-          aboutText = String((ta && ta.text) || "").trim();
-        }
-        about.textContent = aboutText || (trainer ? "" : "Noch kein Coach gewählt.");
-        coachSlide.appendChild(about);
-        paintCoachAppointments(coachSlide, trainer);
-        box.appendChild(coachSlide);
-
-        // Slide 3: groups (one slide per group, or empty upload slide)
+        /* Reihenfolge: 1) Meine Gruppen, 2) Mein Coach, 3) Meine Coachees */
         var groups = myGroups();
         function groupSlide(group) {
           var slide = document.createElement("article");
@@ -11802,7 +11802,73 @@
           groups.forEach(groupSlide);
         }
 
-        // Slide 4: coachees
+        var trainer = null;
+        teamPeople.forEach(function (person) {
+          if (myTrainer && String(person.id) === myTrainer) trainer = person;
+        });
+        var coachSlide = document.createElement("article");
+        coachSlide.className = "team-slide is-scroll is-coach";
+        coachSlide.dataset.title = "Mein Coach";
+        coachSlide.appendChild(teamPortrait(
+          trainer,
+          trainer ? String(trainer.name || "?").slice(0, 1) : "C",
+          { fallbackSrc: "/assets/gogogo/gogogo-Coach-small.jpg" }
+        ));
+        var ptCta = document.createElement("button");
+        ptCta.type = "button";
+        ptCta.className = "team-slide__cta is-solid is-pt";
+        ptCta.textContent = "Personal Training";
+        ptCta.addEventListener("click", function () {
+          if (!trainer) {
+            openTeamSearch("trainer");
+            return;
+          }
+          requestPersonalTraining(trainer).then(function () {
+            setHome(true);
+            paintWelcome();
+            refreshFfcHeute(false);
+            setHeuteFilter("all");
+            paintHeuteJoins();
+          }).catch(function (err) {
+            alert((err && err.message) || "Anfrage fehlgeschlagen.");
+          });
+        });
+        coachSlide.appendChild(ptCta);
+        var nameRow = document.createElement("div");
+        nameRow.className = "team-slide__coach-name";
+        var nameEl = document.createElement("h3");
+        nameEl.className = "team-slide__coach-name-text";
+        nameEl.textContent = trainer ? (trainer.name || "Coach") : "Noch kein Coach";
+        nameRow.appendChild(nameEl);
+        var pick = document.createElement("button");
+        pick.type = "button";
+        pick.className = "team-slide__head-action";
+        pick.setAttribute("aria-label", trainer ? "Trainer ändern" : "Trainer wählen");
+        pick.innerHTML = PENCIL_ICON;
+        pick.addEventListener("click", function () { openTeamSearch("trainer"); });
+        nameRow.appendChild(pick);
+        if (trainer) {
+          var wa = document.createElement("button");
+          wa.type = "button";
+          wa.className = "team-wa";
+          wa.setAttribute("aria-label", "Sofortnachricht an Trainer");
+          wa.innerHTML = WA_ICON;
+          wa.addEventListener("click", function () { openQuickWa(); });
+          nameRow.appendChild(wa);
+        }
+        coachSlide.appendChild(nameRow);
+        var about = document.createElement("p");
+        about.className = "team-slide__about";
+        var aboutText = "";
+        if (trainer) {
+          var ta = profileAbout(trainer);
+          aboutText = String((ta && ta.text) || "").trim();
+        }
+        about.textContent = aboutText || (trainer ? "" : "Noch kein Coach gewählt.");
+        coachSlide.appendChild(about);
+        paintCoachAppointments(coachSlide, trainer);
+        box.appendChild(coachSlide);
+
         var coacheeSlide = document.createElement("article");
         coacheeSlide.className = "team-slide is-scroll";
         coacheeSlide.dataset.title = "Meine Coachees";

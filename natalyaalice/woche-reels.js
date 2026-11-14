@@ -840,7 +840,7 @@
     if (ev.enrollment_id || ev.item_type === "course_session") {
       return '<span class="wr-pill">Kurs</span>';
     }
-    if (ev.is_unplanned) return '<span class="wr-pill">Spontan</span>';
+    /* Kein „Spontan“-Pill neben dem Nutzer-Icon */
     return "";
   }
 
@@ -979,11 +979,11 @@
       (ev.photo_url
         ? '<img class="wr-photo" src="' + esc(ev.photo_url) + '" alt="" />'
         : "") +
-      '<div class="wr-overlay">' +
+      '<div class="wr-bottom">' +
+      '<div class="wr-bottom__main">' +
       '<div class="wr-author">' +
       avatarHtml(p) +
       inviteAvatarsHtml(iso) +
-      coursePill(ev) +
       "</div>" +
       (when ? '<p class="wr-when">' + esc(when) + "</p>" : "") +
       '<h2 class="wr-title">' +
@@ -996,7 +996,7 @@
       travelHint +
       "</div>" +
       actionColHtml(item) +
-      "</div></div>"
+      "</div></div></div>"
     );
   }
 
@@ -1434,11 +1434,85 @@
         '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
     );
     requestAnimationFrame(function () {
-      requestAnimationFrame(scrollTimeColsToSelection);
+      requestAnimationFrame(function () {
+        scrollTimeColsToSelection();
+        bindTimeWheelScroll();
+        syncTimeWheelFromScroll();
+      });
+    });
+  }
+
+  function berlinOffsetSuffix(iso) {
+    try {
+      var probe = new Date(iso + "T12:00:00Z");
+      var parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: "Europe/Berlin",
+        timeZoneName: "longOffset",
+        hour: "2-digit"
+      }).formatToParts(probe);
+      var name = "";
+      parts.forEach(function (p) {
+        if (p.type === "timeZoneName") name = p.value;
+      });
+      var m = String(name || "").match(/GMT([+-]\d{1,2})(?::?(\d{2}))?/i);
+      if (m) {
+        var hh = Number(m[1]);
+        var sign = hh < 0 || String(m[1]).charAt(0) === "-" ? "-" : "+";
+        var abs = Math.abs(hh);
+        return sign + pad2(abs) + ":" + (m[2] || "00");
+      }
+    } catch (e) {}
+    return "+01:00";
+  }
+
+  function syncTimeWheelFromScroll() {
+    var wheel = $("wr-time-wheel");
+    if (!wheel) return;
+    ["wr-time-h", "wr-time-m"].forEach(function (id) {
+      var col = $(id);
+      if (!col) return;
+      var mid = col.scrollTop + col.clientHeight / 2;
+      var best = null;
+      var bestDist = Infinity;
+      col.querySelectorAll(".wr-time-opt").forEach(function (opt) {
+        var c = opt.offsetTop + opt.clientHeight / 2;
+        var d = Math.abs(c - mid);
+        if (d < bestDist) {
+          bestDist = d;
+          best = opt;
+        }
+      });
+      if (!best) return;
+      col.querySelectorAll(".wr-time-opt").forEach(function (opt) {
+        opt.classList.toggle("is-on", opt === best);
+      });
+      if (id === "wr-time-h") {
+        wheel.setAttribute("data-h", best.getAttribute("data-wr-time-h"));
+      } else {
+        wheel.setAttribute("data-m", best.getAttribute("data-wr-time-m"));
+      }
+    });
+  }
+
+  function bindTimeWheelScroll() {
+    ["wr-time-h", "wr-time-m"].forEach(function (id) {
+      var col = $(id);
+      if (!col || col._wrTimeBound) return;
+      col._wrTimeBound = true;
+      var timer = 0;
+      col.addEventListener(
+        "scroll",
+        function () {
+          window.clearTimeout(timer);
+          timer = window.setTimeout(syncTimeWheelFromScroll, 40);
+        },
+        { passive: true }
+      );
     });
   }
 
   function saveEventTime(eventId) {
+    syncTimeWheelFromScroll();
     var wheel = $("wr-time-wheel");
     var h = wheel ? Number(wheel.getAttribute("data-h") || 18) : 18;
     var m = wheel ? Number(wheel.getAttribute("data-m") || 0) : 0;
@@ -1448,13 +1522,21 @@
     })[0];
     if (!ev) return;
     var iso = dayKey(ev.starts_at);
-    var starts = iso + "T" + val + ":00+01:00";
+    var starts = iso + "T" + val + ":00" + berlinOffsetSuffix(iso);
     return rest("events?id=eq." + encodeURIComponent(eventId), {
       method: "PATCH",
-      prefer: "return=minimal",
+      prefer: "return=representation",
       body: { starts_at: starts }
     })
-      .then(function () {
+      .then(function (rows) {
+        var updated = Array.isArray(rows) ? rows[0] : rows;
+        if (updated && updated.starts_at) {
+          state.events = state.events.map(function (e) {
+            return String(e.id) === String(eventId) ? Object.assign({}, e, updated) : e;
+          });
+        } else {
+          ev.starts_at = starts;
+        }
         closeSheet();
         return refreshKeepDay(iso);
       })
@@ -1586,17 +1668,29 @@
         '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
     );
     requestAnimationFrame(function () {
-      requestAnimationFrame(scrollTimeColsToSelection);
+      requestAnimationFrame(function () {
+        scrollTimeColsToSelection();
+        bindTimeWheelScroll();
+        syncTimeWheelFromScroll();
+      });
     });
   }
 
   function confirmPendingCreate() {
     var p = state.pendingCreate;
     if (!p || !p.iso) return Promise.resolve();
+    syncTimeWheelFromScroll();
     var wheel = $("wr-time-wheel");
     var h = wheel ? Number(wheel.getAttribute("data-h") || 18) : 18;
     var m = wheel ? Number(wheel.getAttribute("data-m") || 0) : 0;
-    var starts = p.iso + "T" + pad2(h) + ":" + pad2(m) + ":00+01:00";
+    var starts =
+      p.iso +
+      "T" +
+      pad2(h) +
+      ":" +
+      pad2(m) +
+      ":00" +
+      berlinOffsetSuffix(p.iso);
     var keepIso = p.iso;
     var replaceId = p.replaceId || null;
 

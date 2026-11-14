@@ -562,9 +562,9 @@
   }
 
   function bubbleSvg() {
-    /* Gleich wie Woche-Kommentar-Icon */
+    /* Identisch zu Woche wr-ico Kommentar (30×30) */
     return (
-      '<svg class="acc-bubble-icon" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+      '<svg class="acc-bubble-icon wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3v-3H7.5A2.5 2.5 0 0 1 5 13.5v-7z"/>' +
       "</svg>"
     );
@@ -572,16 +572,17 @@
 
   function checkSvg() {
     return (
-      '<svg class="acc-act-ico" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+      '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
       '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>'
     );
   }
 
   function badgeSvg(kind) {
     if (kind === "plan") {
+      /* Gleich wie Pill-Woche: breites Kalenderblatt + eine Linie */
       return (
-        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
-        '<rect x="7" y="3.5" width="10" height="17" rx="1.6"/><path d="M9.5 7h5M9.5 10.5h5M9.5 14h3.5"/></svg>'
+        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+        '<rect x="5" y="4" width="14" height="16" rx="2"/><path d="M5 9h14"/></svg>'
       );
     }
     if (kind === "zirkel") {
@@ -649,25 +650,27 @@
     var postId = opts.postId || "";
     if (!postId) return opts.actions || "";
     var mine = myCommentText(postId);
-    var teaser = mine ? mine : "…";
+    /* Kommentar-Feld erst nach Tippen auf Sprechblase; teaser nur mit Text */
+    var teaserBlock = mine
+      ? '<div class="acc-card__teaser">' +
+        '<button type="button" class="acc-card__my-line" data-open-comments="' +
+        esc(postId) +
+        '">' +
+        esc(mine) +
+        "</button></div>"
+      : '<div class="acc-card__teaser is-empty" hidden></div>';
     return (
       '<div class="acc-card__bar">' +
       (opts.actions || "") +
       inviteFaceRowHtml(postId, opts.inviteIso || "") +
-      '<div class="acc-card__teaser">' +
-      '<button type="button" class="acc-card__my-line" data-open-comments="' +
-      esc(postId) +
-      '">' +
-      esc(teaser) +
-      "</button>" +
-      "</div>" +
+      teaserBlock +
       '<div class="acc-comments" data-comments="' +
       esc(postId) +
       '" hidden>' +
       '<form class="acc-comment-form" data-comment-form="' +
       esc(postId) +
       '">' +
-      '<input type="text" class="acc-comment-input" maxlength="500" placeholder="Kommentar nach dem Training…" aria-label="Kommentar" />' +
+      '<input type="text" class="acc-comment-input" maxlength="500" placeholder="Kommentar" aria-label="Kommentar" />' +
       "</form></div>" +
       "</div>"
     );
@@ -756,11 +759,8 @@
       return '<img class="acc-card__photo" src="' + esc(opts.photo) + '" alt="" />';
     }
     if (opts.plus) return '<span class="acc-card__plus">+</span>';
-    return (
-      '<span class="acc-card__emoji" aria-hidden="true">' +
-      esc(opts.emoji || "") +
-      "</span>"
-    );
+    /* Kein zentrales Platzhalter-Emoji auf dem Frame */
+    return "";
   }
 
   function overlayHtml(opts) {
@@ -1277,24 +1277,70 @@
     var feed = buildFeedItems(flags);
     root.hidden = false;
     var html = "";
-    /* 1) Heute (meine) */
-    feed.myToday.forEach(function (item) {
-      html += renderFeedItem(item);
-    });
-    /* 2) Spontan direkt unter Heute-Event(s) */
-    html += renderSpontanCard();
-    /* 3) Kommende */
+    /* Oben = Zukunft (Scroll nach oben), Mitte = Heute, Unten = Vergangenheit */
+    html += '<div class="acc-feed-future" data-acc-zone="future">';
     feed.upcoming.forEach(function (item) {
       html += renderFeedItem(item);
     });
-    /* 4) Historie */
+    html += "</div>";
+    html += '<div class="acc-feed-today" data-acc-zone="today" id="acc-feed-today">';
+    feed.myToday.forEach(function (item) {
+      html += renderFeedItem(item);
+    });
+    html += renderSpontanCard();
+    html += "</div>";
+    html += '<div class="acc-feed-past" data-acc-zone="past">';
     feed.history.forEach(function (item) {
       html += renderFeedItem(item);
     });
+    html += "</div>";
 
     root.innerHTML = html;
     bindObserver(root);
+    requestAnimationFrame(function () {
+      var todayEl = $("acc-feed-today");
+      var scroller = welcomeScrollEl();
+      if (todayEl && scroller) {
+        var top = todayEl.offsetTop - 12;
+        if (top > 0) scroller.scrollTop = top;
+      }
+      bindHeuteScrollFilter();
+    });
     if (host.maybeAskHistoryShare) host.maybeAskHistoryShare();
+  }
+
+  function welcomeScrollEl() {
+    return (
+      document.querySelector(".welcome") ||
+      document.scrollingElement ||
+      document.documentElement
+    );
+  }
+
+  function bindHeuteScrollFilter() {
+    var row = document.querySelector(".heute-filter-row");
+    var scroller = welcomeScrollEl();
+    if (!row || !scroller || scroller._heuteFilterBound) return;
+    scroller._heuteFilterBound = true;
+    var last = scroller.scrollTop || 0;
+    scroller.addEventListener(
+      "scroll",
+      function () {
+        if (document.body.dataset.shell !== "heute") return;
+        var y = scroller.scrollTop || 0;
+        var todayEl = $("acc-feed-today");
+        var goingUp = y < last - 2;
+        var aboveToday = todayEl ? y + 40 < todayEl.offsetTop : false;
+        /* Nach oben in die Zukunft: Dropdown ausblenden, nicht sticky mitscrollen */
+        if (goingUp && aboveToday) {
+          row.classList.add("is-scroll-hide");
+        } else if (!aboveToday) {
+          row.classList.remove("is-scroll-hide");
+        }
+        last = y;
+      },
+      { passive: true }
+    );
   }
 
   function setDoneVis(want) {
@@ -1544,11 +1590,17 @@
     }
     if (!panel) return;
     var teaser = card && card.querySelector(".acc-card__teaser");
-    if (teaser) teaser.hidden = true;
+    if (teaser) {
+      teaser.hidden = true;
+      teaser.classList.add("is-composing");
+    }
     panel.hidden = false;
     panel.classList.add("is-open");
     var input = panel.querySelector(".acc-comment-input");
-    if (input) input.focus();
+    if (input) {
+      input.value = "";
+      input.focus();
+    }
   }
 
   function addComment(postId, text) {
