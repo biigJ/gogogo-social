@@ -1071,17 +1071,11 @@
       '<span class="wr-travel-emoji" aria-hidden="true">🛫</span>' +
       "</button>" +
       '<div class="wr-week-nav">' +
-      '<button type="button" class="wr-icon-btn" data-wr-week="-1" aria-label="Vorheriger Zeitraum"' +
-      (state.editMode ? " disabled" : "") +
-      ">‹</button>" +
       '<button type="button" class="wr-week-label" data-wr-week-menu="1"' +
       (state.editMode ? " disabled" : "") +
-      ">" +
+      '><span class="wr-week-label__text">' +
       esc(label) +
-      " ⌄</button>" +
-      '<button type="button" class="wr-icon-btn" data-wr-week="1" aria-label="Nächster Zeitraum"' +
-      (state.editMode ? " disabled" : "") +
-      ">›</button>" +
+      '</span><svg class="wr-week-label__chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>' +
       "</div>" +
       '<button type="button" class="wr-icon-btn' +
       (state.editMode ? " is-on" : "") +
