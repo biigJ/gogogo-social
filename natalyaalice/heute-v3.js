@@ -2534,31 +2534,36 @@
     addComment(eventId, text);
   }
 
+  function softTimeout(promise, ms) {
+    return Promise.race([
+      Promise.resolve(promise).catch(function () {}),
+      new Promise(function (resolve) {
+        setTimeout(resolve, ms || 2500);
+      })
+    ]);
+  }
+
   function refresh() {
     if (!host || !me()) return Promise.resolve();
     var seq = ++state.refreshSeq;
-    var ffcReady = Promise.resolve();
-    if (global.FFC && FFC.refreshHeute && FFC.user && FFC.user()) {
-      ffcReady = Promise.resolve(FFC.refreshHeute()).catch(function () {});
+    function stillCurrent() {
+      return seq === state.refreshSeq;
     }
     var histReady =
       host.prepareHeuteHistory
         ? Promise.resolve(host.prepareHeuteHistory()).catch(function () {})
         : Promise.resolve();
-    return ffcReady
+    /* Kern-Feed zuerst — nicht auf FFC warten (sonst bleibt Aktuell leer) */
+    return Promise.all([
+      loadStreak(),
+      loadEigenCourse(),
+      loadEnrollments(),
+      loadEvents(),
+      loadFfcEvents(),
+      histReady
+    ])
       .then(function () {
-        if (seq !== state.refreshSeq) return null;
-        return Promise.all([
-          loadStreak(),
-          loadEigenCourse(),
-          loadEnrollments(),
-          loadEvents(),
-          loadFfcEvents(),
-          histReady
-        ]);
-      })
-      .then(function (loaded) {
-        if (loaded == null || seq !== state.refreshSeq) return null;
+        if (!stillCurrent()) return null;
         var ids = state.events.map(function (e) {
           return String(e.id);
         });
@@ -2580,14 +2585,23 @@
         ]);
       })
       .then(function (ok) {
-        if (ok == null || seq !== state.refreshSeq) return;
+        if (ok == null || !stillCurrent()) return;
         if (host.heuteDiaryComments) {
           mergeDiaryComments(host.heuteDiaryComments() || {});
         }
+        render();
       })
       .then(function () {
-        if (seq !== state.refreshSeq) return;
-        render();
+        if (!stillCurrent()) return;
+        if (!(global.FFC && FFC.refreshHeute && FFC.user && FFC.user())) return;
+        /* FFC nachziehen — mit Timeout, damit nichts hängen bleibt */
+        return softTimeout(FFC.refreshHeute(), 2800).then(function () {
+          if (!stillCurrent()) return;
+          return loadFfcEvents().then(function () {
+            if (!stillCurrent()) return;
+            render();
+          });
+        });
       });
   }
 
@@ -2681,6 +2695,12 @@
       }
     }
     interceptGoKinds();
+    /* Sofort Plan-Karten zeigen — nicht auf langsames Netzwerk warten */
+    if (me()) {
+      try {
+        render();
+      } catch (ePaint) {}
+    }
   }
 
   global.HeuteAccountability = {
