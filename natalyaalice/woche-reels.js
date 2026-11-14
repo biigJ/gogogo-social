@@ -26,12 +26,42 @@
 
   var ROOT_ID = "woche-reels";
   var REST_DAYS = ["Spaziergang", "Mobility", "Radfahren", "Sauna"];
+  var ALTERNATIVE_CHOICES = [
+    "> 5.000 Schritte",
+    "> 10.000 Schritte",
+    "> 20.000 Schritte",
+    "Mannschaftssport",
+    "Radtour",
+    "Yoga / Pilates",
+    "Fitnesskurs",
+    "Tanzen"
+  ];
   var TRAIN_CATS = { kraft: 1, ausdauer: 1, zirkel: 1 };
   var WEEK_MODES = [
     { id: "from_today", label: "Ab heute" },
     { id: "next_week", label: "Nächste Woche" }
   ];
   var CAT_LABELS = { kraft: "Kraft", ausdauer: "Ausdauer", zirkel: "Zirkel" };
+  /* Spiegel der Trainingsliste → Kurse (idempotent per slug) */
+  var TRAINING_DEFS = [
+    { slug: "training-krafttraining", title: "Einfache Basics", category: "kraft" },
+    { slug: "training-full", title: "Ganzkörpertraining", category: "kraft" },
+    { slug: "training-upper", title: "Oberkörpertraining", category: "kraft" },
+    { slug: "training-lower", title: "Unterkörpertraining", category: "kraft" },
+    { slug: "training-legs", title: "Beintraining", category: "kraft" },
+    { slug: "training-glutes", title: "Glutes/Legs", category: "kraft" },
+    { slug: "training-athletic", title: "Athletic Day", category: "kraft" },
+    { slug: "training-push", title: "Push Day", category: "kraft" },
+    { slug: "training-pull", title: "Pull Day", category: "kraft" },
+    { slug: "ausdauer-run", title: "Laufen", category: "ausdauer" },
+    { slug: "ausdauer-bike", title: "Radfahren", category: "ausdauer" },
+    { slug: "ausdauer-row", title: "Rudern", category: "ausdauer" },
+    { slug: "ausdauer-swim", title: "Schwimmen", category: "ausdauer" },
+    { slug: "ausdauer-walk", title: "Gehen", category: "ausdauer" },
+    { slug: "ausdauer-hike", title: "Wandern", category: "ausdauer" },
+    { slug: "training-zirkel", title: "Zirkeltraining", category: "zirkel" }
+  ];
+  var TRAVEL_MAX_DAYS = 14;
 
   var ICON_CHECK =
     '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>';
@@ -411,6 +441,63 @@
           .catch(function () {
             state.courses = [];
           });
+      });
+  }
+
+  function ensureTrainingCourses() {
+    var coachId = me();
+    if (!coachId) return loadCourses();
+    var slugList = TRAINING_DEFS.map(function (d) {
+      return d.slug;
+    }).join(",");
+    return rest(
+      "courses?slug=in.(" +
+        slugList +
+        ")&select=id,slug,is_active,title,category_default"
+    )
+      .catch(function () {
+        return [];
+      })
+      .then(function (existing) {
+        var have = {};
+        (existing || []).forEach(function (c) {
+          if (c && c.slug) have[c.slug] = c;
+        });
+        var jobs = TRAINING_DEFS.map(function (d) {
+          var row = have[d.slug];
+          if (row && row.is_active === false) {
+            return rest("courses?id=eq." + encodeURIComponent(row.id), {
+              method: "PATCH",
+              prefer: "return=minimal",
+              body: { is_active: true, title: d.title, category_default: d.category }
+            }).catch(function () {
+              return null;
+            });
+          }
+          if (row) return Promise.resolve(null);
+          return rest("courses", {
+            method: "POST",
+            prefer: "return=representation",
+            body: {
+              title: d.title,
+              slug: d.slug,
+              category_default: d.category,
+              duration_weeks: 1,
+              sessions_per_week: 1,
+              price_eur: 0,
+              description: "Training → Kurs",
+              coach_id: coachId,
+              source: "own",
+              is_active: true
+            }
+          }).catch(function () {
+            return null;
+          });
+        });
+        return Promise.all(jobs);
+      })
+      .then(function () {
+        return loadCourses();
       });
   }
 
@@ -893,7 +980,47 @@
     );
   }
 
+  function parseRgb(color) {
+    if (!color) return null;
+    var m = String(color).match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    if (!m) return null;
+    return { r: +m[1], g: +m[2], b: +m[3] };
+  }
+
+  function isLightRgb(rgb) {
+    if (!rgb) return false;
+    /* relative luminance */
+    var lum = (0.2126 * rgb.r + 0.7152 * rgb.g + 0.0722 * rgb.b) / 255;
+    return lum > 0.55;
+  }
+
+  function currentDayMediaEl() {
+    var track = $("wr-vtrack");
+    if (!track || !track.children.length) return null;
+    var ix = Math.max(0, Math.min(track.children.length - 1, state.dayIndex));
+    var day = track.children[ix];
+    return day.querySelector ? day.querySelector(".wr-media") : null;
+  }
+
+  function applyDayContrast() {
+    var root = $(ROOT_ID);
+    if (!root) return;
+    var media = currentDayMediaEl();
+    var rgb = media ? parseRgb(window.getComputedStyle(media).backgroundColor) : null;
+    var light = isLightRgb(rgb);
+    root.classList.toggle("is-light-day", light);
+    root.classList.toggle("is-dark-day", !light);
+  }
+
+  function patchDayLabel() {
+    var el = document.querySelector("#" + ROOT_ID + " .wr-day-label");
+    if (!el) return;
+    el.textContent = formatDayLong(currentDayIso());
+  }
+
   function syncSurface() {
+    applyDayContrast();
+    patchDayLabel();
     if (host && typeof host.syncStatusFade === "function") {
       try {
         host.syncStatusFade();
@@ -1065,35 +1192,88 @@
     if (sheet) sheet.hidden = true;
   }
 
-  function openTravelSheet() {
-    openSheet(
-      '<h3>Unterwegs bis</h3>' +
-        '<div class="wr-chips">' +
-        '<button type="button" class="wr-chip" data-wr-travel-days="1">Morgen</button>' +
-        '<button type="button" class="wr-chip is-on" data-wr-travel-days="3">3 Tage</button>' +
-        '<button type="button" class="wr-chip" data-wr-travel-days="7">1 Woche</button>' +
-        "</div>" +
-        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-travel-go="3">Los</button>' +
-        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+  function travelWheelHtml(selected) {
+    selected = Math.max(1, Math.min(TRAVEL_MAX_DAYS, Number(selected) || 3));
+    var opts = "";
+    for (var d = 1; d <= TRAVEL_MAX_DAYS; d++) {
+      opts +=
+        '<button type="button" class="wr-time-opt' +
+        (d === selected ? " is-on" : "") +
+        '" data-wr-travel-pick="' +
+        d +
+        '">' +
+        (d === 1 ? "1 Tag" : d + " Tage") +
+        "</button>";
+    }
+    return (
+      '<div class="wr-time-wheel wr-travel-wheel" id="wr-travel-wheel" data-days="' +
+      selected +
+      '">' +
+      '<div class="wr-time-col" id="wr-travel-col">' +
+      opts +
+      "</div>" +
+      '<div class="wr-time-fade wr-time-fade--top" aria-hidden="true"></div>' +
+      '<div class="wr-time-fade wr-time-fade--bot" aria-hidden="true"></div>' +
+      '<div class="wr-time-center" aria-hidden="true"></div>' +
+      "</div>"
     );
   }
 
+  function scrollTravelCol() {
+    var col = $("wr-travel-col");
+    if (!col) return;
+    var on = col.querySelector(".wr-time-opt.is-on");
+    if (on) {
+      col.scrollTop = Math.max(0, on.offsetTop - col.clientHeight / 2 + on.clientHeight / 2);
+    }
+  }
+
+  function openTravelSheet() {
+    openSheet(
+      "<h3>Unterwegs bis</h3>" +
+        '<p class="wr-sheet-hint">Tage drehen</p>' +
+        travelWheelHtml(3) +
+        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-travel-go="1">Los</button>' +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+    requestAnimationFrame(function () {
+      requestAnimationFrame(scrollTravelCol);
+    });
+  }
+
   function openRestSheet(iso) {
+    var altBlock =
+      '<div class="wr-cat-block"><h4>Alternative</h4><div class="wr-chips">' +
+      ALTERNATIVE_CHOICES.map(function (t) {
+        return (
+          '<button type="button" class="wr-chip" data-wr-rest-pick="' +
+          esc(t) +
+          '" data-iso="' +
+          esc(iso) +
+          '">' +
+          esc(t) +
+          "</button>"
+        );
+      }).join("") +
+      "</div></div>";
+    var restBlock =
+      '<div class="wr-cat-block"><h4>Erholung</h4><div class="wr-chips">' +
+      REST_DAYS.map(function (t) {
+        return (
+          '<button type="button" class="wr-chip" data-wr-rest-pick="' +
+          esc(t) +
+          '" data-iso="' +
+          esc(iso) +
+          '">' +
+          esc(t) +
+          "</button>"
+        );
+      }).join("") +
+      "</div></div>";
     openSheet(
       "<h3>Bewegung</h3>" +
-        '<div class="wr-chips">' +
-        REST_DAYS.map(function (t) {
-          return (
-            '<button type="button" class="wr-chip" data-wr-rest-pick="' +
-            esc(t) +
-            '" data-iso="' +
-            esc(iso) +
-            '">' +
-            esc(t) +
-            "</button>"
-          );
-        }).join("") +
-        "</div>" +
+        altBlock +
+        restBlock +
         '<label class="wr-field">Freier Titel<input type="text" id="wr-rest-title" maxlength="80" placeholder="z. B. Spaziergang" /></label>' +
         '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-rest-save="' +
         esc(iso) +
@@ -1137,17 +1317,12 @@
         .join("");
       openSheet(
         "<h3>Kurs wählen</h3>" +
-          (body ||
-            "<p>Keine aktiven Kurse. Bitte go-trainings-to-courses.sql ausführen.</p>") +
+          (body || "<p>Trainingskurse werden vorbereitet… Bitte erneut tippen.</p>") +
           '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
       );
     }
-    if (state.courses && state.courses.length) {
-      paint();
-      return;
-    }
     openSheet("<h3>Kurs wählen</h3><p>Lade…</p>");
-    loadCourses().then(paint);
+    ensureTrainingCourses().then(paint).catch(paint);
   }
 
   function openWeekMenu() {
@@ -1768,7 +1943,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-train],[data-wr-add-rest],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-day-course],[data-wr-travel-days],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-train],[data-wr-add-rest],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -1855,21 +2030,26 @@
       );
       return;
     }
-    if (t.hasAttribute("data-wr-travel-days")) {
-      var d = t.getAttribute("data-wr-travel-days");
-      t.parentNode.querySelectorAll(".wr-chip").forEach(function (c) {
-        c.classList.toggle("is-on", c === t);
+    if (t.hasAttribute("data-wr-travel-pick")) {
+      var daysPick = t.getAttribute("data-wr-travel-pick");
+      var wheelT = $("wr-travel-wheel");
+      if (wheelT) wheelT.setAttribute("data-days", daysPick);
+      t.parentNode.querySelectorAll(".wr-time-opt").forEach(function (b) {
+        b.classList.toggle("is-on", b === t);
       });
-      var go = document.querySelector("[data-wr-travel-go]");
-      if (go) go.setAttribute("data-wr-travel-go", d);
+      t.scrollIntoView({ block: "center", behavior: "smooth" });
       return;
     }
     if (t.hasAttribute("data-wr-travel-go")) {
-      applyTravel(Number(t.getAttribute("data-wr-travel-go") || 3));
+      var wheelGo = $("wr-travel-wheel");
+      var nDays = wheelGo
+        ? Number(wheelGo.getAttribute("data-days") || 3)
+        : 3;
+      applyTravel(Math.max(1, Math.min(TRAVEL_MAX_DAYS, nDays || 3)));
       return;
     }
     if (t.getAttribute("data-wr-book")) {
-      loadCourses().then(function () {
+      ensureTrainingCourses().then(function () {
         openBookSheet(1, { course: null, start: null, weekdays: [] });
       });
       return;
@@ -2233,8 +2413,11 @@
     if (next !== state.dayIndex) {
       state.dayIndex = next;
       state.eventIndex = 0;
+      patchDayLabel();
       if (state.editMode) patchEditPanelEvRow();
       syncSurface();
+    } else {
+      patchDayLabel();
     }
   }
 
@@ -2252,7 +2435,9 @@
       }),
       loadFfc().catch(function () {}),
       loadEnrollments().catch(function () {}),
-      loadCourses().catch(function () {})
+      ensureTrainingCourses().catch(function () {
+        return loadCourses().catch(function () {});
+      })
     ])
       .then(function () {
         var ids = (state.events || []).map(function (e) {
@@ -2288,7 +2473,12 @@
         render();
       } catch (e2) {}
     }
-    return Promise.all([loadCourses().catch(function () {}), refresh()]);
+    return Promise.all([
+      ensureTrainingCourses().catch(function () {
+        return loadCourses().catch(function () {});
+      }),
+      refresh()
+    ]);
   }
 
   function hide() {
