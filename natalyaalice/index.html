@@ -2126,9 +2126,23 @@
     body.is-session[data-shell="plan"] .shell-plan { order: 8; }
     body.is-session[data-shell="team"] #team-rail-nav { order: 1; }
     body.is-session[data-shell="team"] #plan-team { order: 2; }
-    body.is-session[data-shell="kurse"] #go-rail-nav { display: none !important; }
     body.is-session[data-shell="kurse"] #support-root { display: none !important; }
-    body.is-session[data-shell="kurse"] #go-rail { order: 0; }
+    body.is-session[data-shell="kurse"] #plan-training {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      order: 0;
+      width: 100%;
+    }
+    body.is-session[data-shell="kurse"] #go-rail-nav {
+      display: grid !important;
+      order: 0;
+      flex: 0 0 auto;
+      padding: 8px 16px 4px;
+      margin: 0;
+    }
+    body.is-session[data-shell="kurse"] #go-rail { order: 1; }
     .go-slide__cta.is-owned,
     .go-slide__cta.is-owned:disabled {
       background: #D8D0C4 !important;
@@ -4010,14 +4024,14 @@
       scroll-snap-align: start;
     }
     .team-slide.is-scroll {
-      /* Scrollfläche bis unters Bottom-Menü; Padding lässt Text darunter durchlaufen */
-      max-height: calc(100dvh - 118px - env(safe-area-inset-bottom, 0px));
+      /* Scrollfläche bis hinter die Bottom-Pill; genug Padding für Gesichter */
+      max-height: calc(100dvh - 96px - env(safe-area-inset-bottom, 0px));
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
       touch-action: pan-x pan-y;
-      padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
       scrollbar-width: thin;
       scrollbar-color: rgba(42, 33, 24, 0.45) transparent;
     }
@@ -4280,7 +4294,7 @@
     body.is-session[data-shell="team"] #plan-team,
     body.is-session[data-shell="plan"][data-plan="team"] #plan-team { order: 8; }
     body.is-session[data-shell="kurse"] #plan-training,
-    body.is-session[data-shell="plan"][data-plan="training"] #plan-training { order: 8; }
+    body.is-session[data-shell="plan"][data-plan="training"] #plan-training { order: 0; }
     .rail-nav__title {
       margin: 0;
       text-align: center;
@@ -4342,6 +4356,7 @@
       align-items: center;
       gap: 10px;
       margin: 12px 0 0;
+      padding-bottom: 28px;
     }
     .team-slide__member {
       flex: none;
@@ -4519,25 +4534,24 @@
       overflow: hidden;
       background: var(--tone-neutral);
     }
-    /* Plus-Headlines: Klasse go-slide__title — nie display:none (früher .go-slide__head) */
-    body.is-session #go-rail .go-slide > h2.go-slide__title,
-    body.is-session #go-rail .go-slide > .go-slide__title,
+    /* Plus-Headlines: Titel sitzt in #go-rail-nav (mit Pfeilen), Slide-Titel ausblenden */
+    body.is-session[data-shell="kurse"] #go-rail .go-slide > h2.go-slide__title,
+    body.is-session[data-shell="kurse"] #go-rail .go-slide > .go-slide__title {
+      display: none !important;
+    }
     .go-slide__title {
-      display: block !important;
-      margin: 0 0 12px !important;
-      padding: 0 !important;
-      font-family: "Playfair Display", Georgia, serif !important;
+      display: block;
+      margin: 0 0 12px;
+      padding: 0;
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: 22px;
+      font-weight: 600;
+      line-height: 1.2;
+      color: #2A2118;
+    }
+    body.is-session[data-shell="kurse"] #go-rail-nav .rail-nav__title {
+      text-align: center;
       font-size: 22px !important;
-      font-weight: 600 !important;
-      line-height: 1.2 !important;
-      color: #2A2118 !important;
-      visibility: visible !important;
-      opacity: 1 !important;
-      height: auto !important;
-      min-height: 1.2em !important;
-      overflow: visible !important;
-      position: relative !important;
-      z-index: 2 !important;
     }
     .go-slide__art { margin: 0; }
     .go-slide__copy {
@@ -4712,6 +4726,8 @@
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
+      /* pan-y: FFC-Leaderboard nach unten scrollen; pan-x bleibt auf dem Rail */
+      touch-action: pan-x pan-y;
       padding: 12px 16px calc(88px + env(safe-area-inset-bottom, 0px));
       box-sizing: border-box;
       scroll-snap-align: start;
@@ -4753,7 +4769,9 @@
     }
     .team-slide__coach-ask p { margin: 0; font-size: 14px !important; line-height: 1.35; }
     .team-slide.is-coach-locked .coach-appointments,
-    .team-slide.is-coach-locked .coach-calendar {
+    .team-slide.is-coach-locked .coach-calendar,
+    .team-slide.is-coach-locked .pt-cal,
+    .pt-cal.is-locked {
       opacity: 0.35; pointer-events: none; filter: grayscale(1);
     }
     .go-toast {
@@ -6798,9 +6816,9 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-32"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-33"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-26"></script>
-  <script src="/natalyaalice/support.js?v=support-9"></script>
+  <script src="/natalyaalice/support.js?v=support-10"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -8905,19 +8923,57 @@
 
       function compressPhoto(file, done) {
         if (!file || !done) return;
+        var MAX_BYTES = Math.floor(2.5 * 1024 * 1024);
         var reader = new FileReader();
         reader.onload = function () {
           var img = new Image();
           img.onload = function () {
-            var max = 900;
-            var scale = Math.min(1, max / Math.max(img.width, img.height));
-            var canvas = document.createElement("canvas");
-            canvas.width = Math.max(1, Math.round(img.width * scale));
-            canvas.height = Math.max(1, Math.round(img.height * scale));
-            canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-            done(canvas.toDataURL("image/jpeg", 0.72));
+            var edge = Math.max(img.width, img.height);
+            var maxEdge = edge > 1600 ? 1400 : edge > 1200 ? 1200 : 900;
+            function encode(max, quality) {
+              var scale = Math.min(1, max / Math.max(img.width, img.height));
+              var canvas = document.createElement("canvas");
+              canvas.width = Math.max(1, Math.round(img.width * scale));
+              canvas.height = Math.max(1, Math.round(img.height * scale));
+              canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+              function finish(dataUrl) {
+                done(dataUrl);
+              }
+              if (canvas.toBlob) {
+                canvas.toBlob(
+                  function (blob) {
+                    if (!blob) {
+                      finish(canvas.toDataURL("image/jpeg", quality));
+                      return;
+                    }
+                    if (blob.size > MAX_BYTES && (quality > 0.42 || max > 640)) {
+                      var nextQ = quality > 0.45 ? Math.max(0.42, quality - 0.12) : quality;
+                      var nextMax = quality <= 0.45 ? Math.max(640, Math.round(max * 0.82)) : max;
+                      encode(nextMax, nextQ);
+                      return;
+                    }
+                    var fr = new FileReader();
+                    fr.onload = function () {
+                      finish(fr.result);
+                    };
+                    fr.readAsDataURL(blob);
+                  },
+                  "image/jpeg",
+                  quality
+                );
+              } else {
+                finish(canvas.toDataURL("image/jpeg", quality));
+              }
+            }
+            encode(maxEdge, 0.72);
+          };
+          img.onerror = function () {
+            done("");
           };
           img.src = reader.result;
+        };
+        reader.onerror = function () {
+          done("");
         };
         reader.readAsDataURL(file);
       }
@@ -13327,27 +13383,37 @@
         var coachees = teamPeople.filter(function (person) {
           return person && person.trainer_id && String(person.trainer_id) === mineId;
         });
-        if (!coachees.length) {
-          var emptyC = document.createElement("p");
-          emptyC.className = "coach-empty";
-          emptyC.textContent = "Noch niemand hat Dich als Coach gewählt.";
-          coacheeSlide.appendChild(emptyC);
+        if (!sessionIsTrainer) {
+          coacheeSlide.classList.add("is-coach-locked");
+          var lockHint = document.createElement("p");
+          lockHint.className = "coach-empty";
+          lockHint.textContent =
+            "Buch Deine Coach-Rolle unter Plus und Du kannst hier als Coach gewählt werden.";
+          coacheeSlide.appendChild(lockHint);
+          paintCoachPtCalendar(coacheeSlide, { locked: true });
+        } else {
+          if (!coachees.length) {
+            var emptyC = document.createElement("p");
+            emptyC.className = "coach-empty";
+            emptyC.textContent = "Noch niemand hat Dich als Coach gewählt.";
+            coacheeSlide.appendChild(emptyC);
+          }
+          coachees.forEach(function (person) {
+            personRow(person, function (row) {
+              var pencil = document.createElement("button");
+              pencil.type = "button";
+              pencil.className = "team-pencil";
+              pencil.setAttribute("aria-label", "Admin für " + (person.name || "Nutzer"));
+              pencil.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg>';
+              pencil.addEventListener("click", function (event) {
+                event.stopPropagation();
+                openTrainerAdmin(person);
+              });
+              row.appendChild(pencil);
+            }, coacheeSlide);
+          });
+          paintCoachPtCalendar(coacheeSlide, { locked: false });
         }
-        coachees.forEach(function (person) {
-          personRow(person, sessionIsTrainer ? function (row) {
-            var pencil = document.createElement("button");
-            pencil.type = "button";
-            pencil.className = "team-pencil";
-            pencil.setAttribute("aria-label", "Admin für " + (person.name || "Nutzer"));
-            pencil.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg>';
-            pencil.addEventListener("click", function (event) {
-              event.stopPropagation();
-              openTrainerAdmin(person);
-            });
-            row.appendChild(pencil);
-          } : null, coacheeSlide);
-        });
-        if (sessionIsTrainer) paintCoachPtCalendar(coacheeSlide);
         box.appendChild(coacheeSlide);
         syncGroupOptions();
         syncHScrollDock();
@@ -13734,16 +13800,29 @@
             ? GoSupport.getOffers()
             : [
                 {
+                  key: "zirkel",
+                  type: "zirkel",
+                  title: "Friday Fitness Circle",
+                  description:
+                    "Werde Teil der Gruppe für ein Zirkeltraining. Du kannst vor Ort trainieren oder die Aufzeichnung hier für Dein eigenes Training nutzen. Du trackst über Eingabe und am Ende landen Deine Daten in einer Datenbank damit Du Deine Trainings von Woche zu Woche vergleichen kannst. Login über E-Mail-Adresse und einem Passwort."
+                },
+                {
+                  key: "stempelkarte",
+                  type: "stempelkarte",
+                  title: "Stempelkarte",
+                  description: "12er-Karte für 25 € Spende — Stempel mit Freunden."
+                },
+                {
+                  key: "web_call",
+                  type: "web_call",
+                  title: "Initialgespräch",
+                  description: "Web-Call zur Analyse und zum individuellen Plan."
+                },
+                {
                   key: "routine",
                   type: "routine",
                   title: "12-Wochen-Routine",
                   description: "Einzahlung, Events loggen, 90 % zurück."
-                },
-                {
-                  key: "zirkel",
-                  type: "zirkel",
-                  title: "Friday Fitness Circle",
-                  description: "Zirkel tracken und Leaderboard — Login mit FFC-Konto."
                 },
                 {
                   key: "ernaehrung",
@@ -13752,22 +13831,10 @@
                   description: "Tägliches Protokoll über 4 Wochen mit Coach-Feedback."
                 },
                 {
-                  key: "web_call",
-                  type: "web_call",
-                  title: "Trainingsplan individualisieren",
-                  description: "Web-Call zur Analyse und zum individuellen Plan."
-                },
-                {
                   key: "coach_offer",
                   type: "coach_offer",
                   title: "Selbst Coaching anbieten",
                   description: "Admin-Zugang und Playbook für Coaches."
-                },
-                {
-                  key: "stempelkarte",
-                  type: "stempelkarte",
-                  title: "Stempelkarte",
-                  description: "12er-Karte für 25 € Spende — Stempel mit Freunden."
                 }
               ];
         /* Kein Full-Rebuild wenn Offer-Keys + FFC-Login gleich — verhindert FFC-Flackern */
@@ -16577,10 +16644,12 @@
         modal.hidden = false;
       }
 
-      function paintCoachPtCalendar(host) {
-        if (!host || !sessionIsTrainer) return;
+      function paintCoachPtCalendar(host, opts) {
+        if (!host) return;
+        opts = opts || {};
+        var locked = !!opts.locked || !sessionIsTrainer;
         var wrap = document.createElement("div");
-        wrap.className = "pt-cal";
+        wrap.className = "pt-cal" + (locked ? " is-locked" : "");
         wrap.id = "pt-coach-cal";
         var now = new Date();
         if (!ptCalMonth) ptCalMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -16591,17 +16660,25 @@
         var prev = document.createElement("button");
         prev.type = "button";
         prev.textContent = "‹";
-        prev.addEventListener("click", function () {
-          ptCalMonth = new Date(y, mo - 1, 1);
-          renderTeam();
-        });
+        if (!locked) {
+          prev.addEventListener("click", function () {
+            ptCalMonth = new Date(y, mo - 1, 1);
+            renderTeam();
+          });
+        } else {
+          prev.disabled = true;
+        }
         var next = document.createElement("button");
         next.type = "button";
         next.textContent = "›";
-        next.addEventListener("click", function () {
-          ptCalMonth = new Date(y, mo + 1, 1);
-          renderTeam();
-        });
+        if (!locked) {
+          next.addEventListener("click", function () {
+            ptCalMonth = new Date(y, mo + 1, 1);
+            renderTeam();
+          });
+        } else {
+          next.disabled = true;
+        }
         var title = document.createElement("div");
         title.className = "pt-cal__title";
         title.textContent = ptCalMonth.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
@@ -16621,14 +16698,16 @@
         var startPad = (first.getDay() + 6) % 7;
         var daysInMonth = new Date(y, mo + 1, 0).getDate();
         var dayMarks = {};
-        remotePtSessions.forEach(function (sess) {
-          if (sess.status === "declined") return;
-          var booking = null;
-          remotePtBookings.forEach(function (b) { if (String(b.id) === String(sess.booking_id)) booking = b; });
-          if (!booking || String(booking.coach_id) !== String(sessionAccount.id)) return;
-          var iso = String(sess.session_at || "").slice(0, 10);
-          dayMarks[iso] = true;
-        });
+        if (!locked) {
+          remotePtSessions.forEach(function (sess) {
+            if (sess.status === "declined") return;
+            var booking = null;
+            remotePtBookings.forEach(function (b) { if (String(b.id) === String(sess.booking_id)) booking = b; });
+            if (!booking || String(booking.coach_id) !== String(sessionAccount.id)) return;
+            var iso = String(sess.session_at || "").slice(0, 10);
+            dayMarks[iso] = true;
+          });
+        }
         var todayIso = Log.berlinToday();
         for (var i = 0; i < startPad; i++) {
           var empty = document.createElement("button");
@@ -16644,9 +16723,13 @@
           btn.type = "button";
           btn.className = "pt-cal__day" + (iso === todayIso ? " is-today" : "") + (dayMarks[iso] ? " has-pt" : "");
           btn.textContent = String(day);
-          (function (dayIso) {
-            btn.addEventListener("click", function () { openPtDayModal(dayIso); });
-          })(iso);
+          if (locked) {
+            btn.disabled = true;
+          } else {
+            (function (dayIso) {
+              btn.addEventListener("click", function () { openPtDayModal(dayIso); });
+            })(iso);
+          }
           grid.appendChild(btn);
         }
         wrap.appendChild(grid);
