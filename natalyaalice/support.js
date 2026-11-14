@@ -325,7 +325,7 @@
     zirkel: "Friday Fitness Circle",
     ernaehrung: "Ernährungscoaching",
     web_call: "Trainingsplan individualisieren",
-    coach_offer: "Coaching anbieten",
+    coach_offer: "Selbst Coaching anbieten",
     stempelkarte: "Stempelkarte",
     personal_training: "Personal Training",
     merch: "Merch"
@@ -367,7 +367,7 @@
     {
       key: "coach_offer",
       type: "coach_offer",
-      title: "Coaching anbieten",
+      title: "Selbst Coaching anbieten",
       price: "Zugang",
       description:
         "Zugang zum Admin-Bereich. Freunde finden Dich in der Coach-Liste. Inklusive Playbook: was gogogo fördert und warum die Trainingspläne so aufgebaut sind."

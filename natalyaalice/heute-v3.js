@@ -1598,7 +1598,8 @@
 
     var firstPaint = !state.paintedAktuell;
     var scroller = welcomeScrollEl();
-    var keepScroll = !firstPaint && state.userScrolledAktuell ? scroller.scrollTop || 0 : null;
+    /* Nach dem ersten Paint Scroll immer behalten — kein erneutes Zentrieren (FFC-Nachzug) */
+    var keepScroll = !firstPaint ? scroller.scrollTop || 0 : null;
     /* Feed sichtbar lassen — kein opacity-Flash bei Refresh */
     root.classList.remove("is-centering");
     root.innerHTML = html;
@@ -1610,7 +1611,7 @@
         scroller.scrollTop = keepScroll;
         return;
       }
-      /* Nur beim ersten Paint / ohne User-Scroll zentrieren */
+      /* Nur beim ersten Paint zentrieren */
       scrollCurrentToCenter({ soft: false, force: true });
     });
     if (host.maybeAskHistoryShare) host.maybeAskHistoryShare();
@@ -2594,11 +2595,13 @@
       .then(function () {
         if (!stillCurrent()) return;
         if (!(global.FFC && FFC.refreshHeute && FFC.user && FFC.user())) return;
-        /* FFC nachziehen — mit Timeout, damit nichts hängen bleibt */
+        /* FFC nachziehen — stiller Update, ohne zweiten Full-Render (Scroll-Hitch) */
         return softTimeout(FFC.refreshHeute(), 2800).then(function () {
           if (!stillCurrent()) return;
           return loadFfcEvents().then(function () {
             if (!stillCurrent()) return;
+            /* Nur neu malen wenn FFC-Events dazugekommen sind und User noch nicht scrollt */
+            if (state.userScrolledAktuell) return;
             render();
           });
         });

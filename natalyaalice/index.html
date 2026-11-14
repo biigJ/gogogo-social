@@ -4117,7 +4117,15 @@
       margin-top: 36px;
     }
     .team-slide.is-coach .team-slide__coach-name + .team-slide__about {
-      margin-top: 0;
+      margin-top: 8px;
+    }
+    /* Meine Gruppe: gleiche Abstände wie Mein Coach (Name → Text) */
+    .team-slide__cta + .team-slide__group-name-row {
+      margin-top: 36px;
+    }
+    .team-slide__group-name-row + .team-slide__about,
+    .team-slide__group-name + .team-slide__about {
+      margin-top: 8px;
     }
     .team-slide.is-coach .coach-appointments {
       margin-top: 4px;
@@ -4421,12 +4429,9 @@
       height: 28px;
       display: block;
     }
-    .team-slide__cta + .team-slide__group-name-row {
-      margin-top: 30px; /* Hälfte des früheren 60px-Abstands */
-    }
     .team-slide__cta + .team-slide__group-name,
     .team-slide__cta + .team-slide__coach-name {
-      margin-top: 30px;
+      margin-top: 36px;
     }
     .team-slide__cta.is-done,
     .team-slide__cta.is-done:disabled {
@@ -6793,9 +6798,9 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-31"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-25"></script>
-  <script src="/natalyaalice/support.js?v=support-8"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-32"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-26"></script>
+  <script src="/natalyaalice/support.js?v=support-9"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -11009,17 +11014,9 @@
         try {
           paintHeuteExtras();
         } catch (eExtras) {}
-        function centerAktuell() {
-          if (window.HeuteAccountability && HeuteAccountability.scrollCurrentToCenter) {
-            HeuteAccountability.scrollCurrentToCenter({ soft: false });
-          }
-        }
+        /* Zentrierung nur im ersten Paint von HeuteAccountability.render — kein Doppel-Sprung */
         if (window.HeuteAccountability && HeuteAccountability.refresh) {
-          Promise.resolve(HeuteAccountability.refresh())
-            .then(centerAktuell)
-            .catch(centerAktuell);
-        } else {
-          centerAktuell();
+          Promise.resolve(HeuteAccountability.refresh()).catch(function () {});
         }
       }
 
@@ -11106,6 +11103,7 @@
               if (about.absence) {
                 about.absence.active = false;
                 about.absence.end = null;
+                about.absence.alts = {};
               }
               return saveAbout(about).then(function () {
                 paintAbsenceButton();
@@ -11172,6 +11170,27 @@
             userOwned = true;
             return saveUserWeek(next).then(function () {
               userUnits = next;
+            });
+          },
+          getPlanUnits: function () {
+            var out = {};
+            Object.keys(userUnits || {}).forEach(function (key) {
+              var n = Number(key);
+              if (!isNaN(n) && userUnits[n]) out[n] = userUnits[n];
+            });
+            return out;
+          },
+          restorePlanUnits: function (units) {
+            if (!units || !sessionAccount) return Promise.resolve();
+            var next = {};
+            Object.keys(units).forEach(function (key) {
+              var n = Number(key);
+              if (!isNaN(n) && units[n]) next[n] = units[n];
+            });
+            userOwned = true;
+            return saveUserWeek(next).then(function () {
+              userUnits = next;
+              paintWelcome();
             });
           },
           planItemForDay: function (iso) {
@@ -11248,8 +11267,10 @@
         scrollShellTop();
         if (planPane === "training") {
           requestAnimationFrame(scrollAbsenceWheels);
-          refreshZirkel();
-          paintGoRail();
+          /* Kein refreshZirkel hier — flackert den FFC-Slide unter Plus */
+          var railEl = document.getElementById("go-rail");
+          if (!railEl || !railEl.querySelector(".go-slide")) paintGoRail();
+          else paintGoRail(); /* skip-Pfad aktualisiert nur CTAs */
           installSupport();
         }
         syncTeamGoRailNav();
@@ -13739,7 +13760,7 @@
                 {
                   key: "coach_offer",
                   type: "coach_offer",
-                  title: "Coaching anbieten",
+                  title: "Selbst Coaching anbieten",
                   description: "Admin-Zugang und Playbook für Coaches."
                 },
                 {
@@ -13859,7 +13880,7 @@
             lbBox.className = "go-slide__ffc-box";
             lbBox.id = "go-zirkel-board";
             lbBox.textContent = ffcLogged
-              ? "Lade Leaderboard …"
+              ? ""
               : "Nach dem Buchen siehst Du hier das Leaderboard.";
             lbSec.appendChild(lbBox);
             var recSec = document.createElement("section");
@@ -13868,16 +13889,15 @@
             recBox.className = "go-slide__ffc-box";
             recBox.id = "go-zirkel-records";
             recBox.textContent = ffcLogged
-              ? "Lade Aufzeichnungen …"
+              ? ""
               : "Nach dem Buchen erscheinen hier Deine Aufzeichnungen.";
             recSec.appendChild(recBox);
             ffcWrap.appendChild(lbSec);
             ffcWrap.appendChild(recSec);
             card.appendChild(ffcWrap);
             if (ffcLogged) {
-              requestAnimationFrame(function () {
-                mountGoZirkelPanels(lbBox, recBox);
-              });
+              /* Sofort füllen — kein „Lade…“-Zwischenzustand der flackert */
+              mountGoZirkelPanels(lbBox, recBox);
             }
           }
           rail.appendChild(card);
@@ -15333,21 +15353,9 @@
             paintHeuteDiaryFeed();
             refreshFfcHeute(false);
             if (tab === "heute") markHeuteSeen();
-            function centerAktuell() {
-              if (
-                window.HeuteAccountability &&
-                HeuteAccountability.scrollCurrentToCenter
-              ) {
-                /* Sofort mittig — kein Soft-Scroll von ganz oben */
-                HeuteAccountability.scrollCurrentToCenter({ soft: false });
-              }
-            }
+            /* Zentrierung nur einmal in render() — kein zweites scrollCurrentToCenter */
             if (window.HeuteAccountability && HeuteAccountability.refresh) {
-              Promise.resolve(HeuteAccountability.refresh())
-                .then(centerAktuell)
-                .catch(centerAktuell);
-            } else {
-              centerAktuell();
+              Promise.resolve(HeuteAccountability.refresh()).catch(function () {});
             }
           }
         }
@@ -18438,7 +18446,10 @@
             if (act) act();
             else {
               refreshFfcHeute(true);
-              if ((shellTab === "kurse" || shellTab === "plan") && planPane === "training") refreshZirkel();
+              /* Plus sichtbar: FFC-DOM nicht neu laden (flackert Leaderboard-Slide) */
+              if ((shellTab === "kurse" || shellTab === "plan") && planPane === "training") {
+                paintGoRail();
+              }
             }
             return;
           }
@@ -18464,7 +18475,9 @@
           }
           if (sessionMode && user.email && !accountEmail()) saveAccountEmail(user.email).catch(function () {});
           refreshFfcHeute(true);
-          if ((shellTab === "kurse" || shellTab === "plan") && planPane === "training") refreshZirkel();
+          if ((shellTab === "kurse" || shellTab === "plan") && planPane === "training") {
+            paintGoRail(true);
+          }
           if (window.FFC && FFC.refreshFriends) FFC.refreshFriends().then(onFfcFriendsChanged).catch(function () { onFfcFriendsChanged(); });
           else onFfcFriendsChanged();
         },
