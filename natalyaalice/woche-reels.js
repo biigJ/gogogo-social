@@ -15,6 +15,8 @@
     courses: [],
     travelUntil: null,
     editMode: false,
+    armTravel: false,
+    armEdit: false,
     touch: null,
     loadError: "",
     sharePick: {},
@@ -3168,6 +3170,10 @@
     /* Sofort 7 Tageskarten — nie leerer Screen während Load */
     try {
       if (state.weekMode === "from_today") state.dayIndex = 0;
+      if (state.armEdit) {
+        state.editMode = true;
+        state.armEdit = false;
+      }
       render();
     } catch (eShow) {
       state.loadError = "Woche konnte nicht gezeichnet werden.";
@@ -3175,11 +3181,27 @@
         render();
       } catch (e2) {}
     }
+    var armedTravel = !!state.armTravel;
+    state.armTravel = false;
     return Promise.all([
       loadCourses().catch(function () {}),
       loadTrainingLists().catch(function () {}),
       refresh()
-    ]);
+    ]).then(function () {
+      if (armedTravel) {
+        try {
+          openTravelSheet();
+        } catch (eT) {}
+      }
+    });
+  }
+
+  function armTravel() {
+    state.armTravel = true;
+  }
+
+  function armEdit() {
+    state.armEdit = true;
   }
 
   function hide() {
@@ -3214,6 +3236,8 @@
     show: show,
     hide: hide,
     refresh: refresh,
+    armTravel: armTravel,
+    armEdit: armEdit,
     dayIndex: function () {
       return state.dayIndex;
     }
