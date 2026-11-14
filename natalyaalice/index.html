@@ -1317,8 +1317,8 @@
     body.is-session[data-shell="heute"] .heute-filter-row {
       order: 0; display: flex; align-items: center; justify-content: center;
       gap: 14px; width: 100%; box-sizing: border-box;
-      position: relative; z-index: 6; background: #F3EEE4;
-      /* Bis Screen-Oberkante füllen; nicht sticky — scrollt nach unten weg */
+      /* Sticky: Header (Dropdown) bleibt sichtbar, Event darunter mittig */
+      position: sticky; top: 0; z-index: 6; background: #F3EEE4;
       margin: calc(-1 * (4px + env(safe-area-inset-top, 0px))) 0 0;
       padding: calc(10px + env(safe-area-inset-top, 0px)) 0 10px;
       transition: opacity .15s ease, transform .15s ease;
@@ -4346,17 +4346,18 @@
       height: 36px;
       margin: 0;
       padding: 0;
-      border: 1px solid #2A2118;
-      border-radius: 50%;
+      border: 0;
+      border-radius: 0;
       background: transparent;
       color: #2A2118;
       display: grid;
       place-items: center;
       cursor: pointer;
+      box-shadow: none;
     }
     .team-slide__group-remove svg {
-      width: 14px;
-      height: 14px;
+      width: 18px;
+      height: 18px;
       display: block;
     }
     .team-slide__coach-name .team-slide__head-action {
@@ -6409,8 +6410,8 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-16"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-18"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-17"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-19"></script>
   <script src="/natalyaalice/support.js?v=support-4"></script>
   <script>
     (function () {
@@ -8038,7 +8039,8 @@
         mainEl.hidden = on;
         var theme = document.querySelector('meta[name="theme-color"]');
         if (theme) theme.setAttribute("content", on ? "#F3EEE4" : "#C7413B");
-        scrollShellTop();
+        /* Aktuell: nicht nach oben springen — Feed zentriert das heutige Event direkt */
+        if (!(on && sessionMode && shellTab === "heute")) scrollShellTop();
       }
 
       function scrollShellTop() {
@@ -9362,8 +9364,9 @@
             if (!post || String(post.author_id) !== String(sessionAccount.id)) return;
             if (post.reply_to_id) return;
             var body = String(post.body || "").trim();
-            /* Event-Erledigt-Medien (Fallback ohne events.note/photo_url) — kein Tagebuch-Post */
+            /* Event-Medien/Kommentare-Fallback — kein Tagebuch-Post */
             if (/\[\[e:[0-9a-f-]{36}\]\]/i.test(body)) return;
+            if (/\[\[c:[0-9a-f-]{36}\]\]/i.test(body)) return;
             if (!body && !post.photo_url) return;
             var day = "";
             try {
@@ -14028,7 +14031,8 @@
                 window.HeuteAccountability &&
                 HeuteAccountability.scrollCurrentToCenter
               ) {
-                HeuteAccountability.scrollCurrentToCenter({ soft: true });
+                /* Sofort mittig — kein Soft-Scroll von ganz oben */
+                HeuteAccountability.scrollCurrentToCenter({ soft: false });
               }
             }
             if (window.HeuteAccountability && HeuteAccountability.refresh) {

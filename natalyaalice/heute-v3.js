@@ -442,9 +442,81 @@
       .catch(function () {});
   }
 
+  function commentMarker(eventId) {
+    return "[[c:" + String(eventId) + "]]";
+  }
+
+  function pushComment(eid, c) {
+    eid = String(eid || "");
+    if (!eid || !c) return;
+    if (!state.comments[eid]) state.comments[eid] = [];
+    var id = String(c.id || "");
+    var exists = state.comments[eid].some(function (x) {
+      return String(x.id) === id;
+    });
+    if (exists) return;
+    state.comments[eid].push({
+      id: c.id,
+      account_id: c.account_id || c.author_id,
+      text: c.text || "",
+      created_at: c.created_at
+    });
+  }
+
+  function loadCommentFallbacks(eventIds) {
+    var want = {};
+    (eventIds || []).forEach(function (id) {
+      want[String(id)] = true;
+    });
+    return rest(
+      "go_community_posts?body=like." +
+        encodeURIComponent("*[[c:*") +
+        "&select=id,author_id,body,photo_url,created_at&order=created_at.asc&limit=400"
+    )
+      .then(function (rows) {
+        (rows || []).forEach(function (r) {
+          var body = String(r.body || "");
+          var m = body.match(/\[\[c:([0-9a-f-]{36})\]\]/i);
+          if (!m) return;
+          var eid = String(m[1]);
+          if (eventIds && eventIds.length && !want[eid]) return;
+          var text = "";
+          var raw = String(r.photo_url || "");
+          if (raw.charAt(0) === "{") {
+            try {
+              var packed = JSON.parse(raw);
+              if (packed && packed.text) text = String(packed.text);
+            } catch (e) {}
+          }
+          if (!text) text = body.replace(/\[\[c:[0-9a-f-]{36}\]\]/i, "").trim();
+          if (!text) return;
+          pushComment(eid, {
+            id: r.id,
+            account_id: r.author_id,
+            text: text,
+            created_at: r.created_at
+          });
+        });
+      })
+      .catch(function () {});
+  }
+
   function loadComments(eventIds) {
+    var preserved = {};
+    Object.keys(state.comments || {}).forEach(function (k) {
+      preserved[k] = (state.comments[k] || []).filter(function (c) {
+        return c && String(c.id).indexOf("local-") === 0;
+      });
+    });
     state.comments = {};
-    if (!eventIds.length) return Promise.resolve();
+    if (!eventIds.length) {
+      Object.keys(preserved).forEach(function (k) {
+        preserved[k].forEach(function (c) {
+          pushComment(k, c);
+        });
+      });
+      return Promise.resolve();
+    }
     return rest(
       "event_comments?event_id=in.(" +
         eventIds.map(encodeURIComponent).join(",") +
@@ -452,16 +524,27 @@
     )
       .then(function (rows) {
         (rows || []).forEach(function (c) {
-          var eid = String(c.event_id);
-          if (!state.comments[eid]) state.comments[eid] = [];
-          state.comments[eid].push(c);
+          pushComment(c.event_id, c);
         });
-        var pids = (rows || []).map(function (c) {
-          return String(c.account_id);
+      })
+      .catch(function () {})
+      .then(function () {
+        return loadCommentFallbacks(eventIds);
+      })
+      .then(function () {
+        Object.keys(preserved).forEach(function (k) {
+          preserved[k].forEach(function (c) {
+            pushComment(k, c);
+          });
+        });
+        var pids = [];
+        Object.keys(state.comments).forEach(function (k) {
+          state.comments[k].forEach(function (c) {
+            if (c.account_id) pids.push(String(c.account_id));
+          });
         });
         return ensurePeople(pids);
-      })
-      .catch(function () {});
+      });
   }
 
   function paintStreak() {
@@ -1475,10 +1558,9 @@
 
     root.innerHTML = html;
     bindObserver(root);
-    requestAnimationFrame(function () {
-      bindHeuteScrollFilter();
-      scrollCurrentToCenter({ soft: true });
-    });
+    bindHeuteScrollFilter();
+    /* Direkt mittig auf heutiges Event — kein Soft-Scroll von Zukunft-oben */
+    scrollCurrentToCenter({ soft: false });
     if (host.maybeAskHistoryShare) host.maybeAskHistoryShare();
   }
 
@@ -1498,19 +1580,22 @@
     return today.querySelector(".acc-card") || today;
   }
 
-  /* Aktuelles Event exakt in Screen-Mitte; soft wenn woanders */
+  /* Aktuelles Event in Screen-Mitte unter dem Filter-Header; soft nur auf Wunsch */
   function scrollCurrentToCenter(opts) {
     opts = opts || {};
-    var soft = opts.soft !== false;
+    var soft = opts.soft === true;
     var scroller = welcomeScrollEl();
     var el = currentEventCard();
     if (!scroller || !el) return;
 
     function run() {
       if (document.body.dataset.shell !== "heute") return;
+      var row = document.querySelector(".heute-filter-row");
+      if (row) row.classList.remove("is-scroll-hide");
       var rect = el.getBoundingClientRect();
       if (!rect.height && !rect.width) return;
-      var mid = window.innerHeight / 2;
+      var headerH = row ? row.getBoundingClientRect().height || 0 : 0;
+      var mid = headerH + (window.innerHeight - headerH) / 2;
       var elMid = rect.top + rect.height / 2;
       var delta = elMid - mid;
       if (Math.abs(delta) < 6) return;
@@ -1522,6 +1607,7 @@
       }
     }
 
+    run();
     requestAnimationFrame(function () {
       requestAnimationFrame(run);
     });
@@ -1953,6 +2039,21 @@
     }
   }
 
+  function saveEventCommentFallback(eventId, text) {
+    var marker = commentMarker(eventId);
+    var short = (marker + "\n" + text).slice(0, 144);
+    return rest("go_community_posts", {
+      method: "POST",
+      prefer: "return=representation",
+      body: {
+        author_id: me(),
+        kind: "text",
+        body: short,
+        photo_url: JSON.stringify({ text: text })
+      }
+    });
+  }
+
   function addComment(postId, text) {
     text = String(text || "").trim();
     if (!text || !postId || !me()) return;
@@ -2000,6 +2101,9 @@
           account_id: me(),
           text: temp.text
         }
+      }).catch(function () {
+        /* Tabelle fehlt oft — Fallback Community-Post, damit Kommentar bleibt */
+        return saveEventCommentFallback(postId, temp.text);
       });
     }
 
@@ -2008,12 +2112,22 @@
         var saved = Array.isArray(rows) ? rows[0] : rows;
         if (saved && saved.id) {
           var list = state.comments[postId] || [];
+          var resolvedText = temp.text;
+          if (saved.text) resolvedText = saved.text;
+          else if (saved.photo_url && String(saved.photo_url).charAt(0) === "{") {
+            try {
+              var packed = JSON.parse(saved.photo_url);
+              if (packed && packed.text) resolvedText = String(packed.text);
+            } catch (e) {}
+          } else if (saved.body && String(saved.body).indexOf("[[c:") < 0 && String(saved.body).indexOf("⟦ix:") < 0) {
+            resolvedText = saved.body;
+          }
           for (var i = 0; i < list.length; i++) {
             if (list[i].id === temp.id) {
               list[i] = {
                 id: saved.id,
                 account_id: saved.account_id || saved.author_id || me(),
-                text: saved.text || saved.body || temp.text,
+                text: resolvedText,
                 created_at: saved.created_at || temp.created_at
               };
               break;
@@ -2022,7 +2136,10 @@
           paintPostBar(postId);
         }
       })
-      .catch(function () {});
+      .catch(function () {
+        /* Optimistic Comment bleibt in state.comments + Teaser */
+        paintPostBar(postId);
+      });
   }
 
   function enrollmentsForCategory(cat) {
