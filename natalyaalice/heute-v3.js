@@ -237,6 +237,46 @@
       });
   }
 
+  function eventFingerprint(ev) {
+    if (!ev) return "";
+    return [
+      String(ev.user_id || ""),
+      dayKey(ev.starts_at),
+      String(ev.category || ""),
+      String(ev.title || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+    ].join("|");
+  }
+
+  function dedupeEvents(rows) {
+    var byId = {};
+    var byFp = {};
+    (rows || []).forEach(function (e) {
+      if (!e || !e.id) return;
+      var id = String(e.id);
+      byId[id] = e;
+    });
+    Object.keys(byId).forEach(function (id) {
+      var e = byId[id];
+      if (e.status === "ausgefallen") return;
+      var fp = eventFingerprint(e);
+      var prev = byFp[fp];
+      if (!prev) {
+        byFp[fp] = e;
+        return;
+      }
+      /* Neueren Eintrag behalten (DB-Abgleich nach Löschen/Neu) */
+      var a = String(prev.starts_at || "");
+      var b = String(e.starts_at || "");
+      if (String(e.id) > String(prev.id) || b >= a) byFp[fp] = e;
+    });
+    return Object.keys(byFp).map(function (k) {
+      return byFp[k];
+    });
+  }
+
   function loadEvents() {
     var id = me();
     if (!id) {
@@ -250,14 +290,23 @@
     var fromIso = from.toISOString();
     var toIso = to.toISOString();
     return rest(
-      "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title&starts_at=gte." +
+      "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note&starts_at=gte." +
         encodeURIComponent(fromIso) +
         "&starts_at=lte." +
         encodeURIComponent(toIso) +
         "&order=starts_at.desc&limit=500"
     )
+      .catch(function () {
+        return rest(
+          "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title&starts_at=gte." +
+            encodeURIComponent(fromIso) +
+            "&starts_at=lte." +
+            encodeURIComponent(toIso) +
+            "&order=starts_at.desc&limit=500"
+        );
+      })
       .then(function (rows) {
-        state.events = rows || [];
+        state.events = dedupeEvents(rows || []);
         var ids = state.events.map(function (e) {
           return String(e.user_id);
         });
@@ -513,11 +562,41 @@
   }
 
   function bubbleSvg() {
+    /* Gleich wie Woche-Kommentar-Icon */
     return (
-      '<svg class="acc-bubble-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M5.5 6.5h13a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H11l-3.8 2.7V16.5H5.5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2Z"/>' +
+      '<svg class="acc-bubble-icon" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3v-3H7.5A2.5 2.5 0 0 1 5 13.5v-7z"/>' +
       "</svg>"
     );
+  }
+
+  function checkSvg() {
+    return (
+      '<svg class="acc-act-ico" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+      '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>'
+    );
+  }
+
+  function badgeSvg(kind) {
+    if (kind === "plan") {
+      return (
+        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<rect x="7" y="3.5" width="10" height="17" rx="1.6"/><path d="M9.5 7h5M9.5 10.5h5M9.5 14h3.5"/></svg>'
+      );
+    }
+    if (kind === "zirkel") {
+      return (
+        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M19 12a7 7 0 1 1-2-4.9"/><path d="M19 5v5h-5"/></svg>'
+      );
+    }
+    if (kind === "booked") {
+      return (
+        '<svg class="acc-badge-ico acc-badge-ico--booked" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">' +
+        '<circle cx="12" cy="12" r="9" fill="#111"/><path d="M12 8v8M8 12h8" fill="none" stroke="#F6F1E8" stroke-width="1.8" stroke-linecap="round"/></svg>'
+      );
+    }
+    return "";
   }
 
   function inviteFaceRowHtml(postId, inviteIso) {
@@ -557,13 +636,20 @@
     );
   }
 
+  function goingCount(eventId) {
+    var uid = me();
+    var others = (state.rsvps[eventId] || []).filter(function (id) {
+      return String(id) !== uid;
+    }).length;
+    return 1 + others;
+  }
+
   function postBarHtml(opts) {
     opts = opts || {};
     var postId = opts.postId || "";
     if (!postId) return opts.actions || "";
     var mine = myCommentText(postId);
-    var count = (state.comments[postId] || []).length;
-    var teaser = mine ? mine : "...";
+    var teaser = mine ? mine : "…";
     return (
       '<div class="acc-card__bar">' +
       (opts.actions || "") +
@@ -574,16 +660,53 @@
       '">' +
       esc(teaser) +
       "</button>" +
-      '<button type="button" class="acc-card__bubble' +
-      (count ? " has-comments" : "") +
-      '" data-open-comments="' +
-      esc(postId) +
-      '" aria-label="Kommentare">' +
-      bubbleSvg() +
-      (count ? '<span class="acc-card__bubble-n">' + count + "</span>" : "") +
-      "</button>" +
       "</div>" +
-      commentsPanelHtml(postId, false) +
+      '<div class="acc-comments" data-comments="' +
+      esc(postId) +
+      '" hidden>' +
+      '<form class="acc-comment-form" data-comment-form="' +
+      esc(postId) +
+      '">' +
+      '<input type="text" class="acc-comment-input" maxlength="500" placeholder="Kommentar nach dem Training…" aria-label="Kommentar" />' +
+      "</form></div>" +
+      "</div>"
+    );
+  }
+
+  function eventToolRowHtml(opts) {
+    opts = opts || {};
+    var eventId = opts.eventId || "";
+    var postId = opts.postId || eventId;
+    var done = !!opts.canDone;
+    var isDone = !!opts.isDone;
+    var count = goingCount(eventId);
+    var check =
+      '<button type="button" class="acc-tool acc-tool--check' +
+      (isDone ? " is-done" : "") +
+      '"' +
+      (done ? ' data-done="' + esc(eventId) + '"' : isDone ? " disabled" : "") +
+      ' aria-label="Erledigt">' +
+      checkSvg() +
+      '<span class="acc-tool__n">' +
+      count +
+      "</span></button>";
+    var bubble =
+      '<button type="button" class="acc-tool acc-tool--bubble" data-open-comments="' +
+      esc(postId) +
+      '" aria-label="Kommentieren">' +
+      bubbleSvg() +
+      "</button>";
+    var badgeKind = opts.badge || "";
+    var badge = badgeKind
+      ? '<span class="acc-tool-badge" title="">' + badgeSvg(badgeKind) + "</span>"
+      : "";
+    return (
+      '<div class="acc-card__tools">' +
+      '<div class="acc-card__tools-left">' +
+      check +
+      bubble +
+      "</div>" +
+      (badge ? '<div class="acc-card__tools-right">' + badge + "</div>" : "") +
       "</div>"
     );
   }
@@ -765,6 +888,13 @@
     });
   }
 
+  function eventBadgeKind(ev) {
+    if (!ev) return "";
+    if (ev.category === "zirkel") return "zirkel";
+    if (ev.enrollment_id || ev.course_id) return "booked";
+    return "";
+  }
+
   function renderEventCard(ev) {
     var uid = me();
     var mine = String(ev.user_id) === uid;
@@ -773,11 +903,18 @@
     var emoji = emojiFor(ev.category, ev.title);
     var title = (emoji + " " + (ev.title || ev.category)).trim();
     var actions = "";
-    if (upcoming && mine && dayKey(ev.starts_at) === todayIso()) {
-      actions = actionRowHtml({ doneBtn: ev.id });
-    } else if (upcoming && !mine) {
+    if (upcoming && !mine) {
       actions = actionRowHtml({ rsvpId: ev.id, going: iAmGoing(ev.id) });
     }
+    var tools = mine
+      ? eventToolRowHtml({
+          eventId: ev.id,
+          postId: String(ev.id),
+          canDone: upcoming && dayKey(ev.starts_at) === todayIso(),
+          isDone: ev.status === "erledigt",
+          badge: eventBadgeKind(ev)
+        })
+      : "";
     return renderCardShell({
       attrs:
         ' data-post-id="' +
@@ -788,7 +925,7 @@
       category: ev.category,
       photo: ev.photo_url || "",
       emoji: emoji,
-      actions: actions,
+      actions: (tools || "") + (actions || ""),
       author: authorHtml(p, !mine),
       when: whenLine(ev.starts_at),
       title: title,
@@ -872,6 +1009,13 @@
     var title = item.title || "Training";
     if (emoji && title.indexOf(emoji) !== 0) title = (emoji + " " + title).trim();
     var postId = "plan:" + String(item.iso || item.id);
+    var tools = eventToolRowHtml({
+      eventId: postId,
+      postId: postId,
+      canDone: false,
+      isDone: false,
+      badge: item.category === "zirkel" ? "zirkel" : "plan"
+    });
     return renderCardShell({
       attrs:
         ' data-post-id="' +
@@ -882,7 +1026,7 @@
       category: item.category || "kraft",
       photo: item.photo_url || "",
       emoji: emoji,
-      actions: "",
+      actions: tools,
       author: "",
       when: item.when || whenLine(item.starts_at),
       title: title,
@@ -905,22 +1049,8 @@
     var myToday = [];
     var upcoming = [];
     var history = [];
-    var seenPlan = {};
-
-    if (flags.showPlanDays && host && host.heutePlanItems) {
-      (host.heutePlanItems() || []).forEach(function (p) {
-        if (!p || !p.starts_at) return;
-        var item = {
-          kind: "plan",
-          starts_at: p.starts_at,
-          _mine: true,
-          item: p
-        };
-        seenPlan[dayKey(p.starts_at)] = true;
-        if (dayKey(p.starts_at) === today) myToday.push(item);
-        else upcoming.push(item);
-      });
-    }
+    var coveredDays = {};
+    var coveredFp = {};
 
     pack.upcoming.forEach(function (ev) {
       var item = {
@@ -929,9 +1059,39 @@
         _mine: String(ev.user_id) === me(),
         ev: ev
       };
+      if (item._mine) {
+        coveredDays[dayKey(ev.starts_at)] = true;
+        coveredFp[eventFingerprint(ev)] = true;
+      }
       if (item._mine && dayKey(ev.starts_at) === today) myToday.push(item);
       else upcoming.push(item);
     });
+
+    /* Plan nur wenn kein echtes Event denselben Tag/Titel abdeckt */
+    if (flags.showPlanDays && host && host.heutePlanItems) {
+      (host.heutePlanItems() || []).forEach(function (p) {
+        if (!p || !p.starts_at) return;
+        var day = dayKey(p.starts_at);
+        var fp = [
+          me(),
+          day,
+          String(p.category || ""),
+          String(p.title || "")
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+        ].join("|");
+        if (coveredDays[day] || coveredFp[fp]) return;
+        var item = {
+          kind: "plan",
+          starts_at: p.starts_at,
+          _mine: true,
+          item: p
+        };
+        if (day === today) myToday.push(item);
+        else upcoming.push(item);
+      });
+    }
 
     /* Support / Ernährung / PT / Web-Call (GoSupport) */
     if (host && host.heuteSupportItems) {
@@ -1002,7 +1162,7 @@
       return sortOwnFirst(a, b);
     });
 
-    return { myToday: myToday, upcoming: upcoming, history: history, seenPlan: seenPlan };
+    return { myToday: myToday, upcoming: upcoming, history: history };
   }
 
   function renderFeedItem(item) {
@@ -1344,18 +1504,18 @@
     var card = document.querySelector('[data-post-id="' + postId + '"]');
     if (!card) return;
     var bar = card.querySelector(".acc-card__bar");
-    var actions = "";
-    var done = card.querySelector("[data-done]");
+    var tools = card.querySelector(".acc-card__tools");
+    var toolsHtml = tools ? tools.outerHTML : "";
+    var actions = toolsHtml;
     var rsvp = card.querySelector("[data-rsvp]");
     var ffc = card.querySelector("[data-ffc-rsvp]");
-    if (done) actions = actionRowHtml({ doneBtn: done.getAttribute("data-done") });
-    else if (rsvp) {
-      actions = actionRowHtml({
+    if (rsvp) {
+      actions += actionRowHtml({
         rsvpId: rsvp.getAttribute("data-rsvp"),
         going: rsvp.classList.contains("is-on")
       });
     } else if (ffc) {
-      actions = actionRowHtml({
+      actions += actionRowHtml({
         ffcRsvpId: ffc.getAttribute("data-ffc-rsvp"),
         going: ffc.classList.contains("is-on")
       });
@@ -1370,21 +1530,21 @@
     if (!next) return;
     if (bar) bar.replaceWith(next);
     else card.appendChild(next);
-    var panel = next.querySelector(".acc-comments");
-    if (panel) {
-      panel.hidden = false;
-      panel.classList.add("is-open");
-      var input = panel.querySelector(".acc-comment-input");
-      if (input) input.focus();
-    }
   }
 
   function openComments(postId) {
-    var panel = document.querySelector('[data-comments="' + postId + '"]');
+    var card = document.querySelector('[data-post-id="' + postId + '"]');
+    var panel = card
+      ? card.querySelector('[data-comments="' + postId + '"]')
+      : document.querySelector('[data-comments="' + postId + '"]');
     if (!panel) {
       paintPostBar(postId);
-      return;
+      card = document.querySelector('[data-post-id="' + postId + '"]');
+      panel = card && card.querySelector('[data-comments="' + postId + '"]');
     }
+    if (!panel) return;
+    var teaser = card && card.querySelector(".acc-card__teaser");
+    if (teaser) teaser.hidden = true;
     panel.hidden = false;
     panel.classList.add("is-open");
     var input = panel.querySelector(".acc-comment-input");

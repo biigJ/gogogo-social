@@ -290,6 +290,43 @@
     return Promise.resolve();
   }
 
+  var TYPE_ORDER = [
+    "personal_training",
+    "web_call",
+    "ernaehrung",
+    "stempelkarte",
+    "merch",
+    "routine",
+    "zirkel"
+  ];
+  var TYPE_LABELS = {
+    personal_training: "Personal Training",
+    web_call: "Web-Call",
+    ernaehrung: "Ernährung",
+    stempelkarte: "Stempelkarte",
+    merch: "Merch",
+    routine: "12-Wochen-Routine",
+    zirkel: "Zirkeltraining"
+  };
+
+  function descHtml(text) {
+    var full = String(text || "").trim();
+    if (!full) return "";
+    var lines = full.split(/\n+/);
+    var short = lines.slice(0, 5).join("\n");
+    if (short.length > 280) short = short.slice(0, 277) + "…";
+    var needsMore = short !== full || lines.length > 5;
+    if (!needsMore) return "<p>" + esc(full) + "</p>";
+    return (
+      '<p class="support-desc">' +
+      esc(short) +
+      ' <button type="button" class="support-more" data-support-more="1">mehr</button></p>' +
+      '<p class="support-desc-full" hidden>' +
+      esc(full) +
+      "</p>"
+    );
+  }
+
   function mineHtml() {
     var active = state.orders.filter(function (o) {
       return o.status === "aktiv" || o.status === "freigeschaltet";
@@ -297,36 +334,69 @@
     if (!active.length) {
       return '<p class="support-empty">Noch nichts gebucht. Wähle unten ein Angebot.</p>';
     }
-    return (
-      '<ul class="support-mine">' +
-      active
-        .map(function (o) {
-          var p = o.support_products || {};
-          var pay = o.payment_status || paymentFor(p);
-          return (
-            '<li><strong>' +
-            esc(p.title || "Support") +
-            '</strong><span>' +
-            esc(pay) +
-            " · " +
-            esc(o.status) +
-            "</span></li>"
-          );
-        })
-        .join("") +
-      "</ul>"
-    );
+    var byType = {};
+    active.forEach(function (o) {
+      var p = o.support_products || {};
+      var t = String(p.type || "merch");
+      if (!byType[t]) byType[t] = [];
+      byType[t].push(o);
+    });
+    var blocks = TYPE_ORDER.filter(function (t) {
+      return byType[t] && byType[t].length;
+    }).map(function (t) {
+      return (
+        '<h3 class="support-subh">' +
+        esc(TYPE_LABELS[t] || t) +
+        "</h3><ul class=\"support-mine\">" +
+        byType[t]
+          .map(function (o) {
+            var p = o.support_products || {};
+            var pay = o.payment_status || paymentFor(p);
+            return (
+              "<li><strong>" +
+              esc(p.title || TYPE_LABELS[t] || "Support") +
+              "</strong><span>" +
+              esc(pay) +
+              " · " +
+              esc(o.status) +
+              "</span></li>"
+            );
+          })
+          .join("") +
+        "</ul>"
+      );
+    });
+    Object.keys(byType).forEach(function (t) {
+      if (TYPE_ORDER.indexOf(t) >= 0) return;
+      blocks.push(
+        '<h3 class="support-subh">' +
+          esc(TYPE_LABELS[t] || t) +
+          '</h3><ul class="support-mine">' +
+          byType[t]
+            .map(function (o) {
+              var p = o.support_products || {};
+              return (
+                "<li><strong>" +
+                esc(p.title || "Support") +
+                "</strong><span>" +
+                esc(o.status) +
+                "</span></li>"
+              );
+            })
+            .join("") +
+          "</ul>"
+      );
+    });
+    return blocks.join("");
   }
 
   function productCard(p) {
-    var owned = !!activeOrderFor(p.type) && activeOrderFor(p.type).product_id === p.id
-      ? true
-      : state.orders.some(function (o) {
-          return (
-            String(o.product_id) === String(p.id) &&
-            (o.status === "aktiv" || o.status === "freigeschaltet")
-          );
-        });
+    var owned = state.orders.some(function (o) {
+      return (
+        String(o.product_id) === String(p.id) &&
+        (o.status === "aktiv" || o.status === "freigeschaltet")
+      );
+    });
     var img = IMG[p.type] || IMG.routine;
     return (
       '<article class="support-card" data-product="' +
@@ -339,15 +409,13 @@
       "<h3>" +
       esc(p.title) +
       "</h3>" +
-      "<p>" +
-      esc(p.description || "") +
-      "</p>" +
+      descHtml(p.description || "") +
       '<div class="support-card__row">' +
       '<span class="support-price">' +
       esc(priceLabel(p)) +
       "</span>" +
       (owned
-        ? '<span class="support-owned">Meins</span>'
+        ? '<span class="support-owned">Gebucht</span>'
         : '<button type="button" class="support-buy" data-buy="' +
           esc(p.id) +
           '">Buchen</button>') +
@@ -355,48 +423,97 @@
     );
   }
 
-  function staticCards() {
+  function staticCard(kind) {
+    if (kind === "routine") {
+      return (
+        '<article class="support-card" data-static="routine">' +
+        '<div class="support-card__art"><img src="' +
+        esc(IMG.routine) +
+        '" alt="" /></div>' +
+        '<div class="support-card__body">' +
+        "<h3>12-Wochen-Routine</h3>" +
+        descHtml(
+          "Täglich ein Event posten — Gewohnheit statt Hyper-Tracking. Wer durchhält, erhält ein Personal Training."
+        ) +
+        '<div class="support-card__row"><span class="support-price">gratis</span>' +
+        '<button type="button" class="support-buy" data-buy-static="routine">Buchen</button>' +
+        "</div></div></article>"
+      );
+    }
     return (
-      '<article class="support-card" data-static="routine">' +
-      '<div class="support-card__art"><img src="' +
-      esc(IMG.routine) +
-      '" alt="" /></div>' +
-      '<div class="support-card__body">' +
-      "<h3>12-Wochen-Routine</h3>" +
-      "<p>Täglich ein Event posten — Gewohnheit statt Hyper-Tracking. Wer durchhält, erhält ein Personal Training.</p>" +
-      '<div class="support-card__row"><span class="support-price">gratis</span>' +
-      '<button type="button" class="support-buy" data-buy-static="routine">Starten</button>' +
-      "</div></div></article>" +
       '<article class="support-card" data-static="zirkel">' +
       '<div class="support-card__art"><img src="' +
       esc(IMG.zirkel) +
       '" alt="" /></div>' +
       '<div class="support-card__body">' +
       "<h3>Zirkeltraining</h3>" +
-      "<p>Gemeinsamer Rhythmus mit Freunden, Leaderboard und Stories.</p>" +
+      descHtml("Gemeinsamer Rhythmus mit Freunden, Leaderboard und Stories.") +
       '<div class="support-card__row"><span class="support-price">gratis</span>' +
-      '<button type="button" class="support-buy" data-buy-static="zirkel">Öffnen</button>' +
+      '<button type="button" class="support-buy" data-buy-static="zirkel">Buchen</button>' +
       "</div></div></article>"
     );
+  }
+
+  function catalogByType() {
+    var groups = {};
+    (state.products || []).forEach(function (p) {
+      if (!p) return;
+      var t = String(p.type || "merch");
+      if (!groups[t]) groups[t] = [];
+      groups[t].push(p);
+    });
+    groups.routine = (groups.routine || []).concat([{ _static: "routine" }]);
+    groups.zirkel = (groups.zirkel || []).concat([{ _static: "zirkel" }]);
+    var html = "";
+    TYPE_ORDER.forEach(function (t) {
+      var list = groups[t] || [];
+      if (!list.length) return;
+      html +=
+        '<section class="support-section">' +
+        '<h2 class="support-h">' +
+        esc(TYPE_LABELS[t] || t) +
+        '</h2><div class="support-grid">';
+      list.forEach(function (p) {
+        if (p && p._static) html += staticCard(p._static);
+        else html += productCard(p);
+      });
+      html += "</div></section>";
+    });
+    Object.keys(groups).forEach(function (t) {
+      if (TYPE_ORDER.indexOf(t) >= 0) return;
+      var list = groups[t] || [];
+      if (!list.length) return;
+      html +=
+        '<section class="support-section">' +
+        '<h2 class="support-h">' +
+        esc(TYPE_LABELS[t] || t) +
+        '</h2><div class="support-grid">' +
+        list.map(productCard).join("") +
+        "</div></section>";
+    });
+    return html;
   }
 
   function render() {
     var root = document.getElementById("support-root");
     if (!root) return;
-    var catalog = state.products.map(productCard).join("") + staticCards();
     root.innerHTML =
       '<section class="support-section">' +
-      '<h2 class="support-h">Meins</h2>' +
+      '<h2 class="support-h">Gebucht</h2>' +
       mineHtml() +
       "</section>" +
-      '<section class="support-section">' +
-      '<h2 class="support-h">Support</h2>' +
-      '<div class="support-grid">' +
-      catalog +
-      "</div></section>";
+      catalogByType();
   }
 
   function onClick(e) {
+    var more = e.target && e.target.closest ? e.target.closest("[data-support-more]") : null;
+    if (more) {
+      var short = more.closest(".support-desc");
+      var full = short && short.parentNode ? short.parentNode.querySelector(".support-desc-full") : null;
+      if (short) short.hidden = true;
+      if (full) full.hidden = false;
+      return;
+    }
     var buy = e.target && e.target.closest ? e.target.closest("[data-buy]") : null;
     if (buy) {
       var id = buy.getAttribute("data-buy");

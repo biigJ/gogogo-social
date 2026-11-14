@@ -1267,49 +1267,47 @@
 
   function editPanelHtml() {
     if (!state.editMode) return "";
-    var list = state.enrollments
-      .map(function (en) {
-        var c = en.courses || {};
-        var weeks = c.duration_weeks || 12;
-        var start = en.start_date || "";
-        var weekNo = 1;
-        if (start) {
-          var diff = Math.floor(
-            (new Date(berlinToday() + "T12:00:00") - new Date(start + "T12:00:00")) /
-              (7 * 86400000)
-          );
-          weekNo = Math.min(weeks, Math.max(1, diff + 1));
-        }
-        return (
-          '<div class="wr-enroll" data-enroll="' +
-          esc(en.id) +
-          '"><div><strong>' +
-          esc(c.title || "Kurs") +
-          "</strong><span>Woche " +
-          weekNo +
-          " von " +
-          weeks +
-          '</span></div><button type="button" data-wr-enroll-menu="' +
-          esc(en.id) +
-          '">⋯</button></div>'
-        );
-      })
-      .join("");
+    var iso = currentDayIso();
     var own = currentOwnEvent();
+    var kinds =
+      '<div class="wr-edit-panel__grid">' +
+      ["kraft", "ausdauer", "alternative", "zirkel"]
+        .map(function (k) {
+          var label =
+            k === "kraft"
+              ? "Kraft"
+              : k === "ausdauer"
+                ? "Ausdauer"
+                : k === "alternative"
+                  ? "Alternative"
+                  : "Zirkeltraining";
+          return (
+            '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-edit-kind="' +
+            esc(k) +
+            '" data-iso="' +
+            esc(iso) +
+            '"' +
+            (own ? ' data-replace="' + esc(own.id) + '"' : "") +
+            ">" +
+            esc(label) +
+            "</button>"
+          );
+        })
+        .join("") +
+      "</div>";
     var evRow = own
       ? '<div class="wr-edit-panel__row">' +
         '<button type="button" class="wr-pill-btn" data-wr-edit-time="' +
         esc(own.id) +
-        '">Zeit</button>' +
+        '">Uhrzeit</button>' +
         '<button type="button" class="wr-pill-btn" data-wr-delete="' +
         esc(own.id) +
         '">Löschen</button></div>'
-      : "";
+      : '<p class="wr-edit-panel__hint">Tag neu belegen</p>';
     return (
       '<div class="wr-edit-panel">' +
-      '<button type="button" class="wr-pill-btn wr-pill-btn--dark wr-pill-btn--center" data-wr-book="1">Kurs hinzufügen</button>' +
+      kinds +
       evRow +
-      (list ? '<div class="wr-enroll-list">' + list + "</div>" : "") +
       "</div>"
     );
   }
@@ -1600,37 +1598,53 @@
     var m = wheel ? Number(wheel.getAttribute("data-m") || 0) : 0;
     var starts = p.iso + "T" + pad2(h) + ":" + pad2(m) + ":00+01:00";
     var keepIso = p.iso;
+    var replaceId = p.replaceId || null;
 
-    function finish(rows) {
+    function finish() {
       state.pendingCreate = null;
+      state.editMode = false;
       closeSheet();
       return refreshKeepDay(keepIso);
     }
 
+    function saveOrReplace(body) {
+      if (replaceId) {
+        return rest("events?id=eq." + encodeURIComponent(replaceId), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: body
+        }).then(finish);
+      }
+      return createEvent(body).then(finish);
+    }
+
     if (p.kind === "alternative") {
-      return createEvent({
+      return saveOrReplace({
         category: "alternative",
         title: p.title || "Bewegung",
         starts_at: starts,
+        course_id: null,
+        enrollment_id: null,
         is_unplanned: true,
         item_type: travelDayActive(p.iso) ? "hotel_workout" : "event",
-        travel_auto: !!travelDayActive(p.iso)
-      }).then(finish);
+        travel_auto: !!travelDayActive(p.iso),
+        status: "geplant"
+      });
     }
 
     if (p.kind === "zirkel") {
-      var payload = {
+      var zBody = {
         category: "zirkel",
         course_id: p.courseId || null,
         enrollment_id: p.enrollmentId || null,
         title: p.title || "Zirkeltraining",
         starts_at: starts,
         is_unplanned: false,
-        item_type: "course_session"
+        item_type: "course_session",
+        travel_auto: false,
+        status: "geplant"
       };
-      if (p.courseId) {
-        return createEvent(payload).then(finish);
-      }
+      if (p.courseId) return saveOrReplace(zBody);
       return ensureCourseByDef({
         slug: "training-zirkel",
         title: "Zirkeltraining",
@@ -1641,8 +1655,8 @@
           if (host.toast) host.toast("Zirkel-Kurs fehlt");
           return;
         }
-        payload.course_id = course.id;
-        return createEvent(payload).then(finish);
+        zBody.course_id = course.id;
+        return saveOrReplace(zBody);
       });
     }
 
@@ -1656,18 +1670,23 @@
         if (host.toast) host.toast("Kurs konnte nicht verknüpft werden");
         return;
       }
-      return createEvent({
+      return saveOrReplace({
         category: p.category || "kraft",
         course_id: course.id,
+        enrollment_id: null,
         title: p.title,
         starts_at: starts,
         is_unplanned: false,
-        item_type: "course_session"
-      }).then(finish);
+        item_type: "course_session",
+        travel_auto: false,
+        status: "geplant"
+      });
     });
   }
 
-  function openKindSheet(kind, iso) {
+  function openKindSheet(kind, iso, replaceId) {
+    replaceId = replaceId || null;
+    state.pendingCreate = { replaceId: replaceId };
     if (kind === "alternative") {
       openSheet(
         "<h3>Alternative</h3>" +
@@ -1689,7 +1708,9 @@
           '<label class="wr-field">Freier Titel<input type="text" id="wr-rest-title" maxlength="80" placeholder="z. B. Spaziergang" /></label>' +
           '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-rest-save="' +
           esc(iso) +
-          '">Weiter</button>' +
+          '"' +
+          (replaceId ? ' data-replace="' + esc(replaceId) + '"' : "") +
+          ">Weiter</button>" +
           '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
       );
       return;
@@ -1717,7 +1738,8 @@
         iso: iso,
         title: "Zirkeltraining",
         courseId: courseId || null,
-        enrollmentId: en && en.id
+        enrollmentId: en && en.id,
+        replaceId: replaceId
       };
       openCreateTimeSheet();
       return;
@@ -1756,7 +1778,9 @@
                 esc(t.technique || "") +
                 '" data-iso="' +
                 esc(iso) +
-                '"><strong>' +
+                '"' +
+                (replaceId ? ' data-replace="' + esc(replaceId) + '"' : "") +
+                "><strong>" +
                 esc(t.label) +
                 "</strong></button>"
               );
@@ -1774,12 +1798,17 @@
     var slug = btn.getAttribute("data-slug");
     var title = btn.getAttribute("data-title") || kind;
     var cat = kind === "ausdauer" ? "ausdauer" : "kraft";
+    var replaceId =
+      (state.pendingCreate && state.pendingCreate.replaceId) ||
+      btn.getAttribute("data-replace") ||
+      null;
     state.pendingCreate = {
       kind: kind,
       category: cat,
       iso: iso,
       slug: slug,
-      title: title
+      title: title,
+      replaceId: replaceId
     };
     openCreateTimeSheet();
   }
@@ -2387,7 +2416,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -2440,6 +2469,14 @@
       openKindSheet(t.getAttribute("data-wr-add-kind"), t.getAttribute("data-iso"));
       return;
     }
+    if (t.getAttribute("data-wr-edit-kind")) {
+      openKindSheet(
+        t.getAttribute("data-wr-edit-kind"),
+        t.getAttribute("data-iso"),
+        t.getAttribute("data-replace")
+      );
+      return;
+    }
     if (t.getAttribute("data-wr-pick-training")) {
       pickTraining(t);
       return;
@@ -2458,7 +2495,11 @@
       state.pendingCreate = {
         kind: "alternative",
         iso: isoR,
-        title: titleR
+        title: titleR,
+        replaceId:
+          t.getAttribute("data-replace") ||
+          (state.pendingCreate && state.pendingCreate.replaceId) ||
+          null
       };
       openCreateTimeSheet();
       return;
@@ -2834,24 +2875,10 @@
 
   function patchEditPanelEvRow() {
     var panel = document.querySelector("#" + ROOT_ID + " .wr-edit-panel");
-    if (!panel) return;
-    var existing = panel.querySelector(".wr-edit-panel__row");
-    var own = currentOwnEvent();
-    var html = own
-      ? '<div class="wr-edit-panel__row">' +
-        '<button type="button" class="wr-pill-btn" data-wr-edit-time="' +
-        esc(own.id) +
-        '">Zeit</button>' +
-        '<button type="button" class="wr-pill-btn" data-wr-delete="' +
-        esc(own.id) +
-        '">Löschen</button></div>'
-      : "";
-    if (existing) existing.outerHTML = html || "";
-    else if (html) {
-      var book = panel.querySelector("[data-wr-book]");
-      if (book) book.insertAdjacentHTML("afterend", html);
-      else panel.insertAdjacentHTML("beforeend", html);
-    }
+    if (!panel || !state.editMode) return;
+    var html = editPanelHtml();
+    if (html) panel.outerHTML = html;
+    else panel.remove();
   }
 
   function syncDayFromScroll() {
