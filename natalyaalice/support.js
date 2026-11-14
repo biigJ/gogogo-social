@@ -291,23 +291,76 @@
   }
 
   var TYPE_ORDER = [
-    "personal_training",
-    "web_call",
-    "ernaehrung",
-    "stempelkarte",
-    "merch",
     "routine",
-    "zirkel"
+    "zirkel",
+    "ernaehrung",
+    "web_call",
+    "coach_offer",
+    "stempelkarte"
   ];
   var TYPE_LABELS = {
-    personal_training: "Personal Training",
-    web_call: "Web-Call",
-    ernaehrung: "Ernährung",
-    stempelkarte: "Stempelkarte",
-    merch: "Merch",
     routine: "12-Wochen-Routine",
-    zirkel: "Zirkeltraining"
+    zirkel: "Friday Fitness Circle",
+    ernaehrung: "Ernährungscoaching",
+    web_call: "Trainingsplan individualisieren",
+    coach_offer: "Coaching anbieten",
+    stempelkarte: "Stempelkarte",
+    personal_training: "Personal Training",
+    merch: "Merch"
   };
+  /* Einheitlicher Katalog — Headlines bleiben auch ohne DB-Produkte sichtbar */
+  var STATIC_OFFERS = [
+    {
+      key: "routine",
+      type: "routine",
+      title: "12-Wochen-Routine",
+      price: "x € Einzahlung",
+      description:
+        "Zahle einen Betrag ein, logge Deine Events über 12 Wochen und erhalte 90 % zurück. Regel und Berechnung sind im System hinterlegt — Freischaltung nach Zahlung."
+    },
+    {
+      key: "zirkel",
+      type: "zirkel",
+      title: "Friday Fitness Circle",
+      price: "gratis",
+      description:
+        "Zirkeltraining tracken und im Leaderboard festhalten — IRL oder online. Login mit Deiner FFC-E-Mail und Passwort."
+    },
+    {
+      key: "ernaehrung",
+      type: "ernaehrung",
+      title: "Ernährungscoaching",
+      price: "Paket",
+      description:
+        "Tägliches Event über 4 Wochen: KI nimmt Dein Protokoll auf und rechnet am Tagesende zusammen. Coach-Feedback und Ernährungsplan auf Wunsch."
+    },
+    {
+      key: "web_call",
+      type: "web_call",
+      title: "Trainingsplan individualisieren",
+      price: "Web-Call",
+      description:
+        "Initialtreffen mit Gründer oder zertifiziertem Coach: Alltag analysieren, Plan schärfen. Optional ACT-basiertes Coaching zum Aufbau im Alltag."
+    },
+    {
+      key: "coach_offer",
+      type: "coach_offer",
+      title: "Coaching anbieten",
+      price: "Zugang",
+      description:
+        "Zugang zum Admin-Bereich. Freunde finden Dich in der Coach-Liste. Inklusive Playbook: was gogogo fördert und warum die Trainingspläne so aufgebaut sind."
+    },
+    {
+      key: "stempelkarte",
+      type: "stempelkarte",
+      title: "Stempelkarte",
+      price: "25 € Spende",
+      description:
+        "10er-Stempelkarte. Event erstellen, Freund macht mit und scannt — beide erhalten einen Stempel. Volle Karte: T-Shirt oder Selfiestick."
+    }
+  ];
+  var PAY_HINT =
+    "Zahlung: PayPal-Link an Dich, danach manuelle Freischaltung (einfachster Start). Stripe später für automatische Freigabe.";
 
   function descHtml(text) {
     var full = String(text || "").trim();
@@ -423,71 +476,61 @@
     );
   }
 
-  function staticCard(kind) {
-    if (kind === "routine") {
-      return (
-        '<article class="support-card" data-static="routine">' +
-        '<div class="support-card__art"><img src="' +
-        esc(IMG.routine) +
-        '" alt="" /></div>' +
-        '<div class="support-card__body">' +
-        "<h3>12-Wochen-Routine</h3>" +
-        descHtml(
-          "Täglich ein Event posten — Gewohnheit statt Hyper-Tracking. Wer durchhält, erhält ein Personal Training."
-        ) +
-        '<div class="support-card__row"><span class="support-price">gratis</span>' +
-        '<button type="button" class="support-buy" data-buy-static="routine">Buchen</button>' +
-        "</div></div></article>"
-      );
-    }
+  function dbProductForType(type) {
+    return (state.products || []).filter(function (p) {
+      return p && String(p.type) === String(type);
+    })[0];
+  }
+
+  function offerOwned(type) {
+    return !!(activeOrderFor(type) || (type === "routine" && host && host.routineActive && host.routineActive()));
+  }
+
+  function staticOfferCard(offer) {
+    var img = IMG[offer.type] || IMG.routine;
+    var owned = offerOwned(offer.type);
+    var db = dbProductForType(offer.type);
+    var price = db ? priceLabel(db) : offer.price;
+    var buyAttr = db
+      ? 'data-buy="' + esc(db.id) + '"'
+      : 'data-buy-static="' + esc(offer.key) + '"';
     return (
-      '<article class="support-card" data-static="zirkel">' +
+      '<article class="support-card" data-offer="' +
+      esc(offer.key) +
+      '">' +
       '<div class="support-card__art"><img src="' +
-      esc(IMG.zirkel) +
+      esc(img) +
       '" alt="" /></div>' +
       '<div class="support-card__body">' +
-      "<h3>Zirkeltraining</h3>" +
-      descHtml("Gemeinsamer Rhythmus mit Freunden, Leaderboard und Stories.") +
-      '<div class="support-card__row"><span class="support-price">gratis</span>' +
-      '<button type="button" class="support-buy" data-buy-static="zirkel">Buchen</button>' +
+      "<h3>" +
+      esc(offer.title) +
+      "</h3>" +
+      descHtml(offer.description) +
+      '<div class="support-card__row">' +
+      '<span class="support-price">' +
+      esc(price) +
+      "</span>" +
+      (owned
+        ? '<span class="support-owned">Gebucht</span>'
+        : '<button type="button" class="support-buy" ' + buyAttr + ">Buchen</button>") +
       "</div></div></article>"
     );
   }
 
   function catalogByType() {
-    var groups = {};
-    (state.products || []).forEach(function (p) {
-      if (!p) return;
-      var t = String(p.type || "merch");
-      if (!groups[t]) groups[t] = [];
-      groups[t].push(p);
-    });
-    /* Keine Extra-Kacheln (Routine/Zirkel) — nur buchbare Produkte */
     var html = "";
-    TYPE_ORDER.forEach(function (t) {
-      var list = groups[t] || [];
-      if (!list.length) return;
+    STATIC_OFFERS.forEach(function (offer) {
       html +=
-        '<section class="support-section support-section--cat">' +
+        '<section class="support-section support-section--cat" data-cat="' +
+        esc(offer.type) +
+        '">' +
         '<h2 class="support-h">' +
-        esc(TYPE_LABELS[t] || t) +
+        esc(TYPE_LABELS[offer.type] || offer.title) +
         '</h2><div class="support-grid">' +
-        list.map(productCard).join("") +
+        staticOfferCard(offer) +
         "</div></section>";
     });
-    Object.keys(groups).forEach(function (t) {
-      if (TYPE_ORDER.indexOf(t) >= 0) return;
-      var list = groups[t] || [];
-      if (!list.length) return;
-      html +=
-        '<section class="support-section support-section--cat">' +
-        '<h2 class="support-h">' +
-        esc(TYPE_LABELS[t] || t) +
-        '</h2><div class="support-grid">' +
-        list.map(productCard).join("") +
-        "</div></section>";
-    });
-    return html || '<p class="support-empty">Noch keine Angebote geladen.</p>';
+    return html;
   }
 
   function render() {
@@ -497,7 +540,9 @@
       '<section class="support-section">' +
       '<h2 class="support-h">Gebucht</h2>' +
       mineHtml() +
-      "</section>" +
+      '<p class="support-empty" style="margin-top:10px">' +
+      esc(PAY_HINT) +
+      "</p></section>" +
       catalogByType();
   }
 
@@ -542,11 +587,93 @@
     if (st) {
       var kind = st.getAttribute("data-buy-static");
       if (kind === "routine") {
-        bookRoutine();
+        bookStaticOffer("routine").then(function () {
+          return bookRoutine();
+        });
         return;
       }
-      if (kind === "zirkel" && host.openZirkel) host.openZirkel();
+      if (kind === "zirkel") {
+        bookStaticOffer("zirkel").then(function () {
+          if (host.openZirkel) host.openZirkel();
+          else if (host.requireFfc) host.requireFfc(function () {});
+        });
+        return;
+      }
+      if (kind === "ernaehrung" || kind === "web_call" || kind === "stempelkarte" || kind === "coach_offer") {
+        bookStaticOffer(kind).then(function () {
+          render();
+          if (host.paintProfil) host.paintProfil();
+          if (host.toast) {
+            host.toast(
+              kind === "coach_offer"
+                ? "Angefragt — Freischaltung nach Freigabe."
+                : "Gebucht — Zahlung per PayPal, danach Freischaltung."
+            );
+          }
+        });
+      }
     }
+  }
+
+  function bookStaticOffer(type) {
+    var db = dbProductForType(type);
+    if (db) return bookProduct(db, { source: "plus_static" });
+    /* Ohne Katalog-Produkt: lokale Order-Merker über Community/activity nicht nötig —
+       speichere angefragte Buchung als support_orders nur wenn Produkt existiert.
+       Fallback: meta in activity_log */
+    return rest("activity_log", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: {
+        user_id: me(),
+        type: "support_request",
+        ref_id: null,
+        meta: { type: type, payment: "paypal_pending" }
+      }
+    })
+      .catch(function () {})
+      .then(function () {
+        state.orders = state.orders.concat([
+          {
+            id: "local-" + type,
+            user_id: me(),
+            status: "angefragt",
+            payment_status: "offen",
+            support_products: { type: type, title: TYPE_LABELS[type] || type }
+          }
+        ]);
+        return null;
+      });
+  }
+
+  function openStampCard() {
+    var order = activeOrderFor("stempelkarte");
+    var stamps = 0;
+    try {
+      stamps = Number((order && order.meta && order.meta.stamps) || 0) || 0;
+    } catch (e) {}
+    if (host.toast) {
+      host.toast("Stempelkarte: " + stamps + "/10 — Freund scannt nach gemeinsamem Event.");
+    }
+  }
+
+  function cancelAllOrdersForUser() {
+    var id = me();
+    if (!id) return Promise.resolve();
+    return rest(
+      "support_orders?user_id=eq." + encodeURIComponent(id) + "&select=id,status"
+    ).then(function (rows) {
+      return Promise.all(
+        (rows || []).map(function (o) {
+          if (!o || o.status === "angefragt") return null;
+          return rest("support_orders?id=eq." + encodeURIComponent(o.id), {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: { status: "angefragt" }
+          }).catch(function () {});
+        })
+      );
+    });
   }
 
   function heuteSupportItems() {
@@ -644,6 +771,8 @@
     bookProduct: bookProduct,
     heuteSupportItems: heuteSupportItems,
     saveNutritionLog: saveNutritionLog,
-    activeOrderFor: activeOrderFor
+    activeOrderFor: activeOrderFor,
+    openStampCard: openStampCard,
+    cancelAllOrdersForUser: cancelAllOrdersForUser
   };
 })(window);

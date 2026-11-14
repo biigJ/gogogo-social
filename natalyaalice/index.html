@@ -4390,11 +4390,19 @@
       display: block;
     }
     .team-slide__cta + .team-slide__group-name-row {
-      margin-top: 60px; /* 3× bisheriger Abstand (20px) */
+      margin-top: 30px; /* Hälfte des früheren 60px-Abstands */
     }
     .team-slide__cta + .team-slide__group-name,
     .team-slide__cta + .team-slide__coach-name {
-      margin-top: 60px;
+      margin-top: 30px;
+    }
+    .team-slide__cta.is-done,
+    .team-slide__cta.is-done:disabled {
+      background: #D8D0C4 !important;
+      color: #6B6358 !important;
+      border-color: #D8D0C4 !important;
+      cursor: default;
+      pointer-events: none;
     }
     .team-slide__group-name + .team-slide__add-friend,
     .team-slide__coach-name + .team-slide__add-friend,
@@ -6409,9 +6417,9 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-22"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-20"></script>
-  <script src="/natalyaalice/support.js?v=support-4"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-23"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-21"></script>
+  <script src="/natalyaalice/support.js?v=support-5"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -10694,6 +10702,52 @@
               return HeuteAccountability.refresh();
             }
           },
+          /* Woche-Edit → go_coach_plans, damit Plan-Ghosts nicht zurückkehren */
+          syncPlanDay: function (iso, unit) {
+            if (!iso || !unit || !sessionAccount) return Promise.resolve();
+            var wd = weekdayIndex(iso);
+            var next = {};
+            Object.keys(userUnits || {}).forEach(function (key) {
+              var n = Number(key);
+              if (!isNaN(n) && userUnits[n]) next[n] = userUnits[n];
+            });
+            var kind = unit.kind || unit.category || "alternative";
+            if (kind === "alternative" || kind === "spontan") {
+              next[wd] = { kind: "alternative", label: unit.label || unit.title || "Bewegung" };
+            } else {
+              next[wd] = {
+                kind: kind,
+                label: unit.label || unit.title || "",
+                systemId: unit.systemId || null,
+                presetId: unit.presetId || null,
+                technique: unit.technique || null
+              };
+            }
+            userOwned = true;
+            return saveUserWeek(next).then(function () {
+              userUnits = next;
+            });
+          },
+          planItemForDay: function (iso) {
+            if (!sessionMode || !sessionAccount || !iso) return null;
+            var wd = weekdayIndex(iso);
+            var unit = displayUnit(wd);
+            if (!unit || !unit.kind || unit.kind === "spontan") return null;
+            var time = timeForWeekday(wd) || "12:00";
+            if (time.length === 4) time = "0" + time;
+            var place = placeForWeekday(wd) || "";
+            return {
+              id: "plan:" + iso,
+              user_id: sessionAccount.id,
+              category: unit.kind === "alternative" ? "alternative" : unit.kind,
+              title: unit.label || unit.kind,
+              starts_at: iso + "T" + time + ":00+01:00",
+              status: "geplant",
+              location: place && String(place).indexOf("Ort:") === 0 ? String(place).slice(4).trim() : place,
+              item_type: unit.kind === "alternative" ? "event" : "course_session",
+              _planOnly: true
+            };
+          },
           openCoachWhatsApp: function (prefill) {
             var trainerId = sessionAccount && sessionAccount.trainer_id;
             if (!trainerId) return;
@@ -10768,10 +10822,30 @@
             else openGoSub("routine", "12-Wochen-Routine");
           },
           openZirkel: function () {
-            openGoSub("zirkel", "Zirkeltraining");
+            openGoSub("zirkel", "Friday Fitness Circle");
+            if (typeof requireFfc === "function") {
+              requireFfc(function () {
+                refreshZirkel();
+              }, { title: "FFC Login", tagline: "Mit Deiner FFC-E-Mail und Passwort anmelden." });
+            }
+          },
+          requireFfc: function (fn, opts) {
+            if (typeof requireFfc === "function") requireFfc(fn || function () {}, opts || {});
+          },
+          routineActive: function () {
+            try {
+              var about = profileAbout(sessionAccount) || {};
+              return !!(about.challenge_started || about.routine_started);
+            } catch (e) {
+              return false;
+            }
+          },
+          paintProfil: function () {
+            if (typeof renderProfil === "function") renderProfil();
           },
           onSupportChanged: function () {
             if (window.HeuteAccountability) HeuteAccountability.refresh();
+            if (typeof renderProfil === "function") renderProfil();
           },
           toast: function (msg) {
             try { window.alert(msg); } catch (e) {}
@@ -11918,6 +11992,24 @@
           openProfile(mePerson);
         });
         meSlide.appendChild(editBtn);
+        var stampOrder = window.GoSupport && GoSupport.activeOrderFor
+          ? GoSupport.activeOrderFor("stempelkarte")
+          : null;
+        if (stampOrder) {
+          var stampBtn = document.createElement("button");
+          stampBtn.type = "button";
+          stampBtn.className = "team-slide__cta is-solid";
+          var stamps = 0;
+          try {
+            stamps = Number((stampOrder.meta && stampOrder.meta.stamps) || 0) || 0;
+          } catch (eSt) {}
+          stampBtn.textContent = "Stempelkarte · " + stamps + "/10";
+          stampBtn.addEventListener("click", function () {
+            if (window.GoSupport && GoSupport.openStampCard) GoSupport.openStampCard();
+            else showPlan("training");
+          });
+          meSlide.appendChild(stampBtn);
+        }
         var feedbackBtn = document.createElement("button");
         feedbackBtn.type = "button";
         feedbackBtn.className = "team-slide__cta is-solid";
@@ -11977,12 +12069,13 @@
           (parent || box).appendChild(row);
         }
 
-        /* Reihenfolge: 1) Meine Gruppen, 2) Mein Coach, 3) Meine Coachees */
+        /* Reihenfolge: 1) Meine Gruppe (max. 1), 2) Mein Coach, 3) Meine Coachees */
         var groups = myGroups();
+        var myGroup = groups.length ? groups[0] : null;
         function groupSlide(group) {
           var slide = document.createElement("article");
           slide.className = "team-slide is-scroll";
-          slide.dataset.title = "Meine Gruppen";
+          slide.dataset.title = "Meine Gruppe";
           var art = document.createElement("label");
           art.className = "team-slide__art is-upload";
           var gImg = document.createElement("img");
@@ -12009,11 +12102,10 @@
           slide.appendChild(art);
           var createBtn = document.createElement("button");
           createBtn.type = "button";
-          createBtn.className = "team-slide__cta is-solid";
-          createBtn.textContent = "Gruppe erstellen";
-          createBtn.addEventListener("click", function () {
-            openGoSub("group", "Gruppe erstellen");
-          });
+          createBtn.className = "team-slide__cta is-solid is-done";
+          createBtn.textContent = "Gruppe erstellen ✔️";
+          createBtn.disabled = true;
+          createBtn.setAttribute("aria-disabled", "true");
           slide.appendChild(createBtn);
           var nameRow = document.createElement("div");
           nameRow.className = "team-slide__group-name-row";
@@ -12059,10 +12151,10 @@
           slide.appendChild(membersRow);
           box.appendChild(slide);
         }
-        if (!groups.length) {
+        if (!myGroup) {
           var emptyGroup = document.createElement("article");
           emptyGroup.className = "team-slide is-scroll is-group-empty";
-          emptyGroup.dataset.title = "Meine Gruppen";
+          emptyGroup.dataset.title = "Meine Gruppe";
           var emptyArt = document.createElement("div");
           emptyArt.className = "team-slide__art";
           var emptyImg = document.createElement("img");
@@ -12084,7 +12176,7 @@
           emptyGroup.appendChild(createBtn);
           box.appendChild(emptyGroup);
         } else {
-          groups.forEach(groupSlide);
+          groupSlide(myGroup);
         }
 
         var trainer = null;
@@ -12721,14 +12813,20 @@
           save.addEventListener("click", function () {
             var name = String(nameIn.value || "").trim();
             if (!name) { nameIn.focus(); return; }
-            var groups = myGroups().slice();
-            groups.push({
+            var existing = myGroups();
+            if (existing.length) {
+              try { window.alert("Du kannst nur eine Gruppe gründen."); } catch (eG) {}
+              closeGoSub();
+              renderTeam();
+              return;
+            }
+            var groups = [{
               id: "g-" + Date.now().toString(36),
               name: name,
               description: String(descIn.value || "").trim(),
               photo_url: "",
               members: Object.keys(selected)
-            });
+            }];
             saveMyGroups(groups).then(function () {
               syncGroupOptions();
               renderTeam();
@@ -15861,7 +15959,7 @@
       function openGruppen() {
         showPlan("team");
         requestAnimationFrame(function () {
-          var slide = document.querySelector('#plan-team [data-title="Meine Gruppen"]');
+          var slide = document.querySelector('#plan-team [data-title="Meine Gruppe"], #plan-team [data-title="Meine Gruppen"]');
           if (slide && slide.scrollIntoView) slide.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
         });
       }
@@ -16968,21 +17066,18 @@
         if (FFC.user()) { action(); return; }
         opts = opts || {};
         var email = accountEmail();
-        var code = String((sessionAccount && sessionAccount.invite_code) || "");
         function askLogin() {
           ffcPending = action;
           ffcAuthWanted = true;
-          FFC.showAuth("login", { title: opts.title, tagline: opts.tagline, email: email });
+          document.body.classList.add("ffc-open");
+          FFC.showAuth("login", {
+            title: opts.title || "FFC Login",
+            tagline: opts.tagline || "Mit Deiner Friday-Fitness-Circle E-Mail und Passwort anmelden.",
+            email: email
+          });
         }
-        if (!email || code.length < 6) { askLogin(); return; }
-        ffcPending = action;
-        FFC.signIn(email, code).then(function (res) {
-          if (res && res.error) { askLogin(); return; }
-          if (ffcPending === action) {
-            ffcPending = null;
-            action();
-          }
-        });
+        /* Immer sichtbares Login — kein stilles Invite-Code-als-Passwort */
+        askLogin();
       }
 
       function closeFfcOverlay() {

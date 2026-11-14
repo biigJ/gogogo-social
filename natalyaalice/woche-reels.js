@@ -417,6 +417,67 @@
       .catch(function () {});
   }
 
+  function commentMarker(eventId) {
+    return "[[c:" + String(eventId) + "]]";
+  }
+
+  function saveCommentFallback(eventId, text) {
+    return rest("go_community_posts", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: {
+        author_id: me(),
+        kind: "text",
+        body: (commentMarker(eventId) + "\n" + text).slice(0, 144),
+        photo_url: JSON.stringify({ text: text })
+      }
+    });
+  }
+
+  function loadCommentFallbacks(ids) {
+    var want = {};
+    (ids || []).forEach(function (id) {
+      want[String(id)] = true;
+    });
+    return rest(
+      "go_community_posts?body=like." +
+        encodeURIComponent("*[[c:*") +
+        "&select=id,author_id,body,photo_url,created_at&order=created_at.asc&limit=400"
+    )
+      .then(function (rows) {
+        (rows || []).forEach(function (r) {
+          var body = String(r.body || "");
+          var m = body.match(/\[\[c:([^\]]+)\]\]/i);
+          if (!m) return;
+          var eid = String(m[1]);
+          if (ids && ids.length && !want[eid]) return;
+          var text = "";
+          var raw = String(r.photo_url || "");
+          if (raw.charAt(0) === "{") {
+            try {
+              var packed = JSON.parse(raw);
+              if (packed && packed.text) text = String(packed.text);
+            } catch (e) {}
+          }
+          if (!text) text = body.replace(/\[\[c:[^\]]+\]\]/i, "").trim();
+          if (!text) return;
+          if (!state.comments[eid]) state.comments[eid] = [];
+          var exists = state.comments[eid].some(function (c) {
+            return String(c.id) === String(r.id);
+          });
+          if (exists) return;
+          state.comments[eid].push({
+            id: r.id,
+            event_id: eid,
+            account_id: r.author_id,
+            text: text,
+            created_at: r.created_at
+          });
+        });
+      })
+      .catch(function () {});
+  }
+
   function loadComments(ids) {
     state.comments = {};
     if (!ids.length) return Promise.resolve();
@@ -437,7 +498,10 @@
           })
         );
       })
-      .catch(function () {});
+      .catch(function () {})
+      .then(function () {
+        return loadCommentFallbacks(ids);
+      });
   }
 
   function loadEnrollments() {
@@ -783,7 +847,7 @@
   function itemsForDay(iso) {
     var list = [];
     state.events.forEach(function (ev) {
-      if (dayKey(ev.starts_at) === iso) {
+      if (dayKey(ev.starts_at) === iso && ev.status !== "ausgefallen") {
         list.push({ kind: "event", starts_at: ev.starts_at, ev: ev });
       }
     });
@@ -792,6 +856,21 @@
         list.push({ kind: "ffc", starts_at: ev.starts_at, ev: ev });
       }
     });
+    /* Wochenplan-Vorlage anzeigen, wenn noch kein echtes Event (z. B. Nächste Woche) */
+    var hasOwn = list.some(function (it) {
+      return it.kind === "event" && it.ev && String(it.ev.user_id) === me();
+    });
+    if (!hasOwn && host && host.planItemForDay) {
+      var plan = host.planItemForDay(iso);
+      if (plan && plan.title) {
+        list.push({
+          kind: "event",
+          starts_at: plan.starts_at,
+          ev: plan,
+          _fromPlan: true
+        });
+      }
+    }
     list.sort(function (a, b) {
       return String(a.starts_at).localeCompare(String(b.starts_at));
     });
@@ -1816,15 +1895,44 @@
       });
     }
 
+    function syncPlanAfterSave(body) {
+      if (!host || !host.syncPlanDay || !p.iso) return Promise.resolve();
+      return Promise.resolve(
+        host.syncPlanDay(p.iso, {
+          kind: body.category === "alternative" ? "alternative" : body.category || p.kind || "kraft",
+          label: body.title || p.title || "",
+          category: body.category || p.category || "kraft"
+        })
+      ).catch(function () {});
+    }
+
     function saveOrReplace(body) {
+      function after() {
+        return syncPlanAfterSave(body).then(finish);
+      }
       if (replaceId) {
         return rest("events?id=eq." + encodeURIComponent(replaceId), {
           method: "PATCH",
           prefer: "return=minimal",
           body: body
-        }).then(finish);
+        })
+          .catch(function () {
+            var bare = Object.assign({}, body);
+            delete bare.item_type;
+            delete bare.travel_auto;
+            return rest("events?id=eq." + encodeURIComponent(replaceId), {
+              method: "PATCH",
+              prefer: "return=minimal",
+              body: bare
+            });
+          })
+          .then(after)
+          .catch(function (err) {
+            if (host.toast) host.toast("Speichern fehlgeschlagen");
+            throw err;
+          });
       }
-      return createEvent(body).then(finish);
+      return createEvent(body).then(after);
     }
 
     if (p.kind === "alternative") {
@@ -2255,8 +2363,12 @@
       return;
     }
     if (step === 2) {
-      var nextMo = addDays(mondayOf(berlinToday()), 7);
-      if (mondayOf(berlinToday()) >= berlinToday()) nextMo = mondayOf(berlinToday());
+      var nextMo =
+        state.weekMode === "next_week"
+          ? addDays(mondayOf(berlinToday()), 7)
+          : mondayOf(berlinToday()) >= berlinToday()
+            ? mondayOf(berlinToday())
+            : addDays(mondayOf(berlinToday()), 7);
       draft.start = draft.start || nextMo;
       var spw = (draft.course && draft.course.sessions_per_week) || 3;
       if (!draft.weekdays.length) {
@@ -2856,12 +2968,42 @@
     }
     if (t.getAttribute("data-wr-done")) {
       var doneId = t.getAttribute("data-wr-done");
-      /* Immer nach Aktuell + Erledigt-Dialog — nie still PATCH ohne Dialog */
-      if (host && typeof host.openDoneModal === "function") {
-        host.openDoneModal(doneId);
-      } else if (host && typeof host.showHeute === "function") {
-        host.showHeute();
+      /* Plan-Ghost materialisieren, dann Erledigt-Dialog */
+      function openDone(id) {
+        if (host && typeof host.openDoneModal === "function") {
+          host.openDoneModal(id);
+        } else if (host && typeof host.showHeute === "function") {
+          host.showHeute();
+        }
       }
+      if (String(doneId).indexOf("plan:") === 0) {
+        var planIso = String(doneId).slice(5);
+        var ghost = itemsForDay(planIso).filter(function (it) {
+          return it && it._fromPlan && it.ev;
+        })[0];
+        var pev = ghost && ghost.ev;
+        if (!pev) return;
+        createEvent({
+          category: pev.category || "alternative",
+          title: pev.title || "Bewegung",
+          starts_at: pev.starts_at,
+          course_id: pev.course_id || null,
+          is_unplanned: false,
+          item_type: pev.item_type || "event",
+          travel_auto: false
+        })
+          .then(function (rows) {
+            var created = Array.isArray(rows) ? rows[0] : rows;
+            return refreshKeepDay(planIso).then(function () {
+              if (created && created.id) openDone(created.id);
+            });
+          })
+          .catch(function () {
+            if (host.toast) host.toast("Event konnte nicht angelegt werden");
+          });
+        return;
+      }
+      openDone(doneId);
       return;
     }
     if (t.getAttribute("data-wr-rsvp")) {
@@ -3014,12 +3156,16 @@
       method: "POST",
       prefer: "return=minimal",
       body: { event_id: eventId, account_id: me(), text: text.slice(0, 500) }
-    }).then(function () {
-      if (input) input.value = "";
-      return loadComments([eventId]).then(function () {
-        openComments(eventId);
+    })
+      .catch(function () {
+        return saveCommentFallback(eventId, text.slice(0, 500));
+      })
+      .then(function () {
+        if (input) input.value = "";
+        return loadComments([eventId]).then(function () {
+          openComments(eventId);
+        });
       });
-    });
   }
 
   function bindSwipe(root) {

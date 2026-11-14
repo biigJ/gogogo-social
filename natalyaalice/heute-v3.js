@@ -446,6 +446,11 @@
     return "[[c:" + String(eventId) + "]]";
   }
 
+  function parseCommentMarker(body) {
+    var m = String(body || "").match(/\[\[c:([^\]]+)\]\]/i);
+    return m ? String(m[1]) : "";
+  }
+
   function pushComment(eid, c) {
     eid = String(eid || "");
     if (!eid || !c) return;
@@ -476,9 +481,8 @@
       .then(function (rows) {
         (rows || []).forEach(function (r) {
           var body = String(r.body || "");
-          var m = body.match(/\[\[c:([0-9a-f-]{36})\]\]/i);
-          if (!m) return;
-          var eid = String(m[1]);
+          var eid = parseCommentMarker(body);
+          if (!eid) return;
           if (eventIds && eventIds.length && !want[eid]) return;
           var text = "";
           var raw = String(r.photo_url || "");
@@ -488,7 +492,7 @@
               if (packed && packed.text) text = String(packed.text);
             } catch (e) {}
           }
-          if (!text) text = body.replace(/\[\[c:[0-9a-f-]{36}\]\]/i, "").trim();
+          if (!text) text = body.replace(/\[\[c:[^\]]+\]\]/i, "").trim();
           if (!text) return;
           pushComment(eid, {
             id: r.id,
@@ -499,6 +503,12 @@
         });
       })
       .catch(function () {});
+  }
+
+  function loadSyntheticCommentKeys(keys) {
+    var list = (keys || []).map(String).filter(Boolean);
+    if (!list.length) return Promise.resolve();
+    return loadCommentFallbacks(list);
   }
 
   function loadComments(eventIds) {
@@ -1324,6 +1334,13 @@
       else upcoming.push(item);
     });
 
+    /* Erledigt/Historie deckt den Tag ebenfalls ab — sonst kehrt der Plan-Ghost zurück */
+    pack.past.forEach(function (ev) {
+      if (String(ev.user_id) !== me()) return;
+      coveredDays[dayKey(ev.starts_at)] = true;
+      coveredFp[eventFingerprint(ev)] = true;
+    });
+
     /* Plan nur wenn kein echtes Event denselben Tag/Titel abdeckt */
     if (flags.showPlanDays && host && host.heutePlanItems) {
       (host.heutePlanItems() || []).forEach(function (p) {
@@ -2095,8 +2112,8 @@
         }
       });
     } else if (String(postId).indexOf("ffc-") === 0 || String(postId).indexOf("plan:") === 0) {
-      /* lokal / ohne Event-Tabelle — nur Anzeige */
-      save = Promise.resolve([temp]);
+      /* Kein events-UUID — permanent über Community-Post-Marker */
+      save = saveEventCommentFallback(postId, temp.text);
     } else {
       save = rest("event_comments", {
         method: "POST",
@@ -2446,7 +2463,22 @@
         var ids = state.events.map(function (e) {
           return String(e.id);
         });
-        return Promise.all([loadRsvps(ids), loadComments(ids)]);
+        var synthetic = [];
+        (state.ffcEvents || []).forEach(function (ev) {
+          if (ev && ev.id) synthetic.push("ffc-" + String(ev.id));
+        });
+        if (host && host.heutePlanItems) {
+          (host.heutePlanItems() || []).forEach(function (p) {
+            if (p && (p.iso || p.starts_at)) {
+              synthetic.push("plan:" + String(p.iso || dayKey(p.starts_at)));
+            }
+          });
+        }
+        return Promise.all([
+          loadRsvps(ids),
+          loadComments(ids),
+          loadSyntheticCommentKeys(synthetic)
+        ]);
       })
       .then(function () {
         if (host.heuteDiaryComments) {
