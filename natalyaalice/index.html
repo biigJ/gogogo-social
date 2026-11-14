@@ -1342,6 +1342,11 @@
     body.is-session[data-shell="heute"] .heute-stories { display: none !important; }
     body.is-session[data-shell="heute"] .dock { display: none !important; }
     body.is-session[data-shell="heute"] #heute-acc { order: 1; margin-top: 8px; width: 100%; }
+    body.is-session[data-shell="heute"] #heute-acc.is-centering {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
     body.is-session[data-shell="heute"] .heute-joins { order: 2; display: block; }
     body.is-session[data-shell="heute"] .heute-start { display: none !important; }
     body.is-session[data-shell="heute"] .heute-events { display: none !important; }
@@ -1542,6 +1547,23 @@
       display: block;
     }
     .wr-travel-banner {
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: calc(100% - 24px);
+      margin: 8px 12px 0;
+      min-height: 44px;
+      border: 1px solid #2A2118;
+      background: #F6F1E8;
+      color: #2A2118;
+      font: inherit;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      z-index: 5;
+    }
+    .wr-travel-banner--legacy {
       position: absolute; top: calc(var(--wr-top-h) + 6px); left: 12px; right: 12px; z-index: 7;
       border: 0; border-radius: 999px; padding: 8px 12px;
       background: #F3EEE4; color: #2A2118;
@@ -1755,6 +1777,13 @@
     }
     .wr-travel-card__body h3 { margin: 0; font-size: 16px; font-weight: 700; }
     .wr-travel-card__body p { margin: 0; font-size: 13px; line-height: 1.35; color: rgba(42,33,24,.75); }
+    .wr-zirkel-cd {
+      margin: 0 0 4px;
+      font-size: 13px !important;
+      font-weight: 700 !important;
+      letter-spacing: 0.02em;
+      color: #C7413B;
+    }
     .wr-edit-panel {
       position: absolute;
       top: calc(var(--wr-top-h) + 8px);
@@ -4482,14 +4511,25 @@
       overflow: hidden;
       background: var(--tone-neutral);
     }
-    .go-slide__title,
-    .go-slide__head {
-      margin: 0 0 10px;
-      font-family: "Playfair Display", Georgia, serif;
-      font-size: 22px;
-      font-weight: 600;
-      line-height: 1.2;
-      color: #2A2118;
+    /* Plus-Headlines: Klasse go-slide__title — nie display:none (früher .go-slide__head) */
+    body.is-session #go-rail .go-slide > h2.go-slide__title,
+    body.is-session #go-rail .go-slide > .go-slide__title,
+    .go-slide__title {
+      display: block !important;
+      margin: 0 0 12px !important;
+      padding: 0 !important;
+      font-family: "Playfair Display", Georgia, serif !important;
+      font-size: 22px !important;
+      font-weight: 600 !important;
+      line-height: 1.2 !important;
+      color: #2A2118 !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      height: auto !important;
+      min-height: 1.2em !important;
+      overflow: visible !important;
+      position: relative !important;
+      z-index: 2 !important;
     }
     .go-slide__art { margin: 0; }
     .go-slide__copy {
@@ -4507,9 +4547,150 @@
       color: #F6F1E8;
       font-weight: 600;
     }
+    .go-slide__ffc {
+      margin-top: 28px;
+      display: grid;
+      gap: 18px;
+    }
+    .go-slide__ffc h3 {
+      margin: 0 0 8px;
+      font-family: "Playfair Display", Georgia, serif !important;
+      font-size: 18px !important;
+      font-weight: 600 !important;
+      color: #2A2118;
+    }
+    .go-slide__ffc-box {
+      border: 1px solid #2A2118;
+      background: #F6F1E8;
+      padding: 12px;
+      min-height: 72px;
+      color: #2A2118;
+      font-size: 14px !important;
+    }
+    .go-slide__ffc-box .lb-table,
+    .go-slide__ffc-box .history-list,
+    .go-slide__ffc-box #lbTable,
+    .go-slide__ffc-box #historyList {
+      width: 100%;
+    }
+    .go-slide__title + .go-slide__art,
+    .go-slide__head + .go-slide__art { margin-top: 0; }
     .go-slide__art + .go-slide__cta { margin-top: calc(36px * 0.65); }
     .go-slide__cta + .go-slide__copy { margin-top: 36px; }
-    .go-slide__head { display: none; }
+    /* Stempelkarte (Spazierclub-Layout, gogogo) */
+    #stamp-card-modal {
+      z-index: 96;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: rgba(42, 33, 24, 0.55);
+    }
+    #stamp-card-modal:not([hidden]) {
+      display: grid !important;
+    }
+    .stamp-pass {
+      position: relative;
+      width: min(100%, 340px);
+      max-height: min(92vh, 720px);
+      overflow: auto;
+      background: #C7413B;
+      color: #F6F1E8;
+      padding: 18px 16px 20px;
+      box-shadow: 0 18px 40px rgba(0,0,0,.28);
+    }
+    .stamp-pass__close {
+      position: absolute; top: 8px; right: 10px;
+      width: 36px; height: 36px; border: 0; background: transparent;
+      color: #F6F1E8; font-size: 28px; line-height: 1; cursor: pointer;
+    }
+    .stamp-pass__top {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 12px; margin: 8px 4px 18px;
+    }
+    .stamp-pass__brand {
+      font-family: "Playfair Display", Georgia, serif !important;
+      font-weight: 600 !important;
+      font-size: 28px !important;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+    }
+    .stamp-pass__count {
+      text-align: right; min-width: 64px;
+    }
+    .stamp-pass__count span {
+      display: block; font-size: 11px !important; font-weight: 600 !important;
+      letter-spacing: 0.08em; opacity: 0.9;
+    }
+    .stamp-pass__count strong {
+      display: block; font-family: "Playfair Display", Georgia, serif !important;
+      font-size: 28px !important; font-weight: 600 !important; line-height: 1;
+    }
+    .stamp-pass__grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      gap: 10px 8px;
+      padding: 14px 8px;
+      background: rgba(0,0,0,.18);
+      margin-bottom: 16px;
+    }
+    .stamp-pass__slot {
+      aspect-ratio: 1;
+      border-radius: 50%;
+      border: 1.5px solid rgba(246,241,232,.55);
+      background: transparent;
+    }
+    .stamp-pass__slot.is-filled {
+      background: #F6F1E8;
+      border-color: #F6F1E8;
+      box-shadow: inset 0 0 0 6px #C7413B;
+    }
+    .stamp-pass__meta {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+      margin: 0 4px 16px;
+    }
+    .stamp-pass__meta span {
+      display: block; font-size: 11px !important; letter-spacing: 0.08em;
+      opacity: 0.85; margin-bottom: 2px;
+    }
+    .stamp-pass__meta strong {
+      font-family: Inter, system-ui, sans-serif !important;
+      font-size: 16px !important; font-weight: 600 !important;
+    }
+    .stamp-pass__qr {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      background: #fff; padding: 14px 14px 10px; color: #2A2118;
+    }
+    .stamp-pass__qr img { display: block; width: 180px; height: 180px; }
+    .stamp-pass__qr code {
+      font-size: 11px !important; letter-spacing: 0.04em;
+      background: #F6F1E8; padding: 4px 8px; color: #2A2118;
+    }
+    .stamp-pass__wallet {
+      width: 100%; min-height: 48px; margin-top: 14px;
+      border: 1px solid #F6F1E8; background: transparent; color: #F6F1E8;
+      font: inherit; font-weight: 700; cursor: pointer;
+    }
+    .nutrition-log-list {
+      list-style: none; margin: 12px 0 0; padding: 0;
+      max-height: 160px; overflow: auto;
+    }
+    .nutrition-log-list li {
+      padding: 8px 0; border-bottom: 1px solid rgba(42,33,24,.15);
+      font-size: 14px !important; line-height: 1.35;
+    }
+    .nutrition-log-sum {
+      display: flex; justify-content: center; gap: 18px;
+      margin: 14px 0 6px; text-align: center; font-size: 14px !important;
+    }
+    .nutrition-macros { text-align: center; margin: 8px 0 12px; font-size: 14px !important; }
+    .team-slide__invite-friends {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; min-height: 48px; margin-top: 8px;
+      border: 0; background: transparent; color: #2A2118;
+      font: inherit; font-weight: 600; text-align: left; cursor: pointer;
+    }
+    .team-slide__invite-friends svg { width: 22px; height: 22px; flex: none; }
     .go-subpage {
       position: fixed;
       inset: 0;
@@ -4940,6 +5121,9 @@
       <button type="button" data-menu="phone">Telefonnummer angeben</button>
       <button type="button" data-menu="email">E-Mail-Adresse angeben</button>
       <button type="button" data-menu="code">Login-Code ändern</button>
+      <button type="button" data-menu="bmr">Grundverbrauch (kcal)</button>
+      <button type="button" data-menu="apple_health">Apple Health verbinden</button>
+      <button type="button" data-menu="garmin">Garmin verbinden</button>
       <button type="button" data-menu="website">Website besuchen</button>
       <button type="button" data-menu="info">Info</button>
       <a href="/impressum/">Impressum</a>
@@ -5671,14 +5855,14 @@
   </div>
   <div class="sand-modal" id="zirkel-register" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="zirkel-register-title">
-      <h2 class="ask" id="zirkel-register-title">Zirkeltraining registrieren</h2>
-      <p class="team-msg" id="zirkel-register-hint">E-Mail, Passwort und Nickname. Der Nickname muss bei gogogo und FFC frei sein.</p>
+      <h2 class="ask" id="zirkel-register-title">Zirkeltraining buchen</h2>
+      <p class="team-msg" id="zirkel-register-hint">Nutzername, E-Mail und Passwort (zweimal). Danach ist Zirkeltraining gebucht — starten tust Du über ein Event oder spontan.</p>
+      <input id="zirkel-reg-nick" type="text" maxlength="20" placeholder="Nutzername / Nickname" autocomplete="username" autocapitalize="off" spellcheck="false" />
       <input id="zirkel-reg-email" type="email" placeholder="E-Mail" autocomplete="email" />
       <input id="zirkel-reg-pass" type="password" placeholder="Passwort (mind. 6 Zeichen)" autocomplete="new-password" />
       <input id="zirkel-reg-pass2" type="password" placeholder="Passwort wiederholen" autocomplete="new-password" />
-      <input id="zirkel-reg-nick" type="text" maxlength="20" placeholder="Nickname" autocomplete="off" autocapitalize="off" spellcheck="false" />
       <p class="team-msg" id="zirkel-register-msg"></p>
-      <button type="button" id="zirkel-register-save">Registrieren</button>
+      <button type="button" id="zirkel-register-save">Buchen</button>
       <button type="button" class="sand-quiet" id="zirkel-register-cancel">Abbrechen</button>
     </div>
   </div>
@@ -5726,6 +5910,68 @@
       <h2 class="ask" id="trainer-title">Trainer</h2>
       <div id="trainer-options"></div>
       <button type="button" id="trainer-save">Trainer festlegen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="stamp-card-modal" hidden>
+    <div class="stamp-pass" role="dialog" aria-modal="true" aria-label="Stempelkarte">
+      <button type="button" class="stamp-pass__close" id="stamp-card-close" aria-label="Schließen">×</button>
+      <div class="stamp-pass__top">
+        <div class="stamp-pass__brand" id="stamp-card-brand">go Ben!</div>
+        <div class="stamp-pass__count"><span>STEMPEL</span><strong id="stamp-card-count">0</strong></div>
+      </div>
+      <div class="stamp-pass__grid" id="stamp-card-grid" aria-hidden="true"></div>
+      <div class="stamp-pass__meta">
+        <div><span>STADT</span><strong id="stamp-card-city">Berlin</strong></div>
+        <div><span>MITGLIED</span><strong id="stamp-card-member">—</strong></div>
+      </div>
+      <div class="stamp-pass__qr">
+        <img id="stamp-card-qr" alt="QR-Code der Stempelkarte" width="180" height="180" />
+        <code id="stamp-card-id"></code>
+      </div>
+      <button type="button" class="stamp-pass__wallet" id="stamp-card-wallet">In Wallet speichern</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="group-edit-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="group-edit-title">
+      <h2 class="ask" id="group-edit-title">Gruppe anpassen</h2>
+      <label class="wr-field" style="display:block;margin:10px 0;">Name
+        <input id="group-edit-name" type="text" maxlength="40" style="width:100%;min-height:44px;margin-top:6px;padding:0 12px;border:1px solid #2A2118;background:transparent;color:#2A2118;" />
+      </label>
+      <label class="wr-field" style="display:block;margin:10px 0;">Beschreibung
+        <input id="group-edit-desc" type="text" maxlength="160" style="width:100%;min-height:44px;margin-top:6px;padding:0 12px;border:1px solid #2A2118;background:transparent;color:#2A2118;" />
+      </label>
+      <button type="button" id="group-edit-save">Speichern</button>
+      <button type="button" class="sand-quiet" id="group-edit-delete" style="color:#C7413B;">Gruppe löschen</button>
+      <button type="button" class="sand-quiet" id="group-edit-cancel">Abbrechen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="nutrition-log-modal" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="nutrition-log-title">
+      <h2 class="ask" id="nutrition-log-title">Ernährung</h2>
+      <label style="display:block;text-align:center;margin:8px 0 12px;">
+        <select id="nutrition-meal" aria-label="Mahlzeit" style="min-height:44px;padding:0 12px;border:1px solid #2A2118;background:#F6F1E8;font:inherit;font-weight:600;">
+          <option>Frühstück</option>
+          <option>Vormittag</option>
+          <option>Pre-Workout</option>
+          <option>Post-Workout</option>
+          <option>Nachmittag</option>
+          <option>Abendessen</option>
+          <option>Abend-Snack</option>
+        </select>
+      </label>
+      <textarea id="nutrition-log-text" rows="5" maxlength="800" placeholder="Was hast Du gegessen?" style="width:100%;padding:12px;border:1px solid #2A2118;background:#F6F1E8;color:#2A2118;font:inherit;"></textarea>
+      <ul id="nutrition-log-list" class="nutrition-log-list"></ul>
+      <div class="nutrition-log-sum" id="nutrition-log-sum">
+        <span><strong id="nutrition-kcal">0</strong> kcal</span>
+        <span><strong id="nutrition-protein">0</strong> g Protein</span>
+      </div>
+      <button type="button" class="sand-quiet" id="nutrition-log-more">mehr</button>
+      <div id="nutrition-macros" class="nutrition-macros" hidden>
+        <p>Kohlenhydrate <strong id="nutrition-carbs">0</strong> g · Fett <strong id="nutrition-fat">0</strong> g</p>
+        <p id="nutrition-balance"></p>
+      </div>
+      <button type="button" id="nutrition-log-save">Eintrag speichern</button>
+      <button type="button" class="sand-quiet" id="nutrition-log-close">Schließen</button>
     </div>
   </div>
   <div class="sand-modal" id="feedback-modal" hidden>
@@ -6424,9 +6670,9 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-24"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-22"></script>
-  <script src="/natalyaalice/support.js?v=support-6"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-26"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-24"></script>
+  <script src="/natalyaalice/support.js?v=support-8"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -8024,7 +8270,7 @@
 
       function closeShellModals() {
         closeDaysPrompt();
-        ["moved-modal", "team-modal", "invite-modal", "time-modal", "invite-in-modal", "goal-modal", "ausdauer-modal", "photo-modal", "short-modal", "quick-wa", "go-modal", "pt-accept-modal", "pt-day-modal", "group-delete-modal"].forEach(function (id) {
+        ["moved-modal", "team-modal", "invite-modal", "time-modal", "invite-in-modal", "goal-modal", "ausdauer-modal", "photo-modal", "short-modal", "quick-wa", "go-modal", "pt-accept-modal", "pt-day-modal", "group-delete-modal", "stamp-card-modal", "group-edit-modal", "nutrition-log-modal"].forEach(function (id) {
           var el = document.getElementById(id);
           if (el) el.hidden = true;
         });
@@ -8357,6 +8603,14 @@
         }
         if (field === "info") {
           showPlan("info");
+          return;
+        }
+        if (field === "bmr") {
+          openBmrSettings();
+          return;
+        }
+        if (field === "apple_health" || field === "garmin") {
+          toggleHealthLink(field === "apple_health" ? "apple_health" : "garmin");
           return;
         }
         openAccountEdit(field);
@@ -10622,6 +10876,18 @@
         try {
           paintHeuteExtras();
         } catch (eExtras) {}
+        function centerAktuell() {
+          if (window.HeuteAccountability && HeuteAccountability.scrollCurrentToCenter) {
+            HeuteAccountability.scrollCurrentToCenter({ soft: false });
+          }
+        }
+        if (window.HeuteAccountability && HeuteAccountability.refresh) {
+          Promise.resolve(HeuteAccountability.refresh())
+            .then(centerAktuell)
+            .catch(centerAktuell);
+        } else {
+          centerAktuell();
+        }
       }
 
       function openDoneFromAnywhere(eventId) {
@@ -10696,6 +10962,43 @@
           },
           onEventsChanged: notifyAktuellEventsChanged,
           openDoneModal: openDoneFromAnywhere,
+          openNutritionLogModal: openNutritionLogModal,
+          getTravelUntil: function () {
+            var range = absenceOf(sessionAccount);
+            return range && range.end ? String(range.end) : null;
+          },
+          setTravelUntil: function (iso) {
+            var about = profileAbout(sessionAccount) || {};
+            if (!iso) {
+              if (about.absence) {
+                about.absence.active = false;
+                about.absence.end = null;
+              }
+              return saveAbout(about).then(function () {
+                paintAbsenceButton();
+                paintWelcome();
+              });
+            }
+            var today = Log.berlinToday();
+            var abs = about.absence && typeof about.absence === "object" ? about.absence : {};
+            abs.start = abs.start && abs.start <= today ? abs.start : today;
+            abs.end = iso;
+            abs.active = true;
+            about.absence = abs;
+            return saveAbout(about).then(function () {
+              paintAbsenceButton();
+              paintWelcome();
+            });
+          },
+          openZirkelWorkout: function (eventId) {
+            requireFfc(function () {
+              if (window.FFC && FFC.openSetup) FFC.openSetup();
+              else if (window.FFC && FFC.go) FFC.go("run");
+            }, { title: "Zirkeltraining" });
+          },
+          requireFfc: function (fn, opts) {
+            if (typeof requireFfc === "function") requireFfc(fn || function () {}, opts || {});
+          },
           showHeute: function () {
             goToAktuellShell();
             if (window.HeuteAccountability && HeuteAccountability.refresh) {
@@ -10826,6 +11129,8 @@
           get sessionAccount() { return sessionAccount; },
           todayIso: function () { return Log.berlinToday(); },
           slidesOnly: true,
+          openStampCardModal: openStampCardModal,
+          paintProfil: renderProfil,
           onOffersReady: function () {
             paintGoRail();
           },
@@ -11154,13 +11459,23 @@
         return hit;
       }
 
+      function dayIsSupportOnlyForTravel(iso) {
+        /* Web-Call / Ernährung brauchen keine Reise-Alternative */
+        try {
+          if (window.WocheReels && WocheReels.dayNeedsTravelAlt) {
+            return !WocheReels.dayNeedsTravelAlt(iso);
+          }
+        } catch (eS) {}
+        return false;
+      }
+
       function firstTravelAltIso(range) {
         if (!range) return "";
         var today = Log.berlinToday();
         var iso = range.start < today ? today : range.start;
         if (iso > range.end) iso = range.start;
         while (iso <= range.end) {
-          if (!travelAltFor(iso)) return iso;
+          if (!dayIsSupportOnlyForTravel(iso) && !travelAltFor(iso)) return iso;
           iso = addDays(iso, 1);
         }
         return range.start;
@@ -11729,6 +12044,451 @@
           });
       }
 
+      function healthPrefs() {
+        var about = (sessionAccount && sessionAccount.about_me && typeof sessionAccount.about_me === "object")
+          ? sessionAccount.about_me
+          : {};
+        if (!about.health || typeof about.health !== "object") about.health = {};
+        return about;
+      }
+
+      function saveHealthPrefs(about) {
+        if (!sessionAccount || !sessionAccount.id) return Promise.resolve();
+        sessionAccount.about_me = about;
+        if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+        return rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { about_me: about }
+        }).catch(function () {});
+      }
+
+      function openBmrSettings() {
+        var about = healthPrefs();
+        var cur = Number((about.health && about.health.bmr) || 0) || "";
+        var next = window.prompt("Grundverbrauch in kcal / Tag", cur === "" ? "1800" : String(cur));
+        if (next == null) return;
+        var n = Math.max(800, Math.min(5000, Number(String(next).replace(",", ".")) || 0));
+        if (!n) {
+          try { window.alert("Bitte eine Zahl zwischen 800 und 5000 eingeben."); } catch (eB) {}
+          return;
+        }
+        about.health.bmr = n;
+        saveHealthPrefs(about).then(function () {
+          try { window.alert("Grundverbrauch: " + n + " kcal"); } catch (eA) {}
+        });
+      }
+
+      function toggleHealthLink(kind) {
+        var about = healthPrefs();
+        var on = !about.health[kind];
+        about.health[kind] = on;
+        if (on && !about.health.connected_at) about.health.connected_at = new Date().toISOString();
+        saveHealthPrefs(about).then(function () {
+          var label = kind === "apple_health" ? "Apple Health" : "Garmin";
+          try {
+            window.alert(
+              on
+                ? label + " verbunden. Verbrauchte kcal fließen in die Ernährungsbilanz (Grundverbrauch + Aktivität)."
+                : label + " getrennt."
+            );
+          } catch (eH) {}
+        });
+      }
+
+      function openGroupEditModal(group) {
+        if (!group) return;
+        var modal = document.getElementById("group-edit-modal");
+        var nameIn = document.getElementById("group-edit-name");
+        var descIn = document.getElementById("group-edit-desc");
+        if (!modal || !nameIn || !descIn) return;
+        modal.dataset.groupId = String(group.id || "");
+        nameIn.value = String(group.name || "");
+        descIn.value = String(group.description || "");
+        modal.hidden = false;
+      }
+
+      function closeGroupEditModal() {
+        var modal = document.getElementById("group-edit-modal");
+        if (modal) modal.hidden = true;
+      }
+
+      function openGroupFriendPick(group, remaining) {
+        if (!group) return;
+        var list = remaining || [];
+        if (!list.length) {
+          openTeamSearch("friend");
+          return;
+        }
+        var labels = list.map(function (p, i) {
+          return (i + 1) + ". " + (p.name || p.nickname || "Freund");
+        }).join("\n");
+        var pick = window.prompt("Freund hinzufügen (Nummer):\n" + labels, "1");
+        if (pick == null) return;
+        var idx = Math.max(1, Number(pick) || 1) - 1;
+        var person = list[idx];
+        if (!person || !person.id) return;
+        var groups = myGroups().slice();
+        groups.forEach(function (g) {
+          if (!g || String(g.id) !== String(group.id)) return;
+          var members = (g.members || []).map(String);
+          if (members.indexOf(String(person.id)) < 0) members.push(String(person.id));
+          g.members = members;
+        });
+        saveMyGroups(groups).then(function () { renderTeam(); });
+      }
+
+      function stampCardId() {
+        var id = String((sessionAccount && (sessionAccount.serial_number || sessionAccount.id)) || "gogogo");
+        return id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16).toLowerCase() || "gogogo";
+      }
+
+      function openStampCardModal(order) {
+        var modal = document.getElementById("stamp-card-modal");
+        if (!modal) {
+          try { window.alert("Stempelkarte ist noch nicht geladen. Bitte Seite neu laden."); } catch (eM) {}
+          return;
+        }
+        var stamps = 0;
+        try {
+          stamps = Number((order && order.meta && order.meta.stamps) || 0) || 0;
+        } catch (eS) {}
+        stamps = Math.max(0, Math.min(12, stamps));
+        var name = (typeof personName === "function" ? personName() : "") || "Du";
+        var brand = document.getElementById("stamp-card-brand");
+        var count = document.getElementById("stamp-card-count");
+        var member = document.getElementById("stamp-card-member");
+        var city = document.getElementById("stamp-card-city");
+        var grid = document.getElementById("stamp-card-grid");
+        var qr = document.getElementById("stamp-card-qr");
+        var code = document.getElementById("stamp-card-id");
+        if (brand) brand.textContent = "go " + name + "!";
+        if (count) count.textContent = String(stamps);
+        if (member) member.textContent = name;
+        if (city) city.textContent = "Berlin";
+        if (grid) {
+          grid.textContent = "";
+          for (var i = 0; i < 12; i++) {
+            var slot = document.createElement("span");
+            slot.className = "stamp-pass__slot" + (i < stamps ? " is-filled" : "");
+            grid.appendChild(slot);
+          }
+        }
+        var sid = stampCardId();
+        if (code) code.textContent = sid;
+        if (qr) {
+          var payload = "gogogo:stamp:" + sid;
+          qr.src =
+            "https://api.qrserver.com/v1/create-qr-code/?size=180x180&margin=8&data=" +
+            encodeURIComponent(payload);
+          qr.alt = "QR " + sid;
+          qr.onerror = function () {
+            qr.removeAttribute("src");
+            qr.alt = sid;
+          };
+        }
+        modal.hidden = false;
+        modal.removeAttribute("hidden");
+        modal.style.display = "grid";
+      }
+
+      function closeStampCardModal() {
+        var modal = document.getElementById("stamp-card-modal");
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute("hidden", "");
+        modal.style.display = "";
+      }
+
+      function mountGoZirkelPanels(lbBox, recBox) {
+        if (!window.FFC || !FFC.user || !FFC.user()) return;
+        try {
+          if (FFC.refreshTraining) FFC.refreshTraining();
+        } catch (eR) {}
+        var board = document.getElementById("zirkel-board");
+        var records = document.getElementById("zirkel-records");
+        if (lbBox) {
+          lbBox.textContent = "";
+          if (board && board.childNodes && board.childNodes.length) {
+            lbBox.appendChild(board.cloneNode(true));
+          } else {
+            var lbTable = document.getElementById("lbTable");
+            if (lbTable) lbBox.appendChild(lbTable.cloneNode(true));
+            else lbBox.textContent = "Noch keine Leaderboard-Daten.";
+          }
+        }
+        if (recBox) {
+          recBox.textContent = "";
+          if (records && records.childNodes && records.childNodes.length) {
+            recBox.appendChild(records.cloneNode(true));
+          } else {
+            var hist = document.getElementById("historyList");
+            if (hist) recBox.appendChild(hist.cloneNode(true));
+            else recBox.textContent = "Noch keine Aufzeichnungen.";
+          }
+        }
+      }
+
+      function saveStampCardToWallet() {
+        var brand = (document.getElementById("stamp-card-brand") || {}).textContent || "go!";
+        var count = (document.getElementById("stamp-card-count") || {}).textContent || "0";
+        var member = (document.getElementById("stamp-card-member") || {}).textContent || "";
+        var sid = (document.getElementById("stamp-card-id") || {}).textContent || stampCardId();
+        var canvas = document.createElement("canvas");
+        canvas.width = 680;
+        canvas.height = 920;
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#C7413B";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#F6F1E8";
+        ctx.font = "600 48px 'Playfair Display', Georgia, serif";
+        ctx.fillText(brand, 36, 70);
+        ctx.font = "600 18px Inter, sans-serif";
+        ctx.fillText("STEMPEL", 520, 48);
+        ctx.font = "600 42px 'Playfair Display', Georgia, serif";
+        ctx.fillText(String(count), 560, 96);
+        var filled = Math.max(0, Math.min(12, Number(count) || 0));
+        var i;
+        for (i = 0; i < 12; i++) {
+          var col = i % 4;
+          var row = Math.floor(i / 4);
+          var x = 70 + col * 140;
+          var y = 160 + row * 140;
+          ctx.beginPath();
+          ctx.arc(x, y, 48, 0, Math.PI * 2);
+          if (i < filled) {
+            ctx.fillStyle = "#F6F1E8";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(x, y, 28, 0, Math.PI * 2);
+            ctx.fillStyle = "#C7413B";
+            ctx.fill();
+          } else {
+            ctx.strokeStyle = "rgba(246,241,232,0.55)";
+            ctx.lineWidth = 3;
+            ctx.stroke();
+          }
+        }
+        ctx.fillStyle = "#F6F1E8";
+        ctx.font = "600 14px Inter, sans-serif";
+        ctx.fillText("STADT", 36, 620);
+        ctx.fillText("MITGLIED", 360, 620);
+        ctx.font = "600 22px Inter, sans-serif";
+        ctx.fillText("Berlin", 36, 652);
+        ctx.fillText(member, 360, 652);
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(190, 690, 300, 300);
+        ctx.fillStyle = "#2A2118";
+        ctx.font = "14px monospace";
+        ctx.fillText(sid, 230, 860);
+        var qrImg = document.getElementById("stamp-card-qr");
+        function finish(blob) {
+          if (!blob) return;
+          var file = new File([blob], "gogogo-stempelkarte.png", { type: "image/png" });
+          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            navigator.share({
+              files: [file],
+              title: "gogogo Stempelkarte",
+              text: brand + " — speichere die Karte in Wallet / Fotos."
+            }).catch(function () {});
+            return;
+          }
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "gogogo-stempelkarte.png";
+          a.click();
+          setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+        }
+        function exportPng() {
+          if (canvas.toBlob) canvas.toBlob(finish, "image/png");
+          else {
+            var data = canvas.toDataURL("image/png");
+            var a = document.createElement("a");
+            a.href = data;
+            a.download = "gogogo-stempelkarte.png";
+            a.click();
+          }
+        }
+        if (qrImg && qrImg.complete && qrImg.naturalWidth) {
+          try { ctx.drawImage(qrImg, 220, 710, 240, 240); } catch (eQ) {}
+          exportPng();
+        } else {
+          exportPng();
+        }
+      }
+
+      var nutritionLogDay = "";
+      var nutritionLogEventId = "";
+
+      function nutritionStoreKey(day) {
+        var uid = String((sessionAccount && sessionAccount.id) || "anon");
+        return "gogogo_nutrition_" + uid + "_" + (day || Log.berlinToday());
+      }
+
+      function readNutritionLog(day) {
+        try {
+          var raw = localStorage.getItem(nutritionStoreKey(day));
+          var rows = raw ? JSON.parse(raw) : [];
+          return Array.isArray(rows) ? rows : [];
+        } catch (eN) {
+          return [];
+        }
+      }
+
+      function writeNutritionLog(day, rows) {
+        try {
+          localStorage.setItem(nutritionStoreKey(day), JSON.stringify(rows || []));
+        } catch (eW) {}
+      }
+
+      function estimateMacros(text, meal) {
+        var t = String(text || "");
+        var kcal = 0;
+        var protein = 0;
+        var carbs = 0;
+        var fat = 0;
+        var mK = t.match(/(\d{2,4})\s*kcal/i);
+        var mP = t.match(/(\d{1,3})\s*g?\s*(?:protein|eiweiß|eiweiss)/i);
+        if (mK) kcal = Number(mK[1]) || 0;
+        if (mP) protein = Number(mP[1]) || 0;
+        if (!kcal) {
+          var defaults = {
+            Frühstück: 420,
+            Vormittag: 180,
+            "Pre-Workout": 160,
+            "Post-Workout": 280,
+            Nachmittag: 200,
+            Abendessen: 550,
+            "Abend-Snack": 180
+          };
+          kcal = defaults[meal] || 300;
+          protein = Math.round(kcal * 0.08);
+          carbs = Math.round(kcal * 0.1);
+          fat = Math.round(kcal * 0.035);
+        } else {
+          protein = protein || Math.round(kcal * 0.08);
+          carbs = Math.round(kcal * 0.1);
+          fat = Math.round(kcal * 0.035);
+        }
+        return { kcal: kcal, protein: protein, carbs: carbs, fat: fat };
+      }
+
+      function nutritionBurnedKcal() {
+        var about = healthPrefs();
+        var bmr = Number((about.health && about.health.bmr) || 0) || 0;
+        var linked = !!(about.health && (about.health.apple_health || about.health.garmin));
+        var active = linked ? Math.round(bmr * 0.2) : 0;
+        return { bmr: bmr, active: active, total: bmr + active, linked: linked };
+      }
+
+      function paintNutritionModal() {
+        var rows = readNutritionLog(nutritionLogDay);
+        var list = document.getElementById("nutrition-log-list");
+        var sumK = 0;
+        var sumP = 0;
+        var sumC = 0;
+        var sumF = 0;
+        if (list) {
+          list.textContent = "";
+          rows.forEach(function (row) {
+            var li = document.createElement("li");
+            li.textContent =
+              (row.meal || "") +
+              ": " +
+              (row.text || "") +
+              " · " +
+              (row.kcal || 0) +
+              " kcal / " +
+              (row.protein || 0) +
+              " g P";
+            list.appendChild(li);
+            sumK += Number(row.kcal) || 0;
+            sumP += Number(row.protein) || 0;
+            sumC += Number(row.carbs) || 0;
+            sumF += Number(row.fat) || 0;
+          });
+        }
+        var kEl = document.getElementById("nutrition-kcal");
+        var pEl = document.getElementById("nutrition-protein");
+        var cEl = document.getElementById("nutrition-carbs");
+        var fEl = document.getElementById("nutrition-fat");
+        var bal = document.getElementById("nutrition-balance");
+        if (kEl) kEl.textContent = String(sumK);
+        if (pEl) pEl.textContent = String(sumP);
+        if (cEl) cEl.textContent = String(sumC);
+        if (fEl) fEl.textContent = String(sumF);
+        if (bal) {
+          var burn = nutritionBurnedKcal();
+          if (burn.bmr) {
+            var delta = sumK - burn.total;
+            var label = delta > 0 ? "Überschuss" : "Defizit";
+            bal.textContent =
+              "Verbrauch ≈ " +
+              burn.total +
+              " kcal (Grund " +
+              burn.bmr +
+              (burn.linked ? " + Aktivität" : "") +
+              ") · " +
+              label +
+              " " +
+              Math.abs(delta) +
+              " kcal";
+          } else {
+            bal.textContent = "Grundverbrauch unter Einstellungen angeben, um Defizit/Überschuss zu sehen.";
+          }
+        }
+      }
+
+      function openNutritionLogModal(opts) {
+        opts = opts || {};
+        nutritionLogDay = opts.day || Log.berlinToday();
+        nutritionLogEventId = opts.eventId || "";
+        var modal = document.getElementById("nutrition-log-modal");
+        var more = document.getElementById("nutrition-macros");
+        var text = document.getElementById("nutrition-log-text");
+        if (more) more.hidden = true;
+        if (text) text.value = "";
+        paintNutritionModal();
+        if (modal) modal.hidden = false;
+      }
+
+      function closeNutritionLogModal() {
+        var modal = document.getElementById("nutrition-log-modal");
+        if (modal) modal.hidden = true;
+      }
+
+      function saveNutritionLogEntry() {
+        var mealEl = document.getElementById("nutrition-meal");
+        var textEl = document.getElementById("nutrition-log-text");
+        var meal = mealEl ? mealEl.value : "Abendessen";
+        var text = textEl ? String(textEl.value || "").trim() : "";
+        if (!text) {
+          if (textEl) textEl.focus();
+          return;
+        }
+        var macros = estimateMacros(text, meal);
+        var rows = readNutritionLog(nutritionLogDay);
+        rows.push({
+          meal: meal,
+          text: text.slice(0, 400),
+          kcal: macros.kcal,
+          protein: macros.protein,
+          carbs: macros.carbs,
+          fat: macros.fat,
+          at: new Date().toISOString(),
+          eventId: nutritionLogEventId || null
+        });
+        writeNutritionLog(nutritionLogDay, rows);
+        if (window.GoSupport && GoSupport.saveNutritionLog) {
+          GoSupport.saveNutritionLog(meal + ": " + text).catch(function () {});
+        }
+        if (textEl) textEl.value = "";
+        paintNutritionModal();
+      }
+
+      window.openNutritionLogModal = openNutritionLogModal;
+      window.openStampCardModal = openStampCardModal;
+
       function saveMyGroups(groups) {
         if (!sessionAccount || !sessionAccount.id) return Promise.resolve();
         var me = String(sessionAccount.id);
@@ -12060,21 +12820,21 @@
         var stampOrder = window.GoSupport && GoSupport.activeOrderFor
           ? GoSupport.activeOrderFor("stempelkarte")
           : null;
-        if (stampOrder) {
-          var stampBtn = document.createElement("button");
-          stampBtn.type = "button";
-          stampBtn.className = "team-slide__cta is-solid";
-          var stamps = 0;
+        var stampBtn = document.createElement("button");
+        stampBtn.type = "button";
+        stampBtn.className = "team-slide__cta is-solid";
+        stampBtn.textContent = "Stempelkarte";
+        stampBtn.setAttribute("aria-label", "Stempelkarte öffnen");
+        stampBtn.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          ev.stopPropagation();
           try {
-            stamps = Number((stampOrder.meta && stampOrder.meta.stamps) || 0) || 0;
-          } catch (eSt) {}
-          stampBtn.textContent = "Stempelkarte · " + stamps + "/10";
-          stampBtn.addEventListener("click", function () {
-            if (window.GoSupport && GoSupport.openStampCard) GoSupport.openStampCard();
-            else showPlan("training");
-          });
-          meSlide.appendChild(stampBtn);
-        }
+            openStampCardModal(stampOrder || null);
+          } catch (eStamp) {
+            try { window.alert("Stempelkarte konnte nicht geöffnet werden."); } catch (eA) {}
+          }
+        });
+        meSlide.appendChild(stampBtn);
         var feedbackBtn = document.createElement("button");
         feedbackBtn.type = "button";
         feedbackBtn.className = "team-slide__cta is-solid";
@@ -12165,45 +12925,48 @@
           });
           art.appendChild(file);
           slide.appendChild(art);
-          var createBtn = document.createElement("button");
-          createBtn.type = "button";
-          createBtn.className = "team-slide__cta is-solid is-done";
-          createBtn.textContent = "Gruppe erstellen ✔️";
-          createBtn.disabled = true;
-          createBtn.setAttribute("aria-disabled", "true");
-          slide.appendChild(createBtn);
+          var editBtn = document.createElement("button");
+          editBtn.type = "button";
+          editBtn.className = "team-slide__cta is-solid";
+          editBtn.textContent = "Gruppe anpassen";
+          editBtn.addEventListener("click", function () {
+            openGroupEditModal(group);
+          });
+          slide.appendChild(editBtn);
           var nameRow = document.createElement("div");
           nameRow.className = "team-slide__group-name-row";
           var nameEl = document.createElement("h3");
           nameEl.className = "team-slide__group-name";
           nameEl.textContent = (group && group.name) || "Gruppe";
           nameRow.appendChild(nameEl);
-          var removeBtn = document.createElement("button");
-          removeBtn.type = "button";
-          removeBtn.className = "team-slide__group-remove";
-          removeBtn.setAttribute("aria-label", "Gruppe entfernen");
-          removeBtn.innerHTML =
-            '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 7l10 10M17 7 7 17"/></svg>';
-          removeBtn.addEventListener("click", function () {
-            openGroupDeleteConfirm(group);
-          });
-          nameRow.appendChild(removeBtn);
           slide.appendChild(nameRow);
           var desc = document.createElement("p");
           desc.className = "team-slide__about";
           desc.textContent = String((group && group.description) || "").trim();
           slide.appendChild(desc);
           var members = ((group && group.members) || []).map(String);
+          var meId = String((sessionAccount && sessionAccount.id) || "");
           var people = teamPeople.filter(function (person) { return person && members.indexOf(String(person.id)) >= 0; });
+          var remainingFriends = (teamPeople || []).filter(function (person) {
+            if (!person || !person.id) return false;
+            var pid = String(person.id);
+            if (pid === meId) return false;
+            if (person.isTrainerPerson) return false;
+            return members.indexOf(pid) < 0;
+          });
           var membersRow = document.createElement("div");
           membersRow.className = "team-slide__members";
-          var addFriend = document.createElement("button");
-          addFriend.type = "button";
-          addFriend.className = "team-slide__add-friend";
-          addFriend.setAttribute("aria-label", "Freunde einladen");
-          addFriend.innerHTML = '<span class="team-slide__add-friend-circle" aria-hidden="true">+</span>';
-          addFriend.addEventListener("click", function () { openTeamSearch("friend"); });
-          membersRow.appendChild(addFriend);
+          if (remainingFriends.length) {
+            var addFriend = document.createElement("button");
+            addFriend.type = "button";
+            addFriend.className = "team-slide__add-friend";
+            addFriend.setAttribute("aria-label", "Freund hinzufügen");
+            addFriend.innerHTML = '<span class="team-slide__add-friend-circle" aria-hidden="true">+</span>';
+            addFriend.addEventListener("click", function () {
+              openGroupFriendPick(group, remainingFriends);
+            });
+            membersRow.appendChild(addFriend);
+          }
           people.forEach(function (person) {
             var btn = document.createElement("button");
             btn.type = "button";
@@ -12214,6 +12977,18 @@
             membersRow.appendChild(btn);
           });
           slide.appendChild(membersRow);
+          if (!remainingFriends.length) {
+            var inviteNew = document.createElement("button");
+            inviteNew.type = "button";
+            inviteNew.className = "team-slide__invite-friends";
+            inviteNew.innerHTML =
+              '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-7-4 16-4-6-8-3z"/></svg>' +
+              "<span>lade neue Freunde ein</span>";
+            inviteNew.addEventListener("click", function () {
+              openTeamSearch("friend");
+            });
+            slide.appendChild(inviteNew);
+          }
           box.appendChild(slide);
         }
         if (!myGroup) {
@@ -12751,7 +13526,7 @@
                   key: "stempelkarte",
                   type: "stempelkarte",
                   title: "Stempelkarte",
-                  description: "10er-Karte für 25 € Spende — Stempel mit Freunden."
+                  description: "12er-Karte für 25 € Spende — Stempel mit Freunden."
                 }
               ];
         offers.forEach(function (offer) {
@@ -12763,6 +13538,10 @@
           card.className = "go-slide";
           card.dataset.title = offer.title;
           card.dataset.offer = offer.key;
+          var head = document.createElement("h2");
+          head.className = "go-slide__title";
+          head.textContent = offer.title;
+          card.appendChild(head);
           var art = document.createElement("div");
           art.className = "go-slide__art";
           art.setAttribute("aria-hidden", "true");
@@ -12774,12 +13553,19 @@
           var cta = document.createElement("button");
           cta.type = "button";
           cta.className = "go-slide__cta" + (owned ? " is-owned" : "");
+          var isZirkel = offer.key === "zirkel" || offer.type === "zirkel";
+          var ffcLogged = !!(window.FFC && FFC.user && FFC.user());
+          if (isZirkel && ffcLogged) owned = true;
           cta.textContent = owned ? "Gebucht ✔️" : "Buchen";
           if (owned) {
             cta.disabled = true;
             cta.setAttribute("aria-disabled", "true");
           } else {
             cta.addEventListener("click", function () {
+              if (isZirkel) {
+                openZirkelRegister();
+                return;
+              }
               cta.disabled = true;
               var book =
                 window.GoSupport && GoSupport.bookOffer
@@ -12803,6 +13589,36 @@
           copy.className = "go-slide__copy";
           copy.textContent = offer.description || "";
           card.appendChild(copy);
+          if (isZirkel) {
+            var ffcWrap = document.createElement("div");
+            ffcWrap.className = "go-slide__ffc";
+            var lbSec = document.createElement("section");
+            lbSec.innerHTML = "<h3>Leaderboard</h3>";
+            var lbBox = document.createElement("div");
+            lbBox.className = "go-slide__ffc-box";
+            lbBox.id = "go-zirkel-board";
+            lbBox.textContent = ffcLogged
+              ? "Lade Leaderboard …"
+              : "Nach dem Buchen siehst Du hier das Leaderboard.";
+            lbSec.appendChild(lbBox);
+            var recSec = document.createElement("section");
+            recSec.innerHTML = "<h3>Aufzeichnungen</h3>";
+            var recBox = document.createElement("div");
+            recBox.className = "go-slide__ffc-box";
+            recBox.id = "go-zirkel-records";
+            recBox.textContent = ffcLogged
+              ? "Lade Aufzeichnungen …"
+              : "Nach dem Buchen erscheinen hier Deine Aufzeichnungen.";
+            recSec.appendChild(recBox);
+            ffcWrap.appendChild(lbSec);
+            ffcWrap.appendChild(recSec);
+            card.appendChild(ffcWrap);
+            if (ffcLogged) {
+              requestAnimationFrame(function () {
+                mountGoZirkelPanels(lbBox, recBox);
+              });
+            }
+          }
           rail.appendChild(card);
         });
         syncHScrollDock();
@@ -13258,6 +14074,14 @@
                 throw new Error("23505");
               }
               document.getElementById("zirkel-register").hidden = true;
+              if (window.GoSupport && GoSupport.bookOffer) {
+                GoSupport.bookOffer("zirkel").catch(function () {});
+              }
+              paintGoRail();
+              if (typeof renderProfil === "function") renderProfil();
+              try {
+                window.alert("Zirkeltraining gebucht. Start über ein Event oder spontan — nicht unter Plus.");
+              } catch (eZ) {}
               paintZirkelState();
               refreshZirkel();
               onFfcFriendsChanged();
@@ -16707,6 +17531,80 @@
         if (modal) {
           modal.addEventListener("click", function (event) {
             if (event.target.id === "group-delete-modal") closeGroupDeleteConfirm();
+          });
+        }
+      })();
+      (function bindStampGroupNutritionUi() {
+        var stampClose = document.getElementById("stamp-card-close");
+        if (stampClose) stampClose.addEventListener("click", closeStampCardModal);
+        var stampModal = document.getElementById("stamp-card-modal");
+        if (stampModal) {
+          stampModal.addEventListener("click", function (event) {
+            if (event.target.id === "stamp-card-modal") closeStampCardModal();
+          });
+        }
+        var wallet = document.getElementById("stamp-card-wallet");
+        if (wallet) wallet.addEventListener("click", saveStampCardToWallet);
+
+        var gSave = document.getElementById("group-edit-save");
+        if (gSave) {
+          gSave.addEventListener("click", function () {
+            var modal = document.getElementById("group-edit-modal");
+            var gid = modal && modal.dataset.groupId;
+            var nameIn = document.getElementById("group-edit-name");
+            var descIn = document.getElementById("group-edit-desc");
+            var name = nameIn ? String(nameIn.value || "").trim() : "";
+            if (!name || !gid) {
+              if (nameIn) nameIn.focus();
+              return;
+            }
+            var groups = myGroups().slice();
+            groups.forEach(function (g) {
+              if (g && String(g.id) === String(gid)) {
+                g.name = name;
+                g.description = descIn ? String(descIn.value || "").trim() : "";
+              }
+            });
+            saveMyGroups(groups).then(function () {
+              closeGroupEditModal();
+              renderTeam();
+            });
+          });
+        }
+        var gDel = document.getElementById("group-edit-delete");
+        if (gDel) {
+          gDel.addEventListener("click", function () {
+            var modal = document.getElementById("group-edit-modal");
+            var gid = modal && modal.dataset.groupId;
+            var group = groupById(gid);
+            closeGroupEditModal();
+            if (group) openGroupDeleteConfirm(group);
+          });
+        }
+        var gCancel = document.getElementById("group-edit-cancel");
+        if (gCancel) gCancel.addEventListener("click", closeGroupEditModal);
+        var gModal = document.getElementById("group-edit-modal");
+        if (gModal) {
+          gModal.addEventListener("click", function (event) {
+            if (event.target.id === "group-edit-modal") closeGroupEditModal();
+          });
+        }
+
+        var nSave = document.getElementById("nutrition-log-save");
+        if (nSave) nSave.addEventListener("click", saveNutritionLogEntry);
+        var nClose = document.getElementById("nutrition-log-close");
+        if (nClose) nClose.addEventListener("click", closeNutritionLogModal);
+        var nMore = document.getElementById("nutrition-log-more");
+        if (nMore) {
+          nMore.addEventListener("click", function () {
+            var box = document.getElementById("nutrition-macros");
+            if (box) box.hidden = !box.hidden;
+          });
+        }
+        var nModal = document.getElementById("nutrition-log-modal");
+        if (nModal) {
+          nModal.addEventListener("click", function (event) {
+            if (event.target.id === "nutrition-log-modal") closeNutritionLogModal();
           });
         }
       })();

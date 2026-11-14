@@ -217,12 +217,65 @@
     return "🏋️";
   }
 
+  /* Countdown ab 07:00 Berlin bis Startzeit */
+  function zirkelCountdownHtml(startsAt) {
+    if (!startsAt) return "";
+    var start = new Date(startsAt).getTime();
+    if (!isFinite(start)) return "";
+    var now = Date.now();
+    if (start <= now) {
+      return '<p class="wr-zirkel-cd">Jetzt starten</p>';
+    }
+    var day = dayKey(startsAt);
+    var gate = new Date(startsAt);
+    try {
+      /* 07:00 am Event-Tag (Berlin) als Anzeigefenster-Start */
+      var parts = String(day).split("-");
+      gate = new Date(
+        Number(parts[0]),
+        Number(parts[1]) - 1,
+        Number(parts[2]),
+        7,
+        0,
+        0,
+        0
+      );
+    } catch (eG) {}
+    if (now < gate.getTime()) {
+      return '<p class="wr-zirkel-cd">Countdown ab 07:00</p>';
+    }
+    var sec = Math.max(0, Math.floor((start - now) / 1000));
+    var h = Math.floor(sec / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = sec % 60;
+    function two(n) {
+      return (n < 10 ? "0" : "") + n;
+    }
+    var label = (h > 0 ? h + ":" : "") + two(m) + ":" + two(s);
+    return (
+      '<p class="wr-zirkel-cd" data-wr-cd-start="' +
+      esc(String(start)) +
+      '">Start in ' +
+      esc(label) +
+      "</p>"
+    );
+  }
+
   function loadTravelPref() {
+    var fromHost = null;
+    try {
+      if (host && typeof host.getTravelUntil === "function") {
+        fromHost = host.getTravelUntil();
+      }
+    } catch (eH) {}
     try {
       var raw = localStorage.getItem("gogogo_woche_travel_" + me());
-      state.travelUntil = raw || null;
+      state.travelUntil = fromHost || raw || null;
+      if (fromHost && fromHost !== raw) {
+        localStorage.setItem("gogogo_woche_travel_" + me(), fromHost);
+      }
     } catch (e) {
-      state.travelUntil = null;
+      state.travelUntil = fromHost || null;
     }
   }
 
@@ -233,6 +286,11 @@
       if (iso) localStorage.setItem(key, iso);
       else localStorage.removeItem(key);
     } catch (e) {}
+    try {
+      if (host && typeof host.setTravelUntil === "function") {
+        host.setTravelUntil(iso || null);
+      }
+    } catch (eH2) {}
   }
 
   function travelActive() {
@@ -1067,10 +1125,14 @@
     var notePack = truncNote(ev.note || ev.description || "", 2);
     var place = ev.location || "";
     var travelHint = "";
+    var supportType =
+      String(ev.item_type || "") === "support_session" ||
+      String(ev.item_type || "") === "nutrition_log";
     if (
       travelActive() &&
       item.kind === "event" &&
       !ev.travel_auto &&
+      !supportType &&
       (String(place).toLowerCase().indexOf("studio") >= 0 || cat === "zirkel") &&
       !ev.enrollment_id
     ) {
@@ -1095,12 +1157,23 @@
         "</p>";
     }
     var going = goingLine(ev);
+    var isNutrition =
+      String(ev.item_type || "") === "nutrition_log" ||
+      /ernährung|ernaehrung/i.test(String(ev.title || ""));
+    var isZirkel = cat === "zirkel" || /zirkel/i.test(String(ev.title || ""));
+    var cd = isZirkel ? zirkelCountdownHtml(ev.starts_at) : "";
     return (
-      '<div class="wr-slide" data-day="' +
+      '<div class="wr-slide' +
+      (isNutrition ? " is-nutrition" : "") +
+      (isZirkel ? " is-zirkel" : "") +
+      '" data-day="' +
       esc(iso) +
       '" data-event-id="' +
       esc(ev.id) +
-      '">' +
+      '"' +
+      (isNutrition ? ' data-wr-nutrition="1"' : "") +
+      (isZirkel ? ' data-wr-zirkel-open="1"' : "") +
+      ">" +
       '<div class="wr-media ' +
       toneClass(cat) +
       (ev.photo_url ? " has-photo" : "") +
@@ -1109,12 +1182,16 @@
         ? '<img class="wr-photo" src="' + esc(ev.photo_url) + '" alt="" />'
         : "") +
       '<div class="wr-bottom">' +
-      '<div class="wr-bottom__main">' +
+      '<div class="wr-bottom__main"' +
+      (isNutrition ? ' data-wr-nutrition-open="1"' : "") +
+      (isZirkel ? ' data-wr-zirkel-open="1"' : "") +
+      ">" +
       '<div class="wr-author">' +
       avatarHtml(p) +
       inviteAvatarsHtml(iso) +
       "</div>" +
       (when ? '<p class="wr-when">' + esc(when) + "</p>" : "") +
+      cd +
       '<h2 class="wr-title">' +
       esc(title) +
       "</h2>" +
@@ -1265,9 +1342,10 @@
     var travelHint = "";
     if (travelOn) {
       travelHint =
-        '<button type="button" class="wr-travel-banner" data-wr-end-travel="1">Unterwegs bis ' +
+        '<button type="button" class="wr-travel-banner" data-wr-end-travel="1" aria-label="Reise beenden">' +
+        "Reise aktiv bis " +
         esc(formatDayLong(state.travelUntil).replace(/^[^,]*,\s*/, "") || state.travelUntil) +
-        " · beenden</button>";
+        " — tippen zum Abbrechen</button>";
     }
     var err = state.loadError
       ? '<p class="wr-error" role="status">' + esc(state.loadError) + "</p>"
@@ -1318,11 +1396,11 @@
 
   function alternativeEventForDay(iso) {
     return itemsForDay(iso).filter(function (it) {
+      if (!it.ev || isSupportEvent(it.ev)) return false;
       return (
-        it.ev &&
-        (it.ev.category === "alternative" ||
-          it.ev.item_type === "hotel_workout" ||
-          it.ev.travel_auto)
+        it.ev.category === "alternative" ||
+        it.ev.item_type === "hotel_workout" ||
+        it.ev.travel_auto
       );
     })[0];
   }
@@ -1336,9 +1414,45 @@
     );
   }
 
+  function isSupportEvent(ev) {
+    if (!ev) return false;
+    var t = String(ev.item_type || "");
+    if (t === "support_session" || t === "nutrition_log") return true;
+    var title = String(ev.title || "");
+    if (/web[\s-]?call|trainingsplan|ernährung|ernaehrung/i.test(title)) return true;
+    return false;
+  }
+
+  function isSupportOnlyDay(iso) {
+    var items = itemsForDay(iso).filter(function (it) {
+      return it && it.kind === "event" && it.ev && String(it.ev.user_id) === me();
+    });
+    if (!items.length) return false;
+    return items.every(function (it) {
+      return isSupportEvent(it.ev);
+    });
+  }
+
+  function dayNeedsTravelAlt(iso) {
+    if (!travelDayActive(iso)) return false;
+    if (isSupportOnlyDay(iso)) return false;
+    var items = itemsForDay(iso).filter(function (it) {
+      return it && it.kind === "event" && it.ev && String(it.ev.user_id) === me();
+    });
+    var training = items.filter(function (it) {
+      return !isSupportEvent(it.ev);
+    });
+    /* Nur Support/Web-Call/Ernährung → keine Reise-Alternative */
+    if (items.length && !training.length) return false;
+    return true;
+  }
+
   function travelAltHtml(iso) {
-    if (!travelDayActive(iso)) return "";
+    if (!dayNeedsTravelAlt(iso)) return "";
     var alt = alternativeEventForDay(iso);
+    if (alt && alt.ev && isSupportEvent(alt.ev)) {
+      alt = null;
+    }
     var title = alt && alt.ev ? alt.ev.title || "Alternative" : "Alternative wählen";
     var copy = alt
       ? "Reise-Tag · tippen zum Ändern"
@@ -1960,12 +2074,22 @@
     }
 
     if (p.kind === "zirkel") {
+      var zNote =
+        "zirkel:" +
+        (p.zMode || "standard") +
+        "|work=" +
+        (p.zWork || 40) +
+        "|pause=" +
+        (p.zPause || 20) +
+        "|rounds=" +
+        (p.zRounds || 8);
       var zBody = {
         category: "zirkel",
         course_id: p.courseId || null,
         enrollment_id: p.enrollmentId || null,
         title: p.title || "Zirkeltraining",
         starts_at: starts,
+        note: zNote,
         is_unplanned: false,
         item_type: "course_session",
         travel_auto: false,
@@ -2043,10 +2167,10 @@
       return;
     }
     if (kind === "zirkel") {
-      if (!state.zirkelOk) {
+      if (!state.zirkelOk && !(host && host.hasZirkelAccess && host.hasZirkelAccess())) {
         openSheet(
           "<h3>Zirkeltraining</h3>" +
-            "<p>Bitte zuerst unter Support für Zirkeltraining anmelden.</p>" +
+            "<p>Bitte zuerst unter Plus Zirkeltraining buchen (Nutzername, E-Mail, Passwort).</p>" +
             '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button>'
         );
         return;
@@ -2066,9 +2190,25 @@
         title: "Zirkeltraining",
         courseId: courseId || null,
         enrollmentId: en && en.id,
-        replaceId: replaceId
+        replaceId: replaceId,
+        zMode: "standard",
+        zWork: 40,
+        zPause: 20,
+        zRounds: 8
       };
-      openCreateTimeSheet();
+      openSheet(
+        "<h3>Zirkeltraining festlegen</h3>" +
+          '<p class="wr-sheet-hint">Modus, Runden und Pausen — Startuhrzeit danach.</p>' +
+          '<div class="wr-chips">' +
+          '<button type="button" class="wr-chip is-on" data-wr-zmode="standard">Standard</button>' +
+          '<button type="button" class="wr-chip" data-wr-zmode="team">Team</button>' +
+          "</div>" +
+          '<label class="wr-field">Rundenzeit (Sek.)<input type="number" id="wr-z-work" min="10" max="180" value="40" /></label>' +
+          '<label class="wr-field">Pause (Sek.)<input type="number" id="wr-z-pause" min="5" max="120" value="20" /></label>' +
+          '<label class="wr-field">Runden<input type="number" id="wr-z-rounds" min="1" max="30" value="8" /></label>' +
+          '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zirkel-next="1">Weiter zur Uhrzeit</button>' +
+          '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+      );
       return;
     }
 
@@ -2484,7 +2624,6 @@
   }
 
   function endTravel() {
-    var id = me();
     var autos = state.events.filter(function (ev) {
       return (
         ev.travel_auto &&
@@ -2500,7 +2639,37 @@
       }).catch(function () {});
     });
     saveTravelPref(null);
-    return Promise.all(jobs).then(refresh);
+    if (host.toast) host.toast("Reise beendet");
+    return Promise.all(jobs).then(function () {
+      return refreshKeepDay(berlinToday());
+    });
+  }
+
+  function openTravelMenu() {
+    var on = travelActive();
+    openSheet(
+      "<h3>Reisemodus</h3>" +
+        (on
+          ? "<p>Aktiv bis " +
+            esc(formatDayLong(state.travelUntil).replace(/^[^,]*,\s*/, "") || state.travelUntil) +
+            ". Gespeichert in Deinem Profil (Supabase) — auf allen Geräten.</p>" +
+            '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-end-travel="1">Reise jetzt abbrechen</button>'
+          : "<p>Abwesenheit wählen — Trainingstage brauchen eine Alternative. Web-Call und Ernährung nicht.</p>" +
+            '<div class="wr-chips">' +
+            [3, 5, 7, 10, 14]
+              .map(function (d) {
+                return (
+                  '<button type="button" class="wr-chip" data-wr-travel-go="' +
+                  d +
+                  '">' +
+                  d +
+                  " Tage</button>"
+                );
+              })
+              .join("") +
+            "</div>") +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button>'
+    );
   }
 
   function swapToHotel(eventId) {
@@ -2769,8 +2938,53 @@
       closeSheet();
       return;
     }
+    if (t.getAttribute("data-wr-zmode")) {
+      var mode = t.getAttribute("data-wr-zmode");
+      if (state.pendingCreate) state.pendingCreate.zMode = mode;
+      var sheet = t.closest(".wr-sheet");
+      if (sheet) {
+        sheet.querySelectorAll("[data-wr-zmode]").forEach(function (b) {
+          b.classList.toggle("is-on", b === t);
+        });
+      }
+      return;
+    }
+    if (t.getAttribute("data-wr-zirkel-next")) {
+      if (!state.pendingCreate) return;
+      var workEl = $("wr-z-work");
+      var pauseEl = $("wr-z-pause");
+      var roundsEl = $("wr-z-rounds");
+      state.pendingCreate.zWork = Math.max(10, Math.min(180, Number(workEl && workEl.value) || 40));
+      state.pendingCreate.zPause = Math.max(5, Math.min(120, Number(pauseEl && pauseEl.value) || 20));
+      state.pendingCreate.zRounds = Math.max(1, Math.min(30, Number(roundsEl && roundsEl.value) || 8));
+      openCreateTimeSheet();
+      return;
+    }
     if (t.getAttribute("data-wr-travel")) {
-      openTravelSheet();
+      openTravelMenu();
+      return;
+    }
+    if (t.closest && t.closest("[data-wr-nutrition-open], [data-wr-nutrition]")) {
+      var slideN = t.closest(".wr-slide");
+      var dayN = slideN ? slideN.getAttribute("data-day") : currentDayIso();
+      var evN = slideN ? slideN.getAttribute("data-event-id") : "";
+      if (host && typeof host.openNutritionLogModal === "function") {
+        host.openNutritionLogModal({ day: dayN, eventId: evN });
+      } else if (typeof window.openNutritionLogModal === "function") {
+        window.openNutritionLogModal({ day: dayN, eventId: evN });
+      }
+      return;
+    }
+    if (t.closest && t.closest("[data-wr-zirkel-open]")) {
+      var slideZ = t.closest(".wr-slide");
+      var evZ = slideZ ? slideZ.getAttribute("data-event-id") : "";
+      if (host && typeof host.openZirkelWorkout === "function") {
+        host.openZirkelWorkout(evZ);
+      } else if (host && typeof host.requireFfc === "function") {
+        host.requireFfc(function () {
+          if (window.FFC && FFC.openSetup) FFC.openSetup();
+        });
+      }
       return;
     }
     if (t.getAttribute("data-wr-end-travel")) {
@@ -2865,9 +3079,10 @@
     }
     if (t.hasAttribute("data-wr-travel-go")) {
       var wheelGo = $("wr-travel-wheel");
+      var attrDays = Number(t.getAttribute("data-wr-travel-go") || 0);
       var nDays = wheelGo
         ? Number(wheelGo.getAttribute("data-days") || 3)
-        : 3;
+        : attrDays || 3;
       applyTravel(Math.max(1, Math.min(TRAVEL_MAX_DAYS, nDays || 3)));
       return;
     }
@@ -3346,7 +3561,7 @@
     ]).then(function () {
       if (armedTravel) {
         try {
-          openTravelSheet();
+          openTravelMenu();
         } catch (eT) {}
       }
     });
@@ -3395,6 +3610,8 @@
     loadInvites: loadInvites,
     armTravel: armTravel,
     armEdit: armEdit,
+    dayNeedsTravelAlt: dayNeedsTravelAlt,
+    endTravel: endTravel,
     dayIndex: function () {
       return state.dayIndex;
     }
