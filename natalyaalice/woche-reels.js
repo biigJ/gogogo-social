@@ -14,7 +14,8 @@
     courses: [],
     travelUntil: null,
     editMode: false,
-    touch: null
+    touch: null,
+    loadError: ""
   };
 
   var ROOT_ID = "woche-reels";
@@ -47,17 +48,25 @@
     return host.todayIso ? host.todayIso() : new Date().toISOString().slice(0, 10);
   }
 
+  function pad2(n) {
+    return n < 10 ? "0" + n : String(n);
+  }
+
+  function localIso(d) {
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+  }
+
   function mondayOf(iso) {
     var d = new Date(iso + "T12:00:00");
     var day = (d.getDay() + 6) % 7; /* 0=Mo */
     d.setDate(d.getDate() - day);
-    return d.toISOString().slice(0, 10);
+    return localIso(d);
   }
 
   function addDays(iso, n) {
     var d = new Date(iso + "T12:00:00");
     d.setDate(d.getDate() + n);
-    return d.toISOString().slice(0, 10);
+    return localIso(d);
   }
 
   function weekStart() {
@@ -199,38 +208,39 @@
     }
     var start = weekStart();
     var end = addDays(start, 7);
-    return rest(
-      "events?user_id=eq." +
-        encodeURIComponent(id) +
-        "&select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,travel_auto,group_id&starts_at=gte." +
-        encodeURIComponent(start + "T00:00:00+01:00") +
-        "&starts_at=lt." +
-        encodeURIComponent(end + "T00:00:00+01:00") +
-        "&order=starts_at.asc&limit=200"
-    )
+    /* Basis-Select zuerst (kompatibel ohne SQL-Migration) */
+    var baseSelect =
+      "id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title";
+    var richSelect = baseSelect + ",item_type,travel_auto,group_id";
+    function query(select) {
+      return rest(
+        "events?user_id=eq." +
+          encodeURIComponent(id) +
+          "&select=" +
+          select +
+          "&starts_at=gte." +
+          encodeURIComponent(start + "T00:00:00+01:00") +
+          "&starts_at=lt." +
+          encodeURIComponent(end + "T00:00:00+01:00") +
+          "&order=starts_at.asc&limit=200"
+      );
+    }
+    return query(richSelect)
+      .catch(function () {
+        return query(baseSelect);
+      })
       .then(function (rows) {
         state.events = rows || [];
-        return ensurePeople(state.events.map(function (e) {
-          return e.user_id;
-        }));
-      })
-      .catch(function () {
-        /* Fallback ohne neue Spalten */
-        return rest(
-          "events?user_id=eq." +
-            encodeURIComponent(id) +
-            "&select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title&starts_at=gte." +
-            encodeURIComponent(start + "T00:00:00+01:00") +
-            "&starts_at=lt." +
-            encodeURIComponent(end + "T00:00:00+01:00") +
-            "&order=starts_at.asc&limit=200"
-        )
-          .then(function (rows) {
-            state.events = rows || [];
+        return ensurePeople(
+          state.events.map(function (e) {
+            return e.user_id;
           })
-          .catch(function () {
-            state.events = [];
-          });
+        );
+      })
+      .catch(function (err) {
+        state.events = [];
+        state.loadError = state.loadError || "Events konnten nicht geladen werden.";
+        return null;
       });
   }
 
@@ -620,6 +630,9 @@
         esc(formatDayLong(state.travelUntil).replace(/^[^,]*,\s*/, "") || state.travelUntil) +
         " · beenden</button>";
     }
+    var err = state.loadError
+      ? '<p class="wr-error" role="status">' + esc(state.loadError) + "</p>"
+      : "";
     return (
       '<header class="wr-top">' +
       '<button type="button" class="wr-icon-btn' +
@@ -640,7 +653,8 @@
       '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20h4L18 10l-4-4L4 16v4zM13 7l4 4"/></svg>' +
       "</button>" +
       "</header>" +
-      travelHint
+      travelHint +
+      err
     );
   }
 
@@ -701,24 +715,37 @@
   function render() {
     var root = $(ROOT_ID);
     if (!root) return;
-    var days = weekDays();
+    var days;
+    try {
+      days = weekDays();
+    } catch (eDays) {
+      days = [];
+      state.loadError = state.loadError || "Wochenkalender fehlerhaft.";
+    }
+    while (days.length < 7) {
+      days.push(addDays(berlinToday(), days.length));
+    }
     if (state.dayIndex < 0) state.dayIndex = 0;
     if (state.dayIndex > 6) state.dayIndex = 6;
-    /* Default: heutiger Wochentag wenn diese Woche */
+    root.hidden = false;
     root.innerHTML =
       headerHtml() +
       editPanelHtml() +
       '<div class="wr-vtrack" id="wr-vtrack">' +
       days
         .map(function (iso) {
-          return dayReelHtml(iso);
+          try {
+            return dayReelHtml(iso);
+          } catch (eDay) {
+            return emptyCardHtml(iso);
+          }
         })
         .join("") +
       "</div>" +
       progressHtml() +
       sheetHtml();
     var track = $("wr-vtrack");
-    if (track) {
+    if (track && track.clientHeight) {
       track.scrollTop = state.dayIndex * track.clientHeight;
     }
   }
@@ -1549,23 +1576,41 @@
   }
 
   function refresh() {
-    if (!host || !me()) return Promise.resolve();
+    if (!host || !me()) {
+      state.loadError = "Nicht angemeldet.";
+      render();
+      return Promise.resolve();
+    }
     loadTravelPref();
-    return Promise.all([loadEvents(), loadFfc(), loadEnrollments()])
+    state.loadError = "";
+    return Promise.all([
+      loadEvents().catch(function () {
+        state.loadError = "Events konnten nicht geladen werden.";
+      }),
+      loadFfc().catch(function () {}),
+      loadEnrollments().catch(function () {})
+    ])
       .then(function () {
-        var ids = state.events.map(function (e) {
+        var ids = (state.events || []).map(function (e) {
           return String(e.id);
         });
-        return Promise.all([loadRsvps(ids), loadComments(ids)]);
+        return Promise.all([
+          loadRsvps(ids).catch(function () {}),
+          loadComments(ids).catch(function () {})
+        ]);
       })
       .then(function () {
-        /* Heute-Wochentag als Start */
         if (state.weekOffset === 0) {
           var today = berlinToday();
           var days = weekDays();
           var ix = days.indexOf(today);
           if (ix >= 0) state.dayIndex = ix;
         }
+      })
+      .catch(function () {
+        state.loadError = state.loadError || "Woche teilweise nicht geladen.";
+      })
+      .then(function () {
         render();
       });
   }
@@ -1574,6 +1619,21 @@
     var root = $(ROOT_ID);
     if (root) root.hidden = false;
     document.body.classList.add("is-woche-reels");
+    /* Sofort 7 Tageskarten — nie leerer Screen während Load */
+    try {
+      if (state.weekOffset === 0) {
+        var today = berlinToday();
+        var days = weekDays();
+        var ix = days.indexOf(today);
+        if (ix >= 0) state.dayIndex = ix;
+      }
+      render();
+    } catch (eShow) {
+      state.loadError = "Woche konnte nicht gezeichnet werden.";
+      try {
+        render();
+      } catch (e2) {}
+    }
     return refresh();
   }
 

@@ -1424,9 +1424,15 @@
     /* Woche Reels */
     .woche-reels {
       display: none; flex-direction: column;
-      position: relative; width: 100vw; margin-left: calc(50% - 50vw);
+      position: relative; width: 100%;
       height: calc(100dvh - 64px); max-height: calc(100dvh - 64px);
       background: #1a1510; color: #F6F1E8; overflow: hidden;
+    }
+    .wr-error {
+      position: absolute; top: 52px; left: 12px; right: 12px; z-index: 6;
+      margin: 0; padding: 8px 12px; border-radius: 10px;
+      background: rgba(246,241,232,.92); color: #2A2118;
+      font-size: 12px; font-weight: 600; text-align: center;
     }
     .wr-top {
       position: absolute; top: 0; left: 0; right: 0; z-index: 5;
@@ -1726,7 +1732,18 @@
     body.is-session.is-woche-reels #days,
     body.is-session.is-woche-reels .absence-block,
     body.is-session.is-woche-reels .welcome { display: none !important; }
-    body.is-session.is-woche-reels #woche-reels { display: flex; }
+    /* #woche-reels liegt AUSSERHALB von .welcome — sonst display:none am Parent */
+    body.is-session.is-woche-reels #woche-reels {
+      display: flex !important;
+      position: fixed;
+      inset: 0;
+      bottom: 64px;
+      width: 100%;
+      height: auto;
+      max-height: none;
+      margin: 0;
+      z-index: 30;
+    }
     body.is-session.is-woche-reels .app-pill { z-index: 40; }
     body.is-session[data-shell="woche"] .routine-row { order: 4; margin-top: 24px; }
     body.is-session[data-shell="woche"] #weeks { order: 5; }
@@ -4865,7 +4882,6 @@
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
       </button>
     </div>
-    <div id="woche-reels" class="woche-reels" hidden aria-label="Woche"></div>
     <div class="days shell-kalender" id="days"></div>
     <div class="absence-block shell-kalender" id="absence-block">
       <div class="week-mode" role="group" aria-label="Woche">
@@ -4911,6 +4927,7 @@
     <div class="heute-diary-feed shell-heute" id="heute-diary-feed"></div>
     <div class="heute-joins shell-heute" id="heute-joins"></div>
   </section>
+  <div id="woche-reels" class="woche-reels" hidden aria-label="Woche"></div>
   <section id="diary" class="diary" hidden>
     <div class="diary-bar">
       <button type="button" id="diary-back" class="home-btn is-back" aria-label="Zurück">
@@ -5871,7 +5888,7 @@
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-5"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-1"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-2"></script>
   <script src="/natalyaalice/support.js?v=support-1"></script>
   <script>
     (function () {
