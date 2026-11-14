@@ -184,15 +184,9 @@
           method: "POST",
           prefer: "return=minimal",
           body: {
-            account_id: me(),
-            kind: "support_order",
-            ref_id: order && order.id ? String(order.id) : String(product.id),
-            meta: {
-              product_id: product.id,
-              type: product.type,
-              title: product.title,
-              payment_status: paymentFor(product)
-            }
+            user_id: me(),
+            type: "support_request",
+            ref_id: order && order.id ? order.id : product.id
           }
         }).catch(function () {});
         return afterBook(product, order);
@@ -483,17 +477,25 @@
         body: { title: "Ernährung", status: "erledigt" }
       }).catch(function () {});
     }).then(function () {
-      /* Body/Notiz: go_community oder events.note falls Spalte fehlt → activity_log */
+      /* Notiz: activity_log (type nutrition_log) + optional meta.text */
+      var logBody = {
+        user_id: me(),
+        type: "nutrition_log",
+        ref_id: null,
+        meta: { text: text, visibility: "privat", day: todayIso() }
+      };
       return rest("activity_log", {
         method: "POST",
         prefer: "return=minimal",
-        body: {
-          account_id: me(),
-          kind: "nutrition_log",
-          ref_id: todayIso(),
-          meta: { text: text, visibility: "privat" }
-        }
-      }).catch(function () {});
+        body: logBody
+      }).catch(function () {
+        delete logBody.meta;
+        return rest("activity_log", {
+          method: "POST",
+          prefer: "return=minimal",
+          body: logBody
+        }).catch(function () {});
+      });
     });
   }
 

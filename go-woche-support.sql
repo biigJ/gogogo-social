@@ -76,29 +76,40 @@ create index if not exists events_user_starts_idx
   on events (user_id, starts_at);
 
 -- ---------------------------------------------------------------------------
--- 3) activity_log enrollment_request (table may already exist)
+-- 3) activity_log (bestehend aus go-courses-support.sql: user_id, type, ref_id)
+--    Kein Neu-Anlegen mit account_id/kind — Schema nicht überschreiben.
+--    Optional: meta + erweiterte type-Werte (idempotent).
 -- ---------------------------------------------------------------------------
-create table if not exists activity_log (
-  id uuid primary key default gen_random_uuid(),
-  account_id uuid references go_accounts(id) on delete set null,
-  kind text not null,
-  ref_id text,
-  meta jsonb not null default '{}'::jsonb,
-  created_at timestamptz not null default now()
-);
+alter table activity_log
+  add column if not exists meta jsonb not null default '{}'::jsonb;
 
-alter table activity_log enable row level security;
+do $$
+declare
+  cname text;
+begin
+  select con.conname into cname
+  from pg_constraint con
+  join pg_class rel on rel.oid = con.conrelid
+  join pg_namespace nsp on nsp.oid = rel.relnamespace
+  where nsp.nspname = 'public'
+    and rel.relname = 'activity_log'
+    and con.contype = 'c'
+    and pg_get_constraintdef(con.oid) ilike '%type%';
 
-drop policy if exists "activity_log_select_anon" on activity_log;
-create policy "activity_log_select_anon"
-  on activity_log for select to anon, authenticated using (true);
+  if cname is not null then
+    execute format('alter table activity_log drop constraint %I', cname);
+  end if;
 
-drop policy if exists "activity_log_insert_anon" on activity_log;
-create policy "activity_log_insert_anon"
-  on activity_log for insert to anon, authenticated with check (true);
-
-create index if not exists activity_log_account_idx
-  on activity_log (account_id, created_at desc);
+  alter table activity_log
+    add constraint activity_log_type_check
+    check (type in (
+      'rsvp_yes', 'rsvp_no', 'checkin', 'unplanned_start',
+      'post_view', 'enrollment_request', 'support_request',
+      'nutrition_log'
+    ));
+exception
+  when duplicate_object then null;
+end $$;
 
 -- ---------------------------------------------------------------------------
 -- 4) support_orders: status aktiv + payment_status (nullable → main bleibt ok)

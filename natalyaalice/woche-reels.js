@@ -1081,15 +1081,9 @@
           method: "POST",
           prefer: "return=minimal",
           body: {
-            account_id: me(),
-            kind: "enrollment_request",
-            ref_id: String(en.id),
-            meta: {
-              course_id: draft.course.id,
-              title: draft.course.title,
-              start_date: draft.start,
-              payment_status: payment
-            }
+            user_id: me(),
+            type: "enrollment_request",
+            ref_id: en.id
           }
         }).catch(function () {});
         return rest("rpc/go_generate_events", {
