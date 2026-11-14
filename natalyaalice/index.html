@@ -1711,12 +1711,11 @@
     .wr-progress p { margin: 0; font-size: 12px; font-weight: 600; color: rgba(246,241,232,.9); }
     .wr-act.is-done { opacity: 1; }
     .wr-act__icon--done {
-      width: 36px; height: 36px; border-radius: 50%;
-      background: #fff; color: transparent;
+      width: 30px; height: 30px; border-radius: 50%;
+      background: transparent; color: #F6F1E8;
+      display: grid; place-items: center;
     }
-    .wr-act__icon--done .wr-ico {
-      opacity: 0.28; color: #111; stroke: #111;
-    }
+    .wr-act__icon--done .wr-ico { display: block; }
     .wr-invite-faces {
       display: inline-flex; align-items: center; gap: 4px; margin-left: 4px;
     }
@@ -1726,14 +1725,14 @@
       border-radius: 50%; overflow: hidden; display: inline-grid; place-items: center;
     }
     .wr-invite-slot.is-pending .wr-avatar {
-      filter: grayscale(0.55); opacity: 0.82;
+      filter: none; opacity: 1;
     }
     .wr-invite-wait {
       position: absolute; inset: 0; display: grid; place-items: center;
-      border-radius: 50%; background: transparent; color: rgba(255,255,255,.72);
+      border-radius: 50%; background: transparent; color: rgba(255,255,255,.78);
       pointer-events: none;
     }
-    .wr-invite-wait svg { width: 17px; height: 17px; display: block; opacity: .72; }
+    .wr-invite-wait svg { width: 22px; height: 22px; display: block; opacity: .85; }
     .wr-author { gap: 6px; }
     .wr-travel-card {
       position: absolute; top: calc(var(--wr-top-h) + 44px); left: 12px; right: 12px; z-index: 7;
@@ -1935,8 +1934,9 @@
       border: 0; background: none; color: #2A2118; cursor: pointer; padding: 0;
       display: inline-flex; align-items: center; gap: 4px; min-height: 36px;
     }
-    .acc-tool.is-done .acc-act-ico { opacity: .35; }
-    .acc-tool__n { font-size: 13px; font-weight: 700; min-width: 1ch; }
+    .acc-tool.is-done .acc-act-ico { opacity: 1; }
+    .acc-tool.is-done .acc-act-ico--done { display: block; }
+    .acc-tool__n { display: none; }
     .acc-tool--bubble { color: #2A2118; }
     .acc-tool--bubble .acc-bubble-icon,
     .acc-tool--bubble .wr-ico { width: 30px; height: 30px; display: block; }
@@ -1968,14 +1968,14 @@
       display: grid; place-items: center;
     }
     .acc-face-slot.is-pending .acc-face {
-      filter: grayscale(0.55); opacity: 0.82;
+      filter: none; opacity: 1;
     }
     .acc-face-wait {
       position: absolute; inset: 0; display: grid; place-items: center;
-      border-radius: 50%; background: transparent; color: rgba(42,33,24,.55);
+      border-radius: 50%; background: transparent; color: rgba(42,33,24,.62);
       pointer-events: none;
     }
-    .acc-face-wait svg { width: 19px; height: 19px; display: block; opacity: .72; }
+    .acc-face-wait svg { width: 25px; height: 25px; display: block; opacity: .88; }
     .acc-face--add {
       border: 1.5px solid rgba(42,33,24,.35); background: transparent !important; color: #2A2118;
       font-size: 18px; font-weight: 500; line-height: 1; cursor: pointer; padding: 0;
@@ -2966,8 +2966,8 @@
     .day-invite__slot.is-pending .day-invite__ph,
     .event-people__slot.is-pending .event-people__face,
     .event-people__slot.is-pending .event-people__ph {
-      filter: grayscale(0.55);
-      opacity: 0.82;
+      filter: none;
+      opacity: 1;
     }
     .day-invite__wait,
     .event-people__wait {
@@ -2977,15 +2977,15 @@
       place-items: center;
       border-radius: 50%;
       background: transparent;
-      color: rgba(42,33,24,.55);
+      color: rgba(42,33,24,.62);
       pointer-events: none;
     }
     .day-invite__wait svg,
     .event-people__wait svg {
-      width: 24px;
-      height: 24px;
+      width: 31px;
+      height: 31px;
       display: block;
-      opacity: .72;
+      opacity: .88;
     }
     .event-people {
       display: flex;
@@ -6403,8 +6403,8 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-14"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-16"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-15"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-17"></script>
   <script src="/natalyaalice/support.js?v=support-4"></script>
   <script>
     (function () {
@@ -9356,6 +9356,8 @@
             if (!post || String(post.author_id) !== String(sessionAccount.id)) return;
             if (post.reply_to_id) return;
             var body = String(post.body || "").trim();
+            /* Event-Erledigt-Medien (Fallback ohne events.note/photo_url) — kein Tagebuch-Post */
+            if (/\[\[e:[0-9a-f-]{36}\]\]/i.test(body)) return;
             if (!body && !post.photo_url) return;
             var day = "";
             try {
