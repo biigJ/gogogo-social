@@ -1342,11 +1342,7 @@
     body.is-session[data-shell="heute"] .heute-stories { display: none !important; }
     body.is-session[data-shell="heute"] .dock { display: none !important; }
     body.is-session[data-shell="heute"] #heute-acc { order: 1; margin-top: 8px; width: 100%; }
-    body.is-session[data-shell="heute"] #heute-acc.is-centering {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-    }
+    /* Kein opacity-Hide mehr — das verursachte das Aktuell-Flackern bei jedem Refresh */
     body.is-session[data-shell="heute"] .heute-joins { order: 2; display: block; }
     body.is-session[data-shell="heute"] .heute-start { display: none !important; }
     body.is-session[data-shell="heute"] .heute-events { display: none !important; }
@@ -4474,35 +4470,42 @@
       margin-top: 16px;
     }
 
-    /* Go carousel */
+    /* Go carousel — #go-rail ist Sibling von #plan-training, nicht Kind */
+    body.is-session #go-rail.go-rail,
     body.is-session #plan-training .go-rail,
     body.is-session #plan-team.team-rail {
       display: flex;
       flex-direction: row;
       align-items: flex-start;
-      gap: 12px;
+      /* kein gap: sonst Snap um ~12px zu weit, dann Korrektur-Sprung */
+      gap: 0;
       margin: 0;
       padding: 0;
       overflow-x: auto;
       overflow-y: hidden;
       scroll-snap-type: x mandatory;
+      scroll-padding-inline: 0;
       scroll-behavior: auto;
       scrollbar-width: none;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-x: contain;
-      touch-action: pan-x pan-y;
+      touch-action: pan-x;
     }
     body.is-session #plan-team.team-rail .team-slide.is-scroll {
       /* Native nested scroll: vertical inside slide, horizontal on rail */
       touch-action: pan-x pan-y;
       overscroll-behavior: contain;
     }
+    body.is-session #go-rail.go-rail::-webkit-scrollbar,
     body.is-session #plan-training .go-rail::-webkit-scrollbar,
     body.is-session #plan-team.team-rail::-webkit-scrollbar { display: none; height: 0; }
     .go-slide {
       flex: 0 0 100%;
       width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
       scroll-snap-align: start;
+      scroll-snap-stop: always;
     }
     .go-slide__art {
       width: 100%;
@@ -4671,6 +4674,126 @@
       border: 1px solid #F6F1E8; background: transparent; color: #F6F1E8;
       font: inherit; font-weight: 700; cursor: pointer;
     }
+    /* Plus: fester Viewport — Padding nicht doppelt zur Rail-Höhe zählen */
+    body.is-session[data-shell="kurse"] .welcome {
+      overflow: hidden !important;
+      overscroll-behavior: none;
+      height: var(--screen-h, 100dvh);
+      max-height: var(--screen-h, 100dvh);
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      padding-top: env(safe-area-inset-top, 0px) !important;
+      padding-bottom: 0 !important;
+    }
+    body.is-session[data-shell="kurse"] #go-rail {
+      flex: 1 1 auto;
+      width: 100%;
+      height: auto;
+      max-height: none;
+      min-height: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior: none;
+      align-items: stretch;
+      gap: 0;
+      scroll-snap-type: x mandatory;
+      scroll-padding-inline: 0;
+    }
+    body.is-session[data-shell="kurse"] .go-slide {
+      height: 100%;
+      min-height: 100%;
+      max-height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding: 12px 16px calc(88px + env(safe-area-inset-bottom, 0px));
+      box-sizing: border-box;
+      scroll-snap-align: start;
+      scroll-snap-stop: always;
+    }
+    .go-slide__ffc-box {
+      max-height: none;
+      overflow: visible;
+    }
+    .go-slide__ffc-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(42,33,24,.12);
+      font-size: 14px !important;
+    }
+    .go-slide__ffc-row:last-child { border-bottom: 0; }
+    .go-friend-pick {
+      display: grid; gap: 8px; max-height: 46vh; overflow: auto; margin: 12px 0; text-align: left;
+    }
+    .go-friend-pick label {
+      display: flex; align-items: center; gap: 12px; min-height: 48px;
+      padding: 0 4px; cursor: pointer;
+    }
+    .go-friend-pick input { position: absolute; opacity: 0; pointer-events: none; }
+    .go-friend-pick__check {
+      width: 24px; height: 24px; flex: none; border: 1.5px solid #2A2118;
+      display: grid; place-items: center;
+    }
+    .go-friend-pick label.is-on .go-friend-pick__check {
+      background: #2A2118; color: #F6F1E8;
+    }
+    .go-friend-pick__check svg { width: 14px; height: 14px; opacity: 0; }
+    .go-friend-pick label.is-on .go-friend-pick__check svg { opacity: 1; }
+    .team-slide__coach-ask {
+      display: flex; align-items: center; gap: 12px; margin-top: 16px;
+    }
+    .team-slide__coach-ask-plus {
+      width: 56px; height: 56px; border-radius: 50%; border: 1px solid #2A2118;
+      display: grid; place-items: center; font-size: 28px; flex: none;
+    }
+    .team-slide__coach-ask p { margin: 0; font-size: 14px !important; line-height: 1.35; }
+    .team-slide.is-coach-locked .coach-appointments,
+    .team-slide.is-coach-locked .coach-calendar {
+      opacity: 0.35; pointer-events: none; filter: grayscale(1);
+    }
+    .go-toast {
+      position: fixed; left: 50%; bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+      transform: translateX(-50%); z-index: 120;
+      max-width: min(92vw, 360px); padding: 12px 16px;
+      background: #2A2118; color: #F6F1E8; font-size: 14px !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,.25);
+    }
+    .wr-travel-card__edit {
+      position: absolute; top: 8px; right: 8px; z-index: 2;
+      width: 36px; height: 36px; border: 0; border-radius: 50%;
+      background: rgba(246,241,232,.95); color: #2A2118;
+      display: grid; place-items: center; cursor: pointer;
+    }
+    .wr-travel-card__edit svg { width: 16px; height: 16px; }
+    .wr-travel-end { margin-top: 20px; }
+    .woche-reels:has(.wr-travel-card) .wr-dots {
+      top: calc(var(--wr-top-h) + 168px);
+      z-index: 8;
+    }
+    .woche-reels:has(.wr-travel-banner):has(.wr-travel-card) .wr-dots {
+      top: calc(var(--wr-top-h) + 176px);
+    }
+    .acc-card__bar {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .acc-card__teaser {
+      order: -1;
+      max-height: min(48%, 7.5em);
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+      align-items: flex-start;
+    }
+    .acc-card__teaser .acc-card__my-line {
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: unset;
+      overflow: visible;
+      text-overflow: unset;
+    }
+    .acc-card__faces { order: 0; }
     .nutrition-log-list {
       list-style: none; margin: 12px 0 0; padding: 0;
       max-height: 160px; overflow: auto;
@@ -6670,8 +6793,8 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-26"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-24"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-31"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-25"></script>
   <script src="/natalyaalice/support.js?v=support-8"></script>
   <script>
     (function () {
@@ -9506,7 +9629,11 @@
       function heutePlanItems() {
         if (!sessionMode || !sessionAccount) return [];
         var today = Log.berlinToday();
-        var days = [today, addDays(today, 1)];
+        var tomorrow = addDays(today, 1);
+        /* 14 Tage voraus — sonst fehlt unter „Alles“ der Wochenplan nach Morgen */
+        var days = [];
+        var di;
+        for (di = 0; di < 14; di++) days.push(addDays(today, di));
         var photos = workoutPhotoMap();
         return days.map(function (iso) {
           var away = awayOn(iso, absenceOf(sessionAccount));
@@ -9534,6 +9661,7 @@
             cat = kind || historyCategoryFromLabel(unit.label);
             note = workoutBlurb(unit, false, "");
           } else {
+            if (iso !== today && iso !== tomorrow) return null;
             title = iso === today ? "Heute frei" : "Morgen frei";
             cat = "kraft";
             place = "";
@@ -9542,19 +9670,21 @@
           var hhmm = time || "12:00";
           if (hhmm.length === 4) hhmm = "0" + hhmm;
           var starts = iso + "T" + hhmm + ":00+01:00";
+          var whenLabel =
+            iso === today ? "Heute" : iso === tomorrow ? "Morgen" : formatLong(iso);
           return {
             id: iso,
             iso: iso,
             user_id: sessionAccount.id,
             starts_at: starts,
-            when: (iso === today ? "Heute" : "Morgen") + (time ? " · " + time : ""),
+            when: whenLabel + (time ? " · " + time : ""),
             title: title,
             note: note,
             photo_url: photos[iso] || "",
             category: cat,
             location: place && place.indexOf("Ort:") === 0 ? place.slice(4).trim() : place
           };
-        });
+        }).filter(Boolean);
       }
 
       var remoteOwnDiaryRows = [];
@@ -10868,6 +10998,9 @@
 
       function goToAktuellShell() {
         if (window.WocheReels) WocheReels.hide();
+        if (window.HeuteAccountability && HeuteAccountability.resetAktuellPaint) {
+          HeuteAccountability.resetAktuellPaint();
+        }
         setHome(true);
         paintWelcome();
         paintHeuteDiaryFeed();
@@ -11132,7 +11265,10 @@
           openStampCardModal: openStampCardModal,
           paintProfil: renderProfil,
           onOffersReady: function () {
-            paintGoRail();
+            if (paintGoRail._t) window.clearTimeout(paintGoRail._t);
+            paintGoRail._t = window.setTimeout(function () {
+              paintGoRail();
+            }, 80);
           },
           openCalendlyPt: typeof openCalendlyPt === "function" ? openCalendlyPt : null,
           startRoutine: function () {
@@ -12202,31 +12338,109 @@
 
       function mountGoZirkelPanels(lbBox, recBox) {
         if (!window.FFC || !FFC.user || !FFC.user()) return;
-        try {
-          if (FFC.refreshTraining) FFC.refreshTraining();
-        } catch (eR) {}
-        var board = document.getElementById("zirkel-board");
-        var records = document.getElementById("zirkel-records");
-        if (lbBox) {
+        function paintLb(rows) {
+          if (!lbBox) return;
           lbBox.textContent = "";
-          if (board && board.childNodes && board.childNodes.length) {
-            lbBox.appendChild(board.cloneNode(true));
-          } else {
-            var lbTable = document.getElementById("lbTable");
-            if (lbTable) lbBox.appendChild(lbTable.cloneNode(true));
-            else lbBox.textContent = "Noch keine Leaderboard-Daten.";
+          if (!rows || !rows.length) {
+            lbBox.textContent = "Noch keine Leaderboard-Daten.";
+            return;
           }
+          rows.forEach(function (r, i) {
+            var row = document.createElement("div");
+            row.className = "go-slide__ffc-row" + (r.is_me ? " is-me" : "");
+            var left = document.createElement("span");
+            left.textContent =
+              String(i + 1) + ". " + (r.nickname || r.name || "Athlet") + (r.is_me ? " · Du" : "");
+            var right = document.createElement("span");
+            var pts = r.points != null ? Number(r.points) : null;
+            right.textContent =
+              pts != null && !isNaN(pts)
+                ? pts.toLocaleString("de-DE") + " P"
+                : String(r.workouts || 0) + " WO";
+            row.appendChild(left);
+            row.appendChild(right);
+            lbBox.appendChild(row);
+          });
         }
-        if (recBox) {
+        function paintRec(rows) {
+          if (!recBox) return;
           recBox.textContent = "";
-          if (records && records.childNodes && records.childNodes.length) {
-            recBox.appendChild(records.cloneNode(true));
-          } else {
-            var hist = document.getElementById("historyList");
-            if (hist) recBox.appendChild(hist.cloneNode(true));
-            else recBox.textContent = "Noch keine Aufzeichnungen.";
+          if (!rows || !rows.length) {
+            recBox.textContent = "Noch keine Aufzeichnungen.";
+            return;
           }
+          rows.slice(0, 12).forEach(function (r) {
+            var row = document.createElement("div");
+            row.className = "go-slide__ffc-row";
+            var left = document.createElement("span");
+            left.textContent = r.title || r.label || r.date || "Training";
+            var right = document.createElement("span");
+            right.textContent = r.meta || r.points || "";
+            row.appendChild(left);
+            if (right.textContent) row.appendChild(right);
+            recBox.appendChild(row);
+          });
         }
+        var lbPromise =
+          FFC.weeklyPoints
+            ? Promise.resolve(FFC.weeklyPoints()).then(function (rows) {
+                paintLb(rows || []);
+              })
+            : Promise.resolve().then(function () {
+                var lbTable = document.getElementById("lbTable");
+                if (!lbBox) return;
+                lbBox.textContent = "";
+                if (!lbTable) {
+                  lbBox.textContent = "Noch keine Leaderboard-Daten.";
+                  return;
+                }
+                Array.prototype.forEach.call(lbTable.querySelectorAll(".lb-row"), function (src) {
+                  var row = document.createElement("div");
+                  row.className = "go-slide__ffc-row";
+                  var name = src.querySelector(".lb-name");
+                  var rank = src.querySelector(".lb-rank");
+                  var stat = src.querySelector(".lb-stat .big");
+                  var left = document.createElement("span");
+                  left.textContent =
+                    ((rank && rank.textContent) || "") +
+                    " " +
+                    ((name && name.childNodes[0] && name.childNodes[0].textContent) ||
+                      (name && name.textContent) ||
+                      "");
+                  var right = document.createElement("span");
+                  right.textContent = (stat && stat.textContent) || "";
+                  row.appendChild(left);
+                  row.appendChild(right);
+                  lbBox.appendChild(row);
+                });
+                if (!lbBox.childNodes.length) lbBox.textContent = "Noch keine Leaderboard-Daten.";
+              });
+        var recPromise = Promise.resolve().then(function () {
+          var hist = document.getElementById("historyList");
+          if (!recBox) return;
+          var rows = [];
+          if (hist) {
+            Array.prototype.forEach.call(
+              hist.querySelectorAll(".history-item, .hist-row, button, li, .record-row"),
+              function (src) {
+                var title =
+                  (src.querySelector &&
+                    (src.querySelector(".history-title, .hist-title, strong, .title") || {})
+                      .textContent) ||
+                  src.getAttribute("aria-label") ||
+                  "";
+                title = String(title || src.textContent || "")
+                  .replace(/\s+/g, " ")
+                  .trim()
+                  .slice(0, 64);
+                if (title) rows.push({ title: title });
+              }
+            );
+          }
+          paintRec(rows);
+        });
+        /* Kein FFC.refreshTraining hier — das flackert die FFC-UI und den Plus-Slide */
+        Promise.all([lbPromise, recPromise]).catch(function () {});
       }
 
       function saveStampCardToWallet() {
@@ -13473,11 +13687,17 @@
         closeFeedbackForm();
       }
 
-      function paintGoRail() {
+      function paintGoRail(force) {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
         rail.hidden = false;
-        rail.textContent = "";
+        var keepLeft = rail.scrollLeft || 0;
+        var keepOffer = "";
+        try {
+          var curSlides = railSlides(rail);
+          var curIx = railCurrentIndex(rail);
+          keepOffer = curSlides[curIx] ? String(curSlides[curIx].dataset.offer || "") : "";
+        } catch (eKeep) {}
         var supportRoot = document.getElementById("support-root");
         if (supportRoot) supportRoot.hidden = true;
         var IMG = {
@@ -13529,6 +13749,47 @@
                   description: "12er-Karte für 25 € Spende — Stempel mit Freunden."
                 }
               ];
+        /* Kein Full-Rebuild wenn Offer-Keys + FFC-Login gleich — verhindert FFC-Flackern */
+        if (!force) {
+          var existing = rail.querySelectorAll(".go-slide");
+          var ffcLoggedNow = !!(window.FFC && FFC.user && FFC.user());
+          var paintedFfc = rail.dataset.ffcLogged || "0";
+          var ffcMismatch =
+            existing.length > 0 && paintedFfc !== (ffcLoggedNow ? "1" : "0");
+          if (!ffcMismatch && existing.length === offers.length) {
+            var same = true;
+            var ei;
+            for (ei = 0; ei < offers.length; ei++) {
+              if (String(existing[ei].dataset.offer || "") !== String(offers[ei].key || "")) {
+                same = false;
+                break;
+              }
+            }
+            if (same) {
+              for (ei = 0; ei < offers.length; ei++) {
+                var of = offers[ei];
+                var ownedNow =
+                  window.GoSupport && GoSupport.offerOwned
+                    ? GoSupport.offerOwned(of.type || of.key)
+                    : false;
+                var isZ = of.key === "zirkel" || of.type === "zirkel";
+                if (isZ && ffcLoggedNow) ownedNow = true;
+                var btn = existing[ei].querySelector(".go-slide__cta");
+                if (!btn) continue;
+                btn.textContent = ownedNow ? "Gebucht ✔️" : "Buchen";
+                btn.disabled = !!ownedNow;
+                btn.classList.toggle("is-owned", !!ownedNow);
+                if (ownedNow) btn.setAttribute("aria-disabled", "true");
+                else btn.removeAttribute("aria-disabled");
+              }
+              syncHScrollDock();
+              syncTeamGoRailNav();
+              return;
+            }
+          }
+        }
+        rail.dataset.ffcLogged = !!(window.FFC && FFC.user && FFC.user()) ? "1" : "0";
+        rail.textContent = "";
         offers.forEach(function (offer) {
           var owned =
             window.GoSupport && GoSupport.offerOwned
@@ -13621,8 +13882,25 @@
           }
           rail.appendChild(card);
         });
-        syncHScrollDock();
-        syncTeamGoRailNav();
+        requestAnimationFrame(function () {
+          /* Snap kurz aus — sonst Korrektur-Sprung nach scrollLeft-Restore */
+          var prevSnap = rail.style.scrollSnapType;
+          rail.style.scrollSnapType = "none";
+          var list = railSlides(rail);
+          var target = null;
+          if (keepOffer) {
+            list.forEach(function (el) {
+              if (String(el.dataset.offer || "") === keepOffer) target = el;
+            });
+          }
+          if (target) rail.scrollLeft = target.offsetLeft;
+          else rail.scrollLeft = keepLeft;
+          requestAnimationFrame(function () {
+            rail.style.scrollSnapType = prevSnap || "";
+            syncHScrollDock();
+            syncTeamGoRailNav();
+          });
+        });
       }
 
       function closeGoSub() {
@@ -15043,6 +15321,13 @@
           else if (tab === "profil") showPlan("profil");
           else {
             if (window.WocheReels) WocheReels.hide();
+            if (
+              tab === "heute" &&
+              window.HeuteAccountability &&
+              HeuteAccountability.resetAktuellPaint
+            ) {
+              HeuteAccountability.resetAktuellPaint();
+            }
             setHome(true);
             paintWelcome();
             paintHeuteDiaryFeed();
@@ -16408,26 +16693,9 @@
         var tomorrow = addDays(today, 1);
         var last = addDays(today, 6);
         var me = String(sessionAccount.id);
+        /* Keine Status-Karte „12-Wochenroutine gestartet“ mehr unter Aktuell —
+           die blockierte den Feed und ist kein Event. Status bleibt im Profil. */
         if (showIncoming) {
-          var started = routineStart();
-          if (started) {
-            var rCard = document.createElement("div");
-            rCard.className = "invite-card";
-            applyWorkoutTone(rCard, { kind: "kraft", systemId: "krafttraining", label: "Einfache Basics" });
-            var rKick = document.createElement("span");
-            rKick.className = "today-card__kicker";
-            rKick.textContent = "Routine";
-            var rTitle = document.createElement("span");
-            rTitle.className = "today-card__title";
-            rTitle.textContent = "12-Wochenroutine gestartet";
-            var rLine = document.createElement("span");
-            rLine.className = "today-card__line";
-            rLine.textContent = "Seit " + formatLong(String(started).slice(0, 10));
-            rCard.appendChild(rKick);
-            rCard.appendChild(rTitle);
-            rCard.appendChild(rLine);
-            box.appendChild(rCard);
-          }
           var seenPt = {};
           remotePtBookings.filter(function (b) {
             return b && String(b.client_id) === me && b.status === "offered";
