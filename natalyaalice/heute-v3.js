@@ -3,6 +3,7 @@
   var host = null;
   var state = {
     events: [],
+    invites: {},
     ffcEvents: [],
     rsvps: {},
     comments: {},
@@ -351,6 +352,50 @@
     return Object.keys(byFp).map(function (k) {
       return byFp[k];
     });
+  }
+
+  /* Eingehende Einladungen (an ein Event gebunden, nicht verfallen) */
+  function loadMyInvites() {
+    var id = me();
+    state.invites = {};
+    if (!id) return Promise.resolve();
+    return rest(
+      "go_workout_invites?to_id=eq." +
+        encodeURIComponent(id) +
+        "&event_id=not.is.null&status=in.(pending,accepted)&workout_date=gte." +
+        encodeURIComponent(todayIso()) +
+        "&select=id,event_id,status,from_id"
+    )
+      .then(function (rows) {
+        (rows || []).forEach(function (r) {
+          if (!r || !r.event_id) return;
+          var key = String(r.event_id);
+          var prev = state.invites[key];
+          if (!prev || r.status === "accepted") state.invites[key] = r;
+        });
+        var have = {};
+        (state.events || []).forEach(function (e) {
+          have[String(e.id)] = true;
+        });
+        var missing = Object.keys(state.invites).filter(function (k) {
+          return !have[k];
+        });
+        if (!missing.length) return null;
+        return rest(
+          "events?id=in.(" +
+            missing.map(encodeURIComponent).join(",") +
+            ")&select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note"
+        ).then(function (rows2) {
+          state.events = (state.events || []).concat(rows2 || []);
+        });
+      })
+      .catch(function () {
+        state.invites = {};
+      });
+  }
+
+  function inviteFor(eventId) {
+    return (state.invites || {})[String(eventId)] || null;
   }
 
   function loadEvents() {
@@ -737,6 +782,12 @@
     var now = Date.now();
     var week = now + 7 * 86400000;
     var t = new Date(ev.starts_at).getTime();
+    var inv = !mine ? inviteFor(ev.id) : null;
+    if (inv && ev.status === "geplant") {
+      /* angenommen: überall wie eigene Zusage; offen: ab Team */
+      if (inv.status === "accepted") return true;
+      return !!flags.showOthersUpcoming;
+    }
     if (ev.status === "geplant") {
       /* Eigene Events von heute bleiben bis Mitternacht sichtbar, damit man sie nachträglich abschließen kann */
       if (mine && t <= week && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString())) return true;
@@ -871,6 +922,12 @@
       return (
         '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
         '<path d="M19 12a7 7 0 1 1-2-4.9"/><path d="M19 5v5h-5"/></svg>'
+      );
+    }
+    if (kind === "invite") {
+      return (
+        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/></svg>'
       );
     }
     if (kind === "spontan") {
@@ -1218,6 +1275,23 @@
 
   function actionRowHtml(opts) {
     var btn = "";
+    if (opts.inviteId) {
+      btn = opts.accepted
+        ? '<button type="button" class="acc-rsvp is-on" disabled>Zugesagt</button>' +
+          '<button type="button" class="acc-tool acc-tool--remove" data-remove-event="' +
+          esc(opts.inviteEventId) +
+          '" data-remove-mode="cancel" aria-label="Absagen">' +
+          '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>' +
+          "</button>"
+        : '<button type="button" class="acc-rsvp" data-accept-invite="' + esc(opts.inviteId) + '">Teilnehmen</button>';
+      return (
+        '<div class="acc-card__actions">' +
+        btn +
+        '<span class="acc-tool-badge acc-tool-badge--right">' +
+        badgeSvg("invite") +
+        "</span></div>"
+      );
+    }
     if (opts.doneBtn) {
       btn =
         '<button type="button" class="acc-rsvp" data-done="' +
@@ -1315,8 +1389,13 @@
     var emoji = emojiFor(ev.category, ev.title);
     var title = (emoji + " " + (ev.title || ev.category)).trim();
     var actions = "";
-    if (upcoming && !mine) {
-      actions = actionRowHtml({ rsvpId: ev.id, going: iAmGoing(ev.id) });
+    var invite = !mine ? inviteFor(ev.id) : null;
+    if (upcoming && !mine && invite) {
+      actions = actionRowHtml({
+        inviteId: invite.id,
+        inviteEventId: ev.id,
+        accepted: invite.status === "accepted"
+      });
     }
     var tools = mine
       ? eventToolRowHtml({
@@ -2273,6 +2352,18 @@
     var ok = global.confirm(cancel ? "Teilnahme absagen?" : "Event löschen? Das lässt sich nicht rückgängig machen.");
     if (!ok) return;
     if (cancel) {
+      var invC = inviteFor(eventId);
+      if (invC) {
+        rest("rpc/go_decline_invite", { method: "POST", body: { p_invite_id: invC.id } })
+          .then(function () {
+            delete state.invites[String(eventId)];
+            return refresh();
+          })
+          .catch(function () {
+            if (host.toast) host.toast("Absagen fehlgeschlagen");
+          });
+        return;
+      }
       if (iAmGoing(eventId)) toggleRsvp(eventId);
       return;
     }
@@ -2871,7 +2962,7 @@
     var invitePost = t.closest("[data-invite-post]");
     if (invitePost) {
       var invIso = invitePost.getAttribute("data-invite-iso") || "";
-      if (host.openInviteForPost) host.openInviteForPost(invIso);
+      if (host.openInviteForPost) host.openInviteForPost(invIso, invitePost.getAttribute("data-invite-post") || "");
       else if (host.openPlanDay && invIso) host.openPlanDay(invIso);
       return;
     }
@@ -2908,6 +2999,20 @@
       else if (typeof global.openNutritionLogModal === "function") {
         global.openNutritionLogModal({ day: nday });
       }
+      return;
+    }
+    var acc = t.closest("[data-accept-invite]");
+    if (acc) {
+      acc.disabled = true;
+      rest("rpc/go_accept_invite", { method: "POST", body: { p_invite_id: acc.getAttribute("data-accept-invite") } })
+        .then(function (res) {
+          if (res === "expired" && host.toast) host.toast("Einladung ist abgelaufen");
+          return refresh();
+        })
+        .catch(function () {
+          acc.disabled = false;
+          if (host.toast) host.toast("Teilnehmen fehlgeschlagen (go-event-invites.sql ausgeführt?)");
+        });
       return;
     }
     var rm = t.closest("[data-remove-event]");
@@ -3004,7 +3109,7 @@
       loadStreak(),
       loadEigenCourse(),
       loadEnrollments(),
-      loadEvents(),
+      loadEvents().then(loadMyInvites),
       loadFfcEvents(),
       loadFfcPosts(),
       histReady
