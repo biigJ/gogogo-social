@@ -3383,6 +3383,34 @@
         return { data, error };
       }catch(err){ return { data:null, error: err }; }
     },
+    /* Passwort liegt nur in FFC-Supabase Auth (auth.users) — nie in go_accounts. */
+    async changePassword(email, currentPassword, newPassword){
+      const mail = String(email || '').trim().toLowerCase();
+      const cur = String(currentPassword || '');
+      const next = String(newPassword || '');
+      if(!mail || !cur || !next) return { error: new Error('missing') };
+      try{
+        const login = await sb.auth.signInWithPassword({ email: mail, password: cur });
+        if(login.error) return { error: login.error };
+        if(login.data && login.data.user) currentUser = login.data.user;
+        const updated = await sb.auth.updateUser({ password: next });
+        if(updated.error) return { error: updated.error };
+        if(updated.data && updated.data.user) currentUser = updated.data.user;
+        return { error: null };
+      }catch(err){ return { error: err }; }
+    },
+    async sendPasswordReset(email){
+      const mail = String(email || '').trim().toLowerCase();
+      if(!mail) return { error: new Error('missing email') };
+      try{
+        const redirectTo = location.origin + (location.pathname.indexOf('/workout') === 0 ? '/workout/' : location.pathname);
+        const { error } = await sb.auth.resetPasswordForEmail(mail, { redirectTo });
+        return { error: error || null };
+      }catch(err){ return { error: err }; }
+    },
+    authErrorMessage(err){
+      return friendlyAuthError(err);
+    },
     async nicknameTaken(nickname){
       const nick = String(nickname || '').trim();
       if(!nick) return { taken:false, error:null };
