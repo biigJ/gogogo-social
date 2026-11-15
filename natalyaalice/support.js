@@ -803,9 +803,8 @@
   function heuteSupportItems() {
     var out = [];
     var today = todayIso();
-    var hour = berlinHour();
 
-    /* Ernährung: 4 Wochen ab Buchungsstart — täglich unter Aktuell */
+    /* Ernährung: nur heute als Karte — Klick öffnet Dialog; 4-Wochen-Fenster steuert Anspruch */
     var nutritionOrder = activeOrderFor("ernaehrung");
     if (nutritionOrder) {
       var start = "";
@@ -814,15 +813,14 @@
       } catch (eStart) {}
       if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) start = today;
       var span = Number((nutritionOrder.meta && nutritionOrder.meta.days) || 28) || 28;
-      var n;
-      for (n = 0; n < span; n++) {
-        var day = addDaysIso(start, n);
+      var end = addDaysIso(start, Math.max(0, span - 1));
+      if (today >= start && today <= end) {
         out.push({
-          id: "nutrition-" + day,
+          id: "nutrition-" + today,
           user_id: me(),
-          starts_at: day + "T19:00:00+01:00",
-          title: "🥗 Ernährung",
-          note: state.nutritionPlan || "Mahlzeiten tracken — Tippe zum Protokoll.",
+          starts_at: today + "T19:00:00+01:00",
+          title: "Ernährung",
+          note: state.nutritionPlan || "Tippe zum Protokollieren.",
           category: "alternative",
           location: "privat",
           item_type: "nutrition_log",
