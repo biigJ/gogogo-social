@@ -427,6 +427,13 @@
         );
       })
       .then(function (rows) {
+        /* Abgesagte Plan-Tage merken, damit der Wochenplan dort nicht wieder auftaucht */
+        state.skippedDays = {};
+        (rows || []).forEach(function (r) {
+          if (r && r.status === "ausgefallen" && String(r.user_id) === String(id)) {
+            state.skippedDays[dayKey(r.starts_at)] = true;
+          }
+        });
         state.events = dedupeEvents(rows || []);
         return mergeEventMediaFromActivity(state.events).then(function () {
           var ids = state.events.map(function (e) {
@@ -1030,7 +1037,23 @@
     return /ernährung|ernaehrung|web-call|web call|initialgespräch|initialgesprach/.test(title);
   }
 
-  function inviteFaceRowHtml(postId, inviteIso, canInvite, eventId) {
+  function inviteFaceRowHtml(postId, inviteIso, canInvite, eventId, ownerId) {
+    /* Fremdes Event: Ersteller vorne, dahinter Zusagen; kein Einladen */
+    if (ownerId && String(ownerId) !== String(me())) {
+      var going = (state.rsvps[String(eventId || postId)] || []).filter(function (id) {
+        return String(id) !== String(ownerId);
+      });
+      return (
+        '<div class="acc-card__faces">' +
+        faceSlotHtml(personOf(ownerId), false) +
+        going
+          .map(function (id) {
+            return faceSlotHtml(personOf(id), false);
+          })
+          .join("") +
+        "</div>"
+      );
+    }
     var mePerson = personOf(me());
     var guests = guestFacesFor(inviteIso, eventId || postId)
       .map(function (g) {
@@ -1115,7 +1138,8 @@
         postId,
         opts.inviteIso || "",
         canInvite,
-        opts.eventId || postId
+        opts.eventId || postId,
+        opts.ownerId || ""
       ) +
       "</div>"
     );
@@ -1127,7 +1151,7 @@
     var postId = opts.postId || eventId;
     var done = !!opts.canDone;
     var isDone = !!opts.isDone;
-    var check =
+    var check = opts.noCheck ? "" :
       '<button type="button" class="acc-tool acc-tool--check' +
       (isDone ? " is-done" : "") +
       '"' +
@@ -1337,6 +1361,7 @@
         eventId: opts.eventId || opts.postId,
         inviteIso: opts.inviteIso || "",
         canInvite: opts.canInvite !== false,
+        ownerId: opts.ownerId || "",
         actions: opts.actions || ""
       });
     } else {
@@ -1407,7 +1432,13 @@
           removeId: ev.id,
           removeMode: "delete"
         })
-      : "";
+      : /* Fremde Events: nur Kommentieren (Einladung hat eigene Zeile) */
+        eventToolRowHtml({
+          eventId: ev.id,
+          postId: String(ev.id),
+          noCheck: true,
+          badge: invite ? "" : eventBadgeKind(ev)
+        });
     return renderCardShell({
       attrs:
         ' data-post-id="' +
@@ -1427,7 +1458,10 @@
       postId: String(ev.id),
       eventId: String(ev.id),
       inviteIso: day,
-      canInvite: isBookedSupportEvent(ev)
+      ownerId: String(ev.user_id || ""),
+      canInvite: !mine
+        ? false
+        : isBookedSupportEvent(ev)
         ? "plus"
         : ev.status === "erledigt"
           ? false
@@ -1464,7 +1498,7 @@
       desc: "",
       postId: postId,
       inviteIso: dayKey(ev.starts_at),
-      canInvite: canInviteOnDay(dayKey(ev.starts_at))
+      canInvite: mine ? canInviteOnDay(dayKey(ev.starts_at)) : false
     });
   }
 
@@ -1526,6 +1560,7 @@
       desc: descHtml(item.note),
       postId: commentKey,
       inviteIso: day,
+      ownerId: String(item.user_id || ""),
       canInvite: false
     });
   }
@@ -1547,7 +1582,9 @@
       postId: postId,
       canDone: false,
       isDone: false,
-      badge: item.category === "zirkel" ? "zirkel" : "plan"
+      badge: item.category === "zirkel" ? "zirkel" : "plan",
+      removeId: item.iso ? "plan:" + item.iso : "",
+      removeMode: "skip"
     });
     return renderCardShell({
       attrs:
@@ -1670,6 +1707,7 @@
             .replace(/\s+/g, " ")
         ].join("|");
         if (coveredDays[day] || coveredFp[fp]) return;
+        if ((state.skippedDays || {})[day]) return;
         var item = {
           kind: "plan",
           starts_at: p.starts_at,
@@ -2349,6 +2387,33 @@
   function removeEvent(eventId, mode) {
     if (!eventId) return;
     var cancel = mode === "cancel";
+    if (mode === "skip") {
+      var skipDay = String(eventId).replace(/^plan:/, "");
+      if (!global.confirm("Training an diesem Tag aus dem Wochenplan nehmen?")) return;
+      rest("events", {
+        method: "POST",
+        prefer: "return=minimal",
+        body: {
+          user_id: me(),
+          category: "alternative",
+          course_id: null,
+          starts_at: skipDay + "T12:00:00+01:00",
+          status: "ausgefallen",
+          title: "Ausgefallen",
+          visibility: "privat",
+          is_unplanned: false
+        }
+      })
+        .then(function () {
+          state.skippedDays = state.skippedDays || {};
+          state.skippedDays[skipDay] = true;
+          return refresh();
+        })
+        .catch(function () {
+          if (host.toast) host.toast("Entfernen fehlgeschlagen");
+        });
+      return;
+    }
     var ok = global.confirm(cancel ? "Teilnahme absagen?" : "Event löschen? Das lässt sich nicht rückgängig machen.");
     if (!ok) return;
     if (cancel) {

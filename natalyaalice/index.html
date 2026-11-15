@@ -1892,6 +1892,10 @@
       display: flex; align-items: flex-end; justify-content: center;
     }
     .wr-sheet[hidden] { display: none !important; }
+    /* Dialog liegt über der Bottom-Pill, Speichern immer erreichbar */
+    body.wr-sheet-open .wr-sheet { position: fixed; z-index: 200; }
+    body.wr-sheet-open .app-pill { visibility: hidden; }
+    body.wr-sheet-open .wr-sheet__card { max-height: 88dvh; padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     .wr-sheet__card {
       width: min(100%, 480px); max-height: 78%; overflow: auto;
       background: #F3EEE4; color: #2A2118; border-radius: 18px 18px 0 0;
@@ -6286,14 +6290,7 @@
       <div class="go-rail" id="go-rail" aria-label="Go Angebote" hidden></div>
       <div id="support-root" class="support-root" aria-label="Support"></div>
       <div class="go-card go-card--routine-plain" id="go-card-routine" hidden>
-        <div class="go-formula" aria-label="Rückzahlungsformel">
-          <span class="go-formula__part">Einzahlung</span>
-          <span class="go-formula__op">×</span>
-          <span class="go-formula__part">0,9</span>
-          <span class="go-formula__op">=</span>
-          <span class="go-formula__part">Rückzahlung</span>
-        </div>
-        <p class="go-card__copy go-card__copy--2line">12 Wochen täglich Events posten — Freunde sehen Dein Commitment. Volle Wochen: Personal Training gratis; 90 % der Einzahlung zurück.</p>
+        <p class="go-card__copy go-card__copy--2line">12 Wochen täglich ein Event posten. Freunde sehen Dein Commitment. Volle Wochen: Personal Training gratis.</p>
       </div>
       <section class="zirkel-block go-card" id="zirkel-block" hidden>
         <h3 class="go-card__title">Zirkeltraining</h3>
@@ -6783,9 +6780,9 @@
   <div class="sand-modal" id="stamp-book-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="stamp-book-title">
       <h2 class="ask" id="stamp-book-title">Stempelkarte</h2>
-      <p class="team-msg">25€ Spende per PayPal an Ben Joscha Grope. Die Stempelkarte ist danach sofort aktiv — Anzeige öffnen und unter Wallet speichern.</p>
+      <p class="team-msg">Gratis und sofort aktiv.</p>
       <p class="team-msg" id="stamp-book-msg"></p>
-      <button type="button" id="stamp-book-pay">25€ spenden &amp; aktivieren</button>
+      <button type="button" id="stamp-book-pay">Aktivieren</button>
       <button type="button" class="sand-quiet" id="stamp-book-show">Nur Anzeige öffnen</button>
       <button type="button" class="sand-quiet" id="stamp-book-cancel">Abbrechen</button>
     </div>
@@ -6793,18 +6790,16 @@
   <div class="sand-modal" id="initial-call-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="initial-call-title">
       <h2 class="ask" id="initial-call-title">Initialgespräch</h2>
-      <p class="team-msg">Triff Joscha für 30 Minuten zu einem Erstgespräch auf Spendenbasis von 25€. Sprich mit Ihm über Deine Trainingsziele, Dein Ressourcen, Deinen Alltag und Herausforderungen. Als Ergebnis fasst er Dir einen Trainingsplan zusammen, der für Deinen Alltag passt.</p>
-      <p class="team-msg">Webmeeting über Calendly buchen. Spende parallel per PayPal an Ben Joscha Grope.</p>
+      <p class="team-msg">Triff Joscha für 30 Minuten zu einem Erstgespräch, gratis. Sprich mit ihm über Deine Trainingsziele, Deine Ressourcen, Deinen Alltag und Herausforderungen. Als Ergebnis fasst er Dir einen Trainingsplan zusammen, der für Deinen Alltag passt. Webmeeting über Calendly.</p>
       <button type="button" id="initial-call-book">Calendly öffnen</button>
-      <button type="button" class="sand-quiet" id="initial-call-pay">25€ per PayPal</button>
       <button type="button" class="sand-quiet" id="initial-call-cancel">Abbrechen</button>
     </div>
   </div>
   <div class="sand-modal" id="nutrition-book-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="nutrition-book-title">
       <h2 class="ask" id="nutrition-book-title">Ernährungscoaching</h2>
-      <p class="team-msg">4 Wochen tägliches Event unter Aktuell. Tracke Deine Mahlzeiten im Dialog — unter Plus findest Du den Button dafür. 25€ Spende per PayPal an Ben Joscha Grope; danach sofort aktiv.</p>
-      <button type="button" id="nutrition-book-pay">25€ spenden &amp; aktivieren</button>
+      <p class="team-msg">4 Wochen tägliches Event unter Aktuell. Tracke Deine Mahlzeiten im Dialog, unter Plus findest Du den Button dafür. Gratis und sofort aktiv.</p>
+      <button type="button" id="nutrition-book-pay">Aktivieren</button>
       <button type="button" class="sand-quiet" id="nutrition-book-track">Tracking öffnen</button>
       <button type="button" class="sand-quiet" id="nutrition-book-cancel">Abbrechen</button>
     </div>
@@ -8768,19 +8763,13 @@
           return;
         }
         var done = routineDoneDays();
-        var deposit = routineDepositEur();
-        var refund = deposit > 0 ? Math.round(deposit * 0.9 * (done / 84) * 100) / 100 : 0;
-        var refundLabel =
-          deposit > 0
-            ? refund.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + "€ zurück"
-            : "—€ zurück";
         el.hidden = false;
         el.innerHTML =
           '<span class="go-routine-status__n">' +
           done +
           "<small>/84 Tage</small></span>" +
           '<span class="go-routine-status__sub">' +
-          refundLabel +
+          (done >= 84 ? "Geschafft: Personal Training gratis" : "Volle Wochen: Personal Training gratis") +
           "</span>";
       }
 
@@ -15598,25 +15587,25 @@
                   key: "stempelkarte",
                   type: "stempelkarte",
                   title: "Stempelkarte",
-                  description: "12er-Stempelkarte für 25€ Spende per PayPal an Ben Joscha Grope. Sofort aktiv — unter Wallet speichern."
+                  description: "12er-Stempelkarte, gratis. Trainierst Du mit einem Freund bei seinem Event, scannst Du seine Karte und bekommst einen Stempel. Volle Karte: T-Shirt oder Selfiestick."
                 },
                 {
                   key: "web_call",
                   type: "web_call",
                   title: "Initialgespräch",
-                  description: "Triff Joscha für 30 Minuten zu einem Erstgespräch auf Spendenbasis von 25€. Webmeeting über Calendly."
+                  description: "Triff Joscha für 30 Minuten zu einem Erstgespräch, gratis. Sprich mit ihm über Deine Trainingsziele, Deine Ressourcen, Deinen Alltag und Herausforderungen. Als Ergebnis fasst er Dir einen Trainingsplan zusammen, der für Deinen Alltag passt. Webmeeting über Calendly."
                 },
                 {
                   key: "routine",
                   type: "routine",
                   title: "12-Wochen-Routine",
-                  description: "Einzahlung × 0,9 = Rückzahlung. 12 Wochen Events — 90 % zurück."
+                  description: "12 Wochen täglich ein Event posten. Freunde sehen Dein Commitment. Volle Wochen: Personal Training gratis."
                 },
                 {
                   key: "ernaehrung",
                   type: "ernaehrung",
                   title: "Ernährungscoaching",
-                  description: "4 Wochen tägliches Event unter Aktuell. Tracking unter Plus. 25€ Spende — sofort aktiv."
+                  description: "4 Wochen tägliches Ernährungs-Event unter Aktuell, gratis. Protokolliere Mahlzeiten im Dialog, Tracking unter Plus. Coach-Feedback und Plan auf Wunsch."
                 },
                 {
                   key: "coach_offer",
@@ -15977,7 +15966,7 @@
           body.appendChild(name);
           var pack = document.createElement("div");
           pack.className = "go-package";
-          pack.innerHTML = "<strong>10 Treffen für 600€</strong><p>Dein Coach schickt Dir ein Angebot. Nach der Annahme wählst Du Termine — Calendly und Supabase bleiben synchron.</p>";
+          pack.innerHTML = "<strong>10 Treffen</strong><p>Dein Coach schickt Dir ein Angebot. Nach der Annahme wählst Du Termine — Calendly und Supabase bleiben synchron.</p>";
           var buy = document.createElement("button");
           buy.type = "button";
           buy.className = "go-slide__cta";
@@ -18475,7 +18464,7 @@
           client_id: sessionAccount.id,
           coach_id: coach.id,
           status: "offered",
-          package_label: "10 Treffen für 600€",
+          package_label: "10 Treffen",
           updated_at: new Date().toISOString()
         };
         return rest("go_pt_bookings", { method: "POST", prefer: "return=representation", body: body }).then(function (rows) {
@@ -19974,7 +19963,6 @@
         }
         function bindBookOffer(type, thenFn) {
           return function () {
-            openPaypalDonate();
             var book =
               window.GoSupport && GoSupport.bookOffer
                 ? GoSupport.bookOffer(type)
@@ -20033,8 +20021,6 @@
             }
           });
         }
-        var initialPay = document.getElementById("initial-call-pay");
-        if (initialPay) initialPay.addEventListener("click", openPaypalDonate);
         var initialCancel = document.getElementById("initial-call-cancel");
         if (initialCancel) initialCancel.addEventListener("click", function () { hideModal("initial-call-modal"); });
 
