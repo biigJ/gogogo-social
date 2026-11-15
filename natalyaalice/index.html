@@ -5209,19 +5209,20 @@
     body.is-session[data-shell="kurse"] #go-rail {
       flex: 1 1 auto;
       width: 100%;
-      min-width: 0; /* flex-Item darf schrumpfen → festes Scrollport */
-      /* height:0 + flex:1 = feste Höhe für nested overflow-y */
+      min-width: 0;
       height: 0;
       max-height: none;
       min-height: 0;
       overflow-x: auto;
       overflow-y: hidden;
-      overscroll-behavior-x: none;
+      overscroll-behavior-x: contain;
       overscroll-behavior-y: contain;
       align-items: stretch;
       gap: 0;
       scroll-snap-type: x mandatory;
       scroll-padding-inline: 0;
+      scroll-behavior: auto;
+      -webkit-overflow-scrolling: touch;
       touch-action: pan-x;
       display: flex !important;
       flex-direction: row !important;
@@ -5238,8 +5239,7 @@
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
-      overscroll-behavior-x: none;
-      /* Native L-R + vertikal — weiches Swipen; Achsen-Lock nur overflow-y */
+      overscroll-behavior-x: contain;
       touch-action: pan-x pan-y;
       padding: 0 0 calc(88px + env(safe-area-inset-bottom, 0px));
       box-sizing: border-box;
@@ -15055,16 +15055,6 @@
         syncRailNav(rail, document.getElementById("go-rail-nav"));
       }
 
-      function unlockGoRailSwipe(rail) {
-        if (!rail) return;
-        rail.dataset.snapLock = "";
-        rail.style.removeProperty("scroll-snap-type");
-        Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (s) {
-          s.style.removeProperty("overflow-y");
-          s.style.removeProperty("touch-action");
-        });
-      }
-
       function jumpToGoOffer(key) {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
@@ -15074,123 +15064,100 @@
           if (String(el.dataset.offer || "") === String(key || "")) idx = i;
         });
         if (idx < 0) return;
-        unlockGoRailSwipe(rail);
+        rail.dataset.snapLock = "";
+        Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (s) {
+          s.style.removeProperty("overflow-y");
+        });
+        /* Snap nie abschalten — sonst bleibt der Rail zwischen Slides hängen */
+        rail.style.removeProperty("scroll-snap-type");
         sizeGoRailSlides(rail);
-        /* Sofort springen — smooth ließ L-R danach tot */
         snapGoRailToIndex(rail, idx, false);
-        unlockGoRailSwipe(rail);
         syncRailNav(rail, document.getElementById("go-rail-nav"));
       }
 
       function bindGoRailHardSnap(rail) {
-        if (!rail) return;
-        if (rail.dataset.hardSnap === "1") return;
+        if (!rail || rail.dataset.hardSnap === "1") return;
         rail.dataset.hardSnap = "1";
         var snapTimer = 0;
         var axis = "";
         var startX = 0;
         var startY = 0;
-        var startLeft = 0;
-        var dragging = false;
 
-        function slides() {
-          return rail.querySelectorAll(".go-slide");
-        }
         function setSlidesOverflowY(value) {
-          Array.prototype.forEach.call(slides(), function (s) {
-            if (value == null || value === "") s.style.removeProperty("overflow-y");
+          Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (s) {
+            if (!value) s.style.removeProperty("overflow-y");
             else s.style.overflowY = value;
           });
         }
-        function clearSnapLock() {
-          rail.dataset.snapLock = "";
-          axis = "";
-          dragging = false;
-          rail.style.removeProperty("scroll-snap-type");
-          setSlidesOverflowY("");
-        }
         function settle() {
-          sizeGoRailSlides(rail);
+          if (rail.dataset.snapLock === "1") return;
+          /* Kein sizeGoRailSlides hier — Breiten-Reset mitten im Scroll lässt es hängen */
           var i = railCurrentIndex(rail);
           var list = railSlides(rail);
           var slide = list[i];
-          if (!slide) {
-            clearSnapLock();
-            return;
-          }
+          if (!slide) return;
           var target = Math.round(slide.offsetLeft);
-          if (Math.abs(rail.scrollLeft - target) <= 1) {
-            clearSnapLock();
+          if (Math.abs(rail.scrollLeft - target) <= 2) {
+            rail.dataset.snapLock = "";
+            setSlidesOverflowY("");
             syncRailNav(rail, document.getElementById("go-rail-nav"));
             return;
           }
           rail.dataset.snapLock = "1";
-          rail.style.scrollSnapType = "none";
           rail.scrollTo({ left: target, behavior: "smooth" });
           window.setTimeout(function () {
             rail.scrollLeft = target;
-            clearSnapLock();
+            rail.dataset.snapLock = "";
+            setSlidesOverflowY("");
             syncRailNav(rail, document.getElementById("go-rail-nav"));
-          }, 300);
+          }, 220);
         }
         function schedule() {
+          if (rail.dataset.snapLock === "1") return;
           window.clearTimeout(snapTimer);
-          snapTimer = window.setTimeout(settle, 60);
+          snapTimer = window.setTimeout(settle, 80);
         }
 
-        /* L-R aktiv steuern — nested overflow-y frisst sonst Gesten nach TOC/Verharren */
         rail.addEventListener(
           "touchstart",
           function (e) {
-            unlockGoRailSwipe(rail);
+            axis = "";
+            rail.dataset.snapLock = "";
+            setSlidesOverflowY("");
             if (!e.touches || !e.touches[0]) return;
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
-            startLeft = rail.scrollLeft;
-            axis = "";
-            dragging = false;
           },
           { passive: true }
         );
         rail.addEventListener(
           "touchmove",
           function (e) {
-            if (!e.touches || !e.touches[0]) return;
+            if (!e.touches || !e.touches[0] || axis) return;
             var dx = e.touches[0].clientX - startX;
             var dy = e.touches[0].clientY - startY;
-            if (!axis) {
-              if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-              axis = Math.abs(dx) > Math.abs(dy) * 1.05 ? "x" : "y";
-              if (axis === "x") {
-                dragging = true;
-                rail.style.scrollSnapType = "none";
-                setSlidesOverflowY("hidden");
-              }
-            }
-            if (axis === "x" && dragging) {
-              e.preventDefault();
-              rail.scrollLeft = startLeft - dx;
-            }
+            if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+            axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+            /* Nur Overflow sperren — Snap bleibt an, kein preventDefault/kein scrollLeft */
+            if (axis === "x") setSlidesOverflowY("hidden");
           },
-          { passive: false }
+          { passive: true }
         );
-        function endTouch() {
-          if (axis === "x") schedule();
-          else clearSnapLock();
-        }
-        rail.addEventListener("touchend", endTouch, { passive: true });
-        rail.addEventListener("touchcancel", endTouch, { passive: true });
         rail.addEventListener(
-          "scroll",
+          "touchend",
           function () {
-            if (dragging) return;
             schedule();
           },
           { passive: true }
         );
+        rail.addEventListener("touchcancel", schedule, { passive: true });
+        rail.addEventListener("scroll", schedule, { passive: true });
+        if ("onscrollend" in window) {
+          rail.addEventListener("scrollend", settle, { passive: true });
+        }
         window.addEventListener("resize", function () {
           if (document.body.dataset.shell !== "kurse") return;
-          clearSnapLock();
+          rail.dataset.snapLock = "";
           sizeGoRailSlides(rail);
           snapGoRailToIndex(rail, railCurrentIndex(rail), false);
         });
