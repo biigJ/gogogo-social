@@ -444,6 +444,8 @@
       font-size: 14px;
       margin-top: 16px;
     }
+    .finish-workout { background: #111; color: #fff; border-color: #111; }
+    .finish-workout:disabled { opacity: .5; }
     .reset {
       width: 100%;
       margin-top: 18px;
@@ -7072,6 +7074,7 @@
 
     <section id="panel-workout" role="tabpanel" aria-labelledby="tab-workout">
       <div id="list"></div>
+      <button type="button" id="finish-workout" class="reset finish-workout">Fertig</button>
       <button type="button" id="reset-workout" class="reset">Alles Löschen und Neustart</button>
     </section>
 
@@ -8514,6 +8517,50 @@
         document.getElementById("done-ok").focus();
       }
 
+      /* Trainingsplan: Workout machen, dann "Fertig" → Tag im Tagebuch + geplantes Event erledigt */
+      function finishWorkoutNow() {
+        var btn = document.getElementById("finish-workout");
+        var label = String((document.getElementById("workout-title") || {}).textContent || "Training").trim();
+        btn.disabled = true;
+        celebratedDate = date;
+        finishWheel();
+        markDiaryMove(date, label);
+        var job = Promise.resolve();
+        if (sessionMode && sessionAccount && sessionAccount.id) {
+          job = rest(
+            "events?user_id=eq." + encodeURIComponent(sessionAccount.id) +
+              "&status=eq.geplant&category=in.(kraft,ausdauer,alternative)" +
+              "&starts_at=gte." + encodeURIComponent(date + "T00:00:00+01:00") +
+              "&starts_at=lt." + encodeURIComponent(addDays(date, 1) + "T00:00:00+01:00") +
+              "&select=id,title&order=starts_at.asc"
+          ).then(function (rows) {
+            rows = rows || [];
+            var hit = rows.filter(function (r) { return String(r.title || "").trim() === label; })[0] || rows[0];
+            if (!hit) return;
+            return rest("events?id=eq." + encodeURIComponent(hit.id), {
+              method: "PATCH",
+              prefer: "return=minimal",
+              body: { status: "erledigt" }
+            });
+          });
+        }
+        job.catch(function () {}).then(function () {
+          btn.disabled = false;
+          try {
+            if (window.WocheReels && WocheReels.refresh) WocheReels.refresh();
+          } catch (eW) {}
+          try {
+            if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
+          } catch (eH) {}
+          if (sessionMode && !linkedNatalya) {
+            var first = String((sessionAccount && sessionAccount.name) || "").split(" ")[0];
+            document.getElementById("done-title").textContent = "Stark" + (first ? ", " + first : "") + ".";
+          }
+          doneModal.hidden = false;
+          document.getElementById("done-ok").focus();
+        });
+      }
+
       function closeDone(openSummary) {
         doneModal.hidden = true;
         if (openSummary) document.getElementById("wa-modal").hidden = false;
@@ -8570,6 +8617,7 @@
       doneModal.addEventListener("click", function (event) {
         if (event.target === doneModal) closeDone(true);
       });
+      document.getElementById("finish-workout").addEventListener("click", finishWorkoutNow);
       document.getElementById("reset-workout").addEventListener("click", askReset);
       document.getElementById("reset-cancel").addEventListener("click", closeReset);
       document.getElementById("reset-confirm").addEventListener("click", resetWorkout);
@@ -12203,8 +12251,14 @@
           syncStatusFade: syncStatusFade,
           kraftChoices: kraftChoices,
           ausdauerChoices: ausdauerChoices,
+          /* Gleiche Regel wie Plus „Gebucht“: Buchung, FFC-Login oder vom Coach zugewiesen */
           hasZirkelAccess: function () {
-            return !!(trainerZirkel || (typeof userOwned !== "undefined" && !userOwned && trainerZirkel));
+            if (trainerZirkel) return true;
+            try {
+              if (window.FFC && FFC.user && FFC.user()) return true;
+              if (window.GoSupport && GoSupport.offerOwned && GoSupport.offerOwned("zirkel")) return true;
+            } catch (eZa) {}
+            return false;
           },
           loadInvites: function () {
             return loadInvites().then(function () {
