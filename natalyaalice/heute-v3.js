@@ -871,6 +871,14 @@
     return out;
   }
 
+  function isBookedSupportEvent(ev) {
+    if (!ev) return false;
+    var t = String(ev.item_type || "");
+    if (t === "nutrition_log" || t === "support_session") return true;
+    var title = String(ev.title || "").toLowerCase();
+    return /ernährung|ernaehrung|web-call|web call|initialgespräch|initialgesprach/.test(title);
+  }
+
   function inviteFaceRowHtml(postId, inviteIso, canInvite, eventId) {
     var mePerson = personOf(me());
     var guests = guestFacesFor(inviteIso, eventId || postId)
@@ -881,14 +889,18 @@
         );
       })
       .join("");
-    var add =
-      canInvite !== false && canInviteOnDay(inviteIso)
-        ? '<button type="button" class="acc-face acc-face--add" data-invite-post="' +
-          esc(postId || "") +
-          '" data-invite-iso="' +
-          esc(inviteIso || "") +
-          '" aria-label="Einladen">+</button>'
-        : "";
+    var add = "";
+    if (canInvite === "plus") {
+      add =
+        '<button type="button" class="acc-card__plus-label" data-shell-plus="1" aria-label="Plus">Plus</button>';
+    } else if (canInvite !== false && canInviteOnDay(inviteIso)) {
+      add =
+        '<button type="button" class="acc-face acc-face--add" data-invite-post="' +
+        esc(postId || "") +
+        '" data-invite-iso="' +
+        esc(inviteIso || "") +
+        '" aria-label="Einladen">+</button>';
+    }
     return (
       '<div class="acc-card__faces">' +
       faceSlotHtml(mePerson, false) +
@@ -1219,7 +1231,7 @@
       postId: String(ev.id),
       eventId: String(ev.id),
       inviteIso: day,
-      canInvite: canInviteOnDay(day)
+      canInvite: isBookedSupportEvent(ev) ? "plus" : canInviteOnDay(day)
     });
   }
 
@@ -1343,16 +1355,62 @@
     var coveredDays = {};
     var coveredFp = {};
 
+    var nutritionDays = {};
     pack.upcoming.forEach(function (ev) {
-      var item = {
-        kind: "event",
-        starts_at: ev.starts_at,
-        _mine: String(ev.user_id) === me(),
-        ev: ev
-      };
-      if (item._mine) {
-        coveredDays[dayKey(ev.starts_at)] = true;
-        coveredFp[eventFingerprint(ev)] = true;
+      var supportLike = isBookedSupportEvent(ev);
+      var item;
+      if (
+        ev.item_type === "nutrition_log" ||
+        (supportLike && /ernährung|ernaehrung/i.test(String(ev.title || "")))
+      ) {
+        nutritionDays[dayKey(ev.starts_at)] = true;
+        item = {
+          kind: "nutrition",
+          starts_at: ev.starts_at,
+          _mine: String(ev.user_id) === me(),
+          item: {
+            id: ev.id,
+            user_id: ev.user_id,
+            starts_at: ev.starts_at,
+            title: ev.title || "Ernährung",
+            note: ev.note || "",
+            category: "alternative",
+            location: ev.location || "privat",
+            item_type: "nutrition_log",
+            nutrition: true,
+            photo_url: ev.photo_url || ""
+          }
+        };
+      } else if (supportLike) {
+        item = {
+          kind: "support",
+          starts_at: ev.starts_at,
+          _mine: String(ev.user_id) === me(),
+          item: {
+            id: ev.id,
+            user_id: ev.user_id,
+            starts_at: ev.starts_at,
+            title: ev.title || "Support",
+            note: ev.note || "",
+            category: ev.category || "alternative",
+            location: ev.location || "",
+            item_type: ev.item_type || "support_session",
+            supportType: ev.item_type || "support_session",
+            photo_url: ev.photo_url || ""
+          }
+        };
+      } else {
+        item = {
+          kind: "event",
+          starts_at: ev.starts_at,
+          _mine: String(ev.user_id) === me(),
+          ev: ev
+        };
+        /* Support/Ernährung decken den Trainingstag nicht ab — zusätzlich chronologisch */
+        if (item._mine) {
+          coveredDays[dayKey(ev.starts_at)] = true;
+          coveredFp[eventFingerprint(ev)] = true;
+        }
       }
       if (item._mine && dayKey(ev.starts_at) === today) myToday.push(item);
       else upcoming.push(item);
@@ -1361,6 +1419,7 @@
     /* Erledigt/Historie deckt den Tag ebenfalls ab — sonst kehrt der Plan-Ghost zurück */
     pack.past.forEach(function (ev) {
       if (String(ev.user_id) !== me()) return;
+      if (isBookedSupportEvent(ev)) return;
       coveredDays[dayKey(ev.starts_at)] = true;
       coveredFp[eventFingerprint(ev)] = true;
     });
@@ -1391,17 +1450,19 @@
       });
     }
 
-    /* Support / Ernährung / PT / Web-Call (GoSupport) */
+    /* Support / Ernährung / PT / Web-Call (GoSupport) — ohne Duplikate zu echten Events */
     if (host && host.heuteSupportItems) {
       (host.heuteSupportItems() || []).forEach(function (s) {
         if (!s || !s.starts_at) return;
+        var day = dayKey(s.starts_at);
+        if (s.nutrition && nutritionDays[day]) return;
         var item = {
           kind: s.nutrition ? "nutrition" : "support",
           starts_at: s.starts_at,
           _mine: true,
           item: s
         };
-        if (dayKey(s.starts_at) === today) myToday.push(item);
+        if (day === today) myToday.push(item);
         else upcoming.push(item);
       });
     }
@@ -1489,32 +1550,38 @@
       photo: item.photo_url || "",
       emoji: emoji,
       author: authorHtml(personOf(me()), false),
-      when: whenLine(item.starts_at),
+      when: whenLine(item.starts_at) + " · privat",
       title: item.title || "Support",
       place: item.location || "",
       desc: descHtml(item.note),
       postId: String(item.id),
+      inviteIso: dayKey(item.starts_at),
+      canInvite: "plus",
       actions: ""
     });
   }
 
   function renderNutritionCard(item) {
-    var form =
-      '<form class="acc-nutrition-form" data-nutrition-form="1">' +
-      '<textarea maxlength="500" placeholder="Abendessen diktieren oder tippen (privat)…" enterkeyhint="done" autocomplete="off"></textarea>' +
-      '<button type="submit">Speichern</button></form>';
+    var day = dayKey(item.starts_at);
     return renderCardShell({
       extraClass: "acc-card--nutrition",
-      attrs: ' data-post-id="' + esc(item.id) + '" data-nutrition="1"',
+      attrs:
+        ' data-post-id="' +
+        esc(item.id) +
+        '" data-nutrition="1" data-nutrition-day="' +
+        esc(day) +
+        '" role="button" tabindex="0"',
       category: "alternative",
       emoji: "🥗",
-      when: "Heute · ab 19:00 · privat",
+      when: whenLine(item.starts_at) + " · privat",
       title: "Ernährung",
       place: "Coach-Plan",
-      desc:
-        (item.note
-          ? '<p class="acc-card__desc">' + esc(item.note) + "</p>"
-          : "") + form,
+      desc: item.note
+        ? '<p class="acc-card__desc">' + esc(item.note) + "</p>"
+        : '<p class="acc-card__desc">Tippe zum Protokollieren.</p>',
+      postId: String(item.id),
+      inviteIso: day,
+      canInvite: "plus",
       actions: ""
     });
   }
@@ -2476,6 +2543,26 @@
     var spontan = t.closest("[data-spontan]");
     if (spontan) {
       if (host.openGoPick) host.openGoPick();
+      return;
+    }
+    var plusLabel = t.closest("[data-shell-plus]");
+    if (plusLabel) {
+      if (host.openPlusTab) host.openPlusTab();
+      else if (host.showShell) host.showShell("kurse");
+      return;
+    }
+    var nutritionCard = t.closest("[data-nutrition]");
+    if (
+      nutritionCard &&
+      !t.closest(".acc-card__bar") &&
+      !t.closest(".acc-comments") &&
+      !t.closest("[data-shell-plus]")
+    ) {
+      var nday = nutritionCard.getAttribute("data-nutrition-day") || todayIso();
+      if (host.openNutritionLogModal) host.openNutritionLogModal({ day: nday });
+      else if (typeof global.openNutritionLogModal === "function") {
+        global.openNutritionLogModal({ day: nday });
+      }
       return;
     }
     var done = t.closest("[data-done]");

@@ -1000,10 +1000,8 @@
         (it.ev.travel_auto || it.ev.item_type === "hotel_workout")
       );
     });
-    /* Reise: Wochenplan zusätzlich im Reel zeigen, auch wenn schon Alternative da ist */
-    var wantPlan =
-      (!hasOwn && host && host.planItemForDay) ||
-      (travelDayActive(iso) && hasTravelAlt && !hasOwnTraining && host && host.planItemForDay);
+    /* Reise: wenn Alternative da ist, Original-Plan nicht parallel zeigen */
+    var wantPlan = !hasOwn && !hasTravelAlt && host && host.planItemForDay;
     if (wantPlan) {
       var plan = host.planItemForDay(iso);
       if (plan && plan.title) {
@@ -3125,7 +3123,9 @@
       return;
     }
     if (t.getAttribute("data-wr-travel")) {
-      openTravelMenu();
+      /* Drehrad statt Multiple-Choice; bei aktiver Reise: Abbruch-Menü */
+      if (travelActive()) openTravelMenu();
+      else openTravelSheet();
       return;
     }
     if (t.closest && t.closest("[data-wr-nutrition-open], [data-wr-nutrition]")) {
@@ -3726,7 +3726,8 @@
     ]).then(function () {
       if (armedTravel) {
         try {
-          openTravelMenu();
+          if (travelActive()) openTravelMenu();
+          else openTravelSheet();
         } catch (eT) {}
       }
     });
