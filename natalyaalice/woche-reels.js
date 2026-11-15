@@ -221,25 +221,24 @@
 
   /* Zirkel-Einstellungen liegen in events.note: "zirkel:team|work=240|pause=30|rounds=7" */
   function parseZirkelNote(note) {
-    var s = String(note || "");
-    if (s.indexOf("zirkel:") !== 0) return null;
-    var parts = s.slice(7).split("|");
-    var out = { mode: parts[0] === "team" ? "team" : "standard", workSec: 240, restSec: 30, rounds: 7 };
-    parts.slice(1).forEach(function (kv) {
-      var i = kv.indexOf("="), k = kv.slice(0, i), v = Number(kv.slice(i + 1));
-      if (isNaN(v)) return;
-      if (k === "work") out.workSec = v;
-      if (k === "pause") out.restSec = v;
-      if (k === "rounds") out.rounds = v;
-    });
-    return out;
+    return GoZirkelSetup.parse(note);
   }
 
   function zirkelLabel(z) {
-    if (!z) return "";
-    var m = Math.floor(z.workSec / 60), sec = z.workSec % 60;
-    var work = m ? m + ":" + (sec < 10 ? "0" : "") + sec + " min" : sec + " s";
-    return z.rounds + " Runden · " + work + " · " + z.restSec + " s Pause · " + (z.mode === "team" ? "Team" : "Standard");
+    return GoZirkelSetup.label(z);
+  }
+
+  /* Admin = Ersteller: am Eventtag Start anhalten oder sofort freigeben */
+  function zirkelAdminHtml(ev, z, iso) {
+    if (!z || !ev || String(ev.user_id) !== String(me())) return "";
+    if (ev.status === "erledigt" || iso !== berlinToday()) return "";
+    var held = z.hold && !z.goAt;
+    return (
+      '<button type="button" class="go-online-cta go-online-cta--ghost" data-wr-zadmin="' +
+      (held ? "go" : "hold") + '" data-id="' + esc(ev.id) + '">' +
+      (held ? "Jetzt starten" : "Start anhalten") +
+      "</button>"
+    );
   }
 
   function zirkelCountdownHtml(startsAt) {
@@ -1280,7 +1279,11 @@
       String(ev.item_type || "") === "nutrition_log" ||
       /ernährung|ernaehrung/i.test(String(ev.title || ""));
     var isZirkel = cat === "zirkel" || /zirkel/i.test(String(ev.title || ""));
-    var cd = isZirkel ? zirkelCountdownHtml(ev.starts_at) : "";
+    var cd = isZirkel
+      ? zSet && zSet.hold && !zSet.goAt
+        ? '<p class="wr-zirkel-cd">Start angehalten</p>'
+        : zirkelCountdownHtml(zSet && zSet.goAt ? new Date(zSet.goAt).toISOString() : ev.starts_at)
+      : "";
     return (
       '<div class="wr-slide' +
       (isNutrition ? " is-nutrition" : "") +
@@ -1317,6 +1320,10 @@
       esc(title) +
       "</h2>" +
       desc +
+      (zSet && zSet.online
+        ? '<button type="button" class="go-online-cta" data-wr-zirkel-go="1">Online mitmachen</button>'
+        : "") +
+      zirkelAdminHtml(ev, zSet, iso) +
       (going
         ? '<div class="wr-going">' + facesHtml(ev) + "</div>"
         : "") +
@@ -2271,15 +2278,20 @@
   function openCreateTimeSheet() {
     var p = state.pendingCreate;
     if (!p) return;
+    var isZ = p.kind === "zirkel";
+    var placeHtml =
+      '<div id="wr-create-place-picker"><label class="wr-field">Ort<input type="text" id="wr-create-place" maxlength="80" value="' +
+      esc(p.place || "") +
+      '" /></label></div>';
     openSheet(
       "<h3>" +
         esc(p.title || "Uhrzeit") +
         "</h3>" +
-        '<p class="wr-sheet-hint">Ort und Uhrzeit</p>' +
-        '<div id="wr-create-place-picker"><label class="wr-field">Ort<input type="text" id="wr-create-place" maxlength="80" value="' +
-        esc(p.place || "") +
-        '" /></label></div>' +
-        timeWheelHtml("18:00") +
+        '<p class="wr-sheet-hint">' + (isZ ? "Uhrzeit und Ort" : "Ort und Uhrzeit") + "</p>" +
+        (isZ ? timeWheelHtml("18:00") + placeHtml : placeHtml + timeWheelHtml("18:00")) +
+        (isZ
+          ? '<label class="gz-online"><input type="checkbox" id="wr-z-online" /> Optional: online mitmachen</label>'
+          : "") +
         '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-create-confirm="1">Speichern</button>' +
         '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
     );
@@ -2298,6 +2310,8 @@
     if (!p || !p.iso) return Promise.resolve();
     syncTimeWheelFromScroll();
     p.place = pickedPlaceName("wr-create-place") || p.place || "";
+    var onlineEl = $("wr-z-online");
+    if (onlineEl) p.zOnline = !!onlineEl.checked;
     rememberPickedPlace();
     var wheel = $("wr-time-wheel");
     var h = wheel ? Number(wheel.getAttribute("data-h") || 18) : 18;
@@ -2387,25 +2401,17 @@
     }
 
     if (p.kind === "zirkel") {
-      /* Nur Standard | Team in gogogo — FFC-Logik schon beim Event */
-      var zMode = p.zMode === "team" ? "team" : "standard";
-      var zGroup = "";
-      try {
-        if (zMode === "team" && global.FFC && FFC.leaderboardScope) {
-          var gid = FFC.leaderboardScope();
-          if (gid != null && gid !== "") zGroup = "|group=" + String(gid);
+      var zNote = GoZirkelSetup.toNote(
+        {
+          workSec: p.zWork || 240,
+          restSec: p.zPause != null ? p.zPause : 30,
+          rounds: p.zRounds || 6,
+          online: !!p.zOnline,
+          mode: p.zMode,
+          partnerId: p.zPartnerId || "",
+          partnerName: p.zPartnerName || ""
         }
-      } catch (eZg) {}
-      var zNote =
-        "zirkel:" +
-        zMode +
-        "|work=" +
-        (p.zWork || 240) +
-        "|pause=" +
-        (p.zPause != null ? p.zPause : 30) +
-        "|rounds=" +
-        (p.zRounds || 7) +
-        zGroup;
+      );
       var zBody = {
         category: "zirkel",
         course_id: p.courseId || null,
@@ -2419,7 +2425,28 @@
         travel_auto: false,
         status: "geplant"
       };
-      if (p.courseId) return saveOrReplace(zBody);
+      function invitePartner() {
+        if (!p.zPartnerId) return;
+        var mine = (state.events || []).filter(function (e) {
+          return e.category === "zirkel" && e.note === zNote && dayKey(e.starts_at) === keepIso;
+        })[0];
+        return rest("go_workout_invites", {
+          method: "POST",
+          prefer: "return=minimal",
+          body: {
+            from_id: me(),
+            to_id: p.zPartnerId,
+            workout_date: keepIso,
+            workout_label: "Zirkeltraining Double",
+            from_name: (host.sessionAccount && host.sessionAccount.name) || "gogogo",
+            place: placeVal || "",
+            meet_time: pad2(h) + ":" + pad2(m),
+            status: "pending",
+            event_id: replaceId ? String(replaceId) : mine ? String(mine.id) : null
+          }
+        }).catch(function () {});
+      }
+      if (p.courseId) return saveOrReplace(zBody).then(invitePartner);
       return ensureCourseByDef({
         slug: "training-zirkel",
         title: "Zirkeltraining",
@@ -2431,7 +2458,7 @@
           return;
         }
         zBody.course_id = course.id;
-        return saveOrReplace(zBody);
+        return saveOrReplace(zBody).then(invitePartner);
       });
     }
 
@@ -2521,24 +2548,25 @@
         courseId: courseId || null,
         enrollmentId: en && en.id,
         replaceId: replaceId,
-        zMode: "standard",
+        zMode: "single",
         zWork: 240,
         zPause: 30,
-        zRounds: 7
+        zRounds: 6
       };
-      openSheet(
-        "<h3>Zirkeltraining festlegen</h3>" +
-          '<p class="wr-sheet-hint">Modus, Runden und Pausen — Startuhrzeit danach.</p>' +
-          '<div class="wr-chips">' +
-          '<button type="button" class="wr-chip is-on" data-wr-zmode="standard">Standard</button>' +
-          '<button type="button" class="wr-chip" data-wr-zmode="team">Team</button>' +
-          "</div>" +
-          '<label class="wr-field">Runden<input type="number" id="wr-z-rounds" min="1" max="30" value="7" /></label>' +
-          '<label class="wr-field">Rundenzeit (Sek.)<input type="number" id="wr-z-work" min="10" max="900" value="240" /></label>' +
-          '<label class="wr-field">Pause (Sek.)<input type="number" id="wr-z-pause" min="0" max="300" value="30" /></label>' +
-          '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zirkel-next="1">Weiter zur Uhrzeit</button>' +
-          '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
-      );
+      loadFriends().then(function () {
+        var friends = (state.friends || []).map(function (fid) {
+          return personOf(fid);
+        });
+        openSheet(
+          "<h3>Zirkeltraining</h3>" +
+            GoZirkelSetup.html({ mode: "single" }, { friends: friends }) +
+            '<button type="button" class="wr-pill-btn wr-pill-btn--dark gz-next" data-wr-zirkel-next="1">Weiter</button>' +
+            '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+        );
+        requestAnimationFrame(function () {
+          GoZirkelSetup.bind(document.querySelector(".wr-sheet"));
+        });
+      });
       return;
     }
 
@@ -2925,6 +2953,7 @@
       item_type: payload.item_type || (payload.is_unplanned ? "spontaneous" : "event"),
       travel_auto: !!payload.travel_auto
     };
+    if (payload.note) body.note = payload.note;
     return rest("events", {
       method: "POST",
       prefer: "return=representation",
@@ -3310,7 +3339,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -3340,32 +3369,30 @@
       }
       return;
     }
+    if (t.getAttribute("data-wr-zadmin")) {
+      if (!global.GoZirkelSync) return;
+      var zAct = t.getAttribute("data-wr-zadmin");
+      t.disabled = true;
+      GoZirkelSync.admin(t.getAttribute("data-id"), zAct)
+        .then(function () {
+          if (host.toast) host.toast(zAct === "go" ? "Start in 10 Sekunden" : "Start angehalten");
+          return refreshKeepDay(berlinToday());
+        })
+        .catch(function () {
+          t.disabled = false;
+          if (host.toast) host.toast("Hat nicht geklappt");
+        });
+      return;
+    }
     if (t.getAttribute("data-wr-zirkel-next")) {
       if (!state.pendingCreate) return;
-      var workEl = $("wr-z-work");
-      var pauseEl = $("wr-z-pause");
-      var roundsEl = $("wr-z-rounds");
-      state.pendingCreate.zWork = Math.max(10, Math.min(900, Number(workEl && workEl.value) || 240));
-      state.pendingCreate.zPause = Math.max(0, Math.min(300, Number(pauseEl && pauseEl.value) || 0));
-      state.pendingCreate.zRounds = Math.max(1, Math.min(30, Number(roundsEl && roundsEl.value) || 7));
-      if (state.pendingCreate.zMode === "team") {
-        var hasGroup = false;
-        try {
-          hasGroup = !!(global.FFC && FFC.leaderboardScope && FFC.leaderboardScope() != null);
-        } catch (eTg) {}
-        if (!hasGroup) {
-          if (host.toast) {
-            host.toast("Team-Modus: zuerst unter Plus/FFC eine Gruppe zuordnen.");
-          }
-          return;
-        }
-        try {
-          if (global.FFC && FFC.setupMode && FFC.setupMode() !== "team") {
-            /* Event-Team → FFC-Setup auf Team spiegeln */
-            localStorage.setItem("ffc_mode", "team");
-          }
-        } catch (eMode) {}
-      }
+      var zRead = GoZirkelSetup.read(t.closest(".wr-sheet") || document);
+      state.pendingCreate.zMode = zRead.mode;
+      state.pendingCreate.zWork = zRead.workSec;
+      state.pendingCreate.zPause = zRead.restSec;
+      state.pendingCreate.zRounds = zRead.rounds;
+      state.pendingCreate.zPartnerId = zRead.partnerId;
+      state.pendingCreate.zPartnerName = zRead.partnerName;
       openCreateTimeSheet();
       return;
     }
@@ -3386,13 +3413,14 @@
       }
       return;
     }
-    if (t.closest && t.closest("[data-wr-zirkel-open]")) {
+    if (t.getAttribute("data-wr-zirkel-go") || (t.closest && t.closest("[data-wr-zirkel-open]"))) {
       var slideZ = t.closest(".wr-slide");
       var evZ = slideZ ? slideZ.getAttribute("data-event-id") : "";
       var evObjZ = (state.events || []).filter(function (e) {
         return String(e.id) === String(evZ);
       })[0];
       var presetZ = evObjZ ? parseZirkelNote(evObjZ.note) : null;
+      if (presetZ) presetZ.eventId = String(evZ);
       if (host && typeof host.openZirkelWorkout === "function") {
         host.openZirkelWorkout(evZ, presetZ);
       } else if (host && typeof host.requireFfc === "function") {

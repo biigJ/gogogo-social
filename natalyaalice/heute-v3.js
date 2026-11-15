@@ -217,25 +217,165 @@
 
   /* Zirkel-Einstellungen liegen in events.note: "zirkel:team|work=240|pause=30|rounds=7" */
   function parseZirkelNote(note) {
-    var s = String(note || "");
-    if (s.indexOf("zirkel:") !== 0) return null;
-    var parts = s.slice(7).split("|");
-    var out = { mode: parts[0] === "team" ? "team" : "standard", workSec: 240, restSec: 30, rounds: 7 };
-    parts.slice(1).forEach(function (kv) {
-      var i = kv.indexOf("="), k = kv.slice(0, i), v = Number(kv.slice(i + 1));
-      if (isNaN(v)) return;
-      if (k === "work") out.workSec = v;
-      if (k === "pause") out.restSec = v;
-      if (k === "rounds") out.rounds = v;
-    });
-    return out;
+    return global.GoZirkelSetup ? GoZirkelSetup.parse(note) : null;
   }
 
   function zirkelLabel(z) {
-    if (!z) return "";
-    var m = Math.floor(z.workSec / 60), sec = z.workSec % 60;
-    var work = m ? m + ":" + (sec < 10 ? "0" : "") + sec + " min" : sec + " s";
-    return z.rounds + " Runden · " + work + " · " + z.restSec + " s Pause · " + (z.mode === "team" ? "Team" : "Standard");
+    return global.GoZirkelSetup ? GoZirkelSetup.label(z) : "";
+  }
+
+  /* CTA unter Zirkel-Events mit Option "online mitmachen" */
+  function onlineCtaHtml(ev) {
+    var z = parseZirkelNote(ev && ev.note);
+    if (!z || !z.online || ev.status === "erledigt") return "";
+    return (
+      '<button type="button" class="go-online-cta" data-online-join="' +
+      esc(ev.id) +
+      '">Online mitmachen</button>'
+    );
+  }
+
+  function joinOnline(eventId) {
+    var ev = (state.events || []).filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    if (!ev) return;
+    var z = parseZirkelNote(ev.note);
+    var start = new Date(ev.starts_at).getTime();
+    var live = isFinite(start) && Date.now() >= start - 10 * 60000;
+    var mine = String(ev.user_id) === String(me());
+    if (!mine && !iAmGoing(eventId)) toggleRsvp(eventId);
+    if (live) {
+      if (host.openZirkel) host.openZirkel(Object.assign({ eventId: String(ev.id) }, z));
+      return;
+    }
+    if (host.toast) host.toast("Du bist online dabei. Zum Start hier wieder tippen.");
+  }
+
+  /* Zirkel Double: Paare unter dem Event; Ersteller-Partner steht in der Note */
+  function zirkelPairs(ev) {
+    var z = parseZirkelNote(ev && ev.note);
+    if (!z || z.mode !== "double") return null;
+    var eid = String(ev.id);
+    var owner = String(ev.user_id || "");
+    var going = (state.rsvps[eid] || []).slice();
+    var partners = (state.rsvpPartner && state.rsvpPartner[eid]) || {};
+    var used = {};
+    var pairs = [];
+    used[owner] = true;
+    if (z.partnerId) used[String(z.partnerId)] = true;
+    pairs.push([personOf(owner).name, z.partnerName || (z.partnerId ? personOf(z.partnerId).name : "")]);
+    going.forEach(function (uid) {
+      if (used[uid]) return;
+      used[uid] = true;
+      var p = partners[uid];
+      if (p && p.id && going.indexOf(p.id) >= 0 && !used[p.id]) {
+        used[p.id] = true;
+        pairs.push([personOf(uid).name, personOf(p.id).name]);
+        return;
+      }
+      if (p && p.id && going.indexOf(p.id) >= 0) return;
+      pairs.push([personOf(uid).name, p ? p.name || (p.id ? personOf(p.id).name : "") : ""]);
+    });
+    return { pairs: pairs, mine: partners[me()], going: going, owner: owner, ownerPartner: z.partnerId || "" };
+  }
+
+  function zirkelPairsHtml(ev) {
+    var info = zirkelPairs(ev);
+    if (!info) return "";
+    var line = info.pairs
+      .map(function (pr) {
+        return pr[1] ? esc(pr[0]) + " &amp; " + esc(pr[1]) : esc(pr[0]) + " sucht Partner";
+      })
+      .join(" · ");
+    var meId = me();
+    var iGo = info.going.indexOf(meId) >= 0 && meId !== info.owner && meId !== String(info.ownerPartner);
+    return (
+      '<p class="acc-card__desc gz-pairs">Paare: ' + line + "</p>" +
+      (iGo
+        ? '<button type="button" class="go-online-cta go-online-cta--ghost" data-zpartner="' + esc(ev.id) + '">' +
+          (info.mine ? "Partner ändern" : "Partner wählen") + "</button>"
+        : "")
+    );
+  }
+
+  function openPartnerSheet(eventId) {
+    var ev = (state.events || []).filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    var info = ev && zirkelPairs(ev);
+    if (!info) return;
+    var partners = (state.rsvpPartner && state.rsvpPartner[String(eventId)]) || {};
+    var taken = {};
+    taken[me()] = true;
+    taken[info.owner] = true;
+    if (info.ownerPartner) taken[String(info.ownerPartner)] = true;
+    Object.keys(partners).forEach(function (uid) {
+      if (uid === me()) return;
+      var p = partners[uid];
+      if (p && (p.id || p.name)) {
+        taken[uid] = true;
+        if (p.id && p.id !== me()) taken[p.id] = true;
+      }
+    });
+    var cands = [];
+    var seen = {};
+    info.going.forEach(function (uid) {
+      if (!taken[uid] && !seen[uid]) { seen[uid] = 1; cands.push({ id: uid, name: personOf(uid).name, tag: "dabei" }); }
+    });
+    (host.teamPeople || []).forEach(function (p) {
+      var uid = p && String(p.id);
+      if (uid && !taken[uid] && !seen[uid]) { seen[uid] = 1; cands.push({ id: uid, name: p.name || p.nickname || "Freund" }); }
+    });
+    var box = document.createElement("div");
+    box.className = "gz-psheet";
+    box.innerHTML =
+      '<div class="gz-psheet__card" role="dialog" aria-modal="true">' +
+      "<h3>Dein Partner</h3>" +
+      '<p class="gz-psheet__hint">Ihr wechselt euch ab. Wähle jemanden oder trag einen Namen ein.</p>' +
+      '<div class="gz-partner__list">' +
+      cands.slice(0, 24).map(function (c) {
+        return '<button type="button" class="gz-pf" data-pid="' + esc(c.id) + '">' + esc(c.name) +
+          (c.tag ? " · " + c.tag : "") + "</button>";
+      }).join("") +
+      "</div>" +
+      '<input type="text" class="gz-partner__name" maxlength="40" placeholder="Name eintragen" />' +
+      '<button type="button" class="gz-psheet__save">Speichern</button>' +
+      '<button type="button" class="gz-psheet__skip">Ohne Partner</button>' +
+      "</div>";
+    document.body.appendChild(box);
+    var picked = "";
+    function close() {
+      if (box.parentNode) box.parentNode.removeChild(box);
+    }
+    box.addEventListener("click", function (e) {
+      if (e.target === box || e.target.closest(".gz-psheet__skip")) { close(); return; }
+      var b = e.target.closest("[data-pid]");
+      if (b) {
+        picked = b.classList.contains("is-on") ? "" : b.getAttribute("data-pid");
+        box.querySelectorAll("[data-pid]").forEach(function (x) {
+          x.classList.toggle("is-on", x === b && !!picked);
+        });
+        if (picked) box.querySelector(".gz-partner__name").value = "";
+        return;
+      }
+      if (e.target.closest(".gz-psheet__save")) {
+        var name = String(box.querySelector(".gz-partner__name").value || "").trim();
+        if (!picked && !name) { close(); return; }
+        rest("rpc/go_set_zirkel_partner", {
+          method: "POST",
+          body: { p_event_id: String(eventId), p_user_id: me(), p_partner_id: picked || null, p_partner_name: picked ? null : name }
+        })
+          .then(function () {
+            close();
+            if (host.toast) host.toast("Partner gespeichert");
+            return refresh();
+          })
+          .catch(function () {
+            if (host.toast) host.toast("Partner speichern fehlt noch (go-zirkel-partner.sql)");
+          });
+      }
+    });
   }
 
   function loadZirkelCourse() {
@@ -561,18 +701,32 @@
 
   function loadRsvps(eventIds) {
     state.rsvps = {};
+    state.rsvpPartner = {};
     if (!eventIds.length) return Promise.resolve();
-    return rest(
+    var base =
       "event_rsvps?event_id=in.(" +
-        eventIds.map(encodeURIComponent).join(",") +
-        ")&status=eq.zugesagt&select=event_id,user_id"
-    )
+      eventIds.map(encodeURIComponent).join(",") +
+      ")&status=eq.zugesagt&select=event_id,user_id";
+    return rest(base + ",partner_id,partner_name")
+      .catch(function () {
+        return rest(base);
+      })
       .then(function (rows) {
+        var partnerIds = [];
         (rows || []).forEach(function (r) {
           var eid = String(r.event_id);
           if (!state.rsvps[eid]) state.rsvps[eid] = [];
           state.rsvps[eid].push(String(r.user_id));
+          if (r.partner_id || r.partner_name) {
+            if (!state.rsvpPartner[eid]) state.rsvpPartner[eid] = {};
+            state.rsvpPartner[eid][String(r.user_id)] = {
+              id: r.partner_id ? String(r.partner_id) : "",
+              name: r.partner_name || ""
+            };
+            if (r.partner_id) partnerIds.push(String(r.partner_id));
+          }
         });
+        if (partnerIds.length) ensurePeople(partnerIds);
         var pids = [];
         Object.keys(state.rsvps).forEach(function (k) {
           state.rsvps[k].forEach(function (uid) {
@@ -1454,7 +1608,10 @@
       when: whenLine(ev.starts_at),
       title: title,
       place: ev.location || "",
-      desc: descHtml(parseZirkelNote(ev.note) ? zirkelLabel(parseZirkelNote(ev.note)) : ev.note),
+      desc:
+        descHtml(parseZirkelNote(ev.note) ? zirkelLabel(parseZirkelNote(ev.note)) : ev.note) +
+        zirkelPairsHtml(ev) +
+        onlineCtaHtml(ev),
       postId: String(ev.id),
       eventId: String(ev.id),
       inviteIso: day,
@@ -2485,6 +2642,11 @@
       })
       .then(function () {
         optimisticRsvpFaces(eventId, true);
+        var evD = (state.events || []).filter(function (e) {
+          return String(e.id) === String(eventId);
+        })[0];
+        var zD = evD && parseZirkelNote(evD.note);
+        if (zD && zD.mode === "double") openPartnerSheet(eventId);
       })
       .catch(function () {
         optimisticRsvpFaces(eventId, false);
@@ -2833,38 +2995,22 @@
       pick.hidden = false;
       pick.innerHTML =
         visPickerHtml() +
-        '<div class="acc-zset">' +
-        '<div class="acc-zset__seg" role="group" aria-label="Modus">' +
-        '<button type="button" class="is-on" data-zmode="standard">Standard</button>' +
-        '<button type="button" data-zmode="team">Team</button>' +
-        "</div>" +
-        '<label>Runden<input type="number" id="acc-z-rounds" min="1" max="30" value="7" /></label>' +
-        '<label>Rundenzeit (Sek.)<input type="number" id="acc-z-work" min="10" max="900" value="240" /></label>' +
-        '<label>Pause (Sek.)<input type="number" id="acc-z-pause" min="0" max="300" value="30" /></label>' +
-        "</div>";
-      var mode = "standard";
-      pick.querySelector(".acc-zset__seg").addEventListener("click", function (e) {
-        var b = e.target.closest("[data-zmode]");
-        if (!b) return;
-        mode = b.getAttribute("data-zmode");
-        Array.prototype.forEach.call(this.children, function (x) {
-          x.classList.toggle("is-on", x === b);
-        });
-      });
+        GoZirkelSetup.html(
+          { mode: "single" },
+          {
+            friends: (host.teamPeople || []).filter(function (p) {
+              return p && p.id && String(p.id) !== String(me());
+            })
+          }
+        ) +
+        '<label class="gz-online"><input type="checkbox" id="acc-z-online" /> Optional: online mitmachen</label>';
+      GoZirkelSetup.bind(pick);
       var go = document.createElement("button");
       go.type = "button";
       go.textContent = "Jetzt starten";
       go.addEventListener("click", function () {
-        function num(id, d, lo, hi) {
-          var v = Number(($(id) || {}).value);
-          return isNaN(v) ? d : Math.max(lo, Math.min(hi, v));
-        }
-        var z = {
-          mode: mode,
-          rounds: num("acc-z-rounds", 7, 1, 30),
-          workSec: num("acc-z-work", 240, 10, 900),
-          restSec: num("acc-z-pause", 30, 0, 300)
-        };
+        var z = GoZirkelSetup.read(pick);
+        z.online = !!(($("acc-z-online") || {}).checked);
         var vis = readCreateVis(pick);
         loadZirkelCourse().then(function (cid) {
           if (!cid) {
@@ -2875,7 +3021,7 @@
             category: "zirkel",
             course_id: cid,
             title: "Zirkeltraining",
-            note: "zirkel:" + z.mode + "|work=" + z.workSec + "|pause=" + z.restSec + "|rounds=" + z.rounds,
+            note: GoZirkelSetup.toNote(z),
             visibility: vis
           }).then(function () {
             if (host.openZirkel) host.openZirkel(z);
@@ -3093,6 +3239,16 @@
     var ffcRsvp = t.closest("[data-ffc-rsvp]");
     if (ffcRsvp) {
       toggleFfcRsvp(ffcRsvp.getAttribute("data-ffc-rsvp"));
+      return;
+    }
+    var zp = t.closest("[data-zpartner]");
+    if (zp) {
+      openPartnerSheet(zp.getAttribute("data-zpartner"));
+      return;
+    }
+    var onl = t.closest("[data-online-join]");
+    if (onl) {
+      joinOnline(onl.getAttribute("data-online-join"));
       return;
     }
     var rsvp = t.closest("[data-rsvp]");

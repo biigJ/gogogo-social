@@ -2056,6 +2056,38 @@
     .acc-zset__seg { display: flex; gap: 8px; }
     .acc-zset__seg button { flex: 1; padding: 10px; border-radius: 999px; border: 1px solid #2A2118; background: transparent; color: #2A2118; font: inherit; }
     .acc-zset__seg button.is-on { background: #2A2118; color: #F7F5F0; }
+    /* Zirkel-Dialog (go-zirkel-setup.js) */
+    .gz-seg { display: flex; justify-content: center; gap: 8px; margin: 0 0 12px; }
+    .gz-seg button { min-width: 112px; min-height: 40px; border-radius: 999px; border: 1px solid #2A2118; background: transparent; color: #2A2118; font: inherit; font-weight: 600; cursor: pointer; }
+    .gz-seg button.is-on { background: #111; color: #fff; border-color: #111; }
+    .gz-row { margin: 0 0 8px; text-align: center; font-weight: 700; }
+    .gz-wheel { height: 132px; margin: 0 0 10px; }
+    .gz-wheel .wr-time-col { padding: 44px 0; }
+    .gz-wheel .wr-time-opt { font-size: 18px; }
+    .gz-wheel .wr-time-opt.is-on { font-size: 20px; }
+    .gz-wheel--one { grid-template-columns: 1fr; }
+    .gz-partner { margin: 0 0 12px; }
+    .gz-partner[hidden] { display: none; }
+    .gz-partner__h { margin: 0 0 6px; text-align: center; font-weight: 700; }
+    .gz-partner__list { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0 0 8px; }
+    .gz-pf { min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid #2A2118; background: transparent; color: #2A2118; font: inherit; font-weight: 600; cursor: pointer; }
+    .gz-pf.is-on { background: #111; color: #fff; border-color: #111; }
+    .gz-partner__name { width: 100%; box-sizing: border-box; min-height: 44px; padding: 0 12px; border: 1px solid rgba(42,33,24,.25); border-radius: 10px; font: inherit; background: #fff; }
+    .gz-pairs { margin-top: 6px; font-weight: 600; }
+    .gz-psheet { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-end; justify-content: center; background: rgba(0,0,0,.35); }
+    .gz-psheet__card { width: min(100%, 480px); box-sizing: border-box; max-height: 85dvh; overflow: auto; background: #F3EEE4; color: #2A2118; border-radius: 18px 18px 0 0; padding: 18px 16px calc(24px + env(safe-area-inset-bottom, 0px)); }
+    .gz-psheet__card h3 { margin: 0 0 6px; font-family: "Playfair Display", Georgia, serif; font-size: 22px; }
+    .gz-psheet__hint { margin: 0 0 12px; font-size: 13px; color: rgba(42,33,24,.6); }
+    .gz-psheet__card .gz-partner__name { margin: 4px 0 12px; }
+    .gz-psheet__save { width: 100%; min-height: 48px; border-radius: 999px; border: 0; background: #111; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+    .gz-psheet__skip { width: 100%; min-height: 44px; margin-top: 6px; border: 0; background: none; color: rgba(42,33,24,.6); font: inherit; font-weight: 600; cursor: pointer; }
+    .gz-total { margin: 4px 0 14px; text-align: center; font-size: 15px; }
+    .gz-total strong { font-size: 20px; }
+    .gz-calc { display: block; margin-top: 2px; font-size: 12px; color: rgba(42,33,24,.55); }
+    .gz-online { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 0 0 12px; font-weight: 600; }
+    .gz-online input { width: 20px; height: 20px; accent-color: #111; }
+    .go-online-cta--ghost { background: transparent !important; color: #111 !important; border: 1.5px solid #111 !important; margin-left: 6px; }
+    .go-online-cta { display: inline-flex; align-items: center; min-height: 36px; margin: 8px 0 0; padding: 0 14px; border-radius: 999px; border: 0; background: #111; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
     .acc-tool-badge { display: inline-flex; align-items: center; justify-content: center; min-height: 30px; }
     .acc-badge-ico { display: block; color: #2A2118; width: 30px; height: 30px; }
     /* Pill-Woche-Kalender bleibt bei .app-pill svg (24px) — hier nur Event-Zeile */
@@ -7563,9 +7595,10 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-35"></script>
+  <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-39"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-29"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-32"></script>
   <script src="/natalyaalice/support.js?v=support-13"></script>
   <script>
     (function () {
@@ -12136,6 +12169,71 @@
         return Promise.resolve();
       }
 
+      /* Zirkel-Event → FFC-Preset mit gemeinsamem Start (Startzeit, Admin-Halt, Spät-Einstieg) */
+      function zirkelSyncPreset(eventId, preset) {
+        var base = Object.assign({}, preset || {});
+        if (!eventId || !/^[0-9a-f-]{36}$/i.test(String(eventId)) || !window.GoZirkelSetup) {
+          return Promise.resolve(base);
+        }
+        function load() {
+          return rest(
+            "events?id=eq." + encodeURIComponent(eventId) + "&select=id,user_id,starts_at,note,status"
+          ).then(function (rows) {
+            return rows && rows[0] ? GoZirkelSetup.startInfo(rows[0]) : null;
+          });
+        }
+        return load()
+          .then(function (info) {
+            if (!info) return base;
+            base.workSec = info.z.workSec;
+            base.restSec = info.z.restSec;
+            base.sync = {
+              eventId: String(eventId),
+              startAt: info.startAt,
+              hold: info.hold,
+              phases: info.phases,
+              poll: load
+            };
+            return base;
+          })
+          .catch(function () {
+            return base;
+          });
+      }
+
+      /* Admin (Event-Ersteller): Start anhalten / jetzt freigeben (10 s Countdown) */
+      function zirkelAdminStart(eventId, action) {
+        return rest("events?id=eq." + encodeURIComponent(eventId) + "&select=note").then(function (rows) {
+          var note = rows && rows[0] ? rows[0].note : "";
+          if (action === "hold") note = GoZirkelSetup.withFlag(GoZirkelSetup.withFlag(note, "go", null), "hold", 1);
+          else note = GoZirkelSetup.withFlag(GoZirkelSetup.withFlag(note, "hold", null), "go", Math.floor(Date.now() / 1000) + 10);
+          return rest("events?id=eq." + encodeURIComponent(eventId), {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: { note: note }
+          });
+        });
+      }
+
+      /* Ende des gemeinsamen Zirkels: eigenes Event automatisch erledigt */
+      function zirkelFinished(eventId) {
+        if (!eventId || !sessionAccount) return Promise.resolve();
+        return rest(
+          "events?id=eq." +
+            encodeURIComponent(eventId) +
+            "&user_id=eq." +
+            encodeURIComponent(sessionAccount.id) +
+            "&status=neq.erledigt",
+          { method: "PATCH", prefer: "return=minimal", body: { status: "erledigt" } }
+        )
+          .then(function () {
+            if (window.WocheReels && WocheReels.refresh) WocheReels.refresh();
+            if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
+          })
+          .catch(function () {});
+      }
+      window.GoZirkelSync = { preset: zirkelSyncPreset, admin: zirkelAdminStart, finished: zirkelFinished };
+
       function installWocheReels() {
         if (!window.WocheReels || !sessionMode || !sessionAccount) {
           document.body.classList.remove("is-woche-reels");
@@ -12208,7 +12306,12 @@
           },
           openZirkelWorkout: function (eventId, preset) {
             requireFfc(function () {
-              if (window.FFC && FFC.openSetup) FFC.openSetup(preset || null);
+              if (window.FFC && FFC.openSetup) {
+                zirkelSyncPreset(eventId, preset).then(function (pr) {
+                  FFC.openSetup(pr);
+                });
+                return;
+              }
               else if (window.FFC && FFC.go) FFC.go("run");
             }, { title: "Zirkeltraining" });
           },
@@ -12393,9 +12496,11 @@
                   openGoSub("zirkel", "Friday Fitness Circle");
                   refreshZirkel();
                   if (window.FFC && FFC.openSetup) {
-                    try {
-                      FFC.openSetup(preset || null);
-                    } catch (eS) {}
+                    zirkelSyncPreset(preset && preset.eventId, preset).then(function (pr) {
+                      try {
+                        FFC.openSetup(pr && Object.keys(pr).length ? pr : null);
+                      } catch (eS) {}
+                    });
                   }
                 },
                 {
@@ -20784,8 +20889,9 @@
         onNicknameWanted: function () {
           if (sessionMode) openAccountEdit("nickname");
         },
-        onSaved: function () {
+        onSaved: function (workout, syncEventId) {
           if (sessionMode) markDiaryMove(Log.berlinToday(), "Zirkeltraining");
+          if (sessionMode && syncEventId && window.GoZirkelSync) GoZirkelSync.finished(syncEventId);
         }
       };
 
@@ -20868,6 +20974,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-pass-1"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-sync-2"></script>
 </body>
 </html>
