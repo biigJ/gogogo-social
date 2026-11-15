@@ -2076,7 +2076,8 @@
   if(document.fonts && document.fonts.ready) document.fonts.ready.then(refitExerciseName);
 
   function render(){
-    document.getElementById('runSkipBtn').style.visibility = (phase === 'work' || phase === 'rest') ? '' : 'hidden';
+    // Beim gemeinsamen Zirkel kein Überspringen, sonst läuft man aus dem Takt
+    document.getElementById('runSkipBtn').style.visibility = (!sync && (phase === 'work' || phase === 'rest')) ? '' : 'hidden';
     updateLane();
     exerciseDisplayEl.style.display = 'none';
 
@@ -3335,10 +3336,7 @@
   // iOS: verhindert, dass die Liste beim Ziehen am Griff mitscrollt
   planListEl.addEventListener('touchmove', e=>{ if(drag) e.preventDefault(); }, { passive:false });
 
-  pauseBtn.addEventListener('click', ()=>{
-    paused = !paused;
-    pauseBtn.textContent = paused ? 'Weiter' : 'Pause';
-  });
+  // Kein Pause-Knopf in gogogo: der Timer läuft durch (gemeinsamer Zirkel bleibt synchron)
 
   document.getElementById('skipBtn').addEventListener('click', ()=>{
     advancePhase();
@@ -3361,6 +3359,7 @@
   document.getElementById('runHomeBtn').addEventListener('click', openQuit);
   // Skip (Play-Symbol neben der Zeit): Arbeit → Pause bzw. Pause → nächste Übung
   document.getElementById('runSkipBtn').addEventListener('click', ()=>{
+    if(sync) return;
     if(phase === 'work' || phase === 'rest') advancePhase();
   });
   document.getElementById('quitNo').addEventListener('click', closeQuit);
