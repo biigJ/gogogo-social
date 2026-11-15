@@ -4596,10 +4596,38 @@
       line-height: 1.2;
       color: #2A2118;
     }
-    body.is-session[data-shell="kurse"] #go-rail-nav .rail-nav__title {
+    /* Plus-Headline = Team (.rail-nav__title → --t-l / 24px), kein kleinerer Override */
+    body.is-session[data-shell="kurse"] #go-rail-nav .rail-nav__title,
+    body.is-session[data-shell="plan"][data-plan="training"] #go-rail-nav .rail-nav__title {
       text-align: center;
-      font-size: 22px !important;
+      font-size: var(--t-l, 24px) !important;
+      line-height: 1.2 !important;
+      min-height: calc(var(--t-l, 24px) * 1.2);
     }
+    .go-toc {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      padding: 8px 0 24px;
+      width: 100%;
+    }
+    .go-toc__item {
+      display: block;
+      width: 100%;
+      margin: 0;
+      padding: 14px 0;
+      border: 0;
+      border-bottom: 1px solid rgba(42, 33, 24, 0.14);
+      background: transparent;
+      text-align: left;
+      color: #2A2118;
+      font-family: "Playfair Display", Georgia, serif !important;
+      font-size: var(--t-l, 24px) !important;
+      font-weight: 600 !important;
+      line-height: 1.2 !important;
+      cursor: pointer;
+    }
+    .go-toc__item:last-child { border-bottom: 0; }
     .go-slide__art { margin: 0; }
     .go-slide__copy {
       margin: 36px 0 0;
@@ -4927,7 +4955,8 @@
       min-height: 0;
       overflow-x: auto;
       overflow-y: hidden;
-      overscroll-behavior: contain;
+      overscroll-behavior-x: none;
+      overscroll-behavior-y: contain;
       align-items: stretch;
       gap: 0;
       scroll-snap-type: x mandatory;
@@ -4940,7 +4969,7 @@
       flex: 0 0 100%;
       width: 100%;
       min-width: 100%;
-      max-width: none;
+      max-width: 100%;
       height: 100%;
       min-height: 0;
       max-height: 100%;
@@ -4948,11 +4977,16 @@
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
+      overscroll-behavior-x: none;
+      /* Wie Team: horizontaler Rail-Snap + vertikaler Slide-Scroll */
       touch-action: pan-x pan-y;
       padding: 12px 16px calc(88px + env(safe-area-inset-bottom, 0px));
       box-sizing: border-box;
       scroll-snap-align: start;
       scroll-snap-stop: always;
+    }
+    body.is-session[data-shell="kurse"] .go-slide.go-slide--toc {
+      touch-action: pan-x pan-y;
     }
     .acc-card__faces {
       display: flex;
@@ -11821,9 +11855,10 @@
           openJoschaCvWa: openJoschaCvWa,
           paintProfil: renderProfil,
           onOffersReady: function () {
+            /* Nie force — sonst FFC-Boards alle paar Sekunden neu mounten/flackern */
             if (paintGoRail._t) window.clearTimeout(paintGoRail._t);
             paintGoRail._t = window.setTimeout(function () {
-              paintGoRail(true);
+              paintGoRail(false);
             }, 80);
           },
           openCalendlyPt: typeof openCalendlyPt === "function" ? openCalendlyPt : null,
@@ -13047,6 +13082,21 @@
 
       function mountGoZirkelPanels(lbBox, recBox) {
         if (!window.FFC || !FFC.user || !FFC.user()) return;
+        var uid = "";
+        try {
+          uid = String((FFC.user() && FFC.user().id) || "");
+        } catch (eUid) {}
+        /* Schon gemountet/lädt für denselben User → nicht neu starten (Top↔Boards-Flackern) */
+        if (
+          lbBox &&
+          recBox &&
+          lbBox.dataset.ffcMount === uid &&
+          recBox.dataset.ffcMount === uid
+        ) {
+          return;
+        }
+        if (lbBox) lbBox.dataset.ffcMount = uid;
+        if (recBox) recBox.dataset.ffcMount = uid;
         function paintLb(rows) {
           if (!lbBox) return;
           lbBox.textContent = "";
@@ -13154,12 +13204,21 @@
             },
             { passive: true }
           );
+          function centerWheelItem(el, smooth) {
+            if (!el || !col) return;
+            var top = el.offsetTop - (col.clientHeight - el.offsetHeight) / 2;
+            if (smooth && typeof col.scrollTo === "function") {
+              col.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+            } else {
+              col.scrollTop = Math.max(0, top);
+            }
+          }
           col.addEventListener("click", function (ev) {
             var btn = ev.target && ev.target.closest ? ev.target.closest(".go-rec-wheel__item") : null;
             if (!btn) return;
             var i = Number(btn.dataset.idx || 0) || 0;
             var el = col.querySelectorAll(".go-rec-wheel__item")[i];
-            if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+            centerWheelItem(el, true);
             show(i);
           });
           recBox.appendChild(wheel);
@@ -13167,7 +13226,8 @@
           show(0);
           requestAnimationFrame(function () {
             var first = col.querySelector(".go-rec-wheel__item");
-            if (first) first.scrollIntoView({ block: "center" });
+            /* Nur im Rad scrollen — scrollIntoView würde den Plus-Slide hoch/runter zerren */
+            centerWheelItem(first, false);
           });
         }
         var lbPromise =
@@ -14293,7 +14353,8 @@
           var i = Math.min(list.length - 1, Math.max(0, railCurrentIndex(rail) + delta));
           var slide = list[i];
           if (!slide) return;
-          rail.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
+          if (rail.id === "go-rail") snapGoRailToIndex(rail, i, true);
+          else rail.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
           window.setTimeout(function () { syncRailNav(rail, nav); }, 280);
         }
         if (prev) prev.addEventListener("click", function () { go(-1); });
@@ -14303,6 +14364,85 @@
           if (rail.id === "days") syncStatusFade();
         }, { passive: true });
         syncRailNav(rail, nav);
+      }
+
+      function sizeGoRailSlides(rail) {
+        if (!rail) return 0;
+        var w = Math.round(rail.clientWidth || rail.offsetWidth || 0);
+        if (w < 200) w = Math.round((window.innerWidth || 360) * 0.92);
+        Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (slide) {
+          slide.style.boxSizing = "border-box";
+          slide.style.flex = "0 0 " + w + "px";
+          slide.style.width = w + "px";
+          slide.style.minWidth = w + "px";
+          slide.style.maxWidth = w + "px";
+        });
+        return w;
+      }
+
+      function snapGoRailToIndex(rail, index, smooth) {
+        if (!rail) return;
+        sizeGoRailSlides(rail);
+        var list = railSlides(rail);
+        var i = Math.min(list.length - 1, Math.max(0, index | 0));
+        var slide = list[i];
+        if (!slide) return;
+        var left = Math.round(slide.offsetLeft);
+        if (smooth) rail.scrollTo({ left: left, behavior: "smooth" });
+        else rail.scrollLeft = left;
+        syncRailNav(rail, document.getElementById("go-rail-nav"));
+      }
+
+      function jumpToGoOffer(key) {
+        var rail = document.getElementById("go-rail");
+        if (!rail) return;
+        var list = railSlides(rail);
+        var idx = -1;
+        list.forEach(function (el, i) {
+          if (String(el.dataset.offer || "") === String(key || "")) idx = i;
+        });
+        if (idx < 0) return;
+        snapGoRailToIndex(rail, idx, true);
+      }
+
+      function bindGoRailHardSnap(rail) {
+        if (!rail || rail.dataset.hardSnap === "1") return;
+        rail.dataset.hardSnap = "1";
+        var snapTimer = 0;
+        function settle() {
+          if (rail.dataset.snapLock === "1") return;
+          sizeGoRailSlides(rail);
+          var i = railCurrentIndex(rail);
+          var list = railSlides(rail);
+          var slide = list[i];
+          if (!slide) return;
+          var target = Math.round(slide.offsetLeft);
+          if (Math.abs(rail.scrollLeft - target) > 1) {
+            rail.dataset.snapLock = "1";
+            rail.scrollTo({ left: target, behavior: "smooth" });
+            window.setTimeout(function () {
+              rail.scrollLeft = target;
+              rail.dataset.snapLock = "";
+              syncRailNav(rail, document.getElementById("go-rail-nav"));
+            }, 220);
+          }
+        }
+        function schedule() {
+          if (rail.dataset.snapLock === "1") return;
+          window.clearTimeout(snapTimer);
+          snapTimer = window.setTimeout(settle, 80);
+        }
+        rail.addEventListener("scroll", schedule, { passive: true });
+        rail.addEventListener("touchend", schedule, { passive: true });
+        rail.addEventListener("pointerup", schedule, { passive: true });
+        if ("onscrollend" in window) {
+          rail.addEventListener("scrollend", settle, { passive: true });
+        }
+        window.addEventListener("resize", function () {
+          if (document.body.dataset.shell !== "kurse") return;
+          sizeGoRailSlides(rail);
+          snapGoRailToIndex(rail, railCurrentIndex(rail), false);
+        });
       }
 
       function lockPlusHeadlineNav() {
@@ -14577,10 +14717,12 @@
         rail.hidden = false;
         var keepLeft = rail.scrollLeft || 0;
         var keepOffer = "";
+        var keepSlideTop = 0;
         try {
           var curSlides = railSlides(rail);
           var curIx = railCurrentIndex(rail);
           keepOffer = curSlides[curIx] ? String(curSlides[curIx].dataset.offer || "") : "";
+          keepSlideTop = curSlides[curIx] ? curSlides[curIx].scrollTop || 0 : 0;
         } catch (eKeep) {}
         var supportRoot = document.getElementById("support-root");
         if (supportRoot) supportRoot.hidden = true;
@@ -14634,6 +14776,9 @@
                   description: "Mit Trainer-A- oder PT-Lizenz Zugang zum Admin-Bereich. CV an Joschas WhatsApp. Mehr erfahren: Playbook."
                 }
               ];
+        var sectionOffers = [
+          { key: "toc", type: "toc", title: "Plus" }
+        ].concat(offers);
         /* Kein Full-Rebuild wenn Offer-Keys + FFC-Login gleich — verhindert FFC-Flackern */
         if (!force) {
           var existing = rail.querySelectorAll(".go-slide");
@@ -14641,18 +14786,19 @@
           var paintedFfc = rail.dataset.ffcLogged || "0";
           var ffcMismatch =
             existing.length > 0 && paintedFfc !== (ffcLoggedNow ? "1" : "0");
-          if (!ffcMismatch && existing.length === offers.length) {
+          if (!ffcMismatch && existing.length === sectionOffers.length) {
             var same = true;
             var ei;
-            for (ei = 0; ei < offers.length; ei++) {
-              if (String(existing[ei].dataset.offer || "") !== String(offers[ei].key || "")) {
+            for (ei = 0; ei < sectionOffers.length; ei++) {
+              if (String(existing[ei].dataset.offer || "") !== String(sectionOffers[ei].key || "")) {
                 same = false;
                 break;
               }
             }
             if (same) {
-              for (ei = 0; ei < offers.length; ei++) {
-                var of = offers[ei];
+              for (ei = 0; ei < sectionOffers.length; ei++) {
+                var of = sectionOffers[ei];
+                if (of.key === "toc") continue;
                 var ownedNow =
                   window.GoSupport && GoSupport.offerOwned
                     ? GoSupport.offerOwned(of.type || of.key)
@@ -14666,7 +14812,14 @@
                 btn.classList.toggle("is-owned", !!ownedNow);
                 if (ownedNow) btn.setAttribute("aria-disabled", "true");
                 else btn.removeAttribute("aria-disabled");
+                if (isZ && ffcLoggedNow) {
+                  var lbKeep = existing[ei].querySelector("#go-zirkel-board");
+                  var recKeep = existing[ei].querySelector("#go-zirkel-records");
+                  if (lbKeep && recKeep) mountGoZirkelPanels(lbKeep, recKeep);
+                }
               }
+              sizeGoRailSlides(rail);
+              bindGoRailHardSnap(rail);
               syncHScrollDock();
               syncTeamGoRailNav();
               return;
@@ -14682,15 +14835,33 @@
           routineCardSafe.hidden = true;
         }
         rail.textContent = "";
-        offers.forEach(function (offer) {
+        sectionOffers.forEach(function (offer) {
           var owned =
             window.GoSupport && GoSupport.offerOwned
               ? GoSupport.offerOwned(offer.type || offer.key)
               : false;
           var card = document.createElement("article");
-          card.className = "go-slide";
+          card.className = "go-slide" + (offer.key === "toc" ? " go-slide--toc" : "");
           card.dataset.title = offer.title;
           card.dataset.offer = offer.key;
+          if (offer.key === "toc") {
+            var tocNav = document.createElement("nav");
+            tocNav.className = "go-toc";
+            tocNav.setAttribute("aria-label", "Plus Abschnitte");
+            offers.forEach(function (item) {
+              var link = document.createElement("button");
+              link.type = "button";
+              link.className = "go-toc__item";
+              link.textContent = item.title;
+              link.addEventListener("click", function () {
+                jumpToGoOffer(item.key);
+              });
+              tocNav.appendChild(link);
+            });
+            card.appendChild(tocNav);
+            rail.appendChild(card);
+            return;
+          }
           var head = document.createElement("h2");
           head.className = "go-slide__title";
           head.textContent = offer.title;
@@ -14836,35 +15007,35 @@
           }
           rail.appendChild(card);
         });
-        function sizeGoSlides() {
-          var w = Math.round(rail.clientWidth || rail.offsetWidth || 0);
-          if (w < 200) w = Math.round((window.innerWidth || 360) * 0.92);
-          Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (slide) {
-            slide.style.flex = "0 0 " + w + "px";
-            slide.style.width = w + "px";
-            slide.style.minWidth = w + "px";
-            slide.style.maxWidth = w + "px";
-          });
-        }
+        bindGoRailHardSnap(rail);
         requestAnimationFrame(function () {
-          sizeGoSlides();
+          sizeGoRailSlides(rail);
           /* Snap kurz aus — sonst Korrektur-Sprung nach scrollLeft-Restore */
           var prevSnap = rail.style.scrollSnapType;
           rail.style.scrollSnapType = "none";
           var list = railSlides(rail);
           var target = null;
+          var targetIdx = 0;
           if (keepOffer) {
-            list.forEach(function (el) {
-              if (String(el.dataset.offer || "") === keepOffer) target = el;
+            list.forEach(function (el, ix) {
+              if (String(el.dataset.offer || "") === keepOffer) {
+                target = el;
+                targetIdx = ix;
+              }
             });
           }
-          if (target) rail.scrollLeft = target.offsetLeft;
+          if (target) rail.scrollLeft = Math.round(target.offsetLeft);
           else rail.scrollLeft = keepLeft;
           requestAnimationFrame(function () {
-            sizeGoSlides();
+            sizeGoRailSlides(rail);
+            if (target) {
+              rail.scrollLeft = Math.round(list[targetIdx].offsetLeft);
+              if (keepSlideTop > 0) list[targetIdx].scrollTop = keepSlideTop;
+            }
             rail.style.scrollSnapType = prevSnap || "";
             syncHScrollDock();
             syncTeamGoRailNav();
+            bindGoRailHardSnap(rail);
           });
         });
       }
@@ -19573,7 +19744,8 @@
           if (sessionMode && user.email && !accountEmail()) saveAccountEmail(user.email).catch(function () {});
           refreshFfcHeute(true);
           if ((shellTab === "kurse" || shellTab === "plan") && planPane === "training") {
-            paintGoRail(true);
+            /* false: Token-Refresh darf FFC-Boards nicht remounten (Top↔Boards-Flackern) */
+            paintGoRail(false);
           }
           if (window.FFC && FFC.refreshFriends) FFC.refreshFriends().then(onFfcFriendsChanged).catch(function () { onFfcFriendsChanged(); });
           else onFfcFriendsChanged();
