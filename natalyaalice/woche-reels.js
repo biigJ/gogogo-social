@@ -274,21 +274,27 @@
       if (fromHost && fromHost !== raw) {
         localStorage.setItem("gogogo_woche_travel_" + me(), fromHost);
       }
+      state.travelStart =
+        localStorage.getItem("gogogo_woche_travel_start_" + me()) || null;
     } catch (e) {
       state.travelUntil = fromHost || null;
     }
   }
 
-  function saveTravelPref(iso) {
+  function saveTravelPref(iso, startIso) {
     state.travelUntil = iso || null;
+    state.travelStart = startIso || (iso ? berlinToday() : null);
     try {
       var key = "gogogo_woche_travel_" + me();
       if (iso) localStorage.setItem(key, iso);
       else localStorage.removeItem(key);
+      var sk = "gogogo_woche_travel_start_" + me();
+      if (startIso) localStorage.setItem(sk, startIso);
+      else localStorage.removeItem(sk);
     } catch (e) {}
     try {
       if (host && typeof host.setTravelUntil === "function") {
-        host.setTravelUntil(iso || null);
+        host.setTravelUntil(iso || null, startIso || null);
       }
     } catch (eH2) {}
   }
@@ -1490,12 +1496,9 @@
   }
 
   function travelDayActive(iso) {
-    return !!(
-      travelActive() &&
-      iso &&
-      iso >= berlinToday() &&
-      iso <= state.travelUntil
-    );
+    if (!travelActive() || !iso) return false;
+    var start = state.travelStart || berlinToday();
+    return iso >= start && iso <= state.travelUntil;
   }
 
   function isSupportEvent(ev) {
@@ -2071,16 +2074,46 @@
   }
 
   function openTravelSheet() {
+    /* gogogo-Kalender Start/Ende — kein System-Dialog, kein Drehrad */
+    closeSheet();
+    if (host && typeof host.openTravelPlanModal === "function") {
+      host.openTravelPlanModal();
+      return;
+    }
     openSheet(
-      "<h3>Unterwegs bis</h3>" +
-        '<p class="wr-sheet-hint">Tage drehen</p>' +
-        travelWheelHtml(3) +
-        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-travel-go="1">Los</button>' +
+      "<h3>Reise planen</h3>" +
+        '<p class="wr-sheet-hint">Start und Ende wählen</p>' +
+        '<label class="wr-field">Von<input type="date" id="wr-travel-start" /></label>' +
+        '<label class="wr-field">Bis<input type="date" id="wr-travel-end" /></label>' +
+        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-travel-range="1">Speichern</button>' +
         '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
     );
-    requestAnimationFrame(function () {
-      requestAnimationFrame(scrollTravelCol);
-    });
+    var today = berlinToday();
+    var s = $("wr-travel-start");
+    var e = $("wr-travel-end");
+    if (s) {
+      s.value = today;
+      s.min = today;
+    }
+    if (e) {
+      e.value = addDays(today, 3);
+      e.min = today;
+    }
+  }
+
+  function applyTravelRange(startIso, endIso) {
+    var start = String(startIso || berlinToday()).slice(0, 10);
+    var end = String(endIso || "").slice(0, 10);
+    if (!end || end < start) end = start;
+    state.travelStart = start;
+    snapshotPlanForTravel();
+    /* setTravelUntil(end, start) — Host speichert beide Tage */
+    saveTravelPref(end, start);
+    closeSheet();
+    if (host.toast) {
+      host.toast("Reise geplant — bitte pro Trainingstag eine Alternative wählen");
+    }
+    return refreshKeepDay(berlinToday());
   }
 
   function openCreateTimeSheet() {
@@ -2732,14 +2765,9 @@
   }
 
   function applyTravel(days) {
-    var until = addDays(berlinToday(), days);
-    snapshotPlanForTravel();
-    saveTravelPref(until);
-    closeSheet();
-    if (host.toast) {
-      host.toast("Reise aktiv — bitte pro Tag eine Alternative wählen");
-    }
-    return refreshKeepDay(berlinToday());
+    var start = berlinToday();
+    var until = addDays(start, days);
+    return applyTravelRange(start, until);
   }
 
   function endTravel() {
@@ -3239,6 +3267,14 @@
         b.classList.toggle("is-on", b === t);
       });
       t.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
+    if (t.hasAttribute("data-wr-travel-range")) {
+      var rs = $("wr-travel-start");
+      var re = $("wr-travel-end");
+      var rStart = rs ? String(rs.value || "").slice(0, 10) : berlinToday();
+      var rEnd = re ? String(re.value || "").slice(0, 10) : rStart;
+      applyTravelRange(rStart, rEnd);
       return;
     }
     if (t.hasAttribute("data-wr-travel-go")) {
@@ -3778,6 +3814,7 @@
     armEdit: armEdit,
     dayNeedsTravelAlt: dayNeedsTravelAlt,
     endTravel: endTravel,
+    applyTravelRange: applyTravelRange,
     dayIndex: function () {
       return state.dayIndex;
     }

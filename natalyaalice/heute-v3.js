@@ -1556,8 +1556,9 @@
       desc: descHtml(item.note),
       postId: String(item.id),
       inviteIso: dayKey(item.starts_at),
-      canInvite: "plus",
-      actions: ""
+      canInvite: false,
+      actions:
+        '<div class="acc-card__plus-row"><button type="button" class="acc-card__plus-label" data-shell-plus="1">Plus</button></div>'
     });
   }
 
@@ -1581,8 +1582,9 @@
         : '<p class="acc-card__desc">Tippe zum Protokollieren.</p>',
       postId: String(item.id),
       inviteIso: day,
-      canInvite: "plus",
-      actions: ""
+      canInvite: false,
+      actions:
+        '<div class="acc-card__plus-row"><button type="button" class="acc-card__plus-label" data-shell-plus="1">Plus</button></div>'
     });
   }
 

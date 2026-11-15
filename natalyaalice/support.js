@@ -835,43 +835,26 @@
   }
 
   function saveNutritionLog(text) {
+    /* Nur Log speichern — kein neues Event/Frame unter Aktuell */
     text = String(text || "").trim().slice(0, 500);
     if (!text || !me()) return Promise.resolve();
-    var starts = todayIso() + "T19:00:00+01:00";
-    return createSupportEvent({
-      title: "Ernährung",
-      category: "alternative",
-      starts_at: starts,
-      visibility: "privat",
-      item_type: "nutrition_log"
-    }).then(function (rows) {
-      var ev = Array.isArray(rows) ? rows[0] : rows;
-      if (!ev || !ev.id) return;
-      return rest("events?id=eq." + encodeURIComponent(ev.id), {
-        method: "PATCH",
-        prefer: "return=minimal",
-        body: { title: "Ernährung", status: "erledigt" }
-      }).catch(function () {});
-    }).then(function () {
-      /* Notiz: activity_log (type nutrition_log) + optional meta.text */
-      var logBody = {
-        user_id: me(),
-        type: "nutrition_log",
-        ref_id: null,
-        meta: { text: text, visibility: "privat", day: todayIso() }
-      };
+    var logBody = {
+      user_id: me(),
+      type: "nutrition_log",
+      ref_id: null,
+      meta: { text: text, visibility: "privat", day: todayIso() }
+    };
+    return rest("activity_log", {
+      method: "POST",
+      prefer: "return=minimal",
+      body: logBody
+    }).catch(function () {
+      delete logBody.meta;
       return rest("activity_log", {
         method: "POST",
         prefer: "return=minimal",
         body: logBody
-      }).catch(function () {
-        delete logBody.meta;
-        return rest("activity_log", {
-          method: "POST",
-          prefer: "return=minimal",
-          body: logBody
-        }).catch(function () {});
-      });
+      }).catch(function () {});
     });
   }
 
