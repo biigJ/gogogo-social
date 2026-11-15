@@ -2076,6 +2076,7 @@
     .gz-calc { display: block; margin-top: 2px; font-size: 12px; color: rgba(42,33,24,.55); }
     .gz-online { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 0 0 12px; font-weight: 600; }
     .gz-online input { width: 20px; height: 20px; accent-color: #111; }
+    .go-online-cta--ghost { background: transparent !important; color: #111 !important; border: 1.5px solid #111 !important; margin-left: 6px; }
     .go-online-cta { display: inline-flex; align-items: center; min-height: 36px; margin: 8px 0 0; padding: 0 14px; border-radius: 999px; border: 0; background: #111; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
     .acc-tool-badge { display: inline-flex; align-items: center; justify-content: center; min-height: 30px; }
     .acc-badge-ico { display: block; color: #2A2118; width: 30px; height: 30px; }
@@ -7583,10 +7584,10 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/go-zirkel-setup.js?v=gz-2"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-37"></script>
+  <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-38"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-31"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-32"></script>
   <script src="/natalyaalice/support.js?v=support-13"></script>
   <script>
     (function () {
@@ -12112,6 +12113,71 @@
         return Promise.resolve();
       }
 
+      /* Zirkel-Event → FFC-Preset mit gemeinsamem Start (Startzeit, Admin-Halt, Spät-Einstieg) */
+      function zirkelSyncPreset(eventId, preset) {
+        var base = Object.assign({}, preset || {});
+        if (!eventId || !/^[0-9a-f-]{36}$/i.test(String(eventId)) || !window.GoZirkelSetup) {
+          return Promise.resolve(base);
+        }
+        function load() {
+          return rest(
+            "events?id=eq." + encodeURIComponent(eventId) + "&select=id,user_id,starts_at,note,status"
+          ).then(function (rows) {
+            return rows && rows[0] ? GoZirkelSetup.startInfo(rows[0]) : null;
+          });
+        }
+        return load()
+          .then(function (info) {
+            if (!info) return base;
+            base.workSec = info.z.workSec;
+            base.restSec = info.z.restSec;
+            base.sync = {
+              eventId: String(eventId),
+              startAt: info.startAt,
+              hold: info.hold,
+              phases: info.phases,
+              poll: load
+            };
+            return base;
+          })
+          .catch(function () {
+            return base;
+          });
+      }
+
+      /* Admin (Event-Ersteller): Start anhalten / jetzt freigeben (10 s Countdown) */
+      function zirkelAdminStart(eventId, action) {
+        return rest("events?id=eq." + encodeURIComponent(eventId) + "&select=note").then(function (rows) {
+          var note = rows && rows[0] ? rows[0].note : "";
+          if (action === "hold") note = GoZirkelSetup.withFlag(GoZirkelSetup.withFlag(note, "go", null), "hold", 1);
+          else note = GoZirkelSetup.withFlag(GoZirkelSetup.withFlag(note, "hold", null), "go", Math.floor(Date.now() / 1000) + 10);
+          return rest("events?id=eq." + encodeURIComponent(eventId), {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: { note: note }
+          });
+        });
+      }
+
+      /* Ende des gemeinsamen Zirkels: eigenes Event automatisch erledigt */
+      function zirkelFinished(eventId) {
+        if (!eventId || !sessionAccount) return Promise.resolve();
+        return rest(
+          "events?id=eq." +
+            encodeURIComponent(eventId) +
+            "&user_id=eq." +
+            encodeURIComponent(sessionAccount.id) +
+            "&status=neq.erledigt",
+          { method: "PATCH", prefer: "return=minimal", body: { status: "erledigt" } }
+        )
+          .then(function () {
+            if (window.WocheReels && WocheReels.refresh) WocheReels.refresh();
+            if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
+          })
+          .catch(function () {});
+      }
+      window.GoZirkelSync = { preset: zirkelSyncPreset, admin: zirkelAdminStart, finished: zirkelFinished };
+
       function installWocheReels() {
         if (!window.WocheReels || !sessionMode || !sessionAccount) {
           document.body.classList.remove("is-woche-reels");
@@ -12178,7 +12244,12 @@
           },
           openZirkelWorkout: function (eventId, preset) {
             requireFfc(function () {
-              if (window.FFC && FFC.openSetup) FFC.openSetup(preset || null);
+              if (window.FFC && FFC.openSetup) {
+                zirkelSyncPreset(eventId, preset).then(function (pr) {
+                  FFC.openSetup(pr);
+                });
+                return;
+              }
               else if (window.FFC && FFC.go) FFC.go("run");
             }, { title: "Zirkeltraining" });
           },
@@ -12363,9 +12434,11 @@
                   openGoSub("zirkel", "Friday Fitness Circle");
                   refreshZirkel();
                   if (window.FFC && FFC.openSetup) {
-                    try {
-                      FFC.openSetup(preset || null);
-                    } catch (eS) {}
+                    zirkelSyncPreset(preset && preset.eventId, preset).then(function (pr) {
+                      try {
+                        FFC.openSetup(pr && Object.keys(pr).length ? pr : null);
+                      } catch (eS) {}
+                    });
                   }
                 },
                 {
@@ -20754,8 +20827,9 @@
         onNicknameWanted: function () {
           if (sessionMode) openAccountEdit("nickname");
         },
-        onSaved: function () {
+        onSaved: function (workout, syncEventId) {
           if (sessionMode) markDiaryMove(Log.berlinToday(), "Zirkeltraining");
+          if (sessionMode && syncEventId && window.GoZirkelSync) GoZirkelSync.finished(syncEventId);
         }
       };
 
@@ -20838,6 +20912,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-pass-1"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-sync-1"></script>
 </body>
 </html>

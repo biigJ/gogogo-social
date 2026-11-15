@@ -1634,8 +1634,77 @@
     const total = rounds > 0 ? rounds*workSec + (rounds-1)*restSec : 0;
     document.getElementById('sumTotal').textContent = fmtMin(total);
     const startBtn = document.getElementById('startBtn');
+    if(sync){ syncTick(); return; }
     startBtn.disabled = rounds === 0;
     startBtn.textContent = rounds === 0 ? 'Wähle mindestens eine Station' : 'Workout starten';
+  }
+
+  // ---------- Gemeinsamer Start (gogogo-Event) ----------
+  // sync = { eventId, startAt (ms), hold (bool), phases, poll: () => Promise<{startAt, hold}> }
+  // Alle Teilnehmer rechnen aus derselben Startzeit; wer später kommt, steigt in der laufenden Runde ein.
+  let sync = null, syncTimer = null, syncPollAt = 0;
+  function syncTotalSec(){
+    const ph = sync.phases || rounds;
+    return ph*workSec + Math.max(0, ph-1)*restSec;
+  }
+  function syncTick(){
+    if(!sync) return;
+    const startBtn = document.getElementById('startBtn');
+    const now = Date.now();
+    if(sync.poll && now - syncPollAt > 5000){
+      syncPollAt = now;
+      Promise.resolve(sync.poll()).then(st=>{
+        if(!sync || !st) return;
+        sync.hold = !!st.hold;
+        if(st.startAt) sync.startAt = st.startAt;
+      }).catch(()=>{});
+    }
+    if(sync.hold){
+      startBtn.disabled = true; startBtn.textContent = 'Wartet auf Start durch Admin';
+      return;
+    }
+    const diff = Math.round((sync.startAt - now)/1000);
+    if(diff > 0){
+      startBtn.disabled = true; startBtn.textContent = 'Gemeinsamer Start in '+fmt(diff);
+      return;
+    }
+    if(-diff >= syncTotalSec()){
+      startBtn.disabled = true; startBtn.textContent = 'Training ist vorbei';
+      return;
+    }
+    if(diff >= -1){
+      // pünktlich: automatisch los
+      startRunAt(sync.startAt);
+      return;
+    }
+    startBtn.disabled = false;
+    startBtn.textContent = 'Einsteigen · läuft seit '+fmt(-diff);
+  }
+  function stopSync(){
+    clearInterval(syncTimer); syncTimer = null; sync = null;
+  }
+  function startRunAt(startMs){
+    clearInterval(syncTimer); syncTimer = null;
+    if(sync && sync.phases){
+      rounds = sync.phases;
+      while(roundExercises.length < rounds) roundExercises.push(roundExercises.length % 2 === (runFirst ? 0 : 1) ? RUN_ID : '');
+      roundExercises = roundExercises.slice(0, rounds);
+    }
+    startRun();
+    // Vorspulen auf die aktuelle Position
+    let e = Math.max(0, Math.floor((Date.now() - startMs)/1000));
+    elapsedTotal = e;
+    while(e > 0){
+      if(e < phaseRemaining){ phaseRemaining -= e; e = 0; break; }
+      e -= phaseRemaining;
+      if(phase === 'work'){
+        if(currentRound >= rounds){ phase = 'log-final'; phaseRemaining = 0; break; }
+        phase = 'rest'; phaseRemaining = restSec;
+      } else {
+        currentRound += 1; phase = 'work'; phaseRemaining = workSec;
+      }
+    }
+    render();
   }
   refreshSetup();
 
@@ -2493,7 +2562,10 @@
     }
   });
 
+  let finishedSyncEventId = null;
   async function finishRun(){
+    finishedSyncEventId = sync ? sync.eventId : null;
+    stopSync();
     saveLogEntry();
     clearInterval(timerId);
     releaseWakeLock();
@@ -2523,14 +2595,14 @@
     if(result.ok){
       statusEl.style.color = 'var(--chalk)';
       statusEl.textContent = 'In deinen Trainingsaufzeichnungen gespeichert.';
-      host('onSaved', lastWorkout);
+      host('onSaved', lastWorkout, finishedSyncEventId);
     } else {
       statusEl.style.color = 'var(--danger)';
       statusEl.textContent = 'Nicht gespeichert: ' + result.message;
     }
   }
 
-  document.getElementById('startBtn').addEventListener('click', startRun);
+  document.getElementById('startBtn').addEventListener('click', ()=>{ if(sync) startRunAt(sync.startAt); else startRun(); });
 
   // =================================================================
   // 24-STUNDEN-POSTS (Supabase: Tabelle posts + privater Speicher "posts", siehe supabase/posts.sql)
@@ -3339,6 +3411,12 @@
         const w = Number(preset.workSec), r = Number(preset.restSec);
         if(w >= 10 && w <= 900) workSec = w;
         if(r >= 0 && r <= 300) restSec = r;
+      }
+      stopSync();
+      if(preset && preset.sync && preset.sync.startAt){
+        sync = Object.assign({}, preset.sync);
+        syncPollAt = Date.now();
+        syncTimer = setInterval(syncTick, 1000);
       }
       await refreshCachedHistory();
       buildExercisePlan();

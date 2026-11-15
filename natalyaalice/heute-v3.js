@@ -246,7 +246,7 @@
     var mine = String(ev.user_id) === String(me());
     if (!mine && !iAmGoing(eventId)) toggleRsvp(eventId);
     if (live) {
-      if (host.openZirkel) host.openZirkel(z);
+      if (host.openZirkel) host.openZirkel(Object.assign({ eventId: String(ev.id) }, z));
       return;
     }
     if (host.toast) host.toast("Du bist online dabei. Zum Start hier wieder tippen.");
