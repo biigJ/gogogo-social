@@ -2282,7 +2282,10 @@
     body.is-session[data-shell="profil"][data-plan="info"] #plan-info,
     body.is-session[data-shell="plan"][data-plan="info"] #plan-info,
     body.is-session[data-shell="kurse"][data-plan="training"] #plan-training,
-    body.is-session[data-shell="plan"][data-plan="training"] #plan-training,
+    body.is-session[data-shell="plan"][data-plan="training"] #plan-training {
+      display: flex !important;
+      flex-direction: column;
+    }
     body.is-session[data-shell="profil"][data-plan="settings"] #plan-settings,
     body.is-session[data-shell="plan"][data-plan="settings"] #plan-settings,
     body.is-session[data-shell="profil"][data-plan="profil"] #plan-profil,
@@ -4517,7 +4520,7 @@
       margin-top: 16px;
     }
 
-    /* Go carousel — #go-rail ist Sibling von #plan-training, nicht Kind */
+    /* Go carousel — #go-rail ist Kind von #plan-training (flex-Spalte) */
     body.is-session #go-rail.go-rail,
     body.is-session #plan-training .go-rail,
     body.is-session #plan-team.team-rail {
@@ -4793,6 +4796,7 @@
     body.is-session[data-shell="kurse"] #go-rail {
       flex: 1 1 auto;
       width: 100%;
+      min-width: 0; /* flex-Item darf schrumpfen → festes Scrollport */
       /* height:0 + flex:1 = feste Höhe für nested overflow-y */
       height: 0;
       max-height: none;
@@ -6237,7 +6241,7 @@
         <div><span>MITGLIED</span><strong id="stamp-card-member">—</strong></div>
       </div>
       <div class="stamp-pass__qr">
-        <img id="stamp-card-qr" alt="QR-Code der Stempelkarte" width="180" height="180" />
+        <img id="stamp-card-qr" alt="QR-Code der Stempelkarte" width="120" height="120" />
         <code id="stamp-card-id"></code>
       </div>
       <button type="button" class="stamp-pass__wallet" id="stamp-card-wallet">In Wallet speichern</button>
@@ -6258,6 +6262,16 @@
       <p class="team-msg" id="travel-plan-msg"></p>
       <button type="button" id="travel-plan-save">Reise speichern</button>
       <button type="button" class="sand-quiet" id="travel-plan-cancel">Abbrechen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="travel-alts-ask" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="travel-alts-ask-title">
+      <h2 class="ask" id="travel-alts-ask-title">Alternativen setzen?</h2>
+      <p class="team-msg">Noch keine Alternativen gesetzt. Möchtest Du Alternativen für die Events erzeugen?</p>
+      <div class="sand-actions">
+        <button type="button" class="sand-quiet" id="travel-alts-ask-cancel">Später</button>
+        <button type="button" id="travel-alts-ask-ok">Ja, setzen</button>
+      </div>
     </div>
   </div>
   <div class="sand-modal" id="stamp-book-modal" hidden>
@@ -12038,9 +12052,23 @@
       function askCreateTravelAlts() {
         var range = absenceOf(sessionAccount);
         if (!range || absenceHasTravelAlts(range)) return false;
-        if (!window.confirm("Noch keine Alternativen gesetzt. Möchtest Du Alternativen für die Events erzeugen?")) return false;
-        openTravelAlt(firstTravelAltIso(range));
+        var modal = document.getElementById("travel-alts-ask");
+        if (!modal) {
+          openTravelAlt(firstTravelAltIso(range));
+          return true;
+        }
+        modal.hidden = false;
         return true;
+      }
+      function closeTravelAltsAsk() {
+        var modal = document.getElementById("travel-alts-ask");
+        if (modal) modal.hidden = true;
+      }
+      function confirmTravelAltsAsk() {
+        var range = absenceOf(sessionAccount);
+        closeTravelAltsAsk();
+        if (!range) return;
+        openTravelAlt(firstTravelAltIso(range));
       }
 
       function openDayAlt(iso) {
@@ -12713,14 +12741,25 @@
         var msg = document.getElementById("travel-plan-msg");
         var today = Log.berlinToday();
         if (msg) msg.textContent = "";
-        if (start) start.value = today;
+        if (start) {
+          start.min = today;
+          start.value = today;
+        }
         if (end) {
           var d = new Date(today + "T12:00:00");
           d.setDate(d.getDate() + 3);
           end.value = d.toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
           end.min = today;
         }
-        if (start) start.min = today;
+        if (start && !start._travelBound) {
+          start._travelBound = true;
+          start.addEventListener("change", function () {
+            var s = String(start.value || "").slice(0, 10);
+            if (!end || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return;
+            end.min = s;
+            if (end.value && end.value < s) end.value = s;
+          });
+        }
         if (modal) modal.hidden = false;
       }
       function closeTravelPlanModal() {
@@ -12996,37 +13035,38 @@
         var nick = (document.getElementById("stamp-card-nick") || {}).textContent || "";
         var sid = (document.getElementById("stamp-card-id") || {}).textContent || stampCardId();
         var canvas = document.createElement("canvas");
+        /* Wallet-Pass ~ 3:4.2 wie .stamp-pass */
         canvas.width = 680;
-        canvas.height = 980;
+        canvas.height = 952;
         var ctx = canvas.getContext("2d");
         ctx.fillStyle = "#C7413B";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "#F6F1E8";
         ctx.textAlign = "center";
         ctx.font = "600 56px 'Playfair Display', Georgia, serif";
-        ctx.fillText(brand, canvas.width / 2, 78);
+        ctx.fillText(brand, canvas.width / 2, 72);
         ctx.font = "500 22px Inter, sans-serif";
-        ctx.fillText("Challenge Deine Bewegung", canvas.width / 2, 118);
+        ctx.fillText("Challenge Deine Bewegung", canvas.width / 2, 110);
         ctx.textAlign = "left";
         var filled = Math.max(0, Math.min(12, Number(count) || 0));
         var i;
         var gridLeft = 90;
-        var gridTop = 170;
+        var gridTop = 150;
         var cell = 125;
         ctx.fillStyle = "rgba(0,0,0,0.18)";
-        ctx.fillRect(60, 140, 560, 420);
+        ctx.fillRect(60, 125, 560, 400);
         for (i = 0; i < 12; i++) {
           var col = i % 4;
           var row = Math.floor(i / 4);
           var x = gridLeft + col * cell + 48;
           var y = gridTop + row * cell + 48;
           ctx.beginPath();
-          ctx.arc(x, y, 42, 0, Math.PI * 2);
+          ctx.arc(x, y, 40, 0, Math.PI * 2);
           if (i < filled) {
             ctx.fillStyle = "#F6F1E8";
             ctx.fill();
             ctx.beginPath();
-            ctx.arc(x, y, 24, 0, Math.PI * 2);
+            ctx.arc(x, y, 22, 0, Math.PI * 2);
             ctx.fillStyle = "#C7413B";
             ctx.fill();
           } else {
@@ -13037,17 +13077,17 @@
         }
         ctx.fillStyle = "#F6F1E8";
         ctx.font = "600 14px Inter, sans-serif";
-        ctx.fillText("NICKNAME", 60, 600);
-        ctx.fillText("MITGLIED", 360, 600);
+        ctx.fillText("NICKNAME", 60, 560);
+        ctx.fillText("MITGLIED", 360, 560);
         ctx.font = "600 22px Inter, sans-serif";
-        ctx.fillText(String(nick || "—").slice(0, 18), 60, 632);
-        ctx.fillText(String(member || "—").slice(0, 18), 360, 632);
+        ctx.fillText(String(nick || "—").slice(0, 18), 60, 592);
+        ctx.fillText(String(member || "—").slice(0, 18), 360, 592);
         ctx.fillStyle = "#fff";
-        ctx.fillRect(190, 670, 300, 260);
+        ctx.fillRect(230, 620, 220, 250);
         ctx.fillStyle = "#2A2118";
         ctx.font = "14px monospace";
         ctx.textAlign = "center";
-        ctx.fillText(sid, canvas.width / 2, 910);
+        ctx.fillText(sid, canvas.width / 2, 900);
         ctx.textAlign = "left";
         var qrImg = document.getElementById("stamp-card-qr");
         function finish(blob) {
@@ -13078,7 +13118,7 @@
           }
         }
         if (qrImg && qrImg.complete && qrImg.naturalWidth) {
-          try { ctx.drawImage(qrImg, 220, 690, 240, 200); } catch (eQ) {}
+          try { ctx.drawImage(qrImg, 245, 640, 190, 190); } catch (eQ) {}
           exportPng();
         } else {
           exportPng();
@@ -18483,6 +18523,16 @@
         if (travelModal) {
           travelModal.addEventListener("click", function (ev) {
             if (ev.target.id === "travel-plan-modal") closeTravelPlanModal();
+          });
+        }
+        var travelAltsOk = document.getElementById("travel-alts-ask-ok");
+        if (travelAltsOk) travelAltsOk.addEventListener("click", confirmTravelAltsAsk);
+        var travelAltsCancel = document.getElementById("travel-alts-ask-cancel");
+        if (travelAltsCancel) travelAltsCancel.addEventListener("click", closeTravelAltsAsk);
+        var travelAltsModal = document.getElementById("travel-alts-ask");
+        if (travelAltsModal) {
+          travelAltsModal.addEventListener("click", function (ev) {
+            if (ev.target.id === "travel-alts-ask") closeTravelAltsAsk();
           });
         }
 

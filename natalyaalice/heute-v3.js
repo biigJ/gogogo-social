@@ -1480,6 +1480,13 @@
     });
 
     pack.past.forEach(function (ev) {
+      /* Ernährung-Logs sind kein eigener Frame — nur activity_log + eine Karte */
+      if (
+        ev.item_type === "nutrition_log" ||
+        (isBookedSupportEvent(ev) && /ernährung|ernaehrung/i.test(String(ev.title || "")))
+      ) {
+        return;
+      }
       var item = {
         kind: "event",
         starts_at: ev.starts_at,
