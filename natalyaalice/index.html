@@ -4642,6 +4642,94 @@
     .go-slide__ffc-box #historyList {
       width: 100%;
     }
+    .go-rec-wheel {
+      position: relative;
+      height: 132px;
+      margin: 0 0 10px;
+      overflow: hidden;
+    }
+    .go-rec-wheel::before,
+    .go-rec-wheel::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0;
+      height: 36px;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .go-rec-wheel::before {
+      top: 0;
+      background: linear-gradient(#F6F1E8, rgba(246, 241, 232, 0));
+    }
+    .go-rec-wheel::after {
+      bottom: 0;
+      background: linear-gradient(rgba(246, 241, 232, 0), #F6F1E8);
+    }
+    .go-rec-wheel__mark {
+      position: absolute;
+      left: 0; right: 0;
+      top: 50%;
+      height: 36px;
+      margin-top: -18px;
+      border-top: 1px solid rgba(42, 33, 24, 0.18);
+      border-bottom: 1px solid rgba(42, 33, 24, 0.18);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .go-rec-wheel__col {
+      height: 100%;
+      overflow-y: auto;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      padding: 48px 0;
+      scrollbar-width: none;
+    }
+    .go-rec-wheel__col::-webkit-scrollbar { display: none; }
+    .go-rec-wheel__item {
+      display: block;
+      width: 100%;
+      height: 36px;
+      margin: 0;
+      padding: 0 8px;
+      border: 0;
+      background: transparent;
+      color: rgba(42, 33, 24, 0.45);
+      font: inherit;
+      font-size: 14px;
+      line-height: 36px;
+      text-align: center;
+      scroll-snap-align: center;
+      cursor: pointer;
+    }
+    .go-rec-wheel__item.is-on {
+      color: #2A2118;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .go-rec-detail {
+      border-top: 1px solid rgba(42, 33, 24, 0.14);
+      padding-top: 10px;
+      display: grid;
+      gap: 6px;
+    }
+    .go-rec-detail__head {
+      font-weight: 700;
+      font-size: 14px !important;
+    }
+    .go-rec-detail__meta {
+      font-size: 12px !important;
+      color: rgba(42, 33, 24, 0.65);
+    }
+    .go-rec-detail__row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 13px !important;
+    }
+    .go-rec-detail__row span:last-child {
+      white-space: nowrap;
+      color: rgba(42, 33, 24, 0.72);
+    }
     .go-slide__title + .go-slide__art,
     .go-slide__head + .go-slide__art { margin-top: 0; }
     .go-slide__art + .go-slide__cta { margin-top: calc(36px * 0.65); }
@@ -12983,23 +13071,103 @@
             lbBox.appendChild(row);
           });
         }
-        function paintRec(rows) {
+        function paintRecSessions(sessions) {
           if (!recBox) return;
           recBox.textContent = "";
-          if (!rows || !rows.length) {
+          if (!sessions || !sessions.length) {
             recBox.textContent = "Noch keine Aufzeichnungen.";
             return;
           }
-          rows.slice(0, 12).forEach(function (r) {
-            var row = document.createElement("div");
-            row.className = "go-slide__ffc-row";
-            var left = document.createElement("span");
-            left.textContent = r.title || r.label || r.date || "Training";
-            var right = document.createElement("span");
-            right.textContent = r.meta || r.points || "";
-            row.appendChild(left);
-            if (right.textContent) row.appendChild(right);
-            recBox.appendChild(row);
+          var wheel = document.createElement("div");
+          wheel.className = "go-rec-wheel";
+          var mark = document.createElement("div");
+          mark.className = "go-rec-wheel__mark";
+          var col = document.createElement("div");
+          col.className = "go-rec-wheel__col";
+          sessions.forEach(function (s, i) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "go-rec-wheel__item" + (i === 0 ? " is-on" : "");
+            btn.dataset.idx = String(i);
+            btn.textContent = s.dateLabel || s.date || "Training";
+            col.appendChild(btn);
+          });
+          wheel.appendChild(mark);
+          wheel.appendChild(col);
+          var detail = document.createElement("div");
+          detail.className = "go-rec-detail";
+          function show(idx) {
+            var s = sessions[idx];
+            if (!s) return;
+            Array.prototype.forEach.call(col.querySelectorAll(".go-rec-wheel__item"), function (el, i) {
+              el.classList.toggle("is-on", i === idx);
+            });
+            detail.textContent = "";
+            var head = document.createElement("div");
+            head.className = "go-rec-detail__head";
+            head.textContent =
+              (s.dateLabel || "Training") +
+              (s.points > 0 ? " · " + s.points + " Punkte" : "");
+            var meta = document.createElement("div");
+            meta.className = "go-rec-detail__meta";
+            meta.textContent = s.meta || "";
+            detail.appendChild(head);
+            if (meta.textContent) detail.appendChild(meta);
+            (s.lines || []).forEach(function (line) {
+              var row = document.createElement("div");
+              row.className = "go-rec-detail__row";
+              var left = document.createElement("span");
+              left.textContent = line.label || "";
+              var right = document.createElement("span");
+              right.textContent = line.value || "";
+              row.appendChild(left);
+              row.appendChild(right);
+              detail.appendChild(row);
+            });
+            if (!(s.lines || []).length) {
+              var empty = document.createElement("div");
+              empty.className = "go-rec-detail__meta";
+              empty.textContent = "Keine Übungen protokolliert.";
+              detail.appendChild(empty);
+            }
+          }
+          function indexFromScroll() {
+            var items = col.querySelectorAll(".go-rec-wheel__item");
+            if (!items.length) return 0;
+            var mid = col.scrollTop + col.clientHeight / 2;
+            var best = 0;
+            var bestDist = Infinity;
+            Array.prototype.forEach.call(items, function (el, i) {
+              var center = el.offsetTop + el.offsetHeight / 2;
+              var d = Math.abs(center - mid);
+              if (d < bestDist) {
+                bestDist = d;
+                best = i;
+              }
+            });
+            return best;
+          }
+          col.addEventListener(
+            "scroll",
+            function () {
+              show(indexFromScroll());
+            },
+            { passive: true }
+          );
+          col.addEventListener("click", function (ev) {
+            var btn = ev.target && ev.target.closest ? ev.target.closest(".go-rec-wheel__item") : null;
+            if (!btn) return;
+            var i = Number(btn.dataset.idx || 0) || 0;
+            var el = col.querySelectorAll(".go-rec-wheel__item")[i];
+            if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+            show(i);
+          });
+          recBox.appendChild(wheel);
+          recBox.appendChild(detail);
+          show(0);
+          requestAnimationFrame(function () {
+            var first = col.querySelector(".go-rec-wheel__item");
+            if (first) first.scrollIntoView({ block: "center" });
           });
         }
         var lbPromise =
@@ -13036,30 +13204,18 @@
                 });
                 if (!lbBox.childNodes.length) lbBox.textContent = "Noch keine Leaderboard-Daten.";
               });
-        var recPromise = Promise.resolve().then(function () {
-          var hist = document.getElementById("historyList");
-          if (!recBox) return;
-          var rows = [];
-          if (hist) {
-            Array.prototype.forEach.call(
-              hist.querySelectorAll(".history-item, .hist-row, button, li, .record-row"),
-              function (src) {
-                var title =
-                  (src.querySelector &&
-                    (src.querySelector(".history-title, .hist-title, strong, .title") || {})
-                      .textContent) ||
-                  src.getAttribute("aria-label") ||
-                  "";
-                title = String(title || src.textContent || "")
-                  .replace(/\s+/g, " ")
-                  .trim()
-                  .slice(0, 64);
-                if (title) rows.push({ title: title });
-              }
-            );
-          }
-          paintRec(rows);
-        });
+        var recPromise =
+          FFC.historyRecords
+            ? Promise.resolve(FFC.historyRecords())
+                .then(function (sessions) {
+                  paintRecSessions(sessions || []);
+                })
+                .catch(function () {
+                  if (recBox) recBox.textContent = "Aufzeichnungen konnten nicht geladen werden.";
+                })
+            : Promise.resolve().then(function () {
+                if (recBox) recBox.textContent = "Noch keine Aufzeichnungen.";
+              });
         /* Kein FFC.refreshTraining hier — das flackert die FFC-UI und den Plus-Slide */
         Promise.all([lbPromise, recPromise]).catch(function () {});
       }

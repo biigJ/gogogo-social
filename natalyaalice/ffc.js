@@ -3376,6 +3376,39 @@
       if(error) return null;
       return (data || []).map(r=>({ user_id:r.user_id, nickname:r.nickname, points:r.points, workouts:r.workouts, is_me:!!r.is_me }));
     },
+    /* Trainings aus FFC-Supabase (training_sessions) für Plus/Aufzeichnungen */
+    async historyRecords(){
+      if(!currentUser) return [];
+      await refreshCachedHistory();
+      return (cachedHistory || []).map(session=>{
+        const d = new Date(session.date);
+        const dateLabel = isNaN(d.getTime())
+          ? String(session.date || '').slice(0, 16)
+          : (d.toLocaleDateString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' }) +
+            ' · ' + d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' }));
+        const pts = sessionPoints(session.log, session.workSec, myGender);
+        const lines = (session.log || []).filter(e=>e && e.exercise).map((entry, i)=>{
+          const ex = exercises.find(e=>e.id===entry.exercise);
+          const p = roundPoints(entry.exercise, entry.amount, session.workSec, myGender);
+          return {
+            label: 'R'+(i+1)+' · '+(ex?ex.name:entry.exercise)+weightSuffix(entry),
+            value: String(entry.amount||'0')+' '+(ex?ex.unit:'')+(p?(' · '+p+' P'):'')
+          };
+        });
+        return {
+          id: session.id,
+          date: session.date,
+          dateLabel,
+          rounds: session.rounds,
+          workSec: session.workSec,
+          restSec: session.restSec,
+          totalSec: session.totalSec,
+          points: pts,
+          meta: (session.rounds||0)+' Runden · '+fmtMin(session.workSec||0)+' Arbeit · '+(session.restSec||0)+'s Pause',
+          lines
+        };
+      });
+    },
     async signUp(email, password){
       try{
         const { data, error } = await sb.auth.signUp({ email, password });

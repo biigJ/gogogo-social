@@ -789,12 +789,22 @@
     ).then(function (rows) {
       return Promise.all(
         (rows || []).map(function (o) {
-          if (!o || o.status === "angefragt") return null;
-          return rest("support_orders?id=eq." + encodeURIComponent(o.id), {
-            method: "PATCH",
-            prefer: "return=minimal",
-            body: { status: "angefragt" }
-          }).catch(function () {});
+          if (!o || !o.id) return null;
+          var cancel =
+            o.status === "angefragt"
+              ? Promise.resolve()
+              : rest("support_orders?id=eq." + encodeURIComponent(o.id), {
+                  method: "PATCH",
+                  prefer: "return=minimal",
+                  body: { status: "angefragt" }
+                }).catch(function () {});
+          return Promise.resolve(cancel).then(function () {
+            /* Hard-Delete wenn RLS-Policy existiert (go-support-orders-delete.sql) */
+            return rest("support_orders?id=eq." + encodeURIComponent(o.id), {
+              method: "DELETE",
+              prefer: "return=minimal"
+            }).catch(function () {});
+          });
         })
       );
     });
