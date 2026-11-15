@@ -12,7 +12,7 @@
     personal_training: "/assets/gogogo/gogogo-Web-Call.jpg",
     web_call: "/assets/gogogo/gogogo-Web-Call.jpg",
     ernaehrung: "/assets/gogogo/gogogo-Ernaehrung.jpg",
-    stempelkarte: "/assets/gogogo/gogogo-12wochen-routine.jpg",
+    stempelkarte: "/assets/gogogo/gogogo-Stempelkarte.jpg",
     merch: "/assets/gogogo/gogogo-12wochen-routine.jpg",
     routine: "/assets/gogogo/gogogo-12wochen-routine.jpg",
     zirkel: "/assets/gogogo/gogogo-Zirkeltraining.jpg"
@@ -38,6 +38,13 @@
 
   function todayIso() {
     return host.todayIso ? host.todayIso() : new Date().toISOString().slice(0, 10);
+  }
+
+  function addDaysIso(iso, days) {
+    var parts = String(iso || "").slice(0, 10).split("-");
+    var dt = new Date(Date.UTC(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+    dt.setUTCDate(dt.getUTCDate() + (Number(days) || 0));
+    return dt.toISOString().slice(0, 10);
   }
 
   function berlinHour() {
@@ -284,17 +291,39 @@
         })
       );
     } else if (type === "ernaehrung") {
-      /* Heute-Karte ab 19:00 — Event für heute Abend anlegen */
-      var dinner = todayIso() + "T19:00:00+01:00";
+      /* 4 Wochen unter Aktuell: Meta merken; Karten kommen aus heuteSupportItems */
+      var startDay = todayIso();
+      if (order) {
+        order.meta = Object.assign({}, order.meta || {}, { start: startDay, days: 28 });
+      }
+      if (order && order.id && String(order.id).indexOf("local-") !== 0) {
+        jobs.push(
+          rest("support_orders?id=eq." + encodeURIComponent(order.id), {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: { meta: order.meta }
+          }).catch(function () {})
+        );
+      }
       jobs.push(
         createSupportEvent({
           title: "Ernährung",
           category: "alternative",
-          starts_at: dinner,
+          starts_at: startDay + "T19:00:00+01:00",
           visibility: "privat",
           item_type: "nutrition_log"
-        })
+        }).catch(function () {})
       );
+    } else if (type === "stempelkarte") {
+      if (order && order.id && String(order.id).indexOf("local-") !== 0) {
+        jobs.push(
+          rest("support_orders?id=eq." + encodeURIComponent(order.id), {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: { status: "aktiv", meta: Object.assign({}, order.meta || {}, { stamps: 0, start: todayIso() }) }
+          }).catch(function () {})
+        );
+      }
     }
     return Promise.all(jobs)
       .then(function () {
@@ -346,15 +375,15 @@
       title: "Stempelkarte",
       price: "25 € Spende",
       description:
-        "12er-Stempelkarte. Event erstellen, Freund macht mit und scannt — beide erhalten einen Stempel. Volle Karte: T-Shirt oder Selfiestick."
+        "12er-Stempelkarte für 25€ Spende per PayPal an Ben Joscha Grope. Die Karte ist sofort aktiv — unter Wallet speichern. Event mit Freund, beide scannen: ein Stempel. Volle Karte: T-Shirt oder Selfiestick."
     },
     {
       key: "web_call",
       type: "web_call",
       title: "Initialgespräch",
-      price: "Web-Call",
+      price: "25 € Spende",
       description:
-        "Initialtreffen mit Gründer oder zertifiziertem Coach: Alltag analysieren, Plan schärfen. Optional ACT-basiertes Coaching zum Aufbau im Alltag."
+        "Triff Joscha für 30 Minuten zu einem Erstgespräch auf Spendenbasis von 25€. Sprich mit Ihm über Deine Trainingsziele, Dein Ressourcen, Deinen Alltag und Herausforderungen. Als Ergebnis fasst er Dir einen Trainingsplan zusammen, der für Deinen Alltag passt. Webmeeting über Calendly."
     },
     {
       key: "routine",
@@ -368,9 +397,9 @@
       key: "ernaehrung",
       type: "ernaehrung",
       title: "Ernährungscoaching",
-      price: "Paket",
+      price: "25 € Spende",
       description:
-        "Tägliches Event über 4 Wochen: KI nimmt Dein Protokoll auf und rechnet am Tagesende zusammen. Coach-Feedback und Ernährungsplan auf Wunsch."
+        "4 Wochen tägliches Ernährungs-Event unter Aktuell. Protokolliere Mahlzeiten im Dialog, Tracke unter Plus. Coach-Feedback und Plan auf Wunsch. 25€ Spende per PayPal an Ben Joscha Grope — sofort aktiv."
     },
     {
       key: "coach_offer",
@@ -378,9 +407,12 @@
       title: "Selbst Coaching anbieten",
       price: "Zugang",
       description:
-        "Zugang zum Admin-Bereich. Freunde finden Dich in der Coach-Liste. Inklusive Playbook: was gogogo fördert und warum die Trainingspläne so aufgebaut sind."
+        "Mit der Trainer-A-Lizenz oder PT-Lizenz und mit Erfahrung in der Fitnesswelt kannst Du hier einen Zugang zum Admin-Bereich erhalten und Freunde finden Dich in der Coach-Liste. Über Buchen musst Du Deinen CV an Joschas WhatsApp schicken."
     }
   ];
+  var PAYPAL_DONATE_URL =
+    "https://www.paypal.com/donate/?business=bjgrope%40googlemail.com&currency_code=EUR&amount=25&item_name=gogogo";
+  var JOSCHA_WA = "491747015500";
   var PAY_HINT =
     "Zahlung: PayPal-Link an Dich, danach manuelle Freischaltung (einfachster Start). Stripe später für automatische Freigabe.";
 
@@ -605,15 +637,16 @@
     ) {
       var type = key === "nutrition" ? "ernaehrung" : key;
       return bookStaticOffer(type).then(function (order) {
-        if (type === "web_call" && host.openCalendlyPt) host.openCalendlyPt();
+        if (type === "coach_offer" && host.openJoschaCvWa) host.openJoschaCvWa();
         if (host.paintProfil) host.paintProfil();
+        if (host.onOffersReady) host.onOffersReady(STATIC_OFFERS.slice());
         if (host.toast) {
           host.toast(
             type === "coach_offer"
-              ? "Angefragt — Freischaltung nach Freigabe."
-              : type === "zirkel"
-                ? "FFC bereit."
-                : "Gebucht — Zahlung per PayPal, danach Freischaltung."
+              ? "CV an Joscha senden — danach Freischaltung."
+              : type === "stempelkarte" || type === "ernaehrung" || type === "web_call"
+                ? "Aktiv — 25€ Spende per PayPal an Ben Joscha Grope."
+                : "Gebucht."
           );
         }
         return order;
@@ -697,6 +730,14 @@
     /* Ohne Katalog-Produkt: lokale Order-Merker über Community/activity nicht nötig —
        speichere angefragte Buchung als support_orders nur wenn Produkt existiert.
        Fallback: meta in activity_log */
+    var instant = type === "stempelkarte" || type === "ernaehrung" || type === "web_call";
+    var status = instant ? "aktiv" : "angefragt";
+    var meta = {
+      type: type,
+      payment: instant ? "paypal_donate" : "paypal_pending",
+      stamps: type === "stempelkarte" ? 0 : undefined,
+      start: todayIso()
+    };
     return rest("activity_log", {
       method: "POST",
       prefer: "return=minimal",
@@ -704,21 +745,24 @@
         user_id: me(),
         type: "support_request",
         ref_id: null,
-        meta: { type: type, payment: "paypal_pending" }
+        meta: meta
       }
     })
       .catch(function () {})
       .then(function () {
-        state.orders = state.orders.concat([
-          {
-            id: "local-" + type,
-            user_id: me(),
-            status: "angefragt",
-            payment_status: "offen",
-            support_products: { type: type, title: TYPE_LABELS[type] || type }
-          }
-        ]);
-        return null;
+        var order = {
+          id: "local-" + type + "-" + Date.now(),
+          user_id: me(),
+          status: status,
+          payment_status: instant ? "spende" : "offen",
+          meta: meta,
+          created_at: new Date().toISOString(),
+          support_products: { type: type, title: TYPE_LABELS[type] || type }
+        };
+        state.orders = state.orders.concat([order]);
+        return afterBook({ type: type, title: TYPE_LABELS[type] || type }, order).then(function () {
+          return order;
+        });
       });
   }
 
@@ -761,21 +805,32 @@
     var today = todayIso();
     var hour = berlinHour();
 
-    /* Ernährung: ab 19:00, wenn aktiv gebucht — private Log-Karte mit Diktat */
-    if (activeOrderFor("ernaehrung") && hour >= 19) {
-      out.push({
-        id: "nutrition-" + today,
-        user_id: me(),
-        starts_at: today + "T19:00:00+01:00",
-        title: "🥗 Ernährung",
-        note: state.nutritionPlan || "",
-        category: "alternative",
-        location: "privat",
-        item_type: "nutrition_log",
-        visibility: "privat",
-        nutrition: true,
-        photo_url: ""
-      });
+    /* Ernährung: 4 Wochen ab Buchungsstart — täglich unter Aktuell */
+    var nutritionOrder = activeOrderFor("ernaehrung");
+    if (nutritionOrder) {
+      var start = "";
+      try {
+        start = String((nutritionOrder.meta && nutritionOrder.meta.start) || (nutritionOrder.created_at || "")).slice(0, 10);
+      } catch (eStart) {}
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) start = today;
+      var span = Number((nutritionOrder.meta && nutritionOrder.meta.days) || 28) || 28;
+      var n;
+      for (n = 0; n < span; n++) {
+        var day = addDaysIso(start, n);
+        out.push({
+          id: "nutrition-" + day,
+          user_id: me(),
+          starts_at: day + "T19:00:00+01:00",
+          title: "🥗 Ernährung",
+          note: state.nutritionPlan || "Mahlzeiten tracken — Tippe zum Protokoll.",
+          category: "alternative",
+          location: "privat",
+          item_type: "nutrition_log",
+          visibility: "privat",
+          nutrition: true,
+          photo_url: ""
+        });
+      }
     }
     /* Web-Call / PT / Routine erscheinen als events (item_type support_session / course_session) */
     return out;
@@ -856,6 +911,8 @@
     activeOrderFor: activeOrderFor,
     openStampCard: openStampCard,
     cancelAllOrdersForUser: cancelAllOrdersForUser,
-    offerOwned: offerOwned
+    offerOwned: offerOwned,
+    paypalDonateUrl: function () { return PAYPAL_DONATE_URL; },
+    joschaWa: function () { return JOSCHA_WA; }
   };
 })(window);
