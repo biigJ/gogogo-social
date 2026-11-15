@@ -4091,7 +4091,7 @@
       background: transparent;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 26px;
     }
     #go-rail .go-card.go-card--routine-plain .go-card__title { display: none !important; }
     .go-formula {
@@ -4120,6 +4120,29 @@
       line-height: 1.35 !important;
       color: rgba(42, 33, 24, 0.78);
     }
+    /* Lockerer: Text voll lesbar, Zähler groß */
+    #go-rail .go-card.go-card--routine-plain .go-card__copy {
+      -webkit-line-clamp: unset;
+      line-clamp: unset;
+      display: block;
+      line-height: 1.5 !important;
+    }
+    #go-rail .go-card.go-card--routine-plain .go-routine-status {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      padding: 18px 0;
+      border-top: 1px solid rgba(42, 33, 24, 0.18);
+      border-bottom: 1px solid rgba(42, 33, 24, 0.18);
+    }
+    .go-routine-status__n {
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: 44px;
+      font-weight: 600;
+      line-height: 1;
+    }
+    .go-routine-status__n small { font-size: 18px; font-weight: 500; opacity: 0.6; margin-left: 4px; }
+    .go-routine-status__sub { font-family: Inter, system-ui, sans-serif; font-size: 15px; font-weight: 500; opacity: 0.75; }
     #go-rail .go-card.go-card--routine-plain .go-formula { order: 0; }
     #go-rail .go-card.go-card--routine-plain .go-routine-status { order: 1; }
     #go-rail .go-card.go-card--routine-plain .go-card__copy { order: 2; }
@@ -8673,8 +8696,21 @@
         return 0;
       }
 
-      function routineDoneDays() {
+      /* Zählstart: Wochenstart der Routine, sonst Buchungstag */
+      function routineCountStart() {
         var start = routineStart();
+        if (start) return start;
+        try {
+          var order = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("routine") : null;
+          if (order && order.created_at) {
+            return new Date(order.created_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+          }
+        } catch (eStart) {}
+        return "";
+      }
+
+      function routineDoneDays() {
+        var start = routineCountStart();
         if (!start) return 0;
         var today = Log.berlinToday();
         var end = addDays(start, 83);
@@ -8718,10 +8754,13 @@
             else card.appendChild(el);
           }
         }
-        var start = routineStart();
+        var start = routineCountStart();
         if (!start) {
-          el.hidden = true;
-          el.textContent = "";
+          /* Zählung schon vor dem Start sichtbar */
+          el.hidden = false;
+          el.innerHTML =
+            '<span class="go-routine-status__n">0<small>/84 Tage</small></span>' +
+            '<span class="go-routine-status__sub">Startet mit Deiner Buchung</span>';
           return;
         }
         var done = routineDoneDays();
@@ -8733,9 +8772,10 @@
             : "—€ zurück";
         el.hidden = false;
         el.innerHTML =
-          "<span>" +
+          '<span class="go-routine-status__n">' +
           done +
-          "/84 Tagen</span><span>" +
+          "<small>/84 Tage</small></span>" +
+          '<span class="go-routine-status__sub">' +
           refundLabel +
           "</span>";
       }
@@ -13738,120 +13778,87 @@
           teamTitle.textContent = "Leaderboard Team";
           teamSec.appendChild(teamTitle);
 
-          var groupsWrap = document.createElement("div");
-          groupsWrap.className = "go-ffc-groups";
-          if (!(lbGroups || []).length) {
-            var emptyG = document.createElement("p");
-            emptyG.className = "go-ffc-msg";
-            emptyG.textContent = "Noch keine FFC-Gruppe.";
-            groupsWrap.appendChild(emptyG);
+          /* Eine Gruppe für alles: Team → Meine Gruppe. FFC-Gruppe gleichen Namens ist die Spiegelung. */
+          var goGroup = (typeof myGroups === "function" && myGroups()[0]) || null;
+          var linked = goGroup ? linkedFfcGroup(goGroup) : null;
+          if (linked && String(lbScopeId) !== String(linked.group_id)) {
+            lbScopeId = linked.group_id;
+            if (FFC.setLeaderboardScope) FFC.setLeaderboardScope(linked.group_id);
+            reloadLb();
+            return;
           }
-          (lbGroups || []).forEach(function (g) {
-            var line = document.createElement("div");
-            line.className =
-              "go-ffc-group-line" +
-              (String(lbScopeId) === String(g.group_id) ? " is-on" : "");
-            var nameBtn = document.createElement("button");
-            nameBtn.type = "button";
-            nameBtn.className = "go-ffc-group-name";
-            nameBtn.textContent = g.name || "Gruppe";
-            nameBtn.addEventListener("click", function () {
-              lbScopeId = g.group_id;
-              if (FFC.setLeaderboardScope) FFC.setLeaderboardScope(g.group_id);
-              reloadLb();
-            });
-            var leave = document.createElement("button");
-            leave.type = "button";
-            leave.className = "go-ffc-btn go-ffc-btn--quiet go-ffc-leave";
-            leave.textContent = "Verlassen";
-            leave.addEventListener("click", function (ev) {
-              ev.stopPropagation();
-              if (leave.dataset.armed !== "1") {
-                leave.dataset.armed = "1";
-                leave.textContent = "Bestätigen";
-                window.setTimeout(function () {
-                  if (leave.dataset.armed === "1") {
-                    leave.dataset.armed = "";
-                    leave.textContent = "Verlassen";
-                  }
-                }, 4000);
+          var groupLine = document.createElement("p");
+          groupLine.className = "go-ffc-msg";
+          if (!goGroup) {
+            groupLine.textContent = "Noch keine Gruppe. Gruppen legst Du unter Team → Meine Gruppe an.";
+          } else if (!linked) {
+            groupLine.textContent = "Gruppe „" + (goGroup.name || "Gruppe") + "“ ist im Zirkel noch nicht aktiv.";
+          } else {
+            groupLine.textContent = "Gruppe „" + (goGroup.name || "Gruppe") + "“";
+          }
+          teamSec.appendChild(groupLine);
+
+          if (goGroup && !linked) {
+            var activate = document.createElement("button");
+            activate.type = "button";
+            activate.className = "go-ffc-btn";
+            activate.textContent = "Im Zirkel aktivieren";
+            activate.addEventListener("click", function () {
+              var friends = (FFC.friends && FFC.friends()) || [];
+              var memberIds = (goGroup.members || []).map(String);
+              var byNick = {};
+              (teamPeople || []).forEach(function (p) {
+                if (p && p.nickname && memberIds.indexOf(String(p.id)) >= 0) byNick[String(p.nickname).toLowerCase()] = true;
+              });
+              var ids = friends
+                .filter(function (f) {
+                  return f && f.status === "accepted" && f.friend_id &&
+                    byNick[String(f.nickname || f.friend_nickname || "").toLowerCase()];
+                })
+                .map(function (f) { return f.friend_id; });
+              if (!ids.length) {
+                ids = friends.filter(function (f) { return f && f.status === "accepted" && f.friend_id; })
+                  .map(function (f) { return f.friend_id; });
+              }
+              if (!ids.length) {
+                msg.textContent = "Deine Gruppenmitglieder brauchen einen FFC-Login. Lade sie über ihren Nickname oben ein.";
                 return;
               }
-              leave.disabled = true;
-              Promise.resolve(FFC.leaveGroup(g.group_id)).then(function () {
-                if (String(lbScopeId) === String(g.group_id)) lbScopeId = null;
-                msg.textContent = "Gruppe verlassen.";
-                reloadLb();
-              });
+              activate.disabled = true;
+              Promise.resolve(FFC.createGroup(goGroup.name || "Gruppe", ids))
+                .then(function (res) {
+                  activate.disabled = false;
+                  if (res && res.error) {
+                    msg.textContent = (res.error && res.error.message) || "Aktivieren fehlgeschlagen.";
+                    return;
+                  }
+                  lbScopeId = res && res.data != null ? res.data : lbScopeId;
+                  reloadLb();
+                })
+                .catch(function () {
+                  activate.disabled = false;
+                  msg.textContent = "Aktivieren fehlgeschlagen.";
+                });
             });
-            line.appendChild(nameBtn);
-            line.appendChild(leave);
-            groupsWrap.appendChild(line);
-          });
-          teamSec.appendChild(groupsWrap);
+            teamSec.appendChild(activate);
+          }
 
           var teamList = document.createElement("div");
           teamList.className = "go-ffc-lb-list";
-          if (lbScopeId == null) {
-            teamList.textContent = "Gruppe tippen, um das Team-Leaderboard zu sehen.";
-          } else {
+          if (linked) {
             paintRows(teamList, teamRows, "Noch keine Punkte in dieser Gruppe.");
+            teamSec.appendChild(teamList);
           }
-          teamSec.appendChild(teamList);
-
-          var createRow = document.createElement("div");
-          createRow.className = "go-ffc-group-row";
-          var groupIn = document.createElement("input");
-          groupIn.type = "text";
-          groupIn.className = "go-ffc-input";
-          groupIn.placeholder = "Neuer Gruppenname";
-          groupIn.maxLength = 40;
-          var groupBtn = document.createElement("button");
-          groupBtn.type = "button";
-          groupBtn.className = "go-ffc-btn";
-          groupBtn.textContent = "Gruppe erstellen";
-          groupBtn.addEventListener("click", function () {
-            var name = String(groupIn.value || "").trim();
-            if (!name) {
-              msg.textContent = "Gruppenname eingeben.";
-              return;
-            }
-            var friends = (FFC.friends && FFC.friends()) || [];
-            var ids = friends
-              .filter(function (f) {
-                return f && f.status === "accepted" && f.friend_id;
-              })
-              .map(function (f) {
-                return f.friend_id;
-              });
-            if (!ids.length) {
-              msg.textContent = "Zuerst FFC-Freunde hinzufügen (angenommen).";
-              return;
-            }
-            groupBtn.disabled = true;
-            Promise.resolve(FFC.createGroup(name, ids))
-              .then(function (res) {
-                groupBtn.disabled = false;
-                if (res && res.error) {
-                  msg.textContent =
-                    (res.error && res.error.message) || "Gruppe fehlgeschlagen.";
-                  return;
-                }
-                groupIn.value = "";
-                msg.textContent = "Gruppe gespeichert.";
-                lbScopeId = res && res.data != null ? res.data : lbScopeId;
-                reloadLb();
-              })
-              .catch(function () {
-                groupBtn.disabled = false;
-                msg.textContent = "Gruppe fehlgeschlagen.";
-              });
-          });
-          createRow.appendChild(groupIn);
-          createRow.appendChild(groupBtn);
-          teamSec.appendChild(createRow);
           lbBox.appendChild(teamSec);
           lbBox.appendChild(msg);
+        }
+        /* FFC-Gruppe zur Team-Gruppe: gleicher Name (Groß/Klein egal) */
+        function linkedFfcGroup(goGroup) {
+          var name = String((goGroup && goGroup.name) || "").trim().toLowerCase();
+          if (!name) return null;
+          return (lbGroups || []).filter(function (g) {
+            return String(g.name || "").trim().toLowerCase() === name;
+          })[0] || null;
         }
         function reloadLb() {
           Promise.all([
