@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>gogogo Kurs-Editor</title>
+  <meta name="robots" content="noindex" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
+  <script src="/assets/go-account-session.js"></script>
+  <style>
+    :root {
+      --bg: #F2EDE5;
+      --card: #FBF8F3;
+      --ink: #2A211C;
+      --dim: rgba(42, 33, 28, 0.62);
+      --line: rgba(42, 33, 28, 0.14);
+      --accent: #C7413B;
+      --ok: #3F7A4E;
+      --serif: "Playfair Display", Georgia, serif;
+      --sans: "Inter", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--sans); }
+    .wrap { max-width: 860px; margin: 0 auto; padding: max(20px, env(safe-area-inset-top)) 16px 120px; }
+    h1, h2, h3 { font-family: var(--serif); font-weight: 600; margin: 0; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 22px; margin: 28px 0 12px; }
+    h3 { font-size: 17px; }
+    .muted { color: var(--dim); font-size: 13px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .grow { flex: 1 1 160px; min-width: 0; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 10px 0; }
+    label { display: block; font-size: 12px; color: var(--dim); margin: 0 0 4px; }
+    input, select, textarea {
+      width: 100%; font: inherit; color: var(--ink); background: #fff;
+      border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px;
+    }
+    textarea { min-height: 72px; resize: vertical; }
+    button {
+      font: 500 14px var(--sans); border-radius: 999px; padding: 9px 16px; cursor: pointer;
+      border: 1px solid var(--ink); background: var(--ink); color: var(--card);
+    }
+    button.ghost { background: transparent; color: var(--ink); }
+    button.small { padding: 5px 11px; font-size: 13px; }
+    button.danger { border-color: var(--accent); color: var(--accent); background: transparent; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    .pill { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--dim); }
+    .list button.course { width: 100%; text-align: left; border-radius: 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); padding: 12px 14px; margin: 6px 0; }
+    .list button.course.on { border-color: var(--ink); }
+    .tabs { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
+    .tabs button { background: transparent; color: var(--ink); border-color: var(--line); }
+    .tabs button.on { background: var(--ink); color: var(--card); border-color: var(--ink); }
+    .block { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+    .item { display: grid; grid-template-columns: 2.4fr 0.6fr 0.8fr 0.8fr 0.8fr 1fr 1.4fr auto; gap: 6px; margin: 6px 0; align-items: center; }
+    .item input { padding: 7px 8px; font-size: 14px; }
+    .ihead { font-size: 11px; color: var(--dim); }
+    @media (max-width: 640px) {
+      .item { grid-template-columns: 1fr 1fr 1fr; }
+      .item .n { grid-column: 1 / -1; }
+      .item .note { grid-column: 1 / 3; }
+      .ihead { display: none; }
+    }
+    .toast {
+      position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translateX(-50%);
+      background: var(--ink); color: var(--card); padding: 10px 18px; border-radius: 999px; font-size: 14px;
+      opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw;
+    }
+    .toast.show { opacity: 1; }
+    .gate { text-align: center; padding: 80px 16px; }
+    .hidden { display: none !important; }
+    label.check { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; margin: 0; color: var(--ink); font-size: 14px; }
+    label.check input { width: auto; flex: 0 0 auto; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="row" style="justify-content: space-between">
+      <h1>Kurse</h1>
+      <a class="muted" href="/workout/">zur App</a>
+    </div>
+    <p class="muted" id="who"></p>
+
+    <div id="gate" class="gate hidden">
+      <h2>Nur für Coaches</h2>
+      <p class="muted">Melde dich in der App an. Der Kurs-Editor ist für Coaches freigeschaltet.</p>
+      <a href="/workout/"><button>Zur App</button></a>
+    </div>
+
+    <div id="app" class="hidden">
+      <div class="row">
+        <select id="f-cat" class="grow">
+          <option value="">Alle Kategorien</option>
+          <option value="kraft">Kraft</option>
+          <option value="ausdauer">Ausdauer</option>
+          <option value="zirkel">Zirkel</option>
+        </select>
+        <button id="btn-new">Neuer Kurs</button>
+      </div>
+      <div class="list" id="list"></div>
+
+      <div id="editor" class="hidden">
+        <h2 id="ed-title">Kurs</h2>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><label>Titel</label><input id="c-title" /></div>
+            <div style="width:130px"><label>Kategorie</label>
+              <select id="c-cat"><option value="kraft">Kraft</option><option value="ausdauer">Ausdauer</option><option value="zirkel">Zirkel</option></select>
+            </div>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <div class="grow"><label>Level</label><select id="c-level"><option value="">–</option><option>1</option><option>2</option><option>3</option></select></div>
+            <div class="grow"><label>Einheiten pro Woche</label><select id="c-per"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
+            <div class="grow"><label>Dauer (Wochen)</label><input id="c-weeks" type="number" min="1" max="52" /></div>
+            <div class="grow"><label>Wochen pro Block</label><input id="c-bw" type="number" min="1" max="12" /></div>
+          </div>
+          <div style="margin-top:8px"><label>Beschreibung</label><textarea id="c-desc"></textarea></div>
+          <div class="row" style="margin-top:10px; justify-content: space-between">
+            <label class="check">
+              <input id="c-active" type="checkbox" style="width:auto" /> im Katalog sichtbar
+            </label>
+            <div class="row">
+              <button class="ghost" id="btn-copy">Als eigenen Plan kopieren</button>
+              <button id="btn-save-course">Kurs speichern</button>
+            </div>
+          </div>
+          <p class="muted" id="c-owner"></p>
+        </div>
+
+        <h2>Einheiten</h2>
+        <div class="tabs" id="block-tabs"></div>
+        <div class="tabs" id="variant-tabs">
+          <button data-travel="0" class="on">Standard</button>
+          <button data-travel="1">Reisevariante</button>
+        </div>
+        <div id="sessions"></div>
+
+        <h2>KI-Hilfe</h2>
+        <div class="card">
+          <p class="muted">„Für Claude kopieren“ kopiert den Kurs mit Anleitung. In Claude einfügen, sagen was sich ändern soll, die Antwort hier einfügen und übernehmen.</p>
+          <div class="row">
+            <button class="ghost" id="btn-ai-copy">Für Claude kopieren</button>
+          </div>
+          <div style="margin-top:10px"><label>Antwort von Claude (JSON)</label><textarea id="ai-in" placeholder='{ "course": {…}, "sessions": [ … ] }'></textarea></div>
+          <div class="row" style="margin-top:8px"><button id="btn-ai-apply">Übernehmen</button></div>
+        </div>
+
+        <h2>Coachee zuordnen</h2>
+        <div class="card">
+          <div class="row">
+            <div class="grow"><label>Coachee</label><select id="a-user"></select></div>
+            <div class="grow"><label>Start (Montag)</label><input id="a-start" type="date" /></div>
+          </div>
+          <div style="margin-top:8px"><label>Trainingstage</label>
+            <div class="row" id="a-days"></div>
+          </div>
+          <div class="row" style="margin-top:10px">
+            <label class="check">
+              <input id="a-private" type="checkbox" checked style="width:auto" /> als persönliche Kopie (anpassbar, Original bleibt)
+            </label>
+          </div>
+          <div class="row" style="margin-top:10px"><button id="btn-assign">Zuordnen</button></div>
+          <p class="muted" id="a-msg"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+  (function () {
+    var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
+    var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
+    var ADMIN_NAME = "biigJ";
+    var BLOCK_TYPES = [
+      ["mobility", "Mobility"], ["skill", "Skill / Power"], ["grund", "Grundübung"],
+      ["hybrid", "Hybrid"], ["hypertrophie", "Hypertrophie"], ["finisher", "Finisher"], ["ausdauer", "Ausdauer"]
+    ];
+    var FOCUS = [["ganzkoerper", "Ganzkörper"], ["unterkoerper", "Unterkörper"], ["oberkoerper", "Oberkörper"], ["ausdauer", "Ausdauer"], ["zirkel", "Zirkel"]];
+    var DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
+    var me = window.GoAccountSession ? GoAccountSession.load() : null;
+    var isAdmin = !!(me && me.name === ADMIN_NAME);
+    var state = { courses: [], course: null, sessions: [], block: 1, travel: false, coachees: [] };
+
+    function $(id) { return document.getElementById(id); }
+    function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+    function toast(msg) { var t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast._t); toast._t = setTimeout(function () { t.classList.remove("show"); }, 2600); }
+
+    function rest(path, opts) {
+      opts = opts || {};
+      var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" };
+      if (me && me.id) headers["x-go-account-id"] = me.id;
+      if (opts.prefer) headers.Prefer = opts.prefer;
+      return fetch(SUPABASE_URL + "/rest/v1/" + path, {
+        method: opts.method || "GET", headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined
+      }).then(function (r) {
+        if (!r.ok) return r.text().then(function (t) {
+          var hint = /course_sessions|exercises|owner|block_weeks/.test(t) ? " (go-kurse-v2.sql ausgeführt?)" : "";
+          throw new Error(t.slice(0, 180) + hint);
+        });
+        return r.status === 204 ? null : r.text().then(function (t) { return t ? JSON.parse(t) : null; });
+      });
+    }
+
+    function canEdit(c) { return !!c && (isAdmin || (me && c.coach_id === me.id && c.owner === "coach")); }
+
+    // ---------- Start ----------
+    if (!me || (!me.is_trainer && !isAdmin)) {
+      $("gate").classList.remove("hidden");
+      if (me) $("who").textContent = "Angemeldet als " + me.name;
+      return;
+    }
+    $("app").classList.remove("hidden");
+    $("who").textContent = (isAdmin ? "Admin · " : "Coach · ") + me.name;
+    DAYS.forEach(function (d, i) {
+      $("a-days").insertAdjacentHTML("beforeend",
+        '<label class="check"><input type="checkbox" value="' + i + '" /> ' + d + "</label>");
+    });
+    $("a-start").value = nextMonday();
+    loadCourses();
+    rest("go_accounts?trainer_id=eq." + me.id + "&select=id,name&order=name.asc")
+      .then(function (rows) {
+        state.coachees = rows || [];
+        $("a-user").innerHTML = state.coachees.length
+          ? state.coachees.map(function (u) { return '<option value="' + u.id + '">' + esc(u.name) + "</option>"; }).join("")
+          : '<option value="">Noch keine Coachees</option>';
+      }).catch(function () {});
+
+    function nextMonday() {
+      var d = new Date(); var add = (8 - d.getDay()) % 7 || 7; d.setDate(d.getDate() + add);
+      return d.toISOString().slice(0, 10);
+    }
+
+    // ---------- Kursliste ----------
+    function loadCourses() {
+      return rest("courses?select=id,title,slug,level,duration_weeks,sessions_per_week,category_default,description,coach_id,owner,is_active,private_for,block_weeks&order=title.asc")
+        .then(function (rows) {
+          state.courses = (rows || []).filter(function (c) {
+            if (c.slug === "eigenes-training") return false;
+            if (c.private_for) return isAdmin || c.coach_id === me.id;
+            return true;
+          });
+          renderList();
+        }).catch(function (e) { toast("Laden fehlgeschlagen: " + e.message); });
+    }
+
+    function renderList() {
+      var cat = $("f-cat").value;
+      var html = state.courses.filter(function (c) { return !cat || c.category_default === cat; }).map(function (c) {
+        var tag = c.private_for ? "persönlich" : c.owner === "coach" ? "mein Plan" : "gogogo";
+        return '<button class="course' + (state.course && state.course.id === c.id ? " on" : "") + '" data-id="' + c.id + '">' +
+          "<strong>" + esc(c.title) + "</strong> " + '<span class="pill">' + tag + "</span> " +
+          (c.is_active ? "" : '<span class="pill">ausgeblendet</span>') +
+          '<div class="muted">' + esc(c.category_default || "–") + " · " + (c.sessions_per_week || "?") + "× pro Woche · " + (c.duration_weeks || "?") + " Wochen</div></button>";
+      }).join("");
+      $("list").innerHTML = html || '<p class="muted">Keine Kurse.</p>';
+    }
+
+    $("f-cat").addEventListener("change", renderList);
+    $("list").addEventListener("click", function (e) {
+      var b = e.target.closest("button.course"); if (!b) return;
+      var c = state.courses.find(function (x) { return x.id === b.getAttribute("data-id"); });
+      openCourse(c);
+    });
+
+    // ---------- Kurs öffnen ----------
+    function openCourse(c) {
+      state.course = c; state.block = 1; state.travel = false;
+      renderList();
+      $("editor").classList.remove("hidden");
+      $("ed-title").textContent = c.title;
+      $("c-title").value = c.title || "";
+      $("c-cat").value = c.category_default || "kraft";
+      $("c-level").value = c.level || "";
+      $("c-per").value = String(c.sessions_per_week || 2);
+      $("c-weeks").value = c.duration_weeks || 12;
+      $("c-bw").value = c.block_weeks || 4;
+      $("c-desc").value = c.description || "";
+      $("c-active").checked = !!c.is_active;
+      var editable = canEdit(c);
+      ["c-title", "c-cat", "c-level", "c-per", "c-weeks", "c-bw", "c-desc", "c-active"].forEach(function (id) { $(id).disabled = !editable; });
+      $("btn-save-course").disabled = !editable;
+      $("btn-ai-apply").disabled = !editable;
+      $("c-owner").textContent = editable ? "" : "gogogo-Standardkurs: nur lesen. Kopiere ihn als eigenen Plan, um ihn anzupassen.";
+      [].forEach.call($("variant-tabs").children, function (b) { b.classList.toggle("on", b.getAttribute("data-travel") === "0"); });
+      loadSessions();
+      $("editor").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function loadSessions() {
+      return rest("course_sessions?course_id=eq." + state.course.id + "&select=*&order=block_no.asc,session_no.asc")
+        .then(function (rows) { state.sessions = rows || []; renderSessions(); })
+        .catch(function (e) { toast("Einheiten: " + e.message); });
+    }
+
+    function blockCount() {
+      var c = state.course; var n = Math.ceil((c.duration_weeks || 12) / (c.block_weeks || 4));
+      var maxDb = state.sessions.reduce(function (m, s) { return Math.max(m, s.block_no); }, 1);
+      return Math.min(Math.max(n, maxDb, 1), 6);
+    }
+
+    function renderSessions() {
+      var c = state.course, bw = c.block_weeks || 4, n = blockCount();
+      var tabs = "";
+      for (var b = 1; b <= n; b++) {
+        tabs += '<button data-block="' + b + '" class="' + (b === state.block ? "on" : "") + '">Block ' + b +
+          " · Wo " + ((b - 1) * bw + 1) + "–" + Math.min(b * bw, c.duration_weeks || 12) + "</button>";
+      }
+      $("block-tabs").innerHTML = tabs;
+      var per = parseInt(c.sessions_per_week, 10) || 1, html = "";
+      for (var s = 1; s <= per; s++) {
+        var row = findSession(state.block, s, state.travel);
+        var inherited = !row && !state.travel ? findInherited(state.block, s) : null;
+        html += sessionCard(s, row, inherited);
+      }
+      $("sessions").innerHTML = html;
+    }
+
+    function findSession(b, s, travel) {
+      return state.sessions.find(function (x) { return x.block_no === b && x.session_no === s && !!x.is_travel === travel; }) || null;
+    }
+    function findInherited(b, s) {
+      for (var k = b - 1; k >= 1; k--) { var r = findSession(k, s, false); if (r) return r; }
+      return null;
+    }
+
+    function sessionCard(s, row, inherited) {
+      var src = row || inherited || { title: "", focus: "", duration_min: "", blocks: [] };
+      var editable = canEdit(state.course);
+      var note = !row && inherited ? '<p class="muted">Noch keine eigene Einheit in diesem Block: übernimmt Block ' + inherited.block_no + ". Speichern legt sie für diesen Block an.</p>"
+        : !row ? '<p class="muted">Noch leer.</p>' : "";
+      var blocks = (src.blocks || []).map(function (bl, bi) { return blockHtml(s, bi, bl, editable); }).join("");
+      return '<div class="card" data-session="' + s + '">' +
+        '<div class="row" style="justify-content:space-between"><h3>Einheit ' + s + (state.travel ? " · Reise" : "") + "</h3>" +
+        (editable && row ? '<button class="small danger" data-act="del-session">Löschen</button>' : "") + "</div>" + note +
+        '<div class="row" style="margin-top:6px">' +
+        '<div class="grow"><label>Titel</label><input data-f="title" value="' + esc(src.title) + '"' + (editable ? "" : " disabled") + " /></div>" +
+        '<div style="width:150px"><label>Fokus</label><select data-f="focus"' + (editable ? "" : " disabled") + ">" +
+        '<option value="">–</option>' + FOCUS.map(function (f) { return '<option value="' + f[0] + '"' + (src.focus === f[0] ? " selected" : "") + ">" + f[1] + "</option>"; }).join("") +
+        "</select></div>" +
+        '<div style="width:90px"><label>Minuten</label><input data-f="duration_min" type="number" value="' + esc(src.duration_min) + '"' + (editable ? "" : " disabled") + " /></div>" +
+        "</div>" + '<div data-blocks>' + blocks + "</div>" +
+        (editable ? '<div class="row" style="margin-top:10px"><button class="small ghost" data-act="add-block">+ Block</button><span class="grow"></span><button class="small" data-act="save-session">Einheit speichern</button></div>' : "") +
+        "</div>";
+    }
+
+    function blockHtml(s, bi, bl, editable) {
+      var dis = editable ? "" : " disabled";
+      var items = (bl.items || []).map(function (it) { return itemHtml(it, editable); }).join("");
+      return '<div class="block" data-block-i="' + bi + '"><div class="row">' +
+        '<select data-bf="type" style="width:auto"' + dis + ">" +
+        BLOCK_TYPES.map(function (t) { return '<option value="' + t[0] + '"' + (bl.type === t[0] ? " selected" : "") + ">" + t[1] + "</option>"; }).join("") +
+        "</select><span class=\"grow\"></span>" +
+        (editable ? '<button class="small ghost" data-act="add-item">+ Übung</button> <button class="small danger" data-act="del-block">Block entfernen</button>' : "") +
+        '</div><div class="item ihead"><span>Übung</span><span>Sätze</span><span>Wdh.</span><span>Sek.</span><span>Meter</span><span>Last</span><span>Hinweis</span><span></span></div>' +
+        '<div data-items>' + items + "</div></div>";
+    }
+
+    function itemHtml(it, editable) {
+      it = it || {}; var dis = editable ? "" : " disabled";
+      function f(k, ph, cls, type) { return '<input class="' + (cls || "") + '" data-if="' + k + '" placeholder="' + ph + '"' + (type ? ' type="' + type + '"' : "") + ' value="' + esc(it[k]) + '"' + dis + " />"; }
+      return '<div class="item">' + f("name", "Übung", "n") + f("sets", "Sätze", "", "number") + f("reps", "Wdh.") + f("time_s", "Sek.", "", "number") +
+        f("dist_m", "m", "", "number") + f("load", "z. B. RPE 7") + f("note", "Hinweis", "note") +
+        (editable ? '<button class="small danger" data-act="del-item" aria-label="Übung entfernen">×</button>' : "<span></span>") + "</div>";
+    }
+
+    function readCard(card) {
+      var out = {
+        title: card.querySelector('[data-f="title"]').value.trim(),
+        focus: card.querySelector('[data-f="focus"]').value || null,
+        duration_min: parseInt(card.querySelector('[data-f="duration_min"]').value, 10) || null,
+        blocks: []
+      };
+      [].forEach.call(card.querySelectorAll(".block"), function (bEl) {
+        var bl = { type: bEl.querySelector('[data-bf="type"]').value, items: [] };
+        [].forEach.call(bEl.querySelectorAll("[data-items] .item"), function (iEl) {
+          var it = {};
+          [].forEach.call(iEl.querySelectorAll("[data-if]"), function (inp) {
+            var k = inp.getAttribute("data-if"), v = inp.value.trim();
+            if (v === "") return;
+            it[k] = (k === "sets" || k === "time_s" || k === "dist_m") ? Number(v) : v;
+          });
+          if (it.name) bl.items.push(it);
+        });
+        out.blocks.push(bl);
+      });
+      return out;
+    }
+
+    $("block-tabs").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-block]"); if (!b) return;
+      state.block = parseInt(b.getAttribute("data-block"), 10); renderSessions();
+    });
+    $("variant-tabs").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-travel]"); if (!b) return;
+      state.travel = b.getAttribute("data-travel") === "1";
+      [].forEach.call($("variant-tabs").children, function (x) { x.classList.toggle("on", x === b); });
+      renderSessions();
+    });
+
+    $("sessions").addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-act]"); if (!btn) return;
+      var card = btn.closest("[data-session]"), act = btn.getAttribute("data-act");
+      if (act === "add-block") {
+        card.querySelector("[data-blocks]").insertAdjacentHTML("beforeend", blockHtml(0, 0, { type: "grund", items: [{}] }, true));
+      } else if (act === "del-block") {
+        btn.closest(".block").remove();
+      } else if (act === "add-item") {
+        btn.closest(".block").querySelector("[data-items]").insertAdjacentHTML("beforeend", itemHtml({}, true));
+      } else if (act === "del-item") {
+        btn.closest(".item").remove();
+      } else if (act === "save-session") {
+        saveSession(parseInt(card.getAttribute("data-session"), 10), readCard(card));
+      } else if (act === "del-session") {
+        var row = findSession(state.block, parseInt(card.getAttribute("data-session"), 10), state.travel);
+        if (!row || !confirm("Einheit löschen?")) return;
+        rest("course_sessions?id=eq." + row.id, { method: "DELETE" }).then(loadSessions).then(function () { toast("Gelöscht"); })
+          .catch(function (err) { toast(err.message); });
+      }
+    });
+
+    function saveSession(s, data) {
+      if (!data.title) { toast("Titel fehlt"); return Promise.resolve(); }
+      var cat = state.course.category_default || "kraft";
+      var body = {
+        course_id: state.course.id, block_no: state.block, session_no: s, is_travel: state.travel,
+        title: data.title, focus: data.focus, category: cat, duration_min: data.duration_min,
+        blocks: data.blocks, updated_at: new Date().toISOString()
+      };
+      return rest("course_sessions?on_conflict=course_id,block_no,session_no,is_travel", {
+        method: "POST", body: [body], prefer: "resolution=merge-duplicates,return=minimal"
+      }).then(loadSessions).then(function () { toast("Einheit gespeichert"); })
+        .catch(function (err) { toast(err.message); });
+    }
+
+    // ---------- Kurs speichern / neu / kopieren ----------
+    function courseForm() {
+      return {
+        title: $("c-title").value.trim(),
+        category_default: $("c-cat").value,
+        level: $("c-level").value ? parseInt($("c-level").value, 10) : null,
+        sessions_per_week: parseInt($("c-per").value, 10),
+        duration_weeks: parseInt($("c-weeks").value, 10) || 12,
+        block_weeks: parseInt($("c-bw").value, 10) || 4,
+        description: $("c-desc").value.trim() || null,
+        is_active: $("c-active").checked
+      };
+    }
+
+    $("btn-save-course").addEventListener("click", function () {
+      var f = courseForm(); if (!f.title) { toast("Titel fehlt"); return; }
+      rest("courses?id=eq." + state.course.id, { method: "PATCH", body: f, prefer: "return=representation" })
+        .then(function (rows) { var c = (rows && rows[0]) || Object.assign(state.course, f); return loadCourses().then(function () { openCourse(c); }); })
+        .then(function () { toast("Kurs gespeichert"); })
+        .catch(function (err) { toast(err.message); });
+    });
+
+    function slugify(t) {
+      return (t || "kurs").toLowerCase().replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+        .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) + "-" + Math.random().toString(36).slice(2, 7);
+    }
+
+    function insertCourse(f, sessions) {
+      var body = Object.assign({
+        slug: slugify(f.title), source: "own", price_eur: 0, coach_id: me.id,
+        owner: isAdmin ? "gogogo" : "coach"
+      }, f);
+      return rest("courses", { method: "POST", body: body, prefer: "return=representation" }).then(function (rows) {
+        var c = rows[0];
+        if (!sessions || !sessions.length) return c;
+        var copy = sessions.map(function (s) {
+          return { course_id: c.id, block_no: s.block_no, session_no: s.session_no, is_travel: !!s.is_travel, title: s.title,
+            focus: s.focus || null, category: s.category || f.category_default || "kraft", duration_min: s.duration_min || null, blocks: s.blocks || [] };
+        });
+        return rest("course_sessions", { method: "POST", body: copy, prefer: "return=minimal" }).then(function () { return c; });
+      });
+    }
+
+    $("btn-new").addEventListener("click", function () {
+      var title = prompt("Name des Kurses"); if (!title) return;
+      insertCourse({ title: title, category_default: $("f-cat").value || "kraft", sessions_per_week: 2, duration_weeks: 12, block_weeks: 4, is_active: false })
+        .then(function (c) { return loadCourses().then(function () { openCourse(c); }); })
+        .then(function () { toast("Kurs angelegt (noch ausgeblendet)"); })
+        .catch(function (err) { toast(err.message); });
+    });
+
+    $("btn-copy").addEventListener("click", function () {
+      var f = courseForm(); f.title = f.title + " · Kopie"; f.is_active = false;
+      var wasAdmin = isAdmin; isAdmin = false; // Kopie ist immer ein eigener Plan
+      insertCourse(f, state.sessions).then(function (c) {
+        isAdmin = wasAdmin;
+        return rest("courses?id=eq." + c.id, { method: "PATCH", body: { base_course_id: state.course.id } })
+          .then(function () { return loadCourses(); }).then(function () { openCourse(Object.assign(c, { base_course_id: state.course.id })); });
+      }).then(function () { toast("Kopie angelegt"); })
+        .catch(function (err) { isAdmin = wasAdmin; toast(err.message); });
+    });
+
+    // ---------- KI-Hilfe ----------
+    $("btn-ai-copy").addEventListener("click", function () {
+      var data = {
+        course: courseForm(),
+        sessions: state.sessions.map(function (s) {
+          return { block_no: s.block_no, session_no: s.session_no, is_travel: !!s.is_travel, title: s.title, focus: s.focus, duration_min: s.duration_min, blocks: s.blocks };
+        })
+      };
+      var text = "Das ist ein gogogo-Trainingskurs als JSON. Aufbau einer Einheit: Blöcke vom Typ mobility, skill, grund, hybrid, hypertrophie, finisher, ausdauer; " +
+        "jede Übung hat name und optional sets, reps, time_s, dist_m, load, note. block_no = Block (je block_weeks Wochen), session_no = Einheit in der Woche, is_travel = Reisevariante (Körpergewicht, Band, Hotel-Gym).\n" +
+        "Meine Änderung: [HIER BESCHREIBEN]\n" +
+        "Antworte nur mit dem vollständigen geänderten JSON im selben Format.\n\n" + JSON.stringify(data, null, 2);
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject())
+        .then(function () { toast("Kopiert. In Claude einfügen und Änderung beschreiben."); })
+        .catch(function () { $("ai-in").value = text; toast("Kopieren nicht möglich: Text steht im Feld darunter"); });
+    });
+
+    $("btn-ai-apply").addEventListener("click", function () {
+      var raw = $("ai-in").value.trim(), m = raw.match(/\{[\s\S]*\}/), data;
+      try { data = JSON.parse(m ? m[0] : raw); } catch (e) { toast("Kein gültiges JSON"); return; }
+      if (!data || !Array.isArray(data.sessions)) { toast("JSON braucht ein Feld sessions"); return; }
+      if (!confirm("Kurs und alle Einheiten durch die KI-Version ersetzen?")) return;
+      var c = state.course, f = Object.assign(courseForm(), data.course || {});
+      delete f.slug; delete f.id; delete f.owner; delete f.coach_id;
+      var rows = data.sessions.filter(function (s) { return s && s.title && s.session_no; }).map(function (s) {
+        return { course_id: c.id, block_no: s.block_no || 1, session_no: s.session_no, is_travel: !!s.is_travel, title: s.title,
+          focus: s.focus || null, category: f.category_default || "kraft", duration_min: s.duration_min || null, blocks: s.blocks || [] };
+      });
+      rest("courses?id=eq." + c.id, { method: "PATCH", body: f })
+        .then(function () { return rest("course_sessions?course_id=eq." + c.id, { method: "DELETE" }); })
+        .then(function () { return rows.length ? rest("course_sessions", { method: "POST", body: rows, prefer: "return=minimal" }) : null; })
+        .then(function () { $("ai-in").value = ""; return loadCourses(); })
+        .then(function () { openCourse(state.courses.find(function (x) { return x.id === c.id; }) || c); toast("Übernommen"); })
+        .catch(function (err) { toast(err.message); });
+    });
+
+    // ---------- Coachee zuordnen ----------
+    $("btn-assign").addEventListener("click", function () {
+      var user = $("a-user").value, start = $("a-start").value;
+      var days = [].map.call($("a-days").querySelectorAll("input:checked"), function (i) { return parseInt(i.value, 10); });
+      var per = parseInt(state.course.sessions_per_week, 10) || 1;
+      if (!user) { toast("Coachee wählen"); return; }
+      if (!start) { toast("Startdatum fehlt"); return; }
+      if (days.length < per) { toast("Bitte " + per + " Trainingstage wählen"); return; }
+      var btn = this; btn.disabled = true;
+      var courseId = $("a-private").checked
+        ? rest("rpc/go_copy_course_for", { method: "POST", body: { p_course_id: state.course.id, p_user_id: user } })
+        : Promise.resolve(state.course.id);
+      courseId.then(function (cid) {
+        return rest("enrollments", { method: "POST", prefer: "return=representation", body: {
+          user_id: user, course_id: cid, status: "aktiv", start_date: start, weekdays: days.slice(0, per),
+          sessions_per_week: per, assigned_by: me.id, payment_status: "gratis"
+        } });
+      }).then(function (rows) {
+        return rest("rpc/go_generate_events", { method: "POST", body: { p_enrollment_id: rows[0].id } });
+      }).then(function (n) {
+        var name = ($("a-user").selectedOptions[0] || {}).textContent || "Coachee";
+        $("a-msg").textContent = name + ": " + (Number(n) || 0) + " Termine angelegt.";
+        toast("Zugeordnet"); return loadCourses();
+      }).catch(function (err) { toast(err.message); })
+        .then(function () { btn.disabled = false; });
+    });
+  })();
+  </script>
+</body>
+</html>
