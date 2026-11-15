@@ -217,25 +217,39 @@
 
   /* Zirkel-Einstellungen liegen in events.note: "zirkel:team|work=240|pause=30|rounds=7" */
   function parseZirkelNote(note) {
-    var s = String(note || "");
-    if (s.indexOf("zirkel:") !== 0) return null;
-    var parts = s.slice(7).split("|");
-    var out = { mode: parts[0] === "team" ? "team" : "standard", workSec: 240, restSec: 30, rounds: 7 };
-    parts.slice(1).forEach(function (kv) {
-      var i = kv.indexOf("="), k = kv.slice(0, i), v = Number(kv.slice(i + 1));
-      if (isNaN(v)) return;
-      if (k === "work") out.workSec = v;
-      if (k === "pause") out.restSec = v;
-      if (k === "rounds") out.rounds = v;
-    });
-    return out;
+    return global.GoZirkelSetup ? GoZirkelSetup.parse(note) : null;
   }
 
   function zirkelLabel(z) {
-    if (!z) return "";
-    var m = Math.floor(z.workSec / 60), sec = z.workSec % 60;
-    var work = m ? m + ":" + (sec < 10 ? "0" : "") + sec + " min" : sec + " s";
-    return z.rounds + " Runden · " + work + " · " + z.restSec + " s Pause · " + (z.mode === "team" ? "Team" : "Standard");
+    return global.GoZirkelSetup ? GoZirkelSetup.label(z) : "";
+  }
+
+  /* CTA unter Zirkel-Events mit Option "online mitmachen" */
+  function onlineCtaHtml(ev) {
+    var z = parseZirkelNote(ev && ev.note);
+    if (!z || !z.online || ev.status === "erledigt") return "";
+    return (
+      '<button type="button" class="go-online-cta" data-online-join="' +
+      esc(ev.id) +
+      '">Online mitmachen</button>'
+    );
+  }
+
+  function joinOnline(eventId) {
+    var ev = (state.events || []).filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    if (!ev) return;
+    var z = parseZirkelNote(ev.note);
+    var start = new Date(ev.starts_at).getTime();
+    var live = isFinite(start) && Date.now() >= start - 10 * 60000;
+    var mine = String(ev.user_id) === String(me());
+    if (!mine && !iAmGoing(eventId)) toggleRsvp(eventId);
+    if (live) {
+      if (host.openZirkel) host.openZirkel(z);
+      return;
+    }
+    if (host.toast) host.toast("Du bist online dabei. Zum Start hier wieder tippen.");
   }
 
   function loadZirkelCourse() {
@@ -1454,7 +1468,9 @@
       when: whenLine(ev.starts_at),
       title: title,
       place: ev.location || "",
-      desc: descHtml(parseZirkelNote(ev.note) ? zirkelLabel(parseZirkelNote(ev.note)) : ev.note),
+      desc:
+        descHtml(parseZirkelNote(ev.note) ? zirkelLabel(parseZirkelNote(ev.note)) : ev.note) +
+        onlineCtaHtml(ev),
       postId: String(ev.id),
       eventId: String(ev.id),
       inviteIso: day,
@@ -2833,38 +2849,15 @@
       pick.hidden = false;
       pick.innerHTML =
         visPickerHtml() +
-        '<div class="acc-zset">' +
-        '<div class="acc-zset__seg" role="group" aria-label="Modus">' +
-        '<button type="button" class="is-on" data-zmode="standard">Standard</button>' +
-        '<button type="button" data-zmode="team">Team</button>' +
-        "</div>" +
-        '<label>Runden<input type="number" id="acc-z-rounds" min="1" max="30" value="7" /></label>' +
-        '<label>Rundenzeit (Sek.)<input type="number" id="acc-z-work" min="10" max="900" value="240" /></label>' +
-        '<label>Pause (Sek.)<input type="number" id="acc-z-pause" min="0" max="300" value="30" /></label>' +
-        "</div>";
-      var mode = "standard";
-      pick.querySelector(".acc-zset__seg").addEventListener("click", function (e) {
-        var b = e.target.closest("[data-zmode]");
-        if (!b) return;
-        mode = b.getAttribute("data-zmode");
-        Array.prototype.forEach.call(this.children, function (x) {
-          x.classList.toggle("is-on", x === b);
-        });
-      });
+        GoZirkelSetup.html({ mode: "standard" }) +
+        '<label class="gz-online"><input type="checkbox" id="acc-z-online" /> Optional: online mitmachen</label>';
+      GoZirkelSetup.bind(pick);
       var go = document.createElement("button");
       go.type = "button";
       go.textContent = "Jetzt starten";
       go.addEventListener("click", function () {
-        function num(id, d, lo, hi) {
-          var v = Number(($(id) || {}).value);
-          return isNaN(v) ? d : Math.max(lo, Math.min(hi, v));
-        }
-        var z = {
-          mode: mode,
-          rounds: num("acc-z-rounds", 7, 1, 30),
-          workSec: num("acc-z-work", 240, 10, 900),
-          restSec: num("acc-z-pause", 30, 0, 300)
-        };
+        var z = GoZirkelSetup.read(pick);
+        z.online = !!(($("acc-z-online") || {}).checked);
         var vis = readCreateVis(pick);
         loadZirkelCourse().then(function (cid) {
           if (!cid) {
@@ -2875,7 +2868,7 @@
             category: "zirkel",
             course_id: cid,
             title: "Zirkeltraining",
-            note: "zirkel:" + z.mode + "|work=" + z.workSec + "|pause=" + z.restSec + "|rounds=" + z.rounds,
+            note: GoZirkelSetup.toNote(z),
             visibility: vis
           }).then(function () {
             if (host.openZirkel) host.openZirkel(z);
@@ -3093,6 +3086,11 @@
     var ffcRsvp = t.closest("[data-ffc-rsvp]");
     if (ffcRsvp) {
       toggleFfcRsvp(ffcRsvp.getAttribute("data-ffc-rsvp"));
+      return;
+    }
+    var onl = t.closest("[data-online-join]");
+    if (onl) {
+      joinOnline(onl.getAttribute("data-online-join"));
       return;
     }
     var rsvp = t.closest("[data-rsvp]");
