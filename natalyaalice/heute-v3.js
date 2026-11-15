@@ -215,12 +215,47 @@
   }
 
   function loadEigenCourse() {
+    function takeId(created) {
+      var row = Array.isArray(created) ? created[0] : created;
+      state.eigenCourseId = row && row.id ? String(row.id) : null;
+      return state.eigenCourseId;
+    }
+    function createCourse(body) {
+      return rest("courses", {
+        method: "POST",
+        prefer: "return=representation,resolution=merge-duplicates",
+        body: body
+      }).then(takeId);
+    }
     return rest("courses?slug=eq.eigenes-training&select=id&limit=1")
       .then(function (rows) {
-        state.eigenCourseId = rows && rows[0] && rows[0].id ? String(rows[0].id) : null;
+        if (rows && rows[0] && rows[0].id) {
+          state.eigenCourseId = String(rows[0].id);
+          return state.eigenCourseId;
+        }
+        /* Systemkurs fehlte — anlegen (statt SQL-Toast) */
+        return createCourse({
+          title: "Eigenes Training",
+          slug: "eigenes-training",
+          price_eur: 0,
+          description: "Systemkurs für außerplanmäßige Starts",
+          source: "own",
+          is_active: true,
+          is_system: true
+        }).catch(function () {
+          return createCourse({
+            title: "Eigenes Training",
+            slug: "eigenes-training",
+            price_eur: 0,
+            description: "Eigenes Training",
+            source: "own",
+            is_active: true
+          });
+        });
       })
       .catch(function () {
         state.eigenCourseId = null;
+        return null;
       });
   }
 
@@ -2443,8 +2478,15 @@
       body: body
     }).then(function (rows) {
       var ev = Array.isArray(rows) ? rows[0] : rows;
-      return logActivity("unplanned_start", ev && ev.id).then(function () {
-        return ev;
+      var inviteIds = payload.inviteIds || [];
+      var inviteP =
+        ev && ev.id && inviteIds.length && host.inviteToEvent
+          ? Promise.resolve(host.inviteToEvent(ev.id, inviteIds)).catch(function () {})
+          : Promise.resolve();
+      return inviteP.then(function () {
+        return logActivity("unplanned_start", ev && ev.id).then(function () {
+          return ev;
+        });
       });
     });
   }
@@ -2545,19 +2587,101 @@
     });
 
     addBtn("Eigenes Training", function () {
-      var courseId = state.eigenCourseId;
-      if (!courseId) {
-        if (host.toast) host.toast("Systemkurs fehlt — go-event-comments.sql ausführen.");
+      function run(courseId) {
+        if (!courseId) {
+          if (host.toast) host.toast("Eigenes Training konnte nicht angelegt werden.");
+          return;
+        }
+        var vis = readCreateVis(pick);
+        finishCreate({
+          category: kind,
+          course_id: courseId,
+          title: "Eigenes Training",
+          visibility: vis
+        });
+      }
+      if (state.eigenCourseId) {
+        run(state.eigenCourseId);
         return;
       }
-      var vis = readCreateVis(pick);
-      finishCreate({
-        category: kind,
-        course_id: courseId,
-        title: "Eigenes Training",
-        visibility: vis
+      loadEigenCourse().then(function () {
+        run(state.eigenCourseId);
       });
     });
+
+    addBtn("FFC-Zirkeltraining starten", function () {
+      var ffcOk = global.FFC && FFC.user && FFC.user();
+      if (!ffcOk) {
+        if (host.requireFfc) {
+          host.requireFfc(function () {
+            if (host.openZirkel) host.openZirkel();
+            else if (host.toast) host.toast("FFC geöffnet — Workout unter Plus starten.");
+          });
+        } else if (host.toast) {
+          host.toast("Bitte zuerst unter Plus bei FFC anmelden.");
+        }
+        return;
+      }
+      modal.hidden = true;
+      if (host.openZirkel) host.openZirkel();
+      else if (global.GoFFC && GoFFC.openSetup) {
+        try {
+          GoFFC.openSetup();
+        } catch (eOs) {}
+      } else if (global.FFC && FFC.openSetup) {
+        try {
+          FFC.openSetup();
+        } catch (eOs2) {}
+      }
+    });
+
+    var friends = (host.teamPeople || []).filter(function (p) {
+      return p && p.id && String(p.id) !== String(me());
+    });
+    if (friends.length) {
+      var inviteBox = document.createElement("div");
+      inviteBox.className = "acc-spontan-invite";
+      inviteBox.innerHTML = "<p class=\"acc-spontan-invite__h\">Freunde einladen</p>";
+      friends.slice(0, 12).forEach(function (p) {
+        var lab = document.createElement("label");
+        lab.className = "acc-spontan-invite__row";
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.value = String(p.id);
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(" " + (p.name || p.nickname || "Freund")));
+        inviteBox.appendChild(lab);
+      });
+      var invBtn = document.createElement("button");
+      invBtn.type = "button";
+      invBtn.className = "acc-spontan-invite__go";
+      invBtn.textContent = "Event erstellen & einladen";
+      invBtn.addEventListener("click", function () {
+        var ids = Array.prototype.map
+          .call(inviteBox.querySelectorAll("input:checked"), function (el) {
+            return el.value;
+          })
+          .filter(Boolean);
+        var vis = readCreateVis(pick);
+        var courseId = state.eigenCourseId;
+        Promise.resolve(courseId ? courseId : loadEigenCourse().then(function () { return state.eigenCourseId; }))
+          .then(function (cid) {
+            if (!cid) {
+              if (host.toast) host.toast("Eigenes Training konnte nicht angelegt werden.");
+              return null;
+            }
+            return finishCreate({
+              category: kind,
+              course_id: cid,
+              title: kind === "zirkel" ? "Zirkeltraining" : "Eigenes Training",
+              visibility: vis,
+              inviteIds: ids
+            });
+          });
+      });
+      inviteBox.appendChild(invBtn);
+      pick.appendChild(inviteBox);
+    }
   }
 
   function interceptGoKinds() {

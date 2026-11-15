@@ -2123,7 +2123,10 @@
       "<h3>" +
         esc(p.title || "Uhrzeit") +
         "</h3>" +
-        '<p class="wr-sheet-hint">Uhrzeit drehen</p>' +
+        '<p class="wr-sheet-hint">Ort und Uhrzeit</p>' +
+        '<label class="wr-field">Ort<input type="text" id="wr-create-place" maxlength="80" placeholder="z. B. Volkspark, Studio, zu Hause" value="' +
+        esc(p.place || "") +
+        '" /></label>' +
         timeWheelHtml("18:00") +
         '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-create-confirm="1">Speichern</button>' +
         '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
@@ -2141,6 +2144,8 @@
     var p = state.pendingCreate;
     if (!p || !p.iso) return Promise.resolve();
     syncTimeWheelFromScroll();
+    var placeEl = $("wr-create-place");
+    p.place = placeEl ? String(placeEl.value || "").trim() : p.place || "";
     var wheel = $("wr-time-wheel");
     var h = wheel ? Number(wheel.getAttribute("data-h") || 18) : 18;
     var m = wheel ? Number(wheel.getAttribute("data-m") || 0) : 0;
@@ -2210,11 +2215,14 @@
       return createEvent(body).then(after);
     }
 
+    var placeVal = p.place || null;
+
     if (p.kind === "alternative") {
       return saveOrReplace({
         category: "alternative",
         title: p.title || "Bewegung",
         starts_at: starts,
+        location: placeVal,
         course_id: null,
         enrollment_id: null,
         is_unplanned: false,
@@ -2250,6 +2258,7 @@
         enrollment_id: p.enrollmentId || null,
         title: p.title || "Zirkeltraining",
         starts_at: starts,
+        location: placeVal,
         note: zNote,
         is_unplanned: false,
         item_type: "course_session",
@@ -2288,6 +2297,7 @@
         enrollment_id: null,
         title: p.title,
         starts_at: starts,
+        location: placeVal,
         is_unplanned: false,
         item_type: "course_session",
         travel_auto: false,
