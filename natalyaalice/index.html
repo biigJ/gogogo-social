@@ -4091,7 +4091,7 @@
       background: transparent;
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 26px;
     }
     #go-rail .go-card.go-card--routine-plain .go-card__title { display: none !important; }
     .go-formula {
@@ -4120,6 +4120,29 @@
       line-height: 1.35 !important;
       color: rgba(42, 33, 24, 0.78);
     }
+    /* Lockerer: Text voll lesbar, Zähler groß */
+    #go-rail .go-card.go-card--routine-plain .go-card__copy {
+      -webkit-line-clamp: unset;
+      line-clamp: unset;
+      display: block;
+      line-height: 1.5 !important;
+    }
+    #go-rail .go-card.go-card--routine-plain .go-routine-status {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+      padding: 18px 0;
+      border-top: 1px solid rgba(42, 33, 24, 0.18);
+      border-bottom: 1px solid rgba(42, 33, 24, 0.18);
+    }
+    .go-routine-status__n {
+      font-family: "Playfair Display", Georgia, serif;
+      font-size: 44px;
+      font-weight: 600;
+      line-height: 1;
+    }
+    .go-routine-status__n small { font-size: 18px; font-weight: 500; opacity: 0.6; margin-left: 4px; }
+    .go-routine-status__sub { font-family: Inter, system-ui, sans-serif; font-size: 15px; font-weight: 500; opacity: 0.75; }
     #go-rail .go-card.go-card--routine-plain .go-formula { order: 0; }
     #go-rail .go-card.go-card--routine-plain .go-routine-status { order: 1; }
     #go-rail .go-card.go-card--routine-plain .go-card__copy { order: 2; }
@@ -8673,8 +8696,21 @@
         return 0;
       }
 
-      function routineDoneDays() {
+      /* Zählstart: Wochenstart der Routine, sonst Buchungstag */
+      function routineCountStart() {
         var start = routineStart();
+        if (start) return start;
+        try {
+          var order = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("routine") : null;
+          if (order && order.created_at) {
+            return new Date(order.created_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+          }
+        } catch (eStart) {}
+        return "";
+      }
+
+      function routineDoneDays() {
+        var start = routineCountStart();
         if (!start) return 0;
         var today = Log.berlinToday();
         var end = addDays(start, 83);
@@ -8718,10 +8754,13 @@
             else card.appendChild(el);
           }
         }
-        var start = routineStart();
+        var start = routineCountStart();
         if (!start) {
-          el.hidden = true;
-          el.textContent = "";
+          /* Zählung schon vor dem Start sichtbar */
+          el.hidden = false;
+          el.innerHTML =
+            '<span class="go-routine-status__n">0<small>/84 Tage</small></span>' +
+            '<span class="go-routine-status__sub">Startet mit Deiner Buchung</span>';
           return;
         }
         var done = routineDoneDays();
@@ -8733,9 +8772,10 @@
             : "—€ zurück";
         el.hidden = false;
         el.innerHTML =
-          "<span>" +
+          '<span class="go-routine-status__n">' +
           done +
-          "/84 Tagen</span><span>" +
+          "<small>/84 Tage</small></span>" +
+          '<span class="go-routine-status__sub">' +
           refundLabel +
           "</span>";
       }
