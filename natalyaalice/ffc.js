@@ -3329,7 +3329,17 @@
         return { error };
       }catch(err){ return { error: err }; }
     },
-    async openSetup(){
+    async openSetup(preset){
+      /* Voreinstellung aus gogogo-Event (Modus, Rundenzeit, Pause) */
+      if(preset && typeof preset === 'object'){
+        if(preset.mode === 'team' || preset.mode === 'standard'){
+          setupMode = preset.mode;
+          try{ localStorage.setItem('ffc_mode', setupMode); }catch(e){}
+        }
+        const w = Number(preset.workSec), r = Number(preset.restSec);
+        if(w >= 10 && w <= 900) workSec = w;
+        if(r >= 0 && r <= 300) restSec = r;
+      }
       await refreshCachedHistory();
       buildExercisePlan();
       showScreen('setup');

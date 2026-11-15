@@ -214,6 +214,41 @@
       });
   }
 
+  /* Zirkel-Einstellungen liegen in events.note: "zirkel:team|work=240|pause=30|rounds=7" */
+  function parseZirkelNote(note) {
+    var s = String(note || "");
+    if (s.indexOf("zirkel:") !== 0) return null;
+    var parts = s.slice(7).split("|");
+    var out = { mode: parts[0] === "team" ? "team" : "standard", workSec: 240, restSec: 30, rounds: 7 };
+    parts.slice(1).forEach(function (kv) {
+      var i = kv.indexOf("="), k = kv.slice(0, i), v = Number(kv.slice(i + 1));
+      if (isNaN(v)) return;
+      if (k === "work") out.workSec = v;
+      if (k === "pause") out.restSec = v;
+      if (k === "rounds") out.rounds = v;
+    });
+    return out;
+  }
+
+  function zirkelLabel(z) {
+    if (!z) return "";
+    var m = Math.floor(z.workSec / 60), sec = z.workSec % 60;
+    var work = m ? m + ":" + (sec < 10 ? "0" : "") + sec + " min" : sec + " s";
+    return z.rounds + " Runden · " + work + " · " + z.restSec + " s Pause · " + (z.mode === "team" ? "Team" : "Standard");
+  }
+
+  function loadZirkelCourse() {
+    if (state.zirkelCourseId) return Promise.resolve(state.zirkelCourseId);
+    return rest("courses?slug=eq.training-zirkel&select=id&limit=1")
+      .then(function (rows) {
+        state.zirkelCourseId = rows && rows[0] && rows[0].id ? String(rows[0].id) : null;
+        return state.zirkelCourseId;
+      })
+      .catch(function () {
+        return null;
+      });
+  }
+
   function loadEigenCourse() {
     function takeId(created) {
       var row = Array.isArray(created) ? created[0] : created;
@@ -1309,7 +1344,7 @@
       when: whenLine(ev.starts_at),
       title: title,
       place: ev.location || "",
-      desc: descHtml(ev.note),
+      desc: descHtml(parseZirkelNote(ev.note) ? zirkelLabel(parseZirkelNote(ev.note)) : ev.note),
       postId: String(ev.id),
       eventId: String(ev.id),
       inviteIso: day,
@@ -2528,6 +2563,7 @@
       enrollment_id: payload.enrollment_id || null,
       starts_at: new Date().toISOString(),
       location: payload.location || null,
+      note: payload.note || null,
       visibility: normalizeVisibility(payload.visibility || state.pendingVis || "team"),
       is_unplanned: true,
       status: "geplant",
@@ -2622,6 +2658,77 @@
       return;
     }
 
+    if (kind === "zirkel") {
+      openZirkelSetup();
+      return;
+    }
+
+    function openZirkelSetup() {
+      var ffcOk = !!(global.FFC && FFC.user && FFC.user());
+      if (!ffcOk) {
+        modal.hidden = true;
+        if (host.toast) host.toast("Zirkeltraining läuft über Plus: bitte bei FFC anmelden.");
+        if (host.openZirkel) host.openZirkel();
+        return;
+      }
+      kinds.hidden = true;
+      title.hidden = false;
+      title.textContent = "Zirkeltraining";
+      pick.hidden = false;
+      pick.innerHTML =
+        visPickerHtml() +
+        '<div class="acc-zset">' +
+        '<div class="acc-zset__seg" role="group" aria-label="Modus">' +
+        '<button type="button" class="is-on" data-zmode="standard">Standard</button>' +
+        '<button type="button" data-zmode="team">Team</button>' +
+        "</div>" +
+        '<label>Runden<input type="number" id="acc-z-rounds" min="1" max="30" value="7" /></label>' +
+        '<label>Rundenzeit (Sek.)<input type="number" id="acc-z-work" min="10" max="900" value="240" /></label>' +
+        '<label>Pause (Sek.)<input type="number" id="acc-z-pause" min="0" max="300" value="30" /></label>' +
+        "</div>";
+      var mode = "standard";
+      pick.querySelector(".acc-zset__seg").addEventListener("click", function (e) {
+        var b = e.target.closest("[data-zmode]");
+        if (!b) return;
+        mode = b.getAttribute("data-zmode");
+        Array.prototype.forEach.call(this.children, function (x) {
+          x.classList.toggle("is-on", x === b);
+        });
+      });
+      var go = document.createElement("button");
+      go.type = "button";
+      go.textContent = "Jetzt starten";
+      go.addEventListener("click", function () {
+        function num(id, d, lo, hi) {
+          var v = Number(($(id) || {}).value);
+          return isNaN(v) ? d : Math.max(lo, Math.min(hi, v));
+        }
+        var z = {
+          mode: mode,
+          rounds: num("acc-z-rounds", 7, 1, 30),
+          workSec: num("acc-z-work", 240, 10, 900),
+          restSec: num("acc-z-pause", 30, 0, 300)
+        };
+        var vis = readCreateVis(pick);
+        loadZirkelCourse().then(function (cid) {
+          if (!cid) {
+            if (host.toast) host.toast("Kurs Zirkeltraining fehlt (go-trainings-to-courses.sql)");
+            return;
+          }
+          return finishCreate({
+            category: "zirkel",
+            course_id: cid,
+            title: "Zirkeltraining",
+            note: "zirkel:" + z.mode + "|work=" + z.workSec + "|pause=" + z.restSec + "|rounds=" + z.rounds,
+            visibility: vis
+          }).then(function () {
+            if (host.openZirkel) host.openZirkel(z);
+          });
+        });
+      });
+      pick.appendChild(go);
+    }
+
     var list = enrollmentsForCategory(kind);
     kinds.hidden = true;
     title.hidden = false;
@@ -2673,32 +2780,6 @@
       loadEigenCourse().then(function () {
         run(state.eigenCourseId);
       });
-    });
-
-    addBtn("FFC-Zirkeltraining starten", function () {
-      var ffcOk = global.FFC && FFC.user && FFC.user();
-      if (!ffcOk) {
-        if (host.requireFfc) {
-          host.requireFfc(function () {
-            if (host.openZirkel) host.openZirkel();
-            else if (host.toast) host.toast("FFC geöffnet — Workout unter Plus starten.");
-          });
-        } else if (host.toast) {
-          host.toast("Bitte zuerst unter Plus bei FFC anmelden.");
-        }
-        return;
-      }
-      modal.hidden = true;
-      if (host.openZirkel) host.openZirkel();
-      else if (global.GoFFC && GoFFC.openSetup) {
-        try {
-          GoFFC.openSetup();
-        } catch (eOs) {}
-      } else if (global.FFC && FFC.openSetup) {
-        try {
-          FFC.openSetup();
-        } catch (eOs2) {}
-      }
     });
 
     var friends = (host.teamPeople || []).filter(function (p) {
