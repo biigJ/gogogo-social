@@ -2159,14 +2159,30 @@
       order: 0;
       width: 100%;
     }
-    body.is-session[data-shell="kurse"] #go-rail-nav {
+    /*
+      PLUS-INVARIANT: #go-rail-nav (Titel + Pfeile) MUSS über #go-rail bleiben.
+      #plan-training ist flex-Spalte; order > 0 am Nav + overflow:hidden schneidet
+      die Headline ab (Regression nach Flex-Scrollport-Fix). Team/Woche unberührt —
+      deren rail-nav liegt als Sibling AUSSERHALB der Pane.
+    */
+    body.is-session[data-shell="kurse"] #go-rail-nav,
+    body.is-session[data-shell="plan"][data-plan="training"] #go-rail-nav {
       display: grid !important;
-      order: 0;
-      flex: 0 0 auto;
+      grid-template-columns: 28px 1fr 28px;
+      align-items: center;
+      gap: 6px;
+      order: 0 !important;
+      flex: 0 0 auto !important;
+      width: 100%;
       padding: 8px 16px 4px;
       margin: 0;
+      position: relative;
+      z-index: 2;
     }
-    body.is-session[data-shell="kurse"] #go-rail { order: 1; }
+    body.is-session[data-shell="kurse"] #go-rail,
+    body.is-session[data-shell="plan"][data-plan="training"] #go-rail {
+      order: 1 !important;
+    }
     .go-slide__cta.is-owned,
     .go-slide__cta.is-owned:disabled {
       background: #D8D0C4 !important;
@@ -4278,10 +4294,10 @@
       padding: 0;
       box-sizing: border-box;
     }
+    /* Team/Woche: rail-nav ist Sibling der Pane → order 7 ok.
+       Plus (#go-rail-nav) NICHT hier — liegt INNERHALB #plan-training (siehe PLUS-INVARIANT). */
     body.is-session[data-shell="team"] #team-rail-nav,
     body.is-session[data-shell="plan"][data-plan="team"] #team-rail-nav,
-    body.is-session[data-shell="kurse"] #go-rail-nav,
-    body.is-session[data-shell="plan"][data-plan="training"] #go-rail-nav,
     body.is-session[data-shell="woche"] #week-rail-nav {
       display: grid;
       grid-template-columns: 28px 1fr 28px;
@@ -14043,6 +14059,23 @@
         syncRailNav(rail, nav);
       }
 
+      function lockPlusHeadlineNav() {
+        /* Runtime-Guard gegen CSS-Regression: Headline+Pfeile bleiben oben im Plus-Flex. */
+        var goNav = document.getElementById("go-rail-nav");
+        var goRail = document.getElementById("go-rail");
+        var host = document.getElementById("plan-training");
+        if (goNav) {
+          goNav.style.setProperty("order", "0", "important");
+          goNav.style.setProperty("flex", "0 0 auto", "important");
+          if (host && goNav.parentElement === host && host.firstElementChild !== goNav) {
+            host.insertBefore(goNav, host.firstElementChild);
+          }
+        }
+        if (goRail) {
+          goRail.style.setProperty("order", "1", "important");
+        }
+      }
+
       function syncTeamGoRailNav() {
         var pane = document.body.dataset.plan || planPane;
         var teamNav = document.getElementById("team-rail-nav");
@@ -14060,6 +14093,7 @@
           syncRailNav(teamRail, teamNav);
         }
         if ((shellNow === "kurse" || pane === "training") && goRail && goNav) {
+          lockPlusHeadlineNav();
           bindRailNav(goRail, goNav);
           syncRailNav(goRail, goNav);
         }
