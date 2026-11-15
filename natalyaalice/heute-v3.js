@@ -838,6 +838,12 @@
         '<path d="M19 12a7 7 0 1 1-2-4.9"/><path d="M19 5v5h-5"/></svg>'
       );
     }
+    if (kind === "spontan") {
+      return (
+        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M13 3L5 13.5h6L10 21l8-10.5h-6L13 3z"/></svg>'
+      );
+    }
     /* Kein Plus-auf-Schwarz-Badge mehr */
     return "";
   }
@@ -1043,6 +1049,17 @@
       '" aria-label="Kommentieren">' +
       bubbleSvg() +
       "</button>";
+    var remove = opts.removeId
+      ? '<button type="button" class="acc-tool acc-tool--remove" data-remove-event="' +
+        esc(opts.removeId) +
+        '" data-remove-mode="' +
+        esc(opts.removeMode || "delete") +
+        '" aria-label="' +
+        (opts.removeMode === "cancel" ? "Absagen" : "Löschen") +
+        '">' +
+        '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>' +
+        "</button>"
+      : "";
     var badgeKind = opts.badge || "";
     var badge = badgeKind
       ? '<span class="acc-tool-badge" title="">' + badgeSvg(badgeKind) + "</span>"
@@ -1052,6 +1069,7 @@
       '<div class="acc-card__tools-left">' +
       check +
       bubble +
+      remove +
       "</div>" +
       (badge ? '<div class="acc-card__tools-right">' + badge + "</div>" : "") +
       "</div>"
@@ -1189,6 +1207,14 @@
         (opts.going ? "Zugesagt" : "Bin dabei") +
         "</button>";
     }
+    if (opts.rsvpId && opts.going) {
+      btn +=
+        '<button type="button" class="acc-tool acc-tool--remove" data-remove-event="' +
+        esc(opts.rsvpId) +
+        '" data-remove-mode="cancel" aria-label="Absagen">' +
+        '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>' +
+        "</button>";
+    }
     var faces = opts.facesHtml || "";
     if (!btn && !faces) return "";
     return '<div class="acc-card__actions">' + btn + faces + "</div>";
@@ -1237,6 +1263,7 @@
   function eventBadgeKind(ev) {
     if (!ev) return "";
     if (ev.category === "zirkel") return "zirkel";
+    if (ev.is_unplanned) return "spontan";
     /* Wochenplanung / Kurs-Session → Kalender-Icon wie Pill-Woche */
     if (ev.enrollment_id || ev.course_id || ev.item_type === "course_session") {
       return "plan";
@@ -1262,7 +1289,9 @@
           postId: String(ev.id),
           canDone: upcoming && day === todayIso(),
           isDone: ev.status === "erledigt",
-          badge: eventBadgeKind(ev)
+          badge: eventBadgeKind(ev),
+          removeId: ev.id,
+          removeMode: "delete"
         })
       : "";
     return renderCardShell({
@@ -1284,7 +1313,11 @@
       postId: String(ev.id),
       eventId: String(ev.id),
       inviteIso: day,
-      canInvite: isBookedSupportEvent(ev) ? "plus" : canInviteOnDay(day)
+      canInvite: isBookedSupportEvent(ev)
+        ? "plus"
+        : ev.status === "erledigt"
+          ? false
+          : canInviteOnDay(day)
     });
   }
 
@@ -1379,7 +1412,7 @@
       desc: descHtml(item.note),
       postId: commentKey,
       inviteIso: day,
-      canInvite: canInviteOnDay(day)
+      canInvite: false
     });
   }
 
@@ -2198,6 +2231,29 @@
     }
   }
 
+  /* Eigenes Event löschen bzw. fremdes absagen, immer mit Bestätigung */
+  function removeEvent(eventId, mode) {
+    if (!eventId) return;
+    var cancel = mode === "cancel";
+    var ok = global.confirm(cancel ? "Teilnahme absagen?" : "Event löschen? Das lässt sich nicht rückgängig machen.");
+    if (!ok) return;
+    if (cancel) {
+      if (iAmGoing(eventId)) toggleRsvp(eventId);
+      return;
+    }
+    rest("events?id=eq." + encodeURIComponent(eventId), { method: "DELETE", prefer: "return=minimal" })
+      .then(function () {
+        state.events = (state.events || []).filter(function (e) {
+          return String(e.id) !== String(eventId);
+        });
+        if (host.toast) host.toast("Event gelöscht");
+        return refresh();
+      })
+      .catch(function () {
+        if (host.toast) host.toast("Löschen fehlgeschlagen");
+      });
+  }
+
   function toggleRsvp(eventId) {
     var uid = me();
     if (!uid) return;
@@ -2771,6 +2827,11 @@
       else if (typeof global.openNutritionLogModal === "function") {
         global.openNutritionLogModal({ day: nday });
       }
+      return;
+    }
+    var rm = t.closest("[data-remove-event]");
+    if (rm) {
+      removeEvent(rm.getAttribute("data-remove-event"), rm.getAttribute("data-remove-mode"));
       return;
     }
     var done = t.closest("[data-done]");
