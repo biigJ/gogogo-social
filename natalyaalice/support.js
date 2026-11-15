@@ -63,13 +63,12 @@
 
   function priceLabel(p) {
     if (p == null || p.price_eur == null) return "";
-    var n = Number(p.price_eur);
-    if (!n) return "gratis";
-    return n.toFixed(0) + " €";
+    /* Testphase: alles gratis */
+    return "gratis";
   }
 
   function paymentFor(product) {
-    return Number(product && product.price_eur) === 0 ? "gratis" : "offen";
+    return "gratis";
   }
 
   function activeOrderFor(type) {
@@ -373,33 +372,33 @@
       key: "stempelkarte",
       type: "stempelkarte",
       title: "Stempelkarte",
-      price: "25 € Spende",
+      price: "gratis",
       description:
-        "12er-Stempelkarte für 25€ Spende per PayPal an Ben Joscha Grope. Die Karte ist sofort aktiv — unter Wallet speichern. Event mit Freund, beide scannen: ein Stempel. Volle Karte: T-Shirt oder Selfiestick."
+        "12er-Stempelkarte, gratis. Trainierst Du mit einem Freund bei seinem Event, scannst Du seine Karte und bekommst einen Stempel. Volle Karte: T-Shirt oder Selfiestick."
     },
     {
       key: "web_call",
       type: "web_call",
       title: "Initialgespräch",
-      price: "25 € Spende",
+      price: "gratis",
       description:
-        "Triff Joscha für 30 Minuten zu einem Erstgespräch auf Spendenbasis von 25€. Sprich mit Ihm über Deine Trainingsziele, Dein Ressourcen, Deinen Alltag und Herausforderungen. Als Ergebnis fasst er Dir einen Trainingsplan zusammen, der für Deinen Alltag passt. Webmeeting über Calendly."
+        "Triff Joscha für 30 Minuten zu einem Erstgespräch, gratis. Sprich mit ihm über Deine Trainingsziele, Deine Ressourcen, Deinen Alltag und Herausforderungen. Als Ergebnis fasst er Dir einen Trainingsplan zusammen, der für Deinen Alltag passt. Webmeeting über Calendly."
     },
     {
       key: "routine",
       type: "routine",
       title: "12-Wochen-Routine",
-      price: "x € Einzahlung",
+      price: "gratis",
       description:
-        "Einzahlung × 0,9 = Rückzahlung. 12 Wochen täglich Events posten — Freunde sehen Dein Commitment. Volle Wochen: Personal Training gratis."
+        "12 Wochen täglich ein Event posten. Freunde sehen Dein Commitment. Volle Wochen: Personal Training gratis."
     },
     {
       key: "ernaehrung",
       type: "ernaehrung",
       title: "Ernährungscoaching",
-      price: "25 € Spende",
+      price: "gratis",
       description:
-        "4 Wochen tägliches Ernährungs-Event unter Aktuell. Protokolliere Mahlzeiten im Dialog, Tracke unter Plus. Coach-Feedback und Plan auf Wunsch. 25€ Spende per PayPal an Ben Joscha Grope — sofort aktiv."
+        "4 Wochen tägliches Ernährungs-Event unter Aktuell, gratis. Protokolliere Mahlzeiten im Dialog, Tracking unter Plus. Coach-Feedback und Plan auf Wunsch."
     },
     {
       key: "coach_offer",
@@ -603,9 +602,7 @@
       '<section class="support-section">' +
       '<h2 class="support-h">Gebucht</h2>' +
       mineHtml() +
-      '<p class="support-empty" style="margin-top:10px">' +
-      esc(PAY_HINT) +
-      "</p></section>" +
+      "</section>" +
       catalogByType();
   }
 
@@ -645,7 +642,7 @@
             type === "coach_offer"
               ? "Bewerbung gespeichert — CV per WhatsApp senden."
               : type === "stempelkarte" || type === "ernaehrung" || type === "web_call"
-                ? "Aktiv — 25€ Spende per PayPal an Ben Joscha Grope."
+                ? "Aktiv."
                 : "Gebucht."
           );
         }
@@ -680,9 +677,7 @@
           render();
           if (host.toast) {
             host.toast(
-              paymentFor(product) === "offen"
-                ? "Gebucht — dein Coach meldet sich wegen der Zahlung."
-                : "Freigeschaltet."
+              "Freigeschaltet."
             );
           }
         })
@@ -716,7 +711,7 @@
             host.toast(
               kind === "coach_offer"
                 ? "Angefragt — Freischaltung nach Freigabe."
-                : "Gebucht — Zahlung per PayPal, danach Freischaltung."
+                : "Gebucht."
             );
           }
         });
@@ -734,7 +729,7 @@
     var status = instant ? "aktiv" : "angefragt";
     var meta = {
       type: type,
-      payment: instant ? "paypal_donate" : "paypal_pending",
+      payment: "gratis",
       stamps: type === "stempelkarte" ? 0 : undefined,
       start: todayIso()
     };
@@ -754,7 +749,7 @@
           id: "local-" + type + "-" + Date.now(),
           user_id: me(),
           status: status,
-          payment_status: instant ? "spende" : "offen",
+          payment_status: "gratis",
           meta: meta,
           created_at: new Date().toISOString(),
           support_products: { type: type, title: TYPE_LABELS[type] || type }

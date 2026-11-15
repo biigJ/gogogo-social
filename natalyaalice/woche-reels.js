@@ -1706,7 +1706,7 @@
         })
         .join("") +
       "</div>";
-    var canTime = own && eventIsStillUpcoming(own);
+    var canTime = own && eventTimeEditable(own);
     var evRow = own
       ? '<div class="wr-edit-panel__row">' +
         '<button type="button" class="wr-pill-btn" data-wr-edit-place="' +
@@ -1841,7 +1841,7 @@
       return String(e.id) === String(eventId);
     })[0];
     if (!ev) return;
-    if (!eventIsStillUpcoming(ev)) {
+    if (!eventTimeEditable(ev)) {
       if (host.toast) host.toast("Vergangene Events können nicht mehr verschoben werden");
       return;
     }
@@ -1930,6 +1930,12 @@
         { passive: true }
       );
     });
+  }
+
+  /* Uhrzeit änderbar, solange nicht erledigt und Tag nicht vorbei (heute auch nachträglich) */
+  function eventTimeEditable(ev) {
+    if (!ev || !ev.starts_at || ev.status === "erledigt") return false;
+    return dayKey(ev.starts_at) >= berlinToday();
   }
 
   function eventIsStillUpcoming(ev) {
@@ -2029,19 +2035,15 @@
       return String(e.id) === String(eventId);
     })[0];
     if (!ev) return;
-    /* Nur solange Start noch in der Zukunft (bzw. gerade eben) */
-    if (!eventIsStillUpcoming(ev)) {
+    /* Nur solange nicht erledigt und Tag nicht vorbei */
+    if (!eventTimeEditable(ev)) {
       if (host.toast) host.toast("Vergangene Events können nicht mehr verschoben werden");
       closeSheet();
       return;
     }
     var iso = dayKey(ev.starts_at);
     var starts = iso + "T" + val + ":00" + berlinOffsetSuffix(iso);
-    var newTs = new Date(starts).getTime();
-    if (!(newTs > Date.now() - 60 * 1000)) {
-      if (host.toast) host.toast("Bitte eine Uhrzeit in der Zukunft wählen");
-      return;
-    }
+    if (isNaN(new Date(starts).getTime())) return;
     return rest("events?id=eq." + encodeURIComponent(eventId), {
       method: "PATCH",
       prefer: "return=representation",
@@ -2121,11 +2123,14 @@
     if (!sheet || !card) return;
     card.innerHTML = html;
     sheet.hidden = false;
+    card.scrollTop = 0;
+    document.body.classList.add("wr-sheet-open");
   }
 
   function closeSheet() {
     var sheet = $("wr-sheet");
     if (sheet) sheet.hidden = true;
+    document.body.classList.remove("wr-sheet-open");
   }
 
   function travelWheelHtml(selected) {
@@ -3048,8 +3053,8 @@
   function bookCourse() {
     var draft = state.bookDraft;
     if (!draft || !draft.course || !me()) return;
-    var price = Number(draft.course.price_eur || 0);
-    var payment = price === 0 ? "gratis" : "offen";
+    /* Testphase: alles gratis */
+    var payment = "gratis";
     var body = {
       user_id: me(),
       course_id: draft.course.id,
@@ -3118,7 +3123,7 @@
       : "";
     openSheet(
       "<h3>Gebucht</h3>" +
-        "<p>Dein Coach meldet sich wegen der Zahlung.</p>" +
+        "<p>Der Kurs steht in Deiner Woche.</p>" +
         waBtn +
         '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button>'
     );
