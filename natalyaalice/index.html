@@ -5063,9 +5063,14 @@
       color: #F6F1E8; font-size: 26px; line-height: 1; cursor: pointer;
     }
     .stamp-pass__top {
-      display: flex; flex-direction: row; align-items: flex-start;
-      justify-content: space-between; gap: 10px;
-      margin: 0; padding: 2px 24px 10px 2px; flex: 0 0 auto;
+      display: flex; flex-direction: row; align-items: center;
+      justify-content: center; gap: 10px;
+      margin: 0; padding: 2px 34px 10px; flex: 0 0 auto;
+    }
+    .stamp-pass__save {
+      position: absolute; top: 8px; right: 8px; z-index: 2;
+      width: 36px; height: 36px; border: 0; background: transparent;
+      color: #F6F1E8; display: grid; place-items: center; cursor: pointer; padding: 0;
     }
     .stamp-pass__brand {
       font-family: "Playfair Display", Georgia, serif !important;
@@ -5073,8 +5078,8 @@
       font-size: 26px !important;
       line-height: 1.05;
       letter-spacing: -0.02em;
-      text-align: left;
-      flex: 1 1 auto;
+      text-align: center;
+      flex: 0 1 auto;
       min-width: 0;
     }
     .stamp-pass__tagline { display: none !important; }
@@ -6702,11 +6707,13 @@
   </div>
   <div class="sand-modal" id="stamp-card-modal" hidden>
     <div class="stamp-pass" role="dialog" aria-modal="true" aria-label="Stempelkarte">
-      <button type="button" class="stamp-pass__close" id="stamp-card-close" aria-label="Schließen">×</button>
+      <button type="button" class="stamp-pass__save" id="stamp-card-wallet" aria-label="Stempelkarte speichern">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/></svg>
+      </button>
       <div class="stamp-pass__top">
         <div class="stamp-pass__brand" id="stamp-card-brand">gogogo</div>
         <div class="stamp-pass__tagline" id="stamp-card-tagline" hidden>Challenge Deine Bewegung</div>
-        <div class="stamp-pass__count"><span>STEMPEL</span><strong id="stamp-card-count">0</strong></div>
+        <strong id="stamp-card-count" hidden>0</strong>
       </div>
       <div class="stamp-pass__grid" id="stamp-card-grid" aria-hidden="true"></div>
       <div class="stamp-pass__meta">
@@ -6718,7 +6725,6 @@
         <code id="stamp-card-id"></code>
       </div>
     </div>
-    <button type="button" class="stamp-pass__wallet" id="stamp-card-wallet">In Wallet speichern</button>
   </div>
   <div class="sand-modal" id="gogogo-toast" hidden>
     <div class="sand-card" role="status" aria-live="polite">
@@ -13303,6 +13309,35 @@
         saveMyGroups(groups).then(function () { renderTeam(); });
       }
 
+      /* QR-Scan einer fremden Stempelkarte: ?stamp=<Gastgeber-ID> → Stempel für mich */
+      function handleStampScan() {
+        var host = "";
+        try { host = new URLSearchParams(location.search).get("stamp") || ""; } catch (eU) {}
+        if (!host || !sessionAccount || !sessionAccount.id) return;
+        try {
+          var clean = location.pathname + location.hash;
+          history.replaceState(null, "", clean);
+        } catch (eH) {}
+        rest("rpc/go_stamp_by_scan", {
+          method: "POST",
+          body: { p_host_id: host, p_scanner_id: sessionAccount.id }
+        })
+          .then(function (res) {
+            var r = res || {};
+            var msg = r.ok
+              ? "Stempel erhalten · " + r.stamps + " von 12"
+              : r.reason === "already" ? "Für dieses Training hast Du schon einen Stempel."
+              : r.reason === "no_event" ? "Kein Stempel: Du bist heute bei keinem Event dieser Person dabei."
+              : r.reason === "no_card" ? "Kein Stempel: Buche zuerst Deine Stempelkarte unter Plus."
+              : r.reason === "self" ? "Das ist Deine eigene Karte."
+              : "Stempel nicht möglich.";
+            gogogoToast(msg);
+          })
+          .catch(function () {
+            gogogoToast("Stempel nicht möglich (go-stamp-scan.sql ausgeführt?)");
+          });
+      }
+
       function gogogoToast(msg) {
         var modal = document.getElementById("gogogo-toast");
         var el = document.getElementById("gogogo-toast-msg");
@@ -13414,7 +13449,8 @@
             String((sessionAccount && sessionAccount.serial_number) || sid);
         }
         if (qr) {
-          var payload = "gogogo:stamp:" + sid;
+          /* Scan mit der Kamera öffnet die App; wer bei mir eingeladen ist, bekommt einen Stempel */
+          var payload = location.origin + "/workout/?stamp=" + encodeURIComponent(String((sessionAccount && sessionAccount.id) || sid));
           qr.src =
             "https://api.qrserver.com/v1/create-qr-code/?size=336x336&margin=8&data=" +
             encodeURIComponent(payload);
@@ -13981,12 +14017,12 @@
         var btn = document.getElementById("stamp-card-wallet");
         if (btn) {
           btn.disabled = true;
-          btn.textContent = "Wird vorbereitet…";
         }
+        var btnHtml = btn ? btn.innerHTML : "";
         function restoreBtn() {
           if (!btn) return;
           btn.disabled = false;
-          btn.textContent = "In Wallet speichern";
+          btn.innerHTML = btnHtml;
         }
         var canvas = document.createElement("canvas");
         canvas.width = 840;
@@ -19306,6 +19342,7 @@
             }
           };
           HeuteAccountability.install(accHost);
+          handleStampScan();
           HeuteAccountability.refresh();
         }
       }
