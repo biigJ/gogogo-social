@@ -2031,6 +2031,12 @@
     .acc-tool--bubble .wr-ico { width: 30px; height: 30px; display: block; }
     .acc-tool--remove { color: #2A2118; }
     .acc-tool--remove .wr-ico { width: 26px; height: 26px; display: block; }
+    .acc-zset { display: grid; gap: 10px; margin: 12px 0; }
+    .acc-zset label { display: grid; gap: 4px; font-size: 13px; }
+    .acc-zset input { font: inherit; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(42, 33, 24, 0.2); background: #fff; }
+    .acc-zset__seg { display: flex; gap: 8px; }
+    .acc-zset__seg button { flex: 1; padding: 10px; border-radius: 999px; border: 1px solid #2A2118; background: transparent; color: #2A2118; font: inherit; }
+    .acc-zset__seg button.is-on { background: #2A2118; color: #F7F5F0; }
     .acc-tool-badge { display: inline-flex; align-items: center; justify-content: center; min-height: 30px; }
     .acc-badge-ico { display: block; color: #2A2118; width: 30px; height: 30px; }
     /* Pill-Woche-Kalender bleibt bei .app-pill svg (24px) — hier nur Event-Zeile */
@@ -12073,9 +12079,9 @@
               paintWelcome();
             });
           },
-          openZirkelWorkout: function (eventId) {
+          openZirkelWorkout: function (eventId, preset) {
             requireFfc(function () {
-              if (window.FFC && FFC.openSetup) FFC.openSetup();
+              if (window.FFC && FFC.openSetup) FFC.openSetup(preset || null);
               else if (window.FFC && FFC.go) FFC.go("run");
             }, { title: "Zirkeltraining" });
           },
@@ -12251,7 +12257,7 @@
             if (btn) btn.click();
             else openGoSub("routine", "12-Wochen-Routine");
           },
-          openZirkel: function () {
+          openZirkel: function (preset) {
             /* Erst Login sichtbar, dann Tracking — Subpage nicht über Login legen */
             if (typeof requireFfc === "function") {
               requireFfc(
@@ -12261,7 +12267,7 @@
                   refreshZirkel();
                   if (window.FFC && FFC.openSetup) {
                     try {
-                      FFC.openSetup();
+                      FFC.openSetup(preset || null);
                     } catch (eS) {}
                   }
                 },
@@ -19167,9 +19173,9 @@
               }
               if (typeof fn === "function") fn();
             },
-            openZirkel: function () {
+            openZirkel: function (preset) {
               if (window.GoHost && typeof GoHost.openZirkel === "function") {
-                return GoHost.openZirkel();
+                return GoHost.openZirkel(preset);
               }
               if (window.GoFFC && typeof GoFFC.openSetup === "function") {
                 GoFFC.openSetup();

@@ -218,6 +218,30 @@
   }
 
   /* Countdown ab 07:00 Berlin bis Startzeit */
+
+  /* Zirkel-Einstellungen liegen in events.note: "zirkel:team|work=240|pause=30|rounds=7" */
+  function parseZirkelNote(note) {
+    var s = String(note || "");
+    if (s.indexOf("zirkel:") !== 0) return null;
+    var parts = s.slice(7).split("|");
+    var out = { mode: parts[0] === "team" ? "team" : "standard", workSec: 240, restSec: 30, rounds: 7 };
+    parts.slice(1).forEach(function (kv) {
+      var i = kv.indexOf("="), k = kv.slice(0, i), v = Number(kv.slice(i + 1));
+      if (isNaN(v)) return;
+      if (k === "work") out.workSec = v;
+      if (k === "pause") out.restSec = v;
+      if (k === "rounds") out.rounds = v;
+    });
+    return out;
+  }
+
+  function zirkelLabel(z) {
+    if (!z) return "";
+    var m = Math.floor(z.workSec / 60), sec = z.workSec % 60;
+    var work = m ? m + ":" + (sec < 10 ? "0" : "") + sec + " min" : sec + " s";
+    return z.rounds + " Runden · " + work + " · " + z.restSec + " s Pause · " + (z.mode === "team" ? "Team" : "Standard");
+  }
+
   function zirkelCountdownHtml(startsAt) {
     if (!startsAt) return "";
     var start = new Date(startsAt).getTime();
@@ -1212,7 +1236,8 @@
     var cat = ev.category || "kraft";
     var title = (emojiFor(cat, ev.title) + " " + (ev.title || cat)).trim();
     var when = ev.starts_at ? formatTime(ev.starts_at) : "";
-    var notePack = truncNote(ev.note || ev.description || "", 2);
+    var zSet = parseZirkelNote(ev.note);
+    var notePack = truncNote(zSet ? zirkelLabel(zSet) : ev.note || ev.description || "", 2);
     var place = ev.location || "";
     var travelHint = "";
     var supportType =
@@ -2291,11 +2316,11 @@
         "zirkel:" +
         zMode +
         "|work=" +
-        (p.zWork || 40) +
+        (p.zWork || 240) +
         "|pause=" +
-        (p.zPause || 20) +
+        (p.zPause != null ? p.zPause : 30) +
         "|rounds=" +
-        (p.zRounds || 8) +
+        (p.zRounds || 7) +
         zGroup;
       var zBody = {
         category: "zirkel",
@@ -2408,9 +2433,9 @@
         enrollmentId: en && en.id,
         replaceId: replaceId,
         zMode: "standard",
-        zWork: 40,
-        zPause: 20,
-        zRounds: 8
+        zWork: 240,
+        zPause: 30,
+        zRounds: 7
       };
       openSheet(
         "<h3>Zirkeltraining festlegen</h3>" +
@@ -2419,9 +2444,9 @@
           '<button type="button" class="wr-chip is-on" data-wr-zmode="standard">Standard</button>' +
           '<button type="button" class="wr-chip" data-wr-zmode="team">Team</button>' +
           "</div>" +
-          '<label class="wr-field">Rundenzeit (Sek.)<input type="number" id="wr-z-work" min="10" max="180" value="40" /></label>' +
-          '<label class="wr-field">Pause (Sek.)<input type="number" id="wr-z-pause" min="5" max="120" value="20" /></label>' +
-          '<label class="wr-field">Runden<input type="number" id="wr-z-rounds" min="1" max="30" value="8" /></label>' +
+          '<label class="wr-field">Runden<input type="number" id="wr-z-rounds" min="1" max="30" value="7" /></label>' +
+          '<label class="wr-field">Rundenzeit (Sek.)<input type="number" id="wr-z-work" min="10" max="900" value="240" /></label>' +
+          '<label class="wr-field">Pause (Sek.)<input type="number" id="wr-z-pause" min="0" max="300" value="30" /></label>' +
           '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zirkel-next="1">Weiter zur Uhrzeit</button>' +
           '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
       );
@@ -3209,9 +3234,9 @@
       var workEl = $("wr-z-work");
       var pauseEl = $("wr-z-pause");
       var roundsEl = $("wr-z-rounds");
-      state.pendingCreate.zWork = Math.max(10, Math.min(180, Number(workEl && workEl.value) || 40));
-      state.pendingCreate.zPause = Math.max(5, Math.min(120, Number(pauseEl && pauseEl.value) || 20));
-      state.pendingCreate.zRounds = Math.max(1, Math.min(30, Number(roundsEl && roundsEl.value) || 8));
+      state.pendingCreate.zWork = Math.max(10, Math.min(900, Number(workEl && workEl.value) || 240));
+      state.pendingCreate.zPause = Math.max(0, Math.min(300, Number(pauseEl && pauseEl.value) || 0));
+      state.pendingCreate.zRounds = Math.max(1, Math.min(30, Number(roundsEl && roundsEl.value) || 7));
       if (state.pendingCreate.zMode === "team") {
         var hasGroup = false;
         try {
@@ -3253,8 +3278,12 @@
     if (t.closest && t.closest("[data-wr-zirkel-open]")) {
       var slideZ = t.closest(".wr-slide");
       var evZ = slideZ ? slideZ.getAttribute("data-event-id") : "";
+      var evObjZ = (state.events || []).filter(function (e) {
+        return String(e.id) === String(evZ);
+      })[0];
+      var presetZ = evObjZ ? parseZirkelNote(evObjZ.note) : null;
       if (host && typeof host.openZirkelWorkout === "function") {
-        host.openZirkelWorkout(evZ);
+        host.openZirkelWorkout(evZ, presetZ);
       } else if (host && typeof host.requireFfc === "function") {
         host.requireFfc(function () {
           if (window.FFC && FFC.openSetup) FFC.openSetup();
