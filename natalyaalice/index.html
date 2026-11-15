@@ -4813,6 +4813,13 @@
       color: #F6F1E8;
       font-weight: 600;
     }
+    .go-slide__cta.go-slide__cta--editor {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
     .go-slide__ffc {
       margin-top: 28px;
       display: grid;
@@ -5180,8 +5187,9 @@
     }
     #coach-playbook-modal .coach-playbook h3 {
       margin: 14px 0 6px;
-      font-family: "Playfair Display", Georgia, serif;
-      font-size: 18px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
     }
     body.is-session #plan-training > .go-card,
     body.is-session #plan-training > .zirkel-block.go-card { display: none !important; }
@@ -5675,6 +5683,13 @@
       border: 1px solid rgba(42, 33, 24, 0.28);
       padding: 12px;
       background: #F6F1E8;
+    }
+    .pt-cal.is-sticky {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      margin-top: 0;
+      box-shadow: 0 10px 14px -12px rgba(42, 33, 24, 0.35);
     }
     .pt-cal__head {
       display: flex;
@@ -14981,6 +14996,10 @@
           coacheeSlide.appendChild(lockHint);
           paintCoachPtCalendar(coacheeSlide, { locked: true });
         } else {
+          /* Kalender oben (sticky), Coachees darunter scrollen */
+          paintCoachPtCalendar(coacheeSlide, { locked: false });
+          var calEl = coacheeSlide.querySelector(".pt-cal");
+          if (calEl) calEl.classList.add("is-sticky");
           if (!coachees.length) {
             var emptyC = document.createElement("p");
             emptyC.className = "coach-empty";
@@ -15001,7 +15020,6 @@
               row.appendChild(pencil);
             }, coacheeSlide);
           });
-          paintCoachPtCalendar(coacheeSlide, { locked: false });
         }
         box.appendChild(coacheeSlide);
         syncGroupOptions();
@@ -15732,6 +15750,19 @@
             });
           }
           card.appendChild(cta);
+          if (offer.key === "coach_offer") {
+            /* Kurs-Editor direkt unter Buchen, nur für Coaches/Admin; reiner Link, keine Rail-Logik */
+            var editorAcc = window.GoAccountSession ? GoAccountSession.load() : null;
+            var editorAdmins = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
+            if (editorAcc && (editorAcc.is_trainer || editorAdmins.indexOf(editorAcc.id) !== -1)) {
+              var editorLink = document.createElement("button");
+              editorLink.type = "button";
+              editorLink.className = "go-slide__cta go-slide__cta--editor";
+              editorLink.textContent = "Kurs-Editor";
+              editorLink.addEventListener("click", function () { location.href = "/go/kurse/"; });
+              card.appendChild(editorLink);
+            }
+          }
           var copy = document.createElement("p");
           copy.className = "go-slide__copy";
           copy.textContent = offer.description || "";
@@ -15746,20 +15777,6 @@
             more.textContent = "Coaching-Playbook";
             more.addEventListener("click", openCoachPlaybook);
             card.appendChild(more);
-            /* Kurs-Editor nur für Coaches/Admin; reiner Link, keine Rail-Logik */
-            var editorAcc = window.GoAccountSession ? GoAccountSession.load() : null;
-            var editorAdmins = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c", "7f0d09d2-8b6c-48a3-a721-62dc0c3651ea"];
-            if (editorAcc && (editorAcc.is_trainer || editorAdmins.indexOf(editorAcc.id) !== -1)) {
-              var editorLink = document.createElement("a");
-              editorLink.className = "go-slide__cta";
-              editorLink.href = "/go/kurse/";
-              editorLink.style.marginTop = "12px";
-              editorLink.style.display = "block";
-              editorLink.style.textAlign = "center";
-              editorLink.style.textDecoration = "none";
-              editorLink.textContent = "Kurs-Editor";
-              card.appendChild(editorLink);
-            }
           }
           if (offer.key === "routine") {
             var routineCard = document.getElementById("go-card-routine");
