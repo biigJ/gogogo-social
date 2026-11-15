@@ -2030,6 +2030,7 @@
     .acc-tool--bubble .acc-bubble-icon,
     .acc-tool--bubble .wr-ico { width: 30px; height: 30px; display: block; }
     .acc-tool--remove { color: #2A2118; }
+    .acc-tool-badge--right { margin-left: auto; }
     .acc-tool--remove .wr-ico { width: 26px; height: 26px; display: block; }
     .acc-zset { display: grid; gap: 10px; margin: 12px 0; }
     .acc-zset label { display: grid; gap: 4px; font-size: 13px; }
@@ -7570,6 +7571,7 @@
       var mantraList = [];
       var pendingInvitePeople = [];
       var pendingInviteIso = "";
+      var pendingInviteEventId = "";
       var pendingUnit = null;
       var profilePerson = null;
       var GOAL_OPTIONS = ["just for Fun", "HYROX", "abnehmen", "Bodybuilding", "Krafttraining", "Hybrid Athlet", "Schwimmer", "Marathon", "Triathlon", "Wellbeing"];
@@ -10832,7 +10834,8 @@
           .catch(function () {});
       }
 
-      function openInviteForPost(iso) {
+      function openInviteForPost(iso, eventId) {
+        pendingInviteEventId = eventId && /^[0-9a-f-]{36}$/i.test(String(eventId)) ? String(eventId) : "";
         if (iso && typeof openInvite === "function") {
           openInvite(iso);
           return;
@@ -16796,7 +16799,8 @@
               from_name: personName(),
               place: place,
               meet_time: time,
-              status: "pending"
+              status: "pending",
+              event_id: pendingInviteEventId || null
             }
           }).then(function (rows) {
             var row = Array.isArray(rows) ? rows[0] : rows;
@@ -17043,7 +17047,7 @@
         return parts.replace(/^0/, "");
       }
 
-      function inviteGoPeople(people, label) {
+      function inviteGoPeople(people, label, eventId) {
         if (!sessionAccount || !people || !people.length) return;
         var iso = Log.berlinToday();
         var place = placeForWeekday(weekdayIndex(iso));
@@ -17059,6 +17063,7 @@
             meet_time: time,
             status: "pending"
           };
+          if (eventId && /^[0-9a-f-]{36}$/i.test(String(eventId))) row.event_id = String(eventId);
           return rest("go_workout_invites", { method: "POST", prefer: "return=representation", body: row })
             .then(function (rows) {
               var saved = Array.isArray(rows) ? rows[0] : rows;
@@ -19165,7 +19170,7 @@
                 return p && friendIds && friendIds.indexOf(String(p.id)) >= 0;
               });
               if (!people.length) return Promise.resolve();
-              return inviteGoPeople(people, "Spontan").catch(function () {});
+              return inviteGoPeople(people, "Spontan", eventId).catch(function () {});
             },
             requireFfc: function (fn, opts) {
               if (window.GoHost && typeof GoHost.requireFfc === "function") {
@@ -19222,7 +19227,7 @@
       function loadInvites() {
         if (!sessionMode || !sessionAccount) return Promise.resolve();
         var id = encodeURIComponent(sessionAccount.id);
-        var select = "id,from_id,to_id,workout_date,workout_label,from_name,place,meet_time,status";
+        var select = "id,from_id,to_id,workout_date,workout_label,from_name,place,meet_time,status,event_id";
         var failed = 0;
         return Promise.all([
           rest("go_workout_invites?from_id=eq." + id + "&select=" + select).catch(function () { failed += 1; return []; }),

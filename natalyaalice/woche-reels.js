@@ -2648,7 +2648,8 @@
           from_name: fromName,
           place: place,
           meet_time: time,
-          status: "pending"
+          status: "pending",
+          event_id: /^[0-9a-f-]{36}$/i.test(String(eventId || "")) ? String(eventId) : null
         }
       }).catch(function () {
         return null;
