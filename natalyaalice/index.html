@@ -584,6 +584,15 @@
       min-height: 44px;
       padding: 8px 10px;
     }
+    /* Laufende Routine / Gebucht: zweizeilig — überschreibt session nowrap */
+    body.is-session .routine-start.is-running {
+      white-space: normal;
+      line-height: 1.25;
+      min-height: 64px;
+      height: auto;
+      flex-direction: column;
+      gap: 2px;
+    }
     .plan-week.is-on { background: #C7413B; color: #F6F1E8; border-color: transparent; }
     .plan-week[hidden] { display: none; }
     .days { margin-top: 14px; }
@@ -667,11 +676,41 @@
       text-align: center;
       font-family: "Playfair Display", serif;
       font-weight: 500;
-      font-size: 10px;
-      line-height: 1.35;
+      font-size: 13px;
+      line-height: 1.25;
+      color: #2A2118;
+      white-space: normal;
+      cursor: pointer;
+    }
+    .routine-start.is-running {
+      min-height: 64px;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .go-routine-status {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px 16px;
+      margin: 0;
+      font-size: var(--t-m, 16px) !important;
+      font-weight: 600 !important;
+      line-height: 1.35 !important;
       color: #2A2118;
     }
-    .routine-start { cursor: pointer; }
+    .go-slide__cta.is-owned {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      white-space: normal;
+      line-height: 1.25;
+      min-height: 56px;
+      height: auto;
+      padding: 10px 12px;
+    }
     .weeks {
       display: grid;
       grid-template-columns: repeat(12, 1fr);
@@ -2148,42 +2187,18 @@
     body.is-session[data-shell="plan"] #plan-week { order: 6; margin-top: 16px; }
     body.is-session[data-shell="plan"] #days { order: 7; }
     body.is-session[data-shell="plan"] .shell-plan { order: 8; }
-    body.is-session[data-shell="team"] #team-rail-nav { order: 1; }
-    body.is-session[data-shell="team"] #plan-team { order: 2; }
+    /* Team/Plus-Headline: gleiche order wie unten (7/8) — keine abweichende order:1 */
+    body.is-session[data-shell="team"] #team-rail-nav { order: 7; }
+    body.is-session[data-shell="team"] #plan-team { order: 8; }
+    body.is-session[data-shell="kurse"] #go-rail-nav { order: 7; }
+    body.is-session[data-shell="kurse"] #plan-training { order: 8; }
     body.is-session[data-shell="kurse"] #support-root { display: none !important; }
     body.is-session[data-shell="kurse"] #plan-training {
       display: flex;
       flex-direction: column;
       flex: 1 1 auto;
       min-height: 0;
-      order: 0;
       width: 100%;
-    }
-    /*
-      PLUS-INVARIANT: #go-rail-nav (Titel + Pfeile) MUSS über #go-rail bleiben.
-      #plan-training ist flex-Spalte; order > 0 am Nav + overflow:hidden schneidet
-      die Headline ab (Regression nach Flex-Scrollport-Fix). Team/Woche unberührt —
-      deren rail-nav liegt als Sibling AUSSERHALB der Pane.
-    */
-    body.is-session[data-shell="kurse"] #go-rail-nav,
-    body.is-session[data-shell="plan"][data-plan="training"] #go-rail-nav {
-      display: grid !important;
-      grid-template-columns: 28px 1fr 28px;
-      align-items: center;
-      gap: 6px;
-      order: 0 !important;
-      flex: 0 0 auto !important;
-      width: 100%;
-      /* Wie Team: gleiche vertikale Metrik; 20px horizontal (kurse welcome hat L/R 0) */
-      padding: 0 20px !important;
-      margin: 0 0 10px !important;
-      position: relative;
-      z-index: 2;
-      box-sizing: border-box;
-    }
-    body.is-session[data-shell="kurse"] #go-rail,
-    body.is-session[data-shell="plan"][data-plan="training"] #go-rail {
-      order: 1 !important;
     }
     .go-slide__cta.is-owned,
     .go-slide__cta.is-owned:disabled {
@@ -2191,7 +2206,6 @@
       color: #6B6358 !important;
       cursor: default;
     }
-    body.is-session[data-shell="kurse"] #plan-training { order: 2; }
     body.is-session[data-shell="profil"] #plan-profil,
     body.is-session[data-shell="profil"] #plan-settings,
     body.is-session[data-shell="profil"] #plan-info { order: 1; }
@@ -2299,6 +2313,7 @@
     #plan-profil, #plan-team, #plan-orte, #plan-training, #plan-info, #plan-settings { display: none !important; }
     body.is-session[data-shell="profil"][data-plan="info"] #plan-info,
     body.is-session[data-shell="plan"][data-plan="info"] #plan-info,
+    body.is-session[data-shell="kurse"] #plan-training,
     body.is-session[data-shell="kurse"][data-plan="training"] #plan-training,
     body.is-session[data-shell="plan"][data-plan="training"] #plan-training {
       display: flex !important;
@@ -3222,6 +3237,7 @@
       width: 26px; height: 26px; border-radius: 50%; object-fit: cover; display: block;
     }
     body.is-comment-open .app-pill { display: none !important; }
+    /* Aktuell-Punkt = Hinweis auf offene Einladung / ungelesenes Tagebuch */
     .pill-dot {
       position: absolute;
       top: -3px;
@@ -3232,6 +3248,61 @@
       background: #120c08;
       opacity: 1;
       pointer-events: none;
+    }
+    .team-slide__member {
+      position: relative;
+    }
+    .team-slide__ffc-badge {
+      position: absolute;
+      right: -2px;
+      bottom: -2px;
+      padding: 1px 4px;
+      border-radius: 6px;
+      background: #2A2118;
+      color: #F6F1E8;
+      font-size: 9px !important;
+      font-weight: 700 !important;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+    }
+    .go-group-ffc-invite {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0 12px;
+      font-size: 14px !important;
+    }
+    .acc-spontan-invite {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(42,33,24,.14);
+      text-align: left;
+    }
+    .acc-spontan-invite__h {
+      margin: 0 0 8px;
+      font-weight: 700 !important;
+      font-size: 14px !important;
+    }
+    .acc-spontan-invite__row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 6px;
+      font-size: 14px !important;
+      color: #2A2118;
+    }
+    .acc-spontan-invite__go {
+      display: block;
+      width: 100%;
+      margin-top: 10px;
+      min-height: 48px;
+      border: 1px solid #2A2118;
+      border-radius: 999px;
+      background: #2A2118;
+      color: #F6F1E8;
+      font-family: "Playfair Display", Georgia, serif;
+      font-weight: 600;
+      font-size: 15px;
     }
     .heute-head { position: relative; }
     .welcome-title { margin: 0; }
@@ -4025,17 +4096,18 @@
       line-height: 1.35 !important;
       color: rgba(42, 33, 24, 0.78);
     }
-    #go-rail .go-card.go-card--routine-plain .routine-row {
-      order: 3;
-      margin-top: 8px !important;
-    }
+    #go-rail .go-card.go-card--routine-plain .go-formula { order: 0; }
+    #go-rail .go-card.go-card--routine-plain .go-routine-status { order: 1; }
+    #go-rail .go-card.go-card--routine-plain .go-card__copy { order: 2; }
     #go-rail .go-card.go-card--routine-plain #weeks {
-      order: 2;
+      order: 3;
       margin-top: 4px;
     }
-    #go-rail .go-card.go-card--routine-plain .go-formula { order: 0; }
-    #go-rail .go-card.go-card--routine-plain .go-card__copy { order: 1; }
-    #go-rail .go-card.go-card--routine-plain #routine-note { order: 4; }
+    #go-rail .go-card.go-card--routine-plain .routine-row {
+      order: 4;
+      margin-top: 8px !important;
+    }
+    #go-rail .go-card.go-card--routine-plain #routine-note { order: 5; }
     #go-rail .go-slide[data-offer="routine"] > .go-slide__copy { display: none !important; }
     .go-card .routine-row { margin-top: 8px !important; }
     .go-card #weeks { margin-top: 10px; }
@@ -4355,16 +4427,20 @@
       padding: 0;
       box-sizing: border-box;
     }
-    /* Team/Woche: rail-nav ist Sibling der Pane → order 7 ok.
-       Plus (#go-rail-nav) NICHT hier — liegt INNERHALB #plan-training (siehe PLUS-INVARIANT). */
+    /* Team/Plus/Woche: rail-nav ist Sibling der Pane — gleiche Höhe */
     body.is-session[data-shell="team"] #team-rail-nav,
     body.is-session[data-shell="plan"][data-plan="team"] #team-rail-nav,
+    body.is-session[data-shell="kurse"] #go-rail-nav,
+    body.is-session[data-shell="plan"][data-plan="training"] #go-rail-nav,
     body.is-session[data-shell="woche"] #week-rail-nav {
       display: grid;
       grid-template-columns: 28px 1fr 28px;
       align-items: center;
       gap: 6px;
       order: 7;
+      padding: 0;
+      margin: 0 0 10px;
+      box-sizing: border-box;
     }
     body.is-session[data-shell="woche"] #week-rail-nav {
       position: fixed;
@@ -4401,7 +4477,9 @@
     body.is-session[data-shell="team"] #plan-team,
     body.is-session[data-shell="plan"][data-plan="team"] #plan-team { order: 8; }
     body.is-session[data-shell="kurse"] #plan-training,
-    body.is-session[data-shell="plan"][data-plan="training"] #plan-training { order: 0; }
+    body.is-session[data-shell="plan"][data-plan="training"] #plan-training { order: 8; }
+    body.is-session[data-shell="kurse"] #go-rail-nav,
+    body.is-session[data-shell="plan"][data-plan="training"] #go-rail-nav { order: 7; }
     .rail-nav__title {
       margin: 0;
       text-align: center;
@@ -4728,24 +4806,42 @@
       margin: 0 0 8px;
       color: #2A2118;
     }
-    .go-ffc-lb-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
-    .go-ffc-chip {
-      border: 1px solid #2A2118;
+    .go-ffc-sec { margin: 0 0 22px; }
+    .go-ffc-groups { display: grid; gap: 8px; margin: 0 0 12px; }
+    .go-ffc-group-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 40px;
+    }
+    .go-ffc-group-line.is-on .go-ffc-group-name { font-weight: 700 !important; text-decoration: underline; }
+    .go-ffc-group-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      border: 0;
       background: transparent;
-      color: #2A2118;
-      padding: 6px 12px;
+      text-align: left;
+      padding: 0;
       font: inherit;
-      font-size: 13px !important;
+      font-size: 15px !important;
       font-weight: 600 !important;
+      color: #2A2118;
       cursor: pointer;
     }
-    .go-ffc-chip.is-on { background: #2A2118; color: #F6F1E8; }
-    .go-ffc-tools { margin-top: 14px; display: grid; gap: 10px; }
+    .go-ffc-leave {
+      flex: 0 0 auto;
+      margin-left: auto;
+      min-height: 34px !important;
+      padding: 0 10px !important;
+      font-size: 12px !important;
+    }
     .go-ffc-friend-row, .go-ffc-group-row {
       display: grid;
       grid-template-columns: 1fr auto;
       gap: 8px;
       align-items: center;
+      margin-top: 10px;
     }
     .go-ffc-input {
       width: 100%;
@@ -5069,16 +5165,16 @@
       background: transparent;
       color: #2A2118;
     }
-    /* Plus: fester Viewport — Slides vertikal scrollbar (Inhalt unter dem Fold) */
+    /* Team + Plus: gleiche welcome-Metrik → Headline auf derselben Höhe */
+    body.is-session[data-shell="team"] .welcome,
     body.is-session[data-shell="kurse"] .welcome {
       overflow: hidden !important;
       overscroll-behavior: none;
       height: var(--screen-h, 100dvh);
       max-height: var(--screen-h, 100dvh);
-      padding-left: 0 !important;
-      padding-right: 0 !important;
-      /* Wie Team: 4px + Safe Area → Headline auf gleicher Höhe, Inhalt darunter */
       padding-top: calc(4px + env(safe-area-inset-top, 0px)) !important;
+      padding-left: 20px !important;
+      padding-right: 20px !important;
       padding-bottom: 0 !important;
     }
     body.is-session[data-shell="kurse"] #plan-training {
@@ -5123,8 +5219,8 @@
       overscroll-behavior-x: none;
       /* Wie Team: horizontaler Rail-Snap + vertikaler Slide-Scroll */
       touch-action: pan-x pan-y;
-      /* Inhalt unter Headline — gleiches horizontales Gutter wie Team-Slides */
-      padding: 0 20px calc(88px + env(safe-area-inset-bottom, 0px));
+      /* welcome hat bereits 20px L/R — Slide braucht kein Extra-Gutter */
+      padding: 0 0 calc(88px + env(safe-area-inset-bottom, 0px));
       box-sizing: border-box;
       scroll-snap-align: start;
       scroll-snap-stop: always;
@@ -5716,6 +5812,16 @@
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
       </button>
     </div>
+    <!-- Plus-Headline als Sibling wie Team — gleiche Höhe im welcome-Flex -->
+    <div class="rail-nav" id="go-rail-nav" hidden>
+      <button type="button" class="rail-nav__btn rail-nav__prev" aria-label="Vorheriges Angebot">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+      <h3 class="rail-nav__title" id="go-rail-title"></h3>
+      <button type="button" class="rail-nav__btn rail-nav__next" aria-label="Nächstes Angebot">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+    </div>
     <div class="shell-plan" id="plan-team"></div>
     <div class="shell-plan settings-list" id="plan-settings">
       <button type="button" data-menu="name">Vorname ändern</button>
@@ -6075,15 +6181,6 @@
       </div>
     </div>
     <div class="shell-plan" id="plan-training">
-      <div class="rail-nav" id="go-rail-nav" hidden>
-        <button type="button" class="rail-nav__btn rail-nav__prev" aria-label="Vorheriges Angebot">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>
-        </button>
-        <h3 class="rail-nav__title" id="go-rail-title"></h3>
-        <button type="button" class="rail-nav__btn rail-nav__next" aria-label="Nächstes Angebot">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
-        </button>
-      </div>
       <div class="go-rail" id="go-rail" aria-label="Go Angebote" hidden></div>
       <div id="support-root" class="support-root" aria-label="Support"></div>
       <div class="go-card go-card--routine-plain" id="go-card-routine" hidden>
@@ -8485,6 +8582,86 @@
         });
       }
 
+      function routineDepositEur() {
+        try {
+          var order =
+            window.GoSupport && GoSupport.activeOrderFor
+              ? GoSupport.activeOrderFor("routine")
+              : null;
+          var meta = (order && order.meta) || {};
+          var n = Number(meta.deposit_eur || meta.amount || meta.einzahlung || 0);
+          if (!isNaN(n) && n > 0) return n;
+        } catch (eDep) {}
+        return 0;
+      }
+
+      function routineDoneDays() {
+        var start = routineStart();
+        if (!start) return 0;
+        var today = Log.berlinToday();
+        var end = addDays(start, 83);
+        if (end > today) end = today;
+        var seen = {};
+        var i;
+        for (i = 0; i < 84; i++) {
+          var iso = addDays(start, i);
+          if (iso > today) break;
+          if (dayFinished(iso)) seen[iso] = 1;
+        }
+        try {
+          var evs =
+            (window.HeuteAccountability &&
+              HeuteAccountability.getEvents &&
+              HeuteAccountability.getEvents()) ||
+            [];
+          (evs || []).forEach(function (ev) {
+            if (!ev || String(ev.user_id || "") !== String((sessionAccount && sessionAccount.id) || "")) return;
+            var d = String(ev.starts_at || "").slice(0, 10);
+            if (d >= start && d <= end) seen[d] = 1;
+          });
+        } catch (eEv) {}
+        return Object.keys(seen).length;
+      }
+
+      function paintRoutineStatus() {
+        var card = document.getElementById("go-card-routine");
+        if (!card) return;
+        var el = document.getElementById("go-routine-status");
+        if (!el) {
+          el = document.createElement("p");
+          el.id = "go-routine-status";
+          el.className = "go-routine-status";
+          var formula = card.querySelector(".go-formula");
+          if (formula && formula.nextSibling) card.insertBefore(el, formula.nextSibling);
+          else if (formula) card.appendChild(el);
+          else {
+            var copy = card.querySelector(".go-card__copy");
+            if (copy) card.insertBefore(el, copy);
+            else card.appendChild(el);
+          }
+        }
+        var start = routineStart();
+        if (!start) {
+          el.hidden = true;
+          el.textContent = "";
+          return;
+        }
+        var done = routineDoneDays();
+        var deposit = routineDepositEur();
+        var refund = deposit > 0 ? Math.round(deposit * 0.9 * (done / 84) * 100) / 100 : 0;
+        var refundLabel =
+          deposit > 0
+            ? refund.toLocaleString("de-DE", { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + "€ zurück"
+            : "—€ zurück";
+        el.hidden = false;
+        el.innerHTML =
+          "<span>" +
+          done +
+          "/84 Tagen</span><span>" +
+          refundLabel +
+          "</span>";
+      }
+
       function paintPhoto() {
         var img = document.getElementById("photo-img");
         var copy = document.getElementById("photo-copy");
@@ -8662,8 +8839,16 @@
         var start = routineStart();
         var startBtn = document.getElementById("routine-start");
         var weeks = document.getElementById("weeks");
-        startBtn.textContent = start ? "Deine Routine läuft. Klick wenn Challenge vorzeitig beenden." : "Start der 12 Wochenroutine";
-        startBtn.style.fontSize = startBtn.textContent.length > 36 ? "11px" : "";
+        if (start) {
+          startBtn.innerHTML =
+            "Deine Routine läuft.<br>Klick zum vorzeitigen Beenden.";
+          startBtn.classList.add("is-running");
+        } else {
+          startBtn.textContent = "Start der 12 Wochenroutine";
+          startBtn.classList.remove("is-running");
+        }
+        startBtn.style.fontSize = "";
+        paintRoutineStatus();
         weeks.textContent = "";
         var origin = mondayOf(today);
         for (var w = 0; w < 12; w++) {
@@ -11663,7 +11848,15 @@
           var dot = btn.querySelector(".pill-dot");
           if (!dot) return;
           var tab = btn.getAttribute("data-shell");
-          dot.hidden = tab === "heute" ? !(planHasInvite() || diaryNote) : true;
+          var showDot = tab === "heute" && !!(planHasInvite() || diaryNote);
+          dot.hidden = !showDot;
+          if (showDot) {
+            dot.title = "Offene Einladung oder ungelesenes Tagebuch";
+            dot.setAttribute("aria-label", "Hinweis: offene Einladung oder Tagebuch");
+          } else {
+            dot.removeAttribute("title");
+            dot.removeAttribute("aria-label");
+          }
         });
         var profilIco = document.getElementById("pill-profil-ico");
         if (profilIco) {
@@ -13339,121 +13532,164 @@
               };
             });
         }
-        function paintLbShell(rows, meta) {
-          if (!lbBox) return;
-          lbBox.textContent = "";
-          var head = document.createElement("div");
-          head.className = "go-ffc-lb-head";
-          var scopeLabel =
-            lbScopeId == null
-              ? "Standard · Freunde"
-              : "Team · " + ((meta && meta.groupName) || "Gruppe");
-          var title = document.createElement("div");
-          title.className = "go-ffc-lb-scope";
-          title.textContent = scopeLabel;
-          head.appendChild(title);
-          var chips = document.createElement("div");
-          chips.className = "go-ffc-lb-chips";
-          function addChip(label, id, on) {
-            var b = document.createElement("button");
-            b.type = "button";
-            b.className = "go-ffc-chip" + (on ? " is-on" : "");
-            b.textContent = label;
-            b.addEventListener("click", function () {
-              lbScopeId = id;
-              if (FFC.setLeaderboardScope) FFC.setLeaderboardScope(id);
-              reloadLb();
-            });
-            chips.appendChild(b);
-          }
-          addChip("Standard", null, lbScopeId == null);
-          (lbGroups || []).forEach(function (g) {
-            addChip(g.name || "Team", g.group_id, String(lbScopeId) === String(g.group_id));
-          });
-          head.appendChild(chips);
-          lbBox.appendChild(head);
-          var list = document.createElement("div");
-          list.className = "go-ffc-lb-list";
+        function paintRows(listEl, rows, emptyText) {
+          listEl.textContent = "";
           if (!rows || !rows.length) {
-            list.textContent =
-              lbScopeId == null
-                ? "Noch keine Leaderboard-Daten. Füge FFC-Freunde hinzu."
-                : "Noch keine Punkte in dieser Gruppe.";
-          } else {
-            rows.forEach(function (r, i) {
-              var row = document.createElement("div");
-              row.className = "go-slide__ffc-row" + (r.is_me ? " is-me" : "");
-              var left = document.createElement("span");
-              left.textContent =
-                String(i + 1) + ". " + (r.nickname || r.name || "Athlet") + (r.is_me ? " · Du" : "");
-              var right = document.createElement("span");
-              var pts = r.points != null ? Number(r.points) : null;
-              right.textContent =
-                pts != null && !isNaN(pts)
-                  ? pts.toLocaleString("de-DE") + " P"
-                  : String(r.workouts || 0) + " WO";
-              row.appendChild(left);
-              row.appendChild(right);
-              list.appendChild(row);
-            });
+            listEl.textContent = emptyText || "Noch keine Leaderboard-Daten.";
+            return;
           }
-          lbBox.appendChild(list);
-          var tools = document.createElement("div");
-          tools.className = "go-ffc-tools";
+          rows.forEach(function (r, i) {
+            var row = document.createElement("div");
+            row.className = "go-slide__ffc-row" + (r.is_me ? " is-me" : "");
+            var left = document.createElement("span");
+            left.textContent =
+              String(i + 1) + ". " + (r.nickname || r.name || "Athlet") + (r.is_me ? " · Du" : "");
+            var right = document.createElement("span");
+            var pts = r.points != null ? Number(r.points) : null;
+            right.textContent =
+              pts != null && !isNaN(pts)
+                ? pts.toLocaleString("de-DE") + " P"
+                : String(r.workouts || 0) + " WO";
+            row.appendChild(left);
+            row.appendChild(right);
+            listEl.appendChild(row);
+          });
+        }
+        function paintLbShell(pack) {
+          if (!lbBox) return;
+          pack = pack || {};
+          var stdRows = pack.standard || [];
+          var teamRows = pack.team || [];
+          lbBox.textContent = "";
+          var msg = document.createElement("p");
+          msg.className = "go-ffc-msg";
+
+          /* —— Leaderboard Standard —— */
+          var stdSec = document.createElement("section");
+          stdSec.className = "go-ffc-sec";
+          var stdTitle = document.createElement("h4");
+          stdTitle.className = "go-ffc-lb-scope";
+          stdTitle.textContent = "Leaderboard Standard";
+          stdSec.appendChild(stdTitle);
+          var stdList = document.createElement("div");
+          stdList.className = "go-ffc-lb-list";
+          paintRows(stdList, stdRows, "Noch keine Punkte unter Freunden.");
+          stdSec.appendChild(stdList);
           var friendRow = document.createElement("div");
           friendRow.className = "go-ffc-friend-row";
           var friendIn = document.createElement("input");
           friendIn.type = "text";
           friendIn.className = "go-ffc-input";
-          friendIn.placeholder = "FFC-Freund: Nickname / E-Mail";
+          friendIn.placeholder = "Nickname oder E-Mail";
           friendIn.autocomplete = "off";
           var friendBtn = document.createElement("button");
           friendBtn.type = "button";
           friendBtn.className = "go-ffc-btn";
           friendBtn.textContent = "Freund hinzufügen";
-          var friendMsg = document.createElement("p");
-          friendMsg.className = "go-ffc-msg";
           friendBtn.addEventListener("click", function () {
             friendBtn.disabled = true;
-            friendMsg.textContent = "Prüfe gogogo-Konto…";
+            msg.textContent = "Prüfe gogogo-Konto…";
             validateFfcFriendQuery(friendIn.value)
               .then(function (v) {
                 if (!v.ok) {
                   friendBtn.disabled = false;
-                  friendMsg.textContent = v.msg;
+                  msg.textContent = v.msg;
                   return null;
                 }
-                friendMsg.textContent = "Anfrage…";
+                msg.textContent = "Anfrage…";
                 return FFC.friendRequest(v.query);
               })
               .then(function (res) {
                 if (res == null) return;
                 friendBtn.disabled = false;
                 if (res && res.error) {
-                  friendMsg.textContent =
+                  msg.textContent =
                     (res.error && res.error.message) || "Anfrage fehlgeschlagen.";
                   return;
                 }
                 friendIn.value = "";
-                friendMsg.textContent =
-                  "Anfrage gesendet. Nach Annahme erscheint die Person im Leaderboard.";
+                msg.textContent = "Anfrage gesendet.";
                 reloadLb();
               })
               .catch(function () {
                 friendBtn.disabled = false;
-                friendMsg.textContent = "Anfrage fehlgeschlagen.";
+                msg.textContent = "Anfrage fehlgeschlagen.";
               });
           });
           friendRow.appendChild(friendIn);
           friendRow.appendChild(friendBtn);
-          tools.appendChild(friendRow);
-          tools.appendChild(friendMsg);
-          var groupRow = document.createElement("div");
-          groupRow.className = "go-ffc-group-row";
+          stdSec.appendChild(friendRow);
+          lbBox.appendChild(stdSec);
+
+          /* —— Leaderboard Team —— */
+          var teamSec = document.createElement("section");
+          teamSec.className = "go-ffc-sec";
+          var teamTitle = document.createElement("h4");
+          teamTitle.className = "go-ffc-lb-scope";
+          teamTitle.textContent = "Leaderboard Team";
+          teamSec.appendChild(teamTitle);
+
+          var groupsWrap = document.createElement("div");
+          groupsWrap.className = "go-ffc-groups";
+          if (!(lbGroups || []).length) {
+            var emptyG = document.createElement("p");
+            emptyG.className = "go-ffc-msg";
+            emptyG.textContent = "Noch keine FFC-Gruppe.";
+            groupsWrap.appendChild(emptyG);
+          }
+          (lbGroups || []).forEach(function (g) {
+            var line = document.createElement("div");
+            line.className =
+              "go-ffc-group-line" +
+              (String(lbScopeId) === String(g.group_id) ? " is-on" : "");
+            var nameBtn = document.createElement("button");
+            nameBtn.type = "button";
+            nameBtn.className = "go-ffc-group-name";
+            nameBtn.textContent = g.name || "Gruppe";
+            nameBtn.addEventListener("click", function () {
+              lbScopeId = g.group_id;
+              if (FFC.setLeaderboardScope) FFC.setLeaderboardScope(g.group_id);
+              reloadLb();
+            });
+            var leave = document.createElement("button");
+            leave.type = "button";
+            leave.className = "go-ffc-btn go-ffc-btn--quiet go-ffc-leave";
+            leave.textContent = "Verlassen";
+            leave.addEventListener("click", function (ev) {
+              ev.stopPropagation();
+              if (leave.dataset.armed !== "1") {
+                leave.dataset.armed = "1";
+                leave.textContent = "Tippen zum Bestätigen";
+                return;
+              }
+              leave.disabled = true;
+              Promise.resolve(FFC.leaveGroup(g.group_id)).then(function () {
+                if (String(lbScopeId) === String(g.group_id)) lbScopeId = null;
+                msg.textContent = "Gruppe verlassen.";
+                reloadLb();
+              });
+            });
+            line.appendChild(nameBtn);
+            line.appendChild(leave);
+            groupsWrap.appendChild(line);
+          });
+          teamSec.appendChild(groupsWrap);
+
+          var teamList = document.createElement("div");
+          teamList.className = "go-ffc-lb-list";
+          if (lbScopeId == null) {
+            teamList.textContent = "Gruppe tippen, um das Team-Leaderboard zu sehen.";
+          } else {
+            paintRows(teamList, teamRows, "Noch keine Punkte in dieser Gruppe.");
+          }
+          teamSec.appendChild(teamList);
+
+          var createRow = document.createElement("div");
+          createRow.className = "go-ffc-group-row";
           var groupIn = document.createElement("input");
           groupIn.type = "text";
           groupIn.className = "go-ffc-input";
-          groupIn.placeholder = "Neue Team-Gruppe";
+          groupIn.placeholder = "Neuer Gruppenname";
           groupIn.maxLength = 40;
           var groupBtn = document.createElement("button");
           groupBtn.type = "button";
@@ -13462,7 +13698,7 @@
           groupBtn.addEventListener("click", function () {
             var name = String(groupIn.value || "").trim();
             if (!name) {
-              friendMsg.textContent = "Gruppenname eingeben.";
+              msg.textContent = "Gruppenname eingeben.";
               return;
             }
             var friends = (FFC.friends && FFC.friends()) || [];
@@ -13474,7 +13710,7 @@
                 return f.friend_id;
               });
             if (!ids.length) {
-              friendMsg.textContent = "Zuerst FFC-Freunde hinzufügen (angenommen).";
+              msg.textContent = "Zuerst FFC-Freunde hinzufügen (angenommen).";
               return;
             }
             groupBtn.disabled = true;
@@ -13482,56 +13718,40 @@
               .then(function (res) {
                 groupBtn.disabled = false;
                 if (res && res.error) {
-                  friendMsg.textContent =
+                  msg.textContent =
                     (res.error && res.error.message) || "Gruppe fehlgeschlagen.";
                   return;
                 }
                 groupIn.value = "";
-                friendMsg.textContent = "Gruppe gespeichert (FFC Supabase).";
+                msg.textContent = "Gruppe gespeichert.";
                 lbScopeId = res && res.data != null ? res.data : lbScopeId;
                 reloadLb();
               })
               .catch(function () {
                 groupBtn.disabled = false;
-                friendMsg.textContent = "Gruppe fehlgeschlagen.";
+                msg.textContent = "Gruppe fehlgeschlagen.";
               });
           });
-          groupRow.appendChild(groupIn);
-          groupRow.appendChild(groupBtn);
-          tools.appendChild(groupRow);
-          if (lbScopeId != null) {
-            var leave = document.createElement("button");
-            leave.type = "button";
-            leave.className = "go-ffc-btn go-ffc-btn--quiet";
-            leave.textContent = "Gruppe verlassen";
-            leave.addEventListener("click", function () {
-              if (leave.dataset.armed !== "1") {
-                leave.dataset.armed = "1";
-                leave.textContent = "Nochmal tippen zum Bestätigen";
-                return;
-              }
-              leave.disabled = true;
-              Promise.resolve(FFC.leaveGroup(lbScopeId)).then(function () {
-                lbScopeId = null;
-                friendMsg.textContent = "Gruppe verlassen — Zuordnung gelöscht.";
-                reloadLb();
-              });
-            });
-            tools.appendChild(leave);
-          }
-          lbBox.appendChild(tools);
+          createRow.appendChild(groupIn);
+          createRow.appendChild(groupBtn);
+          teamSec.appendChild(createRow);
+          lbBox.appendChild(teamSec);
+          lbBox.appendChild(msg);
         }
         function reloadLb() {
-          var gName = "";
-          (lbGroups || []).forEach(function (g) {
-            if (String(g.group_id) === String(lbScopeId)) gName = g.name || "";
-          });
-          Promise.resolve(FFC.weeklyPoints(lbScopeId))
-            .then(function (rows) {
-              paintLbShell(rows || [], { groupName: gName });
+          Promise.all([
+            FFC.groups ? FFC.groups() : Promise.resolve([]),
+            FFC.weeklyPoints ? FFC.weeklyPoints(null) : Promise.resolve([]),
+            lbScopeId != null && FFC.weeklyPoints
+              ? FFC.weeklyPoints(lbScopeId)
+              : Promise.resolve([])
+          ])
+            .then(function (parts) {
+              lbGroups = parts[0] || [];
+              paintLbShell({ standard: parts[1] || [], team: parts[2] || [] });
             })
             .catch(function () {
-              paintLbShell([], { groupName: gName });
+              paintLbShell({ standard: [], team: [] });
             });
         }
         function paintRecSessions(sessions) {
@@ -13643,31 +13863,17 @@
             centerWheelItem(first, false);
           });
         }
-        var lbPromise = Promise.resolve(FFC.groups ? FFC.groups() : [])
-          .then(function (groups) {
-            lbGroups = groups || [];
-            try {
-              lbScopeId = FFC.leaderboardScope ? FFC.leaderboardScope() : null;
-            } catch (eSc) {
-              lbScopeId = null;
-            }
-            if (lbScopeId != null) {
-              var still = lbGroups.some(function (g) {
-                return String(g.group_id) === String(lbScopeId);
-              });
-              if (!still) lbScopeId = null;
-            }
-            return FFC.weeklyPoints ? FFC.weeklyPoints(lbScopeId) : [];
-          })
-          .then(function (rows) {
-            var gName = "";
-            (lbGroups || []).forEach(function (g) {
-              if (String(g.group_id) === String(lbScopeId)) gName = g.name || "";
-            });
-            paintLbShell(rows || [], { groupName: gName });
+        try {
+          lbScopeId = FFC.leaderboardScope ? FFC.leaderboardScope() : null;
+        } catch (eSc) {
+          lbScopeId = null;
+        }
+        var lbPromise = Promise.resolve()
+          .then(function () {
+            reloadLb();
           })
           .catch(function () {
-            paintLbShell([], {});
+            paintLbShell({ standard: [], team: [] });
           });
         var recPromise =
           FFC.historyRecords
@@ -14502,12 +14708,34 @@
             });
             membersRow.appendChild(addFriend);
           }
+          var ffcNicks = {};
+          try {
+            ((window.FFC && FFC.friends && FFC.friends()) || []).forEach(function (f) {
+              if (f && f.status === "accepted" && f.nickname) {
+                ffcNicks[String(f.nickname).toLowerCase()] = true;
+              }
+            });
+            if (window.FFC && FFC.user && FFC.user()) {
+              var myNick = String((sessionAccount && sessionAccount.nickname) || "").toLowerCase();
+              if (myNick) ffcNicks[myNick] = true;
+            }
+          } catch (eFfcN) {}
           people.forEach(function (person) {
             var btn = document.createElement("button");
             btn.type = "button";
             btn.className = "team-slide__member";
-            btn.setAttribute("aria-label", person.name || "Mitglied");
+            var onFfc = !!(person.nickname && ffcNicks[String(person.nickname).toLowerCase()]);
+            btn.setAttribute(
+              "aria-label",
+              (person.name || "Mitglied") + (onFfc ? " · FFC" : "")
+            );
             btn.appendChild(personFace(person));
+            if (onFfc) {
+              var badge = document.createElement("span");
+              badge.className = "team-slide__ffc-badge";
+              badge.textContent = "FFC";
+              btn.appendChild(badge);
+            }
             btn.addEventListener("click", function () { openProfile(person); });
             membersRow.appendChild(btn);
           });
@@ -14851,20 +15079,28 @@
       }
 
       function lockPlusHeadlineNav() {
-        /* Runtime-Guard gegen CSS-Regression: Headline+Pfeile bleiben oben im Plus-Flex. */
+        /* Plus-Nav ist Sibling von #plan-training (wie Team) — nicht zurück in die Pane schieben */
         var goNav = document.getElementById("go-rail-nav");
-        var goRail = document.getElementById("go-rail");
+        var teamNav = document.getElementById("team-rail-nav");
         var host = document.getElementById("plan-training");
-        if (goNav) {
-          goNav.style.setProperty("order", "0", "important");
-          goNav.style.setProperty("flex", "0 0 auto", "important");
-          if (host && goNav.parentElement === host && host.firstElementChild !== goNav) {
-            host.insertBefore(goNav, host.firstElementChild);
+        var welcome = document.getElementById("welcome");
+        if (goNav && host && welcome && goNav.parentElement === host) {
+          welcome.insertBefore(goNav, host);
+        }
+        if (goNav && teamNav && welcome) {
+          /* DOM-Position: direkt vor der Plus-Pane, analog Team vor #plan-team */
+          var training = document.getElementById("plan-training");
+          if (training && goNav.nextElementSibling !== training) {
+            welcome.insertBefore(goNav, training);
           }
         }
-        if (goRail) {
-          goRail.style.setProperty("order", "1", "important");
-        }
+        [goNav, teamNav].forEach(function (nav) {
+          if (!nav) return;
+          nav.style.setProperty("order", "7", "important");
+          nav.style.removeProperty("flex");
+          nav.style.removeProperty("margin-top");
+          nav.style.removeProperty("padding-top");
+        });
       }
 
       function syncTeamGoRailNav() {
@@ -15212,7 +15448,11 @@
                 if (isZ && ffcLoggedNow) ownedNow = true;
                 var btn = existing[ei].querySelector(".go-slide__cta");
                 if (!btn) continue;
-                btn.textContent = ownedNow ? "Gebucht ✔️" : "Buchen";
+                if (ownedNow) {
+                  btn.innerHTML = "Gebucht<br>✔️";
+                } else {
+                  btn.textContent = "Buchen";
+                }
                 btn.disabled = !!ownedNow;
                 btn.classList.toggle("is-owned", !!ownedNow);
                 if (ownedNow) btn.setAttribute("aria-disabled", "true");
@@ -15285,7 +15525,8 @@
           var isZirkel = offer.key === "zirkel" || offer.type === "zirkel";
           var ffcLogged = !!(window.FFC && FFC.user && FFC.user());
           if (isZirkel && ffcLogged) owned = true;
-          cta.textContent = owned ? "Gebucht ✔️" : "Buchen";
+          if (owned) cta.innerHTML = "Gebucht<br>✔️";
+          else cta.textContent = "Buchen";
           if (owned) {
             cta.disabled = true;
             cta.setAttribute("aria-disabled", "true");
@@ -15545,6 +15786,16 @@
           var list = document.createElement("div");
           list.className = "go-group-friends";
           var selected = {};
+          var ffcAlso = document.createElement("label");
+          ffcAlso.className = "go-group-ffc-invite";
+          var ffcCb = document.createElement("input");
+          ffcCb.type = "checkbox";
+          ffcCb.id = "go-group-ffc-also";
+          ffcAlso.appendChild(ffcCb);
+          ffcAlso.appendChild(
+            document.createTextNode(" Auch zu FFC einladen (gleiche Nicknames)")
+          );
+          form.appendChild(ffcAlso);
           (teamPeople || []).forEach(function (person) {
             if (!person || person.isTrainerPerson) return;
             if (sessionAccount && String(person.id) === String(sessionAccount.id)) return;
@@ -15552,12 +15803,28 @@
             var cb = document.createElement("input");
             cb.type = "checkbox";
             cb.value = String(person.id);
+            cb.dataset.nickname = String(person.nickname || "");
             cb.addEventListener("change", function () {
               if (cb.checked) selected[cb.value] = true;
               else delete selected[cb.value];
             });
             lab.appendChild(cb);
-            lab.appendChild(document.createTextNode(" " + (person.name || "Freund")));
+            var onFfc = false;
+            try {
+              onFfc = !!((window.FFC && FFC.friends && FFC.friends()) || []).some(function (f) {
+                return (
+                  f &&
+                  f.status === "accepted" &&
+                  person.nickname &&
+                  String(f.nickname || "").toLowerCase() === String(person.nickname).toLowerCase()
+                );
+              });
+            } catch (eOf) {}
+            lab.appendChild(
+              document.createTextNode(
+                " " + (person.name || "Freund") + (onFfc ? " · FFC" : "")
+              )
+            );
             list.appendChild(lab);
           });
           form.appendChild(list);
@@ -15575,17 +15842,46 @@
               renderTeam();
               return;
             }
+            var memberIds = Object.keys(selected);
             var groups = [{
               id: "g-" + Date.now().toString(36),
               name: name,
               description: String(descIn.value || "").trim(),
               photo_url: "",
-              members: Object.keys(selected)
+              members: memberIds
             }];
+            var ffcInvite = ffcCb.checked;
             saveMyGroups(groups).then(function () {
               syncGroupOptions();
               renderTeam();
               closeGoSub();
+              if (!ffcInvite || !window.FFC || !FFC.user || !FFC.user()) return;
+              var nicks = [];
+              list.querySelectorAll("input:checked").forEach(function (el) {
+                var n = String(el.dataset.nickname || "").trim();
+                if (n) nicks.push(n);
+              });
+              var chain = Promise.resolve();
+              nicks.forEach(function (nick) {
+                chain = chain.then(function () {
+                  return FFC.friendRequest(nick).catch(function () {});
+                });
+              });
+              chain
+                .then(function () {
+                  if (!nicks.length || !FFC.createGroup) return null;
+                  var friends = (FFC.friends && FFC.friends()) || [];
+                  var ids = friends
+                    .filter(function (f) {
+                      return f && f.status === "accepted" && f.friend_id;
+                    })
+                    .map(function (f) {
+                      return f.friend_id;
+                    });
+                  if (!ids.length) return null;
+                  return FFC.createGroup(name, ids);
+                })
+                .catch(function () {});
             });
           });
           form.appendChild(save);
@@ -18762,6 +19058,38 @@
                 : Promise.resolve();
             },
             openInviteForPost: openInviteForPost,
+            inviteToEvent: function (eventId, friendIds) {
+              var iso = Log.berlinToday();
+              try {
+                var ev =
+                  (window.HeuteAccountability &&
+                    HeuteAccountability.state &&
+                    (HeuteAccountability.state.events || []).filter(function (e) {
+                      return String(e.id) === String(eventId);
+                    })[0]) ||
+                  null;
+                if (ev && ev.starts_at) iso = String(ev.starts_at).slice(0, 10);
+              } catch (eIso) {}
+              var people = (teamPeople || []).filter(function (p) {
+                return p && friendIds && friendIds.indexOf(String(p.id)) >= 0;
+              });
+              if (!people.length) return Promise.resolve();
+              return inviteGoPeople(people, "Spontan").catch(function () {});
+            },
+            requireFfc: function (fn, opts) {
+              if (window.GoHost && typeof GoHost.requireFfc === "function") {
+                return GoHost.requireFfc(fn, opts);
+              }
+              if (typeof fn === "function") fn();
+            },
+            openZirkel: function () {
+              if (window.GoHost && typeof GoHost.openZirkel === "function") {
+                return GoHost.openZirkel();
+              }
+              if (window.GoFFC && typeof GoFFC.openSetup === "function") {
+                GoFFC.openSetup();
+              }
+            },
             inviteFacesForIso: inviteFacesForIso,
             clearInvitesForDay: clearInvitesForDay,
             groupMemberIds: groupMemberIds,
