@@ -1195,7 +1195,7 @@
       '">Ausdauer</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-kind="alternative" data-iso="' +
       esc(iso) +
-      '">Alternative</button>' +
+      '">Sonstiges</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-kind="zirkel" data-iso="' +
       esc(iso) +
       '">Zirkeltraining</button>' +
@@ -1232,9 +1232,10 @@
         '">Unterwegs? Tausch gegen Hotel-Workout</button>';
     }
     var fullNote = notePack.full || "";
-    var placePrefix = place ? esc(place) + (notePack.text ? " · " : "") : "";
+    /* Ort steht rechts neben der Uhrzeit, Beschreibung darunter nur noch Notiz */
+    var placePrefix = "";
     var desc = "";
-    if (place || notePack.text) {
+    if (notePack.text) {
       desc =
         '<p class="wr-place"' +
         (notePack.more ? ' data-full="' + esc(placePrefix + fullNote) + '"' : "") +
@@ -1280,7 +1281,9 @@
       avatarHtml(p) +
       inviteAvatarsHtml(iso) +
       "</div>" +
-      (when ? '<p class="wr-when">' + esc(when) + "</p>" : "") +
+      (when || place
+        ? '<p class="wr-when">' + esc([when, place].filter(Boolean).join(" · ")) + "</p>"
+        : "") +
       cd +
       '<h2 class="wr-title">' +
       esc(title) +
@@ -1662,7 +1665,7 @@
               : k === "ausdauer"
                 ? "Ausdauer"
                 : k === "alternative"
-                  ? "Alternative"
+                  ? "Sonstiges"
                   : "Zirkeltraining";
           return (
             '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-edit-kind="' +
@@ -1681,6 +1684,9 @@
     var canTime = own && eventIsStillUpcoming(own);
     var evRow = own
       ? '<div class="wr-edit-panel__row">' +
+        '<button type="button" class="wr-pill-btn" data-wr-edit-place="' +
+        esc(own.id) +
+        '">Ort</button>' +
         (canTime
           ? '<button type="button" class="wr-pill-btn" data-wr-edit-time="' +
             esc(own.id) +
@@ -1926,6 +1932,45 @@
       }
     }
     return Promise.resolve();
+  }
+
+  function openPlaceSheet(eventId) {
+    var ev = state.events.filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    if (!ev) return;
+    openSheet(
+      '<p class="wr-sheet-hint">Ort</p>' +
+        '<label class="wr-field">Ort<input type="text" id="wr-edit-place" maxlength="80" placeholder="z. B. Volkspark, Studio, zu Hause" value="' +
+        esc(ev.location || "") +
+        '" /></label>' +
+        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-place-save="' +
+        esc(eventId) +
+        '">Speichern</button>' +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+  }
+
+  function saveEventPlace(eventId) {
+    var input = $("wr-edit-place");
+    var val = input ? String(input.value || "").trim() : "";
+    var ev = state.events.filter(function (e) {
+      return String(e.id) === String(eventId);
+    })[0];
+    if (!ev) return;
+    return rest("events?id=eq." + encodeURIComponent(eventId), {
+      method: "PATCH",
+      prefer: "return=minimal",
+      body: { location: val || null }
+    })
+      .then(function () {
+        ev.location = val || null;
+        closeSheet();
+        return refreshKeepDay(dayKey(ev.starts_at));
+      })
+      .catch(function () {
+        if (host.toast) host.toast("Ort konnte nicht gespeichert werden");
+      });
   }
 
   function saveEventTime(eventId) {
@@ -2311,7 +2356,7 @@
     state.pendingCreate = { replaceId: replaceId };
     if (kind === "alternative") {
       openSheet(
-        "<h3>Alternative</h3>" +
+        "<h3>Sonstiges</h3>" +
           '<div class="wr-chips">' +
           ALTERNATIVE_CHOICES.concat(REST_DAYS)
             .map(function (t) {
@@ -3129,7 +3174,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -3376,6 +3421,14 @@
     }
     if (t.getAttribute("data-wr-undo-go")) {
       undoDelete();
+      return;
+    }
+    if (t.getAttribute("data-wr-edit-place")) {
+      openPlaceSheet(t.getAttribute("data-wr-edit-place"));
+      return;
+    }
+    if (t.getAttribute("data-wr-place-save")) {
+      saveEventPlace(t.getAttribute("data-wr-place-save"));
       return;
     }
     if (t.getAttribute("data-wr-edit-time")) {

@@ -2558,7 +2558,7 @@
         var vis = readCreateVis(pick);
         finishCreate({
           category: "alternative",
-          title: "Alternative Bewegung",
+          title: "Sonstiges",
           visibility: vis
         });
       });
