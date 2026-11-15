@@ -4810,10 +4810,12 @@
     .go-ffc-groups { display: grid; gap: 8px; margin: 0 0 12px; }
     .go-ffc-group-line {
       display: flex;
+      flex-direction: row;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      min-height: 40px;
+      gap: 12px;
+      min-height: 44px;
+      width: 100%;
     }
     .go-ffc-group-line.is-on .go-ffc-group-name { font-weight: 700 !important; text-decoration: underline; }
     .go-ffc-group-name {
@@ -4828,6 +4830,9 @@
       font-weight: 600 !important;
       color: #2A2118;
       cursor: pointer;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .go-ffc-leave {
       flex: 0 0 auto;
@@ -4835,17 +4840,20 @@
       min-height: 34px !important;
       padding: 0 10px !important;
       font-size: 12px !important;
+      width: auto !important;
+      max-width: none;
     }
+    /* Freund / Gruppe erstellen: unter dem Board, untereinander — nicht neben dem Input */
     .go-ffc-friend-row, .go-ffc-group-row {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr;
       gap: 8px;
-      align-items: center;
-      margin-top: 10px;
+      align-items: stretch;
+      margin-top: 12px;
     }
     .go-ffc-input {
       width: 100%;
-      min-height: 40px;
+      min-height: 44px;
       box-sizing: border-box;
       border: 1px solid rgba(42,33,24,.28);
       background: #fff;
@@ -4854,7 +4862,7 @@
       font-size: 14px !important;
     }
     .go-ffc-btn {
-      min-height: 40px;
+      min-height: 44px;
       padding: 0 12px;
       border: 1px solid #2A2118;
       background: #2A2118;
@@ -4864,11 +4872,13 @@
       font-weight: 600 !important;
       white-space: nowrap;
       cursor: pointer;
+      width: 100%;
+      box-sizing: border-box;
     }
     .go-ffc-btn--quiet {
       background: transparent;
       color: #2A2118;
-      width: 100%;
+      width: auto;
     }
     .go-ffc-msg {
       margin: 0;
@@ -5165,17 +5175,23 @@
       background: transparent;
       color: #2A2118;
     }
-    /* Team + Plus: gleiche welcome-Metrik → Headline auf derselben Höhe */
-    body.is-session[data-shell="team"] .welcome,
+    /* Plus-Viewport: horizontaler Rail. Team bleibt normales welcome (kein Override).
+       padding-top NICHT !important ohne --ios-glass-clear — sonst sitzen Headlines im iOS-Verlauf. */
     body.is-session[data-shell="kurse"] .welcome {
       overflow: hidden !important;
       overscroll-behavior: none;
       height: var(--screen-h, 100dvh);
       max-height: var(--screen-h, 100dvh);
-      padding-top: calc(4px + env(safe-area-inset-top, 0px)) !important;
       padding-left: 20px !important;
       padding-right: 20px !important;
       padding-bottom: 0 !important;
+      /* Gleiche Formel wie Team / standalone-glass-clear */
+      padding-top: calc(4px + env(safe-area-inset-top, 0px) + var(--ios-glass-clear, 0px));
+    }
+    body.is-session[data-shell="team"] .welcome {
+      padding-left: 20px;
+      padding-right: 20px;
+      padding-top: calc(4px + env(safe-area-inset-top, 0px) + var(--ios-glass-clear, 0px));
     }
     body.is-session[data-shell="kurse"] #plan-training {
       flex: 1 1 auto;
@@ -5217,16 +5233,15 @@
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
       overscroll-behavior-x: none;
-      /* Wie Team: horizontaler Rail-Snap + vertikaler Slide-Scroll */
-      touch-action: pan-x pan-y;
-      /* welcome hat bereits 20px L/R — Slide braucht kein Extra-Gutter */
+      /* pan-y native; L-R über Hard-Snap Achsen-Lock (sonst Gesten-Lock nach Verharren) */
+      touch-action: pan-y;
       padding: 0 0 calc(88px + env(safe-area-inset-bottom, 0px));
       box-sizing: border-box;
       scroll-snap-align: start;
       scroll-snap-stop: always;
     }
     body.is-session[data-shell="kurse"] .go-slide.go-slide--toc {
-      touch-action: pan-x pan-y;
+      touch-action: pan-y;
     }
     .acc-card__faces {
       display: flex;
@@ -5579,7 +5594,9 @@
        unter die Statusleiste, das ~20px tiefer reicht. Inhalte dort herausrücken. */
     html.is-standalone { --ios-glass-clear: 24px; }
     html.is-standalone body.is-session .welcome,
-    html.is-standalone body.is-session .diary {
+    html.is-standalone body.is-session .diary,
+    html.is-standalone body.is-session[data-shell="kurse"] .welcome,
+    html.is-standalone body.is-session[data-shell="team"] .welcome {
       padding-top: calc(4px + env(safe-area-inset-top) + var(--ios-glass-clear));
     }
     html.is-standalone body.is-session[data-shell="woche"] #week-rail-nav {
@@ -13659,7 +13676,13 @@
               ev.stopPropagation();
               if (leave.dataset.armed !== "1") {
                 leave.dataset.armed = "1";
-                leave.textContent = "Tippen zum Bestätigen";
+                leave.textContent = "Bestätigen";
+                window.setTimeout(function () {
+                  if (leave.dataset.armed === "1") {
+                    leave.dataset.armed = "";
+                    leave.textContent = "Verlassen";
+                  }
+                }, 4000);
                 return;
               }
               leave.disabled = true;
@@ -15042,37 +15065,112 @@
         if (!rail || rail.dataset.hardSnap === "1") return;
         rail.dataset.hardSnap = "1";
         var snapTimer = 0;
+        var axis = "";
+        var startX = 0;
+        var startY = 0;
+        var startLeft = 0;
+        var dragging = false;
+
+        function slides() {
+          return rail.querySelectorAll(".go-slide");
+        }
+        function setSlidesOverflowY(value) {
+          Array.prototype.forEach.call(slides(), function (s) {
+            if (value == null || value === "") s.style.removeProperty("overflow-y");
+            else s.style.overflowY = value;
+          });
+        }
+        function clearSnapLock() {
+          rail.dataset.snapLock = "";
+          dragging = false;
+          axis = "";
+          setSlidesOverflowY("");
+        }
         function settle() {
-          if (rail.dataset.snapLock === "1") return;
           sizeGoRailSlides(rail);
           var i = railCurrentIndex(rail);
           var list = railSlides(rail);
           var slide = list[i];
           if (!slide) return;
           var target = Math.round(slide.offsetLeft);
-          if (Math.abs(rail.scrollLeft - target) > 1) {
-            rail.dataset.snapLock = "1";
-            rail.scrollTo({ left: target, behavior: "smooth" });
-            window.setTimeout(function () {
-              rail.scrollLeft = target;
-              rail.dataset.snapLock = "";
-              syncRailNav(rail, document.getElementById("go-rail-nav"));
-            }, 220);
+          if (Math.abs(rail.scrollLeft - target) <= 1) {
+            clearSnapLock();
+            syncRailNav(rail, document.getElementById("go-rail-nav"));
+            return;
           }
+          rail.dataset.snapLock = "1";
+          rail.scrollTo({ left: target, behavior: "smooth" });
+          window.setTimeout(function () {
+            rail.scrollLeft = target;
+            clearSnapLock();
+            syncRailNav(rail, document.getElementById("go-rail-nav"));
+          }, 240);
         }
         function schedule() {
-          if (rail.dataset.snapLock === "1") return;
           window.clearTimeout(snapTimer);
-          snapTimer = window.setTimeout(settle, 80);
+          snapTimer = window.setTimeout(settle, 90);
         }
-        rail.addEventListener("scroll", schedule, { passive: true });
-        rail.addEventListener("touchend", schedule, { passive: true });
-        rail.addEventListener("pointerup", schedule, { passive: true });
+
+        /* Achsen-Lock: nach vertikalem Verharren sonst kein L-R mehr (Nested overflow-y frisst Gesten) */
+        rail.addEventListener(
+          "touchstart",
+          function (e) {
+            clearSnapLock();
+            if (!e.touches || !e.touches[0]) return;
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            startLeft = rail.scrollLeft;
+            axis = "";
+            dragging = false;
+          },
+          { passive: true }
+        );
+        rail.addEventListener(
+          "touchmove",
+          function (e) {
+            if (!e.touches || !e.touches[0]) return;
+            var dx = e.touches[0].clientX - startX;
+            var dy = e.touches[0].clientY - startY;
+            if (!axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+              axis = Math.abs(dx) > Math.abs(dy) * 1.05 ? "x" : "y";
+              if (axis === "x") {
+                dragging = true;
+                setSlidesOverflowY("hidden");
+              }
+            }
+            if (axis === "x" && dragging) {
+              e.preventDefault();
+              rail.scrollLeft = startLeft - dx;
+            }
+          },
+          { passive: false }
+        );
+        function endTouch() {
+          if (axis === "x") schedule();
+          else clearSnapLock();
+        }
+        rail.addEventListener("touchend", endTouch, { passive: true });
+        rail.addEventListener("touchcancel", endTouch, { passive: true });
+        rail.addEventListener(
+          "scroll",
+          function () {
+            if (dragging) return;
+            schedule();
+          },
+          { passive: true }
+        );
         if ("onscrollend" in window) {
-          rail.addEventListener("scrollend", settle, { passive: true });
+          rail.addEventListener(
+            "scrollend",
+            function () {
+              if (!dragging) settle();
+            },
+            { passive: true }
+          );
         }
         window.addEventListener("resize", function () {
           if (document.body.dataset.shell !== "kurse") return;
+          clearSnapLock();
           sizeGoRailSlides(rail);
           snapGoRailToIndex(rail, railCurrentIndex(rail), false);
         });
