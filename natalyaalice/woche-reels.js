@@ -1031,7 +1031,10 @@
       );
     });
     /* Reise: wenn Alternative da ist, Original-Plan nicht parallel zeigen */
-    var wantPlan = !hasOwn && !hasTravelAlt && host && host.planItemForDay;
+    var skipped = state.events.some(function (ev) {
+      return ev && ev.status === "ausgefallen" && String(ev.user_id) === me() && dayKey(ev.starts_at) === iso;
+    });
+    var wantPlan = !hasOwn && !hasTravelAlt && !skipped && host && host.planItemForDay;
     if (wantPlan) {
       var plan = host.planItemForDay(iso);
       if (plan && plan.title) {
@@ -1837,9 +1840,7 @@
   }
 
   function openTimeSheet(eventId) {
-    var ev = state.events.filter(function (e) {
-      return String(e.id) === String(eventId);
-    })[0];
+    var ev = findOwnEvent(eventId);
     if (!ev) return;
     if (!eventTimeEditable(ev)) {
       if (host.toast) host.toast("Vergangene Events können nicht mehr verschoben werden");
@@ -1986,10 +1987,59 @@
     return placePicker ? placePicker.remember() : Promise.resolve();
   }
 
-  function openPlaceSheet(eventId) {
+  /* Event per ID, auch Wochenplan-Platzhalter "plan:<Tag>" */
+  function findOwnEvent(id) {
     var ev = state.events.filter(function (e) {
-      return String(e.id) === String(eventId);
+      return String(e.id) === String(id);
     })[0];
+    if (ev) return ev;
+    if (String(id).indexOf("plan:") === 0 && host && host.planItemForDay) {
+      return host.planItemForDay(String(id).slice(5)) || null;
+    }
+    return null;
+  }
+
+  function isPlanPlaceholder(id) {
+    return String(id || "").indexOf("plan:") === 0;
+  }
+
+  /* Wochenplan-Tag in echtes Event umwandeln, damit Ort/Uhrzeit gespeichert werden können */
+  function materializeEvent(ev) {
+    if (!ev || !isPlanPlaceholder(ev.id)) return Promise.resolve(ev);
+    var base = {
+      category: ev.category,
+      title: ev.title,
+      starts_at: ev.starts_at,
+      location: ev.location || null,
+      is_unplanned: false,
+      item_type: ev.category === "alternative" ? "event" : "course_session",
+      travel_auto: false
+    };
+    var made =
+      ev.category === "alternative"
+        ? createEvent(Object.assign(base, { course_id: null }))
+        : ensureCourseByDef(
+            TRAINING_DEFS.filter(function (d) {
+              return d.title === ev.title;
+            })[0] || {
+              slug: "plan-" + String(ev.title || "training").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40),
+              title: ev.title,
+              category: ev.category || "kraft"
+            }
+          ).then(function (course) {
+            if (!course || !course.id) throw new Error("Kurs fehlt");
+            return createEvent(Object.assign(base, { course_id: course.id }));
+          });
+    return made.then(function (rows) {
+      var row = Array.isArray(rows) ? rows[0] : rows;
+      if (!row || !row.id) throw new Error("Event nicht angelegt");
+      state.events.push(row);
+      return row;
+    });
+  }
+
+  function openPlaceSheet(eventId) {
+    var ev = findOwnEvent(eventId);
     if (!ev) return;
     openSheet(
       '<p class="wr-sheet-hint">Ort</p>' +
@@ -2006,15 +2056,18 @@
   function saveEventPlace(eventId) {
     var val = pickedPlaceName("wr-edit-place");
     rememberPickedPlace();
-    var ev = state.events.filter(function (e) {
-      return String(e.id) === String(eventId);
-    })[0];
+    var ev = findOwnEvent(eventId);
     if (!ev) return;
-    return rest("events?id=eq." + encodeURIComponent(eventId), {
-      method: "PATCH",
-      prefer: "return=minimal",
-      body: { location: val || null }
-    })
+    return materializeEvent(ev)
+      .then(function (real) {
+        ev = real;
+        eventId = real.id;
+        return rest("events?id=eq." + encodeURIComponent(eventId), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { location: val || null }
+        });
+      })
       .then(function () {
         ev.location = val || null;
         closeSheet();
@@ -2031,9 +2084,7 @@
     var h = wheel ? Number(wheel.getAttribute("data-h") || 18) : 18;
     var m = wheel ? Number(wheel.getAttribute("data-m") || 0) : 0;
     var val = pad2(h) + ":" + pad2(m);
-    var ev = state.events.filter(function (e) {
-      return String(e.id) === String(eventId);
-    })[0];
+    var ev = findOwnEvent(eventId);
     if (!ev) return;
     /* Nur solange nicht erledigt und Tag nicht vorbei */
     if (!eventTimeEditable(ev)) {
@@ -2044,11 +2095,16 @@
     var iso = dayKey(ev.starts_at);
     var starts = iso + "T" + val + ":00" + berlinOffsetSuffix(iso);
     if (isNaN(new Date(starts).getTime())) return;
-    return rest("events?id=eq." + encodeURIComponent(eventId), {
-      method: "PATCH",
-      prefer: "return=representation",
-      body: { starts_at: starts }
-    })
+    return materializeEvent(ev)
+      .then(function (real) {
+        ev = real;
+        eventId = real.id;
+        return rest("events?id=eq." + encodeURIComponent(eventId), {
+          method: "PATCH",
+          prefer: "return=representation",
+          body: { starts_at: starts }
+        });
+      })
       .then(function (rows) {
         var updated = Array.isArray(rows) ? rows[0] : rows;
         if (updated && updated.starts_at) {
@@ -2283,6 +2339,7 @@
       function after() {
         return syncPlanAfterSave(body).then(finish);
       }
+      if (replaceId && isPlanPlaceholder(replaceId)) replaceId = null;
       if (replaceId) {
         var prev = state.events.filter(function (e) {
           return String(e.id) === String(replaceId);
@@ -2624,9 +2681,7 @@
   }
 
   function shareTextFor(iso, eventId) {
-    var ev = state.events.filter(function (e) {
-      return String(e.id) === String(eventId);
-    })[0];
+    var ev = findOwnEvent(eventId);
     var title = (ev && ev.title) || "Training";
     var when = formatDayLong(iso) + (ev ? " · " + formatTime(ev.starts_at) : "");
     return "Komm mit zu gogogo: " + title + " · " + when;
@@ -2660,9 +2715,7 @@
       if (host.toast) host.toast("Bitte Freunde auswählen");
       return Promise.resolve();
     }
-    var ev = state.events.filter(function (e) {
-      return String(e.id) === String(eventId);
-    })[0];
+    var ev = findOwnEvent(eventId);
     var label = (ev && ev.title) || "Training";
     var place = (ev && ev.location) || "";
     var time = ev ? formatTime(ev.starts_at) : "";
@@ -2986,9 +3039,7 @@
   }
 
   function swapToHotel(eventId) {
-    var ev = state.events.filter(function (e) {
-      return String(e.id) === String(eventId);
-    })[0];
+    var ev = findOwnEvent(eventId);
     if (!ev) return;
     rememberEventBeforeTravel(ev);
     return rest("events?id=eq." + encodeURIComponent(eventId), {
@@ -3188,6 +3239,33 @@
   }
 
   function deleteEvent(id) {
+    if (isPlanPlaceholder(id)) {
+      var skipIso = String(id).slice(5);
+      closeSheet();
+      return rest("events", {
+        method: "POST",
+        prefer: "return=minimal",
+        body: {
+          user_id: me(),
+          category: "alternative",
+          course_id: null,
+          starts_at: skipIso + "T12:00:00" + berlinOffsetSuffix(skipIso),
+          status: "ausgefallen",
+          title: "Ausgefallen",
+          visibility: "privat",
+          is_unplanned: false
+        }
+      })
+        .then(function () {
+          return refreshKeepDay(skipIso);
+        })
+        .then(function () {
+          return notifyAktuell();
+        })
+        .catch(function () {
+          if (host.toast) host.toast("Löschen fehlgeschlagen");
+        });
+    }
     var ev = state.events.filter(function (e) {
       return String(e.id) === String(id);
     })[0];
