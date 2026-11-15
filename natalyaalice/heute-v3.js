@@ -1480,6 +1480,13 @@
     });
 
     pack.past.forEach(function (ev) {
+      /* Ernährung-Logs sind kein eigener Frame — nur activity_log + eine Karte */
+      if (
+        ev.item_type === "nutrition_log" ||
+        (isBookedSupportEvent(ev) && /ernährung|ernaehrung/i.test(String(ev.title || "")))
+      ) {
+        return;
+      }
       var item = {
         kind: "event",
         starts_at: ev.starts_at,
@@ -1556,8 +1563,9 @@
       desc: descHtml(item.note),
       postId: String(item.id),
       inviteIso: dayKey(item.starts_at),
-      canInvite: "plus",
-      actions: ""
+      canInvite: false,
+      actions:
+        '<div class="acc-card__plus-row"><button type="button" class="acc-card__plus-label" data-shell-plus="1">Plus</button></div>'
     });
   }
 
@@ -1581,8 +1589,9 @@
         : '<p class="acc-card__desc">Tippe zum Protokollieren.</p>',
       postId: String(item.id),
       inviteIso: day,
-      canInvite: "plus",
-      actions: ""
+      canInvite: false,
+      actions:
+        '<div class="acc-card__plus-row"><button type="button" class="acc-card__plus-label" data-shell-plus="1">Plus</button></div>'
     });
   }
 
