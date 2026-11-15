@@ -4203,14 +4203,16 @@
       scroll-snap-align: start;
     }
     .team-slide.is-scroll {
-      /* Scrollfläche bis hinter die Bottom-Pill; genug Padding für Gesichter */
-      max-height: calc(100dvh - 96px - env(safe-area-inset-bottom, 0px));
+      /* Slide bis hinter die Pill — kein toter Beige-Rand darüber, der Gesichter abschneidet */
+      max-height: calc(
+        100dvh - 44px - env(safe-area-inset-top, 0px) - var(--ios-glass-clear, 0px)
+      );
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
       touch-action: pan-x pan-y;
-      padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
       scrollbar-width: thin;
       scrollbar-color: rgba(42, 33, 24, 0.45) transparent;
     }
@@ -4659,8 +4661,10 @@
       display: flex;
       flex-direction: column;
       height: auto !important;
-      max-height: calc(100dvh - 96px - env(safe-area-inset-bottom, 0px));
-      padding-bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+      max-height: calc(
+        100dvh - 44px - env(safe-area-inset-top, 0px) - var(--ios-glass-clear, 0px)
+      );
+      padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
       overflow-x: hidden;
       overflow-y: auto;
     }
@@ -5233,15 +5237,15 @@
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
       overscroll-behavior-x: none;
-      /* pan-y native; L-R über Hard-Snap Achsen-Lock (sonst Gesten-Lock nach Verharren) */
-      touch-action: pan-y;
+      /* Native L-R + vertikal — weiches Swipen; Achsen-Lock nur overflow-y */
+      touch-action: pan-x pan-y;
       padding: 0 0 calc(88px + env(safe-area-inset-bottom, 0px));
       box-sizing: border-box;
       scroll-snap-align: start;
       scroll-snap-stop: always;
     }
     body.is-session[data-shell="kurse"] .go-slide.go-slide--toc {
-      touch-action: pan-y;
+      touch-action: pan-x pan-y;
     }
     .acc-card__faces {
       display: flex;
@@ -15058,7 +15062,19 @@
           if (String(el.dataset.offer || "") === String(key || "")) idx = i;
         });
         if (idx < 0) return;
+        rail.dataset.snapLock = "";
+        Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (s) {
+          s.style.removeProperty("overflow-y");
+        });
+        sizeGoRailSlides(rail);
         snapGoRailToIndex(rail, idx, true);
+        window.setTimeout(function () {
+          rail.dataset.snapLock = "";
+          Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (s) {
+            s.style.removeProperty("overflow-y");
+          });
+          syncRailNav(rail, document.getElementById("go-rail-nav"));
+        }, 320);
       }
 
       function bindGoRailHardSnap(rail) {
@@ -15068,8 +15084,6 @@
         var axis = "";
         var startX = 0;
         var startY = 0;
-        var startLeft = 0;
-        var dragging = false;
 
         function slides() {
           return rail.querySelectorAll(".go-slide");
@@ -15082,11 +15096,11 @@
         }
         function clearSnapLock() {
           rail.dataset.snapLock = "";
-          dragging = false;
           axis = "";
           setSlidesOverflowY("");
         }
         function settle() {
+          if (rail.dataset.snapLock === "1") return;
           sizeGoRailSlides(rail);
           var i = railCurrentIndex(rail);
           var list = railSlides(rail);
@@ -15104,14 +15118,14 @@
             rail.scrollLeft = target;
             clearSnapLock();
             syncRailNav(rail, document.getElementById("go-rail-nav"));
-          }, 240);
+          }, 280);
         }
         function schedule() {
           window.clearTimeout(snapTimer);
-          snapTimer = window.setTimeout(settle, 90);
+          snapTimer = window.setTimeout(settle, 100);
         }
 
-        /* Achsen-Lock: nach vertikalem Verharren sonst kein L-R mehr (Nested overflow-y frisst Gesten) */
+        /* Nur overflow-y sperren bei klarer Horizontalgeste — native Rail-Scroll bleibt weich */
         rail.addEventListener(
           "touchstart",
           function (e) {
@@ -15119,31 +15133,21 @@
             if (!e.touches || !e.touches[0]) return;
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
-            startLeft = rail.scrollLeft;
             axis = "";
-            dragging = false;
           },
           { passive: true }
         );
         rail.addEventListener(
           "touchmove",
           function (e) {
-            if (!e.touches || !e.touches[0]) return;
+            if (!e.touches || !e.touches[0] || axis) return;
             var dx = e.touches[0].clientX - startX;
             var dy = e.touches[0].clientY - startY;
-            if (!axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
-              axis = Math.abs(dx) > Math.abs(dy) * 1.05 ? "x" : "y";
-              if (axis === "x") {
-                dragging = true;
-                setSlidesOverflowY("hidden");
-              }
-            }
-            if (axis === "x" && dragging) {
-              e.preventDefault();
-              rail.scrollLeft = startLeft - dx;
-            }
+            if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+            axis = Math.abs(dx) > Math.abs(dy) * 1.1 ? "x" : "y";
+            if (axis === "x") setSlidesOverflowY("hidden");
           },
-          { passive: false }
+          { passive: true }
         );
         function endTouch() {
           if (axis === "x") schedule();
@@ -15151,22 +15155,9 @@
         }
         rail.addEventListener("touchend", endTouch, { passive: true });
         rail.addEventListener("touchcancel", endTouch, { passive: true });
-        rail.addEventListener(
-          "scroll",
-          function () {
-            if (dragging) return;
-            schedule();
-          },
-          { passive: true }
-        );
+        rail.addEventListener("scroll", schedule, { passive: true });
         if ("onscrollend" in window) {
-          rail.addEventListener(
-            "scrollend",
-            function () {
-              if (!dragging) settle();
-            },
-            { passive: true }
-          );
+          rail.addEventListener("scrollend", settle, { passive: true });
         }
         window.addEventListener("resize", function () {
           if (document.body.dataset.shell !== "kurse") return;
