@@ -4,16 +4,18 @@
  * außer nach der letzten.  Gesamt = R × 2 × work + (2R − 1) × pause
  *
  * Speicherung in events.note:
- *   "zirkel:standard|work=240|pause=30|rounds=6|online=1"
- *   mode standard = Single, team = Double (FFC-Modi)
+ *   "zirkel:single|work=240|pause=30|rounds=6|online=1"
+ *   "zirkel:double|...|partner=<account-id>|pname=<Name, URI-kodiert>"
+ *   Double = zu zweit, man wechselt sich ab (Partner optional Freund oder Name)
  */
 (function (global) {
   "use strict";
 
   var ROUNDS = [4, 5, 6, 7, 8];
-  var WORKS = [180, 210, 240, 270, 300];
+  var WORKS = [];
+  for (var w = 60; w <= 480; w += 30) WORKS.push(w);
   var PAUSES = [30, 45, 60];
-  var DEF = { mode: "standard", rounds: 6, workSec: 240, restSec: 30, online: false };
+  var DEF = { mode: "single", rounds: 6, workSec: 240, restSec: 30, online: false };
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -41,31 +43,39 @@
     if (s.indexOf("zirkel:") !== 0) return null;
     var parts = s.slice(7).split("|");
     var out = {
-      mode: parts[0] === "team" ? "team" : "standard",
+      mode: parts[0] === "double" ? "double" : "single",
       workSec: DEF.workSec,
       restSec: DEF.restSec,
       rounds: DEF.rounds,
-      online: false
+      online: false,
+      partnerId: "",
+      partnerName: ""
     };
     parts.slice(1).forEach(function (kv) {
-      var i = kv.indexOf("="), k = kv.slice(0, i), v = Number(kv.slice(i + 1));
+      var i = kv.indexOf("="), k = kv.slice(0, i), raw = kv.slice(i + 1), v = Number(raw);
+      if (k === "partner") out.partnerId = raw;
+      if (k === "pname") {
+        try { out.partnerName = decodeURIComponent(raw); } catch (e) { out.partnerName = raw; }
+      }
       if (isNaN(v)) return;
       if (k === "work") out.workSec = v;
       if (k === "pause") out.restSec = v;
       if (k === "rounds") out.rounds = v;
       if (k === "online") out.online = v === 1;
-      if (k === "group") out.group = v;
     });
     return out;
   }
 
   function toNote(z, extra) {
+    var dbl = z.mode === "double";
     return (
-      "zirkel:" + (z.mode === "team" ? "team" : "standard") +
+      "zirkel:" + (dbl ? "double" : "single") +
       "|work=" + z.workSec +
       "|pause=" + z.restSec +
       "|rounds=" + z.rounds +
       (z.online ? "|online=1" : "") +
+      (dbl && z.partnerId ? "|partner=" + z.partnerId : "") +
+      (dbl && z.partnerName ? "|pname=" + encodeURIComponent(z.partnerName) : "") +
       (extra || "")
     );
   }
@@ -73,7 +83,7 @@
   function label(z) {
     if (!z) return "";
     return (
-      (z.mode === "team" ? "Double" : "Single") +
+      (z.mode === "double" ? "Double" + (z.partnerName ? " mit " + z.partnerName : "") : "Single") +
       " · " + z.rounds + " × " + mmss(z.workSec) + " min · " +
       pauseText(z.restSec) + " Pause · " + mmss(totalSec(z)) + " min"
     );
@@ -112,16 +122,35 @@
   }
 
   /* HTML für Schritt 1. preset optional (z. B. aus bestehendem Event). */
-  function html(preset) {
+  /* opts.friends: [{ id, name }] für die Partnerwahl bei Double */
+  function html(preset, opts) {
     var z = Object.assign({}, DEF, preset || {});
+    var friends = (opts && opts.friends) || [];
     z.rounds = nearest(ROUNDS, z.rounds);
     z.workSec = nearest(WORKS, z.workSec);
     z.restSec = nearest(PAUSES, z.restSec);
     return (
       '<div class="gz" data-gz-mode="' + z.mode + '">' +
       '<div class="gz-seg" role="group" aria-label="Modus">' +
-      '<button type="button" data-gz-mode-btn="standard"' + (z.mode !== "team" ? ' class="is-on"' : "") + ">Single</button>" +
-      '<button type="button" data-gz-mode-btn="team"' + (z.mode === "team" ? ' class="is-on"' : "") + ">Double</button>" +
+      '<button type="button" data-gz-mode-btn="single"' + (z.mode !== "double" ? ' class="is-on"' : "") + ">Single</button>" +
+      '<button type="button" data-gz-mode-btn="double"' + (z.mode === "double" ? ' class="is-on"' : "") + ">Double</button>" +
+      "</div>" +
+      '<div class="gz-partner"' + (z.mode === "double" ? "" : " hidden") + ">" +
+      '<p class="gz-partner__h">Partner</p>' +
+      (friends.length
+        ? '<div class="gz-partner__list">' +
+          friends.slice(0, 20).map(function (f) {
+            return (
+              '<button type="button" class="gz-pf' + (String(f.id) === String(z.partnerId) ? " is-on" : "") +
+              '" data-gz-partner="' + esc(f.id) + '" data-gz-pname="' + esc(f.name || "") + '">' +
+              esc(f.name || "Freund") + "</button>"
+            );
+          }).join("") +
+          "</div>"
+        : "") +
+      '<input type="text" class="gz-partner__name" maxlength="40" placeholder="' +
+      (friends.length ? "oder Name eintragen" : "Name eintragen") + '" value="' +
+      esc(z.partnerId ? "" : z.partnerName || "") + '" />' +
       "</div>" +
       '<p class="gz-row">Laufen + Workout</p>' +
       wheel(
@@ -147,12 +176,16 @@
       var v = c ? Number(c.getAttribute("data-val")) : NaN;
       return isNaN(v) ? d : v;
     }
+    var pf = box.querySelector(".gz-pf.is-on");
+    var nameIn = box.querySelector(".gz-partner__name");
     return {
-      mode: box.getAttribute("data-gz-mode") === "team" ? "team" : "standard",
+      mode: box.getAttribute("data-gz-mode") === "double" ? "double" : "single",
       rounds: val("rounds", DEF.rounds),
       workSec: val("work", DEF.workSec),
       restSec: val("pause", DEF.restSec),
-      online: false
+      online: false,
+      partnerId: pf ? pf.getAttribute("data-gz-partner") : "",
+      partnerName: pf ? pf.getAttribute("data-gz-pname") : nameIn ? String(nameIn.value || "").trim() : ""
     };
   }
 
@@ -192,6 +225,18 @@
         box.querySelectorAll("[data-gz-mode-btn]").forEach(function (x) {
           x.classList.toggle("is-on", x === b);
         });
+        var pBox = box.querySelector(".gz-partner");
+        if (pBox) pBox.hidden = b.getAttribute("data-gz-mode-btn") !== "double";
+        return;
+      }
+      var pfb = e.target.closest("[data-gz-partner]");
+      if (pfb) {
+        var on = !pfb.classList.contains("is-on");
+        box.querySelectorAll(".gz-pf").forEach(function (x) {
+          x.classList.toggle("is-on", on && x === pfb);
+        });
+        var inp = box.querySelector(".gz-partner__name");
+        if (on && inp) inp.value = "";
         return;
       }
       var o = e.target.closest("[data-gz-val]");
@@ -210,6 +255,12 @@
       }, { passive: true });
     });
     paintTotal(box);
+    var nIn = box.querySelector(".gz-partner__name");
+    if (nIn) {
+      nIn.addEventListener("input", function () {
+        if (nIn.value) box.querySelectorAll(".gz-pf").forEach(function (x) { x.classList.remove("is-on"); });
+      });
+    }
   }
 
   global.GoZirkelSetup = {

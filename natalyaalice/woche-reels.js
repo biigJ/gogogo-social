@@ -2383,24 +2383,16 @@
     }
 
     if (p.kind === "zirkel") {
-      /* Nur Standard | Team in gogogo — FFC-Logik schon beim Event */
-      var zMode = p.zMode === "team" ? "team" : "standard";
-      var zGroup = "";
-      try {
-        if (zMode === "team" && global.FFC && FFC.leaderboardScope) {
-          var gid = FFC.leaderboardScope();
-          if (gid != null && gid !== "") zGroup = "|group=" + String(gid);
-        }
-      } catch (eZg) {}
       var zNote = GoZirkelSetup.toNote(
         {
-          mode: zMode,
           workSec: p.zWork || 240,
           restSec: p.zPause != null ? p.zPause : 30,
           rounds: p.zRounds || 6,
-          online: !!p.zOnline
-        },
-        zGroup
+          online: !!p.zOnline,
+          mode: p.zMode,
+          partnerId: p.zPartnerId || "",
+          partnerName: p.zPartnerName || ""
+        }
       );
       var zBody = {
         category: "zirkel",
@@ -2415,7 +2407,28 @@
         travel_auto: false,
         status: "geplant"
       };
-      if (p.courseId) return saveOrReplace(zBody);
+      function invitePartner() {
+        if (!p.zPartnerId) return;
+        var mine = (state.events || []).filter(function (e) {
+          return e.category === "zirkel" && e.note === zNote && dayKey(e.starts_at) === keepIso;
+        })[0];
+        return rest("go_workout_invites", {
+          method: "POST",
+          prefer: "return=minimal",
+          body: {
+            from_id: me(),
+            to_id: p.zPartnerId,
+            workout_date: keepIso,
+            workout_label: "Zirkeltraining Double",
+            from_name: (host.sessionAccount && host.sessionAccount.name) || "gogogo",
+            place: placeVal || "",
+            meet_time: pad2(h) + ":" + pad2(m),
+            status: "pending",
+            event_id: replaceId ? String(replaceId) : mine ? String(mine.id) : null
+          }
+        }).catch(function () {});
+      }
+      if (p.courseId) return saveOrReplace(zBody).then(invitePartner);
       return ensureCourseByDef({
         slug: "training-zirkel",
         title: "Zirkeltraining",
@@ -2427,7 +2440,7 @@
           return;
         }
         zBody.course_id = course.id;
-        return saveOrReplace(zBody);
+        return saveOrReplace(zBody).then(invitePartner);
       });
     }
 
@@ -2512,19 +2525,24 @@
         courseId: courseId || null,
         enrollmentId: en && en.id,
         replaceId: replaceId,
-        zMode: "standard",
+        zMode: "single",
         zWork: 240,
         zPause: 30,
         zRounds: 6
       };
-      openSheet(
-        "<h3>Zirkeltraining</h3>" +
-          GoZirkelSetup.html({ mode: "standard" }) +
-          '<button type="button" class="wr-pill-btn wr-pill-btn--dark gz-next" data-wr-zirkel-next="1">Weiter</button>' +
-          '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
-      );
-      requestAnimationFrame(function () {
-        GoZirkelSetup.bind(document.querySelector(".wr-sheet"));
+      loadFriends().then(function () {
+        var friends = (state.friends || []).map(function (fid) {
+          return personOf(fid);
+        });
+        openSheet(
+          "<h3>Zirkeltraining</h3>" +
+            GoZirkelSetup.html({ mode: "single" }, { friends: friends }) +
+            '<button type="button" class="wr-pill-btn wr-pill-btn--dark gz-next" data-wr-zirkel-next="1">Weiter</button>' +
+            '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+        );
+        requestAnimationFrame(function () {
+          GoZirkelSetup.bind(document.querySelector(".wr-sheet"));
+        });
       });
       return;
     }
@@ -3335,24 +3353,8 @@
       state.pendingCreate.zWork = zRead.workSec;
       state.pendingCreate.zPause = zRead.restSec;
       state.pendingCreate.zRounds = zRead.rounds;
-      if (state.pendingCreate.zMode === "team") {
-        var hasGroup = false;
-        try {
-          hasGroup = !!(global.FFC && FFC.leaderboardScope && FFC.leaderboardScope() != null);
-        } catch (eTg) {}
-        if (!hasGroup) {
-          if (host.toast) {
-            host.toast("Team-Modus: zuerst unter Plus/FFC eine Gruppe zuordnen.");
-          }
-          return;
-        }
-        try {
-          if (global.FFC && FFC.setupMode && FFC.setupMode() !== "team") {
-            /* Event-Team → FFC-Setup auf Team spiegeln */
-            localStorage.setItem("ffc_mode", "team");
-          }
-        } catch (eMode) {}
-      }
+      state.pendingCreate.zPartnerId = zRead.partnerId;
+      state.pendingCreate.zPartnerName = zRead.partnerName;
       openCreateTimeSheet();
       return;
     }

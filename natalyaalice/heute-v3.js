@@ -2849,7 +2849,14 @@
       pick.hidden = false;
       pick.innerHTML =
         visPickerHtml() +
-        GoZirkelSetup.html({ mode: "standard" }) +
+        GoZirkelSetup.html(
+          { mode: "single" },
+          {
+            friends: (host.teamPeople || []).filter(function (p) {
+              return p && p.id && String(p.id) !== String(me());
+            })
+          }
+        ) +
         '<label class="gz-online"><input type="checkbox" id="acc-z-online" /> Optional: online mitmachen</label>';
       GoZirkelSetup.bind(pick);
       var go = document.createElement("button");
