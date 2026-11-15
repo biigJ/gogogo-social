@@ -5234,9 +5234,9 @@
       height: 100%;
       min-height: 0;
       max-height: 100%;
-      /* Slide selbst scrollt nicht — sonst frisst overflow-y L-R nach TOC-Sprung */
+      /* Slide selbst scrollt nicht — Vertikal nur in .go-slide__body */
       overflow: hidden;
-      touch-action: pan-x;
+      touch-action: pan-x pan-y;
       padding: 0;
       box-sizing: border-box;
       scroll-snap-align: start;
@@ -5249,12 +5249,13 @@
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior: contain;
-      touch-action: pan-y;
+      /* pan-y allein blockiert L-R auf iOS — beides erlauben wie Team */
+      touch-action: pan-x pan-y;
       padding: 0 0 calc(88px + env(safe-area-inset-bottom, 0px));
       box-sizing: border-box;
     }
     body.is-session[data-shell="kurse"] .go-slide.go-slide--toc {
-      touch-action: pan-x;
+      touch-action: pan-x pan-y;
     }
     .acc-card__faces {
       display: flex;
@@ -15022,8 +15023,15 @@
           var i = Math.min(list.length - 1, Math.max(0, railCurrentIndex(rail) + delta));
           var slide = list[i];
           if (!slide) return;
-          if (rail.id === "go-rail") snapGoRailToIndex(rail, i, true);
-          else rail.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
+          if (rail.id === "go-rail") {
+            /* Sofort springen — smooth + settle-Lock ließ Pfeile nur 1× funktionieren */
+            if (rail._goSnapTimer) window.clearTimeout(rail._goSnapTimer);
+            rail.dataset.snapLock = "";
+            snapGoRailToIndex(rail, i, false);
+            syncRailNav(rail, nav);
+            return;
+          }
+          rail.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
           window.setTimeout(function () { syncRailNav(rail, nav); }, 280);
         }
         if (prev) prev.addEventListener("click", function () { go(-1); });
@@ -15057,6 +15065,7 @@
         var slide = list[i];
         if (!slide) return;
         var left = Math.round(slide.offsetLeft);
+        rail.dataset.snapLock = "";
         if (smooth) rail.scrollTo({ left: left, behavior: "smooth" });
         else rail.scrollLeft = left;
         syncRailNav(rail, document.getElementById("go-rail-nav"));
@@ -15094,7 +15103,6 @@
       function bindGoRailHardSnap(rail) {
         if (!rail || rail.dataset.hardSnap === "1") return;
         rail.dataset.hardSnap = "1";
-        var snapTimer = 0;
         function settle() {
           if (rail.dataset.snapLock === "1") return;
           var i = railCurrentIndex(rail);
@@ -15108,21 +15116,17 @@
             return;
           }
           rail.dataset.snapLock = "1";
-          rail.scrollTo({ left: target, behavior: "smooth" });
-          window.setTimeout(function () {
-            rail.scrollLeft = target;
-            rail.dataset.snapLock = "";
-            syncRailNav(rail, document.getElementById("go-rail-nav"));
-          }, 220);
+          rail.scrollLeft = target;
+          rail.dataset.snapLock = "";
+          syncRailNav(rail, document.getElementById("go-rail-nav"));
         }
         function schedule() {
           if (rail.dataset.snapLock === "1") return;
-          window.clearTimeout(snapTimer);
-          snapTimer = window.setTimeout(settle, 80);
+          window.clearTimeout(rail._goSnapTimer);
+          rail._goSnapTimer = window.setTimeout(settle, 80);
         }
         rail.addEventListener("scroll", schedule, { passive: true });
         rail.addEventListener("touchend", schedule, { passive: true });
-        rail.addEventListener("pointerup", schedule, { passive: true });
         if ("onscrollend" in window) {
           rail.addEventListener("scrollend", settle, { passive: true });
         }
