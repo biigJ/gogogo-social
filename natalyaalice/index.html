@@ -4203,16 +4203,16 @@
       scroll-snap-align: start;
     }
     .team-slide.is-scroll {
-      /* Slide bis hinter die Pill — kein toter Beige-Rand darüber, der Gesichter abschneidet */
+      /* Volle Höhe hinter die Pill; Faces per padding-bottom freiräumen */
       max-height: calc(
-        100dvh - 44px - env(safe-area-inset-top, 0px) - var(--ios-glass-clear, 0px)
+        100dvh - 40px - env(safe-area-inset-top, 0px) - var(--ios-glass-clear, 0px)
       );
       overflow-y: auto;
       overflow-x: hidden;
       -webkit-overflow-scrolling: touch;
       overscroll-behavior-y: contain;
       touch-action: pan-x pan-y;
-      padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
       scrollbar-width: thin;
       scrollbar-color: rgba(42, 33, 24, 0.45) transparent;
     }
@@ -4543,7 +4543,7 @@
       align-items: center;
       gap: 10px;
       margin: 12px 0 0;
-      padding-bottom: 28px;
+      padding-bottom: 8px;
     }
     .team-slide__member {
       flex: none;
@@ -4662,9 +4662,9 @@
       flex-direction: column;
       height: auto !important;
       max-height: calc(
-        100dvh - 44px - env(safe-area-inset-top, 0px) - var(--ios-glass-clear, 0px)
+        100dvh - 40px - env(safe-area-inset-top, 0px) - var(--ios-glass-clear, 0px)
       );
-      padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+      padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px));
       overflow-x: hidden;
       overflow-y: auto;
     }
@@ -5196,6 +5196,8 @@
       padding-left: 20px;
       padding-right: 20px;
       padding-top: calc(4px + env(safe-area-inset-top, 0px) + var(--ios-glass-clear, 0px));
+      /* Kein 96px-Beige-Rand über der Pill — Slide-Padding räumt die Faces frei */
+      padding-bottom: 0 !important;
     }
     body.is-session[data-shell="kurse"] #plan-training {
       flex: 1 1 auto;
@@ -15053,6 +15055,16 @@
         syncRailNav(rail, document.getElementById("go-rail-nav"));
       }
 
+      function unlockGoRailSwipe(rail) {
+        if (!rail) return;
+        rail.dataset.snapLock = "";
+        rail.style.removeProperty("scroll-snap-type");
+        Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (s) {
+          s.style.removeProperty("overflow-y");
+          s.style.removeProperty("touch-action");
+        });
+      }
+
       function jumpToGoOffer(key) {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
@@ -15062,28 +15074,24 @@
           if (String(el.dataset.offer || "") === String(key || "")) idx = i;
         });
         if (idx < 0) return;
-        rail.dataset.snapLock = "";
-        Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (s) {
-          s.style.removeProperty("overflow-y");
-        });
+        unlockGoRailSwipe(rail);
         sizeGoRailSlides(rail);
-        snapGoRailToIndex(rail, idx, true);
-        window.setTimeout(function () {
-          rail.dataset.snapLock = "";
-          Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (s) {
-            s.style.removeProperty("overflow-y");
-          });
-          syncRailNav(rail, document.getElementById("go-rail-nav"));
-        }, 320);
+        /* Sofort springen — smooth ließ L-R danach tot */
+        snapGoRailToIndex(rail, idx, false);
+        unlockGoRailSwipe(rail);
+        syncRailNav(rail, document.getElementById("go-rail-nav"));
       }
 
       function bindGoRailHardSnap(rail) {
-        if (!rail || rail.dataset.hardSnap === "1") return;
+        if (!rail) return;
+        if (rail.dataset.hardSnap === "1") return;
         rail.dataset.hardSnap = "1";
         var snapTimer = 0;
         var axis = "";
         var startX = 0;
         var startY = 0;
+        var startLeft = 0;
+        var dragging = false;
 
         function slides() {
           return rail.querySelectorAll(".go-slide");
@@ -15097,15 +15105,19 @@
         function clearSnapLock() {
           rail.dataset.snapLock = "";
           axis = "";
+          dragging = false;
+          rail.style.removeProperty("scroll-snap-type");
           setSlidesOverflowY("");
         }
         function settle() {
-          if (rail.dataset.snapLock === "1") return;
           sizeGoRailSlides(rail);
           var i = railCurrentIndex(rail);
           var list = railSlides(rail);
           var slide = list[i];
-          if (!slide) return;
+          if (!slide) {
+            clearSnapLock();
+            return;
+          }
           var target = Math.round(slide.offsetLeft);
           if (Math.abs(rail.scrollLeft - target) <= 1) {
             clearSnapLock();
@@ -15113,41 +15125,54 @@
             return;
           }
           rail.dataset.snapLock = "1";
+          rail.style.scrollSnapType = "none";
           rail.scrollTo({ left: target, behavior: "smooth" });
           window.setTimeout(function () {
             rail.scrollLeft = target;
             clearSnapLock();
             syncRailNav(rail, document.getElementById("go-rail-nav"));
-          }, 280);
+          }, 300);
         }
         function schedule() {
           window.clearTimeout(snapTimer);
-          snapTimer = window.setTimeout(settle, 100);
+          snapTimer = window.setTimeout(settle, 60);
         }
 
-        /* Nur overflow-y sperren bei klarer Horizontalgeste — native Rail-Scroll bleibt weich */
+        /* L-R aktiv steuern — nested overflow-y frisst sonst Gesten nach TOC/Verharren */
         rail.addEventListener(
           "touchstart",
           function (e) {
-            clearSnapLock();
+            unlockGoRailSwipe(rail);
             if (!e.touches || !e.touches[0]) return;
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
+            startLeft = rail.scrollLeft;
             axis = "";
+            dragging = false;
           },
           { passive: true }
         );
         rail.addEventListener(
           "touchmove",
           function (e) {
-            if (!e.touches || !e.touches[0] || axis) return;
+            if (!e.touches || !e.touches[0]) return;
             var dx = e.touches[0].clientX - startX;
             var dy = e.touches[0].clientY - startY;
-            if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-            axis = Math.abs(dx) > Math.abs(dy) * 1.1 ? "x" : "y";
-            if (axis === "x") setSlidesOverflowY("hidden");
+            if (!axis) {
+              if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+              axis = Math.abs(dx) > Math.abs(dy) * 1.05 ? "x" : "y";
+              if (axis === "x") {
+                dragging = true;
+                rail.style.scrollSnapType = "none";
+                setSlidesOverflowY("hidden");
+              }
+            }
+            if (axis === "x" && dragging) {
+              e.preventDefault();
+              rail.scrollLeft = startLeft - dx;
+            }
           },
-          { passive: true }
+          { passive: false }
         );
         function endTouch() {
           if (axis === "x") schedule();
@@ -15155,10 +15180,14 @@
         }
         rail.addEventListener("touchend", endTouch, { passive: true });
         rail.addEventListener("touchcancel", endTouch, { passive: true });
-        rail.addEventListener("scroll", schedule, { passive: true });
-        if ("onscrollend" in window) {
-          rail.addEventListener("scrollend", settle, { passive: true });
-        }
+        rail.addEventListener(
+          "scroll",
+          function () {
+            if (dragging) return;
+            schedule();
+          },
+          { passive: true }
+        );
         window.addEventListener("resize", function () {
           if (document.body.dataset.shell !== "kurse") return;
           clearSnapLock();
