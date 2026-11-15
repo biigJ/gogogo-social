@@ -703,6 +703,8 @@
     var week = now + 7 * 86400000;
     var t = new Date(ev.starts_at).getTime();
     if (ev.status === "geplant") {
+      /* Eigene Events von heute bleiben bis Mitternacht sichtbar, damit man sie nachträglich abschließen kann */
+      if (mine && t <= week && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString())) return true;
       if (t < now - 3600000 || t > week) return false;
       if (mine) return true;
       if (flags.showRsvpdUpcoming && iAmGoing(ev.id)) {
