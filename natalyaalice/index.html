@@ -1401,8 +1401,8 @@
       font-weight: 600;
       line-height: 1.2;
     }
-    /* Einheitlicher Instagram-Feed: kein Dock-/Stories-Karussell unter Heute */
-    body.is-session[data-shell="heute"] .heute-stories { display: none !important; }
+    /* Freunde-Leiste direkt unter dem Dropdown, darunter der Feed */
+    body.is-session[data-shell="heute"] .heute-stories:not([hidden]) { display: block; order: 0; margin-top: 8px; }
     body.is-session[data-shell="heute"] .dock { display: none !important; }
     body.is-session[data-shell="heute"] #heute-acc { order: 1; margin-top: 8px; width: 100%; }
     /* Kein opacity-Hide mehr — das verursachte das Aktuell-Flackern bei jedem Refresh */
@@ -3734,6 +3734,13 @@
       padding-top: 16px;
       border-top: 1px solid rgba(42, 33, 24, 0.2);
     }
+    /* Meine Freunde: schlichte Liste ohne Trennlinien */
+    .friend-list { display: flex; flex-direction: column; gap: 14px; padding: 8px 0 24px; }
+    .friend-list__row { display: flex; align-items: center; gap: 14px; background: none; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+    .friend-list__row img, .friend-list__row .team-face, .friend-list__row > :first-child { flex: 0 0 auto; }
+    .friend-list__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .friend-list__name { font-size: 18px; font-weight: 600; }
+    .friend-list__meta { font-size: 14px; opacity: 0.7; }
     /* Meine Coachees: gleiche Textgröße/-stil wie team-slide__about */
     .coach-empty,
     body.is-session #plan-team .coach-empty {
@@ -14683,7 +14690,60 @@
           (parent || box).appendChild(row);
         }
 
-        /* Reihenfolge: 1) Meine Gruppe (max. 1), 2) Mein Coach, 3) Meine Coachees */
+        /* Reihenfolge: 0) Meine Freunde, 1) Meine Gruppe (max. 1), 2) Mein Coach, 3) Meine Coachees */
+        (function friendsSlide() {
+          var slide = document.createElement("article");
+          slide.className = "team-slide is-scroll is-friends";
+          slide.dataset.title = "Meine Freunde";
+          var inGroup = {};
+          myGroups().forEach(function (g) {
+            (g.members || []).forEach(function (id) { inGroup[String(id)] = g.name || "Gruppe"; });
+          });
+          var list = document.createElement("div");
+          list.className = "friend-list";
+          var people = teamPeople.filter(function (p) {
+            return p && p.id && String(p.id) !== mineId;
+          }).slice().sort(function (a, b) {
+            return String(a.name || "").localeCompare(String(b.name || ""), "de");
+          });
+          if (!people.length) {
+            var empty = document.createElement("p");
+            empty.className = "coach-empty";
+            empty.textContent = "Noch keine Freunde. Füge sie unter Aktuell mit + hinzu.";
+            list.appendChild(empty);
+          }
+          people.forEach(function (p) {
+            var row = document.createElement("button");
+            row.type = "button";
+            row.className = "friend-list__row";
+            var face = personFace(p);
+            row.appendChild(face);
+            var text = document.createElement("span");
+            text.className = "friend-list__text";
+            var nm = document.createElement("span");
+            nm.className = "friend-list__name";
+            nm.textContent = String(p.name || "Freund").split(" ")[0];
+            text.appendChild(nm);
+            var meta = [];
+            if (p.nickname) meta.push("@" + p.nickname);
+            if (myTrainer && String(p.id) === myTrainer) meta.push("mein Coach");
+            else if (p.is_trainer) meta.push("Coach");
+            if (p.trainer_id && String(p.trainer_id) === mineId) meta.push("Coachee");
+            if (inGroup[String(p.id)]) meta.push("Gruppe " + inGroup[String(p.id)]);
+            if (meta.length) {
+              var sub = document.createElement("span");
+              sub.className = "friend-list__meta";
+              sub.textContent = meta.join(" · ");
+              text.appendChild(sub);
+            }
+            row.appendChild(text);
+            row.addEventListener("click", function () { openProfile(p); });
+            list.appendChild(row);
+          });
+          slide.appendChild(list);
+          box.appendChild(slide);
+        })();
+
         var groups = myGroups();
         var myGroup = groups.length ? groups[0] : null;
         function groupSlide(group) {
