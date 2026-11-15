@@ -1959,6 +1959,27 @@
     return Promise.resolve();
   }
 
+  /* Ortswähler (gemeinsame Liste + Karte) in ein Sheet einhängen */
+  var placePicker = null;
+  function mountPlacePicker(hostId, value) {
+    placePicker = null;
+    var el = $(hostId);
+    if (!el || !global.GoPlacePicker) return;
+    placePicker = GoPlacePicker.mount(el, {
+      rest: rest,
+      accountId: me(),
+      value: value || ""
+    });
+  }
+  function pickedPlaceName(fallbackInputId) {
+    if (placePicker && placePicker.value()) return placePicker.value().name;
+    var el = fallbackInputId ? $(fallbackInputId) : null;
+    return el ? String(el.value || "").trim() : "";
+  }
+  function rememberPickedPlace() {
+    return placePicker ? placePicker.remember() : Promise.resolve();
+  }
+
   function openPlaceSheet(eventId) {
     var ev = state.events.filter(function (e) {
       return String(e.id) === String(eventId);
@@ -1966,19 +1987,19 @@
     if (!ev) return;
     openSheet(
       '<p class="wr-sheet-hint">Ort</p>' +
-        '<label class="wr-field">Ort<input type="text" id="wr-edit-place" maxlength="80" placeholder="z. B. Volkspark, Studio, zu Hause" value="' +
+        '<div id="wr-edit-place-picker"><label class="wr-field">Ort<input type="text" id="wr-edit-place" maxlength="80" value="' +
         esc(ev.location || "") +
-        '" /></label>' +
+        '" /></label></div>' +
         '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-place-save="' +
         esc(eventId) +
         '">Speichern</button>' +
         '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
-    );
+    );    mountPlacePicker("wr-edit-place-picker", ev.location || "");
   }
 
   function saveEventPlace(eventId) {
-    var input = $("wr-edit-place");
-    var val = input ? String(input.value || "").trim() : "";
+    var val = pickedPlaceName("wr-edit-place");
+    rememberPickedPlace();
     var ev = state.events.filter(function (e) {
       return String(e.id) === String(eventId);
     })[0];
@@ -2194,13 +2215,14 @@
         esc(p.title || "Uhrzeit") +
         "</h3>" +
         '<p class="wr-sheet-hint">Ort und Uhrzeit</p>' +
-        '<label class="wr-field">Ort<input type="text" id="wr-create-place" maxlength="80" placeholder="z. B. Volkspark, Studio, zu Hause" value="' +
+        '<div id="wr-create-place-picker"><label class="wr-field">Ort<input type="text" id="wr-create-place" maxlength="80" value="' +
         esc(p.place || "") +
-        '" /></label>' +
+        '" /></label></div>' +
         timeWheelHtml("18:00") +
         '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-create-confirm="1">Speichern</button>' +
         '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
     );
+    mountPlacePicker("wr-create-place-picker", p.place || "");
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
         scrollTimeColsToSelection();
@@ -2214,8 +2236,8 @@
     var p = state.pendingCreate;
     if (!p || !p.iso) return Promise.resolve();
     syncTimeWheelFromScroll();
-    var placeEl = $("wr-create-place");
-    p.place = placeEl ? String(placeEl.value || "").trim() : p.place || "";
+    p.place = pickedPlaceName("wr-create-place") || p.place || "";
+    rememberPickedPlace();
     var wheel = $("wr-time-wheel");
     var h = wheel ? Number(wheel.getAttribute("data-h") || 18) : 18;
     var m = wheel ? Number(wheel.getAttribute("data-m") || 0) : 0;
