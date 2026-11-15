@@ -228,6 +228,19 @@
     return GoZirkelSetup.label(z);
   }
 
+  /* Admin = Ersteller: am Eventtag Start anhalten oder sofort freigeben */
+  function zirkelAdminHtml(ev, z, iso) {
+    if (!z || !ev || String(ev.user_id) !== String(me())) return "";
+    if (ev.status === "erledigt" || iso !== berlinToday()) return "";
+    var held = z.hold && !z.goAt;
+    return (
+      '<button type="button" class="go-online-cta go-online-cta--ghost" data-wr-zadmin="' +
+      (held ? "go" : "hold") + '" data-id="' + esc(ev.id) + '">' +
+      (held ? "Jetzt starten" : "Start anhalten") +
+      "</button>"
+    );
+  }
+
   function zirkelCountdownHtml(startsAt) {
     if (!startsAt) return "";
     var start = new Date(startsAt).getTime();
@@ -1266,7 +1279,11 @@
       String(ev.item_type || "") === "nutrition_log" ||
       /ernährung|ernaehrung/i.test(String(ev.title || ""));
     var isZirkel = cat === "zirkel" || /zirkel/i.test(String(ev.title || ""));
-    var cd = isZirkel ? zirkelCountdownHtml(ev.starts_at) : "";
+    var cd = isZirkel
+      ? zSet && zSet.hold && !zSet.goAt
+        ? '<p class="wr-zirkel-cd">Start angehalten</p>'
+        : zirkelCountdownHtml(zSet && zSet.goAt ? new Date(zSet.goAt).toISOString() : ev.starts_at)
+      : "";
     return (
       '<div class="wr-slide' +
       (isNutrition ? " is-nutrition" : "") +
@@ -1306,6 +1323,7 @@
       (zSet && zSet.online
         ? '<button type="button" class="go-online-cta" data-wr-zirkel-go="1">Online mitmachen</button>'
         : "") +
+      zirkelAdminHtml(ev, zSet, iso) +
       (going
         ? '<div class="wr-going">' + facesHtml(ev) + "</div>"
         : "") +
@@ -3316,7 +3334,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -3344,6 +3362,21 @@
           b.classList.toggle("is-on", b === t);
         });
       }
+      return;
+    }
+    if (t.getAttribute("data-wr-zadmin")) {
+      if (!global.GoZirkelSync) return;
+      var zAct = t.getAttribute("data-wr-zadmin");
+      t.disabled = true;
+      GoZirkelSync.admin(t.getAttribute("data-id"), zAct)
+        .then(function () {
+          if (host.toast) host.toast(zAct === "go" ? "Start in 10 Sekunden" : "Start angehalten");
+          return refreshKeepDay(berlinToday());
+        })
+        .catch(function () {
+          t.disabled = false;
+          if (host.toast) host.toast("Hat nicht geklappt");
+        });
       return;
     }
     if (t.getAttribute("data-wr-zirkel-next")) {
@@ -3382,6 +3415,7 @@
         return String(e.id) === String(evZ);
       })[0];
       var presetZ = evObjZ ? parseZirkelNote(evObjZ.note) : null;
+      if (presetZ) presetZ.eventId = String(evZ);
       if (host && typeof host.openZirkelWorkout === "function") {
         host.openZirkelWorkout(evZ, presetZ);
       } else if (host && typeof host.requireFfc === "function") {

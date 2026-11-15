@@ -62,8 +62,27 @@
       if (k === "pause") out.restSec = v;
       if (k === "rounds") out.rounds = v;
       if (k === "online") out.online = v === 1;
+      if (k === "hold") out.hold = v === 1;
+      if (k === "go") out.goAt = v * 1000;
     });
     return out;
+  }
+
+  /* Flag in der Note setzen/entfernen (val null = entfernen), Rest bleibt unverändert */
+  function withFlag(note, key, val) {
+    var parts = String(note || "").split("|").filter(function (kv, i) {
+      return i === 0 || kv.split("=")[0] !== key;
+    });
+    if (val != null) parts.push(key + "=" + val);
+    return parts.join("|");
+  }
+
+  /* Gemeinsamer Start: go (Admin-Freigabe) vor Eventzeit; hold = angehalten */
+  function startInfo(ev) {
+    var z = parse(ev && ev.note);
+    if (!z) return null;
+    var t = new Date(ev.starts_at).getTime();
+    return { startAt: z.goAt || t, hold: !!z.hold && !z.goAt, phases: 2 * z.rounds, z: z };
   }
 
   function toNote(z, extra) {
@@ -270,6 +289,8 @@
     parse: parse,
     toNote: toNote,
     label: label,
-    totalSec: totalSec
+    totalSec: totalSec,
+    withFlag: withFlag,
+    startInfo: startInfo
   };
 })(window);
