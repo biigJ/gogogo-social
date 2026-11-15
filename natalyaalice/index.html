@@ -4108,7 +4108,7 @@
       margin-top: 8px !important;
     }
     #go-rail .go-card.go-card--routine-plain #routine-note { order: 5; }
-    #go-rail .go-slide[data-offer="routine"] > .go-slide__copy { display: none !important; }
+    #go-rail .go-slide[data-offer="routine"] .go-slide__copy { display: none !important; }
     .go-card .routine-row { margin-top: 8px !important; }
     .go-card #weeks { margin-top: 10px; }
     .zirkel-head {
@@ -4725,8 +4725,7 @@
       background: var(--tone-neutral);
     }
     /* Plus-Headlines: Titel sitzt in #go-rail-nav (mit Pfeilen), Slide-Titel ausblenden */
-    body.is-session[data-shell="kurse"] #go-rail .go-slide > h2.go-slide__title,
-    body.is-session[data-shell="kurse"] #go-rail .go-slide > .go-slide__title {
+    body.is-session[data-shell="kurse"] #go-rail .go-slide .go-slide__title {
       display: none !important;
     }
     .go-slide__title {
@@ -5235,19 +5234,27 @@
       height: 100%;
       min-height: 0;
       max-height: 100%;
-      overflow-x: hidden;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      overscroll-behavior-y: contain;
-      overscroll-behavior-x: contain;
-      touch-action: pan-x pan-y;
-      padding: 0 0 calc(88px + env(safe-area-inset-bottom, 0px));
+      /* Slide selbst scrollt nicht — sonst frisst overflow-y L-R nach TOC-Sprung */
+      overflow: hidden;
+      touch-action: pan-x;
+      padding: 0;
       box-sizing: border-box;
       scroll-snap-align: start;
       scroll-snap-stop: always;
     }
+    body.is-session[data-shell="kurse"] .go-slide__body {
+      height: 100%;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      touch-action: pan-y;
+      padding: 0 0 calc(88px + env(safe-area-inset-bottom, 0px));
+      box-sizing: border-box;
+    }
     body.is-session[data-shell="kurse"] .go-slide.go-slide--toc {
-      touch-action: pan-x pan-y;
+      touch-action: pan-x;
     }
     .acc-card__faces {
       display: flex;
@@ -15055,6 +15062,14 @@
         syncRailNav(rail, document.getElementById("go-rail-nav"));
       }
 
+      function wrapGoSlideBody(card) {
+        if (!card || card.querySelector(":scope > .go-slide__body")) return;
+        var body = document.createElement("div");
+        body.className = "go-slide__body";
+        while (card.firstChild) body.appendChild(card.firstChild);
+        card.appendChild(body);
+      }
+
       function jumpToGoOffer(key) {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
@@ -15065,13 +15080,14 @@
         });
         if (idx < 0) return;
         rail.dataset.snapLock = "";
-        Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (s) {
-          s.style.removeProperty("overflow-y");
-        });
-        /* Snap nie abschalten — sonst bleibt der Rail zwischen Slides hängen */
         rail.style.removeProperty("scroll-snap-type");
         sizeGoRailSlides(rail);
         snapGoRailToIndex(rail, idx, false);
+        var slide = list[idx];
+        if (slide) {
+          var body = slide.querySelector(":scope > .go-slide__body");
+          if (body) body.scrollTop = 0;
+        }
         syncRailNav(rail, document.getElementById("go-rail-nav"));
       }
 
@@ -15079,19 +15095,8 @@
         if (!rail || rail.dataset.hardSnap === "1") return;
         rail.dataset.hardSnap = "1";
         var snapTimer = 0;
-        var axis = "";
-        var startX = 0;
-        var startY = 0;
-
-        function setSlidesOverflowY(value) {
-          Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (s) {
-            if (!value) s.style.removeProperty("overflow-y");
-            else s.style.overflowY = value;
-          });
-        }
         function settle() {
           if (rail.dataset.snapLock === "1") return;
-          /* Kein sizeGoRailSlides hier — Breiten-Reset mitten im Scroll lässt es hängen */
           var i = railCurrentIndex(rail);
           var list = railSlides(rail);
           var slide = list[i];
@@ -15099,7 +15104,6 @@
           var target = Math.round(slide.offsetLeft);
           if (Math.abs(rail.scrollLeft - target) <= 2) {
             rail.dataset.snapLock = "";
-            setSlidesOverflowY("");
             syncRailNav(rail, document.getElementById("go-rail-nav"));
             return;
           }
@@ -15108,7 +15112,6 @@
           window.setTimeout(function () {
             rail.scrollLeft = target;
             rail.dataset.snapLock = "";
-            setSlidesOverflowY("");
             syncRailNav(rail, document.getElementById("go-rail-nav"));
           }, 220);
         }
@@ -15117,41 +15120,9 @@
           window.clearTimeout(snapTimer);
           snapTimer = window.setTimeout(settle, 80);
         }
-
-        rail.addEventListener(
-          "touchstart",
-          function (e) {
-            axis = "";
-            rail.dataset.snapLock = "";
-            setSlidesOverflowY("");
-            if (!e.touches || !e.touches[0]) return;
-            startX = e.touches[0].clientX;
-            startY = e.touches[0].clientY;
-          },
-          { passive: true }
-        );
-        rail.addEventListener(
-          "touchmove",
-          function (e) {
-            if (!e.touches || !e.touches[0] || axis) return;
-            var dx = e.touches[0].clientX - startX;
-            var dy = e.touches[0].clientY - startY;
-            if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-            axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
-            /* Nur Overflow sperren — Snap bleibt an, kein preventDefault/kein scrollLeft */
-            if (axis === "x") setSlidesOverflowY("hidden");
-          },
-          { passive: true }
-        );
-        rail.addEventListener(
-          "touchend",
-          function () {
-            schedule();
-          },
-          { passive: true }
-        );
-        rail.addEventListener("touchcancel", schedule, { passive: true });
         rail.addEventListener("scroll", schedule, { passive: true });
+        rail.addEventListener("touchend", schedule, { passive: true });
+        rail.addEventListener("pointerup", schedule, { passive: true });
         if ("onscrollend" in window) {
           rail.addEventListener("scrollend", settle, { passive: true });
         }
@@ -15448,7 +15419,10 @@
           var curSlides = railSlides(rail);
           var curIx = railCurrentIndex(rail);
           keepOffer = curSlides[curIx] ? String(curSlides[curIx].dataset.offer || "") : "";
-          keepSlideTop = curSlides[curIx] ? curSlides[curIx].scrollTop || 0 : 0;
+          if (curSlides[curIx]) {
+            var curBody = curSlides[curIx].querySelector(":scope > .go-slide__body");
+            keepSlideTop = (curBody || curSlides[curIx]).scrollTop || 0;
+          }
         } catch (eKeep) {}
         var supportRoot = document.getElementById("support-root");
         if (supportRoot) supportRoot.hidden = true;
@@ -15589,6 +15563,7 @@
               tocNav.appendChild(link);
             });
             card.appendChild(tocNav);
+            wrapGoSlideBody(card);
             rail.appendChild(card);
             return;
           }
@@ -15754,6 +15729,7 @@
               mountGoZirkelPanels(lbBox, recBox);
             }
           }
+          wrapGoSlideBody(card);
           rail.appendChild(card);
         });
         bindGoRailHardSnap(rail);
@@ -15779,7 +15755,10 @@
             sizeGoRailSlides(rail);
             if (target) {
               rail.scrollLeft = Math.round(list[targetIdx].offsetLeft);
-              if (keepSlideTop > 0) list[targetIdx].scrollTop = keepSlideTop;
+              if (keepSlideTop > 0) {
+                var restoreBody = list[targetIdx].querySelector(":scope > .go-slide__body");
+                (restoreBody || list[targetIdx]).scrollTop = keepSlideTop;
+              }
             }
             rail.style.removeProperty("scroll-snap-type");
             rail.dataset.snapLock = "";
