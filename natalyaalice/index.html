@@ -12105,8 +12105,14 @@
           syncStatusFade: syncStatusFade,
           kraftChoices: kraftChoices,
           ausdauerChoices: ausdauerChoices,
+          /* Gleiche Regel wie Plus „Gebucht“: Buchung, FFC-Login oder vom Coach zugewiesen */
           hasZirkelAccess: function () {
-            return !!(trainerZirkel || (typeof userOwned !== "undefined" && !userOwned && trainerZirkel));
+            if (trainerZirkel) return true;
+            try {
+              if (window.FFC && FFC.user && FFC.user()) return true;
+              if (window.GoSupport && GoSupport.offerOwned && GoSupport.offerOwned("zirkel")) return true;
+            } catch (eZa) {}
+            return false;
           },
           loadInvites: function () {
             return loadInvites().then(function () {

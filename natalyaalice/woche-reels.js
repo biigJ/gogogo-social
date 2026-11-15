@@ -2438,7 +2438,12 @@
       if (!state.zirkelOk && !(host && host.hasZirkelAccess && host.hasZirkelAccess())) {
         openSheet(
           "<h3>Zirkeltraining</h3>" +
-            "<p>Bitte zuerst unter Plus Zirkeltraining buchen (Nutzername, E-Mail, Passwort).</p>" +
+            "<p>Zirkeltraining läuft über den Friday Fitness Circle. Melde Dich dort einmal an, danach kannst Du es Tagen zuordnen.</p>" +
+            '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zirkel-login="' +
+            esc(iso) +
+            '"' +
+            (replaceId ? ' data-replace="' + esc(replaceId) + '"' : "") +
+            ">Beim Zirkel anmelden</button>" +
             '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button>'
         );
         return;
@@ -3227,7 +3232,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -3478,6 +3483,18 @@
     }
     if (t.getAttribute("data-wr-undo-go")) {
       undoDelete();
+      return;
+    }
+    if (t.getAttribute("data-wr-zirkel-login")) {
+      var zIso = t.getAttribute("data-wr-zirkel-login");
+      var zRep = t.getAttribute("data-replace") || null;
+      closeSheet();
+      if (host && typeof host.requireFfc === "function") {
+        host.requireFfc(function () {
+          state.zirkelOk = true;
+          openKindSheet("zirkel", zIso, zRep);
+        });
+      }
       return;
     }
     if (t.getAttribute("data-wr-edit-place")) {
