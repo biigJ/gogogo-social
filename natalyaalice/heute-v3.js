@@ -1933,6 +1933,13 @@
     if (modal) modal.hidden = true;
   }
 
+  /* Original nur behalten, wenn es ohnehin klein ist (sonst lieber ohne Foto als Upload-Fehler) */
+  function keepIfSmall(dataUrl) {
+    if (dataUrl && dataUrl.length <= 1400000) return dataUrl;
+    if (host.toast) host.toast("Foto konnte nicht verkleinert werden.");
+    return "";
+  }
+
   function compressDonePhoto(dataUrl) {
     return new Promise(function (resolve) {
       if (!dataUrl || dataUrl.indexOf("data:image") !== 0) {
@@ -1953,20 +1960,20 @@
           canvas.height = ch;
           var ctx = canvas.getContext("2d");
           if (!ctx) {
-            resolve(dataUrl);
+            resolve(keepIfSmall(dataUrl));
             return;
           }
           ctx.drawImage(img, 0, 0, cw, ch);
           var out = canvas.toDataURL("image/jpeg", 0.82);
           if (out && out.length > 900000) out = canvas.toDataURL("image/jpeg", 0.65);
           if (out && out.length > 900000) out = canvas.toDataURL("image/jpeg", 0.5);
-          resolve(out || dataUrl);
+          resolve(out || keepIfSmall(dataUrl));
         } catch (e) {
-          resolve(dataUrl);
+          resolve(keepIfSmall(dataUrl));
         }
       };
       img.onerror = function () {
-        resolve(dataUrl);
+        resolve(keepIfSmall(dataUrl));
       };
       img.src = dataUrl;
     });
@@ -1976,8 +1983,9 @@
     var input = $("acc-done-photo");
     if (!input || !input.files || !input.files[0]) return Promise.resolve("");
     var file = input.files[0];
-    if (file.size > 2.5 * 1024 * 1024) {
-      if (host.toast) host.toast("Foto zu groß (max. 2,5 MB).");
+    /* iPhone-Fotos (oft > 2,5 MB) werden unten auf max. 1280 px verkleinert; nur echte Ausreißer ablehnen */
+    if (file.size > 25 * 1024 * 1024) {
+      if (host.toast) host.toast("Foto zu groß (max. 25 MB).");
       return Promise.resolve("");
     }
     return new Promise(function (resolve) {
