@@ -62,6 +62,20 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- 2) courses erweitern
 -- ---------------------------------------------------------------------------
+-- private_for aus go-private-courses.sql (falls dort nicht ausgeführt)
+alter table courses add column if not exists private_for uuid references go_accounts(id) on delete set null;
+create index if not exists courses_private_for_idx on courses (private_for) where private_for is not null;
+
+drop policy if exists "courses_select_active" on courses;
+create policy "courses_select_active"
+  on courses for select to anon, authenticated
+  using (
+    (is_active = true and private_for is null)
+    or private_for = go_current_account_id()
+    or coach_id = go_current_account_id()
+    or go_current_account_id() is null
+  );
+
 alter table courses add column if not exists owner text not null default 'gogogo';
 alter table courses add column if not exists focus text;
 alter table courses add column if not exists block_weeks int not null default 4;
