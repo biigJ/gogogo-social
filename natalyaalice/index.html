@@ -3579,7 +3579,8 @@
       color: #2A2118;
       font: inherit;
     }
-    #zirkel-register .sand-card input {
+    #zirkel-register .sand-card input,
+    #ffc-pass-edit .sand-card input {
       display: block;
       width: 100%;
       margin: 8px 0 0;
@@ -3590,7 +3591,9 @@
       color: #2A2118;
       font: inherit;
     }
-    #zirkel-register #zirkel-register-hint { margin: 0 0 8px; }
+    #zirkel-register #zirkel-register-hint,
+    #ffc-pass-edit #ffc-pass-hint { margin: 0 0 8px; }
+    #ffc-pass-edit #ffc-pass-email { margin: 0 0 4px; opacity: 0.72; }
     #zirkel-login .sand-quiet { margin-top: 10px; border: 1px solid #2A2118; background: transparent; color: #2A2118; }
     #days-place .place-add button {
       flex: none;
@@ -5290,6 +5293,7 @@
       <button type="button" data-menu="nickname">Nickname festlegen</button>
       <button type="button" data-menu="phone">Telefonnummer angeben</button>
       <button type="button" data-menu="email">E-Mail-Adresse angeben</button>
+      <button type="button" data-menu="ffc_password">FFC-Passwort ändern</button>
       <button type="button" data-menu="code">Login-Code ändern</button>
       <button type="button" data-menu="bmr">Grundverbrauch (kcal)</button>
       <button type="button" data-menu="apple_health">Apple Health verbinden</button>
@@ -6043,6 +6047,20 @@
       <p class="team-msg" id="account-edit-msg"></p>
       <button type="button" id="account-edit-save">Speichern</button>
       <button type="button" class="sand-quiet" id="account-edit-cancel">Abbrechen</button>
+    </div>
+  </div>
+  <div class="sand-modal" id="ffc-pass-edit" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="ffc-pass-title">
+      <h2 class="ask" id="ffc-pass-title">FFC-Passwort ändern</h2>
+      <p class="team-msg" id="ffc-pass-hint">Dasselbe Passwort wie bei Friday Fitness Circle / Zirkeltraining. Die E-Mail steht unter „E-Mail-Adresse angeben“.</p>
+      <p class="team-msg" id="ffc-pass-email"></p>
+      <input id="ffc-pass-current" type="password" placeholder="Aktuelles Passwort" autocomplete="current-password" />
+      <input id="ffc-pass-new" type="password" placeholder="Neues Passwort (mind. 6 Zeichen)" autocomplete="new-password" />
+      <input id="ffc-pass-new2" type="password" placeholder="Neues Passwort wiederholen" autocomplete="new-password" />
+      <p class="team-msg" id="ffc-pass-msg"></p>
+      <button type="button" id="ffc-pass-save">Passwort speichern</button>
+      <button type="button" class="sand-quiet" id="ffc-pass-forgot">Passwort vergessen?</button>
+      <button type="button" class="sand-quiet" id="ffc-pass-cancel">Abbrechen</button>
     </div>
   </div>
   <div class="sand-modal" id="invite-modal" hidden>
@@ -8785,6 +8803,10 @@
           toggleHealthLink(field === "apple_health" ? "apple_health" : "garmin");
           return;
         }
+        if (field === "ffc_password") {
+          openFfcPasswordEdit();
+          return;
+        }
         openAccountEdit(field);
       });
       document.getElementById("account-edit-save").addEventListener("click", saveAccountEdit);
@@ -8793,6 +8815,118 @@
       });
       document.getElementById("account-edit").addEventListener("click", function (event) {
         if (event.target.id === "account-edit") event.currentTarget.hidden = true;
+      });
+
+      function openFfcPasswordEdit() {
+        var email = accountEmail();
+        var emailEl = document.getElementById("ffc-pass-email");
+        var msg = document.getElementById("ffc-pass-msg");
+        msg.textContent = "";
+        msg.style.color = "";
+        document.getElementById("ffc-pass-current").value = "";
+        document.getElementById("ffc-pass-new").value = "";
+        document.getElementById("ffc-pass-new2").value = "";
+        if (!email) {
+          emailEl.textContent = "Zuerst unter „E-Mail-Adresse angeben“ die FFC-E-Mail speichern.";
+        } else {
+          emailEl.textContent = "E-Mail: " + email;
+        }
+        document.getElementById("ffc-pass-edit").hidden = false;
+        document.getElementById(email ? "ffc-pass-current" : "ffc-pass-cancel").focus();
+      }
+
+      function friendlyFfcPassError(err) {
+        if (window.FFC && typeof FFC.authErrorMessage === "function") {
+          return FFC.authErrorMessage(err);
+        }
+        var text = String((err && err.message) || err || "");
+        if (/invalid login credentials/i.test(text)) return "Aktuelles Passwort ist falsch.";
+        if (/same|different from the old/i.test(text)) return "Das neue Passwort muss sich vom alten unterscheiden.";
+        if (/password should be at least/i.test(text)) return "Das Passwort ist zu kurz (mind. 6 Zeichen).";
+        if (/rate limit|too many|security purposes/i.test(text)) {
+          return "Zu viele Anfragen – bitte warte ein paar Minuten.";
+        }
+        return text || "Speichern fehlgeschlagen.";
+      }
+
+      function saveFfcPasswordEdit() {
+        var msg = document.getElementById("ffc-pass-msg");
+        var email = accountEmail();
+        var cur = String(document.getElementById("ffc-pass-current").value || "");
+        var next = String(document.getElementById("ffc-pass-new").value || "");
+        var next2 = String(document.getElementById("ffc-pass-new2").value || "");
+        msg.style.color = "";
+        if (!email) {
+          msg.textContent = "Bitte zuerst die FFC-E-Mail unter Einstellungen speichern.";
+          return;
+        }
+        if (!cur) { msg.textContent = "Aktuelles Passwort fehlt."; return; }
+        if (next.length < 6) { msg.textContent = "Das neue Passwort braucht mindestens 6 Zeichen."; return; }
+        if (next !== next2) { msg.textContent = "Die neuen Passwörter stimmen nicht überein."; return; }
+        if (cur === next) { msg.textContent = "Das neue Passwort muss sich vom aktuellen unterscheiden."; return; }
+        if (!window.FFC || !FFC.changePassword) {
+          msg.textContent = "Zirkeltraining ist noch nicht geladen.";
+          return;
+        }
+        var saveBtn = document.getElementById("ffc-pass-save");
+        saveBtn.disabled = true;
+        msg.textContent = "Wird gespeichert …";
+        FFC.changePassword(email, cur, next)
+          .then(function (res) {
+            if (res && res.error) throw res.error;
+            msg.style.color = "#2A2118";
+            msg.textContent = "Passwort geändert. FFC und gogogo bleiben über diese E-Mail verknüpft.";
+            document.getElementById("ffc-pass-current").value = "";
+            document.getElementById("ffc-pass-new").value = "";
+            document.getElementById("ffc-pass-new2").value = "";
+            setTimeout(function () {
+              document.getElementById("ffc-pass-edit").hidden = true;
+            }, 900);
+          })
+          .catch(function (err) {
+            msg.textContent = friendlyFfcPassError(err);
+          })
+          .then(function () {
+            saveBtn.disabled = false;
+          });
+      }
+
+      function forgotFfcPassword() {
+        var msg = document.getElementById("ffc-pass-msg");
+        var email = accountEmail();
+        msg.style.color = "";
+        if (!email) {
+          msg.textContent = "Bitte zuerst die FFC-E-Mail unter Einstellungen speichern.";
+          return;
+        }
+        if (!window.FFC || !FFC.sendPasswordReset) {
+          msg.textContent = "Zirkeltraining ist noch nicht geladen.";
+          return;
+        }
+        var btn = document.getElementById("ffc-pass-forgot");
+        btn.disabled = true;
+        msg.textContent = "Link wird gesendet …";
+        FFC.sendPasswordReset(email)
+          .then(function (res) {
+            if (res && res.error) throw res.error;
+            msg.style.color = "#2A2118";
+            msg.textContent = "Wenn es zu dieser E-Mail einen FFC-Account gibt, ist ein Reset-Link unterwegs (auch Spam prüfen).";
+          })
+          .catch(function (err) {
+            msg.textContent = friendlyFfcPassError(err);
+          })
+          .then(function () {
+            btn.disabled = false;
+          });
+      }
+
+      document.getElementById("ffc-pass-save").addEventListener("click", saveFfcPasswordEdit);
+      document.getElementById("ffc-pass-forgot").addEventListener("click", forgotFfcPassword);
+      document.getElementById("ffc-pass-cancel").addEventListener("click", function () {
+        document.getElementById("ffc-pass-edit").hidden = true;
+      });
+      document.getElementById("ffc-pass-edit").addEventListener("click", function (event) {
+        if (event.target.id === "ffc-pass-edit") event.currentTarget.hidden = true;
       });
 
       function ausdauerChoicesForWorkout(iso) {
@@ -18687,6 +18821,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=nav5-clean-17"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-pass-1"></script>
 </body>
 </html>
