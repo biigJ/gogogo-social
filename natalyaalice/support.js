@@ -391,7 +391,7 @@
       title: "12-Wochen-Routine",
       price: "x € Einzahlung",
       description:
-        "Zahle einen Betrag ein, logge Deine Events über 12 Wochen und erhalte 90 % zurück. Regel und Berechnung sind im System hinterlegt — Freischaltung nach Zahlung."
+        "Einzahlung × 0,9 = Rückzahlung. 12 Wochen täglich Events posten — Freunde sehen Dein Commitment. Volle Wochen: Personal Training gratis."
     },
     {
       key: "ernaehrung",
@@ -407,7 +407,7 @@
       title: "Selbst Coaching anbieten",
       price: "Zugang",
       description:
-        "Mit der Trainer-A-Lizenz oder PT-Lizenz und mit Erfahrung in der Fitnesswelt kannst Du hier einen Zugang zum Admin-Bereich erhalten und Freunde finden Dich in der Coach-Liste. Über Buchen musst Du Deinen CV an Joschas WhatsApp schicken."
+        "Mit der Trainer-A-Lizenz oder PT-Lizenz und mit Erfahrung in der Fitnesswelt kannst Du hier einen Zugang zum Admin-Bereich erhalten und Freunde finden Dich in der Coach-Liste. Über Buchen sendest Du Deinen CV an gogogo (WhatsApp) nach Zustimmung."
     }
   ];
   var PAYPAL_DONATE_URL =
@@ -637,13 +637,13 @@
     ) {
       var type = key === "nutrition" ? "ernaehrung" : key;
       return bookStaticOffer(type).then(function (order) {
-        if (type === "coach_offer" && host.openJoschaCvWa) host.openJoschaCvWa();
+        /* coach_offer: WhatsApp öffnet der Consent-Dialog in index.html — hier nicht nochmal */
         if (host.paintProfil) host.paintProfil();
         if (host.onOffersReady) host.onOffersReady(STATIC_OFFERS.slice());
         if (host.toast) {
           host.toast(
             type === "coach_offer"
-              ? "CV an Joscha senden — danach Freischaltung."
+              ? "Bewerbung gespeichert — CV per WhatsApp senden."
               : type === "stempelkarte" || type === "ernaehrung" || type === "web_call"
                 ? "Aktiv — 25€ Spende per PayPal an Ben Joscha Grope."
                 : "Gebucht."

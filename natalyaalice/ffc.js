@@ -1717,11 +1717,16 @@
     buildExercisePlan();
   });
 
-  // ---------- Modus: Standard (jede Station 1×) oder Benutzerdefiniert (Station mehrfach, z. B. 6× Wall Balls) ----------
+  // ---------- Modus: Standard | Team (gogogo) | Benutzerdefiniert (nur FFC-intern, in gogogo ausgeblendet) ----------
   let setupMode = 'standard';
   const customCounts = {};
   try{
-    if(localStorage.getItem('ffc_mode') === 'custom') setupMode = 'custom';
+    const savedMode = localStorage.getItem('ffc_mode');
+    if(savedMode === 'custom' || savedMode === 'team' || savedMode === 'standard') setupMode = savedMode;
+    /* In gogogo-Session: Benutzerdefiniert → Standard (nur Standard/Team) */
+    if(document.body && document.body.classList.contains('is-session') && setupMode === 'custom'){
+      setupMode = 'standard';
+    }
     const c = JSON.parse(localStorage.getItem('ffc_counts') || '{}');
     Object.keys(c).forEach(k=>{ const n = Number(c[k]); if(n >= 1 && n <= 10) customCounts[k] = n; });
   }catch(e){}
@@ -1737,7 +1742,9 @@
     try{ localStorage.setItem('ffc_mode', setupMode); }catch(e){}
     buildExercisePlan();
   });
+  /* Team = gleiche Station-Logik wie Standard; Leaderboard-Scope steuert die Gruppe */
   function repsOf(id){ return setupMode === 'custom' ? (customCounts[id] || 1) : 1; }
+  function currentSetupMode(){ return setupMode; }
 
   function computeRoundExercises(){
     // Pro gewählter Station (bzw. pro Wiederholung) ein Zweierblock: Laufen + Station (oder Station + Laufen)
@@ -3370,11 +3377,73 @@
       openStory(index, firstUnseen < 0 ? 0 : firstUnseen);
       return true;
     },
-    async weeklyPoints(){
+    setupMode(){ return setupMode; },
+    async weeklyPoints(groupId){
       if(!currentUser) return null;
-      const { data, error } = await sb.rpc('weekly_leaderboard', { p_group_id: null });
+      const gid = groupId === undefined ? lbScope : groupId;
+      const { data, error } = await sb.rpc('weekly_leaderboard', { p_group_id: gid == null || gid === '' ? null : Number(gid) });
       if(error) return null;
-      return (data || []).map(r=>({ user_id:r.user_id, nickname:r.nickname, points:r.points, workouts:r.workouts, is_me:!!r.is_me }));
+      return (data || []).map(r=>({ user_id:r.user_id, nickname:r.nickname, points:r.points, workouts:r.workouts, is_me:!!r.is_me, avatar_url:r.avatar_url||'' }));
+    },
+    async groups(){
+      if(!currentUser) return [];
+      await loadGroups();
+      return (lbGroupList || []).map(g=>({
+        group_id: g.group_id,
+        name: g.name,
+        is_owner: !!g.is_owner,
+        member_count: g.member_count
+      }));
+    },
+    leaderboardScope(){ return lbScope; },
+    async setLeaderboardScope(id){
+      lbScope = id == null || id === '' ? null : Number(id);
+      renderScopes();
+      await loadBoard();
+      return lbScope;
+    },
+    async createGroup(name, memberIds){
+      if(!currentUser) return { error: { message: 'Nicht angemeldet' } };
+      const { data, error } = await sb.rpc('create_group', {
+        p_name: String(name || '').trim(),
+        p_member_ids: (memberIds || []).map(String)
+      });
+      if(error) return { error };
+      lbScope = data;
+      await loadGroups();
+      renderGroupList();
+      renderScopes();
+      await loadBoard();
+      return { data, error: null };
+    },
+    async leaveGroup(groupId){
+      if(!currentUser) return { error: { message: 'Nicht angemeldet' } };
+      const gid = groupId == null ? lbScope : Number(groupId);
+      const res = await sb.rpc('leave_group', { p_group_id: gid });
+      if(res.error) return res;
+      lbScope = null;
+      await loadGroups();
+      renderScopes();
+      await loadBoard();
+      return res;
+    },
+    feedPosts(){
+      return (feedPosts || []).map(p=>({
+        id: p.id,
+        user_id: p.user_id,
+        nickname: p.nickname,
+        avatar_url: p.avatar_url || '',
+        created_at: p.created_at,
+        url: p.url || null,
+        path: p.path || '',
+        is_me: !!p.is_me,
+        caption: p.caption || p.body || ''
+      }));
+    },
+    async refreshFeed(){
+      if(!currentUser) return [];
+      await loadFeed();
+      return this.feedPosts();
     },
     /* Trainings aus FFC-Supabase (training_sessions) für Plus/Aufzeichnungen */
     async historyRecords(){

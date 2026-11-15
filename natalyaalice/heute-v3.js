@@ -421,6 +421,22 @@
     return Promise.resolve();
   }
 
+  function loadFfcPosts() {
+    state.ffcPosts = [];
+    if (!global.FFC || !FFC.user || !FFC.user()) return Promise.resolve();
+    var load =
+      FFC.refreshFeed
+        ? Promise.resolve(FFC.refreshFeed())
+        : Promise.resolve(FFC.feedPosts ? FFC.feedPosts() : []);
+    return load
+      .then(function (posts) {
+        state.ffcPosts = posts || [];
+      })
+      .catch(function () {
+        state.ffcPosts = [];
+      });
+  }
+
   function loadRsvps(eventIds) {
     state.rsvps = {};
     if (!eventIds.length) return Promise.resolve();
@@ -1268,6 +1284,37 @@
     });
   }
 
+  /* FFC-Training-Posts unter Aktuell: wie Event, ohne Einladung und ohne Kommentar */
+  function renderFfcPostCard(post) {
+    var authorPerson = {
+      name: post.nickname || "FFC",
+      photo: post.avatar_url || ""
+    };
+    var postId = "ffc-post-" + String(post.id);
+    var when = post.created_at ? whenLine(post.created_at) : "";
+    return renderCardShell({
+      extraClass: "acc-card--ffc-post",
+      attrs:
+        ' data-post-id="' +
+        esc(postId) +
+        '" data-ffc-post="' +
+        esc(post.id) +
+        '"',
+      category: "zirkel",
+      photo: post.url || "",
+      emoji: "🔥",
+      actions: "",
+      author: authorHtml(authorPerson, !post.is_me),
+      when: when,
+      title: "🔥 " + (post.caption || "Zirkeltraining"),
+      place: "",
+      desc: "",
+      postId: "",
+      inviteIso: "",
+      canInvite: false
+    });
+  }
+
   function renderDiaryCard(item) {
     var p = personOf(item.user_id);
     var mine = String(item.user_id) === me();
@@ -1479,6 +1526,23 @@
       else upcoming.push(item);
     });
 
+    (state.ffcPosts || []).forEach(function (post) {
+      if (!post || !post.created_at) return;
+      if (flags.groupOnly && !post.is_me) return;
+      var item = {
+        kind: "ffc_post",
+        starts_at: post.created_at,
+        _mine: !!post.is_me,
+        post: post
+      };
+      if (item._mine && dayKey(post.created_at) === today) myToday.push(item);
+      else if (dayKey(post.created_at) === today || new Date(post.created_at).getTime() >= Date.now() - 86400000) {
+        upcoming.push(item);
+      } else {
+        history.push(item);
+      }
+    });
+
     pack.past.forEach(function (ev) {
       /* Ernährung-Logs sind kein eigener Frame — nur activity_log + eine Karte */
       if (
@@ -1536,6 +1600,7 @@
 
   function renderFeedItem(item) {
     if (item.kind === "ffc") return renderFfcCard(item.ev);
+    if (item.kind === "ffc_post") return renderFfcPostCard(item.post);
     if (item.kind === "diary") return renderDiaryCard(item.item);
     if (item.kind === "plan") return renderPlanCard(item.item);
     if (item.kind === "nutrition") return renderNutritionCard(item.item);
@@ -2665,6 +2730,7 @@
       loadEnrollments(),
       loadEvents(),
       loadFfcEvents(),
+      loadFfcPosts(),
       histReady
     ])
       .then(function () {
@@ -2702,7 +2768,7 @@
         /* FFC nachziehen — stiller Update, ohne zweiten Full-Render (Scroll-Hitch) */
         return softTimeout(FFC.refreshHeute(), 2800).then(function () {
           if (!stillCurrent()) return;
-          return loadFfcEvents().then(function () {
+          return Promise.all([loadFfcEvents(), loadFfcPosts()]).then(function () {
             if (!stillCurrent()) return;
             /* Boot: nach FFC noch einmal zentrieren; sonst nur wenn User nicht scrollt */
             if (state.userScrolledAktuell && !state.bootNeedsCenter) return;

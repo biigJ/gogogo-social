@@ -2225,15 +2225,25 @@
     }
 
     if (p.kind === "zirkel") {
+      /* Nur Standard | Team in gogogo — FFC-Logik schon beim Event */
+      var zMode = p.zMode === "team" ? "team" : "standard";
+      var zGroup = "";
+      try {
+        if (zMode === "team" && global.FFC && FFC.leaderboardScope) {
+          var gid = FFC.leaderboardScope();
+          if (gid != null && gid !== "") zGroup = "|group=" + String(gid);
+        }
+      } catch (eZg) {}
       var zNote =
         "zirkel:" +
-        (p.zMode || "standard") +
+        zMode +
         "|work=" +
         (p.zWork || 40) +
         "|pause=" +
         (p.zPause || 20) +
         "|rounds=" +
-        (p.zRounds || 8);
+        (p.zRounds || 8) +
+        zGroup;
       var zBody = {
         category: "zirkel",
         course_id: p.courseId || null,
@@ -3147,6 +3157,24 @@
       state.pendingCreate.zWork = Math.max(10, Math.min(180, Number(workEl && workEl.value) || 40));
       state.pendingCreate.zPause = Math.max(5, Math.min(120, Number(pauseEl && pauseEl.value) || 20));
       state.pendingCreate.zRounds = Math.max(1, Math.min(30, Number(roundsEl && roundsEl.value) || 8));
+      if (state.pendingCreate.zMode === "team") {
+        var hasGroup = false;
+        try {
+          hasGroup = !!(global.FFC && FFC.leaderboardScope && FFC.leaderboardScope() != null);
+        } catch (eTg) {}
+        if (!hasGroup) {
+          if (host.toast) {
+            host.toast("Team-Modus: zuerst unter Plus/FFC eine Gruppe zuordnen.");
+          }
+          return;
+        }
+        try {
+          if (global.FFC && FFC.setupMode && FFC.setupMode() !== "team") {
+            /* Event-Team → FFC-Setup auf Team spiegeln */
+            localStorage.setItem("ffc_mode", "team");
+          }
+        } catch (eMode) {}
+      }
       openCreateTimeSheet();
       return;
     }
