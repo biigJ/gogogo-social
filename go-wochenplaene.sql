@@ -1124,6 +1124,49 @@ select go_tmp_upsert_plan('bulletproof-knee', 'Bulletproof Knees', 1,
  }
 ]'::jsonb);
 
+-- Joscha: aus seiner Woche (go_coach_plans) — Mo Ganzkörper · Di Glutes/Legs · Mi Oberkörper ·
+-- Do Athletic Day · Fr Zirkeltraining (FFC) · Sa Boxen mit Tarek · So Laufen.
+-- Krafteinheiten = Übungen aus den gleichnamigen Tagesplänen (Einzeleinheiten).
+do $$
+declare
+  v_sessions jsonb := '[]'::jsonb;
+  r record;
+  v_blocks jsonb;
+begin
+  for r in
+    select * from (values
+      (1, 'training-full', 'Ganzkörpertraining', 'kraft', 'ganzkoerper'),
+      (2, 'training-glutes', 'Glutes/Legs', 'kraft', 'unterkoerper'),
+      (3, 'training-upper', 'Oberkörpertraining', 'kraft', 'oberkoerper'),
+      (4, 'training-athletic', 'Athletic Day', 'kraft', 'ganzkoerper'),
+      (5, '', 'Zirkeltraining 30 min', 'zirkel', 'zirkel'),
+      (6, '', 'Boxen mit Tarek', 'alternative', ''),
+      (7, 'ausdauer-run', 'Laufen', 'ausdauer', 'ausdauer')
+    ) as t(n, slug, title, category, focus)
+    order by n
+  loop
+    v_blocks := '[]'::jsonb;
+    if r.slug <> '' then
+      select s.blocks into v_blocks from course_sessions s join courses c on c.id = s.course_id
+      where c.slug = r.slug and s.block_no = 1 and not s.is_travel
+      order by s.session_no limit 1;
+    end if;
+    if r.category = 'alternative' then
+      v_blocks := '[{"type": "ausdauer", "items": [{"name": "Boxen mit Tarek", "note": "Partnertraining"}]}]'::jsonb;
+    end if;
+    if r.category = 'ausdauer' and coalesce(jsonb_array_length(v_blocks), 0) = 0 then
+      v_blocks := '[{"type": "ausdauer", "items": [{"name": "Laufen", "note": "locker"}]}]'::jsonb;
+    end if;
+    v_sessions := v_sessions || jsonb_build_array(jsonb_build_object(
+      'title', r.title, 'category', r.category, 'focus', r.focus,
+      'blocks', coalesce(v_blocks, '[]'::jsonb)
+    ));
+  end loop;
+  perform go_tmp_upsert_plan('joscha', 'Joscha', null,
+    'Vier Krafttage (Ganzkörper, Glutes/Legs, Oberkörper, Athletic), Zirkeltraining über FFC, Boxen und ein Lauf.',
+    v_sessions);
+end $$;
+
 -- Hybrid Kraft 2× / 3×: auf 7 Tage auffüllen (Kraft an festen Tagen, sonst Schritte)
 do $$
 declare
@@ -1198,6 +1241,6 @@ select c.title, c.level,
   count(*) filter (where s.category = 'zirkel') as zirkel
 from courses c
 join course_sessions s on s.course_id = c.id and s.block_no = 1 and not s.is_travel
-where c.slug in ('superwoman-l1', 'fit-for-run-l1', 'fit-for-run-l2', 'fit-for-run-l3', 'bulletproof-knee', 'hybrid-kraft-2x', 'hybrid-kraft-3x')
+where c.slug in ('superwoman-l1', 'fit-for-run-l1', 'fit-for-run-l2', 'fit-for-run-l3', 'bulletproof-knee', 'hybrid-kraft-2x', 'hybrid-kraft-3x', 'joscha')
 group by c.title, c.level
 order by c.title, c.level;

@@ -449,7 +449,7 @@
     var baseSelect =
       "id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title";
     var richSelect =
-      baseSelect + ",item_type,travel_auto,group_id,note,photo_url,courses(id,title,category_default)";
+      baseSelect + ",item_type,travel_auto,group_id,note,photo_url,course_session_id,courses(id,title,category_default)";
     function query(select) {
       return rest(
         "events?user_id=eq." +
@@ -3557,6 +3557,19 @@
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
         return;
+      }
+      /* Kraft-/Ausdauer-Event aus einem Kurs antippen → Workout-Ansicht */
+      if (!state.editMode && e.target && e.target.closest && e.target.closest(".wr-media") && !e.target.closest("button, a, input")) {
+        var slideW = e.target.closest(".wr-slide[data-event-id]");
+        var evW = slideW ? findOwnEvent(slideW.getAttribute("data-event-id")) : null;
+        if (!evW) {
+          var jid = slideW && slideW.getAttribute("data-event-id");
+          evW = (state.joined || []).filter(function (x) { return String(x.id) === String(jid); })[0] || null;
+        }
+        if (evW && (evW.course_id || isPlanPlaceholder(evW.id)) && (evW.category === "kraft" || evW.category === "ausdauer") && host.openEventWorkout) {
+          host.openEventWorkout(evW);
+          return;
+        }
       }
       if (
         state.editMode &&

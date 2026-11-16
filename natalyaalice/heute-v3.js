@@ -598,7 +598,7 @@
     var fromIso = from.toISOString();
     var toIso = to.toISOString();
     return rest(
-      "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note,assigned_by&starts_at=gte." +
+      "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note,assigned_by,course_session_id&starts_at=gte." +
         encodeURIComponent(fromIso) +
         "&starts_at=lte." +
         encodeURIComponent(toIso) +
@@ -3332,6 +3332,28 @@
     if (zp) {
       openPartnerSheet(zp.getAttribute("data-zpartner"));
       return;
+    }
+    /* Eigenes Kraft-/Ausdauer-Event aus einem Kurs antippen → Workout-Ansicht */
+    var mediaHit = t.closest(".acc-card__media");
+    if (mediaHit && !t.closest("button, a, input")) {
+      var cardW = mediaHit.closest(".acc-card[data-event-id]");
+      var evA = cardW ? (state.events || []).filter(function (x) { return String(x.id) === cardW.getAttribute("data-event-id"); })[0] : null;
+      if (evA && String(evA.user_id) === me() && evA.course_id && (evA.category === "kraft" || evA.category === "ausdauer") && host.openEventWorkout) {
+        host.openEventWorkout(evA);
+        return;
+      }
+      /* Tagesplan-Karte (Wochenplan ohne Event) → gleichnamige Einheit */
+      var planCard = mediaHit.closest(".acc-card[data-plan-iso]");
+      if (planCard && host.openEventWorkout) {
+        var pIso = planCard.getAttribute("data-plan-iso");
+        var pCat = mediaHit.classList.contains("tone-ausdauer") ? "ausdauer"
+          : mediaHit.classList.contains("tone-kraft-basics") ? "kraft" : "";
+        var pTitle = ((planCard.querySelector(".acc-card__title") || {}).textContent || "").trim();
+        if (pCat && pTitle && pIso) {
+          host.openEventWorkout({ title: pTitle, category: pCat, starts_at: pIso + "T12:00:00+01:00" });
+          return;
+        }
+      }
     }
     var onl = t.closest("[data-online-join]");
     if (onl) {
