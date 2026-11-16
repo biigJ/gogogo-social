@@ -10,6 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
   <script src="/assets/go-account-session.js"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
+  <script src="/natalyaalice/exercise-media.js?v=gxm-1"></script>
   <style>
     :root {
       --bg: #F2EDE5;
@@ -52,6 +53,20 @@
     .list button.course.on { border-color: var(--ink); }
     .list button.course { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr) auto; gap: 10px; align-items: center; }
     .list .c-name { font-weight: 600; }
+    .cover-row { display: flex; gap: 12px; align-items: center; }
+    .cover-prev { width: 96px; height: 120px; flex: none; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; display: grid; place-items: center; text-align: center; font-size: 12px; background: #E6DED0; }
+    .cover-prev img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .file-btn { display: inline-flex; align-items: center; min-height: 34px; padding: 5px 14px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; margin: 0; }
+    .vgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-top: 12px; }
+    .vcard { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+    .vthumb { position: relative; aspect-ratio: 4 / 5; background: #E6DED0; display: grid; place-items: center; border: 0; padding: 0; width: 100%; border-radius: 0; cursor: pointer; color: var(--ink); }
+    .vthumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .vthumb .vbadge { position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,.65); color: #fff; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; }
+    .vthumb .vplay { position: relative; width: 44px; height: 44px; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,.5)); }
+    .vthumb.empty .vplay { color: var(--dim); filter: none; }
+    .vbody { padding: 8px 10px 10px; }
+    .vname { font-weight: 600; font-size: 14px; line-height: 1.25; margin-bottom: 6px; }
+    .vbody input { width: 100%; font-size: 13px; padding: 7px 9px; }
     .list .c-mix { font-size: 13px; color: var(--dim); }
     .list .c-level { font-size: 12px; font-weight: 600; border: 1px solid var(--ink); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
     .list .c-head { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr) auto; gap: 10px; padding: 4px 14px; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
@@ -101,6 +116,7 @@
           <button data-kind="plan" class="on">Wochenpläne</button>
           <button data-kind="single">Einzeleinheiten</button>
           <button data-kind="hidden">Ausgeblendet</button>
+          <button data-kind="videos">Übungsvideos</button>
         </div>
         <select id="f-cat" class="hidden"><option value=""></option></select>
         <button id="btn-new" style="margin-left:auto">Neuer Wochenplan</button>
@@ -123,6 +139,16 @@
             <div class="grow"><label>Wochen pro Block</label><input id="c-bw" type="number" min="1" max="12" /></div>
           </div>
           <div style="margin-top:8px"><label>Beschreibung</label><textarea id="c-desc"></textarea></div>
+          <div class="cover-row" style="margin-top:10px">
+            <div class="cover-prev" id="c-cover-prev"><span class="muted">Kein Coverbild</span></div>
+            <div class="grow">
+              <label>Coverbild (erscheint in Aktuell und Woche statt der Farbfläche)</label>
+              <div class="row">
+                <label class="file-btn"><input id="c-cover" type="file" accept="image/*" hidden />Bild wählen</label>
+                <button class="ghost small" id="c-cover-del" type="button">Entfernen</button>
+              </div>
+            </div>
+          </div>
           <div class="row" style="margin-top:10px; justify-content: space-between">
             <label class="check">
               <input id="c-active" type="checkbox" style="width:auto" /> im Katalog sichtbar
@@ -211,6 +237,7 @@
     }
     $("app").classList.remove("hidden");
     $("who").textContent = "gogogo · " + me.name;
+    if (window.GoExMedia) GoExMedia.init({ rest: rest });
     loadCourses();
 
     function nextMonday() {
@@ -220,7 +247,9 @@
 
     // ---------- Kursliste ----------
     function loadCourses() {
-      return rest("courses?select=id,title,slug,level,duration_weeks,sessions_per_week,category_default,description,coach_id,owner,is_active,private_for,block_weeks,course_sessions(category,block_no,session_no,is_travel)&order=title.asc,level.asc")
+      var sel = "id,title,slug,level,duration_weeks,sessions_per_week,category_default,description,coach_id,owner,is_active,private_for,block_weeks,course_sessions(category,block_no,session_no,is_travel)";
+      return rest("courses?select=" + sel + ",image_url&order=title.asc,level.asc")
+        .catch(function () { return rest("courses?select=" + sel + "&order=title.asc,level.asc"); })
         .then(function (rows) {
           state.courses = (rows || []).filter(function (c) {
             if (c.slug === "eigenes-training" || c.slug === "12-wochen-routine" || /preset/.test(c.slug || "")) return false;
@@ -251,6 +280,13 @@
     }
 
     function renderList() {
+      var vids = state.kind === "videos";
+      $("btn-new").classList.toggle("hidden", vids);
+      if (vids) {
+        $("editor").classList.add("hidden");
+        renderVideos();
+        return;
+      }
       var rows = state.courses.filter(function (c) { return kindOf(c) === state.kind; });
       var html = rows.map(function (c) {
         return '<button class="course' + (state.course && state.course.id === c.id ? " on" : "") + '" data-id="' + c.id + '">' +
@@ -289,6 +325,7 @@
       $("c-bw").value = c.block_weeks || 4;
       $("c-desc").value = c.description || "";
       $("c-active").checked = !!c.is_active;
+      paintCover(c.image_url);
       var editable = canEdit(c);
       ["c-title", "c-cat", "c-level", "c-per", "c-weeks", "c-bw", "c-desc", "c-active"].forEach(function (id) { $(id).disabled = !editable; });
       $("btn-save-course").disabled = !editable;
@@ -483,6 +520,137 @@
         is_active: $("c-active").checked
       };
     }
+
+    // ---------- Coverbild ----------
+    function paintCover(url) {
+      $("c-cover-prev").innerHTML = url ? '<img src="' + esc(url) + '" alt="" />' : '<span class="muted">Kein Coverbild</span>';
+      $("c-cover-del").classList.toggle("hidden", !url);
+    }
+    function shrinkImage(file, maxSide) {
+      return new Promise(function (resolve, reject) {
+        var img = new Image();
+        img.onload = function () {
+          var k = Math.min(1, maxSide / Math.max(img.width, img.height));
+          var cv = document.createElement("canvas");
+          cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+          cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+          cv.toBlob(function (b) { b ? resolve(b) : reject(new Error("Bild konnte nicht gelesen werden")); }, "image/jpeg", 0.82);
+          URL.revokeObjectURL(img.src);
+        };
+        img.onerror = function () { reject(new Error("Bild konnte nicht gelesen werden")); };
+        img.src = URL.createObjectURL(file);
+      });
+    }
+    function saveCoverUrl(url) {
+      var c = state.course;
+      return rest("courses?id=eq." + c.id, { method: "PATCH", body: { image_url: url } }).then(function () {
+        c.image_url = url;
+        var inList = state.courses.find(function (x) { return x.id === c.id; });
+        if (inList) inList.image_url = url;
+        paintCover(url);
+      });
+    }
+    $("c-cover").addEventListener("change", function () {
+      var file = this.files && this.files[0];
+      this.value = "";
+      if (!file || !state.course) return;
+      toast("Lade Bild hoch …");
+      var path = "covers/" + state.course.id + "-" + Date.now() + ".jpg";
+      shrinkImage(file, 1200).then(function (blob) {
+        return fetch(SUPABASE_URL + "/storage/v1/object/go-avatars/" + path, {
+          method: "POST",
+          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "image/jpeg", "x-upsert": "true" },
+          body: blob
+        });
+      }).then(function (r) {
+        if (!r.ok) return r.text().then(function (t) { throw new Error("Upload fehlgeschlagen " + t.slice(0, 80)); });
+        return saveCoverUrl(SUPABASE_URL + "/storage/v1/object/public/go-avatars/" + path);
+      }).then(function () { toast("Coverbild gespeichert"); })
+        .catch(function (err) { toast(/image_url/.test(err.message) ? "Spalte fehlt: go-medien.sql ausführen" : err.message); });
+    });
+    $("c-cover-del").addEventListener("click", function () {
+      if (!state.course) return;
+      saveCoverUrl(null).then(function () { toast("Coverbild entfernt"); }).catch(function (err) { toast(err.message); });
+    });
+
+    // ---------- Übungsvideos (Bibliothek: ein Link pro Übungsname) ----------
+    var videoNames = null;
+    function loadVideoNames() {
+      if (videoNames) return Promise.resolve(videoNames);
+      return rest("course_sessions?select=blocks&limit=2000").then(function (rows) {
+        var seen = {};
+        (rows || []).forEach(function (r) {
+          (r.blocks || []).forEach(function (bl) {
+            (bl.items || []).forEach(function (it) {
+              if (it && it.name && !seen[GoExMedia.key(it.name)]) seen[GoExMedia.key(it.name)] = String(it.name).trim();
+            });
+          });
+        });
+        videoNames = seen;
+        return seen;
+      });
+    }
+    function videoCard(name) {
+      var url = GoExMedia.urlFor(name);
+      var info = url ? GoExMedia.parse(url) : null;
+      return '<div class="vcard" data-vname="' + esc(name) + '">' +
+        '<button type="button" class="vthumb' + (info ? "" : " empty") + '" data-vplay' + (info ? "" : " disabled") + ">" +
+        (info && info.thumb ? '<img src="' + esc(info.thumb) + '" alt="" loading="lazy" />' : "") +
+        '<span class="vplay">' + GoExMedia.playIcon + "</span>" +
+        (info ? '<span class="vbadge">' + esc(info.label) + "</span>" : "") + "</button>" +
+        '<div class="vbody"><div class="vname">' + esc(name) + "</div>" +
+        '<input type="url" inputmode="url" placeholder="YouTube- oder Instagram-Link" value="' + esc(url) + '" data-vurl /></div></div>';
+    }
+    function renderVideos() {
+      $("list").innerHTML = '<p class="muted">Lädt …</p>';
+      Promise.all([GoExMedia.ready(), loadVideoNames()]).then(function (res) {
+        var names = res[1];
+        var q = state.videoQuery || "";
+        var list = Object.keys(names).map(function (k) { return names[k]; })
+          .filter(function (n) { return !q || n.toLowerCase().indexOf(q.toLowerCase()) !== -1; })
+          .sort(function (a, b) {
+            var ha = GoExMedia.urlFor(a) ? 1 : 0, hb = GoExMedia.urlFor(b) ? 1 : 0;
+            return ha !== hb ? ha - hb : a.localeCompare(b, "de");
+          });
+        var missing = list.filter(function (n) { return !GoExMedia.urlFor(n); }).length;
+        $("list").innerHTML =
+          '<p class="muted">Link einfügen, fertig: Das Video gilt für diese Übung in allen Plänen und lässt sich in der Workout-Ansicht abspielen. ' +
+          missing + " von " + list.length + " Übungen ohne Video.</p>" +
+          '<input type="search" id="v-search" placeholder="Übung suchen" value="' + esc(q) + '" />' +
+          '<div class="vgrid">' + list.map(videoCard).join("") + "</div>";
+        var search = $("v-search");
+        search.addEventListener("input", function () {
+          state.videoQuery = search.value;
+          clearTimeout(renderVideos._t);
+          renderVideos._t = setTimeout(function () { renderVideos(); var s2 = $("v-search"); if (s2) { s2.focus(); s2.setSelectionRange(s2.value.length, s2.value.length); } }, 250);
+        });
+      }).catch(function (e) { $("list").innerHTML = '<p class="muted">Laden fehlgeschlagen: ' + esc(e.message) + "</p>"; });
+    }
+    $("list").addEventListener("change", function (e) {
+      var inp = e.target.closest ? e.target.closest("[data-vurl]") : null;
+      if (!inp) return;
+      var card = inp.closest(".vcard");
+      var name = card.getAttribute("data-vname");
+      var url = inp.value.trim();
+      if (url && !GoExMedia.parse(url)) { toast("Bitte einen vollständigen Link mit https:// einfügen"); return; }
+      var job = url
+        ? rest("go_exercise_media?on_conflict=name_key", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+            body: { name_key: GoExMedia.key(name), name: name, url: url, updated_by: me.id, updated_at: new Date().toISOString() } })
+        : rest("go_exercise_media?name_key=eq." + encodeURIComponent(GoExMedia.key(name)), { method: "DELETE" });
+      job.then(function () {
+        GoExMedia.set(name, url);
+        card.outerHTML = videoCard(name);
+        toast(url ? "Video gespeichert" : "Video entfernt");
+      }).catch(function (err) {
+        toast(/go_exercise_media|relation/.test(err.message) ? "Tabelle fehlt: go-medien.sql ausführen" : err.message);
+      });
+    });
+    $("list").addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest("[data-vplay]") : null;
+      if (!b) return;
+      var name = b.closest(".vcard").getAttribute("data-vname");
+      GoExMedia.open(name);
+    });
 
     $("btn-save-course").addEventListener("click", function () {
       var f = courseForm(); if (!f.title) { toast("Titel fehlt"); return; }

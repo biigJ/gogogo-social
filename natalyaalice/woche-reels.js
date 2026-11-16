@@ -1300,6 +1300,9 @@
         "</p>";
     }
     var going = goingLine(ev);
+    /* Coverbild statt Farbfläche (go-covers.js): Kursbild, sonst Bild der Kategorie */
+    var nutritionTitle = /ernährung|ernaehrung/i.test(String(ev.title || ""));
+    var cover = !ev.photo_url && global.GoCovers ? GoCovers.url(ev.course_id, nutritionTitle ? "ernaehrung" : cat) : "";
     var isNutrition =
       String(ev.item_type || "") === "nutrition_log" ||
       /ernährung|ernaehrung/i.test(String(ev.title || ""));
@@ -1323,11 +1326,13 @@
       ">" +
       '<div class="wr-media ' +
       toneClass(cat) +
-      (ev.photo_url ? " has-photo" : "") +
+      (ev.photo_url || cover ? " has-photo" : "") +
       '">' +
       (ev.photo_url
         ? '<img class="wr-photo" src="' + esc(ev.photo_url) + '" alt="" />'
-        : "") +
+        : cover
+          ? '<img class="wr-photo wr-cover" src="' + esc(cover) + '" alt="" loading="lazy" />'
+          : "") +
       '<div class="wr-bottom">' +
       '<div class="wr-bottom__main"' +
       (isNutrition ? ' data-wr-nutrition-open="1"' : "") +
