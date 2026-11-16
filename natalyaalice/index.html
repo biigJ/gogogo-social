@@ -6755,6 +6755,14 @@
       <button type="button" class="sand-quiet" id="share-ask-no">Nein, private Einträge.</button>
     </div>
   </div>
+  <div class="sand-modal" id="privacy-ask" hidden>
+    <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="privacy-ask-title">
+      <h2 class="ask" id="privacy-ask-title">Kurz zum Datenschutz</h2>
+      <p>gogogo ist in der Testphase. Deine Trainings sehen nur Du und Dein Coach, Freunde nur, wenn Du das freigibst. Der Login mit Vorname und Code ist noch kein vollwertiger Schutz, und Events und Fotos sind technisch noch nicht abgeschlossen. Trag deshalb keine sensiblen Gesundheitsdaten ein. Löschen lassen kannst Du alles jederzeit über Joscha.</p>
+      <button type="button" id="privacy-ask-ok">Verstanden</button>
+      <a class="sand-quiet" href="/datenschutz/" target="_blank" rel="noopener" style="display:block;text-align:center;margin-top:8px;border:0;background:none;">Datenschutz lesen</a>
+    </div>
+  </div>
   <div class="sand-modal" id="history-share-ask" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="history-share-ask-title">
       <h2 class="ask" id="history-share-ask-title">Events und Historie teilen?</h2>
@@ -18730,9 +18738,49 @@
         }).catch(function () {});
       }
 
+      /* Datenschutz Stufe 1: einmaliger Hinweis vor dem Teilen-Dialog (go_accounts.privacy_ack_at) */
+      var privacyAckState = "";
+      function privacyAckKey() { return "gogogo_privacy_ack_" + (sessionAccount ? sessionAccount.id : ""); }
+      function ensurePrivacyAck() {
+        if (privacyAckState === "ok") return Promise.resolve(true);
+        if (privacyAckState === "asking") return Promise.resolve(false);
+        try { if (localStorage.getItem(privacyAckKey())) { privacyAckState = "ok"; return Promise.resolve(true); } } catch (eLs) {}
+        privacyAckState = "asking";
+        return rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id) + "&select=privacy_ack_at")
+          .catch(function () { return null; })
+          .then(function (rows) {
+            if (rows && rows[0] && rows[0].privacy_ack_at) return true;
+            var modal = document.getElementById("privacy-ask");
+            if (!modal) return true;
+            var ask = function () {
+              return new Promise(function (resolve) {
+                var okBtn = document.getElementById("privacy-ask-ok");
+                okBtn.onclick = function () { modal.hidden = true; resolve(true); };
+                modal.hidden = false;
+              });
+            };
+            return ask().then(function () {
+              rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+                method: "PATCH", prefer: "return=minimal", body: { privacy_ack_at: new Date().toISOString() }
+              }).catch(function () {});
+              return true;
+            });
+          })
+          .then(function () {
+            privacyAckState = "ok";
+            try { localStorage.setItem(privacyAckKey(), "1"); } catch (eLs2) {}
+            return true;
+          });
+      }
+
       function maybeAskHistoryShare() {
         if (!sessionMode || !sessionAccount) return;
         if (document.body.dataset.shell !== "heute") return;
+        if (privacyAckState !== "ok") {
+          /* kurz warten: der Klick auf „Verstanden“ läuft noch durch die Modal-Handler */
+          ensurePrivacyAck().then(function (ok) { if (ok) setTimeout(maybeAskHistoryShare, 400); });
+          return;
+        }
         if (historyShareAsked()) return;
         var modal = document.getElementById("history-share-ask");
         if (!modal || !modal.hidden) return;
