@@ -7718,6 +7718,7 @@
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-1"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-4"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-1"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-45"></script>
@@ -15148,6 +15149,30 @@
           showPlan("settings");
         });
         meSlide.appendChild(settingsBtn);
+        /* Admin (Joscha / Ben): Nachrichten zu neuen Nutzern + Buchungen, Coaches freischalten */
+        var adminIds = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
+        if (window.GoAdmin && sessionAccount && (sessionAccount.is_admin || adminIds.indexOf(String(sessionAccount.id)) !== -1)) {
+          var paintAdminBadge = function () {
+            GoAdmin.unread(adminHost).then(function (n) {
+              var b = document.getElementById("profil-admin");
+              if (b) b.textContent = n ? "Admin · " + n + " neu" : "Admin";
+            });
+          };
+          var adminHost = {
+            rest: rest,
+            sessionAccount: sessionAccount,
+            toast: gogogoToast,
+            onAdminClosed: paintAdminBadge
+          };
+          var adminBtn = document.createElement("button");
+          adminBtn.type = "button";
+          adminBtn.className = "team-slide__cta is-solid";
+          adminBtn.id = "profil-admin";
+          adminBtn.textContent = "Admin";
+          adminBtn.addEventListener("click", function () { GoAdmin.open(adminHost); });
+          meSlide.appendChild(adminBtn);
+          paintAdminBadge();
+        }
         box.appendChild(meSlide);
       }
 
