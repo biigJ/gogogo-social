@@ -1583,7 +1583,7 @@
           canDone: upcoming && day === todayIso(),
           isDone: ev.status === "erledigt",
           badge: eventBadgeKind(ev),
-          removeId: ev.id,
+          removeId: "",
           removeMode: "delete"
         })
       : /* Fremde Events: nur Kommentieren (Einladung hat eigene Zeile) */
@@ -1740,7 +1740,7 @@
       canDone: false,
       isDone: false,
       badge: item.category === "zirkel" ? "zirkel" : "plan",
-      removeId: item.iso ? "plan:" + item.iso : "",
+      removeId: "",
       removeMode: "skip"
     });
     return renderCardShell({

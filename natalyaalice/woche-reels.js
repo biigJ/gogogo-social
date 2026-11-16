@@ -1686,10 +1686,23 @@
     );
   }
 
+  /* Erledigte Events sind abgeschlossen: nicht ersetzen, verschieben oder löschen */
+  function eventLocked(id) {
+    var ev = id ? findOwnEvent(id) : null;
+    return !!(ev && ev.status === "erledigt");
+  }
+
+  function lockedToast() {
+    if (host.toast) host.toast("Erledigt. Das Event bleibt so.");
+  }
+
   function editPanelHtml() {
     if (!state.editMode) return "";
     var iso = currentDayIso();
     var own = currentOwnEvent();
+    if (own && own.status === "erledigt") {
+      return '<div class="wr-edit-panel"><p class="wr-edit-panel__hint">Erledigt. Dieses Event lässt sich nicht mehr ändern.</p></div>';
+    }
     var kinds =
       '<div class="wr-edit-panel__grid">' +
       ["kraft", "ausdauer", "alternative", "zirkel"]
@@ -2048,6 +2061,7 @@
   function openPlaceSheet(eventId) {
     var ev = findOwnEvent(eventId);
     if (!ev) return;
+    if (ev.status === "erledigt") return lockedToast();
     openSheet(
       '<p class="wr-sheet-hint">Ort</p>' +
         '<div id="wr-edit-place-picker"><label class="wr-field">Ort<input type="text" id="wr-edit-place" maxlength="80" value="' +
@@ -3461,6 +3475,7 @@
       return;
     }
     if (t.getAttribute("data-wr-edit-kind")) {
+      if (eventLocked(t.getAttribute("data-replace"))) return lockedToast();
       openKindSheet(
         t.getAttribute("data-wr-edit-kind"),
         t.getAttribute("data-iso"),
@@ -3580,6 +3595,7 @@
       return;
     }
     if (t.getAttribute("data-wr-delete")) {
+      if (eventLocked(t.getAttribute("data-wr-delete"))) return lockedToast();
       confirmDeleteEvent(t.getAttribute("data-wr-delete"));
       return;
     }
@@ -3637,6 +3653,7 @@
       return;
     }
     if (t.getAttribute("data-wr-swap")) {
+      if (eventLocked(t.getAttribute("data-wr-swap"))) return lockedToast();
       swapToHotel(t.getAttribute("data-wr-swap"));
       return;
     }
