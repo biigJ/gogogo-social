@@ -532,7 +532,7 @@
       })
       .catch(function () {
         btn.disabled = false;
-        toast("Zuordnen fehlgeschlagen (go-wochenplaene.sql ausgeführt?)");
+        toast("Zuordnen fehlgeschlagen (go-coach-enroll.sql ausgeführt?)");
       });
   }
 
