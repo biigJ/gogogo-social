@@ -449,7 +449,7 @@
     var baseSelect =
       "id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title";
     var richSelect =
-      baseSelect + ",item_type,travel_auto,group_id,note,photo_url,courses(id,title,category_default)";
+      baseSelect + ",item_type,travel_auto,group_id,note,photo_url,course_session_id,courses(id,title,category_default)";
     function query(select) {
       return rest(
         "events?user_id=eq." +
@@ -1767,7 +1767,10 @@
         (canTime
           ? '<button type="button" class="wr-pill-btn" data-wr-edit-time="' +
             esc(own.id) +
-            '">Uhrzeit</button>'
+            '">Uhrzeit</button>' +
+            '<button type="button" class="wr-pill-btn" data-wr-edit-day="' +
+            esc(own.id) +
+            '">Tag</button>'
           : "") +
         '<button type="button" class="wr-pill-btn" data-wr-delete="' +
         esc(own.id) +
@@ -2125,6 +2128,64 @@
       })
       .catch(function () {
         if (host.toast) host.toast("Ort konnte nicht gespeichert werden");
+      });
+  }
+
+  /* Event auf einen anderen Tag derselben Woche schieben (Uhrzeit bleibt).
+     Liegt dort schon etwas, stehen beide Events am Tag (wischen). */
+  function openDaySheet(eventId) {
+    var ev = findOwnEvent(eventId);
+    if (!ev) return;
+    if (ev.status === "erledigt") return lockedToast();
+    var iso = dayKey(ev.starts_at);
+    var d = new Date(iso + "T12:00:00Z");
+    var mon = new Date(d);
+    mon.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    var names = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+    var today = berlinToday();
+    var btns = names.map(function (n, i) {
+      var x = new Date(mon);
+      x.setUTCDate(mon.getUTCDate() + i);
+      var di = x.toISOString().slice(0, 10);
+      var past = di < today;
+      return (
+        '<button type="button" class="wr-pill-btn' + (di === iso ? " wr-pill-btn--dark" : "") + '"' +
+        (past || di === iso ? " disabled" : "") +
+        ' data-wr-day-move="' + esc(ev.id) + '" data-day="' + di + '">' +
+        n + " " + x.getUTCDate() + "." + "</button>"
+      );
+    }).join("");
+    openSheet(
+      "<h3>Verschieben</h3>" +
+        '<p class="wr-sheet-hint">Auf welchen Tag? Die Uhrzeit bleibt.</p>' +
+        '<div class="wr-day-grid">' + btns + "</div>" +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+  }
+
+  function moveEventToDay(eventId, iso) {
+    var ev = findOwnEvent(eventId);
+    if (!ev || !iso) return;
+    var hhmm = formatTime(ev.starts_at);
+    var starts = iso + "T" + hhmm + ":00" + berlinOffsetSuffix(iso);
+    return materializeEvent(ev)
+      .then(function (real) {
+        return rest("events?id=eq." + encodeURIComponent(real.id), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { starts_at: starts }
+        });
+      })
+      .then(function () {
+        closeSheet();
+        if (host.toast) host.toast("Verschoben");
+        return refreshKeepDay(iso);
+      })
+      .then(function () {
+        return notifyAktuell();
+      })
+      .catch(function () {
+        if (host.toast) host.toast("Verschieben hat nicht geklappt");
       });
   }
 
@@ -3491,11 +3552,24 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
         return;
+      }
+      /* Kraft-/Ausdauer-Event aus einem Kurs antippen → Workout-Ansicht */
+      if (!state.editMode && e.target && e.target.closest && e.target.closest(".wr-media") && !e.target.closest("button, a, input")) {
+        var slideW = e.target.closest(".wr-slide[data-event-id]");
+        var evW = slideW ? findOwnEvent(slideW.getAttribute("data-event-id")) : null;
+        if (!evW) {
+          var jid = slideW && slideW.getAttribute("data-event-id");
+          evW = (state.joined || []).filter(function (x) { return String(x.id) === String(jid); })[0] || null;
+        }
+        if (evW && (evW.course_id || isPlanPlaceholder(evW.id)) && (evW.category === "kraft" || evW.category === "ausdauer") && host.openEventWorkout) {
+          host.openEventWorkout(evW);
+          return;
+        }
       }
       if (
         state.editMode &&
@@ -3778,6 +3852,14 @@
     }
     if (t.getAttribute("data-wr-place-save")) {
       saveEventPlace(t.getAttribute("data-wr-place-save"));
+      return;
+    }
+    if (t.getAttribute("data-wr-edit-day")) {
+      openDaySheet(t.getAttribute("data-wr-edit-day"));
+      return;
+    }
+    if (t.getAttribute("data-wr-day-move")) {
+      moveEventToDay(t.getAttribute("data-wr-day-move"), t.getAttribute("data-day"));
       return;
     }
     if (t.getAttribute("data-wr-edit-time")) {

@@ -2117,6 +2117,17 @@
     .cp-ev__x { margin-left: auto; border: 0; background: none; color: inherit; font-size: 20px; line-height: 1; padding: 0 2px; cursor: pointer; }
     .cp-add { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 0; background: #111; color: #fff; font-size: 20px; line-height: 1; cursor: pointer; }
     .cp-foot { padding-bottom: 20px; }
+    .cp-ev--joined { background: transparent; border: 1.5px solid #111; }
+    .cp-ev[data-cp="move"] { cursor: pointer; }
+    .wr-day-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 4px 0 12px; }
+    .wr-day-grid .wr-pill-btn { width: 100%; padding: 0 4px; }
+    .wr-day-grid .wr-pill-btn:disabled { opacity: .35; }
+    .cp-ev--joined em { font-style: normal; font-weight: 600; margin-left: 4px; }
+    .cp-plan__name { margin: 0; font-weight: 700; font-size: 17px; }
+    .cp-row { display: grid; grid-template-columns: 1fr 96px; gap: 10px; }
+    .cp-days { display: flex; gap: 6px; margin: 4px 0 4px; }
+    .cp-days button { flex: 1; min-height: 40px; border-radius: 999px; border: 1.5px solid #111; background: transparent; color: #111; font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; }
+    .cp-days button.is-on { background: #111; color: #fff; }
     .cp-modal { position: fixed; inset: 0; z-index: 9600; display: flex; align-items: flex-end; justify-content: center; background: rgba(20,16,12,.4); }
     .cp-modal__card { width: min(100%, 480px); box-sizing: border-box; background: #F3EEE4; border-radius: 20px 20px 0 0; padding: 18px 16px calc(22px + env(safe-area-inset-bottom, 0px)); }
     .cp-modal__card h3 { margin: 0 0 12px; text-align: center; font-family: "Playfair Display", Georgia, serif !important; font-size: 22px; font-weight: 600; }
@@ -7701,12 +7712,12 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/coach-portal.js?v=cp-1"></script>
+  <script src="/natalyaalice/coach-portal.js?v=cp-3"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-42"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-44"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-34"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-36"></script>
   <script src="/natalyaalice/support.js?v=support-15"></script>
   <script>
     (function () {
@@ -12351,6 +12362,7 @@
           rest: rest,
           get sessionAccount() { return sessionAccount; },
           get teamPeople() { return teamPeople; },
+          openEventWorkout: function (ev) { openEventWorkout(ev); },
           /* Zirkel beitreten: Mitglieder der FFC-Gruppe zuerst, sonst aller Gruppen */
           groupMemberIds: function () {
             var g = ffcContextGroup();
@@ -16235,7 +16247,8 @@
             /* Kurs-Editor direkt unter Buchen, nur für Coaches/Admin; reiner Link, keine Rail-Logik */
             var editorAcc = window.GoAccountSession ? GoAccountSession.load() : null;
             var editorAdmins = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
-            if (editorAcc && (sessionIsTrainer || editorAdmins.indexOf(editorAcc.id) !== -1)) {
+            /* Wochenpläne pflegt nur gogogo (Joscha / biigJ) */
+            if (editorAcc && editorAdmins.indexOf(editorAcc.id) !== -1) {
               var editorLink = document.createElement("button");
               editorLink.type = "button";
               editorLink.className = "go-slide__cta go-slide__cta--editor";
@@ -16601,6 +16614,7 @@
             rest: rest,
             get sessionAccount() { return sessionAccount; },
             toast: function (msg) { gogogoToast(msg); },
+            isAdmin: ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"].indexOf(String(sessionAccount && sessionAccount.id)) !== -1,
             openKursEditor: function () { location.href = "/workout/kurse/"; },
             openLegacyAdmin: function (uid) {
               location.href = "/workout/admin/?trainer=1&user=" + encodeURIComponent(uid) + "&back=team";
@@ -17756,6 +17770,84 @@
           goButton(box, "Zurück", "sand-quiet", askGoPlan);
         });
       }
+
+      /* Event antippen → Workout-Ansicht mit den Übungen der Kurs-Einheit (wie bei Natalya) */
+      var BLOCK_GROUP = {
+        mobility: "Aufwärmen", skill: "Skill", grund: "Hauptteil", hybrid: "Hybrid",
+        hypertrophie: "Hypertrophie", finisher: "Finisher", ausdauer: "Ausdauer"
+      };
+      function exercisesFromSession(ses) {
+        var out = [];
+        var sid = String((ses && ses.id) || "x").slice(0, 8);
+        ((ses && ses.blocks) || []).forEach(function (bl, bi) {
+          (bl.items || []).forEach(function (it, ii) {
+            if (!it || !it.name) return;
+            var bits = [];
+            if (it.sets && it.reps) bits.push(it.sets + " × " + it.reps);
+            else if (it.sets && it.time_s) bits.push(it.sets + " × " + it.time_s + " s");
+            else if (it.time_s) bits.push(it.time_s >= 120 ? Math.round(it.time_s / 60) + " min" : it.time_s + " s");
+            if (it.dist_m) bits.push(it.dist_m >= 1000 ? (it.dist_m / 1000).toString().replace(".", ",") + " km" : it.dist_m + " m");
+            if (it.load) bits.push(it.load);
+            if (it.note) bits.push(it.note);
+            var counted = !!(it.sets && (it.reps || it.load));
+            var ex = {
+              id: "cs-" + sid + "-" + bi + "-" + ii,
+              name: it.name,
+              short: String(it.name).slice(0, 18),
+              kind: counted ? "reps" : "check",
+              cue: "",
+              note: bits.join(" · "),
+              group: BLOCK_GROUP[bl.type] || "Hauptteil"
+            };
+            if (counted) {
+              ex.sets = Number(it.sets) || 3;
+              if (bl.type === "grund" || bl.type === "hypertrophie" || bl.type === "hybrid") {
+                ex.weight = true;
+                ex.step = 1;
+              }
+            }
+            out.push(ex);
+          });
+        });
+        return out;
+      }
+
+      function openEventWorkout(ev) {
+        if (!ev || !sessionMode) return;
+        function sessionsOf(courseId) {
+          return rest("course_sessions?course_id=eq." + encodeURIComponent(courseId) + "&block_no=eq.1&is_travel=eq.false&select=id,title,category,blocks,session_no&order=session_no.asc&limit=1");
+        }
+        var load;
+        if (ev.course_session_id) {
+          load = rest("course_sessions?id=eq." + encodeURIComponent(ev.course_session_id) + "&select=id,title,category,blocks");
+        } else if (ev.course_id) {
+          load = sessionsOf(ev.course_id);
+        } else if (ev.title) {
+          /* Tagesplan ohne Kurs-Bezug (z. B. "Ganzkörpertraining"): gleichnamige Einzeleinheit */
+          load = rest("courses?title=eq." + encodeURIComponent(String(ev.title).replace(/^[^A-Za-zÄÖÜäöü0-9]+\s*/, "")) + "&is_active=eq.true&select=id&limit=1")
+            .then(function (cs) { return cs && cs[0] ? sessionsOf(cs[0].id) : []; });
+        } else {
+          return;
+        }
+        load.then(function (rows) {
+          var ses = rows && rows[0];
+          var exercises = exercisesFromSession(ses);
+          if (!exercises.length) {
+            gogogoToast("Für diese Einheit sind noch keine Übungen hinterlegt");
+            return;
+          }
+          var iso = new Date(ev.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+          var unit = { kind: ev.category || "kraft", label: ev.title || (ses && ses.title) || "Training" };
+          todayPick = { iso: iso, unit: unit, exercises: exercises };
+          closeShellModals();
+          if (window.WocheReels) WocheReels.hide();
+          startWorkout(iso, false);
+          window.scrollTo(0, 0);
+        }).catch(function () {
+          gogogoToast("Workout konnte nicht geladen werden");
+        });
+      }
+      window.GoOpenEventWorkout = openEventWorkout;
 
       function startPickedWorkout(unit, exercises) {
         var today = Log.berlinToday();
@@ -19797,6 +19889,7 @@
         if (sessionMode && window.GoSupport) installSupport();
         if (sessionMode && window.HeuteAccountability) {
           var accHost = {
+            openEventWorkout: function (ev) { openEventWorkout(ev); },
             onTodayActivity: function () {
               var key = "";
               try { key = JSON.stringify(HeuteAccountability.todayActivity()); } catch (eK) {}

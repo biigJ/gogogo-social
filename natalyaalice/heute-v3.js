@@ -598,12 +598,21 @@
     var fromIso = from.toISOString();
     var toIso = to.toISOString();
     return rest(
-      "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note&starts_at=gte." +
+      "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note,assigned_by,course_session_id&starts_at=gte." +
         encodeURIComponent(fromIso) +
         "&starts_at=lte." +
         encodeURIComponent(toIso) +
         "&order=starts_at.desc&limit=500"
     )
+      .catch(function () {
+        return rest(
+          "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note&starts_at=gte." +
+            encodeURIComponent(fromIso) +
+            "&starts_at=lte." +
+            encodeURIComponent(toIso) +
+            "&order=starts_at.desc&limit=500"
+        );
+      })
       .catch(function () {
         return rest(
           "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title&starts_at=gte." +
@@ -1123,6 +1132,13 @@
   }
 
   function badgeSvg(kind) {
+    if (kind === "coach") {
+      /* Vom Coach eingetragen / Wochenplan des Coaches: Klemmbrett */
+      return (
+        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<rect x="5" y="4.5" width="14" height="16" rx="2"/><path d="M9 4.5V3.5h6v1"/><rect x="9" y="3" width="6" height="3" rx="1"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4"/></svg>'
+      );
+    }
     if (kind === "plan") {
       /* Gleich wie Pill-Woche: breites Kalenderblatt + eine Linie */
       return (
@@ -1610,6 +1626,7 @@
     if (!ev) return "";
     if (ev.category === "zirkel") return "zirkel";
     if (ev.is_unplanned) return "spontan";
+    if (ev.assigned_by) return "coach";
     /* Wochenplanung / Kurs-Session → Kalender-Icon wie Pill-Woche */
     if (ev.enrollment_id || ev.course_id || ev.item_type === "course_session") {
       return "plan";
@@ -3315,6 +3332,28 @@
     if (zp) {
       openPartnerSheet(zp.getAttribute("data-zpartner"));
       return;
+    }
+    /* Eigenes Kraft-/Ausdauer-Event aus einem Kurs antippen → Workout-Ansicht */
+    var mediaHit = t.closest(".acc-card__media");
+    if (mediaHit && !t.closest("button, a, input")) {
+      var cardW = mediaHit.closest(".acc-card[data-event-id]");
+      var evA = cardW ? (state.events || []).filter(function (x) { return String(x.id) === cardW.getAttribute("data-event-id"); })[0] : null;
+      if (evA && String(evA.user_id) === me() && evA.course_id && (evA.category === "kraft" || evA.category === "ausdauer") && host.openEventWorkout) {
+        host.openEventWorkout(evA);
+        return;
+      }
+      /* Tagesplan-Karte (Wochenplan ohne Event) → gleichnamige Einheit */
+      var planCard = mediaHit.closest(".acc-card[data-plan-iso]");
+      if (planCard && host.openEventWorkout) {
+        var pIso = planCard.getAttribute("data-plan-iso");
+        var pCat = mediaHit.classList.contains("tone-ausdauer") ? "ausdauer"
+          : mediaHit.classList.contains("tone-kraft-basics") ? "kraft" : "";
+        var pTitle = ((planCard.querySelector(".acc-card__title") || {}).textContent || "").trim();
+        if (pCat && pTitle && pIso) {
+          host.openEventWorkout({ title: pTitle, category: pCat, starts_at: pIso + "T12:00:00+01:00" });
+          return;
+        }
+      }
     }
     var onl = t.closest("[data-online-join]");
     if (onl) {
