@@ -1,0 +1,127 @@
+/* go-dialog.js — gogogo-Dialoge statt System-alert/confirm/prompt
+ *
+ *   GoDialog.alert(text)                       → Promise<void>
+ *   GoDialog.confirm(text, { ok, cancel })     → Promise<boolean>
+ *   GoDialog.prompt(text, value, { ok, type }) → Promise<string|null>
+ *   GoDialog.choose(text, [{ label, value }])  → Promise<value|null>
+ *
+ * Stil wie .sand-modal / .sand-card (Sandfläche, Playfair-Titel, schwarze Pill-Buttons).
+ */
+(function (global) {
+  "use strict";
+
+  var CSS =
+    ".god{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,16,12,.42)}" +
+    ".god__card{width:min(100%,380px);box-sizing:border-box;background:#F3EEE4;color:#2A2118;border-radius:22px;padding:22px 18px 16px;box-shadow:0 18px 50px rgba(0,0,0,.25);font-family:Inter,system-ui,sans-serif}" +
+    ".god__card .god__text{margin:0 0 16px !important;font-family:'Playfair Display',Georgia,serif;font-size:21px;font-weight:600;line-height:1.25;white-space:pre-wrap}" +
+    ".god__input{width:100%;box-sizing:border-box;min-height:46px;margin:0 0 14px;padding:0 12px;border:1px solid rgba(42,33,24,.25);border-radius:12px;background:#fff;font:inherit;font-size:16px;color:#2A2118}" +
+    ".god__btn{display:block;width:100%;min-height:48px;margin:0 0 8px;border:0;border-radius:999px;background:#111;color:#fff;font:inherit;font-weight:700;font-size:16px;cursor:pointer}" +
+    ".god__btn--quiet{background:transparent;color:rgba(42,33,24,.7);font-weight:600}" +
+    ".god__btn--choice{background:transparent;color:#2A2118;border:1.5px solid #2A2118}";
+
+  function ensureCss() {
+    if (document.getElementById("go-dialog-css")) return;
+    var st = document.createElement("style");
+    st.id = "go-dialog-css";
+    st.textContent = CSS;
+    document.head.appendChild(st);
+  }
+
+  function open(build) {
+    ensureCss();
+    return new Promise(function (resolve) {
+      var box = document.createElement("div");
+      box.className = "god";
+      box.setAttribute("role", "dialog");
+      box.setAttribute("aria-modal", "true");
+      var card = document.createElement("div");
+      card.className = "god__card";
+      box.appendChild(card);
+      var done = false;
+      function close(value) {
+        if (done) return;
+        done = true;
+        if (box.parentNode) box.parentNode.removeChild(box);
+        resolve(value);
+      }
+      var cancelValue = build(card, close);
+      box.addEventListener("click", function (e) {
+        if (e.target === box) close(cancelValue);
+      });
+      document.body.appendChild(box);
+      var focus = card.querySelector("input") || card.querySelector("button");
+      if (focus) {
+        try { focus.focus(); } catch (e) {}
+      }
+    });
+  }
+
+  function text(card, msg) {
+    var p = document.createElement("h2");
+    p.className = "god__text";
+    p.textContent = String(msg == null ? "" : msg);
+    card.appendChild(p);
+  }
+
+  function button(card, label, cls, onClick) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "god__btn" + (cls ? " " + cls : "");
+    b.textContent = label;
+    b.addEventListener("click", onClick);
+    card.appendChild(b);
+    return b;
+  }
+
+  function alertDlg(msg, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      button(card, opts.ok || "OK", "", function () { close(); });
+      return undefined;
+    });
+  }
+
+  function confirmDlg(msg, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      button(card, opts.ok || "Ja", "", function () { close(true); });
+      button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(false); });
+      return false;
+    });
+  }
+
+  function promptDlg(msg, value, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      var input = document.createElement("input");
+      input.className = "god__input";
+      input.type = opts.type === "number" ? "text" : opts.type || "text";
+      if (opts.type === "number") input.inputMode = "decimal";
+      input.value = value == null ? "" : String(value);
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") close(input.value);
+      });
+      card.appendChild(input);
+      button(card, opts.ok || "Speichern", "", function () { close(input.value); });
+      button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(null); });
+      return null;
+    });
+  }
+
+  function chooseDlg(msg, choices, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      (choices || []).forEach(function (c) {
+        button(card, c.label, "god__btn--choice", function () { close(c.value); });
+      });
+      button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(null); });
+      return null;
+    });
+  }
+
+  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg };
+})(window);

@@ -2160,6 +2160,21 @@
       display: flex; align-items: center; justify-content: center; gap: 8px;
       font-size: 12px; font-weight: 600; color: rgba(42,33,24,.72); margin-bottom: 2px;
     }
+    /* Eigentümer oben links im Frame */
+    .acc-card__overlay > .acc-card__author {
+      position: absolute; top: 12px; left: 12px; margin: 0; justify-content: flex-start;
+      font-size: 13px; color: #2A2118;
+    }
+    .acc-card__overlay > .acc-card__author .acc-face { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; }
+    /* Tool-Zeile: Haken · Sprechblase · schwarzer + · Eingeladene, alle in Haken-Höhe */
+    .acc-card__faces--inline { margin: 0 !important; width: auto !important; flex-wrap: nowrap; gap: 6px; }
+    .acc-card__faces--inline .acc-face-slot,
+    .acc-card__faces--inline .acc-face-slot .acc-face { width: 23px; height: 23px; font-size: 11px; }
+    .acc-card__faces--inline .acc-face-wait svg { width: 17px; height: 17px; }
+    .acc-card__faces--inline .acc-face--add {
+      width: 23px; height: 23px; border: 0; background: #111 !important; color: #fff;
+      font-size: 17px; font-weight: 600;
+    }
     .acc-card__when { margin: 0; font-size: 12px; font-weight: 600; color: rgba(42,33,24,.72); }
     .acc-card__title {
       margin: 0; font-family: "Playfair Display", Georgia, serif;
@@ -3911,6 +3926,7 @@
     .crew-story.is-training.is-training-active .crew-story__ring {
       animation: training-ring-pulse-strong 0.85s ease-in-out infinite;
     }
+    .crew-story.is-today .crew-story__name { font-weight: 700; }
     .crew-story.is-training .crew-story__name {
       font-weight: 700;
       color: #C7413B;
@@ -5609,8 +5625,8 @@
       font-weight: 600 !important;
     }
     body.is-session .profile-identity small {
-      display: block;
-      margin-top: 2px;
+      display: inline;
+      margin: 0 0 0 8px;
       font-family: Inter, system-ui, sans-serif !important;
       font-size: 14px !important;
       font-weight: 500 !important;
@@ -6637,10 +6653,10 @@
   </div>
   <div class="sand-modal" id="history-share-ask" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="history-share-ask-title">
-      <h2 class="ask" id="history-share-ask-title">Historie mit Freunden teilen?</h2>
-      <p>Freunde sehen dann deine erledigten Einträge — außer Events, die du auf privat stellst.</p>
-      <button type="button" id="history-share-ask-yes">Ja</button>
-      <button type="button" class="sand-quiet" id="history-share-ask-later">Später</button>
+      <h2 class="ask" id="history-share-ask-title">Events und Historie teilen?</h2>
+      <p>Freunde, deine Gruppe und dein Coach sehen dann deine Events und erledigten Trainings. Ohne Zustimmung sieht sie nur, wen du einlädst. Ändern kannst du das jederzeit im Profil.</p>
+      <button type="button" id="history-share-ask-yes">Ja, teilen</button>
+      <button type="button" class="sand-quiet" id="history-share-ask-later">Nein, nur für mich</button>
     </div>
   </div>
   <div class="sand-modal" id="diary-vis" hidden>
@@ -7596,8 +7612,9 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-40"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-41"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-33"></script>
   <script src="/natalyaalice/support.js?v=support-13"></script>
@@ -12411,13 +12428,13 @@
                 var phone = row && (row.whatsapp_phone || row.phone);
                 var digits = String(phone || "").replace(/\D/g, "");
                 if (!digits) {
-                  try { window.alert("Keine Coach-Nummer hinterlegt"); } catch (eA) {}
+                  try { GoDialog.alert("Keine Coach-Nummer hinterlegt"); } catch (eA) {}
                   return;
                 }
                 var url = "https://wa.me/" + digits + (prefill ? "?text=" + encodeURIComponent(prefill) : "");
                 try { window.open(url, "_blank"); } catch (eWa) { location.href = url; }
               })
-              .catch(function () { try { window.alert("Coach nicht erreichbar"); } catch (eB) {} });
+              .catch(function () { try { GoDialog.alert("Coach nicht erreichbar"); } catch (eB) {} });
           },
           toast: function (msg) { gogogoToast(msg); },
           openTravelPlanModal: openTravelPlanModal
@@ -12534,7 +12551,7 @@
             if (typeof renderProfil === "function") renderProfil();
           },
           toast: function (msg) {
-            try { window.alert(msg); } catch (e) {}
+            try { GoDialog.alert(msg); } catch (e) {}
           }
         });
       }
@@ -13283,6 +13300,7 @@
         }).catch(function () {});
       }
 
+      var groupPeople = {};
       function loadMyGroups() {
         if (!sessionAccount || !sessionAccount.id) {
           myGroupsCache = [];
@@ -13348,11 +13366,25 @@
                           description: g.description || "",
                           photo_url: g.photo_url || "",
                           members: memberIds,
+                          owner: owner,
                           legacy_key: g.legacy_key || null
                         };
                       }).filter(Boolean);
                       syncGroupOptions();
-                      return myGroupsCache;
+                      /* Gruppenmitglieder auch ohne Freundschaft anzeigen: Profile nachladen */
+                      var need = [];
+                      myGroupsCache.forEach(function (g) {
+                        g.members.concat(g.owner && g.owner !== me ? [g.owner] : []).forEach(function (aid) {
+                          if (need.indexOf(aid) < 0 && !groupPeople[aid]) need.push(aid);
+                        });
+                      });
+                      if (!need.length) return myGroupsCache;
+                      return rest(
+                        "go_accounts?id=in.(" + need.map(encodeURIComponent).join(",") + ")&select=id,name,nickname,photo_url,is_trainer,trainer_id"
+                      ).catch(function () { return []; }).then(function (accs) {
+                        (accs || []).forEach(function (a) { if (a && a.id) groupPeople[String(a.id)] = a; });
+                        return myGroupsCache;
+                      });
                     });
                   });
               });
@@ -13431,16 +13463,17 @@
       function openBmrSettings() {
         var about = healthPrefs();
         var cur = Number((about.health && about.health.bmr) || 0) || "";
-        var next = window.prompt("Grundverbrauch in kcal / Tag", cur === "" ? "1800" : String(cur));
-        if (next == null) return;
-        var n = Math.max(800, Math.min(5000, Number(String(next).replace(",", ".")) || 0));
-        if (!n) {
-          try { window.alert("Bitte eine Zahl zwischen 800 und 5000 eingeben."); } catch (eB) {}
-          return;
-        }
-        about.health.bmr = n;
-        saveHealthPrefs(about).then(function () {
-          try { window.alert("Grundverbrauch: " + n + " kcal"); } catch (eA) {}
+        GoDialog.prompt("Grundverbrauch in kcal / Tag", cur === "" ? "1800" : String(cur), { type: "number" }).then(function (next) {
+          if (next == null) return;
+          var n = Math.max(800, Math.min(5000, Number(String(next).replace(",", ".")) || 0));
+          if (!n) {
+            GoDialog.alert("Bitte eine Zahl zwischen 800 und 5000 eingeben.");
+            return;
+          }
+          about.health.bmr = n;
+          saveHealthPrefs(about).then(function () {
+            GoDialog.alert("Grundverbrauch: " + n + " kcal");
+          });
         });
       }
 
@@ -13452,7 +13485,7 @@
         saveHealthPrefs(about).then(function () {
           var label = kind === "apple_health" ? "Apple Health" : "Garmin";
           try {
-            window.alert(
+            GoDialog.alert(
               on
                 ? label + " verbunden. Verbrauchte kcal fließen in die Ernährungsbilanz (Grundverbrauch + Aktivität)."
                 : label + " getrennt."
@@ -13485,12 +13518,10 @@
           openTeamSearch("friend");
           return;
         }
-        var labels = list.map(function (p, i) {
-          return (i + 1) + ". " + (p.name || p.nickname || "Freund");
-        }).join("\n");
-        var pick = window.prompt("Freund hinzufügen (Nummer):\n" + labels, "1");
-        if (pick == null) return;
-        var idx = Math.max(1, Number(pick) || 1) - 1;
+        GoDialog.choose("Freund hinzufügen", list.map(function (p, i) {
+          return { label: p.name || p.nickname || "Freund", value: i };
+        })).then(function (idx) {
+        if (idx == null) return;
         var person = list[idx];
         if (!person || !person.id) return;
         var groups = myGroups().slice();
@@ -13501,6 +13532,7 @@
           g.members = members;
         });
         saveMyGroups(groups).then(function () { renderTeam(); });
+        });
       }
 
       /* QR-Scan einer fremden Stempelkarte: ?stamp=<Gastgeber-ID> → Stempel für mich */
@@ -13536,7 +13568,7 @@
         var modal = document.getElementById("gogogo-toast");
         var el = document.getElementById("gogogo-toast-msg");
         if (!modal || !el) {
-          try { window.alert(msg); } catch (e) {}
+          try { GoDialog.alert(msg); } catch (e) {}
           return;
         }
         el.textContent = String(msg || "");
@@ -13608,7 +13640,7 @@
       function openStampCardModal(order) {
         var modal = document.getElementById("stamp-card-modal");
         if (!modal) {
-          try { window.alert("Stempelkarte ist noch nicht geladen. Bitte Seite neu laden."); } catch (eM) {}
+          try { GoDialog.alert("Stempelkarte ist noch nicht geladen. Bitte Seite neu laden."); } catch (eM) {}
           return;
         }
         var stamps = 0;
@@ -13952,6 +13984,11 @@
 
           /* Eine Gruppe für alles: Team → Meine Gruppe. FFC-Gruppe gleichen Namens ist die Spiegelung. */
           var goGroup = (typeof myGroups === "function" && myGroups()[0]) || null;
+          /* FFC-Gruppe vorhanden, gogogo-Gruppe noch nicht: FFC-Gruppe zeigen und nach Team spiegeln */
+          if (!goGroup && lbGroups && lbGroups[0]) {
+            goGroup = { name: lbGroups[0].name, members: [] };
+            if (typeof syncFfcGroupIntoTeam === "function") syncFfcGroupIntoTeam();
+          }
           var linked = goGroup ? linkedFfcGroup(goGroup) : null;
           if (linked && String(lbScopeId) !== String(linked.group_id)) {
             lbScopeId = linked.group_id;
@@ -14646,9 +14683,8 @@
                     body: missing.map(function (aid) { return { group_id: mine.id, account_id: aid, role: "member" }; })
                   }).catch(function () {}).then(loadMyGroups);
                 }
-                /* Gibt es die Gruppe schon bei einem Mitglied? Dann beitreten statt doppelt anlegen */
-                var owners = ids.length ? "&created_by=in.(" + ids.map(encodeURIComponent).join(",") + ")" : "&created_by=eq.none";
-                return rest("groups?name=ilike." + encodeURIComponent(name) + owners + "&select=id&limit=1")
+                /* Gibt es die Gruppe schon (gleicher Name, älteste zuerst)? Dann beitreten statt doppelt anlegen */
+                return rest("groups?name=ilike." + encodeURIComponent(name) + "&select=id&order=created_at.asc&limit=1")
                   .catch(function () { return []; })
                   .then(function (found) {
                     var gid = found && found[0] && found[0].id;
@@ -14683,7 +14719,13 @@
           h.textContent = group.name;
           box.appendChild(h);
           var members = (group.members || []).map(String);
-          var people = teamPeople.filter(function (person) { return person && members.indexOf(String(person.id)) >= 0; });
+          /* Alle Mitglieder inkl. Gründer, auch ohne angenommene Freundschaft */
+          var shownIds = members.slice();
+          if (group && group.owner && String(group.owner) !== mineId && shownIds.indexOf(String(group.owner)) < 0) shownIds.unshift(String(group.owner));
+          var people = shownIds.map(function (aid) {
+            var fromTeam = teamPeople.filter(function (person) { return person && String(person.id) === aid; })[0];
+            return fromTeam || groupPeople[aid] || null;
+          }).filter(Boolean);
           if (!people.length) {
             var empty = document.createElement("p");
             empty.className = "coach-empty";
@@ -14929,7 +14971,7 @@
           try {
             openStampCardModal(stampOrder || null);
           } catch (eStamp) {
-            try { window.alert("Stempelkarte konnte nicht geöffnet werden."); } catch (eA) {}
+            try { GoDialog.alert("Stempelkarte konnte nicht geöffnet werden."); } catch (eA) {}
           }
         });
         meSlide.appendChild(stampBtn);
@@ -15106,7 +15148,13 @@
           slide.appendChild(desc);
           var members = ((group && group.members) || []).map(String);
           var meId = String((sessionAccount && sessionAccount.id) || "");
-          var people = teamPeople.filter(function (person) { return person && members.indexOf(String(person.id)) >= 0; });
+          /* Alle Mitglieder inkl. Gründer, auch ohne angenommene Freundschaft */
+          var shownIds = members.slice();
+          if (group && group.owner && String(group.owner) !== mineId && shownIds.indexOf(String(group.owner)) < 0) shownIds.unshift(String(group.owner));
+          var people = shownIds.map(function (aid) {
+            var fromTeam = teamPeople.filter(function (person) { return person && String(person.id) === aid; })[0];
+            return fromTeam || groupPeople[aid] || null;
+          }).filter(Boolean);
           var remainingFriends = (teamPeople || []).filter(function (person) {
             if (!person || !person.id) return false;
             var pid = String(person.id);
@@ -15229,7 +15277,7 @@
             setHeuteFilter("all");
             paintHeuteJoins();
           }).catch(function (err) {
-            alert((err && err.message) || "Anfrage fehlgeschlagen.");
+            GoDialog.alert((err && err.message) || "Anfrage fehlgeschlagen.");
           });
         });
         coachSlide.appendChild(ptCta);
@@ -16020,7 +16068,7 @@
                     .catch(function () {
                       cta.disabled = false;
                       try {
-                        window.alert("Buchung fehlgeschlagen");
+                        GoDialog.alert("Buchung fehlgeschlagen");
                       } catch (eB) {}
                     });
                 });
@@ -16039,7 +16087,7 @@
                 .catch(function () {
                   cta.disabled = false;
                   try {
-                    window.alert("Buchung fehlgeschlagen");
+                    GoDialog.alert("Buchung fehlgeschlagen");
                   } catch (eB) {}
                 });
             });
@@ -16240,7 +16288,7 @@
               setHeuteFilter("all");
               paintHeuteJoins();
             }).catch(function (err) {
-              alert((err && err.message) || "Anfrage fehlgeschlagen.");
+              GoDialog.alert((err && err.message) || "Anfrage fehlgeschlagen.");
             });
           });
           pack.appendChild(buy);
@@ -16312,7 +16360,7 @@
             if (!name) { nameIn.focus(); return; }
             var existing = myGroups();
             if (existing.length) {
-              try { window.alert("Du kannst nur eine Gruppe gründen."); } catch (eG) {}
+              try { GoDialog.alert("Du kannst nur eine Gruppe gründen."); } catch (eG) {}
               closeGoSub();
               renderTeam();
               return;
@@ -16700,7 +16748,7 @@
               paintGoRail();
               if (typeof renderProfil === "function") renderProfil();
               try {
-                window.alert("Zirkeltraining gebucht. Start über ein Event oder spontan — nicht unter Plus.");
+                GoDialog.alert("Zirkeltraining gebucht. Start über ein Event oder spontan — nicht unter Plus.");
               } catch (eZ) {}
               paintZirkelState();
               refreshZirkel();
@@ -18787,7 +18835,7 @@
         if (!pendingPtBooking || !sessionAccount) return;
         var inputs = Array.prototype.slice.call(document.querySelectorAll("#pt-pick-dates input"));
         var times = inputs.map(function (el) { return el.value; }).filter(Boolean);
-        if (!times.length) { alert("Bitte mindestens einen Termin wählen."); return; }
+        if (!times.length) { GoDialog.alert("Bitte mindestens einen Termin wählen."); return; }
         var bookingId = pendingPtBooking.id;
         upsertLocalPtBooking(Object.assign({}, pendingPtBooking, { status: "accepted" }));
         paintHeuteJoins();
@@ -19468,14 +19516,44 @@
             presence: presenceFor(pid)
           });
         });
+        /* Heute: wer trainiert, steht oben; wer heute ein Foto hat, bekommt den aktiven Rand */
+        var act = {};
+        try {
+          act = (window.HeuteAccountability && HeuteAccountability.todayActivity && HeuteAccountability.todayActivity()) || {};
+        } catch (eAct) { act = {}; }
+        friends.forEach(function (entry) {
+          entry.today = act[String(entry.person.id)] || null;
+        });
+        Object.keys(act).forEach(function (uid) {
+          if (uid === String(sessionAccount.id) || seenIds[uid]) return;
+          seenIds[uid] = true;
+          var a = act[uid];
+          friends.push({
+            person: { id: uid, name: a.name, photo_url: a.photo || "" },
+            story: null,
+            presence: presenceFor(uid),
+            today: a
+          });
+        });
+        var meToday = act[String(sessionAccount.id)];
+        if (meToday && meToday.photoEventId && !myStory) {
+          meItem.classList.add("has-story");
+          meItem.onclick = null;
+          var meFresh = meItem.cloneNode(true);
+          meFresh.addEventListener("click", function () {
+            if (!(window.HeuteAccountability && HeuteAccountability.focusEvent(meToday.photoEventId))) openProfile(me);
+          });
+          box.replaceChild(meFresh, meItem);
+        }
         friends.sort(function (a, b) {
           function rank(entry) {
             var p = entry.presence;
             if (p && p.status === "active") return 0;
-            if (p && p.status === "done") return 1;
-            if (entry.story && !entry.story.seen) return 2;
-            if (entry.story) return 3;
-            return 4;
+            if (entry.today && entry.today.photoEventId) return 1;
+            if (entry.today || (p && p.status === "done")) return 2;
+            if (entry.story && !entry.story.seen) return 3;
+            if (entry.story) return 4;
+            return 5;
           }
           var ra = rank(a), rb = rank(b);
           if (ra !== rb) return ra - rb;
@@ -19483,7 +19561,18 @@
         });
         crewActive = friends.length;
         friends.forEach(function (entry) {
-          var el = storyItem(entry.person, entry.story, openFor(entry.person, entry.story));
+          var photoId = entry.today && entry.today.photoEventId;
+          var opener = openFor(entry.person, entry.story);
+          if (photoId && !entry.story) {
+            opener = function () {
+              if (!(window.HeuteAccountability && HeuteAccountability.focusEvent(photoId))) openProfile(entry.person);
+            };
+          }
+          var el = storyItem(entry.person, entry.story || (photoId ? { seen: false } : null), opener);
+          if (entry.today && !entry.presence) {
+            el.classList.add("is-today");
+            el.title = entry.today.done ? "Heute trainiert" : "Trainiert heute";
+          }
           if (entry.presence) {
             el.classList.add("is-training");
             if (entry.presence.status === "active") el.classList.add("is-training-active");
@@ -19525,6 +19614,13 @@
         if (sessionMode && window.GoSupport) installSupport();
         if (sessionMode && window.HeuteAccountability) {
           var accHost = {
+            onTodayActivity: function () {
+              var key = "";
+              try { key = JSON.stringify(HeuteAccountability.todayActivity()); } catch (eK) {}
+              if (key === paintHeuteCrew.actKey) return;
+              paintHeuteCrew.actKey = key;
+              if (document.body.dataset.shell === "heute") paintHeuteCrew();
+            },
             rest: rest,
             get sessionAccount() { return sessionAccount; },
             get teamPeople() { return teamPeople; },
@@ -20024,7 +20120,8 @@
         var idName = document.getElementById("profile-identity-name");
         var idNick = document.getElementById("profile-identity-nick");
         if (idName) idName.textContent = (account && account.name) || (profilePerson && profilePerson.name) || "Profil";
-        if (idNick) idNick.textContent = (account && account.nickname) ? ("@" + String(account.nickname).replace(/^@/, "")) : "";
+        var nickRaw = (account && account.nickname) || (profilePerson && profilePerson.nickname) || (mine && sessionAccount && sessionAccount.nickname) || "";
+        if (idNick) idNick.textContent = nickRaw ? ("@" + String(nickRaw).replace(/^@/, "")) : "";
         document.getElementById("profile-goal").textContent = (account && account.training_goal) || (mine ? "Ziel wählen" : "");
         var edit = document.getElementById("profile-edit");
         if (edit) edit.hidden = true;
@@ -20089,7 +20186,7 @@
         requestAnimationFrame(function () { sheet.classList.add("is-open"); });
         var id = encodeURIComponent(person.id);
         Promise.all([
-          rest("go_accounts?id=eq." + id + "&select=id,name,photo_url,training_goal,about_me,mantra,workout_places,weekday_meet_prefs,diary_visibility,trainer_id").catch(function () { return []; }),
+          rest("go_accounts?id=eq." + id + "&select=id,name,nickname,photo_url,training_goal,about_me,mantra,workout_places,weekday_meet_prefs,diary_visibility,trainer_id").catch(function () { return []; }),
           rest("go_coach_plans?account_id=eq." + id + "&select=blurb,life_situation,goal,phase_steps,day_training_units,kraft_weekdays,ausdauer_weekdays,zirkel_weekday").catch(function () { return []; }),
           rest("go_community_posts?author_id=eq." + id + "&select=author_id,photo_url&limit=60").catch(function () { return []; })
         ]).then(function (pack) {
@@ -20255,7 +20352,7 @@
                 if (thenFn) thenFn(order);
               })
               .catch(function () {
-                try { window.alert("Buchung fehlgeschlagen"); } catch (eB) {}
+                try { GoDialog.alert("Buchung fehlgeschlagen"); } catch (eB) {}
               });
           };
         }
@@ -21096,6 +21193,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-sync-2"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-1"></script>
 </body>
 </html>

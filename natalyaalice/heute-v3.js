@@ -197,6 +197,41 @@
       .catch(function () {});
   }
 
+  /* Einverständnis: Events/Historie anderer nur, wenn sie geteilt haben (Profil "Historie teilen").
+     friends = Freunde, Gruppe und Coach; trainer = nur der eigene Coach; private = niemand */
+  function loadShareConsent(ids) {
+    var uniq = [];
+    ids.forEach(function (id) {
+      id = String(id || "");
+      if (id && id !== me() && uniq.indexOf(id) < 0) uniq.push(id);
+    });
+    if (!state.share) state.share = {};
+    if (!uniq.length) return Promise.resolve();
+    return rest(
+      "go_accounts?id=in.(" + uniq.map(encodeURIComponent).join(",") + ")&select=id,diary_visibility,trainer_id"
+    )
+      .then(function (rows) {
+        (rows || []).forEach(function (r) {
+          if (!r || !r.id) return;
+          state.share[String(r.id)] = {
+            vis: r.diary_visibility || "private",
+            coach: r.trainer_id ? String(r.trainer_id) : ""
+          };
+        });
+      })
+      .catch(function () {});
+  }
+
+  function ownerShares(uid) {
+    uid = String(uid || "");
+    if (!uid || uid === me()) return true;
+    var s = state.share && state.share[uid];
+    if (!s) return false;
+    if (s.vis === "friends") return true;
+    if (s.vis === "trainer") return s.coach === me();
+    return false;
+  }
+
   function loadStreak() {
     var id = me();
     if (!id) {
@@ -579,7 +614,7 @@
           var ids = state.events.map(function (e) {
             return String(e.user_id);
           });
-          return ensurePeople(ids);
+          return Promise.all([ensurePeople(ids), loadShareConsent(ids)]);
         });
       })
       .catch(function () {
@@ -958,12 +993,14 @@
         return inGroupFilter(ev.user_id, flags);
       }
       if (!flags.showOthersUpcoming) return false;
+      if (!ownerShares(ev.user_id)) return false;
       if (!(vis === "team" || vis === "gruppe")) return false;
       return inGroupFilter(ev.user_id, flags);
     }
     if (ev.status === "erledigt") {
       if (mine) return !!flags.showOwnHistory;
       if (!flags.showFriendsHistory || !(vis === "team" || vis === "gruppe")) return false;
+      if (!ownerShares(ev.user_id) && !iAmGoing(ev.id)) return false;
       return inGroupFilter(ev.user_id, flags);
     }
     return false;
@@ -1199,7 +1236,6 @@
       });
       return (
         '<div class="acc-card__faces">' +
-        faceSlotHtml(personOf(ownerId), false) +
         going
           .map(function (id) {
             return faceSlotHtml(personOf(id), false);
@@ -1229,11 +1265,11 @@
         esc(inviteIso || "") +
         '" aria-label="Einladen">+</button>';
     }
+    void mePerson;
     return (
       '<div class="acc-card__faces">' +
-      faceSlotHtml(mePerson, false) +
-      guests +
       add +
+      guests +
       "</div>"
     );
   }
@@ -1284,17 +1320,24 @@
         esc(mine) +
         "</button></div>"
       : '<div class="acc-card__teaser is-empty" hidden></div>';
+    var faces = inviteFaceRowHtml(
+      postId,
+      opts.inviteIso || "",
+      canInvite,
+      opts.eventId || postId,
+      opts.ownerId || ""
+    );
+    var actions = opts.actions || "";
+    /* Layout: Haken · Sprechblase · + · Eingeladene/Zusagen in einer Zeile */
+    if (actions.indexOf("<!--faces-->") >= 0) {
+      actions = actions.replace("<!--faces-->", faces.replace('class="acc-card__faces"', 'class="acc-card__faces acc-card__faces--inline"'));
+      faces = "";
+    }
     return (
       '<div class="acc-card__bar">' +
-      (opts.actions || "") +
+      actions +
       teaserBlock +
-      inviteFaceRowHtml(
-        postId,
-        opts.inviteIso || "",
-        canInvite,
-        opts.eventId || postId,
-        opts.ownerId || ""
-      ) +
+      faces +
       "</div>"
     );
   }
@@ -1340,6 +1383,7 @@
       check +
       bubble +
       remove +
+      "<!--faces-->" +
       "</div>" +
       (badge ? '<div class="acc-card__tools-right">' + badge + "</div>" : "") +
       "</div>"
@@ -1446,7 +1490,7 @@
       '<div class="acc-card__author">' +
       avatarHtml(person, "acc-face") +
       "<span>" +
-      esc(person.name || "?") +
+      esc(String(person.name || "?").split(" ")[0]) +
       "</span></div>"
     );
   }
@@ -1604,7 +1648,7 @@
       photo: ev.photo_url || "",
       emoji: emoji,
       actions: (tools || "") + (actions || ""),
-      author: authorHtml(p, !mine),
+      author: authorHtml(p, true),
       when: whenLine(ev.starts_at),
       title: title,
       place: ev.location || "",
@@ -2094,6 +2138,7 @@
     }
 
     if (host.paintHeuteJoins) host.paintHeuteJoins(flags);
+    if (host.onTodayActivity) host.onTodayActivity();
 
     var feed = buildFeedItems(flags);
     root.hidden = false;
@@ -3479,6 +3524,30 @@
     }
   }
 
+  /* Für die Profilreihe: wer trainiert heute (Event heute, sichtbar für mich), wer hat heute ein Foto */
+  function todayActivity() {
+    var today = todayIso();
+    var flags = viewFlags("alles");
+    var out = {};
+    (state.events || []).forEach(function (ev) {
+      if (!ev || dayKey(ev.starts_at) !== today || ev.status === "ausgefallen") return;
+      if (!eventVisibleToMe(ev, flags)) return;
+      var uid = String(ev.user_id);
+      var p = personOf(uid);
+      var a = out[uid] || (out[uid] = { id: uid, name: p.name, photo: p.photo, training: true, done: false, photoEventId: "" });
+      if (ev.status === "erledigt") a.done = true;
+      if (ev.photo_url && !a.photoEventId) a.photoEventId = String(ev.id);
+    });
+    return out;
+  }
+
+  function focusEvent(id) {
+    var card = document.querySelector('.acc-card[data-event-id="' + String(id).replace(/"/g, "") + '"]');
+    if (!card) return false;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    return true;
+  }
+
   global.HeuteAccountability = {
     install: install,
     refresh: refresh,
@@ -3489,6 +3558,8 @@
       saveFilter(v);
       refresh();
     },
-    afterKindChosen: afterKindChosen
+    afterKindChosen: afterKindChosen,
+    todayActivity: todayActivity,
+    focusEvent: focusEvent
   };
 })(window);
