@@ -3791,6 +3791,7 @@
     .friend-list__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .friend-list__name { font-size: 18px; font-weight: 600; }
     .friend-list__meta { font-size: 14px; opacity: 0.7; }
+    .friend-list__plus { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; border: 1.5px dashed rgba(42,33,24,.45); font-size: 26px; font-weight: 500; line-height: 1; }
     /* Meine Coachees: gleiche Textgröße/-stil wie team-slide__about */
     .coach-empty,
     body.is-session #plan-team .coach-empty {
@@ -7596,9 +7597,9 @@
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-39"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-40"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-32"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-33"></script>
   <script src="/natalyaalice/support.js?v=support-13"></script>
   <script>
     (function () {
@@ -12458,6 +12459,7 @@
           var railEl = document.getElementById("go-rail");
           if (!railEl || !railEl.querySelector(".go-slide")) paintGoRail();
           else paintGoRail(); /* skip-Pfad aktualisiert nur CTAs */
+          if (sessionIsTrainer || (sessionAccount && sessionAccount.is_trainer)) markCoachOfferOwned();
           installSupport();
         }
         syncTeamGoRailNav();
@@ -13724,6 +13726,24 @@
         );
       }
 
+      /* Coach-Status kommt nach dem ersten Rail-Paint: CTA in place umstellen, kein Rail-Rebuild */
+      function markCoachOfferOwned() {
+        var rail = document.getElementById("go-rail");
+        if (!rail) return;
+        Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (slide) {
+          var h = slide.querySelector(".go-slide__title");
+          if (!h || h.textContent !== "Selbst Coaching anbieten") return;
+          var cta = slide.querySelector(".go-slide__cta");
+          if (!cta || cta.textContent === "Du bist Coach") return;
+          var fresh = cta.cloneNode(false);
+          fresh.className = "go-slide__cta is-owned";
+          fresh.textContent = "Du bist Coach";
+          fresh.disabled = true;
+          fresh.setAttribute("aria-disabled", "true");
+          cta.parentNode.replaceChild(fresh, cta);
+        });
+      }
+
       function openCoachCvConsent(thenBook) {
         var modal = document.getElementById("coach-cv-consent-modal");
         var ok = document.getElementById("coach-cv-consent-ok");
@@ -14586,6 +14606,69 @@
         });
       }
 
+      /* FFC-Gruppe → Team "Meine Gruppe": gleicher Name, Mitglieder per Nickname. Nur ergänzen, nie löschen. */
+      var ffcGroupSyncing = false;
+      function syncFfcGroupIntoTeam() {
+        if (ffcGroupSyncing || !sessionAccount || !window.FFC || !FFC.user || !FFC.user() || !FFC.groups) {
+          return Promise.resolve();
+        }
+        ffcGroupSyncing = true;
+        var me = String(sessionAccount.id);
+        function done() { ffcGroupSyncing = false; }
+        return Promise.resolve(FFC.groups())
+          .then(function (groups) {
+            var g = (groups || [])[0];
+            if (!g || !String(g.name || "").trim()) return;
+            var name = String(g.name).trim();
+            return Promise.resolve(FFC.weeklyPoints ? FFC.weeklyPoints(g.group_id) : [])
+              .catch(function () { return []; })
+              .then(function (rows) {
+                var nicks = (rows || []).filter(function (r) { return r && r.nickname && !r.is_me; })
+                  .map(function (r) { return String(r.nickname).replace(/[(),*]/g, ""); });
+                if (!nicks.length) return [];
+                return rest("go_accounts?or=(" + nicks.map(function (n) {
+                  return "nickname.ilike." + encodeURIComponent(n);
+                }).join(",") + ")&select=id").catch(function () { return []; });
+              })
+              .then(function (accs) {
+                var ids = (accs || []).map(function (a) { return String(a.id); })
+                  .filter(function (aid) { return aid && aid !== me; });
+                var mine = myGroups().filter(function (x) {
+                  return String(x.name || "").trim().toLowerCase() === name.toLowerCase();
+                })[0];
+                if (mine) {
+                  var have = (mine.members || []).map(String);
+                  var missing = ids.filter(function (aid) { return have.indexOf(aid) < 0; });
+                  if (!missing.length) return;
+                  return rest("group_members", {
+                    method: "POST",
+                    prefer: "resolution=merge-duplicates,return=minimal",
+                    body: missing.map(function (aid) { return { group_id: mine.id, account_id: aid, role: "member" }; })
+                  }).catch(function () {}).then(loadMyGroups);
+                }
+                /* Gibt es die Gruppe schon bei einem Mitglied? Dann beitreten statt doppelt anlegen */
+                var owners = ids.length ? "&created_by=in.(" + ids.map(encodeURIComponent).join(",") + ")" : "&created_by=eq.none";
+                return rest("groups?name=ilike." + encodeURIComponent(name) + owners + "&select=id&limit=1")
+                  .catch(function () { return []; })
+                  .then(function (found) {
+                    var gid = found && found[0] && found[0].id;
+                    if (gid) {
+                      return rest("group_members", {
+                        method: "POST",
+                        prefer: "resolution=merge-duplicates,return=minimal",
+                        body: [{ group_id: gid, account_id: me, role: "member" }]
+                      }).catch(function () {}).then(loadMyGroups);
+                    }
+                    return saveMyGroups(myGroups().concat([{ name: name, members: ids }]));
+                  });
+              });
+          })
+          .then(function () {
+            done();
+            if (document.body.dataset.plan === "team" && typeof renderTeam === "function") renderTeam();
+          }, done);
+      }
+
       function groupById(id) {
         var hit = null;
         myGroups().forEach(function (g) { if (g && String(g.id) === String(id)) hit = g; });
@@ -14920,6 +15003,15 @@
           });
           var list = document.createElement("div");
           list.className = "friend-list";
+          /* Oben: Kreis mit + → Freund per Nickname oder ID suchen */
+          var addRow = document.createElement("button");
+          addRow.type = "button";
+          addRow.className = "friend-list__row friend-list__add";
+          addRow.innerHTML = '<span class="friend-list__plus" aria-hidden="true">+</span>' +
+            '<span class="friend-list__text"><span class="friend-list__name">Freund hinzufügen</span>' +
+            '<span class="friend-list__meta">Nickname oder ID</span></span>';
+          addRow.addEventListener("click", function () { openTeamSearch("friend"); });
+          list.appendChild(addRow);
           var people = teamPeople.filter(function (p) {
             return p && p.id && String(p.id) !== mineId;
           }).slice().sort(function (a, b) {
@@ -14928,7 +15020,7 @@
           if (!people.length) {
             var empty = document.createElement("p");
             empty.className = "coach-empty";
-            empty.textContent = "Noch keine Freunde. Füge sie unter Aktuell mit + hinzu.";
+            empty.textContent = "Noch keine Freunde.";
             list.appendChild(empty);
           }
           people.forEach(function (p) {
@@ -15802,10 +15894,12 @@
                     : false;
                 var isZ = of.key === "zirkel" || of.type === "zirkel";
                 if (isZ && ffcLoggedNow) ownedNow = true;
+                var coachSelf = of.key === "coach_offer" && !!(sessionIsTrainer || (sessionAccount && sessionAccount.is_trainer));
+                if (coachSelf) ownedNow = true;
                 var btn = existing[ei].querySelector(".go-slide__cta");
                 if (!btn) continue;
                 if (ownedNow) {
-                  btn.textContent = "Gebucht";
+                  btn.textContent = coachSelf ? "Du bist Coach" : "Gebucht";
                 } else {
                   btn.textContent = "Buchen";
                 }
@@ -15882,7 +15976,13 @@
           var isZirkel = offer.key === "zirkel" || offer.type === "zirkel";
           var ffcLogged = !!(window.FFC && FFC.user && FFC.user());
           if (isZirkel && ffcLogged) owned = true;
-          if (owned) cta.textContent = "Gebucht";
+          /* Wer schon Coach ist, bucht "Selbst Coaching anbieten" nicht */
+          var isCoachSelf = offer.key === "coach_offer" && !!(sessionIsTrainer || (sessionAccount && sessionAccount.is_trainer));
+          if (isCoachSelf) {
+            owned = true;
+            cta.className = "go-slide__cta is-owned";
+          }
+          if (owned) cta.textContent = isCoachSelf ? "Du bist Coach" : "Gebucht";
           else cta.textContent = "Buchen";
           if (owned) {
             cta.disabled = true;
@@ -16324,10 +16424,20 @@
           .then(function (rows) {
             var me = rows && rows[0];
             if (me) {
+              /* Foto lag bisher nur lokal (Upload ohne Speichern) → nachtragen */
+              if (!me.photo_url && /^data:image\//.test(String(sessionAccount.photo_url || ""))) {
+                rest("go_accounts?id=eq." + encodeURIComponent(id), {
+                  method: "PATCH",
+                  prefer: "return=minimal",
+                  body: { photo_url: sessionAccount.photo_url }
+                }).catch(function () {});
+                me.photo_url = sessionAccount.photo_url;
+              }
               if (me.name) sessionAccount.name = me.name;
               if (me.trainer_id) sessionAccount.trainer_id = me.trainer_id;
               sessionAccount.is_trainer = !!me.is_trainer;
               sessionIsTrainer = !!me.is_trainer;
+              if (sessionIsTrainer) markCoachOfferOwned();
               if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
               applyInstalledIdentity(sessionAccount);
             }
@@ -16431,6 +16541,7 @@
           return Promise.resolve();
         }
         var list = FFC.friends() || [];
+        syncFfcGroupIntoTeam();
         ffcIncoming = list.filter(function (f) { return f && f.status === "pending" && f.incoming; });
         var accepted = list.filter(function (f) { return f && f.status === "accepted" && f.nickname; });
         if (!accepted.length) {
@@ -17550,7 +17661,17 @@
           lastAt = now;
           if (tab === "woche") showWoche();
           else if (tab === "team") showPlan("team");
-          else if (tab === "kurse") showPlan("training");
+          else if (tab === "kurse") {
+            /* Schon in Plus (Rail sichtbar, kein Unterseiten-Overlay): Position halten statt zum Inhaltsverzeichnis */
+            var sub = document.getElementById("go-subpage");
+            if (
+              document.body.dataset.shell === "kurse" &&
+              document.body.dataset.plan === "training" &&
+              !document.body.classList.contains("is-diary") &&
+              (!sub || sub.hidden)
+            ) return;
+            showPlan("training");
+          }
           else if (tab === "profil") showPlan("profil");
           else {
             if (window.WocheReels) WocheReels.hide();
@@ -20025,7 +20146,8 @@
       }
 
       function saveProfileFields(fields) {
-        if (!sessionAccount || !profilePerson || !profilePerson.isSelf) return;
+        /* Speichert immer das eigene Konto (auch vom Team-Upload ohne offenes Profil) */
+        if (!sessionAccount) return;
         Object.keys(fields).forEach(function (key) { sessionAccount[key] = fields[key]; });
         if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
         if (Object.prototype.hasOwnProperty.call(fields, "mantra")) {
