@@ -1431,7 +1431,7 @@
     const id = Number(btn.dataset.id);
     if(btn.dataset.evact === 'share'){ shareEventWhatsApp(evList.find(x=>x.id===id)); return; }
     if(btn.dataset.evact === 'del'){
-      if(!window.confirm('Event wirklich löschen?')) return;
+      if(!(await GoDialog.confirm('Event wirklich löschen?', { ok: 'Löschen' }))) return;
       btn.disabled = true;
       const evObj = evList.find(x=>x.id===id);
       const res = await sb.rpc('delete_event', { p_event_id: id });
@@ -2555,7 +2555,7 @@
 
   document.getElementById('clearHistoryBtn').addEventListener('click', async ()=>{
     if(!currentUser) return;
-    if(confirm('Gesamte Trainingsaufzeichnungen und Bestleistungen wirklich löschen?')){
+    if(await GoDialog.confirm('Gesamte Trainingsaufzeichnungen und Bestleistungen wirklich löschen?', { ok: 'Löschen' })){
       const { error } = await sb.from('training_sessions').delete().eq('user_id', currentUser.id);
       if(error){ console.error('Fehler beim Löschen des Verlaufs:', error.message); return; }
       cachedHistory = [];
@@ -2646,7 +2646,7 @@
       postSheetEl.classList.add('open');
       postSheetEl.setAttribute('aria-hidden','false');
     };
-    img.onerror = ()=> alert('Dieses Bild kann nicht geöffnet werden. Bitte ein anderes Foto wählen.');
+    img.onerror = ()=> GoDialog.alert('Dieses Bild kann nicht geöffnet werden. Bitte ein anderes Foto wählen.');
     img.src = url;
   });
   postStatsToggle.addEventListener('change', drawPost);
