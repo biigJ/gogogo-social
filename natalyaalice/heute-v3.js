@@ -32,6 +32,9 @@
       view: view,
       level: level,
       groupOnly: view === "gruppe",
+      /* Team = Freunde + Coach/Coachees; Tagebuch = Erledigtes + heute, keine Zukunft */
+      teamOnly: view === "team",
+      diaryOnly: view === "tagebuch",
       showIncomingInvites: level >= 1,
       showOwnFfc: true,
       showAcceptedFfc: true,
@@ -102,6 +105,15 @@
       if (id) set[String(id)] = true;
     });
     return set;
+  }
+
+  function inTeamFilter(userId, flags) {
+    if (!flags || !flags.teamOnly) return true;
+    var uid = String(userId || "");
+    if (!uid || uid === me()) return true;
+    return (host.teamPeople || []).some(function (p) {
+      return p && String(p.id) === uid;
+    });
   }
 
   function inGroupFilter(userId, flags) {
@@ -994,6 +1006,7 @@
       }
       if (!flags.showOthersUpcoming) return false;
       if (!ownerShares(ev.user_id)) return false;
+      if (!inTeamFilter(ev.user_id, flags)) return false;
       if (!(vis === "team" || vis === "gruppe")) return false;
       return inGroupFilter(ev.user_id, flags);
     }
@@ -1001,6 +1014,7 @@
       if (mine) return !!flags.showOwnHistory;
       if (!flags.showFriendsHistory || !(vis === "team" || vis === "gruppe")) return false;
       if (!ownerShares(ev.user_id) && !iAmGoing(ev.id)) return false;
+      if (!inTeamFilter(ev.user_id, flags)) return false;
       return inGroupFilter(ev.user_id, flags);
     }
     return false;
@@ -2006,6 +2020,17 @@
       });
     }
 
+    if (flags.diaryOnly) {
+      /* Tagebuch: heute ja, Zukunft nein */
+      upcoming = upcoming.filter(function (it) {
+        return dayKey(it.starts_at) <= today;
+      });
+    }
+    if (flags.teamOnly) {
+      history = history.filter(function (it) {
+        return it._mine || inTeamFilter((it.ev && it.ev.user_id) || (it.item && it.item.user_id) || "", flags);
+      });
+    }
     myToday.sort(sortOwnFirst);
     upcoming.sort(function (a, b) {
       var c = String(a.starts_at).localeCompare(String(b.starts_at));
