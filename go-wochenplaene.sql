@@ -1,11 +1,13 @@
 -- go-wochenplaene.sql
 -- Kurse = Wochenpläne: Kombination aus Kraft + Ausdauer + Sonstiges (+ Zirkel über FFC), Level 1/2/3.
+-- Jeder Wochenplan füllt alle 7 Tage: Einheit 1 = Mo … Einheit 7 = So.
 -- Idempotent. Voraussetzung: go-kurse-v2.sql, go-coach-portal.sql (events.assigned_by).
 --
 --   course_sessions.category  zusätzlich 'alternative' (= Sonstiges, z. B. Schritte)
 --   enrollments.weeks         Laufzeit legt der Coach je Coachee fest (nicht der Kurs)
---   go_generate_events        Wochen aus dem Enrollment; Zirkel erzeugt keine Events (läuft über FFC);
---                             Sonstiges ohne course_id (events_course_or_alternative_chk)
+--   go_generate_events        Wochen aus dem Enrollment; 7 Wochentage = Einheit n auf weekdays[n]
+--                             (Reihenfolge frei, so lassen sich Tage tauschen); Zirkel erzeugt keine
+--                             Events (läuft über FFC); Sonstiges ohne course_id
 --   Inhalte                   Superwoman L1 (aus Natalyas Plan), Fit for Run L1–L3 (Kraft für Läufer),
 --                             Bulletproof Knees L1. Inhalte = Entwurf, bitte fachlich prüfen.
 
@@ -40,6 +42,7 @@ declare
   v_starts timestamptz;
   v_inserted int := 0;
   v_k int;
+  v_by_slot boolean;
   w int;
   s int;
 begin
@@ -60,6 +63,8 @@ begin
   if exists (select 1 from course_sessions where course_id = en.course_id and not is_travel) then
     v_weeks := coalesce(en.weeks, co.duration_weeks, 12);
     v_slots := array_length(v_weekdays, 1);
+    -- 7 Tage angegeben: Einheit n landet auf en.weekdays[n] (unsortiert = individuelle Tage)
+    v_by_slot := array_length(en.weekdays, 1) >= 7;
     select max(block_no) into v_max_block from course_sessions
       where course_id = en.course_id and not is_travel;
 
@@ -74,15 +79,21 @@ begin
         if not found then
           continue;
         end if;
-        if ses.category = 'zirkel' then
-          continue;  -- Zirkel läuft über FFC
+        if v_by_slot then
+          if ses.category = 'zirkel' then
+            continue;  -- Zirkel läuft über FFC, Tag bleibt frei
+          end if;
+          v_wd := en.weekdays[s];
+        else
+          if ses.category = 'zirkel' then
+            continue;
+          end if;
+          v_k := v_k + 1;
+          if v_k > v_slots then
+            exit;
+          end if;
+          v_wd := v_weekdays[v_k];
         end if;
-        v_k := v_k + 1;
-        if v_k > v_slots then
-          exit;
-        end if;
-
-        v_wd := v_weekdays[v_k];
         v_day := en.start_date + ((w - 1) * 7) + v_wd;
         if v_day < current_date then
           continue;
@@ -173,7 +184,7 @@ begin
 end;
 $$;
 
--- Superwoman L1: 2 Kraft + 1 Ausdauer (5 km) + 4 Sonstiges (> 5.000 Schritte)
+-- Superwoman L1: Mo Kraft A · Di/Mi Schritte · Do Kraft B · Fr Schritte · Sa Laufen 5 km · So Schritte
 do $$
 declare
   v_kraft jsonb;
@@ -190,82 +201,996 @@ begin
     jsonb_build_array(
       jsonb_build_object('title', 'Einfache Basics A', 'category', 'kraft', 'focus', 'ganzkoerper', 'min', 45, 'blocks', v_kraft),
       v_steps,
-      jsonb_build_object('title', 'Laufen 5 km', 'category', 'ausdauer', 'focus', 'ausdauer', 'min', 35,
-        'blocks', '[{"type": "ausdauer", "items": [{"name": "Laufen", "dist_m": 5000, "note": "locker, Gesprächstempo; Gehpausen erlaubt"}]}]'::jsonb),
       v_steps,
       jsonb_build_object('title', 'Einfache Basics B', 'category', 'kraft', 'focus', 'ganzkoerper', 'min', 45, 'blocks', v_kraft),
       v_steps,
+      jsonb_build_object('title', 'Laufen 5 km', 'category', 'ausdauer', 'focus', 'ausdauer', 'min', 35,
+        'blocks', '[{"type": "ausdauer", "items": [{"name": "Laufen", "dist_m": 5000, "note": "locker, Gesprächstempo; Gehpausen erlaubt"}]}]'::jsonb),
       v_steps
     )
   );
 end $$;
 
--- Fit for Run: Krafttraining für Läufer
 select go_tmp_upsert_plan('fit-for-run-l1', 'Fit for Run', 1,
   'Krafttraining für Läufer, Level 1: Grundkraft für Hüfte, Beine und Rumpf, dazu zwei lockere Läufe.',
   '[
-    {"title": "Läuferkraft A", "category": "kraft", "focus": "unterkoerper", "min": 40, "blocks": [
-      {"type": "mobility", "items": [{"name": "Hüftbeuger-Dehnung kniend", "time_s": 45, "note": "je Seite"}, {"name": "Wadenheben langsam", "sets": 1, "reps": "15"}]},
-      {"type": "grund", "items": [{"name": "Goblet Squat", "sets": 3, "reps": "10", "load": "RPE 6"}, {"name": "Rumänisches Kreuzheben Kurzhantel", "sets": 3, "reps": "10", "load": "RPE 6"}, {"name": "Ausfallschritt rückwärts", "sets": 3, "reps": "8", "note": "je Seite"}, {"name": "Glute Bridge einbeinig", "sets": 3, "reps": "10", "note": "je Seite"}]},
-      {"type": "finisher", "items": [{"name": "Seitstütz", "sets": 3, "time_s": 30, "note": "je Seite"}, {"name": "Dead Bug", "sets": 3, "reps": "10"}]}]},
-    {"title": "Lockerer Lauf 30 min", "category": "ausdauer", "focus": "ausdauer", "min": 30, "blocks": [{"type": "ausdauer", "items": [{"name": "Laufen locker", "time_s": 1800, "note": "Gesprächstempo"}]}]},
-    {"title": "Läuferkraft B", "category": "kraft", "focus": "unterkoerper", "min": 40, "blocks": [
-      {"type": "skill", "items": [{"name": "Hopserlauf", "sets": 3, "dist_m": 20}, {"name": "Kniehebelauf", "sets": 3, "dist_m": 20}]},
-      {"type": "grund", "items": [{"name": "Step-ups", "sets": 3, "reps": "10", "note": "je Seite"}, {"name": "Hip Thrust", "sets": 3, "reps": "12", "load": "RPE 6"}, {"name": "Wadenheben einbeinig", "sets": 3, "reps": "15", "note": "je Seite"}]},
-      {"type": "finisher", "items": [{"name": "Copenhagen Plank kurzer Hebel", "sets": 3, "time_s": 15, "note": "je Seite"}, {"name": "Pallof Press", "sets": 3, "reps": "10", "note": "je Seite"}]}]},
-    {"title": "Lauf mit Steigerungen", "category": "ausdauer", "focus": "ausdauer", "min": 35, "blocks": [{"type": "ausdauer", "items": [{"name": "Laufen locker", "time_s": 1800}, {"name": "Steigerungsläufe", "sets": 4, "time_s": 20, "note": "zügig, nicht maximal"}]}]}
-  ]'::jsonb);
+ {
+  "title": "Läuferkraft A",
+  "category": "kraft",
+  "focus": "unterkoerper",
+  "min": 40,
+  "blocks": [
+   {
+    "type": "mobility",
+    "items": [
+     {
+      "name": "Hüftbeuger-Dehnung kniend",
+      "time_s": 45,
+      "note": "je Seite"
+     },
+     {
+      "name": "Wadenheben langsam",
+      "sets": 1,
+      "reps": "15"
+     }
+    ]
+   },
+   {
+    "type": "grund",
+    "items": [
+     {
+      "name": "Goblet Squat",
+      "sets": 3,
+      "reps": "10",
+      "load": "RPE 6"
+     },
+     {
+      "name": "Rumänisches Kreuzheben Kurzhantel",
+      "sets": 3,
+      "reps": "10",
+      "load": "RPE 6"
+     },
+     {
+      "name": "Ausfallschritt rückwärts",
+      "sets": 3,
+      "reps": "8",
+      "note": "je Seite"
+     },
+     {
+      "name": "Glute Bridge einbeinig",
+      "sets": 3,
+      "reps": "10",
+      "note": "je Seite"
+     }
+    ]
+   },
+   {
+    "type": "finisher",
+    "items": [
+     {
+      "name": "Seitstütz",
+      "sets": 3,
+      "time_s": 30,
+      "note": "je Seite"
+     },
+     {
+      "name": "Dead Bug",
+      "sets": 3,
+      "reps": "10"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Lockerer Lauf 30 min",
+  "category": "ausdauer",
+  "focus": "ausdauer",
+  "min": 30,
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Laufen locker",
+      "time_s": 1800,
+      "note": "Gesprächstempo"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "> 5.000 Schritte",
+  "category": "alternative",
+  "focus": "",
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Gehen",
+      "note": "mindestens 5.000 Schritte über den Tag"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Läuferkraft B",
+  "category": "kraft",
+  "focus": "unterkoerper",
+  "min": 40,
+  "blocks": [
+   {
+    "type": "skill",
+    "items": [
+     {
+      "name": "Hopserlauf",
+      "sets": 3,
+      "dist_m": 20
+     },
+     {
+      "name": "Kniehebelauf",
+      "sets": 3,
+      "dist_m": 20
+     }
+    ]
+   },
+   {
+    "type": "grund",
+    "items": [
+     {
+      "name": "Step-ups",
+      "sets": 3,
+      "reps": "10",
+      "note": "je Seite"
+     },
+     {
+      "name": "Hip Thrust",
+      "sets": 3,
+      "reps": "12",
+      "load": "RPE 6"
+     },
+     {
+      "name": "Wadenheben einbeinig",
+      "sets": 3,
+      "reps": "15",
+      "note": "je Seite"
+     }
+    ]
+   },
+   {
+    "type": "finisher",
+    "items": [
+     {
+      "name": "Copenhagen Plank kurzer Hebel",
+      "sets": 3,
+      "time_s": 15,
+      "note": "je Seite"
+     },
+     {
+      "name": "Pallof Press",
+      "sets": 3,
+      "reps": "10",
+      "note": "je Seite"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "> 5.000 Schritte",
+  "category": "alternative",
+  "focus": "",
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Gehen",
+      "note": "mindestens 5.000 Schritte über den Tag"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Lauf mit Steigerungen",
+  "category": "ausdauer",
+  "focus": "ausdauer",
+  "min": 35,
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Laufen locker",
+      "time_s": 1800
+     },
+     {
+      "name": "Steigerungsläufe",
+      "sets": 4,
+      "time_s": 20,
+      "note": "zügig, nicht maximal"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "> 5.000 Schritte",
+  "category": "alternative",
+  "focus": "",
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Gehen",
+      "note": "mindestens 5.000 Schritte über den Tag"
+     }
+    ]
+   }
+  ]
+ }
+]'::jsonb);
 
 select go_tmp_upsert_plan('fit-for-run-l2', 'Fit for Run', 2,
   'Krafttraining für Läufer, Level 2: schwerere Grundübungen, erste Sprünge, drei Läufe inklusive Intervalle.',
   '[
-    {"title": "Läuferkraft A", "category": "kraft", "focus": "unterkoerper", "min": 50, "blocks": [
-      {"type": "skill", "items": [{"name": "Pogo Jumps", "sets": 3, "reps": "20"}]},
-      {"type": "grund", "items": [{"name": "Bulgarische Kniebeuge", "sets": 4, "reps": "8", "note": "je Seite", "load": "RPE 7"}, {"name": "Kreuzheben", "sets": 4, "reps": "6", "load": "RPE 7"}, {"name": "Wadenheben einbeinig mit Gewicht", "sets": 4, "reps": "12", "note": "je Seite"}]},
-      {"type": "finisher", "items": [{"name": "Seitstütz mit Beinheben", "sets": 3, "reps": "10", "note": "je Seite"}]}]},
-    {"title": "Lockerer Lauf 40 min", "category": "ausdauer", "focus": "ausdauer", "min": 40, "blocks": [{"type": "ausdauer", "items": [{"name": "Laufen locker", "time_s": 2400}]}]},
-    {"title": "Läuferkraft B", "category": "kraft", "focus": "unterkoerper", "min": 50, "blocks": [
-      {"type": "skill", "items": [{"name": "Box Jumps", "sets": 3, "reps": "5"}]},
-      {"type": "grund", "items": [{"name": "Frontkniebeuge", "sets": 4, "reps": "6", "load": "RPE 7"}, {"name": "Einbeiniges Kreuzheben", "sets": 3, "reps": "8", "note": "je Seite"}, {"name": "Nordic Curl exzentrisch", "sets": 3, "reps": "5"}]},
-      {"type": "finisher", "items": [{"name": "Copenhagen Plank", "sets": 3, "time_s": 20, "note": "je Seite"}]}]},
-    {"title": "Intervalle 6 × 3 min", "category": "ausdauer", "focus": "ausdauer", "min": 45, "blocks": [{"type": "ausdauer", "items": [{"name": "Einlaufen", "time_s": 900}, {"name": "Intervall", "sets": 6, "time_s": 180, "note": "zügig, 2 min Trabpause"}, {"name": "Auslaufen", "time_s": 600}]}]},
-    {"title": "Langer Lauf 60 min", "category": "ausdauer", "focus": "ausdauer", "min": 60, "blocks": [{"type": "ausdauer", "items": [{"name": "Laufen locker", "time_s": 3600}]}]}
-  ]'::jsonb);
+ {
+  "title": "Läuferkraft A",
+  "category": "kraft",
+  "focus": "unterkoerper",
+  "min": 50,
+  "blocks": [
+   {
+    "type": "skill",
+    "items": [
+     {
+      "name": "Pogo Jumps",
+      "sets": 3,
+      "reps": "20"
+     }
+    ]
+   },
+   {
+    "type": "grund",
+    "items": [
+     {
+      "name": "Bulgarische Kniebeuge",
+      "sets": 4,
+      "reps": "8",
+      "note": "je Seite",
+      "load": "RPE 7"
+     },
+     {
+      "name": "Kreuzheben",
+      "sets": 4,
+      "reps": "6",
+      "load": "RPE 7"
+     },
+     {
+      "name": "Wadenheben einbeinig mit Gewicht",
+      "sets": 4,
+      "reps": "12",
+      "note": "je Seite"
+     }
+    ]
+   },
+   {
+    "type": "finisher",
+    "items": [
+     {
+      "name": "Seitstütz mit Beinheben",
+      "sets": 3,
+      "reps": "10",
+      "note": "je Seite"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Lockerer Lauf 40 min",
+  "category": "ausdauer",
+  "focus": "ausdauer",
+  "min": 40,
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Laufen locker",
+      "time_s": 2400,
+      "note": "Gesprächstempo"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Hüft- & Core-Mobility",
+  "category": "alternative",
+  "focus": "",
+  "min": 20,
+  "blocks": [
+   {
+    "type": "mobility",
+    "items": [
+     {
+      "name": "Couch Stretch",
+      "time_s": 60,
+      "note": "je Seite"
+     },
+     {
+      "name": "90/90 Hüftrotation",
+      "sets": 2,
+      "reps": "8",
+      "note": "je Seite"
+     },
+     {
+      "name": "Adduktoren-Rocking",
+      "sets": 2,
+      "reps": "10"
+     },
+     {
+      "name": "Katze-Kuh",
+      "sets": 2,
+      "reps": "10"
+     },
+     {
+      "name": "Bird Dog",
+      "sets": 2,
+      "reps": "8",
+      "note": "je Seite"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Läuferkraft B",
+  "category": "kraft",
+  "focus": "unterkoerper",
+  "min": 50,
+  "blocks": [
+   {
+    "type": "skill",
+    "items": [
+     {
+      "name": "Box Jumps",
+      "sets": 3,
+      "reps": "5"
+     }
+    ]
+   },
+   {
+    "type": "grund",
+    "items": [
+     {
+      "name": "Frontkniebeuge",
+      "sets": 4,
+      "reps": "6",
+      "load": "RPE 7"
+     },
+     {
+      "name": "Einbeiniges Kreuzheben",
+      "sets": 3,
+      "reps": "8",
+      "note": "je Seite"
+     },
+     {
+      "name": "Nordic Curl exzentrisch",
+      "sets": 3,
+      "reps": "5"
+     }
+    ]
+   },
+   {
+    "type": "finisher",
+    "items": [
+     {
+      "name": "Copenhagen Plank",
+      "sets": 3,
+      "time_s": 20,
+      "note": "je Seite"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Intervalle 6 × 3 min",
+  "category": "ausdauer",
+  "focus": "ausdauer",
+  "min": 45,
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Einlaufen",
+      "time_s": 900
+     },
+     {
+      "name": "Intervall",
+      "sets": 6,
+      "time_s": 180,
+      "note": "zügig, 2 min Trabpause"
+     },
+     {
+      "name": "Auslaufen",
+      "time_s": 600
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "> 5.000 Schritte",
+  "category": "alternative",
+  "focus": "",
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Gehen",
+      "note": "mindestens 5.000 Schritte über den Tag"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Langer Lauf 60 min",
+  "category": "ausdauer",
+  "focus": "ausdauer",
+  "min": 60,
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Laufen locker",
+      "time_s": 3600
+     }
+    ]
+   }
+  ]
+ }
+]'::jsonb);
 
 select go_tmp_upsert_plan('fit-for-run-l3', 'Fit for Run', 3,
   'Krafttraining für Läufer, Level 3: Maximalkraft, Reaktivkraft und Kraftausdauer, drei Läufe mit Tempo und langem Lauf.',
   '[
-    {"title": "Maximalkraft", "category": "kraft", "focus": "unterkoerper", "min": 55, "blocks": [
-      {"type": "grund", "items": [{"name": "Kniebeuge", "sets": 5, "reps": "4", "load": "RPE 8"}, {"name": "Kreuzheben", "sets": 4, "reps": "4", "load": "RPE 8"}, {"name": "Bulgarische Kniebeuge", "sets": 3, "reps": "6", "note": "je Seite", "load": "RPE 8"}]},
-      {"type": "finisher", "items": [{"name": "Wadenheben einbeinig mit Gewicht", "sets": 4, "reps": "10", "note": "je Seite"}]}]},
-    {"title": "Lockerer Lauf 45 min", "category": "ausdauer", "focus": "ausdauer", "min": 45, "blocks": [{"type": "ausdauer", "items": [{"name": "Laufen locker", "time_s": 2700}]}]},
-    {"title": "Reaktivkraft", "category": "kraft", "focus": "unterkoerper", "min": 45, "blocks": [
-      {"type": "skill", "items": [{"name": "Bounding", "sets": 4, "dist_m": 30}, {"name": "Einbeinige Hops", "sets": 3, "reps": "8", "note": "je Seite"}, {"name": "Drop Jumps", "sets": 3, "reps": "5"}]},
-      {"type": "hybrid", "items": [{"name": "Hip Thrust", "sets": 3, "reps": "8", "load": "RPE 8"}, {"name": "Nordic Curl", "sets": 3, "reps": "5"}]}]},
-    {"title": "Tempo 3 × 10 min", "category": "ausdauer", "focus": "ausdauer", "min": 55, "blocks": [{"type": "ausdauer", "items": [{"name": "Einlaufen", "time_s": 900}, {"name": "Tempo", "sets": 3, "time_s": 600, "note": "Schwellentempo, 2 min Trabpause"}, {"name": "Auslaufen", "time_s": 600}]}]},
-    {"title": "Kraftausdauer & Rumpf", "category": "kraft", "focus": "ganzkoerper", "min": 40, "blocks": [
-      {"type": "hybrid", "items": [{"name": "Walking Lunges", "sets": 3, "reps": "20"}, {"name": "Step-ups mit Gewicht", "sets": 3, "reps": "12", "note": "je Seite"}, {"name": "Copenhagen Plank", "sets": 3, "time_s": 30, "note": "je Seite"}, {"name": "Pallof Press", "sets": 3, "reps": "12", "note": "je Seite"}]}]},
-    {"title": "Langer Lauf 75–90 min", "category": "ausdauer", "focus": "ausdauer", "min": 85, "blocks": [{"type": "ausdauer", "items": [{"name": "Laufen locker", "time_s": 5100}]}]}
-  ]'::jsonb);
+ {
+  "title": "Maximalkraft",
+  "category": "kraft",
+  "focus": "unterkoerper",
+  "min": 55,
+  "blocks": [
+   {
+    "type": "grund",
+    "items": [
+     {
+      "name": "Kniebeuge",
+      "sets": 5,
+      "reps": "4",
+      "load": "RPE 8"
+     },
+     {
+      "name": "Kreuzheben",
+      "sets": 4,
+      "reps": "4",
+      "load": "RPE 8"
+     },
+     {
+      "name": "Bulgarische Kniebeuge",
+      "sets": 3,
+      "reps": "6",
+      "note": "je Seite",
+      "load": "RPE 8"
+     }
+    ]
+   },
+   {
+    "type": "finisher",
+    "items": [
+     {
+      "name": "Wadenheben einbeinig mit Gewicht",
+      "sets": 4,
+      "reps": "10",
+      "note": "je Seite"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Lockerer Lauf 45 min",
+  "category": "ausdauer",
+  "focus": "ausdauer",
+  "min": 45,
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Laufen locker",
+      "time_s": 2700,
+      "note": "Gesprächstempo"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Reaktivkraft",
+  "category": "kraft",
+  "focus": "unterkoerper",
+  "min": 45,
+  "blocks": [
+   {
+    "type": "skill",
+    "items": [
+     {
+      "name": "Bounding",
+      "sets": 4,
+      "dist_m": 30
+     },
+     {
+      "name": "Einbeinige Hops",
+      "sets": 3,
+      "reps": "8",
+      "note": "je Seite"
+     },
+     {
+      "name": "Drop Jumps",
+      "sets": 3,
+      "reps": "5"
+     }
+    ]
+   },
+   {
+    "type": "hybrid",
+    "items": [
+     {
+      "name": "Hip Thrust",
+      "sets": 3,
+      "reps": "8",
+      "load": "RPE 8"
+     },
+     {
+      "name": "Nordic Curl",
+      "sets": 3,
+      "reps": "5"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Tempo 3 × 10 min",
+  "category": "ausdauer",
+  "focus": "ausdauer",
+  "min": 55,
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Einlaufen",
+      "time_s": 900
+     },
+     {
+      "name": "Tempo",
+      "sets": 3,
+      "time_s": 600,
+      "note": "Schwellentempo, 2 min Trabpause"
+     },
+     {
+      "name": "Auslaufen",
+      "time_s": 600
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Kraftausdauer & Rumpf",
+  "category": "kraft",
+  "focus": "ganzkoerper",
+  "min": 40,
+  "blocks": [
+   {
+    "type": "hybrid",
+    "items": [
+     {
+      "name": "Walking Lunges",
+      "sets": 3,
+      "reps": "20"
+     },
+     {
+      "name": "Step-ups mit Gewicht",
+      "sets": 3,
+      "reps": "12",
+      "note": "je Seite"
+     },
+     {
+      "name": "Copenhagen Plank",
+      "sets": 3,
+      "time_s": 30,
+      "note": "je Seite"
+     },
+     {
+      "name": "Pallof Press",
+      "sets": 3,
+      "reps": "12",
+      "note": "je Seite"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "> 5.000 Schritte",
+  "category": "alternative",
+  "focus": "",
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Gehen",
+      "note": "mindestens 5.000 Schritte über den Tag"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Langer Lauf 75–90 min",
+  "category": "ausdauer",
+  "focus": "ausdauer",
+  "min": 85,
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Laufen locker",
+      "time_s": 5100
+     }
+    ]
+   }
+  ]
+ }
+]'::jsonb);
 
--- Bulletproof Knees: starke Beine, Knie, Core- und Hüftmobilität
 select go_tmp_upsert_plan('bulletproof-knee', 'Bulletproof Knees', 1,
   'Für starke Beine und belastbare Knie mit guter Core- und Hüftmobilität.',
   '[
-    {"title": "Knie & Beine A", "category": "kraft", "focus": "unterkoerper", "min": 45, "blocks": [
-      {"type": "mobility", "items": [{"name": "90/90 Hüftrotation", "sets": 2, "reps": "8", "note": "je Seite"}, {"name": "Tibialis Raises", "sets": 2, "reps": "15"}]},
-      {"type": "grund", "items": [{"name": "Spanish Squat isometrisch", "sets": 3, "time_s": 40}, {"name": "Step-down langsam", "sets": 3, "reps": "8", "note": "je Seite, 3 s ablassen"}, {"name": "Rumänisches Kreuzheben", "sets": 3, "reps": "10", "load": "RPE 7"}, {"name": "Wadenheben mit gebeugtem Knie", "sets": 3, "reps": "15"}]},
-      {"type": "finisher", "items": [{"name": "Dead Bug", "sets": 3, "reps": "10"}, {"name": "Seitstütz", "sets": 3, "time_s": 30, "note": "je Seite"}]}]},
-    {"title": "Hüft- & Core-Mobility", "category": "alternative", "focus": "", "min": 20, "blocks": [
-      {"type": "mobility", "items": [{"name": "Couch Stretch", "time_s": 60, "note": "je Seite"}, {"name": "Adduktoren-Rocking", "sets": 2, "reps": "10"}, {"name": "Katze-Kuh", "sets": 2, "reps": "10"}, {"name": "Bird Dog", "sets": 2, "reps": "8", "note": "je Seite"}]}]},
-    {"title": "Knie & Beine B", "category": "kraft", "focus": "unterkoerper", "min": 45, "blocks": [
-      {"type": "grund", "items": [{"name": "Split Squat", "sets": 3, "reps": "10", "note": "je Seite", "load": "RPE 7"}, {"name": "Einbeiniges Kreuzheben", "sets": 3, "reps": "8", "note": "je Seite"}, {"name": "Seitlicher Ausfallschritt", "sets": 3, "reps": "8", "note": "je Seite"}, {"name": "Reverse Nordic leicht", "sets": 3, "reps": "6"}]},
-      {"type": "finisher", "items": [{"name": "Copenhagen Plank kurzer Hebel", "sets": 3, "time_s": 20, "note": "je Seite"}, {"name": "Pallof Press", "sets": 3, "reps": "10", "note": "je Seite"}]}]}
-  ]'::jsonb);
+ {
+  "title": "Knie & Beine A",
+  "category": "kraft",
+  "focus": "unterkoerper",
+  "min": 45,
+  "blocks": [
+   {
+    "type": "mobility",
+    "items": [
+     {
+      "name": "90/90 Hüftrotation",
+      "sets": 2,
+      "reps": "8",
+      "note": "je Seite"
+     },
+     {
+      "name": "Tibialis Raises",
+      "sets": 2,
+      "reps": "15"
+     }
+    ]
+   },
+   {
+    "type": "grund",
+    "items": [
+     {
+      "name": "Spanish Squat isometrisch",
+      "sets": 3,
+      "time_s": 40
+     },
+     {
+      "name": "Step-down langsam",
+      "sets": 3,
+      "reps": "8",
+      "note": "je Seite, 3 s ablassen"
+     },
+     {
+      "name": "Rumänisches Kreuzheben",
+      "sets": 3,
+      "reps": "10",
+      "load": "RPE 7"
+     },
+     {
+      "name": "Wadenheben mit gebeugtem Knie",
+      "sets": 3,
+      "reps": "15"
+     }
+    ]
+   },
+   {
+    "type": "finisher",
+    "items": [
+     {
+      "name": "Dead Bug",
+      "sets": 3,
+      "reps": "10"
+     },
+     {
+      "name": "Seitstütz",
+      "sets": 3,
+      "time_s": 30,
+      "note": "je Seite"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "> 5.000 Schritte",
+  "category": "alternative",
+  "focus": "",
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Gehen",
+      "note": "mindestens 5.000 Schritte über den Tag"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Hüft- & Core-Mobility",
+  "category": "alternative",
+  "focus": "",
+  "min": 20,
+  "blocks": [
+   {
+    "type": "mobility",
+    "items": [
+     {
+      "name": "Couch Stretch",
+      "time_s": 60,
+      "note": "je Seite"
+     },
+     {
+      "name": "90/90 Hüftrotation",
+      "sets": 2,
+      "reps": "8",
+      "note": "je Seite"
+     },
+     {
+      "name": "Adduktoren-Rocking",
+      "sets": 2,
+      "reps": "10"
+     },
+     {
+      "name": "Katze-Kuh",
+      "sets": 2,
+      "reps": "10"
+     },
+     {
+      "name": "Bird Dog",
+      "sets": 2,
+      "reps": "8",
+      "note": "je Seite"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Knie & Beine B",
+  "category": "kraft",
+  "focus": "unterkoerper",
+  "min": 45,
+  "blocks": [
+   {
+    "type": "grund",
+    "items": [
+     {
+      "name": "Split Squat",
+      "sets": 3,
+      "reps": "10",
+      "note": "je Seite",
+      "load": "RPE 7"
+     },
+     {
+      "name": "Einbeiniges Kreuzheben",
+      "sets": 3,
+      "reps": "8",
+      "note": "je Seite"
+     },
+     {
+      "name": "Seitlicher Ausfallschritt",
+      "sets": 3,
+      "reps": "8",
+      "note": "je Seite"
+     },
+     {
+      "name": "Reverse Nordic leicht",
+      "sets": 3,
+      "reps": "6"
+     }
+    ]
+   },
+   {
+    "type": "finisher",
+    "items": [
+     {
+      "name": "Copenhagen Plank kurzer Hebel",
+      "sets": 3,
+      "time_s": 20,
+      "note": "je Seite"
+     },
+     {
+      "name": "Pallof Press",
+      "sets": 3,
+      "reps": "10",
+      "note": "je Seite"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "> 5.000 Schritte",
+  "category": "alternative",
+  "focus": "",
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Gehen",
+      "note": "mindestens 5.000 Schritte über den Tag"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "Hüft- & Core-Mobility",
+  "category": "alternative",
+  "focus": "",
+  "min": 20,
+  "blocks": [
+   {
+    "type": "mobility",
+    "items": [
+     {
+      "name": "Couch Stretch",
+      "time_s": 60,
+      "note": "je Seite"
+     },
+     {
+      "name": "90/90 Hüftrotation",
+      "sets": 2,
+      "reps": "8",
+      "note": "je Seite"
+     },
+     {
+      "name": "Adduktoren-Rocking",
+      "sets": 2,
+      "reps": "10"
+     },
+     {
+      "name": "Katze-Kuh",
+      "sets": 2,
+      "reps": "10"
+     },
+     {
+      "name": "Bird Dog",
+      "sets": 2,
+      "reps": "8",
+      "note": "je Seite"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "title": "> 5.000 Schritte",
+  "category": "alternative",
+  "focus": "",
+  "blocks": [
+   {
+    "type": "ausdauer",
+    "items": [
+     {
+      "name": "Gehen",
+      "note": "mindestens 5.000 Schritte über den Tag"
+     }
+    ]
+   }
+  ]
+ }
+]'::jsonb);
+
+-- Hybrid Kraft 2× / 3×: auf 7 Tage auffüllen (Kraft an festen Tagen, sonst Schritte)
+do $$
+declare
+  v_steps jsonb := '{"title": "> 5.000 Schritte", "category": "alternative", "focus": "", "blocks": [{"type": "ausdauer", "items": [{"name": "Gehen", "note": "mindestens 5.000 Schritte über den Tag"}]}]}';
+  v_c uuid;
+begin
+  select id into v_c from courses where slug = 'hybrid-kraft-2x';
+  if v_c is not null and (select max(session_no) from course_sessions where course_id = v_c) < 7 then
+    update course_sessions set session_no = 4 where course_id = v_c and session_no = 2;  -- Mo + Do
+    insert into course_sessions (course_id, block_no, session_no, is_travel, title, category, blocks)
+    select v_c, 1, n, false, v_steps->>'title', 'alternative', v_steps->'blocks'
+    from unnest(array[2, 3, 5, 6, 7]) as n
+    on conflict (course_id, block_no, session_no, is_travel) do nothing;
+    update courses set sessions_per_week = 7, level = coalesce(level, 1) where id = v_c;
+  end if;
+  select id into v_c from courses where slug = 'hybrid-kraft-3x';
+  if v_c is not null and (select max(session_no) from course_sessions where course_id = v_c) < 7 then
+    update course_sessions set session_no = 5 where course_id = v_c and session_no = 3;  -- Mo + Mi + Fr
+    update course_sessions set session_no = 3 where course_id = v_c and session_no = 2;
+    insert into course_sessions (course_id, block_no, session_no, is_travel, title, category, blocks)
+    select v_c, 1, n, false, v_steps->>'title', 'alternative', v_steps->'blocks'
+    from unnest(array[2, 4, 6, 7]) as n
+    on conflict (course_id, block_no, session_no, is_travel) do nothing;
+    update courses set sessions_per_week = 7, level = coalesce(level, 1) where id = v_c;
+  end if;
+end $$;
+
+-- Natalya: persönlichen Plan durch Superwoman ersetzen.
+-- Kraft an ihren Tagen Di + Mi, Lauf am Samstag, sonst Schritte. Erledigtes bleibt.
+do $$
+declare
+  v_user uuid := '94a49c08-0818-4491-86a5-714885b6b73c';
+  v_sw uuid;
+  v_coach uuid;
+  v_en uuid;
+begin
+  if not exists (select 1 from go_accounts where id = v_user) then
+    return;
+  end if;
+  select id into v_sw from courses where slug = 'superwoman-l1';
+  select trainer_id into v_coach from go_accounts where id = v_user;
+  if v_coach is not null and not exists (select 1 from go_accounts where id = v_coach) then
+    v_coach := null;
+  end if;
+
+  -- alter persönlicher Plan: offene Termine weg, Enrollment beendet, Kurs ausgeblendet
+  delete from events e
+  using enrollments x
+  where e.enrollment_id = x.id and x.user_id = v_user and x.course_id <> v_sw
+    and e.status = 'geplant';
+  update enrollments set status = 'beendet' where user_id = v_user and course_id <> v_sw and status = 'aktiv';
+  update courses set is_active = false where private_for = v_user and slug like 'training-krafttraining-%';
+
+  -- Superwoman einmalig zuordnen
+  if not exists (select 1 from enrollments where user_id = v_user and course_id = v_sw and status = 'aktiv') then
+    -- Einheit: 1 Kraft A, 2 Schritte, 3 Schritte, 4 Kraft B, 5 Schritte, 6 Lauf, 7 Schritte
+    -- Tag:     Di(1),    Mo(0),     Do(3),     Mi(2),     Fr(4),     Sa(5),  So(6)
+    insert into enrollments (user_id, course_id, status, start_date, weekdays, sessions_per_week, weeks, assigned_by, payment_status)
+    values (v_user, v_sw, 'aktiv', date '2026-11-16', array[1, 0, 3, 2, 4, 5, 6], 7, 12, v_coach, 'gratis')
+    returning id into v_en;
+    perform go_generate_events(v_en);
+  end if;
+end $$;
 
 drop function if exists go_tmp_upsert_plan(text, text, int, text, jsonb);
 
--- Kurzcheck: Wochenpläne mit Verteilung
+-- Kurzcheck: Wochenpläne mit Verteilung (jede Zeile sollte 7 ergeben)
 select c.title, c.level,
   count(*) filter (where s.category = 'kraft') as kraft,
   count(*) filter (where s.category = 'ausdauer') as ausdauer,
@@ -273,6 +1198,6 @@ select c.title, c.level,
   count(*) filter (where s.category = 'zirkel') as zirkel
 from courses c
 join course_sessions s on s.course_id = c.id and s.block_no = 1 and not s.is_travel
-where c.slug in ('superwoman-l1', 'fit-for-run-l1', 'fit-for-run-l2', 'fit-for-run-l3', 'bulletproof-knee')
+where c.slug in ('superwoman-l1', 'fit-for-run-l1', 'fit-for-run-l2', 'fit-for-run-l3', 'bulletproof-knee', 'hybrid-kraft-2x', 'hybrid-kraft-3x')
 group by c.title, c.level
 order by c.title, c.level;

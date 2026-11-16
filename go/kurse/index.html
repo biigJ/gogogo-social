@@ -118,7 +118,7 @@
           </div>
           <div class="row" style="margin-top:8px">
             <div class="grow"><label>Level</label><select id="c-level"><option value="">–</option><option>1</option><option>2</option><option>3</option></select></div>
-            <div class="grow"><label>Einheiten pro Woche</label><select id="c-per"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></div>
+            <div class="grow"><label>Einheiten pro Woche (Wochenplan = 7, Mo–So)</label><select id="c-per"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></div>
             <div class="grow hidden"><label>Dauer (Wochen)</label><input id="c-weeks" type="number" min="1" max="52" /></div>
             <div class="grow"><label>Wochen pro Block</label><input id="c-bw" type="number" min="1" max="12" /></div>
           </div>
@@ -337,6 +337,7 @@
     }
 
     function sessionCard(s, row, inherited) {
+      var per = parseInt(state.course.sessions_per_week, 10) || 1;
       var src = row || inherited || { title: "", focus: "", duration_min: "", blocks: [], category: "kraft" };
       var editable = canEdit(state.course);
       var cat = src.category || "kraft";
@@ -344,7 +345,7 @@
         : !row ? '<p class="muted">Noch leer.</p>' : "";
       var blocks = (src.blocks || []).map(function (bl, bi) { return blockHtml(s, bi, bl, editable); }).join("");
       return '<div class="card" data-session="' + s + '">' +
-        '<div class="row" style="justify-content:space-between"><h3>Einheit ' + s + (state.travel ? " · Reise" : "") + "</h3>" +
+        '<div class="row" style="justify-content:space-between"><h3>' + (per === 7 ? DAYS[s - 1] + " · " : "") + "Einheit " + s + (state.travel ? " · Reise" : "") + "</h3>" +
         (editable && row ? '<button class="small danger" data-act="del-session">Löschen</button>' : "") + "</div>" + note +
         '<div class="row" style="margin-top:6px">' +
         '<div class="grow"><label>Titel</label><input data-f="title" value="' + esc(src.title) + '"' + (editable ? "" : " disabled") + " /></div>" +
@@ -515,7 +516,7 @@
     $("btn-new").addEventListener("click", function () {
       GoDialog.prompt("Name des Wochenplans", "").then(function (title) {
       if (!title) return;
-      insertCourse({ title: title, category_default: "kraft", level: 1, sessions_per_week: 3, duration_weeks: 12, block_weeks: 4, is_active: false })
+      insertCourse({ title: title, category_default: "kraft", level: 1, sessions_per_week: 7, duration_weeks: 12, block_weeks: 4, is_active: false })
         .then(function (c) { return loadCourses().then(function () { openCourse(c); }); })
         .then(function () { toast("Wochenplan angelegt (noch ausgeblendet)"); })
         .catch(function (err) { toast(err.message); });

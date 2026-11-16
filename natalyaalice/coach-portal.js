@@ -240,8 +240,10 @@
         (evs.length
           ? evs.map(function (e) {
               var byMe = String(e.assigned_by || "") === me();
+              var movable = e.status === "geplant" && dayKey(e.starts_at) >= todayIso();
               return (
-                '<span class="cp-ev' + (e.status === "erledigt" ? " is-done" : "") + (byMe ? " is-coach" : "") + '">' +
+                '<span class="cp-ev' + (e.status === "erledigt" ? " is-done" : "") + (byMe ? " is-coach" : "") + '"' +
+                (movable ? ' data-cp="move" data-id="' + esc(e.id) + '" role="button" tabindex="0"' : "") + ">" +
                 esc(timeOf(e.starts_at)) + " " + (EMOJI[e.category] || "") + " " + esc(e.title || e.category) +
                 (e.status === "erledigt" ? " ✓" : "") +
                 (byMe && e.status === "geplant"
@@ -291,8 +293,6 @@
     var plans = st.plans || [];
     var sel = st.planPick || (plans[0] && plans[0].id) || "";
     var pick = plans.filter(function (c) { return String(c.id) === String(sel); })[0];
-    var need = pick ? trainDays(planMix(pick)) : 0;
-    var days = st.planDays || DAYS.map(function (_, i) { return i; }).slice(0, need);
     var hasZ = pick && planMix(pick).zirkel;
     return (
       '<section class="cp-sec"><h3>Wochenplan</h3>' +
@@ -305,12 +305,8 @@
           "</select></label>" +
           '<div class="cp-row"><label class="cp-field">Start (Montag)<input type="date" id="cp-start" value="' + esc(st.planStart || addDays(mondayOf(todayIso()), 7)) + '" /></label>' +
           '<label class="cp-field">Wochen<input type="number" id="cp-weeks" min="1" max="52" value="' + esc(st.planWeeks || 12) + '" /></label></div>' +
-          '<p class="cp-hint">' + need + " Trainingstage wählen" + (hasZ ? " (Zirkeltraining läuft über FFC und braucht keinen Tag)" : "") + "</p>" +
-          '<div class="cp-days">' +
-          DAYS.map(function (d, i) {
-            return '<button type="button" data-cp="day" data-day="' + i + '"' + (days.indexOf(i) >= 0 ? ' class="is-on"' : "") + ">" + d + "</button>";
-          }).join("") +
-          "</div>" +
+          '<p class="cp-hint">Der Plan füllt Mo bis So automatisch. Einzelne Tage kannst Du danach in der Woche verschieben (Event antippen).' +
+          (hasZ ? " Zirkeltraining läuft über FFC und erzeugt keinen Termin." : "") + "</p>" +
           '<button type="button" class="cp-btn" data-cp="assign">Zuordnen</button>'
         : '<p class="cp-hint">Noch keine Wochenpläne.</p>') +
       "</section>"
@@ -439,6 +435,10 @@
       return;
     }
     if (act === "assign") return assignPlan(t);
+    if (act === "move") {
+      if (e.target.closest(".cp-ev__x")) return;
+      return moveEvent(t.getAttribute("data-id"));
+    }
     if (act === "end-plan") return endPlan();
     if (act === "add") return openAdd(t.getAttribute("data-iso"));
     if (act === "del") {
@@ -473,6 +473,29 @@
     if (act === "legacy" && host.openLegacyAdmin) return host.openLegacyAdmin(st.id);
   }
 
+  /* Coach verschiebt ein Event des Coachees auf einen anderen Tag dieser Woche (Uhrzeit bleibt) */
+  function moveEvent(id) {
+    var ev = st.events.filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!ev || !global.GoDialog) return;
+    var cur = dayKey(ev.starts_at);
+    var choices = [];
+    for (var i = 0; i < 7; i++) {
+      var iso = addDays(st.week, i);
+      if (iso === cur || iso < todayIso()) continue;
+      choices.push({ label: dayLabel(iso, i), value: iso });
+    }
+    GoDialog.choose("„" + (ev.title || "Event") + "“ verschieben auf", choices).then(function (iso) {
+      if (!iso) return;
+      var starts = iso + "T" + timeOf(ev.starts_at) + ":00" + berlinOffset(iso);
+      rest("events?id=eq." + encodeURIComponent(id), { method: "PATCH", prefer: "return=minimal", body: { starts_at: starts } })
+        .then(function () {
+          toast("Verschoben");
+          return loadWeek().then(paint);
+        })
+        .catch(function () { toast("Verschieben fehlgeschlagen"); });
+    });
+  }
+
   function readPlanForm() {
     var selEl = document.getElementById("cp-plan");
     st.planPick = selEl ? selEl.value : st.planPick;
@@ -484,12 +507,8 @@
     readPlanForm();
     var pick = (st.plans || []).filter(function (c) { return String(c.id) === String(st.planPick); })[0];
     if (!pick) return;
-    var need = trainDays(planMix(pick));
-    var days = [].map.call(st.root.querySelectorAll(".cp-days .is-on"), function (b) { return Number(b.getAttribute("data-day")); }).sort();
-    if (days.length !== need) {
-      toast("Bitte genau " + need + " Tage wählen");
-      return;
-    }
+    var days = [0, 1, 2, 3, 4, 5, 6];
+    var need = 7;
     var start = st.planStart;
     if (!start) return toast("Startdatum fehlt");
     start = mondayOf(start);
