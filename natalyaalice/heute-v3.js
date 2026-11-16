@@ -1460,9 +1460,20 @@
     );
   }
 
+  /* Coverbild statt Farbfläche: Kursbild, sonst Bild der Kategorie (go-covers.js) */
+  function coverFor(opts) {
+    if (opts.photo || opts.plus || !global.GoCovers) return "";
+    var cat = /ernährung|ernaehrung/i.test(String(opts.title || "")) ? "ernaehrung" : opts.category;
+    return GoCovers.url(opts.courseId, cat);
+  }
+
   function mediaInnerHtml(opts) {
     if (opts.photo) {
       return '<img class="acc-card__photo" src="' + esc(opts.photo) + '" alt="" />';
+    }
+    var cover = coverFor(opts);
+    if (cover) {
+      return '<img class="acc-card__photo acc-card__cover" src="' + esc(cover) + '" alt="" loading="lazy" />';
     }
     if (opts.plus) return '<span class="acc-card__plus">+</span>';
     /* Kein zentrales Platzhalter-Emoji auf dem Frame */
@@ -1492,7 +1503,7 @@
     return (
       '<div class="acc-card__media ' +
       tone +
-      (opts.photo ? " has-photo" : "") +
+      (opts.photo || coverFor(opts) ? " has-photo" : "") +
       '">' +
       mediaInnerHtml(opts) +
       overlayHtml(opts) +
@@ -1677,6 +1688,7 @@
         '"',
       category: ev.category,
       photo: ev.photo_url || "",
+      courseId: ev.course_id || "",
       emoji: emoji,
       actions: (tools || "") + (actions || ""),
       author: authorHtml(p, true),

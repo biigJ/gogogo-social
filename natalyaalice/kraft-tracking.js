@@ -419,6 +419,7 @@
 
   function init(h) {
     host = h;
+    ensureCss(); /* Kurven-Symbol in der Workout-Ansicht braucht die Styles auch ohne Plus-Besuch */
     try {
       ((global.NatalyaLog || global.Log || {}).EXERCISES || []).forEach(function (ex) {
         if (ex && ex.id && !STATIC[ex.id]) STATIC[ex.id] = ex.name;

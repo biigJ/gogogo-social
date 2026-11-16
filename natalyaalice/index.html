@@ -209,9 +209,9 @@
       margin-bottom: 8px;
     }
     .item.is-done { background: var(--panel-2); }
-    .item.has-chart { position: relative; }
-    .item.has-chart > .name { padding-right: 40px; }
-    .item.has-chart > .kt-chart-btn { position: absolute; top: 8px; right: 8px; }
+    .item.has-tools { position: relative; }
+    .item.has-tools > .name, .item.has-tools .check-copy { padding-right: var(--tools-w, 40px); }
+    .item-tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; }
     .check-btn {
       width: 100%;
       display: flex;
@@ -7724,14 +7724,16 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/kraft-tracking.js?v=kt-1"></script>
+  <script src="/natalyaalice/kraft-tracking.js?v=kt-2"></script>
+  <script src="/natalyaalice/exercise-media.js?v=gxm-1"></script>
+  <script src="/natalyaalice/go-covers.js?v=cov-1"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-4"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-1"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-45"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-46"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-37"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-38"></script>
   <script src="/natalyaalice/support.js?v=support-16"></script>
   <script>
     (function () {
@@ -8123,8 +8125,7 @@
               chartBtn.setAttribute("aria-label", "Verlauf " + ex.name);
               chartBtn.innerHTML = GoKraftTracking.chartIcon;
               chartBtn.addEventListener("click", function () { GoKraftTracking.openChart(ex.name); });
-              item.classList.add("has-chart");
-              item.appendChild(chartBtn);
+              itemTools(item).appendChild(chartBtn);
             }
             var statEl = document.createElement("p");
             statEl.className = "stat";
@@ -8137,9 +8138,27 @@
             renderSetRows(ex, controls);
           }
 
+          /* Übungsvideo (exercise-media.js), vor der Kurve */
+          if (window.GoExMedia && GoExMedia.urlFor(ex.name)) {
+            var tools = itemTools(item);
+            tools.insertBefore(GoExMedia.button(ex.name), tools.firstChild);
+          }
+          var toolCount = item.querySelectorAll(".item-tools > button").length;
+          if (toolCount) item.style.setProperty("--tools-w", (toolCount * 38 + 4) + "px");
           listEl.appendChild(item);
         });
         paintMeta();
+      }
+
+      function itemTools(item) {
+        var box = item.querySelector(":scope > .item-tools");
+        if (!box) {
+          box = document.createElement("div");
+          box.className = "item-tools";
+          item.classList.add("has-tools");
+          item.appendChild(box);
+        }
+        return box;
       }
 
       function renderHistory() {
@@ -17926,6 +17945,22 @@
         });
       }
       window.GoOpenEventWorkout = openEventWorkout;
+
+      /* Coverbilder: Kursbilder laden; Karten, die schon ohne sie gemalt wurden, einmal neu zeichnen */
+      if (window.GoCovers) {
+        GoCovers.init({ rest: rest }).then(function () {
+          if (!GoCovers.count()) return;
+          try { if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh(); } catch (eCv) {}
+          try { if (window.WocheReels && WocheReels.refresh && document.body.dataset.shell === "woche") WocheReels.refresh(); } catch (eCw) {}
+        });
+      }
+
+      /* Übungsvideos: Bibliothek laden, danach Liste neu zeichnen, falls das Workout offen ist */
+      if (window.GoExMedia) {
+        GoExMedia.init({ rest: rest }).then(function () {
+          try { if (listEl && listEl.children.length) renderList(); } catch (eGx) {}
+        });
+      }
 
       /* Kraft-Tracking: Historie + Verlauf (kraft-tracking.js) */
       if (window.GoKraftTracking) {
