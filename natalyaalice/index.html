@@ -3927,6 +3927,9 @@
       animation: training-ring-pulse-strong 0.85s ease-in-out infinite;
     }
     .crew-story.is-today .crew-story__name { font-weight: 700; }
+    #heute-stories.is-filter-hidden { display: none !important; }
+    .team-group-ffc { margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(42,33,24,.2); }
+    .team-group-ffc__head { margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: rgba(42,33,24,.6); }
     .crew-story.is-training .crew-story__name {
       font-weight: 700;
       color: #C7413B;
@@ -15123,7 +15126,7 @@
 
         var ffcGroup = ffcContextGroup();
         var myGroup = ownGroups()[0] || null;
-        function groupSlide(group, title) {
+        function groupSlide(group, title, detached) {
           var slide = document.createElement("article");
           slide.className = "team-slide is-scroll";
           slide.dataset.title = title || "Meine Gruppe";
@@ -15243,9 +15246,10 @@
             });
             slide.appendChild(inviteNew);
           }
-          box.appendChild(slide);
+          if (!detached) box.appendChild(slide);
+          return slide;
         }
-        if (ffcGroup) groupSlide(ffcGroup, "FFC-Gruppe");
+        var groupHost = null;
         if (!myGroup) {
           var emptyGroup = document.createElement("article");
           emptyGroup.className = "team-slide is-scroll is-group-empty";
@@ -15272,8 +15276,24 @@
           });
           emptyGroup.appendChild(createBtn);
           box.appendChild(emptyGroup);
+          groupHost = emptyGroup;
         } else {
-          groupSlide(myGroup, "Meine Gruppe");
+          groupHost = groupSlide(myGroup, "Meine Gruppe");
+        }
+        /* FFC-Gruppe im selben Abschnitt unter der gogogo-Gruppe */
+        if (ffcGroup && groupHost) {
+          var ffcPart = groupSlide(ffcGroup, "FFC-Gruppe", true);
+          var ffcSec = document.createElement("section");
+          ffcSec.className = "team-group-ffc";
+          var ffcHead = document.createElement("p");
+          ffcHead.className = "team-group-ffc__head";
+          ffcHead.textContent = "FFC-Gruppe";
+          ffcSec.appendChild(ffcHead);
+          Array.prototype.slice.call(ffcPart.childNodes).forEach(function (node) {
+            if (node.classList && node.classList.contains("team-slide__art")) return;
+            ffcSec.appendChild(node);
+          });
+          groupHost.appendChild(ffcSec);
         }
 
         var trainer = null;
@@ -16129,7 +16149,7 @@
               editorLink.type = "button";
               editorLink.className = "go-slide__cta go-slide__cta--editor";
               editorLink.textContent = "Kurs-Editor";
-              editorLink.addEventListener("click", function () { location.href = "/go/kurse/"; });
+              editorLink.addEventListener("click", function () { location.href = "/workout/kurse/"; /* im PWA-Scope bleiben */ });
               card.appendChild(editorLink);
             }
           }
@@ -16484,7 +16504,7 @@
       function openTrainerAdmin(person) {
         if (!sessionIsTrainer || !person || !person.id) return;
         if (String(person.trainer_id || "") !== String(sessionAccount.id)) return;
-        location.href = "/go/admin/?trainer=1&user=" + encodeURIComponent(person.id) + "&back=team";
+        location.href = "/workout/admin/?trainer=1&user=" + encodeURIComponent(person.id) + "&back=team";
       }
 
       function loadTeam() {
@@ -17773,6 +17793,18 @@
           if (!btn || !pill.contains(btn)) return;
           goTab(btn.getAttribute("data-shell"));
         }
+        /* Zurück aus Admin/Kurs-Editor (bfcache): Zustand neu anwenden statt eingefrorenem Layout */
+        window.addEventListener("pageshow", function (ev) {
+          if (!ev.persisted) return;
+          lastAt = 0;
+          try { window.scrollTo(0, 0); } catch (eS) {}
+          document.body.classList.remove("ffc-open");
+          var sh = document.body.dataset.shell;
+          if (sh === "team") showPlan("team");
+          else if (sh === "kurse") showPlan("training");
+          else if (sh === "profil") showPlan("profil");
+          paintPill();
+        });
         pill.addEventListener("click", fromEvent);
         pill.addEventListener("pointerup", function (event) {
           if (event.pointerType && event.pointerType !== "touch") return;
@@ -19512,7 +19544,7 @@
           nickname: sessionAccount.nickname,
           photo_url: sessionAccount.photo_url,
           isSelf: true,
-          label: "Deine Story"
+          label: "Du"
         };
         var myStory = storyFor(me, true);
         if (myStory) used[myStory.index] = true;
@@ -19571,6 +19603,26 @@
             if (!(window.HeuteAccountability && HeuteAccountability.focusEvent(meToday.photoEventId))) openProfile(me);
           });
           box.replaceChild(meFresh, meItem);
+        }
+        /* Reihe folgt dem Filter: Ich = keine Reihe, Team = Team, Gruppe = Gruppe, Tagebuch/Alles = alle */
+        var crewView = heuteView();
+        var storiesWrap = document.getElementById("heute-stories");
+        if (storiesWrap) storiesWrap.classList.toggle("is-filter-hidden", crewView === "ich");
+        if (crewView === "gruppe") {
+          var gIds = groupMemberIds();
+          gIds.forEach(function (gid) {
+            if (gid === String(sessionAccount.id) || seenIds[gid]) return;
+            var gp = groupPeople[gid];
+            if (!gp) return;
+            seenIds[gid] = true;
+            friends.push({ person: gp, story: null, presence: presenceFor(gid), today: act[gid] || null });
+          });
+          friends = friends.filter(function (entry) { return gIds.indexOf(String(entry.person.id)) >= 0; });
+        } else if (crewView === "team") {
+          friends = friends.filter(function (entry) {
+            var pid = String(entry.person.id);
+            return teamPeople.some(function (tp) { return tp && String(tp.id) === pid; });
+          });
         }
         friends.sort(function (a, b) {
           function rank(entry) {
@@ -19724,6 +19776,7 @@
               document.body.dataset.heute = heuteFilter;
               try { localStorage.setItem(HOME_HEUTE, heuteFilter); } catch (eHF2) {}
               paintHeuteJoins(heuteFlags());
+              paintHeuteCrew();
             },
             toast: function (msg) { gogogoToast(msg); },
             onEventsChanged: notifyAktuellEventsChanged,
