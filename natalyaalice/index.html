@@ -2081,6 +2081,15 @@
     .gz-psheet__card .gz-partner__name { margin: 4px 0 12px; }
     .gz-psheet__save { width: 100%; min-height: 48px; border-radius: 999px; border: 0; background: #111; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
     .gz-psheet__skip { width: 100%; min-height: 44px; margin-top: 6px; border: 0; background: none; color: rgba(42,33,24,.6); font: inherit; font-weight: 600; cursor: pointer; }
+    .gz-next { display: block; margin: 0 auto 8px; }
+    .wr-zjoin { margin: 0 0 12px; padding: 12px; border-radius: 14px; background: rgba(42,33,24,.06); text-align: center; }
+    .wr-zjoin__who { margin: 0; font-size: 12px; font-weight: 600; color: rgba(42,33,24,.6); }
+    .wr-zjoin__title { margin: 2px 0; font-family: "Playfair Display", Georgia, serif; font-size: 20px; font-weight: 600; }
+    .wr-zjoin__meta { margin: 0 0 10px; font-size: 13px; }
+    .wr-zjoin .wr-pill-btn { display: block; margin: 0 auto; }
+    .wr-zjoin__weekly { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; font-weight: 600; }
+    .wr-zjoin__none { margin: 0 0 14px; text-align: center; font-weight: 600; color: rgba(42,33,24,.6); }
+    .wr-zjoin__own { display: block; margin: 4px auto 8px; background: transparent !important; color: #111 !important; border: 1.5px solid #111 !important; }
     .gz-total { margin: 4px 0 14px; text-align: center; font-size: 15px; }
     .gz-total strong { font-size: 20px; }
     .gz-calc { display: block; margin-top: 2px; font-size: 12px; color: rgba(42,33,24,.55); }
@@ -4777,6 +4786,8 @@
       overflow-x: hidden;
       overflow-y: auto;
     }
+    /* Flex-Spalte mit max-height: Kinder nicht stauchen, sonst wird das Bild abgeschnitten */
+    body.is-session #plan-team.team-rail .team-slide.is-group-empty > * { flex-shrink: 0; }
     body.is-session #plan-team.team-rail .team-slide.is-group-empty .team-slide__cta {
       position: static;
       margin-top: calc(36px * 0.65) !important;
@@ -6851,7 +6862,7 @@
   </div>
   <div class="sand-modal" id="nutrition-book-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="nutrition-book-title">
-      <h2 class="ask" id="nutrition-book-title">Ernährungscoaching</h2>
+      <h2 class="ask" id="nutrition-book-title">Ernährung</h2>
       <p class="team-msg">4 Wochen tägliches Event unter Aktuell. Tracke Deine Mahlzeiten im Dialog, unter Plus findest Du den Button dafür. Gratis und sofort aktiv.</p>
       <button type="button" id="nutrition-book-pay">Aktivieren</button>
       <button type="button" class="sand-quiet" id="nutrition-book-track">Tracking öffnen</button>
@@ -7619,8 +7630,8 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-42"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-33"></script>
-  <script src="/natalyaalice/support.js?v=support-13"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-34"></script>
+  <script src="/natalyaalice/support.js?v=support-14"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -12266,6 +12277,12 @@
           rest: rest,
           get sessionAccount() { return sessionAccount; },
           get teamPeople() { return teamPeople; },
+          /* Zirkel beitreten: Mitglieder der FFC-Gruppe zuerst, sonst aller Gruppen */
+          groupMemberIds: function () {
+            var g = ffcContextGroup();
+            if (g) return (g.members || []).concat(g.owner ? [g.owner] : []).map(String);
+            return groupMemberIds();
+          },
           todayIso: function () { return Log.berlinToday(); },
           activityEmoji: activityEmoji,
           openInviteForPost: openInviteForPost,
@@ -15950,7 +15967,7 @@
                 {
                   key: "ernaehrung",
                   type: "ernaehrung",
-                  title: "Ernährungscoaching",
+                  title: "Ernährung",
                   description: "4 Wochen tägliches Ernährungs-Event unter Aktuell, gratis. Protokolliere Mahlzeiten im Dialog, Tracking unter Plus. Coach-Feedback und Plan auf Wunsch."
                 },
                 {
@@ -16144,7 +16161,7 @@
             /* Kurs-Editor direkt unter Buchen, nur für Coaches/Admin; reiner Link, keine Rail-Logik */
             var editorAcc = window.GoAccountSession ? GoAccountSession.load() : null;
             var editorAdmins = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
-            if (editorAcc && (editorAcc.is_trainer || editorAdmins.indexOf(editorAcc.id) !== -1)) {
+            if (editorAcc && (sessionIsTrainer || editorAdmins.indexOf(editorAcc.id) !== -1)) {
               var editorLink = document.createElement("button");
               editorLink.type = "button";
               editorLink.className = "go-slide__cta go-slide__cta--editor";

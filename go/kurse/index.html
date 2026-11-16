@@ -173,7 +173,7 @@
     var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
     var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
     /* Ben (biigJ) und beide Joscha-Accounts */
-    var ADMIN_IDS = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c", "7f0d09d2-8b6c-48a3-a721-62dc0c3651ea"];
+    var ADMIN_IDS = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
     var BLOCK_TYPES = [
       ["mobility", "Mobility"], ["skill", "Skill / Power"], ["grund", "Grundübung"],
       ["hybrid", "Hybrid"], ["hypertrophie", "Hypertrophie"], ["finisher", "Finisher"], ["ausdauer", "Ausdauer"]
@@ -208,11 +208,20 @@
     function canEdit(c) { return !!c && (isAdmin || (me && c.coach_id === me.id && c.owner === "coach")); }
 
     // ---------- Start ----------
-    if (!me || (!me.is_trainer && !isAdmin)) {
+    function showGate() {
       $("gate").classList.remove("hidden");
+      $("app").classList.add("hidden");
       if (me) $("who").textContent = "Angemeldet als " + me.name;
+    }
+    if (!me || (!me.is_trainer && !isAdmin)) {
+      showGate();
       return;
     }
+    /* Coach-Status aus der Datenbank, nicht nur aus dem lokalen Konto */
+    rest("go_accounts?id=eq." + encodeURIComponent(me.id) + "&select=is_trainer").then(function (rows) {
+      var row = rows && rows[0];
+      if (!row || (!row.is_trainer && !isAdmin)) showGate();
+    }).catch(function () {});
     $("app").classList.remove("hidden");
     $("who").textContent = (isAdmin ? "Admin · " : "Coach · ") + me.name;
     DAYS.forEach(function (d, i) {

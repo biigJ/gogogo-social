@@ -351,7 +351,7 @@
   var TYPE_LABELS = {
     routine: "12-Wochen-Routine",
     zirkel: "Friday Fitness Circle",
-    ernaehrung: "Ernährungscoaching",
+    ernaehrung: "Ernährung",
     web_call: "Initialgespräch",
     coach_offer: "Selbst Coaching anbieten",
     stempelkarte: "Stempelkarte",
@@ -395,7 +395,7 @@
     {
       key: "ernaehrung",
       type: "ernaehrung",
-      title: "Ernährungscoaching",
+      title: "Ernährung",
       price: "gratis",
       description:
         "4 Wochen tägliches Ernährungs-Event unter Aktuell, gratis. Protokolliere Mahlzeiten im Dialog, Tracking unter Plus. Coach-Feedback und Plan auf Wunsch."
