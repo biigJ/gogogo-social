@@ -3566,6 +3566,17 @@
           var jid = slideW && slideW.getAttribute("data-event-id");
           evW = (state.joined || []).filter(function (x) { return String(x.id) === String(jid); })[0] || null;
         }
+        var wIso = evW && evW.starts_at ? new Date(evW.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }) : "";
+        /* Vergangen → gespeicherte Übungen (kraft-tracking.js) */
+        if (evW && (evW.category === "kraft" || evW.category === "ausdauer") && wIso && wIso < berlinToday() && global.GoKraftTracking) {
+          var meW = me();
+          GoKraftTracking.openDay({
+            people: String(evW.user_id || meW) === meW ? [meW] : [String(evW.user_id), meW],
+            iso: wIso,
+            title: evW.title || ""
+          });
+          return;
+        }
         if (evW && (evW.course_id || isPlanPlaceholder(evW.id)) && (evW.category === "kraft" || evW.category === "ausdauer") && host.openEventWorkout) {
           host.openEventWorkout(evW);
           return;

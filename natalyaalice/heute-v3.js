@@ -3333,22 +3333,44 @@
       openPartnerSheet(zp.getAttribute("data-zpartner"));
       return;
     }
-    /* Eigenes Kraft-/Ausdauer-Event aus einem Kurs antippen → Workout-Ansicht */
+    /* Kraft-/Ausdauer-Event antippen: vergangen → gespeicherte Übungen, heute/später → Workout tracken.
+       Eingeladene/Teilnehmer tracken die Einheit des Erstellers unter ihrem eigenen Profil. */
     var mediaHit = t.closest(".acc-card__media");
     if (mediaHit && !t.closest("button, a, input")) {
       var cardW = mediaHit.closest(".acc-card[data-event-id]");
       var evA = cardW ? (state.events || []).filter(function (x) { return String(x.id) === cardW.getAttribute("data-event-id"); })[0] : null;
-      if (evA && String(evA.user_id) === me() && evA.course_id && (evA.category === "kraft" || evA.category === "ausdauer") && host.openEventWorkout) {
-        host.openEventWorkout(evA);
-        return;
+      if (evA && (evA.category === "kraft" || evA.category === "ausdauer")) {
+        var evIso = new Date(evA.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+        var mine = String(evA.user_id) === me();
+        var joined = !mine && (iAmGoing(evA.id) || !!inviteFor(evA.id));
+        if (evIso < todayIso() && global.GoKraftTracking) {
+          var names = {};
+          var authorEl = cardW.querySelector(".acc-card__author span");
+          if (authorEl) names[String(evA.user_id)] = authorEl.textContent;
+          GoKraftTracking.openDay({
+            people: mine ? [me()] : [String(evA.user_id)].concat(joined ? [me()] : []),
+            names: names,
+            iso: evIso,
+            title: ((cardW.querySelector(".acc-card__title") || {}).textContent || evA.title || "").trim()
+          });
+          return;
+        }
+        if ((mine || joined) && evA.course_id && host.openEventWorkout) {
+          host.openEventWorkout(evA);
+          return;
+        }
       }
-      /* Tagesplan-Karte (Wochenplan ohne Event) → gleichnamige Einheit */
+      /* Tagesplan-Karte (Wochenplan ohne Event) → gleichnamige Einheit bzw. Historie */
       var planCard = mediaHit.closest(".acc-card[data-plan-iso]");
       if (planCard && host.openEventWorkout) {
         var pIso = planCard.getAttribute("data-plan-iso");
         var pCat = mediaHit.classList.contains("tone-ausdauer") ? "ausdauer"
           : mediaHit.classList.contains("tone-kraft-basics") ? "kraft" : "";
         var pTitle = ((planCard.querySelector(".acc-card__title") || {}).textContent || "").trim();
+        if (pCat && pTitle && pIso && pIso < todayIso() && global.GoKraftTracking) {
+          GoKraftTracking.openDay({ people: [me()], iso: pIso, title: pTitle });
+          return;
+        }
         if (pCat && pTitle && pIso) {
           host.openEventWorkout({ title: pTitle, category: pCat, starts_at: pIso + "T12:00:00+01:00" });
           return;
