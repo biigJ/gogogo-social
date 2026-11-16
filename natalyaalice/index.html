@@ -2117,6 +2117,13 @@
     .cp-ev__x { margin-left: auto; border: 0; background: none; color: inherit; font-size: 20px; line-height: 1; padding: 0 2px; cursor: pointer; }
     .cp-add { flex: none; width: 32px; height: 32px; border-radius: 50%; border: 0; background: #111; color: #fff; font-size: 20px; line-height: 1; cursor: pointer; }
     .cp-foot { padding-bottom: 20px; }
+    .cp-ev--joined { background: transparent; border: 1.5px solid #111; }
+    .cp-ev--joined em { font-style: normal; font-weight: 600; margin-left: 4px; }
+    .cp-plan__name { margin: 0; font-weight: 700; font-size: 17px; }
+    .cp-row { display: grid; grid-template-columns: 1fr 96px; gap: 10px; }
+    .cp-days { display: flex; gap: 6px; margin: 4px 0 4px; }
+    .cp-days button { flex: 1; min-height: 40px; border-radius: 999px; border: 1.5px solid #111; background: transparent; color: #111; font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; }
+    .cp-days button.is-on { background: #111; color: #fff; }
     .cp-modal { position: fixed; inset: 0; z-index: 9600; display: flex; align-items: flex-end; justify-content: center; background: rgba(20,16,12,.4); }
     .cp-modal__card { width: min(100%, 480px); box-sizing: border-box; background: #F3EEE4; border-radius: 20px 20px 0 0; padding: 18px 16px calc(22px + env(safe-area-inset-bottom, 0px)); }
     .cp-modal__card h3 { margin: 0 0 12px; text-align: center; font-family: "Playfair Display", Georgia, serif !important; font-size: 22px; font-weight: 600; }
@@ -7701,7 +7708,7 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/coach-portal.js?v=cp-1"></script>
+  <script src="/natalyaalice/coach-portal.js?v=cp-2"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-42"></script>
@@ -16235,7 +16242,8 @@
             /* Kurs-Editor direkt unter Buchen, nur für Coaches/Admin; reiner Link, keine Rail-Logik */
             var editorAcc = window.GoAccountSession ? GoAccountSession.load() : null;
             var editorAdmins = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
-            if (editorAcc && (sessionIsTrainer || editorAdmins.indexOf(editorAcc.id) !== -1)) {
+            /* Wochenpläne pflegt nur gogogo (Joscha / biigJ) */
+            if (editorAcc && editorAdmins.indexOf(editorAcc.id) !== -1) {
               var editorLink = document.createElement("button");
               editorLink.type = "button";
               editorLink.className = "go-slide__cta go-slide__cta--editor";
@@ -16601,6 +16609,7 @@
             rest: rest,
             get sessionAccount() { return sessionAccount; },
             toast: function (msg) { gogogoToast(msg); },
+            isAdmin: ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"].indexOf(String(sessionAccount && sessionAccount.id)) !== -1,
             openKursEditor: function () { location.href = "/workout/kurse/"; },
             openLegacyAdmin: function (uid) {
               location.href = "/workout/admin/?trainer=1&user=" + encodeURIComponent(uid) + "&back=team";

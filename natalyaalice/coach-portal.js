@@ -5,7 +5,9 @@
  *   2. Analyse: Notiz des Coaches (coach_notes)
  *   3. Woche: Coach trägt Events direkt in die Woche des Coachees ein (events.assigned_by)
  *
- * Host: { rest, sessionAccount, toast, openKursEditor, openLegacyAdmin }
+ *   4. Wochenplan zuordnen (Laufzeit je Coachee) und sehen, wo der Coachee mitmacht
+ *
+ * Host: { rest, sessionAccount, toast, isAdmin, openKursEditor, openLegacyAdmin }
  * Schema: go-coach-portal.sql
  */
 (function (global) {
@@ -21,6 +23,7 @@
     { key: "alternative", label: "Sonstiges" }
   ];
   var EMOJI = { kraft: "🏋️", ausdauer: "🏃", zirkel: "🔁", alternative: "✨" };
+  var CAT_LABEL = [["kraft", "Kraft"], ["ausdauer", "Ausdauer"], ["alternative", "Sonstiges"], ["zirkel", "Zirkeltraining"]];
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -132,6 +135,67 @@
       });
   }
 
+  /* Wochenpläne = aktive Kurse mit mehreren Einheiten (Block 1) */
+  function planMix(c) {
+    var n = {};
+    (c.course_sessions || []).forEach(function (x) {
+      if (x.is_travel || x.block_no !== 1) return;
+      n[x.category] = (n[x.category] || 0) + 1;
+    });
+    return n;
+  }
+  function mixText(n) {
+    return CAT_LABEL.filter(function (k) { return n[k[0]]; }).map(function (k) { return n[k[0]] + " " + k[1]; }).join(" + ");
+  }
+  function trainDays(n) {
+    return (n.kraft || 0) + (n.ausdauer || 0) + (n.alternative || 0);
+  }
+  function loadPlans() {
+    if (st.plans) return Promise.resolve();
+    return rest("courses?is_active=eq.true&select=id,title,level,private_for,course_sessions(category,block_no,is_travel)&order=title.asc,level.asc")
+      .then(function (rows) {
+        st.plans = (rows || []).filter(function (c) {
+          if (c.private_for && String(c.private_for) !== String(st.id)) return false;
+          return trainDays(planMix(c)) > 1;
+        });
+      })
+      .catch(function () { st.plans = []; });
+  }
+  function loadEnrollment() {
+    var base = "enrollments?user_id=eq." + encodeURIComponent(st.id) + "&status=eq.aktiv&order=created_at.desc&limit=1";
+    return rest(base + "&select=id,start_date,weeks,weekdays,course_id,courses(title,level)")
+      .catch(function () { return rest(base + "&select=id,start_date,weekdays,course_id,courses(title,level)"); })
+      .then(function (rows) { st.enrollment = (rows && rows[0]) || null; })
+      .catch(function () { st.enrollment = null; });
+  }
+  /* Wo macht der Coachee bei anderen mit (Zusage / angenommene Einladung) */
+  function loadJoined() {
+    st.joined = [];
+    return rest("event_rsvps?user_id=eq." + encodeURIComponent(st.id) + "&status=eq.zugesagt&select=event_id&limit=300")
+      .then(function (rs) {
+        var ids = (rs || []).map(function (r) { return String(r.event_id); });
+        if (!ids.length) return [];
+        var end = addDays(st.week, 7);
+        return rest(
+          "events?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&user_id=neq." + encodeURIComponent(st.id) +
+            "&starts_at=gte." + encodeURIComponent(st.week + "T00:00:00" + berlinOffset(st.week)) +
+            "&starts_at=lt." + encodeURIComponent(end + "T00:00:00" + berlinOffset(end)) +
+            "&select=id,user_id,title,category,starts_at,status"
+        );
+      })
+      .then(function (rows) {
+        st.joined = rows || [];
+        var owners = [];
+        st.joined.forEach(function (e) { if (owners.indexOf(String(e.user_id)) < 0) owners.push(String(e.user_id)); });
+        if (!owners.length) return;
+        return rest("go_accounts?id=in.(" + owners.map(encodeURIComponent).join(",") + ")&select=id,name").then(function (accs) {
+          st.names = st.names || {};
+          (accs || []).forEach(function (a) { st.names[String(a.id)] = String(a.name || "").split(" ")[0]; });
+        });
+      })
+      .catch(function () { st.joined = []; });
+  }
+
   /* ---------- Darstellung ---------- */
   function headHtml() {
     var p = st.person || {};
@@ -167,6 +231,7 @@
     for (var i = 0; i < 7; i++) {
       var iso = addDays(st.week, i);
       var evs = st.events.filter(function (e) { return dayKey(e.starts_at) === iso; });
+      var joined = (st.joined || []).filter(function (e) { return dayKey(e.starts_at) === iso; });
       var past = iso < todayIso();
       rows.push(
         '<div class="cp-day' + (past ? " is-past" : "") + '">' +
@@ -185,7 +250,14 @@
                 "</span>"
               );
             }).join("")
-          : '<span class="cp-ev cp-ev--empty">frei</span>') +
+          : joined.length ? "" : '<span class="cp-ev cp-ev--empty">frei</span>') +
+        joined.map(function (e) {
+          return (
+            '<span class="cp-ev cp-ev--joined">' + esc(timeOf(e.starts_at)) + " " + (EMOJI[e.category] || "") + " " +
+            esc(e.title || e.category) + ' <em>dabei bei ' + esc((st.names && st.names[String(e.user_id)]) || "…") + "</em>" +
+            (e.status === "erledigt" ? " ✓" : "") + "</span>"
+          );
+        }).join("") +
         "</div>" +
         (past ? "" : '<button type="button" class="cp-add" data-cp="add" data-iso="' + iso + '" aria-label="Eintragen">+</button>') +
         "</div>"
@@ -203,10 +275,52 @@
     );
   }
 
+  function planHtml() {
+    var en = st.enrollment;
+    if (en) {
+      var c = en.courses || {};
+      var weeks = en.weeks ? en.weeks + " Wochen" : "";
+      return (
+        '<section class="cp-sec"><h3>Wochenplan</h3>' +
+        '<div class="cp-plan"><p class="cp-plan__name">' + esc(c.title || "Wochenplan") + (c.level ? " · Level " + c.level : "") + "</p>" +
+        '<p class="cp-hint">ab ' + esc(String(en.start_date || "").split("-").reverse().join(".")) + (weeks ? " · " + weeks : "") + "</p>" +
+        '<button type="button" class="cp-btn cp-btn--ghost" data-cp="end-plan">Wochenplan beenden</button></div>' +
+        "</section>"
+      );
+    }
+    var plans = st.plans || [];
+    var sel = st.planPick || (plans[0] && plans[0].id) || "";
+    var pick = plans.filter(function (c) { return String(c.id) === String(sel); })[0];
+    var need = pick ? trainDays(planMix(pick)) : 0;
+    var days = st.planDays || DAYS.map(function (_, i) { return i; }).slice(0, need);
+    var hasZ = pick && planMix(pick).zirkel;
+    return (
+      '<section class="cp-sec"><h3>Wochenplan</h3>' +
+      (plans.length
+        ? '<label class="cp-field">Plan<select id="cp-plan">' +
+          plans.map(function (c) {
+            return '<option value="' + esc(c.id) + '"' + (String(c.id) === String(sel) ? " selected" : "") + ">" +
+              esc(c.title + (c.level ? " · L" + c.level : "") + " — " + mixText(planMix(c))) + "</option>";
+          }).join("") +
+          "</select></label>" +
+          '<div class="cp-row"><label class="cp-field">Start (Montag)<input type="date" id="cp-start" value="' + esc(st.planStart || addDays(mondayOf(todayIso()), 7)) + '" /></label>' +
+          '<label class="cp-field">Wochen<input type="number" id="cp-weeks" min="1" max="52" value="' + esc(st.planWeeks || 12) + '" /></label></div>' +
+          '<p class="cp-hint">' + need + " Trainingstage wählen" + (hasZ ? " (Zirkeltraining läuft über FFC und braucht keinen Tag)" : "") + "</p>" +
+          '<div class="cp-days">' +
+          DAYS.map(function (d, i) {
+            return '<button type="button" data-cp="day" data-day="' + i + '"' + (days.indexOf(i) >= 0 ? ' class="is-on"' : "") + ">" + d + "</button>";
+          }).join("") +
+          "</div>" +
+          '<button type="button" class="cp-btn" data-cp="assign">Zuordnen</button>'
+        : '<p class="cp-hint">Noch keine Wochenpläne.</p>') +
+      "</section>"
+    );
+  }
+
   function footHtml() {
     return (
       '<section class="cp-sec cp-foot">' +
-      '<button type="button" class="cp-btn cp-btn--ghost" data-cp="kurse">Kurs-Editor</button>' +
+      (host.isAdmin ? '<button type="button" class="cp-btn cp-btn--ghost" data-cp="kurse">Wochenpläne bearbeiten</button>' : "") +
       '<button type="button" class="cp-link" data-cp="legacy">Altes Admin-Portal</button>' +
       "</section>"
     );
@@ -215,7 +329,7 @@
   function paint() {
     if (!st || !st.root) return;
     var scroll = st.body ? st.body.scrollTop : 0;
-    st.body.innerHTML = headHtml() + noteHtml() + weekHtml() + footHtml();
+    st.body.innerHTML = headHtml() + noteHtml() + planHtml() + weekHtml() + footHtml();
     st.body.scrollTop = scroll;
   }
 
@@ -312,9 +426,20 @@
     if (act === "close") return close();
     if (act === "week") {
       st.week = t.getAttribute("data-week");
-      loadWeek().then(paint);
+      Promise.all([loadWeek(), loadJoined()]).then(paint);
       return;
     }
+    if (act === "day") {
+      var dd = Number(t.getAttribute("data-day"));
+      var cur = [].map.call(st.root.querySelectorAll(".cp-days .is-on"), function (b) { return Number(b.getAttribute("data-day")); });
+      var ix = cur.indexOf(dd);
+      if (ix >= 0) cur.splice(ix, 1); else cur.push(dd);
+      st.planDays = cur.sort();
+      t.classList.toggle("is-on");
+      return;
+    }
+    if (act === "assign") return assignPlan(t);
+    if (act === "end-plan") return endPlan();
     if (act === "add") return openAdd(t.getAttribute("data-iso"));
     if (act === "del") {
       var id = t.getAttribute("data-id");
@@ -348,6 +473,76 @@
     if (act === "legacy" && host.openLegacyAdmin) return host.openLegacyAdmin(st.id);
   }
 
+  function readPlanForm() {
+    var selEl = document.getElementById("cp-plan");
+    st.planPick = selEl ? selEl.value : st.planPick;
+    st.planStart = (document.getElementById("cp-start") || {}).value || st.planStart;
+    st.planWeeks = Number((document.getElementById("cp-weeks") || {}).value) || 12;
+  }
+
+  function assignPlan(btn) {
+    readPlanForm();
+    var pick = (st.plans || []).filter(function (c) { return String(c.id) === String(st.planPick); })[0];
+    if (!pick) return;
+    var need = trainDays(planMix(pick));
+    var days = [].map.call(st.root.querySelectorAll(".cp-days .is-on"), function (b) { return Number(b.getAttribute("data-day")); }).sort();
+    if (days.length !== need) {
+      toast("Bitte genau " + need + " Tage wählen");
+      return;
+    }
+    var start = st.planStart;
+    if (!start) return toast("Startdatum fehlt");
+    start = mondayOf(start);
+    var body = {
+      user_id: st.id, course_id: pick.id, status: "aktiv", start_date: start, weekdays: days,
+      sessions_per_week: need, weeks: st.planWeeks, assigned_by: me(), payment_status: "gratis"
+    };
+    btn.disabled = true;
+    rest("enrollments", { method: "POST", prefer: "return=representation", body: body })
+      .catch(function () {
+        delete body.weeks;
+        return rest("enrollments", { method: "POST", prefer: "return=representation", body: body });
+      })
+      .then(function (rows) {
+        return rest("rpc/go_generate_events", { method: "POST", body: { p_enrollment_id: rows[0].id } });
+      })
+      .then(function (n) {
+        toast((Number(n) || 0) + " Termine eingetragen");
+        st.planDays = null;
+        return Promise.all([loadEnrollment(), loadWeek()]).then(paint);
+      })
+      .catch(function () {
+        btn.disabled = false;
+        toast("Zuordnen fehlgeschlagen (go-wochenplaene.sql ausgeführt?)");
+      });
+  }
+
+  function endPlan() {
+    var en = st.enrollment;
+    if (!en) return;
+    var go = global.GoDialog
+      ? GoDialog.confirm("Wochenplan beenden? Offene Termine ab heute werden entfernt.", { ok: "Beenden" })
+      : Promise.resolve(true);
+    go.then(function (ok) {
+      if (!ok) return;
+      var from = todayIso() + "T00:00:00" + berlinOffset(todayIso());
+      rest("events?enrollment_id=eq." + encodeURIComponent(en.id) + "&status=eq.geplant&starts_at=gte." + encodeURIComponent(from), {
+        method: "DELETE", prefer: "return=minimal"
+      })
+        .catch(function () {})
+        .then(function () {
+          return rest("enrollments?id=eq." + encodeURIComponent(en.id), {
+            method: "PATCH", prefer: "return=minimal", body: { status: "beendet" }
+          });
+        })
+        .then(function () {
+          toast("Wochenplan beendet");
+          return Promise.all([loadEnrollment(), loadWeek()]).then(paint);
+        })
+        .catch(function () { toast("Beenden fehlgeschlagen"); });
+    });
+  }
+
   function close() {
     if (st && st.root) st.root.remove();
     document.body.classList.remove("cp-open");
@@ -379,7 +574,14 @@
       courses: null
     };
     root.addEventListener("click", onClick);
-    Promise.all([loadPerson(), loadNote(), loadCourses(), loadWeek()]).then(paint);
+    root.addEventListener("change", function (e) {
+      if (e.target && e.target.id === "cp-plan") {
+        readPlanForm();
+        st.planDays = null;
+        paint();
+      }
+    });
+    Promise.all([loadPerson(), loadNote(), loadCourses(), loadWeek(), loadPlans(), loadEnrollment(), loadJoined()]).then(paint);
   }
 
   global.GoCoachPortal = { open: open, close: close };

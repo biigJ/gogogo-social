@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet" />
   <script src="/assets/go-account-session.js"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <style>
     :root {
       --bg: #F2EDE5;
@@ -49,6 +50,12 @@
     .pill { display: inline-block; font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--dim); }
     .list button.course { width: 100%; text-align: left; border-radius: 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); padding: 12px 14px; margin: 6px 0; }
     .list button.course.on { border-color: var(--ink); }
+    .list button.course { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr) auto; gap: 10px; align-items: center; }
+    .list .c-name { font-weight: 600; }
+    .list .c-mix { font-size: 13px; color: var(--dim); }
+    .list .c-level { font-size: 12px; font-weight: 600; border: 1px solid var(--ink); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+    .list .c-head { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 2fr) auto; gap: 10px; padding: 4px 14px; font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: .04em; }
+    .zirkel-info { background: #111; color: #fff; border-radius: 12px; padding: 12px 14px; margin-top: 8px; font-size: 14px; }
     .tabs { display: flex; gap: 6px; margin: 8px 0; flex-wrap: wrap; }
     .tabs button { background: transparent; color: var(--ink); border-color: var(--line); }
     .tabs button.on { background: var(--ink); color: var(--card); border-color: var(--ink); }
@@ -77,26 +84,26 @@
 <body>
   <div class="wrap">
     <div class="row" style="justify-content: space-between">
-      <h1>Kurse</h1>
+      <h1>Wochenpläne</h1>
       <a class="muted" href="/workout/">zur App</a>
     </div>
     <p class="muted" id="who"></p>
 
     <div id="gate" class="gate hidden">
-      <h2>Nur für Coaches</h2>
-      <p class="muted">Melde dich in der App an. Der Kurs-Editor ist für Coaches freigeschaltet.</p>
+      <h2>Nur für gogogo</h2>
+      <p class="muted">Wochenpläne pflegt gogogo zentral. Coaches ordnen sie im Coach-Portal (Team → Coachee) zu.</p>
       <a href="/workout/"><button>Zur App</button></a>
     </div>
 
     <div id="app" class="hidden">
       <div class="row">
-        <select id="f-cat" class="grow">
-          <option value="">Alle Kategorien</option>
-          <option value="kraft">Kraft</option>
-          <option value="ausdauer">Ausdauer</option>
-          <option value="zirkel">Zirkel</option>
-        </select>
-        <button id="btn-new">Neuer Kurs</button>
+        <div class="tabs" id="f-kind" style="margin:0; flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto">
+          <button data-kind="plan" class="on">Wochenpläne</button>
+          <button data-kind="single">Einzeleinheiten</button>
+          <button data-kind="hidden">Ausgeblendet</button>
+        </div>
+        <select id="f-cat" class="hidden"><option value=""></option></select>
+        <button id="btn-new" style="margin-left:auto">Neuer Wochenplan</button>
       </div>
       <div class="list" id="list"></div>
 
@@ -105,14 +112,14 @@
         <div class="card">
           <div class="row">
             <div class="grow"><label>Titel</label><input id="c-title" /></div>
-            <div style="width:130px"><label>Kategorie</label>
+            <div style="width:130px" class="hidden"><label>Kategorie</label>
               <select id="c-cat"><option value="kraft">Kraft</option><option value="ausdauer">Ausdauer</option><option value="zirkel">Zirkel</option></select>
             </div>
           </div>
           <div class="row" style="margin-top:8px">
             <div class="grow"><label>Level</label><select id="c-level"><option value="">–</option><option>1</option><option>2</option><option>3</option></select></div>
-            <div class="grow"><label>Einheiten pro Woche</label><select id="c-per"><option>1</option><option>2</option><option>3</option><option>4</option></select></div>
-            <div class="grow"><label>Dauer (Wochen)</label><input id="c-weeks" type="number" min="1" max="52" /></div>
+            <div class="grow"><label>Einheiten pro Woche</label><select id="c-per"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select></div>
+            <div class="grow hidden"><label>Dauer (Wochen)</label><input id="c-weeks" type="number" min="1" max="52" /></div>
             <div class="grow"><label>Wochen pro Block</label><input id="c-bw" type="number" min="1" max="12" /></div>
           </div>
           <div style="margin-top:8px"><label>Beschreibung</label><textarea id="c-desc"></textarea></div>
@@ -121,8 +128,7 @@
               <input id="c-active" type="checkbox" style="width:auto" /> im Katalog sichtbar
             </label>
             <div class="row">
-              <button class="ghost" id="btn-copy">Als eigenen Plan kopieren</button>
-              <button id="btn-save-course">Kurs speichern</button>
+              <button id="btn-save-course">Wochenplan speichern</button>
             </div>
           </div>
           <p class="muted" id="c-owner"></p>
@@ -146,23 +152,6 @@
           <div class="row" style="margin-top:8px"><button id="btn-ai-apply">Übernehmen</button></div>
         </div>
 
-        <h2>Coachee zuordnen</h2>
-        <div class="card">
-          <div class="row">
-            <div class="grow"><label>Coachee</label><select id="a-user"></select></div>
-            <div class="grow"><label>Start (Montag)</label><input id="a-start" type="date" /></div>
-          </div>
-          <div style="margin-top:8px"><label>Trainingstage</label>
-            <div class="row" id="a-days"></div>
-          </div>
-          <div class="row" style="margin-top:10px">
-            <label class="check">
-              <input id="a-private" type="checkbox" checked style="width:auto" /> als persönliche Kopie (anpassbar, Original bleibt)
-            </label>
-          </div>
-          <div class="row" style="margin-top:10px"><button id="btn-assign">Zuordnen</button></div>
-          <p class="muted" id="a-msg"></p>
-        </div>
       </div>
     </div>
   </div>
@@ -183,7 +172,9 @@
 
     var me = window.GoAccountSession ? GoAccountSession.load() : null;
     var isAdmin = !!(me && ADMIN_IDS.indexOf(me.id) !== -1);
-    var state = { courses: [], course: null, sessions: [], block: 1, travel: false, coachees: [] };
+    var state = { courses: [], course: null, sessions: [], block: 1, travel: false, coachees: [], kind: "plan" };
+    var CATS = [["kraft", "Kraft"], ["ausdauer", "Ausdauer"], ["alternative", "Sonstiges"], ["zirkel", "Zirkeltraining"]];
+    var ZIRKEL_INFO = "Zirkeltraining 30 min – buche unter FFC mit E-Mail-Adresse und Passwort und erstell dort ein wiederkehrendes Training.";
 
     function $(id) { return document.getElementById(id); }
     function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
@@ -205,7 +196,8 @@
       });
     }
 
-    function canEdit(c) { return !!c && (isAdmin || (me && c.coach_id === me.id && c.owner === "coach")); }
+    /* Nur gogogo (Joscha / biigJ) ändert Wochenpläne global; Coaches nicht */
+    function canEdit(c) { return !!c && isAdmin; }
 
     // ---------- Start ----------
     function showGate() {
@@ -213,30 +205,13 @@
       $("app").classList.add("hidden");
       if (me) $("who").textContent = "Angemeldet als " + me.name;
     }
-    if (!me || (!me.is_trainer && !isAdmin)) {
+    if (!me || !isAdmin) {
       showGate();
       return;
     }
-    /* Coach-Status aus der Datenbank, nicht nur aus dem lokalen Konto */
-    rest("go_accounts?id=eq." + encodeURIComponent(me.id) + "&select=is_trainer").then(function (rows) {
-      var row = rows && rows[0];
-      if (!row || (!row.is_trainer && !isAdmin)) showGate();
-    }).catch(function () {});
     $("app").classList.remove("hidden");
-    $("who").textContent = (isAdmin ? "Admin · " : "Coach · ") + me.name;
-    DAYS.forEach(function (d, i) {
-      $("a-days").insertAdjacentHTML("beforeend",
-        '<label class="check"><input type="checkbox" value="' + i + '" /> ' + d + "</label>");
-    });
-    $("a-start").value = nextMonday();
+    $("who").textContent = "gogogo · " + me.name;
     loadCourses();
-    rest("go_accounts?trainer_id=eq." + me.id + "&select=id,name&order=name.asc")
-      .then(function (rows) {
-        state.coachees = rows || [];
-        $("a-user").innerHTML = state.coachees.length
-          ? state.coachees.map(function (u) { return '<option value="' + u.id + '">' + esc(u.name) + "</option>"; }).join("")
-          : '<option value="">Noch keine Coachees</option>';
-      }).catch(function () {});
 
     function nextMonday() {
       var d = new Date(); var add = (8 - d.getDay()) % 7 || 7; d.setDate(d.getDate() + add);
@@ -245,30 +220,55 @@
 
     // ---------- Kursliste ----------
     function loadCourses() {
-      return rest("courses?select=id,title,slug,level,duration_weeks,sessions_per_week,category_default,description,coach_id,owner,is_active,private_for,block_weeks&order=title.asc")
+      return rest("courses?select=id,title,slug,level,duration_weeks,sessions_per_week,category_default,description,coach_id,owner,is_active,private_for,block_weeks,course_sessions(category,block_no,session_no,is_travel)&order=title.asc,level.asc")
         .then(function (rows) {
           state.courses = (rows || []).filter(function (c) {
-            if (c.slug === "eigenes-training") return false;
-            if (c.private_for) return isAdmin || c.coach_id === me.id;
+            if (c.slug === "eigenes-training" || c.slug === "12-wochen-routine" || /preset/.test(c.slug || "")) return false;
             return true;
           });
           renderList();
         }).catch(function (e) { toast("Laden fehlgeschlagen: " + e.message); });
     }
 
-    function renderList() {
-      var cat = $("f-cat").value;
-      var html = state.courses.filter(function (c) { return !cat || c.category_default === cat; }).map(function (c) {
-        var tag = c.private_for ? "persönlich" : c.owner === "coach" ? "mein Plan" : "gogogo";
-        return '<button class="course' + (state.course && state.course.id === c.id ? " on" : "") + '" data-id="' + c.id + '">' +
-          "<strong>" + esc(c.title) + "</strong> " + '<span class="pill">' + tag + "</span> " +
-          (c.is_active ? "" : '<span class="pill">ausgeblendet</span>') +
-          '<div class="muted">' + esc(c.category_default || "–") + " · " + (c.sessions_per_week || "?") + "× pro Woche · " + (c.duration_weeks || "?") + " Wochen</div></button>";
-      }).join("");
-      $("list").innerHTML = html || '<p class="muted">Keine Kurse.</p>';
+    /* Verteilung aus den Einheiten von Block 1: "2 Kraft + 1 Ausdauer + 4 Sonstiges" */
+    function mixOf(c) {
+      var n = {};
+      (c.course_sessions || []).forEach(function (s) {
+        if (s.is_travel || s.block_no !== 1) return;
+        n[s.category] = (n[s.category] || 0) + 1;
+      });
+      return n;
+    }
+    function mixText(n) {
+      var parts = CATS.filter(function (k) { return n[k[0]]; }).map(function (k) { return n[k[0]] + " " + k[1]; });
+      return parts.join(" + ") || "noch leer";
+    }
+    function kindOf(c) {
+      if (!c.is_active) return "hidden";
+      var total = 0, n = mixOf(c);
+      Object.keys(n).forEach(function (k) { total += n[k]; });
+      return total > 1 || (c.sessions_per_week || 1) > 1 ? "plan" : "single";
     }
 
-    $("f-cat").addEventListener("change", renderList);
+    function renderList() {
+      var rows = state.courses.filter(function (c) { return kindOf(c) === state.kind; });
+      var html = rows.map(function (c) {
+        return '<button class="course' + (state.course && state.course.id === c.id ? " on" : "") + '" data-id="' + c.id + '">' +
+          '<span class="c-name">' + esc(c.title) + (c.private_for ? ' <span class="pill">persönlich</span>' : "") + "</span>" +
+          '<span class="c-mix">' + esc(mixText(mixOf(c))) + "</span>" +
+          '<span class="c-level">' + (c.level ? "Level " + c.level : "–") + "</span></button>";
+      }).join("");
+      $("list").innerHTML = rows.length
+        ? '<div class="c-head"><span>Name</span><span>Verteilung</span><span>Level</span></div>' + html
+        : '<p class="muted">Keine Einträge.</p>';
+    }
+
+    $("f-kind").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-kind]"); if (!b) return;
+      state.kind = b.getAttribute("data-kind");
+      [].forEach.call($("f-kind").children, function (x) { x.classList.toggle("on", x === b); });
+      renderList();
+    });
     $("list").addEventListener("click", function (e) {
       var b = e.target.closest("button.course"); if (!b) return;
       var c = state.courses.find(function (x) { return x.id === b.getAttribute("data-id"); });
@@ -293,7 +293,7 @@
       ["c-title", "c-cat", "c-level", "c-per", "c-weeks", "c-bw", "c-desc", "c-active"].forEach(function (id) { $(id).disabled = !editable; });
       $("btn-save-course").disabled = !editable;
       $("btn-ai-apply").disabled = !editable;
-      $("c-owner").textContent = editable ? "" : "gogogo-Standardkurs: nur lesen. Kopiere ihn als eigenen Plan, um ihn anzupassen.";
+      $("c-owner").textContent = "Die Laufzeit legt der Coach je Coachee im Coach-Portal fest.";
       [].forEach.call($("variant-tabs").children, function (b) { b.classList.toggle("on", b.getAttribute("data-travel") === "0"); });
       loadSessions();
       $("editor").scrollIntoView({ behavior: "smooth" });
@@ -337,8 +337,9 @@
     }
 
     function sessionCard(s, row, inherited) {
-      var src = row || inherited || { title: "", focus: "", duration_min: "", blocks: [] };
+      var src = row || inherited || { title: "", focus: "", duration_min: "", blocks: [], category: "kraft" };
       var editable = canEdit(state.course);
+      var cat = src.category || "kraft";
       var note = !row && inherited ? '<p class="muted">Noch keine eigene Einheit in diesem Block: übernimmt Block ' + inherited.block_no + ". Speichern legt sie für diesen Block an.</p>"
         : !row ? '<p class="muted">Noch leer.</p>' : "";
       var blocks = (src.blocks || []).map(function (bl, bi) { return blockHtml(s, bi, bl, editable); }).join("");
@@ -351,8 +352,14 @@
         '<option value="">–</option>' + FOCUS.map(function (f) { return '<option value="' + f[0] + '"' + (src.focus === f[0] ? " selected" : "") + ">" + f[1] + "</option>"; }).join("") +
         "</select></div>" +
         '<div style="width:90px"><label>Minuten</label><input data-f="duration_min" type="number" value="' + esc(src.duration_min) + '"' + (editable ? "" : " disabled") + " /></div>" +
-        "</div>" + '<div data-blocks>' + blocks + "</div>" +
-        (editable ? '<div class="row" style="margin-top:10px"><button class="small ghost" data-act="add-block">+ Block</button><span class="grow"></span><button class="small" data-act="save-session">Einheit speichern</button></div>' : "") +
+        '<div style="width:150px"><label>Art</label><select data-f="category"' + (editable ? "" : " disabled") + ">" +
+        CATS.map(function (k) { return '<option value="' + k[0] + '"' + (cat === k[0] ? " selected" : "") + ">" + k[1] + "</option>"; }).join("") +
+        "</select></div>" +
+        "</div>" +
+        (cat === "zirkel"
+          ? '<p class="zirkel-info">' + esc(ZIRKEL_INFO) + "</p>" + '<div data-blocks hidden></div>'
+          : '<div data-blocks>' + blocks + "</div>") +
+        (editable ? '<div class="row" style="margin-top:10px">' + (cat === "zirkel" ? "" : '<button class="small ghost" data-act="add-block">+ Block</button>') + '<span class="grow"></span><button class="small" data-act="save-session">Einheit speichern</button></div>' : "") +
         "</div>";
     }
 
@@ -378,6 +385,7 @@
 
     function readCard(card) {
       var out = {
+        category: (card.querySelector('[data-f="category"]') || {}).value || "kraft",
         title: card.querySelector('[data-f="title"]').value.trim(),
         focus: card.querySelector('[data-f="focus"]').value || null,
         duration_min: parseInt(card.querySelector('[data-f="duration_min"]').value, 10) || null,
@@ -410,6 +418,17 @@
       renderSessions();
     });
 
+    $("sessions").addEventListener("change", function (e) {
+      var sel = e.target.closest('[data-f="category"]'); if (!sel) return;
+      var card = sel.closest("[data-session]");
+      var isZ = sel.value === "zirkel";
+      var bl = card.querySelector("[data-blocks]");
+      var info = card.querySelector(".zirkel-info");
+      if (isZ && !info) bl.insertAdjacentHTML("beforebegin", '<p class="zirkel-info">' + esc(ZIRKEL_INFO) + "</p>");
+      if (!isZ && info) info.remove();
+      bl.hidden = isZ;
+    });
+
     $("sessions").addEventListener("click", function (e) {
       var btn = e.target.closest("[data-act]"); if (!btn) return;
       var card = btn.closest("[data-session]"), act = btn.getAttribute("data-act");
@@ -425,15 +444,20 @@
         saveSession(parseInt(card.getAttribute("data-session"), 10), readCard(card));
       } else if (act === "del-session") {
         var row = findSession(state.block, parseInt(card.getAttribute("data-session"), 10), state.travel);
-        if (!row || !confirm("Einheit löschen?")) return;
-        rest("course_sessions?id=eq." + row.id, { method: "DELETE" }).then(loadSessions).then(function () { toast("Gelöscht"); })
-          .catch(function (err) { toast(err.message); });
+        if (!row) return;
+        GoDialog.confirm("Einheit löschen?", { ok: "Löschen" }).then(function (ok) {
+          if (!ok) return;
+          rest("course_sessions?id=eq." + row.id, { method: "DELETE" }).then(loadSessions).then(function () { toast("Gelöscht"); })
+            .catch(function (err) { toast(err.message); });
+        });
       }
     });
 
     function saveSession(s, data) {
+      if (data.category === "zirkel" && !data.title) data.title = "Zirkeltraining 30 min";
       if (!data.title) { toast("Titel fehlt"); return Promise.resolve(); }
-      var cat = state.course.category_default || "kraft";
+      var cat = data.category || "kraft";
+      if (cat === "zirkel") { data.blocks = []; data.duration_min = data.duration_min || 30; }
       var body = {
         course_id: state.course.id, block_no: state.block, session_no: s, is_travel: state.travel,
         title: data.title, focus: data.focus, category: cat, duration_min: data.duration_min,
@@ -489,22 +513,13 @@
     }
 
     $("btn-new").addEventListener("click", function () {
-      var title = prompt("Name des Kurses"); if (!title) return;
-      insertCourse({ title: title, category_default: $("f-cat").value || "kraft", sessions_per_week: 2, duration_weeks: 12, block_weeks: 4, is_active: false })
+      GoDialog.prompt("Name des Wochenplans", "").then(function (title) {
+      if (!title) return;
+      insertCourse({ title: title, category_default: "kraft", level: 1, sessions_per_week: 3, duration_weeks: 12, block_weeks: 4, is_active: false })
         .then(function (c) { return loadCourses().then(function () { openCourse(c); }); })
-        .then(function () { toast("Kurs angelegt (noch ausgeblendet)"); })
+        .then(function () { toast("Wochenplan angelegt (noch ausgeblendet)"); })
         .catch(function (err) { toast(err.message); });
-    });
-
-    $("btn-copy").addEventListener("click", function () {
-      var f = courseForm(); f.title = f.title + " · Kopie"; f.is_active = false;
-      var wasAdmin = isAdmin; isAdmin = false; // Kopie ist immer ein eigener Plan
-      insertCourse(f, state.sessions).then(function (c) {
-        isAdmin = wasAdmin;
-        return rest("courses?id=eq." + c.id, { method: "PATCH", body: { base_course_id: state.course.id } })
-          .then(function () { return loadCourses(); }).then(function () { openCourse(Object.assign(c, { base_course_id: state.course.id })); });
-      }).then(function () { toast("Kopie angelegt"); })
-        .catch(function (err) { isAdmin = wasAdmin; toast(err.message); });
+      });
     });
 
     // ---------- KI-Hilfe ----------
@@ -512,10 +527,10 @@
       var data = {
         course: courseForm(),
         sessions: state.sessions.map(function (s) {
-          return { block_no: s.block_no, session_no: s.session_no, is_travel: !!s.is_travel, title: s.title, focus: s.focus, duration_min: s.duration_min, blocks: s.blocks };
+          return { block_no: s.block_no, session_no: s.session_no, is_travel: !!s.is_travel, title: s.title, category: s.category, focus: s.focus, duration_min: s.duration_min, blocks: s.blocks };
         })
       };
-      var text = "Das ist ein gogogo-Trainingskurs als JSON. Aufbau einer Einheit: Blöcke vom Typ mobility, skill, grund, hybrid, hypertrophie, finisher, ausdauer; " +
+      var text = "Das ist ein gogogo-Wochenplan als JSON. Jede Einheit hat category kraft, ausdauer, alternative (Sonstiges, z. B. Schritte, Mobility) oder zirkel (läuft über FFC, ohne Übungen). Aufbau einer Einheit: Blöcke vom Typ mobility, skill, grund, hybrid, hypertrophie, finisher, ausdauer; " +
         "jede Übung hat name und optional sets, reps, time_s, dist_m, load, note. block_no = Block (je block_weeks Wochen), session_no = Einheit in der Woche, is_travel = Reisevariante (Körpergewicht, Band, Hotel-Gym).\n" +
         "Meine Änderung: [HIER BESCHREIBEN]\n" +
         "Antworte nur mit dem vollständigen geänderten JSON im selben Format.\n\n" + JSON.stringify(data, null, 2);
@@ -528,12 +543,13 @@
       var raw = $("ai-in").value.trim(), m = raw.match(/\{[\s\S]*\}/), data;
       try { data = JSON.parse(m ? m[0] : raw); } catch (e) { toast("Kein gültiges JSON"); return; }
       if (!data || !Array.isArray(data.sessions)) { toast("JSON braucht ein Feld sessions"); return; }
-      if (!confirm("Kurs und alle Einheiten durch die KI-Version ersetzen?")) return;
+      GoDialog.confirm("Wochenplan und alle Einheiten durch die KI-Version ersetzen?", { ok: "Ersetzen" }).then(function (ok) {
+      if (!ok) return;
       var c = state.course, f = Object.assign(courseForm(), data.course || {});
       delete f.slug; delete f.id; delete f.owner; delete f.coach_id;
       var rows = data.sessions.filter(function (s) { return s && s.title && s.session_no; }).map(function (s) {
         return { course_id: c.id, block_no: s.block_no || 1, session_no: s.session_no, is_travel: !!s.is_travel, title: s.title,
-          focus: s.focus || null, category: f.category_default || "kraft", duration_min: s.duration_min || null, blocks: s.blocks || [] };
+          focus: s.focus || null, category: s.category || f.category_default || "kraft", duration_min: s.duration_min || null, blocks: s.blocks || [] };
       });
       rest("courses?id=eq." + c.id, { method: "PATCH", body: f })
         .then(function () { return rest("course_sessions?course_id=eq." + c.id, { method: "DELETE" }); })
@@ -541,34 +557,9 @@
         .then(function () { $("ai-in").value = ""; return loadCourses(); })
         .then(function () { openCourse(state.courses.find(function (x) { return x.id === c.id; }) || c); toast("Übernommen"); })
         .catch(function (err) { toast(err.message); });
+      });
     });
 
-    // ---------- Coachee zuordnen ----------
-    $("btn-assign").addEventListener("click", function () {
-      var user = $("a-user").value, start = $("a-start").value;
-      var days = [].map.call($("a-days").querySelectorAll("input:checked"), function (i) { return parseInt(i.value, 10); });
-      var per = parseInt(state.course.sessions_per_week, 10) || 1;
-      if (!user) { toast("Coachee wählen"); return; }
-      if (!start) { toast("Startdatum fehlt"); return; }
-      if (days.length < per) { toast("Bitte " + per + " Trainingstage wählen"); return; }
-      var btn = this; btn.disabled = true;
-      var courseId = $("a-private").checked
-        ? rest("rpc/go_copy_course_for", { method: "POST", body: { p_course_id: state.course.id, p_user_id: user } })
-        : Promise.resolve(state.course.id);
-      courseId.then(function (cid) {
-        return rest("enrollments", { method: "POST", prefer: "return=representation", body: {
-          user_id: user, course_id: cid, status: "aktiv", start_date: start, weekdays: days.slice(0, per),
-          sessions_per_week: per, assigned_by: me.id, payment_status: "gratis"
-        } });
-      }).then(function (rows) {
-        return rest("rpc/go_generate_events", { method: "POST", body: { p_enrollment_id: rows[0].id } });
-      }).then(function (n) {
-        var name = ($("a-user").selectedOptions[0] || {}).textContent || "Coachee";
-        $("a-msg").textContent = name + ": " + (Number(n) || 0) + " Termine angelegt.";
-        toast("Zugeordnet"); return loadCourses();
-      }).catch(function (err) { toast(err.message); })
-        .then(function () { btn.disabled = false; });
-    });
   })();
   </script>
 </body>
