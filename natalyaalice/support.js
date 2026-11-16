@@ -390,7 +390,7 @@
       title: "12-Wochen-Routine",
       price: "gratis",
       description:
-        "12 Wochen täglich ein Event posten. Freunde sehen Dein Commitment. Volle Wochen: Personal Training gratis."
+        "Bestätige jeden Tag ein Event, ob Sport, Bewegung oder wenn Du einen Ausfall hast mit Kommentar, warum. Das hilft Dir, Deinen Fokus auf Deine tägliche Bewegung zu festigen und Dein alltägliches Verhalten zur Verbesserung Deiner Gesundheit zu verändern. Wenn Du 12 Wochen lang Deine Wochen voll hast, bekommst Du ein Goodie: das gogogo-Shirt!"
     },
     {
       key: "ernaehrung",
