@@ -15,7 +15,8 @@
     stempelkarte: "/assets/gogogo/gogogo-Stempelkarte.jpg",
     merch: "/assets/gogogo/gogogo-12wochen-routine.jpg",
     routine: "/assets/gogogo/gogogo-12wochen-routine.jpg",
-    zirkel: "/assets/gogogo/gogogo-Zirkeltraining.jpg"
+    zirkel: "/assets/gogogo/gogogo-Zirkeltraining.jpg",
+    kraft_tracking: "/assets/gogogo/Jelena-Pullups-1600.webp"
   };
 
   function esc(s) {
@@ -352,6 +353,7 @@
     routine: "12-Wochen-Routine",
     zirkel: "Friday Fitness Circle",
     ernaehrung: "Ernährung",
+    kraft_tracking: "Kraft-Tracking",
     web_call: "Initialgespräch",
     coach_offer: "Selbst Coaching anbieten",
     stempelkarte: "Stempelkarte",
@@ -399,6 +401,14 @@
       price: "gratis",
       description:
         "4 Wochen tägliches Ernährungs-Event unter Aktuell, gratis. Protokolliere Mahlzeiten im Dialog, Tracking unter Plus. Coach-Feedback und Plan auf Wunsch."
+    },
+    {
+      key: "kraft_tracking",
+      type: "kraft_tracking",
+      title: "Kraft-Tracking",
+      price: "gratis",
+      description:
+        "Alle Deine Krafttrainings als Liste, gratis. Klapp jedes Workout auf, filtere nach Datum und sieh über das Kurven-Symbol Deinen Fortschritt pro Übung, auch direkt beim Tracken."
     },
     {
       key: "coach_offer",
@@ -535,8 +545,17 @@
     })[0];
   }
 
+  function trackingKey() {
+    return "gogogo_kraft_tracking_" + (me() || "");
+  }
+
   function offerOwned(type) {
     if (type === "zirkel" && global.FFC && FFC.user && FFC.user()) return true;
+    if (type === "kraft_tracking") {
+      try {
+        if (me() && localStorage.getItem(trackingKey()) === "1") return true;
+      } catch (eLs) {}
+    }
     return !!(activeOrderFor(type) || (type === "routine" && host && host.routineActive && host.routineActive()));
   }
 
@@ -630,6 +649,7 @@
       key === "web_call" ||
       key === "stempelkarte" ||
       key === "coach_offer" ||
+      key === "kraft_tracking" ||
       key === "nutrition"
     ) {
       var type = key === "nutrition" ? "ernaehrung" : key;
@@ -703,7 +723,7 @@
         });
         return;
       }
-      if (kind === "ernaehrung" || kind === "web_call" || kind === "stempelkarte" || kind === "coach_offer") {
+      if (kind === "ernaehrung" || kind === "web_call" || kind === "stempelkarte" || kind === "coach_offer" || kind === "kraft_tracking") {
         bookStaticOffer(kind).then(function () {
           render();
           if (host.paintProfil) host.paintProfil();
@@ -720,12 +740,18 @@
   }
 
   function bookStaticOffer(type) {
+    if (type === "kraft_tracking") {
+      /* Merker lokal, falls go-kraft-tracking.sql (Produkt) noch nicht läuft */
+      try {
+        localStorage.setItem(trackingKey(), "1");
+      } catch (eLs) {}
+    }
     var db = dbProductForType(type);
     if (db) return bookProduct(db, { source: "plus_static" });
     /* Ohne Katalog-Produkt: lokale Order-Merker über Community/activity nicht nötig —
        speichere angefragte Buchung als support_orders nur wenn Produkt existiert.
        Fallback: meta in activity_log */
-    var instant = type === "stempelkarte" || type === "ernaehrung" || type === "web_call";
+    var instant = type === "stempelkarte" || type === "ernaehrung" || type === "web_call" || type === "kraft_tracking";
     var status = instant ? "aktiv" : "angefragt";
     var meta = {
       type: type,

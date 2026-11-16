@@ -209,6 +209,9 @@
       margin-bottom: 8px;
     }
     .item.is-done { background: var(--panel-2); }
+    .item.has-chart { position: relative; }
+    .item.has-chart > .name { padding-right: 40px; }
+    .item.has-chart > .kt-chart-btn { position: absolute; top: 8px; right: 8px; }
     .check-btn {
       width: 100%;
       display: flex;
@@ -7712,13 +7715,14 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
+  <script src="/natalyaalice/kraft-tracking.js?v=kt-1"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-3"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-44"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-45"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-36"></script>
-  <script src="/natalyaalice/support.js?v=support-15"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-37"></script>
+  <script src="/natalyaalice/support.js?v=support-16"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -7926,7 +7930,8 @@
         return path;
       }
 
-      function logBody(when, plan) {
+      var logNameCol = true;
+      function logBody(when, plan, ex) {
         var body = {
           workout_date: when,
           exercise_id: plan.storageId,
@@ -7936,6 +7941,8 @@
           updated_at: new Date().toISOString()
         };
         if (sessionMode && !linkedNatalya) body.account_id = sessionAccount.id;
+        /* Name für Historie/Verlauf (go-kraft-tracking.sql); ohne Spalte weglassen */
+        if (logNameCol && ex && ex.name) body.exercise_name = String(ex.name);
         return body;
       }
 
@@ -8098,6 +8105,17 @@
             item.appendChild(btn);
           } else {
             fillCopy(item, ex);
+            /* Verlauf als Kurve (kraft-tracking.js) */
+            if (window.GoKraftTracking && sessionMode) {
+              var chartBtn = document.createElement("button");
+              chartBtn.type = "button";
+              chartBtn.className = "kt-chart-btn";
+              chartBtn.setAttribute("aria-label", "Verlauf " + ex.name);
+              chartBtn.innerHTML = GoKraftTracking.chartIcon;
+              chartBtn.addEventListener("click", function () { GoKraftTracking.openChart(ex.name); });
+              item.classList.add("has-chart");
+              item.appendChild(chartBtn);
+            }
             var statEl = document.createElement("p");
             statEl.className = "stat";
             statEl.dataset.stat = ex.id;
@@ -8307,10 +8325,17 @@
                 });
               }
               var table = sessionMode ? "go_workout_logs" : "go_natalya_logs";
-              return rest(table + "?on_conflict=" + logConflict(), {
-                method: "POST",
-                prefer: "resolution=merge-duplicates,return=minimal",
-                body: logBody(when, plan)
+              function post() {
+                return rest(table + "?on_conflict=" + logConflict(), {
+                  method: "POST",
+                  prefer: "resolution=merge-duplicates,return=minimal",
+                  body: logBody(when, plan, ex)
+                });
+              }
+              return post().catch(function (err) {
+                if (!logNameCol || !/exercise_name/.test(String((err && err.message) || err))) throw err;
+                logNameCol = false;
+                return post();
               });
             });
           });
@@ -8319,6 +8344,7 @@
           }).then(function (rows) {
             if (gen !== generation) return;
             serverLogs = rows || [];
+            if (window.GoKraftTracking) GoKraftTracking.invalidate();
             showBanner("");
             setStatus("Gespeichert", false);
             paintMeta();
@@ -15995,6 +16021,21 @@
         closeFeedbackForm();
       }
 
+      /* Kraft-Tracking-Liste in den Plus-Slide hängen (Inhalt scrollt in .go-slide__body mit) */
+      function mountKraftTracking(card) {
+        if (!window.GoKraftTracking || !card) return;
+        var panel = card.querySelector("[data-kt-panel]");
+        if (!panel) {
+          panel = document.createElement("div");
+          panel.setAttribute("data-kt-panel", "1");
+          var into = card.querySelector(":scope > .go-slide__body") || card;
+          into.appendChild(panel);
+          GoKraftTracking.mount(panel, true);
+          return;
+        }
+        GoKraftTracking.mount(panel, false);
+      }
+
       function paintGoRail(force) {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
@@ -16019,7 +16060,8 @@
           ernaehrung: "/assets/gogogo/gogogo-Ernaehrung.jpg",
           web_call: "/assets/gogogo/gogogo-Web-Call.jpg",
           coach_offer: "/assets/gogogo/gogogo-Coach-small.jpg",
-          stempelkarte: "/assets/gogogo/gogogo-Stempelkarte.jpg"
+          stempelkarte: "/assets/gogogo/gogogo-Stempelkarte.jpg",
+          kraft_tracking: "/assets/gogogo/Jelena-Pullups-1600.webp"
         };
         var offers =
           window.GoSupport && GoSupport.getOffers
@@ -16105,6 +16147,7 @@
                 btn.classList.toggle("is-owned", !!ownedNow);
                 if (ownedNow) btn.setAttribute("aria-disabled", "true");
                 else btn.removeAttribute("aria-disabled");
+                if (of.key === "kraft_tracking" && ownedNow) mountKraftTracking(existing[ei]);
                 if (isZ && ffcLoggedNow) {
                   var lbKeep = existing[ei].querySelector("#go-zirkel-board");
                   var recKeep = existing[ei].querySelector("#go-zirkel-records");
@@ -16292,6 +16335,7 @@
             });
             card.appendChild(track);
           }
+          if (offer.key === "kraft_tracking" && owned) mountKraftTracking(card);
           if (offer.key === "stempelkarte" && owned) {
             var showStamp = document.createElement("button");
             showStamp.type = "button";
@@ -17848,6 +17892,28 @@
         });
       }
       window.GoOpenEventWorkout = openEventWorkout;
+
+      /* Kraft-Tracking: Historie + Verlauf (kraft-tracking.js) */
+      if (window.GoKraftTracking) {
+        GoKraftTracking.init({
+          rest: rest,
+          me: function () { return sessionMode && sessionAccount ? sessionAccount.id : ""; },
+          logPathFor: function (accountId) {
+            if (sessionAccount && String(accountId) === String(sessionAccount.id)) return Promise.resolve(logQuery());
+            /* Natalya loggt historisch in go_natalya_logs */
+            return rest("go_accounts?id=eq." + encodeURIComponent(accountId) + "&select=phone,serial_number&limit=1")
+              .catch(function () { return []; })
+              .then(function (rows) {
+                if (rows && rows[0] && isLinkedNatalya(rows[0])) return "go_natalya_logs?";
+                return "go_workout_logs?account_id=eq." + encodeURIComponent(accountId) + "&";
+              });
+          },
+          nameFor: function (id) {
+            var ex = Log.exerciseById(id);
+            return ex ? ex.name : null;
+          }
+        });
+      }
 
       function startPickedWorkout(unit, exercises) {
         var today = Log.berlinToday();
