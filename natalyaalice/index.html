@@ -210,6 +210,15 @@
     }
     .item.is-done { background: var(--panel-2); }
     .item.has-tools { position: relative; }
+    /* Übersicht: zugeklappte Übung mit Kreis links, Werte nach dem Antippen */
+    .item.is-collapsible { position: relative; padding-left: 52px; cursor: pointer; }
+    .item.is-collapsible > .ex-mark { position: absolute; left: 14px; top: 16px; width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid currentColor; display: grid; place-items: center; opacity: .9; }
+    .item.is-collapsible > .ex-mark svg { opacity: 0; }
+    .item.is-collapsible.is-done > .ex-mark { background: #F6F1E8; border-color: #F6F1E8; }
+    .item.is-collapsible.is-done > .ex-mark svg { opacity: 1; }
+    .item.is-collapsible:not(.is-open) > .sets,
+    .item.is-collapsible:not(.is-open) > .ex-finish { display: none; }
+    .item.is-collapsible > .ex-finish { display: block; width: 100%; min-height: 44px; margin: 12px 0 2px; border: 0; border-radius: 999px; background: #F6F1E8; color: #2A2118; font: inherit; font-weight: 700; cursor: pointer; }
     .item.has-tools > .name, .item.has-tools .check-copy { padding-right: var(--tools-w, 40px); }
     .item-tools { position: absolute; top: 8px; right: 8px; display: flex; gap: 2px; }
     .check-btn {
@@ -7731,7 +7740,7 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-1"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-46"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-48"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-38"></script>
   <script src="/natalyaalice/support.js?v=support-16"></script>
@@ -8136,12 +8145,25 @@
             item.appendChild(statEl);
             item.appendChild(controls);
             renderSetRows(ex, controls);
+            /* Übersicht: Kreis links, Übung antippen klappt Sätze/kg/Wdh. auf, „Übung fertig“ setzt den Haken */
+            if (sessionMode) {
+              item.classList.add("is-collapsible");
+              var exMark = document.createElement("span");
+              exMark.className = "ex-mark";
+              exMark.innerHTML = CHECK_SVG;
+              item.insertBefore(exMark, item.firstChild);
+              var exFinish = document.createElement("button");
+              exFinish.type = "button";
+              exFinish.className = "ex-finish";
+              exFinish.dataset.exFinish = ex.id;
+              exFinish.textContent = "Übung fertig";
+              item.appendChild(exFinish);
+            }
           }
 
-          /* Übungsvideo (exercise-media.js), vor der Kurve */
+          /* Übungsvideo (exercise-media.js), ganz rechts */
           if (window.GoExMedia && GoExMedia.urlFor(ex.name)) {
-            var tools = itemTools(item);
-            tools.insertBefore(GoExMedia.button(ex.name), tools.firstChild);
+            itemTools(item).appendChild(GoExMedia.button(ex.name));
           }
           var toolCount = item.querySelectorAll(".item-tools > button").length;
           if (toolCount) item.style.setProperty("--tools-w", (toolCount * 38 + 4) + "px");
@@ -8584,6 +8606,38 @@
         if (tap && event.pointerId === tap.id) tap = null;
       });
 
+      /* Übung auf-/zuklappen und als fertig markieren */
+      listEl.addEventListener("click", function (event) {
+        var fin = event.target.closest("[data-ex-finish]");
+        if (fin) {
+          var exF = Log.exerciseById(fin.dataset.exFinish);
+          if (!exF) return;
+          var setsF = draft[exF.id].sets;
+          var n = Log.setCount(exF);
+          var anyValue = setsF.some(function (st) { return st && (st.reps || st.kg != null); });
+          if (!anyValue) {
+            gogogoToast("Trag mindestens einen Satz mit Wiederholungen oder Gewicht ein");
+            return;
+          }
+          for (var k = 0; k < n; k++) {
+            if (!setsF[k]) setsF[k] = { reps: "", kg: null, kgTouched: false, done: false };
+            setsF[k].done = true;
+          }
+          paintMeta();
+          scheduleSave(exF, true);
+          noteProgress();
+          var itemF = fin.closest(".item");
+          if (itemF) itemF.classList.remove("is-open");
+          return;
+        }
+        var itemT = event.target.closest(".item.is-collapsible");
+        if (!itemT) return;
+        if (event.target.closest(".sets, .item-tools, button, input, a")) return;
+        var willOpen = !itemT.classList.contains("is-open");
+        listEl.querySelectorAll(".item.is-open").forEach(function (o) { o.classList.remove("is-open"); });
+        if (willOpen) itemT.classList.add("is-open");
+      });
+
       listEl.addEventListener("click", function (event) {
         var reps = event.target.closest("[data-reps], .reps");
         if (reps) {
@@ -8700,6 +8754,27 @@
         finishWheel();
         markDiaryMove(date, label);
         var job = Promise.resolve();
+        /* Spontan: jetzt erst das Event anlegen, dann Abschluss mit Foto in Aktuell */
+        var sp = spontanPick && spontanPick.iso === date && label.indexOf(spontanPick.label) !== -1 ? spontanPick : null;
+        spontanPick = null;
+        if (sp && window.HeuteAccountability && HeuteAccountability.createUnplanned) {
+          HeuteAccountability.createUnplanned({
+            category: sp.category,
+            course_id: sp.course_id || null,
+            title: sp.label,
+            visibility: sp.visibility || "team"
+          }).then(function (evNew) {
+            btn.disabled = false;
+            setHome(true);
+            return Promise.resolve(HeuteAccountability.refresh()).then(function () {
+              if (evNew && evNew.id) HeuteAccountability.openDone(evNew.id);
+            });
+          }).catch(function () {
+            btn.disabled = false;
+            gogogoToast("Training konnte nicht gespeichert werden");
+          });
+          return;
+        }
         if (sessionMode && sessionAccount && sessionAccount.id) {
           job = rest(
             "events?user_id=eq." + encodeURIComponent(sessionAccount.id) +
@@ -17909,6 +17984,7 @@
         return out;
       }
 
+      var spontanPick = null;
       function openEventWorkout(ev) {
         if (!ev || !sessionMode) return;
         function sessionsOf(courseId) {
@@ -17936,6 +18012,8 @@
           var iso = new Date(ev.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
           var unit = { kind: ev.category || "kraft", label: ev.title || (ses && ses.title) || "Training" };
           todayPick = { iso: iso, unit: unit, exercises: exercises };
+          /* Spontan geloggt: Event entsteht erst beim Abschluss (finishWorkoutNow) */
+          spontanPick = ev.spontan ? Object.assign({ iso: iso, label: unit.label }, ev.spontan) : null;
           closeShellModals();
           if (window.WocheReels) WocheReels.hide();
           startWorkout(iso, false);

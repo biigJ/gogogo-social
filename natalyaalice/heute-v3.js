@@ -2972,6 +2972,20 @@
     });
   }
 
+  /* Einzeleinheiten = aktive Kurse mit genau einer Einheit (wie im Kurs-Editor) */
+  function loadSingleUnits(kind) {
+    return rest(
+      "courses?is_active=eq.true&private_for=is.null&category_default=eq." + encodeURIComponent(kind) +
+        "&select=id,title,slug,sessions_per_week,course_sessions(id)&order=title.asc"
+    ).then(function (rows) {
+      return (rows || []).filter(function (c) {
+        var n = (c.course_sessions || []).length;
+        return n === 1 && (c.sessions_per_week || 1) <= 1 &&
+          ["eigenes-training", "12-wochen-routine"].indexOf(String(c.slug || "")) === -1;
+      });
+    }).catch(function () { return []; });
+  }
+
   function createUnplannedEvent(payload) {
     var body = {
       user_id: me(),
@@ -3065,10 +3079,11 @@
       startBtn.textContent = "Jetzt starten";
       startBtn.addEventListener("click", function () {
         var vis = readCreateVis(pick);
-        finishCreate({
-          category: "alternative",
-          title: "Sonstiges",
-          visibility: vis
+        /* Sonstiges: gleich abschließen, mit Foto und Notiz */
+        createUnplannedEvent({ category: "alternative", title: "Sonstiges", visibility: vis }).then(function (ev) {
+          modal.hidden = true;
+          if (host.closeGoPick) host.closeGoPick();
+          return refresh().then(function () { if (ev && ev.id) openDoneModal(ev.id); });
         });
       });
       pick.appendChild(startBtn);
@@ -3128,6 +3143,42 @@
         });
       });
       pick.appendChild(go);
+    }
+
+    /* Kraft / Ausdauer: Einzeleinheit wählen → direkt tracken. Das Event entsteht erst beim Abschluss. */
+    if ((kind === "kraft" || kind === "ausdauer") && host.openEventWorkout) {
+      kinds.hidden = true;
+      title.hidden = false;
+      title.textContent = "Welche Einheit?";
+      pick.hidden = false;
+      pick.innerHTML = visPickerHtml() + '<p class="acc-spontan-loading">Lädt …</p>';
+      loadSingleUnits(kind).then(function (units) {
+        var loading = pick.querySelector(".acc-spontan-loading");
+        if (loading) loading.remove();
+        if (!units.length) {
+          pick.insertAdjacentHTML("beforeend", "<p>Noch keine Einzeleinheiten für diese Kategorie.</p>");
+          return;
+        }
+        units.forEach(function (u) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.textContent = u.title;
+          b.addEventListener("click", function () {
+            var vis = readCreateVis(pick);
+            modal.hidden = true;
+            if (host.closeGoPick) host.closeGoPick();
+            host.openEventWorkout({
+              course_id: u.id,
+              title: u.title,
+              category: kind,
+              starts_at: new Date().toISOString(),
+              spontan: { category: kind, course_id: u.id, visibility: vis }
+            });
+          });
+          pick.appendChild(b);
+        });
+      });
+      return;
     }
 
     var list = enrollmentsForCategory(kind);
@@ -3657,6 +3708,7 @@
       refresh();
     },
     afterKindChosen: afterKindChosen,
+    createUnplanned: createUnplannedEvent,
     todayActivity: todayActivity,
     focusEvent: focusEvent
   };
