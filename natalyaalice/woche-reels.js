@@ -2159,6 +2159,10 @@
           body: { starts_at: starts }
         });
       })
+      .then(function (r) {
+        if (global.GoTama) global.GoTama.invalidate();
+        return r;
+      })
       .then(function () {
         closeSheet();
         if (host.toast) host.toast("Verschoben");
