@@ -1464,7 +1464,7 @@
   function coverFor(opts) {
     if (opts.photo || opts.plus || !global.GoCovers) return "";
     var cat = /ernährung|ernaehrung/i.test(String(opts.title || "")) ? "ernaehrung" : opts.category;
-    return GoCovers.url(opts.courseId, cat);
+    return GoCovers.url(opts.courseId, cat, opts.enrollmentId);
   }
 
   function mediaInnerHtml(opts) {
@@ -1689,6 +1689,7 @@
       category: ev.category,
       photo: ev.photo_url || "",
       courseId: ev.course_id || "",
+      enrollmentId: ev.enrollment_id || "",
       emoji: emoji,
       actions: (tools || "") + (actions || ""),
       author: authorHtml(p, true),

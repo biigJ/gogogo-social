@@ -303,7 +303,7 @@
               esc(c.title + (c.level ? " · L" + c.level : "") + " — " + mixText(planMix(c))) + "</option>";
           }).join("") +
           "</select></label>" +
-          '<div class="cp-row"><label class="cp-field">Start (Montag)<input type="date" id="cp-start" value="' + esc(st.planStart || addDays(mondayOf(todayIso()), 7)) + '" /></label>' +
+          '<div class="cp-row"><label class="cp-field">Start (Montag)<input type="date" id="cp-start" value="' + esc(st.planStart || mondayOf(todayIso())) + '" /></label>' +
           '<label class="cp-field">Wochen<input type="number" id="cp-weeks" min="1" max="52" value="' + esc(st.planWeeks || 12) + '" /></label></div>' +
           '<p class="cp-hint">Der Plan füllt Mo bis So automatisch. Einzelne Tage kannst Du danach in der Woche verschieben (Event antippen).' +
           (hasZ ? " Zirkeltraining läuft über FFC und erzeugt keinen Termin." : "") + "</p>" +
