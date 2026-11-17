@@ -2980,7 +2980,7 @@
     ).then(function (rows) {
       return (rows || []).filter(function (c) {
         var n = (c.course_sessions || []).length;
-        return n === 1 && (c.sessions_per_week || 1) <= 1 &&
+        return n <= 1 && (c.sessions_per_week || 1) <= 1 &&
           ["eigenes-training", "12-wochen-routine"].indexOf(String(c.slug || "")) === -1;
       });
     }).catch(function () { return []; });
@@ -3167,6 +3167,13 @@
             var vis = readCreateVis(pick);
             modal.hidden = true;
             if (host.closeGoPick) host.closeGoPick();
+            /* Einheit ohne Übungen (z. B. Laufen): gleich abschließen, mit Foto */
+            if (!(u.course_sessions || []).length) {
+              createUnplannedEvent({ category: kind, course_id: u.id, title: u.title, visibility: vis }).then(function (ev) {
+                return refresh().then(function () { if (ev && ev.id) openDoneModal(ev.id); });
+              });
+              return;
+            }
             host.openEventWorkout({
               course_id: u.id,
               title: u.title,
