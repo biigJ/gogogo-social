@@ -355,7 +355,7 @@
     zirkel: "Friday Fitness Circle",
     ernaehrung: "Ernährung",
     kraft_tracking: "Kraft-Tracking",
-    uebungen: "Übungen",
+    uebungen: "Videos",
     web_call: "Initialgespräch",
     coach_offer: "Selbst Coaching anbieten",
     stempelkarte: "Stempelkarte",
@@ -407,10 +407,10 @@
     {
       key: "uebungen",
       type: "uebungen",
-      title: "Übungen",
+      title: "Videos",
       price: "gratis",
       description:
-        "Alle Übungen aus den Wochenplänen mit Video. Speicher eigene Links von Instagram oder YouTube und vergib Sterne: die besten Videos rücken nach vorn und laufen direkt beim Tracken."
+        "Kopier Links aus Instagram oder Youtube hierher und such die passende Übung aus der Liste. Dann wird es Dir beim Üben angezeigt."
     },
     {
       key: "kraft_tracking",
