@@ -15,6 +15,8 @@
 
   var host = null;
   var map = {};
+  var userBest = {};
+  var userLinks = [];
   var loading = null;
 
   var PLAY_SVG =
@@ -83,17 +85,43 @@
   function load() {
     if (!host || !host.rest) return Promise.resolve();
     if (loading) return loading;
-    loading = host.rest("go_exercise_media?select=name_key,name,url&limit=2000")
-      .then(function (rows) {
-        map = {};
-        (rows || []).forEach(function (r) { if (r && r.name_key && r.url) map[r.name_key] = r.url; });
-      })
-      .catch(function () { map = {}; });
+    loading = Promise.all([
+      host.rest("go_exercise_media?select=name_key,name,url&limit=2000").catch(function () { return []; }),
+      /* Nutzer-Links mit Sternen (go-exercise-links.sql); fehlt die View, bleibt es bei gogogo-Links */
+      host.rest("go_exercise_links_ranked?select=id,name_key,name,url,added_by,added_by_name,stars,created_at&limit=5000").catch(function () { return []; })
+    ]).then(function (res) {
+      map = {};
+      (res[0] || []).forEach(function (r) { if (r && r.name_key && r.url) map[r.name_key] = r.url; });
+      userLinks = res[1] || [];
+      rankUser();
+    });
     return loading;
   }
 
+  function rankUser() {
+    userBest = {};
+    userLinks.slice().sort(function (a, b) {
+      return (b.stars || 0) - (a.stars || 0) || String(a.created_at).localeCompare(String(b.created_at));
+    }).forEach(function (l) {
+      if (!userBest[l.name_key]) userBest[l.name_key] = l.url;
+    });
+  }
+
+  /* gogogo-Link zuerst, sonst der Nutzer-Link mit den meisten Sternen */
   function urlFor(name) {
-    return map[key(name)] || "";
+    var k = key(name);
+    return map[k] || userBest[k] || "";
+  }
+
+  /* Alle Links einer Übung: gogogo zuerst, dann Nutzer nach Sternen */
+  function linksFor(name) {
+    var k = key(name);
+    var out = [];
+    if (map[k]) out.push({ id: "", url: map[k], admin: true, stars: null, by: "gogogo" });
+    userLinks.filter(function (l) { return l.name_key === k && l.url !== map[k]; })
+      .sort(function (a, b) { return (b.stars || 0) - (a.stars || 0) || String(a.created_at).localeCompare(String(b.created_at)); })
+      .forEach(function (l) { out.push({ id: l.id, url: l.url, admin: false, stars: l.stars || 0, by: l.added_by_name || "", added_by: l.added_by }); });
+    return out;
   }
 
   function open(name, url) {
@@ -145,6 +173,7 @@
     reload: function () { loading = null; return load(); },
     set: function (name, url) { if (url) map[key(name)] = url; else delete map[key(name)]; },
     urlFor: urlFor,
+    linksFor: linksFor,
     parse: parse,
     open: open,
     button: button,

@@ -7776,8 +7776,9 @@
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
-  <script src="/natalyaalice/exercise-media.js?v=gxm-1"></script>
+  <script src="/natalyaalice/exercise-media.js?v=gxm-2"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-1"></script>
+  <script src="/natalyaalice/exercise-links.js?v=gxl-1"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-5"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-1"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-1"></script>
@@ -7786,7 +7787,7 @@
   <script src="/natalyaalice/heute-v3.js?v=feed-49"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-39"></script>
-  <script src="/natalyaalice/support.js?v=support-17"></script>
+  <script src="/natalyaalice/support.js?v=support-18"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -16292,6 +16293,25 @@
         GoKraftTracking.mount(panel, false);
       }
 
+      /* Plus → Übungen: Liste, eigene Links, Sterne (exercise-links.js) */
+      function mountExLinks(card) {
+        if (!window.GoExLinks || !card) return;
+        var panel = card.querySelector("[data-gxl-panel]");
+        if (!panel) {
+          panel = document.createElement("div");
+          panel.setAttribute("data-gxl-panel", "1");
+          (card.querySelector(":scope > .go-slide__body") || card).appendChild(panel);
+        } else if (panel.dataset.gxlReady) {
+          return; /* schon da: Suche und offene Einträge nicht zurücksetzen */
+        }
+        GoExLinks.init({
+          rest: rest,
+          me: function () { return sessionAccount ? sessionAccount.id : ""; },
+          toast: function (m) { gogogoToast(m); }
+        });
+        GoExLinks.mount(panel);
+      }
+
       function paintGoRail(force) {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
@@ -16317,7 +16337,8 @@
           web_call: "/assets/gogogo/gogogo-Web-Call.jpg",
           coach_offer: "/assets/gogogo/gogogo-Coach-small.jpg",
           stempelkarte: "/assets/gogogo/gogogo-Stempelkarte.jpg",
-          kraft_tracking: "/assets/gogogo/Jelena-Pullups-1600.webp"
+          kraft_tracking: "/assets/gogogo/Jelena-Pullups-1600.webp",
+          uebungen: "/assets/gogogo/gogogo-upperbody-Video-Poster-1600.webp"
         };
         var offers =
           window.GoSupport && GoSupport.getOffers
@@ -16404,6 +16425,7 @@
                 if (ownedNow) btn.setAttribute("aria-disabled", "true");
                 else btn.removeAttribute("aria-disabled");
                 if (of.key === "kraft_tracking" && ownedNow) mountKraftTracking(existing[ei]);
+                if (of.key === "uebungen") mountExLinks(existing[ei]);
                 if (isZ && ffcLoggedNow) {
                   var lbKeep = existing[ei].querySelector("#go-zirkel-board");
                   var recKeep = existing[ei].querySelector("#go-zirkel-records");
@@ -16631,6 +16653,10 @@
             card.appendChild(track);
           }
           if (offer.key === "kraft_tracking" && owned) mountKraftTracking(card);
+          if (offer.key === "uebungen") {
+            cta.hidden = true; cta.style.display = "none"; /* frei für alle, kein Buchen */
+            mountExLinks(card);
+          }
           if (offer.key === "stempelkarte" && owned) {
             var showStamp = document.createElement("button");
             showStamp.type = "button";
