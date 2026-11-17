@@ -368,7 +368,7 @@
       title: "Friday Fitness Circle",
       price: "gratis",
       description:
-        "Werde Teil der Gruppe für ein Zirkeltraining. Du kannst vor Ort trainieren oder die Aufzeichnung hier für Dein eigenes Training nutzen. Du trackst über Eingabe und am Ende landen Deine Daten in einer Datenbank damit Du Deine Trainings von Woche zu Woche vergleichen kannst. Login über E-Mail-Adresse und einem Passwort."
+        "Buch Dich ein in das Friday Fitness Zirkeltraining. Warum der Name? Weil am Freitagmittag die erste Gruppe vor Ort in Berlin trainiert. Du kannst aber immer und überall Dein Zirkeltraining als Event anlegen und machen. Hier legst Du Deinen Circle-Account an und kannst direkt von gogogo aus starten. Das Tracking startet direkt im Event unter Aktuell, die Aufzeichnungen findest Du hier unterm Text."
     },
     {
       key: "stempelkarte",
@@ -392,7 +392,7 @@
       title: "12-Wochen-Routine",
       price: "gratis",
       description:
-        "Bestätige jeden Tag ein Event, ob Sport, Bewegung oder wenn Du einen Ausfall hast mit Kommentar, warum. Das hilft Dir, Deinen Fokus auf Deine tägliche Bewegung zu festigen und Dein alltägliches Verhalten zur Verbesserung Deiner Gesundheit zu verändern. Wenn Du 12 Wochen lang Deine Wochen voll hast, bekommst Du ein Goodie: das gogogo-Shirt!"
+        "Bestätige jeden Tag ein Event, ob Sport, Bewegung oder wenn Du einen Ausfall hast mit Kommentar, warum. Das hilft Dir, Deine tägliche Bewegung zu etablieren, Dein Verhalten im Alltag zu festigen und Deine Gesundheit zu verbessern. Wenn Du 12 Wochen lang Deine Wochen voll hast, bekommst Du ein Goodie: das gogogo-Shirt!"
     },
     {
       key: "ernaehrung",
