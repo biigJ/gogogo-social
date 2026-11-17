@@ -1277,7 +1277,7 @@
     var going = goingLine(ev);
     /* Coverbild statt Farbfläche (go-covers.js): Kursbild, sonst Bild der Kategorie */
     var nutritionTitle = /ernährung|ernaehrung/i.test(String(ev.title || ""));
-    var cover = !ev.photo_url && global.GoCovers ? GoCovers.url(ev.course_id, nutritionTitle ? "ernaehrung" : cat) : "";
+    var cover = !ev.photo_url && global.GoCovers ? GoCovers.url(ev.course_id, nutritionTitle ? "ernaehrung" : cat, ev.enrollment_id) : "";
     var isNutrition =
       String(ev.item_type || "") === "nutrition_log" ||
       /ernährung|ernaehrung/i.test(String(ev.title || ""));
