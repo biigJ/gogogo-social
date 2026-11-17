@@ -3,7 +3,7 @@
 -- Läuft auch ohne go-admin.sql: legt is_admin + go_is_admin() bei Bedarf selbst an (gleiche Definition).
 --
 -- go_exercise_media: ein Link pro Übungsname, gilt in allen Plänen (Schlüssel = Name klein, ohne Leerzeichen-Doppelungen).
--- courses.image_url: Coverbild (Datei im öffentlichen Bucket go-avatars unter covers/).
+-- courses.image_url: Coverbild (Datei im öffentlichen Bucket go-covers, siehe go-covers-bucket.sql).
 
 alter table go_accounts add column if not exists is_admin boolean not null default false;
 

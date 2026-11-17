@@ -21,9 +21,16 @@
 
   var CSS =
     ".kt{margin:18px 0 8px;text-align:left;color:#2A2118}" +
-    ".kt__filter{display:flex;gap:8px;margin:0 0 12px}" +
-    ".kt__filter label{flex:1;display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:rgba(42,33,24,.65)}" +
-    ".kt__filter input{min-height:40px;box-sizing:border-box;width:100%;padding:0 8px;border:1px solid rgba(42,33,24,.25);border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118}" +
+    ".kt__filter{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;margin:0 0 12px}" +
+    ".kt__filter label{min-width:0;display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:rgba(42,33,24,.65)}" +
+    ".kt__filter input{-webkit-appearance:none;appearance:none;display:block;min-height:40px;box-sizing:border-box;width:100%;min-width:0;max-width:100%;padding:0 8px;border:1px solid rgba(42,33,24,.25);border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118;text-align:left}" +
+    ".kt-tab{width:100%;border-collapse:collapse;margin:0 0 10px;font-size:14px;table-layout:fixed}" +
+    ".kt-tab th{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:rgba(42,33,24,.55)!important;background:transparent!important;border:0!important;text-align:right;padding:2px 4px 4px}" +
+    ".kt-tab th:first-child,.kt-tab td:first-child{text-align:left;width:46%}" +
+    ".kt-tab td{padding:5px 4px;text-align:right;font-variant-numeric:tabular-nums;border-top:1px solid rgba(42,33,24,.08);background:transparent!important;color:#2A2118!important;vertical-align:middle}" +
+    ".kt-tab td:first-child{font-weight:600;overflow-wrap:anywhere;hyphens:auto}" +
+    ".kt-tab td.kt-tab__c{width:34px;padding:0;text-align:right}" +
+    ".kt-tab .kt-chart-btn{width:30px;height:30px}" +
     ".kt__empty{margin:8px 0;font-size:14px;color:rgba(42,33,24,.65)}" +
     ".kt__day{border-top:1px solid rgba(42,33,24,.14)}" +
     ".kt__day:last-child{border-bottom:1px solid rgba(42,33,24,.14)}" +
@@ -202,6 +209,24 @@
     );
   }
 
+  /* Eine Zeile pro Satz: Übung | Satz | kg | Wdh. — nur Übungen mit Werten */
+  function setTableHtml(list, accountId) {
+    var withData = list.filter(function (ex) { return !ex.check && ex.sets.some(function (s) { return s.reps != null || s.kg != null; }); });
+    if (!withData.length) return '<p class="kt__empty">Keine Aktivitäten</p>';
+    var rows = "";
+    withData.forEach(function (ex) {
+      var sets = ex.sets.filter(function (s) { return s.reps != null || s.kg != null; });
+      sets.forEach(function (st, i) {
+        rows += "<tr><td>" + (i === 0 ? esc(ex.name) : "") + "</td><td>" + (i + 1) + "</td><td>" +
+          (st.kg != null ? esc(fmtNum(st.kg)) : "–") + "</td><td>" + (st.reps != null ? esc(String(st.reps)) : "–") + "</td>" +
+          '<td class="kt-tab__c">' + (i === 0
+            ? '<button type="button" class="kt-chart-btn" data-kt-chart="' + esc(ex.name) + '" data-kt-who="' + esc(accountId) + '" aria-label="Verlauf ' + esc(ex.name) + '">' + CHART_SVG + "</button>"
+            : "") + "</td></tr>";
+      });
+    });
+    return '<table class="kt-tab"><thead><tr><th>Übung</th><th>Satz</th><th>kg</th><th>Wdh.</th><th class="kt-tab__c"></th></tr></thead><tbody>' + rows + "</tbody></table>";
+  }
+
   function onChartClick(e) {
     var b = e.target && e.target.closest ? e.target.closest("[data-kt-chart]") : null;
     if (!b) return;
@@ -267,8 +292,8 @@
         return (
           '<details class="kt__day" data-kt-day="' + esc(iso) + '"' + (open[iso] ? " open" : "") + ">" +
           '<summary><span class="kt__date">' + esc(fmtDate(iso, true)) + '</span><span class="kt__title">' +
-          esc(titles[iso] || "Workout") + " · " + list.length + " Übungen</span></summary>" +
-          exListHtml(list, me) +
+          esc(titles[iso] || "Workout") + "</span></summary>" +
+          setTableHtml(list, me) +
           "</details>"
         );
       }).join("");

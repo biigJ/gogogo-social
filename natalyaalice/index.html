@@ -1607,6 +1607,16 @@
       background: linear-gradient(0deg, rgba(255,255,255,.55), transparent);
     }
     .woche-reels.is-dark-day .wr-day-label { color: #fff; }
+    /* Fotos: Abdunklung oben und unten, damit Icons und Text auch auf hellen/unruhigen Bildern lesbar bleiben */
+    .woche-reels.is-photo-day .wr-top {
+      background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.25) 70%, transparent 100%);
+    }
+    .woche-reels.is-photo-day .wr-icon-btn,
+    .woche-reels.is-photo-day .wr-week-label { color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
+    .woche-reels.is-photo-day .wr-travel-emoji { filter: grayscale(1) brightness(10) drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
+    .woche-reels.is-photo-day .wr-day-label { color: #fff; text-shadow: 0 1px 10px rgba(0,0,0,.6); }
+    .woche-reels.is-photo-day .wr-progress { background: linear-gradient(0deg, rgba(0,0,0,.72), rgba(0,0,0,.35) 60%, transparent); }
+    .woche-reels.is-photo-day .wr-progress p { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
     .woche-reels.is-dark-day .wr-week-label,
     .woche-reels.is-dark-day .wr-icon-btn { color: #fff; }
     .wr-travel-emoji {
@@ -3958,6 +3968,9 @@
       border-width: 4px;
     }
     .crew-story--add .team-avatar { background: transparent; border-style: dashed; }
+    .crew-story--add .team-avatar { display: grid; place-items: center; }
+    .acc-face--add { display: inline-grid !important; place-items: center; padding: 0 !important; line-height: 0 !important; }
+    .acc-face--add svg { display: block; }
     .crew-story__ring .team-avatar {
       width: 100%;
       height: 100%;
@@ -3990,6 +4003,12 @@
     .crew-story.is-training.is-training-active .crew-story__ring {
       animation: training-ring-pulse-strong 0.85s ease-in-out infinite;
     }
+    /* Heute erledigt: dunkel pulsieren bis 0:00 */
+    .crew-story.is-training.is-training-done .crew-story__ring {
+      box-shadow: 0 0 0 5px #2A2118;
+      animation: training-ring-pulse-dark 1.6s ease-in-out infinite;
+    }
+    .crew-story.is-training.is-training-done .crew-story__name { color: #2A2118; }
     .crew-story.is-today .crew-story__name { font-weight: 700; }
     #heute-stories.is-filter-hidden { display: none !important; }
     .team-group-ffc { margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(42,33,24,.2); }
@@ -4001,6 +4020,10 @@
     @keyframes training-ring-pulse {
       0%, 100% { box-shadow: 0 0 0 3px #5C1614; }
       50% { box-shadow: 0 0 0 12px #F8D2C8; }
+    }
+    @keyframes training-ring-pulse-dark {
+      0%, 100% { box-shadow: 0 0 0 3px #2A2118; }
+      50% { box-shadow: 0 0 0 10px rgba(42,33,24,.28); }
     }
     @keyframes training-ring-pulse-strong {
       0%, 100% { box-shadow: 0 0 0 4px #4A1010; }
@@ -4982,7 +5005,9 @@
       line-height: 1.2 !important;
       cursor: pointer;
     }
-    .go-toc__item:last-child { border-bottom: 0; }
+    .go-toc__item:last-child { border-bottom: 1px solid rgba(42, 33, 24, 0.14); }
+    .go-slide__copy.is-clamped { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+    .go-slide__more { display: inline; margin: 4px 0 0; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 700; color: #2A2118; text-decoration: underline; cursor: pointer; }
     .go-slide__art { margin: 0; }
     .go-slide__copy {
       margin: 36px 0 0;
@@ -7724,17 +7749,17 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js"></script>
-  <script src="/natalyaalice/kraft-tracking.js?v=kt-2"></script>
+  <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-1"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-1"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-4"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-1"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-46"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-47"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-38"></script>
-  <script src="/natalyaalice/support.js?v=support-16"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-39"></script>
+  <script src="/natalyaalice/support.js?v=support-17"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -7802,6 +7827,7 @@
       var pendingInvitePeople = [];
       var pendingInviteIso = "";
       var pendingInviteEventId = "";
+      var pendingInviteOverride = null;
       var pendingUnit = null;
       var profilePerson = null;
       var GOAL_OPTIONS = ["just for Fun", "HYROX", "abnehmen", "Bodybuilding", "Krafttraining", "Hybrid Athlet", "Schwimmer", "Marathon", "Triathlon", "Wellbeing"];
@@ -13881,10 +13907,11 @@
       var COACH_PLAYBOOK = [
         ["Was gogogo ist", "Erinnerst du dich an Vereinstraining? Dienstag 18 Uhr, feste Leute, ein Trainer, der wusste, was zu tun ist. Niemand musste überlegen, ob er heute trainiert. Genau diesen Rahmen baut gogogo zurück, für Erwachsene mit vollem Leben."],
         ["Für wen", "Unsere Nutzer leisten viel: im Job, in der Familie, im Alltag. Beim Thema Bewegung sind sie überfordert. Zu viele Apps, zu viele Pläne, zu viele Meinungen auf YouTube. Jeden Tag neu zu entscheiden kostet Kraft, und am Ende gewinnt meist der Alltag. Sie brauchen kein weiteres Wissen. Sie brauchen jemanden, der für sie entscheidet, und Leute, die merken, wenn sie fehlen."],
-        ["Was gogogo ausmacht", "1. Eine Woche mit System\nJede Woche hat 7 aktive Tage. Davon sind 4 Trainings, die übrigen sind aktive Erholung: Spaziergang, Mobility, Sauna. Kein Tag bleibt leer, und kein Tag muss neu verhandelt werden. Die Trainings stammen aus erprobten Kursen, die du für deine Coachees auswählst und Schritt für Schritt anpasst. Der Nutzer öffnet die App und weiß, was heute dran ist.\n\n2. Ein Team, das mitzieht\nJeder Nutzer hat ein Team aus Freunden und seinem Coach. Wer zusagt, ist für alle sichtbar. Wer fehlt, fällt auf. Kommentare, gemeinsame Termine und Stempel für gemeinsames Training sorgen dafür, dass Dranbleiben leichter ist als Absagen."],
-        ["Deine Aufgabe als Coach", "Erstgespräch: Verstehe, wo jemand steht und was in seinem Alltag realistisch ist. Frag nach Zeitfenstern, nicht nach Zielen in Kilo.\nWoche aufsetzen: Wähle einen passenden Kurs, verteile die Trainings auf feste Tage, plane die Erholungstage mit. Danach steht die Woche, und dein Coachee muss nichts mehr entscheiden.\nAnpassen statt neu bauen: Ändere einzelne Einheiten, wenn etwas nicht passt. Ein neuer Plan von Grund auf ist fast nie nötig.\nPräsent sein: Schau täglich in Heute. Kommentiere, was geschafft wurde. Melde dich, wenn jemand zwei Tage nichts geloggt hat, kurz und persönlich.\nTermine halten: Bestätige Web-Calls und Personal Trainings zeitnah in Meine Coachees.\nErnährung begleiten: Wenn dein Coachee Ernährung gebucht hat, lies seine Abend-Logs und gib einen Hinweis pro Woche, nicht täglich zehn."],
+        ["Was gogogo ausmacht", "1. Eine Woche mit System\nJede Woche hat 7 aktive Tage. Davon sind mindestens 2 Trainings, die übrigen Tage mindestens aktive Tagesimpulse. Wir wollen die Menschen aber dazu ermutigen, auch weitere Trainings Schritt für Schritt in die Woche zu integrieren: mindestens einen langen Lauf oder Ähnliches und bestenfalls ein Zirkeltraining. Für mehr Ambitionen erweitert sich der Kurs zu mehr Krafttraining, meist funktional und teilweise mit mehr Ausdauertraining. Kein Tag bleibt leer, und kein Tag muss neu verhandelt werden. Die Trainings stammen aus erprobten Kursen, die du für deine Coachees auswählst und Schritt für Schritt anpasst. Der Nutzer öffnet die App und weiß, was heute dran ist.\n\n2. Ein Team, das mitzieht\nJeder Nutzer hat ein Team aus Freunden und seinem Coach. Wer zusagt, ist für alle sichtbar. Wer fehlt, fällt auf. Kommentare, gemeinsame Termine und Stempel für gemeinsames Training sorgen dafür, dass Dranbleiben leichter ist als Absagen."],
+        ["Deine Aufgabe als Coach", "Erstgespräch: Verstehe, wo jemand steht und was in seinem Alltag realistisch ist. Frag nach Zeitfenstern, nicht nach Zielen in Kilo.\nWoche aufsetzen: Wähle einen passenden Kurs, verteile die Trainings auf feste Tage, plane die Erholungstage mit. Danach steht die Woche, und dein Coachee muss nichts mehr entscheiden.\nAnpassen statt neu bauen: Ändere einzelne Einheiten, wenn etwas nicht passt. Ein neuer Plan von Grund auf ist fast nie nötig.\nPräsent sein: Schau täglich in Aktuell. Kommentiere, was geschafft wurde. Melde dich, wenn jemand zwei Tage nichts geloggt hat, kurz und persönlich.\nTermine halten: Bestätige Web-Calls und Personal Trainings zeitnah in Meine Coachees.\nErnährung begleiten: Wenn dein Coachee Ernährung gebucht hat, lies seine Abend-Logs und gib einen Hinweis pro Woche, nicht täglich zehn."],
         ["Was du vermeidest", "Informationsflut. Ein klarer Satz hilft mehr als ein Fachartikel.\nDruck über Zahlen und Ergebnisse. Wir messen Regelmäßigkeit.\nSpontane Komplettumbauten. Stabilität ist das Produkt."],
-        ["Woran du merkst, dass es funktioniert", "Dein Coachee plant nicht mehr, er macht einfach. Er sagt Termine zu, bevor du fragst. Und nach 12 Wochen will er die nächste Runde."]
+        ["Woran du merkst, dass es funktioniert", "Dein Coachee plant nicht mehr, er macht einfach. Er sagt Termine zu, bevor du fragst. Und nach 12 Wochen will er die nächste Runde."],
+        ["Bau Deine Community", "Lern Deine Coachees vor Ort kennen, vernetz Dich auf WhatsApp, nutz gogogo, um eine Gruppe aufzubauen. Biete Gruppentrainings an, sodass auch Menschen, die kein Personal Training nutzen wollen, in den Genuss Deiner Präsenz und Aura kommen. Auf Social Media stellst Du die Kurse vor und Deine persönlichen Tipps. gogogo ist eine Basis für Dein Wirken. Und andersherum.\n\nBitte auch gerne Deine Coachees, etwas zu Deiner Persönlichkeit zu schreiben. Das können sie hier machen und per Cross-Posting teilen.\n\nWeil gogogo ein Sammelbecken von Menschen mit Herausforderungen und Wünschen ist, wirst Du immer wieder neue Menschen kennenlernen. Mit anderen Coaches ist es ein Miteinander, keine Konkurrenz. Es gibt so viele Menschen, die Deine Expertise benötigen. Also: Teilen im Geiste von gogogo!"]
       ];
 
       function openCoachPlaybook() {
@@ -15445,10 +15472,8 @@
           emptyGroup.appendChild(emptyArt);
           var emptyCopy = document.createElement("p");
           emptyCopy.className = "team-slide__about";
-          emptyCopy.textContent = ffcGroup
-            ? "Neben deiner FFC-Gruppe kannst du eine eigene Gruppe erstellen."
-            : "Noch keine Gruppe. Erstelle eine und lade Freunde ein.";
-          emptyGroup.appendChild(emptyCopy);
+          emptyCopy.textContent = "Noch keine Gruppe. Erstelle eine und lade Freunde ein.";
+          if (!ffcGroup) emptyGroup.appendChild(emptyCopy);
           var createBtn = document.createElement("button");
           createBtn.type = "button";
           createBtn.className = "team-slide__cta is-solid";
@@ -15464,12 +15489,12 @@
         }
         /* FFC-Gruppe im selben Abschnitt unter der gogogo-Gruppe */
         if (ffcGroup && groupHost) {
-          var ffcPart = groupSlide(ffcGroup, "FFC-Gruppe", true);
+          var ffcPart = groupSlide(ffcGroup, "Friday Fitness Circle", true);
           var ffcSec = document.createElement("section");
           ffcSec.className = "team-group-ffc";
           var ffcHead = document.createElement("p");
           ffcHead.className = "team-group-ffc__head";
-          ffcHead.textContent = "FFC-Gruppe";
+          ffcHead.textContent = "Friday Fitness Circle";
           ffcSec.appendChild(ffcHead);
           Array.prototype.slice.call(ffcPart.childNodes).forEach(function (node) {
             if (node.classList && node.classList.contains("team-slide__art")) return;
@@ -15500,10 +15525,9 @@
             return;
           }
           requestPersonalTraining(trainer).then(function () {
-            setHome(true);
+            /* auf Team bleiben: Aktuell nur im Hintergrund auffrischen */
             paintWelcome();
             refreshFfcHeute(false);
-            setHeuteFilter("all");
             paintHeuteJoins();
           }).catch(function (err) {
             GoDialog.alert((err && err.message) || "Anfrage fehlgeschlagen.");
@@ -15522,7 +15546,7 @@
         pick.setAttribute("aria-label", trainer ? "Trainer ändern" : "Trainer wählen");
         pick.innerHTML = PENCIL_ICON;
         pick.addEventListener("click", function () { openTeamSearch("trainer"); });
-        nameRow.appendChild(pick);
+        /* Name · WhatsApp direkt daneben · Stift rechtsbündig */
         if (trainer) {
           var wa = document.createElement("button");
           wa.type = "button";
@@ -15532,6 +15556,8 @@
           wa.addEventListener("click", function () { openQuickWa(); });
           nameRow.appendChild(wa);
         }
+        pick.style.marginLeft = "auto";
+        nameRow.appendChild(pick);
         coachSlide.appendChild(nameRow);
         var about = document.createElement("p");
         about.className = "team-slide__about";
@@ -16125,7 +16151,7 @@
                   type: "zirkel",
                   title: "Friday Fitness Circle",
                   description:
-                    "Werde Teil der Gruppe für ein Zirkeltraining. Du kannst vor Ort trainieren oder die Aufzeichnung hier für Dein eigenes Training nutzen. Du trackst über Eingabe und am Ende landen Deine Daten in einer Datenbank damit Du Deine Trainings von Woche zu Woche vergleichen kannst. Login über E-Mail-Adresse und einem Passwort."
+                    "Buch Dich ein in das Friday Fitness Zirkeltraining. Warum der Name? Weil am Freitagmittag die erste Gruppe vor Ort in Berlin trainiert. Du kannst aber immer und überall Dein Zirkeltraining als Event anlegen und machen. Hier legst Du Deinen Circle-Account an und kannst direkt von gogogo aus starten. Das Tracking startet direkt im Event unter Aktuell, die Aufzeichnungen findest Du hier unterm Text."
                 },
                 {
                   key: "stempelkarte",
@@ -16143,7 +16169,7 @@
                   key: "routine",
                   type: "routine",
                   title: "12-Wochen-Routine",
-                  description: "Bestätige jeden Tag ein Event, ob Sport, Bewegung oder wenn Du einen Ausfall hast mit Kommentar, warum. Das hilft Dir, Deinen Fokus auf Deine tägliche Bewegung zu festigen und Dein alltägliches Verhalten zur Verbesserung Deiner Gesundheit zu verändern. Wenn Du 12 Wochen lang Deine Wochen voll hast, bekommst Du ein Goodie: das gogogo-Shirt!"
+                  description: "Bestätige jeden Tag ein Event, ob Sport, Bewegung oder wenn Du einen Ausfall hast mit Kommentar, warum. Das hilft Dir, Deine tägliche Bewegung zu etablieren, Dein Verhalten im Alltag zu festigen und Deine Gesundheit zu verbessern. Wenn Du 12 Wochen lang Deine Wochen voll hast, bekommst Du ein Goodie: das gogogo-Shirt!"
                 },
                 {
                   key: "ernaehrung",
@@ -16357,6 +16383,19 @@
           copy.className = "go-slide__copy";
           copy.textContent = offer.description || "";
           card.appendChild(copy);
+          /* Friday Fitness Circle: eine Zeile, mit „mehr“ aufklappbar */
+          if (offer.key === "zirkel" && copy.textContent) {
+            copy.classList.add("is-clamped");
+            var moreTxt = document.createElement("button");
+            moreTxt.type = "button";
+            moreTxt.className = "go-slide__more";
+            moreTxt.textContent = "mehr";
+            moreTxt.addEventListener("click", function () {
+              var open = copy.classList.toggle("is-clamped");
+              moreTxt.textContent = open ? "mehr" : "weniger";
+            });
+            card.appendChild(moreTxt);
+          }
           if (offer.key === "coach_offer") {
             var more = document.createElement("button");
             more.type = "button";
@@ -17483,6 +17522,13 @@
         var label = unit && unit.label ? unit.label : "Training";
         var place = placeForWeekday(wd);
         var time = timeForWeekday(wd);
+        var ov = pendingInviteOverride;
+        pendingInviteOverride = null;
+        if (ov) {
+          time = ov.time || time;
+          place = ov.place || place;
+          label = ov.label || label;
+        }
         if (!time) {
           time = chosenTime();
           setDayTime(wd, time);
@@ -17583,6 +17629,25 @@
         var path = "go_workout_invites?id=eq." + encodeURIComponent(invite.id);
         rest(path, { method: "PATCH", prefer: "return=minimal", body: { status: status } }).catch(function () {});
         invite.status = status;
+        /* Wiederkehrende Einladung (aus der Woche): Zusage gilt für die ganze Serie */
+        if (status === "accepted" && invite.from_id && invite.workout_label && invite.workout_date) {
+          var wdInv = new Date(invite.workout_date + "T12:00:00").getDay();
+          rest("go_workout_invites?to_id=eq." + encodeURIComponent(sessionAccount.id) +
+            "&from_id=eq." + encodeURIComponent(invite.from_id) +
+            "&workout_label=eq." + encodeURIComponent(invite.workout_label) +
+            "&workout_date=gt." + encodeURIComponent(invite.workout_date) +
+            "&status=eq.pending&select=id,workout_date")
+            .then(function (rows) {
+              return Promise.all((rows || []).filter(function (r) {
+                return new Date(r.workout_date + "T12:00:00").getDay() === wdInv;
+              }).map(function (r) {
+                remoteInvites.forEach(function (ri) { if (String(ri.id) === String(r.id)) ri.status = "accepted"; });
+                return rest("go_workout_invites?id=eq." + encodeURIComponent(r.id), { method: "PATCH", prefer: "return=minimal", body: { status: "accepted" } });
+              }));
+            })
+            .then(function () { syncInviteStore(); paintWelcome(); })
+            .catch(function () {});
+        }
         if (invite.id) {
           persistDots(function (dots) {
             var key = String(invite.id);
@@ -19920,11 +19985,21 @@
         var myStory = storyFor(me, true);
         if (myStory) used[myStory.index] = true;
         var meItem = storyItem(me, myStory, openFor(me, myStory));
-        var mePresence = presenceFor(sessionAccount.id);
-        if (mePresence) {
-          meItem.classList.add("is-training");
-          if (mePresence.status === "active") meItem.classList.add("is-training-active");
+        /* Rand: ab 0:00 pulsieren, wer heute ein Training hat; nach dem Abhaken dunkel bis Mitternacht */
+        function applyTrainingRing(el, today, presence) {
+          var done = !!((today && today.done) || (presence && presence.status === "done"));
+          var active = !!(presence && presence.status === "active");
+          if (!today && !presence) return;
+          el.classList.add("is-training");
+          if (active && !done) el.classList.add("is-training-active");
+          if (done) el.classList.add("is-training-done");
+          el.title = active && !done ? "Trainiert gerade" : done ? "Heute trainiert" : "Trainiert heute";
         }
+        var meActEarly = {};
+        try {
+          meActEarly = (window.HeuteAccountability && HeuteAccountability.todayActivity && HeuteAccountability.todayActivity()) || {};
+        } catch (eMe) { meActEarly = {}; }
+        applyTrainingRing(meItem, meActEarly[String(sessionAccount.id)] || null, presenceFor(sessionAccount.id));
         box.appendChild(meItem);
         var seenIds = {};
         var friends = teamPeople.filter(function (person) {
@@ -20019,21 +20094,14 @@
             };
           }
           var el = storyItem(entry.person, entry.story || (photoId ? { seen: false } : null), opener);
-          if (entry.today && !entry.presence) {
-            el.classList.add("is-today");
-            el.title = entry.today.done ? "Heute trainiert" : "Trainiert heute";
-          }
-          if (entry.presence) {
-            el.classList.add("is-training");
-            if (entry.presence.status === "active") el.classList.add("is-training-active");
-            el.title = entry.presence.status === "active" ? "Trainiert gerade" : "Heute schon trainiert";
-          }
+          if (entry.today) el.classList.add("is-today");
+          applyTrainingRing(el, entry.today, entry.presence);
           box.appendChild(el);
         });
         var add = document.createElement("button");
         add.type = "button";
         add.className = "crew-story crew-story--add";
-        add.innerHTML = '<span class="crew-story__ring"><span class="team-avatar">+</span></span><span class="crew-story__name">Freund</span>';
+        add.innerHTML = '<span class="crew-story__ring"><span class="team-avatar"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span></span><span class="crew-story__name">Freund</span>';
         add.setAttribute("aria-label", "Freund hinzufügen");
         add.addEventListener("click", function () { openTeamSearch("friend"); });
         box.appendChild(add);
@@ -20712,6 +20780,22 @@
 
       document.getElementById("invite-send").addEventListener("click", function () {
         if (!pendingInvitePeople.length) return;
+        /* Einladung zu einem Event: Uhrzeit, Ort und Titel stehen im Event, kein Uhrzeit-Rad */
+        if (pendingInviteEventId) {
+          rest("events?id=eq." + encodeURIComponent(pendingInviteEventId) + "&select=starts_at,location,title&limit=1")
+            .then(function (rows) {
+              var evInv = rows && rows[0];
+              if (!evInv || !evInv.starts_at) { openTimeWheel(); return; }
+              pendingInviteOverride = {
+                time: new Date(evInv.starts_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }),
+                place: evInv.location || "",
+                label: String(evInv.title || "").replace(/^[^A-Za-zÄÖÜäöü0-9]+\s*/, "")
+              };
+              sendDayInvites();
+            })
+            .catch(function () { openTimeWheel(); });
+          return;
+        }
         if (pendingInviteIso && timeForWeekday(weekdayIndex(pendingInviteIso))) sendDayInvites();
         else openTimeWheel();
       });

@@ -1190,34 +1190,9 @@
     var id = String(ev.id);
     var mine = item.kind !== "ffc" && String(ev.user_id) === me();
     var today = berlinToday() === dayKey(ev.starts_at);
-    var count = (state.comments[id] || []).length;
-    var canDone = mine && today && ev.status === "geplant";
-    var isDone = mine && ev.status === "erledigt";
-    /* Zusagen nur auf Heute — in der Woche höchstens „Erledigt“ */
-    var checkBtn = "";
-    if (canDone) {
-      checkBtn =
-        '<button type="button" class="wr-act" data-wr-done="' +
-        esc(id) +
-        '" aria-label="Erledigt"><span class="wr-act__icon">' +
-        ICON_CHECK +
-        '</span><span class="wr-act__n"></span></button>';
-    } else if (isDone) {
-      checkBtn =
-        '<button type="button" class="wr-act is-done" disabled aria-label="Erledigt"><span class="wr-act__icon wr-act__icon--done">' +
-        ICON_CHECK_DONE +
-        "</span></button>";
-    }
+    /* Woche ist Planung: kein Abhaken, kein Kommentieren (beides in Aktuell). Nur Einladen/Teilen. */
     return (
       '<div class="wr-actions">' +
-      checkBtn +
-      '<button type="button" class="wr-act" data-wr-comments="' +
-      esc(id) +
-      '" aria-label="Kommentare"><span class="wr-act__icon">' +
-      ICON_COMMENT +
-      '</span><span class="wr-act__n">' +
-      (count || "") +
-      "</span></button>" +
       '<button type="button" class="wr-act" data-wr-share="' +
       esc(dayKey(ev.starts_at)) +
       '" data-wr-event="' +
@@ -1815,8 +1790,11 @@
     var root = $(ROOT_ID);
     if (!root) return;
     var media = currentDayMediaEl();
-    var rgb = media ? parseRgb(window.getComputedStyle(media).backgroundColor) : null;
-    var light = isLightRgb(rgb);
+    /* Foto/Cover: immer helle Icons auf Abdunklung, egal welche Farbfläche darunter liegt */
+    var photo = !!(media && media.classList.contains("has-photo"));
+    var rgb = media && !photo ? parseRgb(window.getComputedStyle(media).backgroundColor) : null;
+    var light = !photo && isLightRgb(rgb);
+    root.classList.toggle("is-photo-day", photo);
     root.classList.toggle("is-light-day", light);
     root.classList.toggle("is-dark-day", !light);
   }
@@ -2967,28 +2945,53 @@
     var time = ev ? formatTime(ev.starts_at) : "";
     var fromName =
       (host.sessionAccount && host.sessionAccount.name) || "gogogo";
-    var jobs = ids.map(function (fid) {
-      return rest("go_workout_invites", {
-        method: "POST",
-        prefer: "return=representation",
-        body: {
-          from_id: me(),
-          to_id: fid,
-          workout_date: iso,
-          workout_label: label,
-          from_name: fromName,
-          place: place,
-          meet_time: time,
-          status: "pending",
-          event_id: /^[0-9a-f-]{36}$/i.test(String(eventId || "")) ? String(eventId) : null
-        }
-      }).catch(function () {
-        return null;
+    /* Aus der Woche eingeladen = wiederkehrend: alle eigenen Termine dieser Serie
+       (gleicher Titel, Wochentag, Uhrzeit) ab diesem Tag, höchstens 12 Wochen. */
+    var realId = /^[0-9a-f-]{36}$/i.test(String(eventId || "")) ? String(eventId) : null;
+    var series = realId && ev && ev.starts_at
+      ? rest(
+          "events?user_id=eq." + encodeURIComponent(me()) +
+            "&title=eq." + encodeURIComponent(ev.title || "") +
+            "&starts_at=gte." + encodeURIComponent(ev.starts_at) +
+            "&status=eq.geplant&select=id,starts_at,location&order=starts_at.asc&limit=40"
+        ).then(function (rows) {
+          var wd = new Date(ev.starts_at).getDay();
+          var hhmm = formatTime(ev.starts_at);
+          var list = (rows || []).filter(function (r) {
+            return new Date(r.starts_at).getDay() === wd && formatTime(r.starts_at) === hhmm;
+          }).slice(0, 12);
+          if (!list.some(function (r) { return String(r.id) === realId; })) list.unshift({ id: realId, starts_at: ev.starts_at, location: place });
+          return list;
+        }).catch(function () { return [{ id: realId, starts_at: ev.starts_at, location: place }]; })
+      : Promise.resolve([{ id: realId, starts_at: null, location: place }]);
+    var jobs = series.then(function (list) {
+      var posts = [];
+      ids.forEach(function (fid) {
+        list.forEach(function (sev) {
+          posts.push(rest("go_workout_invites", {
+            method: "POST",
+            prefer: "return=representation",
+            body: {
+              from_id: me(),
+              to_id: fid,
+              workout_date: sev.starts_at ? dayKey(sev.starts_at) : iso,
+              workout_label: label,
+              from_name: fromName,
+              place: sev.location || place,
+              meet_time: time,
+              status: "pending",
+              event_id: sev.id || null
+            }
+          }).catch(function () {
+            return null;
+          }));
+        });
       });
+      return Promise.all(posts).then(function () { return list.length; });
     });
-    return Promise.all(jobs).then(function () {
+    return jobs.then(function (weeks) {
       closeSheet();
-      if (host.toast) host.toast("Einladung gesendet");
+      if (host.toast) host.toast(weeks > 1 ? "Einladung für " + weeks + " Wochen gesendet" : "Einladung gesendet");
       if (host.loadInvites) {
         try {
           host.loadInvites();
