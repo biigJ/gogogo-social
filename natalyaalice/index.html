@@ -4611,6 +4611,15 @@
       opacity: 0;
       cursor: pointer;
     }
+    .stamp-mini { width: 100%; height: 100%; box-sizing: border-box; background: #C7413B; color: #F6F1E8; padding: 14px 16px 12px; display: flex; flex-direction: column; justify-content: space-between; }
+    .stamp-mini__top { display: flex; justify-content: space-between; align-items: baseline; }
+    .stamp-mini__brand { font-family: "Playfair Display", Georgia, serif !important; font-size: 26px !important; font-weight: 600 !important; letter-spacing: -0.02em; }
+    .stamp-mini__count { font-size: 13px; font-weight: 700; letter-spacing: .06em; }
+    .stamp-mini__grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 10px 0; justify-items: center; }
+    .stamp-mini__slot { width: min(100%, 30px); aspect-ratio: 1; border-radius: 50%; border: 1.5px solid rgba(246,241,232,.55); box-sizing: border-box; }
+    .stamp-mini__slot.is-filled { background: #F6F1E8; border-color: #F6F1E8; box-shadow: inset 0 0 0 4px #C7413B; }
+    .stamp-mini__foot { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .9; }
+    .team-slide__cta.is-locked { opacity: .4; }
     .go-slide__art img {
       width: 100%;
       height: 100%;
@@ -5120,6 +5129,9 @@
       font: inherit;
       font-size: 14px !important;
     }
+    .go-ffc-chips { display: flex; gap: 6px; margin: 0 0 12px; flex-wrap: wrap; }
+    .go-ffc-chip { min-height: 34px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(42,33,24,.35); background: transparent; color: #2A2118; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .go-ffc-chip.is-on { background: #2A2118; color: #F6F1E8; border-color: #2A2118; }
     .go-ffc-btn {
       min-height: 44px;
       padding: 0 12px;
@@ -14178,79 +14190,91 @@
             listEl.appendChild(row);
           });
         }
+        /* Leaderboard: Single (Filter Freunde / Gruppe) und Double (Paare aus Zirkel-Double-Events dieser Woche) */
+        var lbMode = "single";
+        var lbFilter = "friends";
+        function lbChips(items, cur, onPick) {
+          var row = document.createElement("div");
+          row.className = "go-ffc-chips";
+          items.forEach(function (it) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.className = "go-ffc-chip" + (it[0] === cur ? " is-on" : "");
+            b.textContent = it[1];
+            b.addEventListener("click", function () { onPick(it[0]); });
+            row.appendChild(b);
+          });
+          return row;
+        }
         function paintLbShell(pack) {
           if (!lbBox) return;
           pack = pack || {};
+          lastPack = pack;
           var stdRows = pack.standard || [];
           var teamRows = pack.team || [];
           lbBox.textContent = "";
           var msg = document.createElement("p");
           msg.className = "go-ffc-msg";
-
-          /* —— Leaderboard Standard —— */
-          var stdSec = document.createElement("section");
-          stdSec.className = "go-ffc-sec";
-          var stdTitle = document.createElement("h4");
-          stdTitle.className = "go-ffc-lb-scope";
-          stdTitle.textContent = "Leaderboard Standard";
-          stdSec.appendChild(stdTitle);
-          var stdList = document.createElement("div");
-          stdList.className = "go-ffc-lb-list";
-          paintRows(stdList, stdRows, "Noch keine Punkte unter Freunden.");
-          stdSec.appendChild(stdList);
-          var friendRow = document.createElement("div");
-          friendRow.className = "go-ffc-friend-row";
-          var friendIn = document.createElement("input");
-          friendIn.type = "text";
-          friendIn.className = "go-ffc-input";
-          friendIn.placeholder = "Nickname oder E-Mail";
-          friendIn.autocomplete = "off";
-          var friendBtn = document.createElement("button");
-          friendBtn.type = "button";
-          friendBtn.className = "go-ffc-btn";
-          friendBtn.textContent = "Freund hinzufügen";
-          friendBtn.addEventListener("click", function () {
-            friendBtn.disabled = true;
-            msg.textContent = "Prüfe gogogo-Konto…";
-            validateFfcFriendQuery(friendIn.value)
-              .then(function (v) {
-                if (!v.ok) {
-                  friendBtn.disabled = false;
-                  msg.textContent = v.msg;
-                  return null;
-                }
-                msg.textContent = "Anfrage…";
-                return FFC.friendRequest(v.query);
-              })
-              .then(function (res) {
-                if (res == null) return;
-                friendBtn.disabled = false;
-                if (res && res.error) {
-                  msg.textContent =
-                    (res.error && res.error.message) || "Anfrage fehlgeschlagen.";
-                  return;
-                }
-                friendIn.value = "";
-                msg.textContent = "Anfrage gesendet.";
-                reloadLb();
-              })
-              .catch(function () {
-                friendBtn.disabled = false;
-                msg.textContent = "Anfrage fehlgeschlagen.";
+          lbBox.appendChild(lbChips([["single", "Single"], ["double", "Double"]], lbMode, function (m) {
+            lbMode = m;
+            paintLbShell(lastPack);
+          }));
+          if (lbMode === "double") {
+            var dSec = document.createElement("section");
+            dSec.className = "go-ffc-sec";
+            var dList = document.createElement("div");
+            dList.className = "go-ffc-lb-list";
+            dList.textContent = "Lädt …";
+            dSec.appendChild(dList);
+            var dHint = document.createElement("p");
+            dHint.className = "go-ffc-msg";
+            dHint.textContent = "Paare aus Zirkeltrainings im Modus Double dieser Woche. Punkte = Wochenpunkte beider zusammen.";
+            dSec.appendChild(dHint);
+            lbBox.appendChild(dSec);
+            loadDoublePairs(stdRows).then(function (pairs) {
+              dList.textContent = "";
+              if (!pairs.length) {
+                dList.textContent = "Diese Woche noch kein Double. Leg ein Zirkeltraining als Double mit Partner an.";
+                return;
+              }
+              pairs.forEach(function (pr, i) {
+                var row = document.createElement("div");
+                row.className = "go-slide__ffc-row" + (pr.me ? " is-me" : "");
+                var left = document.createElement("span");
+                left.textContent = String(i + 1) + ". " + pr.names.join(" + ") + " · " + pr.count + "×";
+                var right = document.createElement("span");
+                right.textContent = pr.points != null ? pr.points.toLocaleString("de-DE") + " P" : "–";
+                row.appendChild(left);
+                row.appendChild(right);
+                dList.appendChild(row);
               });
-          });
-          friendRow.appendChild(friendIn);
-          friendRow.appendChild(friendBtn);
-          stdSec.appendChild(friendRow);
-          lbBox.appendChild(stdSec);
-
+            });
+            return;
+          }
+          var groupName = (ffcContextGroup() && ffcContextGroup().name) || (lbGroups[0] && lbGroups[0].name) || "Gruppe";
+          lbBox.appendChild(lbChips([["friends", "Freunde"], ["group", groupName]], lbFilter, function (f) {
+            lbFilter = f;
+            paintLbShell(lastPack);
+          }));
+          if (lbFilter === "friends") {
+            var stdSec = document.createElement("section");
+            stdSec.className = "go-ffc-sec";
+            var stdList = document.createElement("div");
+            stdList.className = "go-ffc-lb-list";
+            paintRows(stdList, stdRows, "Noch keine Punkte unter Freunden. Freunde fügst Du unter Team → Meine Freunde hinzu.");
+            stdSec.appendChild(stdList);
+            lbBox.appendChild(stdSec);
+            return;
+          }
+          var grp = buildGroupSection(teamRows, msg);
+          if (grp) lbBox.appendChild(grp);
+          lbBox.appendChild(msg);
+        }
+        var lastPack = {};
+        function buildGroupSection(teamRows, msg) {
           /* —— Leaderboard Team —— */
           var teamSec = document.createElement("section");
           teamSec.className = "go-ffc-sec";
-          var teamTitle = document.createElement("h4");
-          teamTitle.className = "go-ffc-lb-scope";
-          teamTitle.textContent = "Leaderboard Team";
-          teamSec.appendChild(teamTitle);
 
           /* Eine Gruppe für alles: Team → Meine Gruppe. FFC-Gruppe gleichen Namens ist die Spiegelung. */
           rememberFfcGroups(lbGroups);
@@ -14265,7 +14289,7 @@
             lbScopeId = linked.group_id;
             if (FFC.setLeaderboardScope) FFC.setLeaderboardScope(linked.group_id);
             reloadLb();
-            return;
+            return null;
           }
           var groupLine = document.createElement("p");
           groupLine.className = "go-ffc-msg";
@@ -14329,8 +14353,61 @@
             paintRows(teamList, teamRows, "Noch keine Punkte in dieser Gruppe.");
             teamSec.appendChild(teamList);
           }
-          lbBox.appendChild(teamSec);
-          lbBox.appendChild(msg);
+          return teamSec;
+        }
+        /* Double-Paare: eigene und Freundes-Zirkel im Modus Double dieser Woche (gogogo-Events + Zusagen mit Partner) */
+        function loadDoublePairs(stdRows) {
+          var now = new Date();
+          var monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
+          var people = {};
+          (teamPeople || []).forEach(function (p) { if (p && p.id) people[String(p.id)] = p; });
+          if (sessionAccount) people[String(sessionAccount.id)] = sessionAccount;
+          var pts = {};
+          (stdRows || []).forEach(function (r) { if (r && r.nickname) pts[String(r.nickname).toLowerCase()] = Number(r.points) || 0; });
+          function nameOf(id, fallback) {
+            var p = people[String(id)];
+            return (p && (p.name || p.nickname)) || fallback || "Partner";
+          }
+          function pointsOf(id) {
+            var p = people[String(id)];
+            var n = p && p.nickname ? String(p.nickname).toLowerCase() : "";
+            return n && pts[n] != null ? pts[n] : null;
+          }
+          return rest("events?category=eq.zirkel&note=like.zirkel:double*&starts_at=gte." + encodeURIComponent(monday.toISOString()) +
+              "&starts_at=lte." + encodeURIComponent(now.toISOString()) + "&status=neq.ausgefallen&select=id,user_id,note&limit=200")
+            .then(function (evs) {
+              evs = (evs || []).filter(function (e) { return people[String(e.user_id)]; });
+              if (!evs.length) return [[], []];
+              return rest("event_rsvps?event_id=in.(" + evs.map(function (e) { return e.id; }).join(",") + ")&select=event_id,user_id,partner_id,partner_name")
+                .catch(function () { return []; })
+                .then(function (rs) { return [evs, rs || []]; });
+            })
+            .then(function (res) {
+              var pairs = {};
+              function add(a, aName, b, bName) {
+                if (!a || (!b && !bName)) return;
+                var ka = String(a), kb = b ? String(b) : "n:" + String(bName).toLowerCase();
+                var key = [ka, kb].sort().join("|");
+                var pr = pairs[key] || (pairs[key] = { ids: [ka, kb], names: [nameOf(a, aName), b ? nameOf(b, bName) : bName], count: 0 });
+                pr.count += 1;
+              }
+              res[0].forEach(function (e) {
+                var z = window.GoZirkelSetup && GoZirkelSetup.parse ? GoZirkelSetup.parse(e.note) : null;
+                if (z && z.mode === "double" && (z.partnerId || z.partnerName)) add(e.user_id, "", z.partnerId, z.partnerName);
+              });
+              res[1].forEach(function (r) {
+                if (r.partner_id || r.partner_name) add(r.user_id, "", r.partner_id, r.partner_name);
+              });
+              var meId = sessionAccount ? String(sessionAccount.id) : "";
+              return Object.keys(pairs).map(function (k) {
+                var pr = pairs[k];
+                var pa = pointsOf(pr.ids[0]), pb = /^n:/.test(pr.ids[1]) ? null : pointsOf(pr.ids[1]);
+                pr.points = pa == null && pb == null ? null : (pa || 0) + (pb || 0);
+                pr.me = pr.ids.indexOf(meId) !== -1;
+                return pr;
+              }).sort(function (a, b) { return (b.points || 0) - (a.points || 0) || b.count - a.count; });
+            })
+            .catch(function () { return []; });
         }
         /* FFC-Gruppe zur Team-Gruppe: gleicher Name (Groß/Klein egal) */
         function linkedFfcGroup(goGroup) {
@@ -15259,9 +15336,19 @@
         stampBtn.className = "team-slide__cta is-solid";
         stampBtn.textContent = "Stempelkarte";
         stampBtn.setAttribute("aria-label", "Stempelkarte öffnen");
+        /* Erst nach Buchung unter Plus nutzbar, vorher ausgegraut */
+        var stampOwned = !!stampOrder || !!(window.GoSupport && GoSupport.offerOwned && GoSupport.offerOwned("stempelkarte"));
+        if (!stampOwned) {
+          stampBtn.classList.add("is-locked");
+          stampBtn.setAttribute("aria-disabled", "true");
+        }
         stampBtn.addEventListener("click", function (ev) {
           ev.preventDefault();
           ev.stopPropagation();
+          if (!stampOwned) {
+            gogogoToast("Die Stempelkarte buchst Du gratis unter Plus.");
+            return;
+          }
           try {
             openStampCardModal(stampOrder || null);
           } catch (eStamp) {
@@ -16397,10 +16484,20 @@
           var art = document.createElement("div");
           art.className = "go-slide__art";
           art.setAttribute("aria-hidden", "true");
-          var img = document.createElement("img");
-          img.src = IMG[offer.type] || IMG.routine;
-          img.alt = "";
-          art.appendChild(img);
+          if (offer.key === "stempelkarte") {
+            /* Stempelkarte als Karte statt Foto: 12 Felder, gefüllt nach Stand */
+            var stampOrd = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
+            var stampN = 0;
+            try { stampN = Math.max(0, Math.min(12, Number((stampOrd && stampOrd.meta && stampOrd.meta.stamps) || 0) || 0)); } catch (eSn) {}
+            var mini = '<div class="stamp-mini"><div class="stamp-mini__top"><span class="stamp-mini__brand">gogogo</span><span class="stamp-mini__count">' + stampN + ' / 12</span></div><div class="stamp-mini__grid">';
+            for (var si = 0; si < 12; si++) mini += '<span class="stamp-mini__slot' + (si < stampN ? " is-filled" : "") + '"></span>';
+            art.innerHTML = mini + '</div><div class="stamp-mini__foot">Stempelkarte</div></div>';
+          } else {
+            var img = document.createElement("img");
+            img.src = IMG[offer.type] || IMG.routine;
+            img.alt = "";
+            art.appendChild(img);
+          }
           card.appendChild(art);
           var cta = document.createElement("button");
           cta.type = "button";
@@ -17057,6 +17154,14 @@
         var list = FFC.friends() || [];
         syncFfcGroupIntoTeam();
         ffcIncoming = list.filter(function (f) { return f && f.status === "pending" && f.incoming; });
+        /* Wer bei gogogo schon Freund ist, wird im Zirkel automatisch angenommen (Freunde nur unter Team → Meine Freunde) */
+        if (FFC.respondFriend && ffcIncoming.length) {
+          var goNicks = {};
+          (teamPeople || []).forEach(function (p) { if (p && p.nickname && !/^ffc-/.test(String(p.id))) goNicks[String(p.nickname).toLowerCase()] = true; });
+          ffcIncoming.filter(function (f) { return f.nickname && goNicks[String(f.nickname).toLowerCase()]; }).forEach(function (f) {
+            FFC.respondFriend(f.friendship_id, true).catch(function () {});
+          });
+        }
         var accepted = list.filter(function (f) { return f && f.status === "accepted" && f.nickname; });
         if (!accepted.length) {
           paintPill();
