@@ -16,7 +16,8 @@
     merch: "/assets/gogogo/gogogo-12wochen-routine.jpg",
     routine: "/assets/gogogo/gogogo-12wochen-routine.jpg",
     zirkel: "/assets/gogogo/gogogo-Zirkeltraining.jpg",
-    kraft_tracking: "/assets/gogogo/Jelena-Pullups-1600.webp"
+    kraft_tracking: "/assets/gogogo/Jelena-Pullups-1600.webp",
+    uebungen: "/assets/gogogo/gogogo-upperbody-Video-Poster-1600.webp"
   };
 
   function esc(s) {
@@ -354,6 +355,7 @@
     zirkel: "Friday Fitness Circle",
     ernaehrung: "Ernährung",
     kraft_tracking: "Kraft-Tracking",
+    uebungen: "Übungen",
     web_call: "Initialgespräch",
     coach_offer: "Selbst Coaching anbieten",
     stempelkarte: "Stempelkarte",
@@ -401,6 +403,14 @@
       price: "gratis",
       description:
         "4 Wochen tägliches Ernährungs-Event unter Aktuell, gratis. Protokolliere Mahlzeiten im Dialog, Tracking unter Plus. Coach-Feedback und Plan auf Wunsch."
+    },
+    {
+      key: "uebungen",
+      type: "uebungen",
+      title: "Übungen",
+      price: "gratis",
+      description:
+        "Alle Übungen aus den Wochenplänen mit Video. Speicher eigene Links von Instagram oder YouTube und vergib Sterne: die besten Videos rücken nach vorn und laufen direkt beim Tracken."
     },
     {
       key: "kraft_tracking",
@@ -551,6 +561,7 @@
 
   function offerOwned(type) {
     if (type === "zirkel" && global.FFC && FFC.user && FFC.user()) return true;
+    if (type === "uebungen") return true; /* frei für alle, keine Buchung */
     if (type === "kraft_tracking") {
       try {
         if (me() && localStorage.getItem(trackingKey()) === "1") return true;

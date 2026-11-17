@@ -152,7 +152,7 @@
   }
   function loadPlans() {
     if (st.plans) return Promise.resolve();
-    return rest("courses?is_active=eq.true&select=id,title,level,private_for,course_sessions(category,block_no,is_travel)&order=title.asc,level.asc")
+    return rest("courses?is_active=eq.true&select=id,title,level,private_for,course_sessions!course_sessions_course_id_fkey(category,block_no,is_travel)&order=title.asc,level.asc")
       .then(function (rows) {
         st.plans = (rows || []).filter(function (c) {
           if (c.private_for && String(c.private_for) !== String(st.id)) return false;

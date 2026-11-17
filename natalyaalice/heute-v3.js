@@ -2976,7 +2976,7 @@
   function loadSingleUnits(kind) {
     return rest(
       "courses?is_active=eq.true&private_for=is.null&category_default=eq." + encodeURIComponent(kind) +
-        "&select=id,title,slug,sessions_per_week,course_sessions(id)&order=title.asc"
+        "&select=id,title,slug,sessions_per_week,course_sessions!course_sessions_course_id_fkey(id)&order=title.asc"
     ).then(function (rows) {
       return (rows || []).filter(function (c) {
         var n = (c.course_sessions || []).length;
