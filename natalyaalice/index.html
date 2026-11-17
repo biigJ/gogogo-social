@@ -4551,6 +4551,11 @@
     .team-slide.is-coach .team-slide__cta.is-pt + .team-slide__coach-name {
       margin-top: 36px;
     }
+    .team-slide.is-coach .team-slide__cta.is-review {
+      margin-top: 10px; margin-bottom: 0; flex: none;
+      background: transparent; color: #2A2118; border: 1px solid #2A2118;
+    }
+    .team-slide.is-coach .team-slide__cta.is-review + .team-slide__coach-name { margin-top: 36px; }
     .team-slide.is-coach .team-slide__coach-name + .team-slide__about {
       margin-top: 8px;
     }
@@ -7763,6 +7768,7 @@
   <script src="/natalyaalice/go-covers.js?v=cov-1"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-4"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-1"></script>
+  <script src="/natalyaalice/coach-reviews.js?v=gcr-1"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-48"></script>
@@ -15609,6 +15615,15 @@
           });
         });
         coachSlide.appendChild(ptCta);
+        /* Bewertung schreiben (coach-reviews.js) */
+        if (trainer && window.GoCoachReviews) {
+          var reviewCta = document.createElement("button");
+          reviewCta.type = "button";
+          reviewCta.className = "team-slide__cta is-review";
+          reviewCta.textContent = "Bewertung schreiben";
+          reviewCta.addEventListener("click", function () { coachReviewsReady(); GoCoachReviews.openWrite(trainer); });
+          coachSlide.appendChild(reviewCta);
+        }
         var nameRow = document.createElement("div");
         nameRow.className = "team-slide__coach-name";
         var nameEl = document.createElement("h3");
@@ -16445,6 +16460,15 @@
             var editorAcc = window.GoAccountSession ? GoAccountSession.load() : null;
             var editorAdmins = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
             /* Wochenpläne pflegt nur gogogo (Joscha / biigJ) */
+            if (isCoachSelf) {
+              /* Calendly für Personal Training: hinzufügen bzw. verwalten */
+              var calBtn = document.createElement("button");
+              calBtn.type = "button";
+              calBtn.className = "go-slide__cta go-slide__cta--editor";
+              calBtn.textContent = sessionAccount && sessionAccount.calendly_url ? "Calendly verwalten" : "Calendly hinzufügen";
+              calBtn.addEventListener("click", function () { editOwnCalendly(calBtn); });
+              card.appendChild(calBtn);
+            }
             if (editorAcc && editorAdmins.indexOf(editorAcc.id) !== -1) {
               var editorLink = document.createElement("button");
               editorLink.type = "button";
@@ -16452,6 +16476,13 @@
               editorLink.textContent = "Kurs-Editor";
               editorLink.addEventListener("click", function () { location.href = "/workout/kurse/"; /* im PWA-Scope bleiben */ });
               card.appendChild(editorLink);
+            } else if (isCoachSelf) {
+              var cmLink = document.createElement("button");
+              cmLink.type = "button";
+              cmLink.className = "go-slide__cta go-slide__cta--editor";
+              cmLink.textContent = "Coachees verwalten";
+              cmLink.addEventListener("click", openMyCoachees);
+              card.appendChild(cmLink);
             }
           }
           var copy = document.createElement("p");
@@ -16806,7 +16837,40 @@
 
 
       var teamSearchMode = "friend";
-      function openTeamSearch(mode) {
+      var coachReviewsInit = false;
+      function coachReviewsReady() {
+        if (coachReviewsInit || !window.GoCoachReviews) return;
+        coachReviewsInit = true;
+        GoCoachReviews.init({
+          rest: rest,
+          me: function () { return sessionAccount ? sessionAccount.id : ""; },
+          toast: function (msg) { gogogoToast(msg); }
+        });
+      }
+
+      function pickTrainer(coach) {
+        return rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { trainer_id: coach.id }
+        }).then(function () {
+          sessionAccount.trainer_id = coach.id;
+          if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+          loadTeam();
+        }).catch(function () { gogogoToast("Speichern fehlgeschlagen."); });
+      }
+
+      function openTeamSearch(mode, forceSearch) {
+        /* Coach wählen: Liste aller Coaches mit Sterne-Schnitt und „Über“ (Suche per ID bleibt als Link) */
+        if (mode === "trainer" && !forceSearch && window.GoCoachReviews && sessionAccount) {
+          coachReviewsReady();
+          GoCoachReviews.openCoachList({
+            currentId: sessionAccount.trainer_id || "",
+            onPick: pickTrainer,
+            onSearch: function () { openTeamSearch("trainer", true); }
+          });
+          return;
+        }
         teamSearchMode = mode === "trainer" ? "trainer" : "friend";
         document.getElementById("team-title").textContent = teamSearchMode === "trainer"
           ? "Trainer: ID oder Nickname eingeben"
@@ -19305,10 +19369,20 @@
         window.setTimeout(attach, 80);
       }
 
-      function openCalendlyPt() {
+      /* Calendly des gewählten Coaches (go_accounts.calendly_url), sonst gogogo-Standard */
+      function openCoachCalendly(coach) {
+        var id = coach && coach.id;
+        Promise.resolve(id ? rest("go_accounts?id=eq." + encodeURIComponent(id) + "&select=calendly_url&limit=1").catch(function () { return []; }) : [])
+          .then(function (rows) {
+            var url = rows && rows[0] && rows[0].calendly_url;
+            try { openCalendlyPt(url || ""); } catch (eCal) {}
+          });
+      }
+
+      function openCalendlyPt(customUrl) {
         function boot() {
           if (window.Calendly) {
-            window.Calendly.initPopupWidget({ url: CALENDLY_PT_URL });
+            window.Calendly.initPopupWidget({ url: customUrl || CALENDLY_PT_URL });
             ensureCalendlyDismiss();
           }
         }
@@ -19372,12 +19446,12 @@
           var row = Array.isArray(rows) ? rows[0] : rows;
           if (!row || !row.id) row = Object.assign({ id: "local-pt-" + Date.now() }, body, { created_at: new Date().toISOString() });
           upsertLocalPtBooking(row);
-          try { openCalendlyPt(); } catch (eCal) {}
+          openCoachCalendly(coach);
           return row;
         }).catch(function () {
           var row = Object.assign({ id: "local-pt-" + Date.now(), created_at: new Date().toISOString() }, body);
           upsertLocalPtBooking(row);
-          try { openCalendlyPt(); } catch (e2) {}
+          openCoachCalendly(coach);
           return row;
         });
       }
@@ -20190,6 +20264,34 @@
             if (teamPeople.length) paintHeuteCrew();
           }).catch(function () {});
         }
+      }
+
+      function openMyCoachees() {
+        showPlan("team");
+        requestAnimationFrame(function () {
+          var slide = document.querySelector('#plan-team [data-title="Meine Coachees"]');
+          if (slide && slide.scrollIntoView) slide.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+        });
+      }
+
+      function editOwnCalendly(btn) {
+        var cur = (sessionAccount && sessionAccount.calendly_url) || "";
+        GoDialog.prompt("Dein Calendly-Link für Personal Training", cur).then(function (val) {
+          if (val == null) return;
+          var url = String(val).trim();
+          if (url && !/^https:\/\/(www\.)?calendly\.com\//i.test(url)) {
+            gogogoToast("Bitte einen Link wie https://calendly.com/dein-name/30min einfügen");
+            return;
+          }
+          rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+            method: "PATCH", prefer: "return=minimal", body: { calendly_url: url || null }
+          }).then(function () {
+            sessionAccount.calendly_url = url || null;
+            if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+            if (btn) btn.textContent = url ? "Calendly verwalten" : "Calendly hinzufügen";
+            gogogoToast(url ? "Calendly gespeichert" : "Calendly entfernt");
+          }).catch(function () { gogogoToast("Speichern fehlgeschlagen (go-coach-reviews.sql ausgeführt?)"); });
+        });
       }
 
       function openGruppen() {
