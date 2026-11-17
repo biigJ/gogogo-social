@@ -1293,7 +1293,7 @@
         esc(postId || "") +
         '" data-invite-iso="' +
         esc(inviteIso || "") +
-        '" aria-label="Einladen">+</button>';
+        '" aria-label="Einladen"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>';
     }
     void mePerson;
     return (
@@ -2223,7 +2223,7 @@
       !firstPaint && !state.bootNeedsCenter ? scroller.scrollTop || 0 : null;
     /* Feed sichtbar lassen — kein opacity-Flash bei Refresh */
     root.classList.remove("is-centering");
-    root.innerHTML = html;
+    patchFeed(root, html);
     state.paintedAktuell = true;
     bindObserver(root);
     bindHeuteScrollFilter();
@@ -3458,6 +3458,58 @@
     ]);
   }
 
+  /* Feed neu zeichnen, ohne dass Bilder blitzen: unveränderte Karten bleiben dieselben
+     DOM-Knoten, in geänderten Karten werden vorhandene <img> mit gleicher Quelle übernommen. */
+  function patchFeed(root, html) {
+    if (!root.firstElementChild) {
+      root.innerHTML = html;
+      return;
+    }
+    var tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    var oldZones = {};
+    Array.prototype.forEach.call(root.children, function (z) {
+      if (z.getAttribute("data-acc-zone")) oldZones[z.getAttribute("data-acc-zone")] = z;
+    });
+    var imgPool = {};
+    var reused = [];
+    Array.prototype.forEach.call(root.querySelectorAll("img"), function (img) {
+      var src = img.getAttribute("src") || "";
+      (imgPool[src] = imgPool[src] || []).push(img);
+    });
+    Array.prototype.forEach.call(tmp.children, function (nz) {
+      var oz = oldZones[nz.getAttribute("data-acc-zone") || ""];
+      if (!oz) return;
+      var pool = {};
+      Array.prototype.forEach.call(oz.children, function (c) {
+        (pool[c.outerHTML] = pool[c.outerHTML] || []).push(c);
+      });
+      Array.prototype.slice.call(nz.children).forEach(function (nc) {
+        var same = pool[nc.outerHTML];
+        if (same && same.length) {
+          var keep = same.shift();
+          Array.prototype.forEach.call(keep.querySelectorAll("img"), function (img) {
+            var list = imgPool[img.getAttribute("src") || ""];
+            if (list && list.indexOf(img) !== -1) list.splice(list.indexOf(img), 1);
+            reused.push(img);
+          });
+          nz.replaceChild(keep, nc);
+        }
+      });
+    });
+    /* geänderte Karten: Bilder mit gleicher Quelle übernehmen (kein neues Dekodieren) */
+    Array.prototype.forEach.call(tmp.querySelectorAll("img"), function (img) {
+      if (reused.indexOf(img) !== -1) return;
+      var list = imgPool[img.getAttribute("src") || ""];
+      var old = list && list.shift();
+      if (!old) return;
+      old.className = img.className;
+      img.parentNode.replaceChild(old, img);
+    });
+    while (root.firstChild) root.removeChild(root.firstChild);
+    while (tmp.firstChild) root.appendChild(tmp.firstChild);
+  }
+
   function refresh() {
     if (!host || !me()) return Promise.resolve();
     var seq = ++state.refreshSeq;
@@ -3529,8 +3581,20 @@
     state.bootNeedsCenter = true;
   }
 
+  /* Um 0:00 neu laden: neuer Tag, Ringe und „heute“ springen um */
+  function scheduleMidnight() {
+    if (state.midnightTimer) clearTimeout(state.midnightTimer);
+    var now = new Date();
+    var next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+    state.midnightTimer = setTimeout(function () {
+      refresh();
+      scheduleMidnight();
+    }, Math.max(60000, next - now));
+  }
+
   function install(h) {
     host = h || host || {};
+    scheduleMidnight();
     saveFilter(loadFilter());
     var sel = $("heute-filter-select");
     if (sel) {
