@@ -1293,7 +1293,7 @@
         esc(postId || "") +
         '" data-invite-iso="' +
         esc(inviteIso || "") +
-        '" aria-label="Einladen">+</button>';
+        '" aria-label="Einladen"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>';
     }
     void mePerson;
     return (
@@ -2223,7 +2223,7 @@
       !firstPaint && !state.bootNeedsCenter ? scroller.scrollTop || 0 : null;
     /* Feed sichtbar lassen — kein opacity-Flash bei Refresh */
     root.classList.remove("is-centering");
-    root.innerHTML = html;
+    patchFeed(root, html);
     state.paintedAktuell = true;
     bindObserver(root);
     bindHeuteScrollFilter();
@@ -2972,6 +2972,20 @@
     });
   }
 
+  /* Einzeleinheiten = aktive Kurse mit genau einer Einheit (wie im Kurs-Editor) */
+  function loadSingleUnits(kind) {
+    return rest(
+      "courses?is_active=eq.true&private_for=is.null&category_default=eq." + encodeURIComponent(kind) +
+        "&select=id,title,slug,sessions_per_week,course_sessions(id)&order=title.asc"
+    ).then(function (rows) {
+      return (rows || []).filter(function (c) {
+        var n = (c.course_sessions || []).length;
+        return n === 1 && (c.sessions_per_week || 1) <= 1 &&
+          ["eigenes-training", "12-wochen-routine"].indexOf(String(c.slug || "")) === -1;
+      });
+    }).catch(function () { return []; });
+  }
+
   function createUnplannedEvent(payload) {
     var body = {
       user_id: me(),
@@ -3065,10 +3079,11 @@
       startBtn.textContent = "Jetzt starten";
       startBtn.addEventListener("click", function () {
         var vis = readCreateVis(pick);
-        finishCreate({
-          category: "alternative",
-          title: "Sonstiges",
-          visibility: vis
+        /* Sonstiges: gleich abschließen, mit Foto und Notiz */
+        createUnplannedEvent({ category: "alternative", title: "Sonstiges", visibility: vis }).then(function (ev) {
+          modal.hidden = true;
+          if (host.closeGoPick) host.closeGoPick();
+          return refresh().then(function () { if (ev && ev.id) openDoneModal(ev.id); });
         });
       });
       pick.appendChild(startBtn);
@@ -3128,6 +3143,42 @@
         });
       });
       pick.appendChild(go);
+    }
+
+    /* Kraft / Ausdauer: Einzeleinheit wählen → direkt tracken. Das Event entsteht erst beim Abschluss. */
+    if ((kind === "kraft" || kind === "ausdauer") && host.openEventWorkout) {
+      kinds.hidden = true;
+      title.hidden = false;
+      title.textContent = "Welche Einheit?";
+      pick.hidden = false;
+      pick.innerHTML = visPickerHtml() + '<p class="acc-spontan-loading">Lädt …</p>';
+      loadSingleUnits(kind).then(function (units) {
+        var loading = pick.querySelector(".acc-spontan-loading");
+        if (loading) loading.remove();
+        if (!units.length) {
+          pick.insertAdjacentHTML("beforeend", "<p>Noch keine Einzeleinheiten für diese Kategorie.</p>");
+          return;
+        }
+        units.forEach(function (u) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.textContent = u.title;
+          b.addEventListener("click", function () {
+            var vis = readCreateVis(pick);
+            modal.hidden = true;
+            if (host.closeGoPick) host.closeGoPick();
+            host.openEventWorkout({
+              course_id: u.id,
+              title: u.title,
+              category: kind,
+              starts_at: new Date().toISOString(),
+              spontan: { category: kind, course_id: u.id, visibility: vis }
+            });
+          });
+          pick.appendChild(b);
+        });
+      });
+      return;
     }
 
     var list = enrollmentsForCategory(kind);
@@ -3458,6 +3509,58 @@
     ]);
   }
 
+  /* Feed neu zeichnen, ohne dass Bilder blitzen: unveränderte Karten bleiben dieselben
+     DOM-Knoten, in geänderten Karten werden vorhandene <img> mit gleicher Quelle übernommen. */
+  function patchFeed(root, html) {
+    if (!root.firstElementChild) {
+      root.innerHTML = html;
+      return;
+    }
+    var tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    var oldZones = {};
+    Array.prototype.forEach.call(root.children, function (z) {
+      if (z.getAttribute("data-acc-zone")) oldZones[z.getAttribute("data-acc-zone")] = z;
+    });
+    var imgPool = {};
+    var reused = [];
+    Array.prototype.forEach.call(root.querySelectorAll("img"), function (img) {
+      var src = img.getAttribute("src") || "";
+      (imgPool[src] = imgPool[src] || []).push(img);
+    });
+    Array.prototype.forEach.call(tmp.children, function (nz) {
+      var oz = oldZones[nz.getAttribute("data-acc-zone") || ""];
+      if (!oz) return;
+      var pool = {};
+      Array.prototype.forEach.call(oz.children, function (c) {
+        (pool[c.outerHTML] = pool[c.outerHTML] || []).push(c);
+      });
+      Array.prototype.slice.call(nz.children).forEach(function (nc) {
+        var same = pool[nc.outerHTML];
+        if (same && same.length) {
+          var keep = same.shift();
+          Array.prototype.forEach.call(keep.querySelectorAll("img"), function (img) {
+            var list = imgPool[img.getAttribute("src") || ""];
+            if (list && list.indexOf(img) !== -1) list.splice(list.indexOf(img), 1);
+            reused.push(img);
+          });
+          nz.replaceChild(keep, nc);
+        }
+      });
+    });
+    /* geänderte Karten: Bilder mit gleicher Quelle übernehmen (kein neues Dekodieren) */
+    Array.prototype.forEach.call(tmp.querySelectorAll("img"), function (img) {
+      if (reused.indexOf(img) !== -1) return;
+      var list = imgPool[img.getAttribute("src") || ""];
+      var old = list && list.shift();
+      if (!old) return;
+      old.className = img.className;
+      img.parentNode.replaceChild(old, img);
+    });
+    while (root.firstChild) root.removeChild(root.firstChild);
+    while (tmp.firstChild) root.appendChild(tmp.firstChild);
+  }
+
   function refresh() {
     if (!host || !me()) return Promise.resolve();
     var seq = ++state.refreshSeq;
@@ -3529,8 +3632,20 @@
     state.bootNeedsCenter = true;
   }
 
+  /* Um 0:00 neu laden: neuer Tag, Ringe und „heute“ springen um */
+  function scheduleMidnight() {
+    if (state.midnightTimer) clearTimeout(state.midnightTimer);
+    var now = new Date();
+    var next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+    state.midnightTimer = setTimeout(function () {
+      refresh();
+      scheduleMidnight();
+    }, Math.max(60000, next - now));
+  }
+
   function install(h) {
     host = h || host || {};
+    scheduleMidnight();
     saveFilter(loadFilter());
     var sel = $("heute-filter-select");
     if (sel) {
@@ -3657,6 +3772,7 @@
       refresh();
     },
     afterKindChosen: afterKindChosen,
+    createUnplanned: createUnplannedEvent,
     todayActivity: todayActivity,
     focusEvent: focusEvent
   };
