@@ -378,7 +378,7 @@
       title: "Stempelkarte",
       price: "gratis",
       description:
-        "12er-Stempelkarte, gratis. Trainierst Du mit einem Freund bei seinem Event, scannst Du seine Karte und bekommst einen Stempel. Volle Karte: T-Shirt oder Selfiestick."
+        "12er-Stempelkarte, gratis. Trainierst Du mit einem Freund bei seinem Event, scannst Du seine Karte. Ihr bekommt beide einen Stempel: Du als Gast, er als Gastgeber. Volle Karte: T-Shirt oder Selfiestick."
     },
     {
       key: "web_call",
@@ -809,7 +809,7 @@
       stamps = Number((order && order.meta && order.meta.stamps) || 0) || 0;
     } catch (e) {}
     if (host.toast) {
-      host.toast("Stempelkarte: " + stamps + "/12 — Freund scannt nach gemeinsamem Event.");
+      host.toast("Stempelkarte: " + stamps + "/12. Nach gemeinsamem Event scannt Ihr Euch, beide bekommen einen Stempel.");
     }
   }
 
