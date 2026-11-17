@@ -1410,6 +1410,16 @@
       /* sticky behalten — soft ausfaden statt abrupt visibility:hidden */
     }
     body.is-session[data-shell="heute"] .heute-filter-pick { display: flex; margin: 0; width: auto; }
+    .heute-refresh { display: none; }
+    body.is-session[data-shell="heute"] .heute-refresh {
+      display: grid; place-items: center; position: absolute; right: 12px;
+      top: calc(max(6px, env(safe-area-inset-top, 0px)) + var(--heute-filter-line) + 4px);
+      width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%;
+      background: transparent; color: #2A2118; cursor: pointer;
+    }
+    .heute-refresh svg { width: 22px; height: 22px; }
+    .heute-refresh.is-busy svg { animation: heute-spin .8s linear infinite; }
+    @keyframes heute-spin { to { transform: rotate(360deg); } }
     body.is-session[data-shell="heute"] .heute-filter-pick select {
       font-size: calc(22px * 1.3);
       font-weight: 600;
@@ -6554,6 +6564,9 @@
           <option value="alles">Alles</option>
         </select>
       </label>
+      <button type="button" class="heute-refresh" id="heute-refresh" aria-label="Aktualisieren">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>
+      </button>
       <div class="heute-stories shell-heute" id="heute-stories" hidden>
         <div class="heute-stories__row ffc" id="heute-stories-row"><span class="heute-stories__team" id="heute-stories-team"></span></div>
       </div>
@@ -6925,11 +6938,13 @@
   <div class="sand-modal" id="invite-in-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="invite-in-title">
       <h2 class="ask" id="invite-in-title">Einladung</h2>
+      <p id="invite-in-from"></p>
       <p id="invite-in-place"></p>
       <p id="invite-in-activity"></p>
       <p id="invite-in-time"></p>
       <button type="button" id="invite-accept">annehmen</button>
       <button type="button" class="sand-quiet" id="invite-decline">ablehnen</button>
+      <button type="button" class="sand-quiet" id="invite-later">später</button>
     </div>
   </div>
   <div class="sand-modal" id="goal-modal" hidden>
@@ -7779,7 +7794,7 @@
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-2"></script>
-  <script src="/natalyaalice/go-covers.js?v=cov-2"></script>
+  <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-1"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-6"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-1"></script>
@@ -17896,10 +17911,54 @@
 
       function openIncoming(invite) {
         pendingIncoming = invite;
+        var fromEl = document.getElementById("invite-in-from");
+        if (fromEl) {
+          var dIso = String(invite.workout_date || "").slice(0, 10);
+          var dTxt = dIso ? new Date(dIso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "numeric" }) : "";
+          fromEl.textContent = [invite.from_name ? "Von " + invite.from_name : "", dTxt].filter(Boolean).join(" · ");
+        }
         document.getElementById("invite-in-place").textContent = "Ort: " + (invite.place || "zu Hause");
         document.getElementById("invite-in-activity").textContent = "Training / Aktivität: " + (invite.workout_label || "Training");
         document.getElementById("invite-in-time").textContent = "Uhrzeit: " + (invite.meet_time || "");
         document.getElementById("invite-in-modal").hidden = false;
+      }
+
+      /* Beim Start und nach Refresh: offene Einladungen nacheinander als Dialog (Serie nur einmal) */
+      var invitePromptSkip = {};
+      var invitePromptOn = false;
+      function inviteSeriesKey(r) {
+        var d = String(r.workout_date || "").slice(0, 10);
+        return "s:" + r.from_id + "|" + (r.workout_label || "") + "|" + (d ? new Date(d + "T12:00:00").getDay() : "");
+      }
+      function promptPendingInvites() {
+        if (!sessionMode || !sessionAccount || invitePromptOn) return;
+        var modal = document.getElementById("invite-in-modal");
+        if (!modal || !modal.hidden) return;
+        var me = String(sessionAccount.id);
+        var today = Log.berlinToday();
+        var next = (remoteInvites || []).filter(function (r) {
+          return r && r.id && String(r.to_id) === me && r.status === "pending" &&
+            String(r.workout_date || "") >= today &&
+            !invitePromptSkip[String(r.id)] && !invitePromptSkip[inviteSeriesKey(r)];
+        }).sort(function (a, b) { return String(a.workout_date).localeCompare(String(b.workout_date)); })[0];
+        if (!next) return;
+        invitePromptOn = true;
+        openIncoming(next);
+      }
+      function invitePromptDone(invite) {
+        if (invite) {
+          invitePromptSkip[String(invite.id)] = true;
+          invitePromptSkip[inviteSeriesKey(invite)] = true;
+        }
+        if (!invitePromptOn) return;
+        invitePromptOn = false;
+        setTimeout(promptPendingInvites, 250);
+      }
+      function laterIncoming() {
+        var invite = pendingIncoming;
+        pendingIncoming = null;
+        document.getElementById("invite-in-modal").hidden = true;
+        invitePromptDone(invite);
       }
 
       var pendingIncoming = null;
@@ -17939,6 +17998,8 @@
         syncInviteStore();
         paintWelcome();
         paintPill();
+        if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
+        invitePromptDone(invite);
       }
 
       function movementLabel() {
@@ -20346,7 +20407,7 @@
         /* Reihe folgt dem Filter: Ich = keine Reihe, Team = Team, Gruppe = Gruppe, Tagebuch/Alles = alle */
         var crewView = heuteView();
         var storiesWrap = document.getElementById("heute-stories");
-        if (storiesWrap) storiesWrap.classList.toggle("is-filter-hidden", crewView === "ich");
+        if (storiesWrap) storiesWrap.classList.remove("is-filter-hidden");
         if (crewView === "gruppe") {
           var gIds = groupMemberIds();
           gIds.forEach(function (gid) {
@@ -20597,6 +20658,7 @@
             paintWelcome();
             refreshDiaryNote();
             paintPill();
+            promptPendingInvites();
           });
         });
       }
@@ -21126,8 +21188,28 @@
       });
       document.getElementById("invite-accept").addEventListener("click", function () { decideIncoming("accepted"); });
       document.getElementById("invite-decline").addEventListener("click", function () { decideIncoming("declined"); });
+      document.getElementById("invite-later").addEventListener("click", laterIncoming);
+      (function bindHeuteRefresh() {
+        var btn = document.getElementById("heute-refresh");
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          if (btn.classList.contains("is-busy")) return;
+          btn.classList.add("is-busy");
+          invitePromptSkip = {};
+          var jobs = [loadInvites()];
+          try { jobs.push(loadTeam()); } catch (eT) {}
+          if (window.HeuteAccountability && HeuteAccountability.refresh) {
+            try { jobs.push(HeuteAccountability.refresh()); } catch (eH) {}
+          }
+          if (window.WocheReels && WocheReels.refreshKeepDay) {
+            try { WocheReels.refreshKeepDay(); } catch (eW) {}
+          }
+          Promise.all(jobs.map(function (j) { return Promise.resolve(j).catch(function () {}); }))
+            .then(function () { setTimeout(function () { btn.classList.remove("is-busy"); }, 300); });
+        });
+      })();
       document.getElementById("invite-in-modal").addEventListener("click", function (event) {
-        if (event.target.id === "invite-in-modal") event.currentTarget.hidden = true;
+        if (event.target.id === "invite-in-modal") laterIncoming();
       });
       document.getElementById("profile-back").addEventListener("click", closeProfile);
       var goSubBack = document.getElementById("go-sub-back");

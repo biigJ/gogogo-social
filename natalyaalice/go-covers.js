@@ -4,7 +4,7 @@
  *   GoCovers.ready()             → Promise
  *   GoCovers.url(courseId, cat, enrollmentId)
  *                                → Bild der Einzeleinheit, sonst Bild des Wochenplans
- *                                  (über die Einschreibung bzw. den Plan, der die Einheit nutzt),
+ *                                  (nur wenn das Event aus dieser Wochenplan-Einschreibung stammt),
  *                                  sonst Bild der Kategorie
  *
  * Ein eigenes Foto am Event (events.photo_url) hat immer Vorrang; das entscheidet der Aufrufer.
@@ -22,7 +22,6 @@
   };
 
   var byCourse = {};
-  var plansOfUnit = {}; // Einzeleinheit → Wochenpläne, die sie nutzen
   var planOfEnroll = {}; // Einschreibung → Wochenplan
   var loading = null;
 
@@ -32,15 +31,10 @@
     var safe = function (p) { return h.rest(p).catch(function () { return []; }); };
     loading = Promise.all([
       safe("courses?image_url=not.is.null&select=id,image_url&limit=500"),
-      safe("course_sessions?unit_course_id=not.is.null&select=course_id,unit_course_id&limit=2000"),
       safe("enrollments?select=id,course_id&limit=500")
     ]).then(function (res) {
       (res[0] || []).forEach(function (r) { if (r && r.id && r.image_url) byCourse[String(r.id)] = r.image_url; });
-      (res[1] || []).forEach(function (r) {
-        var u = String(r.unit_course_id);
-        (plansOfUnit[u] = plansOfUnit[u] || []).push(String(r.course_id));
-      });
-      (res[2] || []).forEach(function (r) { if (r && r.id && r.course_id) planOfEnroll[String(r.id)] = String(r.course_id); });
+      (res[1] || []).forEach(function (r) { if (r && r.id && r.course_id) planOfEnroll[String(r.id)] = String(r.course_id); });
     }).catch(function () {});
     return loading;
   }
@@ -48,8 +42,6 @@
   function planImage(courseId, enrollmentId) {
     var plan = enrollmentId && planOfEnroll[String(enrollmentId)];
     if (plan && byCourse[plan]) return byCourse[plan];
-    var list = courseId ? plansOfUnit[String(courseId)] || [] : [];
-    for (var i = 0; i < list.length; i++) if (byCourse[list[i]]) return byCourse[list[i]];
     return "";
   }
 
