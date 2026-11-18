@@ -2182,6 +2182,7 @@
     .go-online-cta--ghost { background: transparent !important; color: #111 !important; border: 1.5px solid #111 !important; margin-left: 6px; }
     .go-online-cta { display: inline-flex; align-items: center; min-height: 36px; margin: 8px 0 0; padding: 0 14px; border-radius: 999px; border: 0; background: #111; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
     .acc-tool-badge { display: inline-flex; align-items: center; justify-content: center; min-height: 30px; }
+    button.acc-tool-badge { border: 0; background: transparent; color: inherit; padding: 0; cursor: pointer; font: inherit; }
     .acc-badge-ico { display: block; color: #2A2118; width: 30px; height: 30px; }
     /* Pill-Woche-Kalender bleibt bei .app-pill svg (24px) — hier nur Event-Zeile */
     .acc-card__emoji { display: none !important; }
@@ -7795,15 +7796,16 @@
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-2"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
+  <script src="/natalyaalice/tamagotchi.js?v=tama-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-1"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-6"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-1"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-1"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-50"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-51"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-40"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-41"></script>
   <script src="/natalyaalice/support.js?v=support-18"></script>
   <script>
     (function () {
@@ -18356,6 +18358,13 @@
       window.GoOpenEventWorkout = openEventWorkout;
 
       /* Coverbilder: Kursbilder laden; Karten, die schon ohne sie gemalt wurden, einmal neu zeichnen */
+      if (window.GoTama) {
+        GoTama.init({
+          rest: rest,
+          todayIso: function () { return Log.berlinToday(); },
+          onChange: function () { try { paintHeuteCrew(); } catch (eTama) {} }
+        });
+      }
       if (window.GoCovers) {
         GoCovers.init({ rest: rest }).then(function () {
           if (!GoCovers.count()) return;
@@ -20354,6 +20363,7 @@
           meActEarly = (window.HeuteAccountability && HeuteAccountability.todayActivity && HeuteAccountability.todayActivity()) || {};
         } catch (eMe) { meActEarly = {}; }
         applyTrainingRing(meItem, meActEarly[String(sessionAccount.id)] || null, presenceFor(sessionAccount.id));
+        if (window.GoTama) GoTama.decorate(meItem, sessionAccount.id);
         box.appendChild(meItem);
         var seenIds = {};
         var friends = teamPeople.filter(function (person) {
@@ -20450,6 +20460,7 @@
           var el = storyItem(entry.person, entry.story || (photoId ? { seen: false } : null), opener);
           if (entry.today) el.classList.add("is-today");
           applyTrainingRing(el, entry.today, entry.presence);
+          if (window.GoTama) GoTama.decorate(el, entry.person.id);
           box.appendChild(el);
         });
         var add = document.createElement("button");
@@ -21196,6 +21207,7 @@
           if (btn.classList.contains("is-busy")) return;
           btn.classList.add("is-busy");
           invitePromptSkip = {};
+          if (window.GoTama) GoTama.invalidate();
           var jobs = [loadInvites()];
           try { jobs.push(loadTeam()); } catch (eT) {}
           if (window.HeuteAccountability && HeuteAccountability.refresh) {

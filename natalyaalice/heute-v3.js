@@ -1158,6 +1158,13 @@
         '<rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7l8 6 8-6"/></svg>'
       );
     }
+    if (kind === "alternative") {
+      /* Blatt: Bewegung statt Training */
+      return (
+        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19l8-8"/></svg>'
+      );
+    }
     if (kind === "spontan") {
       return (
         '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
@@ -1372,6 +1379,31 @@
     );
   }
 
+  /* Tipp auf das Icon rechts unter dem Event: kurzer Satz, was das ist */
+  var BADGE_INFO = {
+    plan: "Wochenplan: Termin aus Deinem gewählten Plan.",
+    coach: "Klemmbrett: Dein Coach hat das eingetragen.",
+    zirkel: "FRIDAY CIRCLE: Zirkeltraining der Gruppe.",
+    spontan: "Spontanes Event: einfach so trainiert.",
+    alternative: "Alternative: Bewegung statt Training, z. B. Schritte oder Mobility.",
+    invite: "Einladung: Jemand will mit Dir trainieren."
+  };
+
+  var SPONTAN_BTN =
+    '<button type="button" class="acc-tool acc-tool--spontan" data-spontan="1" aria-label="Spontan trainieren">' +
+    '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="14.5" cy="4.5" r="1.8"/><path d="M9 21l3-6 3 2.5V21"/><path d="M6.5 12.5l3-4 4 1 2.5 3 3 .5"/><path d="M9.5 8.5L12 15"/></svg>' +
+    "</button>";
+
+  /* Sportler-Icon nur einmal: am ersten eigenen Event ab heute abwärts */
+  function placeSpontan(html) {
+    var from = html.indexOf('data-acc-zone="today"');
+    if (from < 0) from = 0;
+    var at = html.indexOf("<!--spontan-->", from);
+    if (at < 0) return html;
+    return html.slice(0, at) + SPONTAN_BTN + html.slice(at + "<!--spontan-->".length);
+  }
+
   function eventToolRowHtml(opts) {
     opts = opts || {};
     var eventId = opts.eventId || "";
@@ -1405,12 +1437,14 @@
       : "";
     var badgeKind = opts.badge || "";
     var badge = badgeKind
-      ? '<span class="acc-tool-badge" title="">' + badgeSvg(badgeKind) + "</span>"
+      ? '<button type="button" class="acc-tool-badge" data-badge-info="' + esc(badgeKind) + '" aria-label="' +
+        esc(BADGE_INFO[badgeKind] || "") + '">' + badgeSvg(badgeKind) + "</button>"
       : "";
     return (
       '<div class="acc-card__tools">' +
       '<div class="acc-card__tools-left">' +
       check +
+      (check && !opts.noCheck ? "<!--spontan-->" : "") +
       bubble +
       remove +
       "<!--faces-->" +
@@ -1637,6 +1671,7 @@
     if (!ev) return "";
     if (ev.category === "zirkel") return "zirkel";
     if (ev.is_unplanned) return "spontan";
+    if (ev.category === "alternative" && !ev.enrollment_id && !ev.assigned_by) return "alternative";
     if (ev.assigned_by) return "coach";
     /* Wochenplanung / Kurs-Session → Kalender-Icon wie Pill-Woche */
     if (ev.enrollment_id || ev.course_id || ev.item_type === "course_session") {
@@ -2205,8 +2240,7 @@
     }
     html += "</div>";
     html += '<div class="acc-feed-today" data-acc-zone="today" id="acc-feed-today">';
-    /* Spontan über dem aktuellen Event */
-    html += renderSpontanCard();
+    /* Spontan: Sportler-Icon in der Werkzeugzeile des aktuellen Events (eventToolRowHtml spontan) */
     feed.myToday.forEach(function (item) {
       html += renderFeedItem(item);
     });
@@ -2224,7 +2258,7 @@
       !firstPaint && !state.bootNeedsCenter ? scroller.scrollTop || 0 : null;
     /* Feed sichtbar lassen — kein opacity-Flash bei Refresh */
     root.classList.remove("is-centering");
-    patchFeed(root, html);
+    patchFeed(root, placeSpontan(html));
     state.paintedAktuell = true;
     bindObserver(root);
     bindHeuteScrollFilter();
@@ -2571,7 +2605,10 @@
         };
         if (note) body.note = note;
         if (photo) body.photo_url = photo;
-        return patchEventDone(eventId, body);
+        return patchEventDone(eventId, body).then(function (r) {
+          if (global.GoTama) global.GoTama.invalidate();
+          return r;
+        });
       })
       .then(function (updated) {
         var photo = (updated && updated.photo_url) || "";
@@ -3336,6 +3373,12 @@
     ) {
       var iso = planCard.getAttribute("data-plan-iso");
       if (iso && host.openPlanDay) host.openPlanDay(iso);
+      return;
+    }
+    var badgeInfo = t.closest("[data-badge-info]");
+    if (badgeInfo) {
+      var info = BADGE_INFO[badgeInfo.getAttribute("data-badge-info")] || "";
+      if (info && host.toast) host.toast(info);
       return;
     }
     var spontan = t.closest("[data-spontan]");
