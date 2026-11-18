@@ -4,6 +4,7 @@
  *   GoDialog.confirm(text, { ok, cancel })     → Promise<boolean>
  *   GoDialog.prompt(text, value, { ok, type }) → Promise<string|null>
  *   GoDialog.choose(text, [{ label, value }])  → Promise<value|null>
+ *   GoDialog.pick(text, [{ label, value }], { ok }) → Promise<value[]|null>  (Mehrfachauswahl)
  *
  * Stil wie .sand-modal / .sand-card (Sandfläche, Playfair-Titel, schwarze Pill-Buttons).
  */
@@ -17,7 +18,11 @@
     ".god__input{width:100%;box-sizing:border-box;min-height:46px;margin:0 0 14px;padding:0 12px;border:1px solid rgba(42,33,24,.25);border-radius:12px;background:#fff;font:inherit;font-size:16px;color:#2A2118}" +
     ".god__btn{display:block;width:100%;min-height:48px;margin:0 0 8px;border:0;border-radius:999px;background:#111;color:#fff;font:inherit;font-weight:700;font-size:16px;cursor:pointer}" +
     ".god__btn--quiet{background:transparent;color:rgba(42,33,24,.7);font-weight:600}" +
-    ".god__btn--choice{background:transparent;color:#2A2118;border:1.5px solid #2A2118}";
+    ".god__btn--choice{background:transparent;color:#2A2118;border:1.5px solid #2A2118}" +
+    ".god__list{max-height:46vh;overflow-y:auto;margin:0 0 14px;display:grid;gap:6px}" +
+    ".god__pick{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:12px;background:#fff;font-size:16px;cursor:pointer}" +
+    ".god__pick input{width:20px;height:20px;accent-color:#2A2118;margin:0}" +
+    ".god__empty{margin:0 0 14px;color:rgba(42,33,24,.65);font-size:14px}";
 
   function ensureCss() {
     if (document.getElementById("go-dialog-css")) return;
@@ -123,5 +128,38 @@
     });
   }
 
-  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg };
+  function pickDlg(msg, items, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      var list = document.createElement("div");
+      list.className = "god__list";
+      (items || []).forEach(function (it) {
+        var row = document.createElement("label");
+        row.className = "god__pick";
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.value = String(it.value);
+        if (it.checked) cb.checked = true;
+        row.appendChild(cb);
+        row.appendChild(document.createTextNode(it.label));
+        list.appendChild(row);
+      });
+      if (!(items || []).length && opts.empty) {
+        var e = document.createElement("p");
+        e.className = "god__empty";
+        e.textContent = opts.empty;
+        card.appendChild(e);
+      } else {
+        card.appendChild(list);
+      }
+      button(card, opts.ok || "Weiter", "", function () {
+        close(Array.prototype.map.call(list.querySelectorAll("input:checked"), function (i) { return i.value; }));
+      });
+      button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(null); });
+      return null;
+    });
+  }
+
+  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg };
 })(window);

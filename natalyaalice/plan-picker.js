@@ -132,6 +132,24 @@
       });
   }
 
+  /* Vorabfrage = Profilziel: erstes gewähltes Ziel landet in go_accounts.training_goal (nur eigener Account) */
+  function saveGoalToProfile() {
+    if (st.mode !== "self" || !st.goals.length || !st.host.me) return;
+    var g = GOALS.filter(function (x) { return x.key === st.goals[0]; })[0];
+    var me = st.host.me();
+    if (!g || !me) return;
+    st.host.rest("go_accounts?id=eq." + encodeURIComponent(me), { method: "PATCH", prefer: "return=minimal", body: { training_goal: g.label } })
+      .then(function () {
+        try {
+          if (global.GoAccountSession) {
+            var acc = GoAccountSession.load();
+            if (acc) { acc.training_goal = g.label; GoAccountSession.save(acc); }
+          }
+        } catch (e) {}
+      })
+      .catch(function () {});
+  }
+
   /* ---------- Schritte ---------- */
   function paintGoals() {
     st.step = "goals";
@@ -428,7 +446,10 @@
       if (i === -1) st.goals.push(k); else st.goals.splice(i, 1);
       return paintGoals();
     }
-    if (t.closest("[data-gpp-next]")) return paintList();
+    if (t.closest("[data-gpp-next]")) {
+      saveGoalToProfile();
+      return paintList();
+    }
     if (t.closest("[data-gpp-goals]")) return paintGoals();
     if (t.closest("[data-gpp-indiv]")) return paintIndividual();
     if (t.closest("[data-gpp-coach]")) return chooseCoach();
