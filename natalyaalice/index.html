@@ -6160,6 +6160,7 @@
       <button type="button" data-menu="name">Vorname ändern</button>
       <button type="button" data-menu="nickname">Nickname festlegen</button>
       <button type="button" data-menu="phone">Telefonnummer angeben</button>
+      <button type="button" data-menu="wa_reminder">WhatsApp-Erinnerung</button>
       <button type="button" data-menu="email">E-Mail-Adresse angeben</button>
       <button type="button" data-menu="ffc_password">FFC-Passwort ändern</button>
       <button type="button" data-menu="code">Login-Code ändern</button>
@@ -7812,7 +7813,7 @@
   <script src="/natalyaalice/tamagotchi.js?v=tama-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-1"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-6"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-1"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-2"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-1"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
@@ -9797,6 +9798,40 @@
         }
       }
 
+      /* WhatsApp-Erinnerung 19 Uhr: Einverständnis speichern (Versand per Checkliste im Admin) */
+      function openWaReminderSetting() {
+        if (!sessionAccount) return;
+        var id = encodeURIComponent(sessionAccount.id);
+        rest("go_accounts?id=eq." + id + "&select=phone,wa_reminder")
+          .then(function (rows) {
+            var row = (rows && rows[0]) || {};
+            var phone = String(row.phone || sessionAccount.phone || "").trim();
+            if (row.wa_reminder) {
+              return GoDialog.confirm("WhatsApp-Erinnerung ist an (" + phone + "). Abschalten?", { ok: "Abschalten" }).then(function (ok) {
+                if (!ok) return;
+                return rest("go_accounts?id=eq." + id, { method: "PATCH", prefer: "return=minimal", body: { wa_reminder: false } })
+                  .then(function () { gogogoToast("WhatsApp-Erinnerung ist aus."); });
+              });
+            }
+            if (!phone) {
+              gogogoToast("Gib zuerst Deine Telefonnummer an.");
+              return;
+            }
+            return GoDialog.confirm(
+              "Jeden Abend um 19 Uhr eine kurze WhatsApp an " + phone + ": was heute noch offen ist oder was morgen ansteht. Einverstanden? Abschalten geht jederzeit hier.",
+              { ok: "Einverstanden" }
+            ).then(function (ok) {
+              if (!ok) return;
+              return rest("go_accounts?id=eq." + id, {
+                method: "PATCH",
+                prefer: "return=minimal",
+                body: { wa_reminder: true, wa_reminder_at: new Date().toISOString() }
+              }).then(function () { gogogoToast("WhatsApp-Erinnerung ist an."); });
+            });
+          })
+          .catch(function () { gogogoToast("Speichern nicht möglich (go-wa-reminder.sql ausgeführt?)"); });
+      }
+
       var accountEditField = "";
       function openAccountEdit(field) {
         accountEditField = field;
@@ -9997,6 +10032,10 @@
             sessionStorage.setItem("gogogo_profile_website_return", JSON.stringify({ href: "/workout/", at: Date.now() }));
           } catch (eWeb) {}
           location.href = "/?landing=1";
+          return;
+        }
+        if (field === "wa_reminder") {
+          openWaReminderSetting();
           return;
         }
         if (field === "darstellung") {

@@ -1,6 +1,7 @@
 /* admin-inbox.js — Admin in der App (nur Joscha / Ben)
  *
- *   GoAdmin.open(host)        → Vollbild: Nachrichten (neue Nutzer, Buchungen) + Coaches freischalten
+ *   GoAdmin.open(host)        → Vollbild: Nachrichten (neue Nutzer, Buchungen), Coaches freischalten,
+ *                               Erinnerungen (WhatsApp 19 Uhr als Checkliste, go-wa-reminder.sql)
  *   GoAdmin.unread(host)      → Promise<Anzahl neuer Nachrichten seit dem letzten Öffnen>
  *
  * host: rest(path, opts), sessionAccount, toast(msg)
@@ -33,7 +34,10 @@
     ".ga-when{display:block;font-size:12px;color:rgba(42,33,24,.6)}" +
     ".ga-item.is-new .ga-copy p::before{content:'';display:inline-block;width:8px;height:8px;margin:0 6px 1px 0;border-radius:50%;background:#111}" +
     ".ga-act{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer}" +
-    ".ga-act.is-on{background:#111;color:#fff}";
+    ".ga-act.is-on{background:#111;color:#fff}" +
+    ".ga-wa{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:#128C7E;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-grid;place-items:center}" +
+    ".ga-item.is-sent{opacity:.5}" +
+    ".ga-msg{display:block;font-size:13px;color:rgba(42,33,24,.75);margin-top:2px}";
 
   function ensureCss() {
     if (document.getElementById("ga-css")) return;
@@ -160,8 +164,69 @@
     }
     st.body.innerHTML =
       '<div class="cp-seg"><button type="button" data-ga-tab="news" class="' + (st.tab === "news" ? "is-on" : "") + '">Nachrichten</button>' +
-      '<button type="button" data-ga-tab="coaches" class="' + (st.tab === "coaches" ? "is-on" : "") + '">Coaches</button></div>' +
-      (st.tab === "news" ? paintNews() : paintCoaches());
+      '<button type="button" data-ga-tab="coaches" class="' + (st.tab === "coaches" ? "is-on" : "") + '">Coaches</button>' +
+      '<button type="button" data-ga-tab="wa" class="' + (st.tab === "wa" ? "is-on" : "") + '">Erinnerungen</button></div>' +
+      (st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : paintCoaches());
+  }
+
+  /* ---------- Erinnerungen: WhatsApp 19 Uhr als Checkliste ---------- */
+  function berlinToday() {
+    return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+  }
+  function hhmm(at) {
+    var d = new Date(at);
+    return isNaN(d.getTime()) ? "" : d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+  }
+  function waNumber(phone) {
+    var d = String(phone || "").replace(/[^0-9+]/g, "");
+    if (d.indexOf("+") === 0) return d.slice(1);
+    if (d.indexOf("00") === 0) return d.slice(2);
+    if (d.indexOf("0") === 0) return "49" + d.slice(1);
+    return d;
+  }
+  function waText(r) {
+    var first = String(r.nickname || r.name || "").split(" ")[0];
+    var open = (r.today || []).filter(function (e) { return e.status === "geplant"; });
+    var done = (r.today || []).some(function (e) { return e.status === "erledigt"; });
+    var next = (r.tomorrow || [])[0];
+    var parts = ["Hi " + first + "!"];
+    if (open.length) parts.push("Heute noch offen: " + open[0].title + ". Schaffst Du das noch?");
+    else if (done) parts.push("Stark, heute erledigt.");
+    if (next) parts.push("Morgen: " + next.title + (hhmm(next.at) ? " um " + hhmm(next.at) : "") + ".");
+    if (!open.length && !next) parts.push("Morgen steht nichts an. Plan Dir was in gogogo.");
+    parts.push("gogogo");
+    return parts.join(" ");
+  }
+  function loadWa() {
+    st.wa = null;
+    return host.rest("rpc/go_admin_wa_list", { method: "POST", body: { p_day: berlinToday() } })
+      .then(function (rows) { if (st) { st.wa = rows || []; paint(); } })
+      .catch(function () { if (st) { st.wa = "error"; paint(); } });
+  }
+  function paintWa() {
+    if (st.wa === "error") return '<p class="cp-hint">Liste nicht geladen. Ist go-wa-reminder.sql in Supabase ausgeführt?</p>';
+    if (!st.wa) { loadWa(); return '<p class="cp-hint">Lade…</p>'; }
+    var done = st.wa.filter(function (r) { return r.sent_at; }).length;
+    var head = '<p class="cp-hint">Heute 19 Uhr · ' + done + " von " + st.wa.length + " erinnert. Tipp auf WhatsApp öffnet den Text, danach ist die Person abgehakt.</p>";
+    if (!st.wa.length) return head + '<p class="cp-hint">Noch niemand hat die Erinnerung in den Einstellungen eingeschaltet.</p>';
+    return head + st.wa.map(function (r) {
+      var text = waText(r);
+      var href = "https://wa.me/" + waNumber(r.phone) + "?text=" + encodeURIComponent(text);
+      return '<div class="ga-item' + (r.sent_at ? " is-sent" : "") + '">' + face(r) +
+        '<div class="ga-copy"><p><b>' + esc(r.name || "?") + "</b>" + (r.sent_at ? " ✓" : "") + "</p>" +
+        '<span class="ga-msg">' + esc(text) + "</span></div>" +
+        '<a class="ga-wa" href="' + esc(href) + '" target="_blank" rel="noopener" data-ga-wa="' + esc(r.account_id) + '">WhatsApp</a></div>';
+    }).join("");
+  }
+  function markWa(id) {
+    var row = (st.wa || []).filter(function (r) { return String(r.account_id) === String(id); })[0];
+    if (row) row.sent_at = new Date().toISOString();
+    host.rest("go_wa_reminder_log", {
+      method: "POST",
+      prefer: "resolution=merge-duplicates,return=minimal",
+      body: { account_id: id, day: berlinToday(), sent_by: me(), sent_at: new Date().toISOString() }
+    }).catch(function () {});
+    setTimeout(paint, 300);
   }
 
   function setCoach(btn) {
@@ -188,8 +253,9 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-close],[data-ga-tab],[data-ga-coach]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-close],[data-ga-tab],[data-ga-coach],[data-ga-wa]") : null;
     if (!t) return;
+    if (t.hasAttribute("data-ga-wa")) { markWa(t.getAttribute("data-ga-wa")); return; }
     if (t.hasAttribute("data-ga-close")) return close();
     if (t.hasAttribute("data-ga-tab")) {
       st.tab = t.getAttribute("data-ga-tab");
@@ -206,7 +272,7 @@
     if (host && host.onAdminClosed) host.onAdminClosed();
   }
 
-  function open(h) {
+  function open(h, tab) {
     host = h;
     ensureCss();
     if (st) close();
@@ -220,7 +286,7 @@
       '<div class="cp-body"><p class="cp-hint">Lade…</p></div>';
     document.body.appendChild(root);
     document.body.classList.add("cp-open");
-    st = { root: root, body: root.querySelector(".cp-body"), tab: "news", seenBefore: lastSeen(), data: null, accounts: [] };
+    st = { root: root, body: root.querySelector(".cp-body"), tab: tab || "news", seenBefore: lastSeen(), data: null, accounts: [] };
     root.addEventListener("click", onClick);
     load().then(function (data) {
       if (!st) return;
