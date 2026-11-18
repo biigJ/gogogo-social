@@ -8,7 +8,7 @@
  *   Tag mit erledigtem Event              → eine Stufe zurück (bis 0)
  *   Tag mit geplantem, nicht erledigtem   → eine Stufe hoch (bis Rot)
  *   Event von diesem Tag verschoben       → eine Stufe hoch, höchstens Gelb-Orange (2)
- *   Event ausdrücklich ausfallen lassen   → Rot (3)
+ *   Event ausdrücklich ausfallen lassen   → Rot (3), außer am Tag steht ein Ersatz (Alternative)
  *   Tag ohne Event                        → bleibt
  *   Stufen: 0 normal · 1 Gelb · 2 Gelb-Orange · 3 Rot
  *   Ziffer (nur am eigenen Kreis): Wochen am Stück (Mo bis So), in denen an allen 7 Tagen etwas abgehakt wurde.
@@ -23,6 +23,7 @@
   var timer = null;
   var noMovedCol = false;
   var LABEL = ["", "1× verschoben", "2× verschoben", "Training ausgefallen"];
+  var COLORS = ["#2E9E5B", "#F2C94C", "#F29A2E", "#E5251B"];
 
   function berlinDay(ts) {
     if (!ts) return "";
@@ -46,7 +47,7 @@
   }
 
   function compute(rows, todayIso) {
-    var done = {}, missed = {}, cancelled = {}, moved = {};
+    var done = {}, missed = {}, cancelled = {}, moved = {}, other = {};
     (rows || []).forEach(function (r) {
       (r.moved_days || []).forEach(function (m) {
         m = String(m).slice(0, 10);
@@ -57,12 +58,13 @@
       if (r.status === "erledigt") done[d] = true;
       else if (r.status === "ausgefallen") cancelled[d] = true;
       else if (r.status === "geplant" && d < todayIso) missed[d] = true;
+      if (r.status !== "ausgefallen") other[d] = true;
     });
     var start = addDays(mondayOf(todayIso), -7 * 12);
     var level = 0;
     for (var d = start; d <= todayIso; d = addDays(d, 1)) {
       if (done[d]) level = Math.max(0, level - 1);
-      else if (d < todayIso && cancelled[d]) level = 3;
+      else if (d < todayIso && cancelled[d] && !other[d]) level = 3;
       else if (d < todayIso && missed[d]) level = Math.min(3, level + 1);
       else if (moved[d]) level = level >= 3 ? 3 : Math.min(2, level + moved[d]);
     }
@@ -119,8 +121,10 @@
       }
       return;
     }
-    el.classList.remove("tama-1", "tama-2", "tama-3");
-    if (s.level) el.classList.add("tama-" + s.level);
+    el.classList.remove("tama-0", "tama-1", "tama-2", "tama-3");
+    el.classList.add("tama-" + s.level);
+    /* Farbe für Puls und dicken Rand: Grün, Gelb, Gelb-Orange, Rot */
+    el.style.setProperty("--tama", COLORS[s.level] || COLORS[0]);
     var ring = el.querySelector(".crew-story__ring") || el;
     var old = ring.querySelector(".tama-badge");
     if (old) old.remove();

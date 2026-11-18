@@ -242,6 +242,8 @@
     if (!uid || uid === me()) return true;
     var s = state.share && state.share[uid];
     if (!s) return false;
+    /* Coach sieht seine Coachees immer */
+    if (s.coach && s.coach === me()) return true;
     if (s.vis === "friends") return true;
     if (s.vis === "trainer") return s.coach === me();
     return false;
@@ -581,6 +583,14 @@
       })
       .catch(function () {
         state.invites = {};
+      })
+      .then(function () {
+        /* eigene offene Anfragen (Winken) bleiben nach Neuladen ausgegraut */
+        return rest("go_event_requests?from_id=eq." + encodeURIComponent(id) + "&status=eq.pending&select=event_id")
+          .then(function (rows) {
+            (rows || []).forEach(function (r) { if (r && r.event_id) state.waved[String(r.event_id)] = true; });
+          })
+          .catch(function () {});
       });
   }
 
@@ -1019,7 +1029,7 @@
         return inGroupFilter(ev.user_id, flags);
       }
       if (!flags.showOthersUpcoming) return false;
-      if (!ownerShares(ev.user_id)) return false;
+      /* Kommende Events: „zeigen“ am Event reicht (Historie teilen gilt nur für Vergangenes) */
       if (!inTeamFilter(ev.user_id, flags)) return false;
       if (!(vis === "team" || vis === "gruppe")) return false;
       return inGroupFilter(ev.user_id, flags);
@@ -1423,6 +1433,9 @@
     '<path d="M8.5 12.5V6.8a1.3 1.3 0 0 1 2.6 0v4.7"/><path d="M11.1 11.5V5.3a1.3 1.3 0 0 1 2.6 0v6.2"/><path d="M13.7 11.5V6.3a1.3 1.3 0 0 1 2.6 0v7.4"/>' +
     '<path d="M16.3 10.2a1.3 1.3 0 0 1 2.6 0v4.3a6.2 6.2 0 0 1-6.2 6.2h-.6a6 6 0 0 1-4.5-2.1L4.6 15a1.4 1.4 0 0 1 2-1.9l1.9 1.6"/>' +
     '<path d="M4 7.2c.4-1.3 1.2-2.4 2.3-3.1M19.6 4.3c1 .7 1.7 1.7 2 2.9"/></svg>';
+  var HEART_SVG =
+    '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">' +
+    '<path d="M12 20.3s-7.3-4.4-8.6-9A4.6 4.6 0 0 1 12 7.1a4.6 4.6 0 0 1 8.6 4.2c-1.3 4.6-8.6 9-8.6 9z"/></svg>';
   /* Postausgang statt Plus: Einladen */
   var OUTBOX_SVG =
     '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
@@ -1451,6 +1464,11 @@
       ? '<button type="button" class="acc-tool acc-tool--wave' + (opts.waved ? " is-on" : "") + '" data-wave-ev="' + esc(eventId) +
         '" aria-label="' + (opts.waved ? "Anfrage gesendet" : "Fragen, ob ich mitmachen kann") + '">' + WAVE_SVG + "</button>"
       : "";
+    if (opts.heart) {
+      var meP = personOf(me());
+      wave = '<button type="button" class="acc-tool acc-tool--heart is-on" data-heart-ev="' + esc(eventId) + '" aria-label="Dabei. Tippen zum Absagen">' + HEART_SVG + "</button>" +
+        '<span class="acc-heart-me">' + (meP.photo ? '<img src="' + esc(meP.photo) + '" alt="" />' : esc(String(meP.name || "Ich").slice(0, 1))) + "</span>";
+    }
     var bubble =
       '<button type="button" class="acc-tool acc-tool--bubble" data-open-comments="' +
       esc(postId) +
@@ -1723,7 +1741,8 @@
     var title = (emoji + " " + (ev.title || ev.category)).trim();
     var actions = "";
     var invite = !mine ? inviteFor(ev.id) : null;
-    if (upcoming && !mine && invite) {
+    var acceptedInv = upcoming && !mine && invite && invite.status === "accepted";
+    if (upcoming && !mine && invite && !acceptedInv) {
       actions = actionRowHtml({
         inviteId: invite.id,
         inviteEventId: ev.id,
@@ -1736,6 +1755,8 @@
           postId: String(ev.id),
           canDone: upcoming && day === todayIso(),
           isDone: ev.status === "erledigt",
+          /* vergangene Tage: kein Kreis, die Einheit lässt sich nicht mehr nachholen */
+          noCheck: ev.status !== "erledigt" && day < todayIso(),
           menu: ev.status !== "erledigt" && day >= todayIso(),
           badge: eventBadgeKind(ev),
           removeId: "",
@@ -1746,9 +1767,10 @@
           eventId: ev.id,
           postId: String(ev.id),
           noCheck: true,
-          /* Freunde-Events: links Sprechblase, daneben Winken (Anfrage). Kein Herkunfts-Icon. */
+          /* Freunde-Events: links Sprechblase, daneben Winken (Anfrage). Angenommen: Herz + mein Bild, Herz tippen = absagen. */
           wave: !invite && !iAmGoing(ev.id) && day >= todayIso(),
-          waved: !!state.waved[String(ev.id)]
+          waved: !!state.waved[String(ev.id)],
+          heart: acceptedInv || (upcoming && !invite && iAmGoing(ev.id))
         });
     return renderCardShell({
       attrs:
@@ -1826,6 +1848,13 @@
     };
     var postId = "ffc-post-" + String(post.id);
     var when = post.created_at ? whenLine(post.created_at) : "";
+    /* FFC liefert bei jedem Laden eine neu signierte Foto-URL → Bild lud neu und blitzte.
+       Erste URL 45 min behalten, dann bleibt der <img>-Knoten derselbe. */
+    var cache = state.ffcUrl || (state.ffcUrl = {});
+    var hit = cache[post.id];
+    var url = post.url || "";
+    if (url && hit && Date.now() - hit.t < 45 * 60000) url = hit.url;
+    else if (url) cache[post.id] = { url: url, t: Date.now() };
     return renderCardShell({
       extraClass: "acc-card--ffc-post",
       attrs:
@@ -1835,7 +1864,7 @@
         esc(post.id) +
         '"',
       category: "zirkel",
-      photo: post.url || "",
+      photo: url,
       emoji: "🔥",
       actions: "",
       author: authorHtml(authorPerson, !post.is_me),
@@ -2420,12 +2449,17 @@
     });
   }
 
-  function openDoneModal(eventId) {
+  function openDoneModal(eventId, opts) {
+    opts = opts || {};
     var ev = state.events.find(function (e) {
       return String(e.id) === String(eventId);
     });
     var modal = $("acc-done-modal");
     if (!modal) return;
+    var ttl = $("acc-done-title");
+    if (ttl) ttl.textContent = opts.title || "Erledigt";
+    var noteEl = $("acc-done-note");
+    if (noteEl) noteEl.placeholder = opts.placeholder || "Kurznotiz (optional)";
     modal.hidden = false;
     modal.dataset.eventId = String(eventId);
     var want = normalizeVisibility((ev && ev.visibility) || "team");
@@ -2714,12 +2748,16 @@
   }
 
   /* Eigenes Event löschen bzw. fremdes absagen, immer mit Bestätigung */
+  function ask(text, ok) {
+    return global.GoDialog ? GoDialog.confirm(text, { ok: ok || "Ja" }) : Promise.resolve(global.confirm(text));
+  }
   function removeEvent(eventId, mode) {
     if (!eventId) return;
     var cancel = mode === "cancel";
     if (mode === "skip") {
       var skipDay = String(eventId).replace(/^plan:/, "");
-      if (!global.confirm("Training an diesem Tag aus dem Wochenplan nehmen?")) return;
+      ask("Training an diesem Tag aus dem Wochenplan nehmen?", "Rausnehmen").then(function (yes) {
+      if (!yes) return;
       rest("events", {
         method: "POST",
         prefer: "return=minimal",
@@ -2742,10 +2780,14 @@
         .catch(function () {
           if (host.toast) host.toast("Entfernen fehlgeschlagen");
         });
+      });
       return;
     }
-    var ok = global.confirm(cancel ? "Teilnahme absagen?" : "Event löschen? Das lässt sich nicht rückgängig machen.");
-    if (!ok) return;
+    ask(cancel ? "Teilnahme absagen?" : "Event löschen? Das lässt sich nicht rückgängig machen.", cancel ? "Absagen" : "Löschen").then(function (ok) {
+      if (ok) removeEventNow(eventId, cancel);
+    });
+  }
+  function removeEventNow(eventId, cancel) {
     if (cancel) {
       var invC = inviteFor(eventId);
       if (invC) {
@@ -3435,11 +3477,20 @@
       }));
       return;
     }
-    if ((ev.category === "kraft" || ev.category === "ausdauer") && ev.course_id && host.openEventWorkout) {
+    /* Kraft: immer Workout. Ausdauer: Eieruhr. Diverses: „Schreib, wie es war“. */
+    if (ev.category === "kraft" && host.openEventWorkout) {
       host.openEventWorkout(ev);
       return;
     }
-    openDoneModal(ev.id);
+    if (ev.category === "ausdauer" && global.GoTimer) {
+      Promise.resolve(host.eventMinutes ? host.eventMinutes(ev) : 30)
+        .catch(function () { return 30; })
+        .then(function (min) {
+          GoTimer.start({ id: ev.id, title: ev.title || "Ausdauer", minutes: min || 30 });
+        });
+      return;
+    }
+    openDoneModal(ev.id, { title: "Schreib, wie es war", placeholder: "Wie war es?" });
   }
 
   function alternativeFor(ev) {
@@ -3476,6 +3527,15 @@
   function sendJoinRequest(id, btn) {
     var ev = evById(id);
     if (!ev || state.waved[String(id)]) return;
+    /* vorher bestätigen: Einheit, Uhrzeit, Ort, mit wem */
+    var owner = String(personOf(ev.user_id).name || "").split(" ")[0];
+    var when = new Date(ev.starts_at).toLocaleString("de-DE", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+    var text = "Ich möchte mitmachen.\n\n" + (ev.title || "Training") + "\n" + when + " Uhr" + (ev.location ? " · " + ev.location : "") + "\nmit " + owner;
+    ask(text, "Senden").then(function (yes) {
+      if (yes) sendJoinRequestNow(ev, id, btn);
+    });
+  }
+  function sendJoinRequestNow(ev, id, btn) {
     rest("go_event_requests", {
       method: "POST",
       prefer: "resolution=ignore-duplicates,return=minimal",
@@ -3578,6 +3638,11 @@
       openEventMenu(evMenu.getAttribute("data-ev-menu"));
       return;
     }
+    var heart = t.closest("[data-heart-ev]");
+    if (heart) {
+      removeEvent(heart.getAttribute("data-heart-ev"), "cancel");
+      return;
+    }
     var wave = t.closest("[data-wave-ev]");
     if (wave) {
       sendJoinRequest(wave.getAttribute("data-wave-ev"), wave);
@@ -3620,10 +3685,20 @@
           });
           return;
         }
-        if ((mine || joined) && evA.course_id && host.openEventWorkout) {
+        if ((mine || joined) && evIso === todayIso() && evA.status !== "erledigt") {
+          startEvent(evA);
+          return;
+        }
+        if ((mine || joined) && evA.course_id && host.openEventWorkout && evA.category === "kraft") {
           host.openEventWorkout(evA);
           return;
         }
+      }
+      /* Diverses von heute: „Schreib, wie es war“ */
+      if (evA && String(evA.user_id) === me() && evA.category === "alternative" && evA.status !== "erledigt" &&
+          new Date(evA.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }) === todayIso()) {
+        startEvent(evA);
+        return;
       }
       /* Tagesplan-Karte (Wochenplan ohne Event) → gleichnamige Einheit bzw. Historie */
       var planCard = mediaHit.closest(".acc-card[data-plan-iso]");
@@ -3848,6 +3923,18 @@
   function install(h) {
     host = h || host || {};
     scheduleMidnight();
+    if (global.GoTimer) {
+      /* Eieruhr fertig → Erledigt-Dialog des Events; laufende Uhr nach App-Start wieder zeigen */
+      GoTimer.init({
+        onFinish: function (eventId) {
+          if (!eventId) return;
+          var go = function () { openDoneModal(eventId, { title: "Geschafft", placeholder: "Wie war es?" }); };
+          if ((state.events || []).some(function (e) { return String(e.id) === String(eventId); })) go();
+          else refresh().then(go, go);
+        }
+      });
+      if (!state.timerResumed) { state.timerResumed = true; setTimeout(function () { GoTimer.resume(); }, 1200); }
+    }
     saveFilter(loadFilter());
     var sel = $("heute-filter-select");
     if (sel) {
@@ -3964,12 +4051,17 @@
   }
 
   /* Heutiges Event einer Person als Karte (für das Popup beim Tipp auf den pulsierenden Kreis) */
-  function todayCardFor(personId) {
+  function todayCardFor(personId, opts) {
+    opts = opts || {};
     var t = todayIso();
-    var ev = (state.events || []).filter(function (e) {
+    /* Flags mitgeben: ohne sie scheiterte die Prüfung bei Freunden (ging nur beim eigenen Kreis) */
+    var flags = viewFlags("alles");
+    var list = (state.events || []).filter(function (e) {
       return String(e.user_id) === String(personId) && e.status !== "ausgefallen" &&
-        evDayIso(e) === t && eventVisibleToMe(e);
-    }).sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); })[0];
+        evDayIso(e) === t && eventVisibleToMe(e, flags);
+    }).sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
+    var pick = list.filter(function (e) { return opts.done ? e.status === "erledigt" : e.status !== "erledigt"; });
+    var ev = pick[0] || list[0];
     if (!ev) return null;
     try { return { id: ev.id, html: renderEventCard(ev) }; } catch (e) { return null; }
   }
