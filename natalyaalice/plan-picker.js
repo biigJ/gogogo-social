@@ -81,6 +81,7 @@
     ".gpl__vday summary::-webkit-details-marker{display:none}" +
     ".gpl__vday summary span{font-size:15px;font-weight:600}.gpl__vday summary small{display:block;font-size:12px;font-weight:500;color:rgba(42,33,24,.6)}" +
     ".gpl__vlist{margin:0;padding:0 14px 12px 58px;font-size:14px;line-height:1.6}.gpl__vlist small{color:rgba(42,33,24,.6)}" +
+    ".gpl__own{display:block;width:100%;box-sizing:border-box;min-height:50px;margin:0 0 4px;padding:0 14px;border-radius:14px;border:1.5px solid rgba(42,33,24,.2);background:#F6F1E8;color:#2A2118;font:inherit;font-size:16px}" +
     ".gpl__link{display:block;margin:14px auto 0;border:0;background:transparent;color:#2A2118;text-decoration:underline;font:inherit;font-size:14px;cursor:pointer}" +
     "@media (min-width:900px){.gpl__body{max-width:980px;margin:0 auto;width:100%}.gpl__card{flex-basis:320px}}";
 
@@ -142,8 +143,10 @@
 
   /* Vorabfrage = Profilziel: erstes gewähltes Ziel landet in go_accounts.training_goal (nur eigener Account) */
   function saveGoalToProfile() {
-    if (st.mode !== "self" || !st.goals.length || !st.host.me) return;
-    var g = GOALS.filter(function (x) { return x.key === st.goals[0]; })[0];
+    var own = String(st.ownGoal || "").trim();
+    if (st.mode !== "self" || (!st.goals.length && !own) || !st.host.me) return;
+    /* eigenes Ziel (Freitext) geht vor */
+    var g = own ? { label: own } : GOALS.filter(function (x) { return x.key === st.goals[0]; })[0];
     var me = st.host.me();
     if (!g || !me) return;
     st.host.rest("go_accounts?id=eq." + encodeURIComponent(me), { method: "PATCH", prefer: "return=minimal", body: { training_goal: g.label } })
@@ -169,6 +172,7 @@
         return '<button type="button" class="gpl__goal' + (on ? " is-on" : "") + '" data-gpp-goal="' + g.key + '">' +
           '<span class="gpl__tick">' + (on ? "✓" : "") + "</span><span><b>" + esc(g.label) + "</b><small>" + esc(g.sub) + "</small></span></button>";
       }).join("") +
+      '<input type="text" class="gpl__own" id="gpl-own-goal" maxlength="60" placeholder="Oder eigenes Ziel eingeben" value="' + esc(st.ownGoal || "") + '" />' +
       '<button type="button" class="gpl__btn" data-gpp-next>' + (st.goals.length ? "Passende Pläne zeigen" : "Alle Pläne zeigen") + "</button>" +
       (st.mode === "self" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-indiv>Individuell</button>' : "");
   }
@@ -459,12 +463,16 @@
     if (t.closest("[data-gpp-close]")) return back();
     var g = t.closest("[data-gpp-goal]");
     if (g) {
+      var ownIn = st.root.querySelector("#gpl-own-goal");
+      if (ownIn) st.ownGoal = ownIn.value;
       var k = g.getAttribute("data-gpp-goal");
       var i = st.goals.indexOf(k);
       if (i === -1) st.goals.push(k); else st.goals.splice(i, 1);
       return paintGoals();
     }
     if (t.closest("[data-gpp-next]")) {
+      var ownEl = st.root.querySelector("#gpl-own-goal");
+      if (ownEl) st.ownGoal = ownEl.value;
       saveGoalToProfile();
       return paintList();
     }
