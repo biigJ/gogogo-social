@@ -7811,15 +7811,16 @@
   <script src="/natalyaalice/exercise-media.js?v=gxm-2"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-1"></script>
+  <script src="/natalyaalice/plan-picker.js?v=gpp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-2"></script>
-  <script src="/natalyaalice/coach-portal.js?v=cp-6"></script>
+  <script src="/natalyaalice/coach-portal.js?v=cp-7"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-2"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-1"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-51"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-41"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-42"></script>
   <script src="/natalyaalice/support.js?v=support-20"></script>
   <script>
     (function () {
@@ -16693,7 +16694,7 @@
               editorLink.type = "button";
               editorLink.className = "go-slide__cta go-slide__cta--editor";
               editorLink.textContent = "Kurs-Editor";
-              editorLink.addEventListener("click", function () { location.href = "/workout/kurse/"; /* im PWA-Scope bleiben */ });
+              editorLink.addEventListener("click", function () { location.href = "/workout/kurse/?from=plus"; /* im PWA-Scope bleiben */ });
               card.appendChild(editorLink);
             } else if (isCoachSelf) {
               var cmLink = document.createElement("button");
@@ -17125,7 +17126,7 @@
             get sessionAccount() { return sessionAccount; },
             toast: function (msg) { gogogoToast(msg); },
             isAdmin: ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"].indexOf(String(sessionAccount && sessionAccount.id)) !== -1,
-            openKursEditor: function () { location.href = "/workout/kurse/"; },
+            openKursEditor: function () { location.href = "/workout/kurse/?from=team"; },
             openLegacyAdmin: function (uid) {
               location.href = "/workout/admin/?trainer=1&user=" + encodeURIComponent(uid) + "&back=team";
             }
@@ -20722,6 +20723,21 @@
           HeuteAccountability.install(accHost);
           handleStampScan();
           handleFriendScan();
+          (function openFromGoParam() {
+            /* ?go=<Angebot> (z. B. zurück aus dem Kurs-Editor): Plus öffnen und zu diesem Angebot springen */
+            var goKey = "";
+            try { goKey = new URLSearchParams(location.search).get("go") || ""; } catch (eG) {}
+            if (!goKey) return;
+            try {
+              var spG = new URLSearchParams(location.search);
+              spG.delete("go");
+              history.replaceState(null, "", location.pathname + (spG.toString() ? "?" + spG : "") + location.hash);
+            } catch (eH) {}
+            setTimeout(function () {
+              showPlan("training");
+              setTimeout(function () { jumpToGoOffer(goKey); }, 400);
+            }, 300);
+          })();
           HeuteAccountability.refresh();
         }
       }

@@ -3716,8 +3716,26 @@
       return;
     }
     if (t.getAttribute("data-wr-edit")) {
-      state.editMode = !state.editMode;
-      render();
+      /* Stift: Wochenplan wählen (plan-picker.js); im Bearbeiten-Modus beendet der Stift ihn wieder */
+      if (state.editMode || !global.GoPlanPicker) {
+        state.editMode = !state.editMode;
+        render();
+        return;
+      }
+      global.GoPlanPicker.open({
+        host: { rest: rest, me: me, toast: function (m) { if (host.toast) host.toast(m); } },
+        mode: "self",
+        userId: me(),
+        onDone: function () {
+          if (global.GoTama) global.GoTama.invalidate();
+          refresh();
+          notifyAktuell();
+        },
+        onEditWeek: function () {
+          state.editMode = true;
+          render();
+        }
+      });
       return;
     }
     if (t.getAttribute("data-wr-add-kind")) {

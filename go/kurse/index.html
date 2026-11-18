@@ -122,6 +122,18 @@
     .hidden { display: none !important; }
     label.check { display: flex; gap: 8px; align-items: center; flex-wrap: nowrap; margin: 0; color: var(--ink); font-size: 14px; }
     label.check input { width: auto; flex: 0 0 auto; }
+    .goal-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .goal-chips label.check { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; background: #fff; font-size: 13px; }
+    .pill.on { border-color: var(--ink); color: var(--ink); }
+    .del-row { margin-top: 18px; display: flex; justify-content: flex-end; }
+    /* Desktop: Liste links, Detail rechts */
+    @media (min-width: 1100px) {
+      .wrap { max-width: 1320px; padding-left: 28px; padding-right: 28px; }
+      .panes.is-split { display: grid; grid-template-columns: minmax(380px, 460px) minmax(0, 1fr); gap: 28px; align-items: start; }
+      .panes.is-split #list-view { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; }
+      .panes.is-split #list-view tr.is-current td { background: rgba(42,33,28,.07); }
+      .item { grid-template-columns: 2.6fr 0.6fr 0.8fr 0.8fr 0.8fr 1fr 1.6fr auto; }
+    }
   </style>
 </head>
 <body>
@@ -147,8 +159,10 @@
       <p class="muted">Wochenpläne pflegt gogogo zentral. Coaches ordnen sie im Coach-Portal (Team → Coachee) zu.</p>
     </div>
 
-    <main id="list-view" class="hidden"></main>
-    <main id="detail-view" class="hidden"></main>
+    <div class="panes" id="panes">
+      <main id="list-view" class="hidden"></main>
+      <main id="detail-view" class="hidden"></main>
+    </div>
   </div>
   <div class="toast" id="toast"></div>
   <datalist id="ex-names"></datalist>
@@ -165,6 +179,7 @@
     ];
     var CATS = [["kraft", "Kraft"], ["ausdauer", "Ausdauer"], ["alternative", "Sonstiges"], ["zirkel", "Zirkeltraining"]];
     var DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+    var GOALS = [["laufen", "Gesund laufen"], ["ruecken", "Rücken stärken"], ["gesund", "Gesund bleiben"], ["abnehmen", "Abnehmen"], ["muskeln", "Muskeln erhalten"], ["gelenke", "Gelenke schonen"]];
     var ZIRKEL_INFO = "Zirkeltraining 30 min – buche unter FFC mit E-Mail-Adresse und Passwort und erstell dort ein wiederkehrendes Training.";
     var HIDE_SLUGS = ["eigenes-training", "12-wochen-routine"];
 
@@ -200,7 +215,7 @@
       $("view-sel").classList.add("hidden");
       $("detail-title").classList.remove("hidden");
       $("detail-title").textContent = "Kurs-Editor";
-      $("back").addEventListener("click", function () { location.href = "/workout/"; });
+      $("back").addEventListener("click", function () { location.href = backUrl(); });
       return;
     }
     if (window.GoExMedia) GoExMedia.init({ rest: rest });
@@ -209,7 +224,10 @@
     function loadAll() {
       var sel = "id,title,slug,level,sessions_per_week,category_default,description,is_active,private_for,image_url,course_sessions!course_sessions_course_id_fkey(id,title,category,block_no,session_no,is_travel,unit_course_id,blocks)";
       return Promise.all([
-        rest("courses?select=" + sel + "&order=title.asc,level.asc").catch(function () {
+        rest("courses?select=" + sel + ",is_public,goals,preview_url&order=title.asc,level.asc")
+          .then(function (rows) { state.newCols = true; return rows; })
+          .catch(function () { state.newCols = false; return rest("courses?select=" + sel + "&order=title.asc,level.asc"); })
+          .catch(function () {
           toast("go-wochenplan-slots.sql fehlt noch: Tage ohne Einzeleinheiten");
           return rest("courses?select=" + sel.replace(",unit_course_id", "").replace("image_url,", "") + "&order=title.asc,level.asc");
         }),
@@ -282,8 +300,18 @@
     $("view-sel").addEventListener("change", function () { location.hash = this.value; });
     $("back").addEventListener("click", function () {
       if (!$("detail-view").classList.contains("hidden")) location.hash = state.view;
-      else location.href = "/workout/";
+      else location.href = backUrl();
     });
+    /* Zurück in die App dorthin, wo man hereinkam (?from=plus → Selbst Coaching, ?from=team → Team) */
+    function backUrl() {
+      var from = "";
+      try { from = new URLSearchParams(location.search).get("from") || sessionStorage.getItem("kurse_from") || ""; } catch (eF) {}
+      try { if (from) sessionStorage.setItem("kurse_from", from); } catch (eS) {}
+      if (from === "plus") return "/workout/?go=coach_offer";
+      if (from === "team") return "/workout/?plan=team";
+      return "/workout/";
+    }
+    backUrl();
 
     function setHeader(detailTitle) {
       $("view-sel").classList.toggle("hidden", !!detailTitle);
@@ -297,9 +325,18 @@
     function showList() {
       setHeader("");
       $("detail-view").classList.add("hidden");
+      $("panes").classList.remove("is-split");
+      window.scrollTo(0, 0);
+      renderListOnly();
+    }
+    function markCurrent(open) {
+      [].forEach.call($("list-view").querySelectorAll("tr[data-open]"), function (tr) {
+        tr.classList.toggle("is-current", tr.getAttribute("data-open") === open);
+      });
+    }
+    function renderListOnly() {
       var box = $("list-view");
       box.classList.remove("hidden");
-      window.scrollTo(0, 0);
       if (state.view === "videos") return renderVideos(box);
       var v = state.view, html = "";
       if (v === "plans") {
@@ -308,7 +345,7 @@
           '<tr class="new-row" data-open="new-plan"><td>Neu</td><td></td><td></td></tr>' +
           plans().map(function (c) {
             return '<tr data-open="plan/' + c.id + '" class="' + (c.is_active ? "" : "is-off") + '"><td class="name">' + esc(c.title) +
-              (c.is_active ? "" : ' <span class="pill">nicht im Katalog</span>') + "</td><td>" + esc(mixText(mixOf(c))) +
+              (c.is_active ? "" : ' <span class="pill">nicht im Katalog</span>') + (c.is_public ? ' <span class="pill on">öffentlich</span>' : "") + "</td><td>" + esc(mixText(mixOf(c))) +
               '</td><td class="num">' + (c.level ? "L" + c.level : "–") + "</td></tr>";
           }).join("") + "</tbody></table>";
       } else if (v === "units") {
@@ -393,9 +430,16 @@
     }
 
     // ---------- Details ----------
+    var desktop = window.matchMedia ? window.matchMedia("(min-width: 1100px)") : { matches: false };
     function showDetail(kind, id) {
       var box = $("detail-view");
-      $("list-view").classList.add("hidden");
+      var split = desktop.matches;
+      $("panes").classList.toggle("is-split", split);
+      if (split) {
+        var v = kind === "plan" ? "plans" : kind === "unit" ? "units" : "exercises";
+        if (state.view !== v || $("list-view").classList.contains("hidden") || !$("list-view").firstChild) { state.view = v; renderListOnly(); }
+        markCurrent(kind + "/" + id);
+      } else $("list-view").classList.add("hidden");
       box.classList.remove("hidden");
       window.scrollTo(0, 0);
       if (kind === "ex") return exerciseDetail(box, decodeURIComponent(id));
@@ -421,13 +465,43 @@
         "<label>Coverbild (Aktuell und Woche)</label>" +
         '<div class="row"><label class="file-btn"><input id="f-cover" type="file" accept="image/*" hidden />Bild wählen</label>' +
         '<button class="ghost small" id="f-cover-del" type="button">Entfernen</button></div></div></div>' +
+        (!isUnit && state.newCols ?
+          '<div style="margin-top:12px"><label>Ziele (Auswahl beim Nutzer, Matrix: docs/ZIELE-WOCHENPLAENE.md)</label><div class="goal-chips">' +
+          GOALS.map(function (g) {
+            return '<label class="check"><input type="checkbox" data-goal="' + g[0] + '"' + ((c.goals || []).indexOf(g[0]) !== -1 ? " checked" : "") + " /> " + g[1] + "</label>";
+          }).join("") + "</div></div>" +
+          '<div style="margin-top:8px"><label>Vorschau-Video (Instagram- oder YouTube-Link)</label><input id="f-preview" type="url" value="' + esc(c.preview_url || "") + '" placeholder="https://…" /></div>' : "") +
         '<div class="row" style="margin-top:12px; justify-content: space-between">' +
-        '<label class="check"><input id="f-active" type="checkbox"' + (c.is_active ? " checked" : "") + " /> im Katalog sichtbar</label>" +
-        '<button id="f-save">Speichern</button></div></div>';
+        '<div class="row"><label class="check"><input id="f-active" type="checkbox"' + (c.is_active ? " checked" : "") + " /> im Katalog sichtbar</label>" +
+        (!isUnit && state.newCols ? '<label class="check"><input id="f-public" type="checkbox"' + (c.is_public ? " checked" : "") + " /> öffentlich (Nutzer wählen ihn unter Woche)</label>" : "") +
+        "</div>" +
+        '<button id="f-save">Speichern</button></div>' +
+        '<div class="del-row"><button type="button" class="danger small" id="f-del">' + (isUnit ? "Einzeleinheit" : "Wochenplan") + " löschen</button></div></div>";
+    }
+
+    function deleteCourse(c, isUnit) {
+      var check = isUnit
+        ? rest("course_sessions?unit_course_id=eq." + c.id + "&select=course_id").then(function (rows) {
+            var n = {}; (rows || []).forEach(function (r) { if (r.course_id !== c.id) n[r.course_id] = 1; });
+            return Object.keys(n).length ? "Steckt in " + Object.keys(n).length + " Wochenplan/-plänen. Erst dort austauschen." : "";
+          })
+        : rest("enrollments?course_id=eq." + c.id + "&status=eq.aktiv&select=id").then(function (rows) {
+            return (rows || []).length ? (rows.length + " Person(en) nutzen den Plan gerade. Erst beenden oder „im Katalog sichtbar“ ausschalten.") : "";
+          });
+      check.then(function (blocked) {
+        if (blocked) { toast(blocked); return; }
+        return GoDialog.confirm("„" + c.title + "“ endgültig löschen?", { ok: "Löschen" }).then(function (ok) {
+          if (!ok) return;
+          return rest("courses?id=eq." + c.id, { method: "DELETE" })
+            .then(loadAll)
+            .then(function () { toast("Gelöscht"); location.hash = isUnit ? "units" : "plans"; });
+        });
+      }).catch(function (err) { toast(err.message); });
     }
 
     function bindBaseForm(c, isUnit) {
       paintCover(c.image_url);
+      $("f-del").addEventListener("click", function () { deleteCourse(c, isUnit); });
       $("f-save").addEventListener("click", function () {
         var f = {
           title: $("f-title").value.trim(),
@@ -436,6 +510,11 @@
           is_active: $("f-active").checked
         };
         if (isUnit) f.category_default = $("f-cat").value;
+        if (!isUnit && state.newCols) {
+          f.is_public = $("f-public").checked;
+          f.goals = [].map.call(document.querySelectorAll("[data-goal]:checked"), function (x) { return x.getAttribute("data-goal"); });
+          f.preview_url = $("f-preview").value.trim() || null;
+        }
         if (!f.title) { toast("Titel fehlt"); return; }
         var jobs = [rest("courses?id=eq." + c.id, { method: "PATCH", body: f })];
         /* Einzeleinheit: Titel/Kategorie auch in der Einheit und in allen Wochenplan-Tagen, die darauf zeigen */
