@@ -268,9 +268,6 @@
                 (movable ? ' data-cp="move" data-id="' + esc(e.id) + '" role="button" tabindex="0"' : "") + ">" +
                 esc(timeOf(e.starts_at)) + " " + (EMOJI[e.category] || "") + " " + esc(e.title || e.category) +
                 (e.status === "erledigt" ? " ✓" : "") +
-                (byMe && e.status === "geplant"
-                  ? '<button type="button" class="cp-ev__x" data-cp="del" data-id="' + esc(e.id) + '" aria-label="Entfernen">×</button>'
-                  : "") +
                 "</span>"
               );
             }).join("")
@@ -293,7 +290,7 @@
       '<button type="button" data-cp="week" data-week="' + thisMon + '"' + (st.week === thisMon ? ' class="is-on"' : "") + ">Diese Woche</button>" +
       '<button type="button" data-cp="week" data-week="' + addDays(thisMon, 7) + '"' + (st.week === addDays(thisMon, 7) ? ' class="is-on"' : "") + ">Nächste Woche</button>" +
       "</div>" +
-      '<p class="cp-hint">Was Du einträgst, landet direkt in der Woche von ' + esc(String((st.person && st.person.name) || "").split(" ")[0]) + ". Von Dir eingetragene, noch offene Events kannst Du wieder entfernen.</p>" +
+      '<p class="cp-hint">Was Du einträgst, landet direkt in der Woche von ' + esc(String((st.person && st.person.name) || "").split(" ")[0]) + ". Offenes Event antippen, um es auf einen anderen Tag zu schieben.</p>" +
       rows.join("") +
       "</section>"
     );
@@ -303,12 +300,14 @@
     var en = st.enrollment;
     if (en) {
       var c = en.courses || {};
-      var weeks = en.weeks ? en.weeks + " Wochen" : "";
       return (
         '<section class="cp-sec"><h3>Wochenplan</h3>' +
         '<div class="cp-plan"><p class="cp-plan__name">' + esc(c.title || "Wochenplan") + (c.level ? " · Level " + c.level : "") + "</p>" +
-        '<p class="cp-hint">ab ' + esc(String(en.start_date || "").split("-").reverse().join(".")) + (weeks ? " · " + weeks : "") + "</p>" +
-        '<button type="button" class="cp-btn cp-btn--ghost" data-cp="end-plan">Wochenplan beenden</button></div>' +
+        '<p class="cp-hint">ab ' + esc(String(en.start_date || "").split("-").reverse().join(".")) + "</p>" +
+        weeksWheelHtml(en.weeks || 12, "cp-weeks-active") +
+        '<button type="button" class="cp-btn cp-btn--ghost" data-cp="end-plan">Wochenplan beenden</button>' +
+        (global.GoPlanPicker ? '<button type="button" class="cp-btn" data-cp="picker" style="margin-top:8px">Wochenplan bearbeiten</button>' : "") +
+        "</div>" +
         "</section>"
       );
     }
@@ -325,10 +324,10 @@
               esc(c.title + (c.level ? " · L" + c.level : "") + " — " + mixText(planMix(c))) + "</option>";
           }).join("") +
           "</select></label>" +
-          '<div class="cp-row"><label class="cp-field">Start (Montag)<input type="date" id="cp-start" value="' + esc(st.planStart || mondayOf(todayIso())) + '" /></label>' +
-          '<label class="cp-field">Wochen<input type="number" id="cp-weeks" min="1" max="52" value="' + esc(st.planWeeks || 12) + '" /></label></div>' +
+          '<label class="cp-field">Start (Montag)<input type="date" id="cp-start" value="' + esc(st.planStart || mondayOf(todayIso())) + '" /></label>' +
           '<p class="cp-hint">Der Plan füllt Mo bis So automatisch. Einzelne Tage kannst Du danach in der Woche verschieben (Event antippen).' +
           (hasZ ? " Zirkeltraining läuft über FFC und erzeugt keinen Termin." : "") + "</p>" +
+          weeksWheelHtml(st.planWeeks || 12, "cp-weeks") +
           '<button type="button" class="cp-btn" data-cp="assign">Zuordnen</button>' +
           (global.GoPlanPicker ? '<button type="button" class="cp-btn cp-btn--ghost" data-cp="picker" style="margin-top:8px">Alle Wochenpläne ansehen und Tage schieben</button>' : "")
         : '<p class="cp-hint">Noch keine Wochenpläne.</p>') +
@@ -336,19 +335,42 @@
     );
   }
 
-  function footHtml() {
-    return (
-      '<section class="cp-sec cp-foot">' +
-      (host.isAdmin ? '<button type="button" class="cp-btn cp-btn--ghost" data-cp="kurse">Wochenpläne bearbeiten</button>' : "") +
-      '<button type="button" class="cp-link" data-cp="legacy">Altes Admin-Portal</button>' +
-      "</section>"
-    );
+  /* Dauer als Drehauswahl (1 bis 52 Wochen), Zeilen 36px, Mitte = Auswahl */
+  var WHEEL_H = 36;
+  function weeksWheelHtml(val, id) {
+    var opts = "";
+    for (var w = 1; w <= 52; w++) opts += '<div class="cp-wheel__opt">' + w + (w === 1 ? " Woche" : " Wochen") + "</div>";
+    return '<div class="cp-field">Dauer<div class="cp-wheel" id="' + id + '" data-val="' + esc(val) + '">' + opts + "</div></div>";
+  }
+  function wheelVal(el) {
+    if (!el) return 0;
+    return Math.max(1, Math.min(52, Math.round(el.scrollTop / WHEEL_H) + 1));
+  }
+  function bindWheels() {
+    [].forEach.call(st.body.querySelectorAll(".cp-wheel"), function (el) {
+      var v = Number(el.getAttribute("data-val")) || 12;
+      el.scrollTop = (v - 1) * WHEEL_H;
+      var t = null;
+      el.addEventListener("scroll", function () {
+        clearTimeout(t);
+        t = setTimeout(function () {
+          var nv = wheelVal(el);
+          if (el.id === "cp-weeks") { st.planWeeks = nv; return; }
+          if (el.id === "cp-weeks-active" && st.enrollment && nv !== Number(st.enrollment.weeks || 12)) {
+            rest("enrollments?id=eq." + encodeURIComponent(st.enrollment.id), { method: "PATCH", prefer: "return=minimal", body: { weeks: nv } })
+              .then(function () { st.enrollment.weeks = nv; toast("Dauer: " + nv + (nv === 1 ? " Woche" : " Wochen")); })
+              .catch(function () { toast("Dauer speichern ging nicht"); });
+          }
+        }, 260);
+      }, { passive: true });
+    });
   }
 
   function paint() {
     if (!st || !st.root) return;
     var scroll = st.body ? st.body.scrollTop : 0;
-    st.body.innerHTML = headHtml() + noteHtml() + planHtml() + weekHtml() + footHtml();
+    st.body.innerHTML = headHtml() + noteHtml() + planHtml() + weekHtml();
+    bindWheels();
     st.body.scrollTop = scroll;
   }
 
@@ -474,19 +496,6 @@
     }
     if (act === "end-plan") return endPlan();
     if (act === "add") return openAdd(t.getAttribute("data-iso"));
-    if (act === "del") {
-      var id = t.getAttribute("data-id");
-      rest("events?id=eq." + encodeURIComponent(id) + "&assigned_by=eq." + encodeURIComponent(me()) + "&status=eq.geplant", {
-        method: "DELETE",
-        prefer: "return=representation"
-      })
-        .then(function (rows) {
-          if (!rows || !rows.length) toast("Entfernen braucht go-coach-portal.sql");
-          return loadWeek().then(paint);
-        })
-        .catch(function () { toast("Entfernen fehlgeschlagen"); });
-      return;
-    }
     if (act === "save-note") {
       var note = String((document.getElementById("cp-note") || {}).value || "");
       rest("coach_notes", {
@@ -502,8 +511,6 @@
         .catch(function () { toast("Speichern braucht go-coach-portal.sql in Supabase"); });
       return;
     }
-    if (act === "kurse" && host.openKursEditor) return host.openKursEditor();
-    if (act === "legacy" && host.openLegacyAdmin) return host.openLegacyAdmin(st.id);
   }
 
   /* Coach verschiebt ein Event des Coachees auf einen anderen Tag dieser Woche (Uhrzeit bleibt) */
@@ -533,7 +540,8 @@
     var selEl = document.getElementById("cp-plan");
     st.planPick = selEl ? selEl.value : st.planPick;
     st.planStart = (document.getElementById("cp-start") || {}).value || st.planStart;
-    st.planWeeks = Number((document.getElementById("cp-weeks") || {}).value) || 12;
+    var wEl = document.getElementById("cp-weeks");
+    if (wEl) st.planWeeks = wheelVal(wEl);
   }
 
   function assignPlan(btn) {

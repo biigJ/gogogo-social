@@ -2191,6 +2191,10 @@
     .cp-plan__name { margin: 0; font-weight: 700; font-size: 17px; }
     .cp-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
     .cp-days { display: flex; gap: 6px; margin: 4px 0 4px; }
+    .cp-wheel { height: 108px; overflow-y: auto; scroll-snap-type: y mandatory; padding: 36px 0; box-sizing: border-box; border-radius: 12px; background: #fff; border: 1px solid rgba(42,33,24,.25); scrollbar-width: none; -webkit-mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent); }
+    .cp-wheel::-webkit-scrollbar { display: none; }
+    .goal-wheel { margin: 4px 0 14px; }
+    .cp-wheel__opt { height: 36px; line-height: 36px; text-align: center; scroll-snap-align: center; font-size: 17px; font-weight: 600; color: #2A2118; }
     .cp-days button { flex: 1; min-height: 40px; border-radius: 999px; border: 1.5px solid #111; background: transparent; color: #111; font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; }
     .cp-days button.is-on { background: #111; color: #fff; }
     .cp-request { margin: 0 0 6px; padding: 12px 14px; border-radius: 12px; background: #F6F1E8; font-size: 15px; line-height: 1.45; white-space: pre-wrap; }
@@ -3937,9 +3941,10 @@
       border-top: 1px solid rgba(42, 33, 24, 0.2);
     }
     /* Meine Freunde: schlichte Liste ohne Trennlinien */
-    .friend-list__feed { flex: none; margin-left: auto; min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(42,33,24,.3); display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; color: rgba(42,33,24,.6); cursor: pointer; }
+    .friend-list__feed { flex: none; margin-left: auto; width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(42,33,24,.3); display: inline-flex; align-items: center; justify-content: center; color: transparent; cursor: pointer; box-sizing: border-box; }
+    .friend-list__feed svg { width: 16px; height: 16px; }
     .friend-list__feed.is-on { background: #2A2118; color: #F6F1E8; border-color: #2A2118; }
-    .friend-list__hint { margin: 12px 4px 0; font-size: 12px; color: rgba(42,33,24,.6); line-height: 1.4; }
+    .friend-list__hint { margin: 0 4px 10px; font-size: 14px; color: rgba(42,33,24,.65); line-height: 1.4; }
     .friend-list { display: flex; flex-direction: column; gap: 14px; padding: 8px 0 24px; }
     .friend-list__row { display: flex; align-items: center; gap: 14px; background: none; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
     .friend-list__row img, .friend-list__row .team-face, .friend-list__row > :first-child { flex: 0 0 auto; }
@@ -7856,13 +7861,13 @@
   <script src="/natalyaalice/exercise-media.js?v=gxm-2"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-2"></script>
-  <script src="/natalyaalice/plan-picker.js?v=gpl-3"></script>
+  <script src="/natalyaalice/plan-picker.js?v=gpl-4"></script>
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
-  <script src="/natalyaalice/exercise-links.js?v=gxl-2"></script>
-  <script src="/natalyaalice/coach-portal.js?v=cp-8"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-2"></script>
+  <script src="/natalyaalice/exercise-links.js?v=gxl-3"></script>
+  <script src="/natalyaalice/coach-portal.js?v=cp-9"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-3"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-1"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-2"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-4"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-53"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
@@ -7939,7 +7944,8 @@
       var pendingInviteOverride = null;
       var pendingUnit = null;
       var profilePerson = null;
-      var GOAL_OPTIONS = ["just for Fun", "HYROX", "abnehmen", "Bodybuilding", "Krafttraining", "Hybrid Athlet", "Schwimmer", "Marathon", "Triathlon", "Wellbeing"];
+      /* Gleiche Ziele wie die Vorabfrage bei den Wochenplänen (plan-picker.js) + Hybrid Athlet */
+      var GOAL_OPTIONS = ["Gesund laufen", "Rücken stärken", "Gesund bleiben", "Abnehmen", "Muskeln erhalten", "Gelenke schonen", "Hybrid Athlet"];
       var EMPTY_MANTRA = "- kein eigenes Mantra -";
       var profileTrainerChoices = [];
       var inviteIso = "";
@@ -13959,7 +13965,7 @@
             return x && x.id && !rel && !feedMuted[String(x.id)] && String(x.id) !== String(sessionAccount.id);
           }).length;
           if (onCount >= 12) {
-            gogogoToast("Im Feed sind schon 12. Nimm erst jemanden raus.");
+            gogogoToast("Du hast schon 12 gewählt. Nimm erst jemanden raus.");
             return;
           }
         }
@@ -13971,7 +13977,6 @@
           if (turnOn) delete feedMuted[pid]; else feedMuted[pid] = true;
           el.classList.toggle("is-on", turnOn);
           el.setAttribute("aria-checked", turnOn ? "true" : "false");
-          el.textContent = turnOn ? "im Feed" : "nicht im Feed";
           try { paintHeuteCrew(); } catch (e1) {}
           if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
         }).catch(function () { gogogoToast("Ging nicht (go-friends-feed.sql ausgeführt?)"); });
@@ -13996,7 +14001,7 @@
                 .then(function (r) {
                   var muted = r && r[0] && r[0].in_feed === false;
                   gogogoToast("Ihr seid jetzt verbunden: " + (f.nickname || f.name || "Freund") +
-                    (muted ? ". Im Feed sind schon 12, umstellen unter Team → Meine Freunde." : ""));
+                    (muted ? ". Du hast schon 12 gewählt, umstellen unter Team → Meine Freunde." : ""));
                 })
                 .catch(function () { gogogoToast("Ihr seid jetzt verbunden: " + (f.nickname || f.name || "Freund")); });
               if (f.nickname && window.FFC && FFC.user() && FFC.friendRequest) FFC.friendRequest(f.nickname).then(onFfcFriendsChanged).catch(function () {});
@@ -14582,10 +14587,8 @@
             groupLine.textContent = "Noch keine Gruppe. Gruppen legst Du unter Team → Meine Gruppe an.";
           } else if (!linked) {
             groupLine.textContent = "Gruppe „" + (goGroup.name || "Gruppe") + "“ ist im Zirkel noch nicht aktiv.";
-          } else {
-            groupLine.textContent = "Gruppe „" + (goGroup.name || "Gruppe") + "“";
           }
-          teamSec.appendChild(groupLine);
+          if (!linked) teamSec.appendChild(groupLine);
 
           if (goGroup && !linked) {
             var activate = document.createElement("button");
@@ -15729,6 +15732,10 @@
           });
           var list = document.createElement("div");
           list.className = "friend-list";
+          var hintTop = document.createElement("p");
+          hintTop.className = "friend-list__hint";
+          hintTop.textContent = "Wähle bis zu 12 Freunde.";
+          list.appendChild(hintTop);
           /* Oben: Kreis mit + → Freund per Nickname oder ID suchen */
           var addRow = document.createElement("button");
           addRow.type = "button";
@@ -15786,21 +15793,13 @@
               fb.setAttribute("role", "switch");
               fb.setAttribute("tabindex", "0");
               fb.setAttribute("aria-checked", feedMuted[String(p.id)] ? "false" : "true");
-              fb.setAttribute("aria-label", "In Aktuell zeigen");
-              fb.textContent = feedMuted[String(p.id)] ? "nicht im Feed" : "im Feed";
+              fb.setAttribute("aria-label", "Gewählt");
+              fb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
               fb.addEventListener("click", function () { toggleFeed(p, fb); });
               row.appendChild(fb);
             }
             list.appendChild(row);
           });
-          var feedCount = people.filter(function (p) {
-            var rel = (myTrainer && String(p.id) === myTrainer) || (p.trainer_id && String(p.trainer_id) === mineId);
-            return !rel && !feedMuted[String(p.id)];
-          }).length;
-          var hintFeed = document.createElement("p");
-          hintFeed.className = "friend-list__hint";
-          hintFeed.textContent = "Im Aktuell-Feed: " + feedCount + " von 12. Coach und Coachees zählen nicht. Alle anderen bleiben verbunden (Leaderboard, Gruppe, Partner).";
-          list.appendChild(hintFeed);
           slide.appendChild(list);
           box.appendChild(slide);
         })();
@@ -15945,7 +15944,7 @@
           var emptyCopy = document.createElement("p");
           emptyCopy.className = "team-slide__about";
           emptyCopy.textContent = "Noch keine Gruppe. Erstelle eine und lade Freunde ein.";
-          if (!ffcGroup) emptyGroup.appendChild(emptyCopy);
+          emptyGroup.appendChild(emptyCopy);
           var createBtn = document.createElement("button");
           createBtn.type = "button";
           createBtn.className = "team-slide__cta is-solid";
@@ -15959,8 +15958,8 @@
         } else {
           groupHost = groupSlide(myGroup, "Meine Gruppe");
         }
-        /* FFC-Gruppe im selben Abschnitt unter der gogogo-Gruppe */
-        if (ffcGroup && groupHost) {
+        /* FFC-Gruppe nicht mehr unter Meine Gruppe, sondern Plus → FFC → Circle beitreten */
+        if (false && ffcGroup && groupHost) {
           var ffcPart = groupSlide(ffcGroup, "Friday Fitness Circle", true);
           var ffcSec = document.createElement("section");
           ffcSec.className = "team-group-ffc";
@@ -16891,10 +16890,17 @@
             });
           }
           card.appendChild(cta);
+          if (isZirkel) {
+            /* Circle = FFC-Gruppe: hier beitreten oder gründen (nicht mehr unter Team → Meine Gruppe) */
+            var circleBtn = document.createElement("button");
+            circleBtn.type = "button";
+            circleBtn.className = "go-slide__cta go-slide__cta--editor";
+            circleBtn.textContent = "Circle beitreten";
+            circleBtn.addEventListener("click", function () { openCircleJoin(); });
+            card.appendChild(circleBtn);
+          }
           if (offer.key === "coach_offer") {
             /* Kurs-Editor direkt unter Buchen, nur für Coaches/Admin; reiner Link, keine Rail-Logik */
-            var editorAcc = window.GoAccountSession ? GoAccountSession.load() : null;
-            var editorAdmins = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
             /* Wochenpläne pflegt nur gogogo (Joscha / biigJ) */
             if (isCoachSelf) {
               /* Calendly für Personal Training: hinzufügen bzw. verwalten */
@@ -16905,14 +16911,8 @@
               calBtn.addEventListener("click", function () { editOwnCalendly(calBtn); });
               card.appendChild(calBtn);
             }
-            if (editorAcc && editorAdmins.indexOf(editorAcc.id) !== -1) {
-              var editorLink = document.createElement("button");
-              editorLink.type = "button";
-              editorLink.className = "go-slide__cta go-slide__cta--editor";
-              editorLink.textContent = "Kurs-Editor";
-              editorLink.addEventListener("click", function () { location.href = "/workout/kurse/?from=plus"; /* im PWA-Scope bleiben */ });
-              card.appendChild(editorLink);
-            } else if (isCoachSelf) {
+            /* Für alle Coaches gleich: Coachees wählen → Coach-Portal (Reihenfolge + Dauer). Voller Kurs-Editor nur unter Profil → Admin */
+            if (isCoachSelf) {
               var cmLink = document.createElement("button");
               cmLink.type = "button";
               cmLink.className = "go-slide__cta go-slide__cta--editor";
@@ -17582,6 +17582,43 @@
           .then(syncExistingBuddiesToFfc)
           .catch(function () {})
           .then(function () { ffcFriendSyncing = false; });
+      }
+
+      /* Plus → FFC → Circle beitreten: eigene FFC-Gruppen zeigen oder neue gründen.
+         Hendriks Backend kennt kein „selbst beitreten“: in einen bestehenden Circle holt Dich der Gründer. */
+      function openCircleJoin() {
+        if (!window.FFC || !FFC.user || !FFC.user()) { openZirkelRegister(); return; }
+        Promise.resolve(FFC.groups ? FFC.groups() : []).then(function (groups) {
+          var choices = (groups || []).map(function (g) {
+            return { label: g.name + " · " + g.member_count, value: "g:" + g.group_id };
+          });
+          choices.push({ label: "Neuen Circle gründen", value: "new" });
+          var msg = (groups || []).length ? "Deine Circles" : "Noch in keinem Circle. In einen bestehenden holt Dich der Gründer. Oder gründe selbst einen.";
+          return GoDialog.choose(msg, choices).then(function (v) {
+            if (!v) return;
+            if (v === "new") { createCircle(); return; }
+            var gid = Number(String(v).slice(2));
+            if (FFC.setLeaderboardScope) FFC.setLeaderboardScope(gid);
+            gogogoToast("Leaderboard zeigt jetzt diesen Circle.");
+          });
+        }).catch(function () { GoDialog.alert("Circles laden ging gerade nicht."); });
+      }
+      function createCircle() {
+        GoDialog.prompt("Wie heißt Dein Circle?", "", { ok: "Weiter" }).then(function (name) {
+          name = String(name || "").trim();
+          if (!name) return;
+          var friends = ((FFC.friends && FFC.friends()) || []).filter(function (f) { return f && f.status === "accepted" && f.friend_id; });
+          return GoDialog.pick("Wer ist dabei?", friends.map(function (f) {
+            return { label: f.nickname || "Freund", value: f.friend_id };
+          }), { ok: "Circle gründen", empty: "Noch keine Freunde im Zirkel. Freunde fügst Du unter Team → Meine Freunde hinzu." }).then(function (ids) {
+            if (!ids) return;
+            if (!ids.length) { GoDialog.alert("Wähle mindestens eine Person."); return; }
+            return Promise.resolve(FFC.createGroup(name, ids)).then(function (res) {
+              if (res && res.error) { GoDialog.alert("Ging nicht: " + (res.error.message || "Fehler")); return; }
+              GoDialog.alert("Circle „" + name + "“ steht.");
+            });
+          });
+        });
       }
 
       function openZirkelRegister() {
@@ -22030,18 +22067,31 @@
         if (!profilePerson || !profilePerson.isSelf) return;
         var box = document.getElementById("goal-options");
         box.textContent = "";
+        /* Drehauswahl: Mitte = Ziel, dann Speichern */
+        var wheel = document.createElement("div");
+        wheel.className = "cp-wheel goal-wheel";
         GOAL_OPTIONS.forEach(function (opt) {
-          var button = document.createElement("button");
-          button.type = "button";
-          button.textContent = opt;
-          button.addEventListener("click", function () {
-            saveProfileFields({ training_goal: opt });
-            document.getElementById("profile-goal").textContent = opt;
-            document.getElementById("goal-modal").hidden = true;
-          });
-          box.appendChild(button);
+          var o = document.createElement("div");
+          o.className = "cp-wheel__opt";
+          o.textContent = opt;
+          wheel.appendChild(o);
         });
+        box.appendChild(wheel);
+        var save = document.createElement("button");
+        save.type = "button";
+        save.textContent = "Speichern";
+        save.addEventListener("click", function () {
+          var ix = Math.max(0, Math.min(GOAL_OPTIONS.length - 1, Math.round(wheel.scrollTop / 36)));
+          var opt = GOAL_OPTIONS[ix];
+          if (sessionAccount) sessionAccount.training_goal = opt;
+          saveProfileFields({ training_goal: opt });
+          document.getElementById("profile-goal").textContent = opt;
+          document.getElementById("goal-modal").hidden = true;
+        });
+        box.appendChild(save);
         document.getElementById("goal-modal").hidden = false;
+        var cur = GOAL_OPTIONS.indexOf((sessionAccount && sessionAccount.training_goal) || "");
+        requestAnimationFrame(function () { wheel.scrollTop = Math.max(0, cur) * 36; });
       }
       document.getElementById("profile-edit").addEventListener("click", function () {
         if (!profilePerson || !profilePerson.isSelf) return;

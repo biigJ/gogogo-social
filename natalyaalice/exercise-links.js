@@ -18,6 +18,7 @@
   var query = "";
   var label = "";
   var labelsOf = {};
+  var photoOf = {};
   var LABELS = ["Push", "Pull", "Beine", "Glutes", "Oberkörper", "Arme", "Rumpf", "Mehrgelenkig", "Sprung", "Mobility", "Ausdauer"];
 
   var CSS =
@@ -45,7 +46,15 @@
     ".gxl__chip{min-height:32px;padding:0 12px;border-radius:999px;border:1px solid rgba(42,33,24,.3);background:transparent;color:#2A2118;font:inherit;font-size:13px;font-weight:600;cursor:pointer}" +
     ".gxl__chip.is-on{background:#2A2118;color:#F6F1E8;border-color:#2A2118}" +
     ".gxl__pick{flex:none;min-height:30px;padding:0 12px;border-radius:999px;border:0;background:#2A2118;color:#F6F1E8;font:inherit;font-size:12px;font-weight:700;cursor:pointer}" +
-    ".gxl__tags{display:block;font-size:11px;color:rgba(42,33,24,.55);font-weight:500}";
+    ".gxl__tags{display:block;font-size:11px;color:rgba(42,33,24,.55);font-weight:500}" +
+    ".gxl__media{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 8px}" +
+    ".gxl__frame{position:relative;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:rgba(42,33,24,.08);display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;color:rgba(42,33,24,.55)}" +
+    ".gxl__frame img,.gxl__frame iframe{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0}" +
+    ".gxl__frame--video{background:#111;color:rgba(246,241,232,.7)}" +
+    ".gxl__submit{margin:22px 0 8px;display:grid;gap:8px}" +
+    ".gxl__submit h3{margin:0;font-size:16px;font-weight:700}" +
+    ".gxl__submit input{min-height:44px;box-sizing:border-box;padding:0 12px;border:1px solid rgba(42,33,24,.25);border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118}" +
+    ".gxl__submit button{justify-self:start;min-height:42px;padding:0 18px;border:0;border-radius:999px;background:#2A2118;color:#F6F1E8;font:inherit;font-weight:700;cursor:pointer}";
 
   function ensureCss() {
     if (document.getElementById("gxl-css")) return;
@@ -79,12 +88,14 @@
 
   function loadNames() {
     if (names) return Promise.resolve(names);
-    return host.rest("go_exercise_catalog?select=name,labels&order=name.asc&limit=1000")
+    return host.rest("go_exercise_catalog?select=name,labels,photo_url&order=name.asc&limit=1000")
+      .catch(function () { return host.rest("go_exercise_catalog?select=name,labels&order=name.asc&limit=1000"); })
       .then(function (rows) {
         if (!rows || !rows.length || !("labels" in rows[0])) return loadNamesFromBlocks();
         labelsOf = {};
         return rows.map(function (r) {
           labelsOf[GoExMedia.key(r.name)] = r.labels || [];
+          if (r.photo_url) photoOf[GoExMedia.key(r.name)] = r.photo_url;
           return r.name;
         });
       })
@@ -115,6 +126,25 @@
       "</div>";
   }
 
+  /* Aufgeklappt: Foto links, Hochformat-Video rechts (erstes Video, lädt erst beim Aufklappen) */
+  function mediaHtml(name, links) {
+    var photo = photoOf[GoExMedia.key(name)];
+    var first = null;
+    for (var i = 0; i < links.length; i++) {
+      var info = GoExMedia.parse(links[i].url);
+      if (info && info.embed) { first = info; break; }
+    }
+    return '<div class="gxl__media">' +
+      '<div class="gxl__frame">' + (photo ? '<img src="' + esc(photo) + '" alt="" loading="lazy" />' : "Foto folgt") + "</div>" +
+      '<div class="gxl__frame gxl__frame--video"' + (first ? ' data-gxl-embed="' + esc(first.embed.replace("autoplay=1", "autoplay=0")) + '"' : "") + ">" +
+      (first ? "" : "Noch kein Video") + "</div></div>";
+  }
+  function loadEmbed(details) {
+    var f = details && details.querySelector("[data-gxl-embed]");
+    if (!f || f.querySelector("iframe")) return;
+    f.innerHTML = '<iframe src="' + esc(f.getAttribute("data-gxl-embed")) + '" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" loading="lazy" title="Video"></iframe>';
+  }
+
   function exHtml(name, open, picking) {
     var links = GoExMedia.linksFor(name);
     var tags = labelsOf[GoExMedia.key(name)] || [];
@@ -125,6 +155,7 @@
       (links.length ? links.length + (links.length === 1 ? " Video" : " Videos") : "kein Video") + "</span>" +
       (picking ? '<button type="button" class="gxl__pick" data-gxl-pick>Hierhin</button>' : "") +
       "</summary>" +
+      mediaHtml(name, links) +
       links.map(function (l) { return linkRow(l, name); }).join("") +
       "</details>";
   }
@@ -149,6 +180,7 @@
     box.innerHTML = list.length
       ? list.map(function (n) { return exHtml(n, open[n], picking); }).join("")
       : '<p class="gxl__empty">Keine Übung gefunden.</p>';
+    box.querySelectorAll("details[open]").forEach(loadEmbed);
     el.querySelectorAll("[data-gxl-label]").forEach(function (c) {
       c.classList.toggle("is-on", c.getAttribute("data-gxl-label") === label);
     });
@@ -161,7 +193,10 @@
 
   function refreshOne(el, name) {
     var d = el.querySelector('details[data-gxl-ex="' + (global.CSS && CSS.escape ? CSS.escape(name) : name) + '"]');
-    if (d) d.outerHTML = exHtml(name, true, !!pendingUrl(el));
+    if (d) {
+      d.outerHTML = exHtml(name, true, !!pendingUrl(el));
+      loadEmbed(el.querySelector('details[data-gxl-ex="' + (global.CSS && CSS.escape ? CSS.escape(name) : name) + '"]'));
+    }
   }
 
   function mount(el) {
@@ -177,7 +212,14 @@
           return '<button type="button" class="gxl__chip" data-gxl-label="' + esc(l) + '">' + esc(l) + "</button>";
         }).join("") + "</div>" +
         '<input type="search" class="gxl__search" placeholder="Übung suchen" data-gxl-q />' +
-        '<div data-gxl-list><p class="gxl__empty">Lädt …</p></div>';
+        '<div data-gxl-list><p class="gxl__empty">Lädt …</p></div>' +
+        '<div class="gxl__submit"><h3>Übung einreichen</h3>' +
+        '<input type="text" maxlength="80" placeholder="Name der Übung, die fehlt" data-gxl-subname />' +
+        '<input type="text" maxlength="300" placeholder="Kurz beschreiben (optional)" data-gxl-subnote />' +
+        '<button type="button" data-gxl-submit>Einreichen</button></div>';
+      el.querySelector("[data-gxl-list]").addEventListener("toggle", function (e) {
+        if (e.target && e.target.open) loadEmbed(e.target);
+      }, true);
       el.querySelector("[data-gxl-q]").addEventListener("input", function () {
         query = this.value;
         paint(el);
@@ -190,6 +232,27 @@
   }
 
   function onClick(el, e) {
+    if (e.target.closest("[data-gxl-submit]")) {
+      var nmEl = el.querySelector("[data-gxl-subname]");
+      var ntEl = el.querySelector("[data-gxl-subnote]");
+      var nm = String(nmEl.value || "").trim();
+      if (nm.length < 2) { if (host.toast) host.toast("Wie heißt die Übung?"); return; }
+      var btn = e.target.closest("[data-gxl-submit]");
+      btn.disabled = true;
+      host.rest("go_exercise_submissions", { method: "POST", prefer: "return=minimal",
+        body: { account_id: host.me(), name: nm, note: String(ntEl.value || "").trim() || null } })
+        .then(function () {
+          nmEl.value = ""; ntEl.value = "";
+          btn.disabled = false;
+          if (global.GoDialog) GoDialog.alert("Danke! gogogo schaut sich „" + nm + "“ an.");
+        })
+        .catch(function (err) {
+          btn.disabled = false;
+          var m = String((err && err.message) || "");
+          if (host.toast) host.toast(/go_exercise_submissions|relation/.test(m) ? "Tabelle fehlt: go-uebung-einreichen.sql ausführen" : "Einreichen ging nicht");
+        });
+      return;
+    }
     var play = e.target.closest("[data-gxl-play]");
     if (play) {
       GoExMedia.open(play.getAttribute("data-gxl-name"), play.getAttribute("data-gxl-play"));

@@ -149,7 +149,7 @@
       if (!!y.is_trainer !== !!x.is_trainer) return y.is_trainer ? 1 : -1;
       return String(x.name || "").localeCompare(String(y.name || ""), "de");
     });
-    return '<p class="cp-hint">Coaches sehen „Du bist Coach“, ihr Team und das Coach-Portal. Wochenpläne bearbeiten bleibt bei Dir.</p>' +
+    return '<p class="cp-hint">Coaches sehen „Du bist Coach“, ihr Team und das Coach-Portal. Den Kurs-Editor gibt es nur hier im Admin-Bereich.</p>' +
       accs.map(function (a) {
         return '<div class="ga-item">' + face(a) + '<div class="ga-copy"><p><b>' + esc(a.name || "?") + "</b></p>" +
           '<span class="ga-when">seit ' + esc(when(a.at).split(" · ")[0]) + "</span></div>" + coachBtn(a.account_id) + "</div>";
@@ -165,8 +165,10 @@
     st.body.innerHTML =
       '<div class="cp-seg"><button type="button" data-ga-tab="news" class="' + (st.tab === "news" ? "is-on" : "") + '">Nachrichten</button>' +
       '<button type="button" data-ga-tab="coaches" class="' + (st.tab === "coaches" ? "is-on" : "") + '">Coaches</button>' +
-      '<button type="button" data-ga-tab="wa" class="' + (st.tab === "wa" ? "is-on" : "") + '">Erinnerungen</button></div>' +
-      (st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : paintCoaches());
+      '<button type="button" data-ga-tab="wa" class="' + (st.tab === "wa" ? "is-on" : "") + '">Erinnerungen</button>' +
+      '<button type="button" data-ga-tab="ex" class="' + (st.tab === "ex" ? "is-on" : "") + '">Übungen</button></div>' +
+      (st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : paintCoaches()) +
+      '<button type="button" class="cp-btn cp-btn--ghost" data-ga-editor="1" style="margin-top:18px">Kurs-Editor (alle Wochenpläne)</button>';
   }
 
   /* ---------- Erinnerungen: WhatsApp 19 Uhr als Checkliste ---------- */
@@ -229,6 +231,45 @@
     setTimeout(paint, 300);
   }
 
+  /* ---------- Eingereichte Übungen (go-uebung-einreichen.sql) ---------- */
+  function loadEx() {
+    st.ex = null;
+    return host.rest("go_exercise_submissions?done_at=is.null&select=id,account_id,name,note,created_at&order=created_at.desc&limit=100")
+      .then(function (rows) {
+        rows = rows || [];
+        var ids = rows.map(function (r) { return r.account_id; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; });
+        if (!ids.length) return { rows: rows, names: {} };
+        return host.rest("go_accounts?id=in.(" + ids.join(",") + ")&select=id,name")
+          .catch(function () { return []; })
+          .then(function (acc) {
+            var names = {};
+            (acc || []).forEach(function (a) { names[a.id] = a.name; });
+            return { rows: rows, names: names };
+          });
+      })
+      .then(function (res) { if (st) { st.ex = res; paint(); } })
+      .catch(function () { if (st) { st.ex = "error"; paint(); } });
+  }
+  function paintEx() {
+    if (st.ex === "error") return '<p class="cp-hint">Liste nicht geladen. Ist go-uebung-einreichen.sql in Supabase ausgeführt?</p>';
+    if (!st.ex) { loadEx(); return '<p class="cp-hint">Lade…</p>'; }
+    if (!st.ex.rows.length) return '<p class="cp-hint">Keine offenen Einreichungen. Nutzer reichen unter Plus → Videos Übungen ein.</p>';
+    return st.ex.rows.map(function (r) {
+      return '<div class="ga-item"><div class="ga-copy"><p><b>' + esc(r.name) + "</b></p>" +
+        '<span class="ga-msg">' + esc((st.ex.names[r.account_id] || "?") + (r.note ? " · " + r.note : "")) + "</span>" +
+        '<span class="ga-when">' + esc(when(r.created_at)) + "</span></div>" +
+        '<button type="button" class="ga-wa" style="background:#2A2118" data-ga-exdone="' + esc(r.id) + '">Erledigt</button></div>';
+    }).join("");
+  }
+  function exDone(id) {
+    host.rest("go_exercise_submissions?id=eq." + encodeURIComponent(id), { method: "PATCH", prefer: "return=minimal", body: { done_at: new Date().toISOString() } })
+      .then(function () {
+        st.ex.rows = st.ex.rows.filter(function (r) { return String(r.id) !== String(id); });
+        paint();
+      })
+      .catch(function () { if (host.toast) host.toast("Ging nicht"); });
+  }
+
   function setCoach(btn) {
     var id = btn.getAttribute("data-ga-coach");
     var on = btn.getAttribute("data-on") !== "1";
@@ -253,8 +294,13 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-close],[data-ga-tab],[data-ga-coach],[data-ga-wa]") : null;
+    if (e.target && e.target.closest && e.target.closest("[data-ga-editor]")) {
+      location.href = "/workout/kurse/?from=admin";
+      return;
+    }
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-close],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-exdone]") : null;
     if (!t) return;
+    if (t.hasAttribute("data-ga-exdone")) { exDone(t.getAttribute("data-ga-exdone")); return; }
     if (t.hasAttribute("data-ga-wa")) { markWa(t.getAttribute("data-ga-wa")); return; }
     if (t.hasAttribute("data-ga-close")) return close();
     if (t.hasAttribute("data-ga-tab")) {
