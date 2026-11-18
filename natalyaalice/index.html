@@ -793,6 +793,9 @@
       background: rgba(42, 33, 24, 0.35);
     }
     .sand-modal[hidden] { display: none; }
+    /* Offene Dialoge liegen mittig und über der Pill; die Pill verschwindet solange */
+    body:has(.sand-modal:not([hidden])) .app-pill,
+    body:has(.god) .app-pill { display: none !important; }
     .sand-card {
       width: min(100%, 380px);
       background: #F3EEE4;
@@ -2805,6 +2808,8 @@
       padding: calc(12px + env(safe-area-inset-top)) 20px 32px;
     }
     .profile-sheet.is-open { transform: translateX(0); }
+    /* Profil: unten Platz für die Pill, damit das letzte Feld (Empfehlungen) erreichbar ist */
+    .profile-sheet { padding-bottom: calc(140px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
     .profile-sheet[hidden] { display: none; }
     .profile-top {
       display: grid;
@@ -5586,8 +5591,8 @@
       cursor: pointer;
     }
     #gogogo-toast {
-      z-index: 120;
-      align-items: flex-end;
+      z-index: 10045;
+      align-items: center;
       justify-content: center;
       padding: 20px 16px calc(24px + env(safe-area-inset-bottom));
       background: rgba(42, 33, 24, 0.35);
@@ -7822,8 +7827,8 @@
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-2"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
-  <script src="/natalyaalice/tamagotchi.js?v=tama-1"></script>
-  <script src="/natalyaalice/plan-picker.js?v=gpp-1"></script>
+  <script src="/natalyaalice/tamagotchi.js?v=tama-2"></script>
+  <script src="/natalyaalice/plan-picker.js?v=gpl-2"></script>
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-2"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-7"></script>
@@ -18640,6 +18645,7 @@
       if (window.GoTama) {
         GoTama.init({
           rest: rest,
+          meId: function () { return sessionAccount ? String(sessionAccount.id) : ""; },
           todayIso: function () { return Log.berlinToday(); },
           onChange: function () { try { paintHeuteCrew(); } catch (eTama) {} }
         });
@@ -19325,7 +19331,8 @@
           var stored = parseStoredUnits(plan && plan.day_training_units);
           kraftWeekdays = plan ? parseWeekdays(plan.kraft_weekdays) : [];
           ausWeekdays = plan ? parseWeekdays(plan.ausdauer_weekdays) : [];
-          var needSharedDays = !stored.owned && (linkedNatalya || (!kraftWeekdays.length && !ausWeekdays.length));
+          /* Natalyas Routine gilt nur für Natalya. Ohne eigene Vorlage bleibt die Woche frei, bis ein Wochenplan gewählt ist. */
+          var needSharedDays = !stored.owned && linkedNatalya;
           var daysReady = needSharedDays
             ? rest("go_natalya_routine?id=eq.natalya&select=days").catch(function () { return []; })
             : Promise.resolve(null);
@@ -19336,7 +19343,7 @@
                 var n = DAY_KEYS.indexOf(String(key));
                 if (n >= 0 && nums.indexOf(n) < 0) nums.push(n);
               });
-              if (nums.length && (linkedNatalya || (!kraftWeekdays.length && !ausWeekdays.length))) {
+              if (nums.length && linkedNatalya) {
                 kraftWeekdays = nums;
                 ausWeekdays = [];
               }

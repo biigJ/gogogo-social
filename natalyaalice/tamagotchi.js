@@ -5,12 +5,13 @@
  *   GoTama.invalidate()          nach Erledigt / Verschieben / Ausfallen
  *
  * Regeln (Tag für Tag, letzte 12 Wochen, nur eigene Events der Person):
- *   Tag mit erledigtem Event          → eine Stufe zurück (bis 0)
- *   Tag ausgefallen / nicht erledigt  → Rot (3)
- *   Event von diesem Tag verschoben   → eine Stufe hoch, höchstens Gelb-Orange (2)
- *   Tag ohne Event                    → bleibt
+ *   Tag mit erledigtem Event              → eine Stufe zurück (bis 0)
+ *   Tag mit geplantem, nicht erledigtem   → eine Stufe hoch (bis Rot)
+ *   Event von diesem Tag verschoben       → eine Stufe hoch, höchstens Gelb-Orange (2)
+ *   Event ausdrücklich ausfallen lassen   → Rot (3)
+ *   Tag ohne Event                        → bleibt
  *   Stufen: 0 normal · 1 Gelb · 2 Gelb-Orange · 3 Rot
- *   Badge: Anzahl Wochen am Stück (Mo bis So) mit mindestens einem erledigten Event und keinem ausgefallenen Tag.
+ *   Ziffer (nur am eigenen Kreis): Wochen am Stück (Mo bis So), in denen an allen 7 Tagen etwas abgehakt wurde.
  *   Verschieben merkt sich die Datenbank in events.moved_days (go-tamagotchi.sql).
  */
 (function (global) {
@@ -45,7 +46,7 @@
   }
 
   function compute(rows, todayIso) {
-    var done = {}, missed = {}, moved = {};
+    var done = {}, missed = {}, cancelled = {}, moved = {};
     (rows || []).forEach(function (r) {
       (r.moved_days || []).forEach(function (m) {
         m = String(m).slice(0, 10);
@@ -54,26 +55,25 @@
       var d = berlinDay(r.starts_at);
       if (!d || d > todayIso) return;
       if (r.status === "erledigt") done[d] = true;
-      else if (r.status === "ausgefallen") missed[d] = true;
+      else if (r.status === "ausgefallen") cancelled[d] = true;
       else if (r.status === "geplant" && d < todayIso) missed[d] = true;
     });
     var start = addDays(mondayOf(todayIso), -7 * 12);
     var level = 0;
     for (var d = start; d <= todayIso; d = addDays(d, 1)) {
       if (done[d]) level = Math.max(0, level - 1);
-      else if (d < todayIso && missed[d]) level = 3;
+      else if (d < todayIso && cancelled[d]) level = 3;
+      else if (d < todayIso && missed[d]) level = Math.min(3, level + 1);
       else if (moved[d]) level = level >= 3 ? 3 : Math.min(2, level + moved[d]);
     }
     var weeks = 0;
     var wk = addDays(mondayOf(todayIso), -7);
     while (wk >= start) {
-      var any = false, bad = false;
+      var all = true;
       for (var i = 0; i < 7; i++) {
-        var day = addDays(wk, i);
-        if (done[day]) any = true;
-        else if (missed[day]) bad = true;
+        if (!done[addDays(wk, i)]) { all = false; break; }
       }
-      if (!any || bad) break;
+      if (!all) break;
       weeks += 1;
       wk = addDays(wk, -7);
     }
@@ -124,7 +124,8 @@
     var ring = el.querySelector(".crew-story__ring") || el;
     var old = ring.querySelector(".tama-badge");
     if (old) old.remove();
-    if (s.weeks > 0) {
+    var isMe = host && host.meId && String(host.meId()) === id;
+    if (isMe) {
       var b = document.createElement("span");
       b.className = "tama-badge";
       b.textContent = String(s.weeks);
