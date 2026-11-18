@@ -131,26 +131,11 @@ on conflict (name_key) do update
       aliases = (select array(select distinct unnest(go_exercise_catalog.aliases || excluded.aliases)));
 
 -- ---------- andere Schreibweisen → ein Name ----------
-drop table if exists _alias;
-create temp table _alias (alias text, canon text);
-insert into _alias values
-  ('Ausfallschritte', 'Walking Lunges'),
-  ('Box Jumps', 'Box Jump'),
-  ('Broad Jump', 'Weitsprung'),
-  ('Bulgarian Split Squat', 'Bulgarische Kniebeuge'),
-  ('Cat-Cow', 'Katze-Kuh'),
-  ('Glute Bridge einbeinig', 'Einbeiniges Hüftheben'),
-  ('Hüftbeuger-Dehnung im Halbknien', 'Hüftbeuger-Dehnung kniend'),
-  ('Klimmzug', 'Klimmzüge'),
-  ('Liegestütz', 'Liegestütze'),
-  ('Nordic Curl exzentrisch', 'Nordic Curl'),
-  ('Romanian Deadlift', 'Rumänisches Kreuzheben'),
-  ('Sitzendes Rudern', 'Rudern am Kabel'),
-  ('Sled Push', 'Schlitten schieben'),
-  ('Step-ups mit Gewicht', 'Step-ups');
 
+-- Map alte Schreibweise → Name (ohne Hilfstabelle, der SQL-Editor behält keine temporären Tabellen)
 do $$
 declare
+  v_map jsonb := '{"Ausfallschritte": "Walking Lunges", "Box Jumps": "Box Jump", "Broad Jump": "Weitsprung", "Bulgarian Split Squat": "Bulgarische Kniebeuge", "Cat-Cow": "Katze-Kuh", "Glute Bridge einbeinig": "Einbeiniges Hüftheben", "Hüftbeuger-Dehnung im Halbknien": "Hüftbeuger-Dehnung kniend", "Klimmzug": "Klimmzüge", "Liegestütz": "Liegestütze", "Nordic Curl exzentrisch": "Nordic Curl", "Romanian Deadlift": "Rumänisches Kreuzheben", "Sitzendes Rudern": "Rudern am Kabel", "Sled Push": "Schlitten schieben", "Step-ups mit Gewicht": "Step-ups"}'::jsonb;
   a record;
   s record;
   v_blocks jsonb;
@@ -161,8 +146,8 @@ begin
              case when jsonb_typeof(bl->'items') = 'array' then
                jsonb_set(bl, '{items}', (
                  select coalesce(jsonb_agg(
-                   case when it ? 'name' and exists (select 1 from _alias x where x.alias = trim(it->>'name'))
-                        then jsonb_set(it, '{name}', to_jsonb((select x.canon from _alias x where x.alias = trim(it->>'name'))))
+                   case when it ? 'name' and v_map ? trim(it->>'name')
+                        then jsonb_set(it, '{name}', v_map -> trim(it->>'name'))
                         else it end order by o2), '[]'::jsonb)
                  from jsonb_array_elements(bl->'items') with ordinality as t2(it, o2)))
              else bl end order by o1), '[]'::jsonb)
@@ -173,7 +158,7 @@ begin
     end if;
   end loop;
 
-  for a in select * from _alias loop
+  for a in select key as alias, value #>> '{}' as canon from jsonb_each(v_map) loop
     -- Videos von gogogo: nur übernehmen, wenn der Hauptname noch keins hat
     if to_regclass('public.go_exercise_media') is not null then
       update go_exercise_media m set name_key = lower(a.canon), name = a.canon
@@ -200,4 +185,3 @@ end $$;
 
 -- Kontrolle
 select name, labels, aliases from go_exercise_catalog order by name;
-drop table if exists _alias;
