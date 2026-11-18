@@ -307,7 +307,8 @@
           '<label class="cp-field">Wochen<input type="number" id="cp-weeks" min="1" max="52" value="' + esc(st.planWeeks || 12) + '" /></label></div>' +
           '<p class="cp-hint">Der Plan füllt Mo bis So automatisch. Einzelne Tage kannst Du danach in der Woche verschieben (Event antippen).' +
           (hasZ ? " Zirkeltraining läuft über FFC und erzeugt keinen Termin." : "") + "</p>" +
-          '<button type="button" class="cp-btn" data-cp="assign">Zuordnen</button>'
+          '<button type="button" class="cp-btn" data-cp="assign">Zuordnen</button>' +
+          (global.GoPlanPicker ? '<button type="button" class="cp-btn cp-btn--ghost" data-cp="picker" style="margin-top:8px">Alle Wochenpläne ansehen und Tage schieben</button>' : "")
         : '<p class="cp-hint">Noch keine Wochenpläne.</p>') +
       "</section>"
     );
@@ -435,6 +436,16 @@
       return;
     }
     if (act === "assign") return assignPlan(t);
+    if (act === "picker") {
+      global.GoPlanPicker.open({
+        host: { rest: rest, me: me, toast: toast },
+        mode: "coach",
+        userId: st.id,
+        userName: (st.person && st.person.name) || "",
+        onDone: function () { Promise.all([loadEnrollment(), loadWeek()]).then(paint); }
+      });
+      return;
+    }
     if (act === "move") {
       if (e.target.closest(".cp-ev__x")) return;
       return moveEvent(t.getAttribute("data-id"));
