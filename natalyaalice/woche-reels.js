@@ -2073,6 +2073,268 @@
     });
   }
 
+  function openPlanPicker() {
+    if (!global.GoPlanPicker) return;
+    global.GoPlanPicker.open({
+      host: { rest: rest, me: me, toast: function (m) { if (host.toast) host.toast(m); } },
+      mode: "self",
+      userId: me(),
+      onDone: function () {
+        if (global.GoTama) global.GoTama.invalidate();
+        refresh();
+        notifyAktuell();
+      }
+    });
+  }
+
+  /* ---------- Tage bearbeiten: 7 Tage, ziehen, Uhrzeit-Rad, privat/zeigen ---------- */
+  var MINI_TIMES = (function () {
+    var out = [];
+    for (var h = 5; h <= 22; h++) for (var q = 0; q < 60; q += 15) out.push(pad2(h) + ":" + pad2(q));
+    return out;
+  })();
+  var DAYS_DE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+
+  function nearestTimeIdx(hhmm) {
+    var p = String(hhmm || "18:00").split(":");
+    var mins = Number(p[0]) * 60 + Number(p[1] || 0);
+    var best = 0, bestD = 1e9;
+    MINI_TIMES.forEach(function (t, i) {
+      var q = t.split(":");
+      var d = Math.abs(Number(q[0]) * 60 + Number(q[1]) - mins);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    return best;
+  }
+
+  function openDaysEditor() {
+    var days = [];
+    for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
+    var slots = days.map(function (iso) {
+      return state.events.filter(function (e) {
+        return e && String(e.user_id) === me() && e.status !== "erledigt" && e.status !== "ausgefallen" && dayKey(e.starts_at) === iso;
+      }).sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); })[0] || null;
+    });
+    state.daysEdit = { days: days, slots: slots, times: {}, vis: {} };
+    slots.forEach(function (ev) {
+      if (!ev) return;
+      state.daysEdit.times[ev.id] = nearestTimeIdx(formatTime(ev.starts_at));
+      state.daysEdit.vis[ev.id] = ev.visibility === "privat" ? "privat" : "team";
+    });
+    paintDaysEditor();
+  }
+
+  function paintDaysEditor() {
+    var de = state.daysEdit;
+    if (!de) return;
+    var rows = de.days.map(function (iso, i) {
+      var d = new Date(iso + "T12:00:00");
+      var label = DAYS_DE[d.getDay()] + " " + d.getDate() + ".";
+      var ev = de.slots[i];
+      if (!ev) {
+        return '<div class="wr-dayrow is-empty" data-wr-dayslot="' + i + '"><b>' + label + '</b><span class="wr-dayrow__free">frei</span><span></span></div>';
+      }
+      var ti = de.times[ev.id];
+      var vis = de.vis[ev.id];
+      return '<div class="wr-dayrow" data-wr-dayslot="' + i + '"><b>' + label + "</b>" +
+        '<div class="wr-dayrow__mid"><span class="wr-dayrow__title">' + esc(ev.title || "Training") + "</span>" +
+        '<div class="wr-dayrow__ctl"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
+        MINI_TIMES.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
+        '<button type="button" class="wr-dayrow__vis' + (vis === "privat" ? "" : " is-on") + '" data-wr-dayvis="' + esc(ev.id) + '">' + (vis === "privat" ? "privat" : "zeigen") + "</button></div></div>" +
+        '<span class="wr-dayrow__grip" data-wr-grip="' + i + '" aria-label="Ziehen"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span></div>';
+    }).join("");
+    openSheet(
+      '<p class="wr-sheet-title">Tage bearbeiten</p>' +
+      '<p class="wr-sheet-hint">Rechts anfassen und auf einen anderen Tag ziehen. Uhrzeit drehen, Privat oder Zeigen antippen.</p>' +
+      '<div class="wr-days">' + rows + "</div>" +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-days-save="1">Speichern</button>' +
+      '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+    var card = $("wr-sheet-card");
+    if (!card) return;
+    /* Räder auf den Wert stellen und Scroll lesen */
+    card.querySelectorAll("[data-wr-mini]").forEach(function (w) {
+      var idx = Number(w.getAttribute("data-idx")) || 0;
+      w.scrollTop = idx * 36;
+      var tm = null;
+      w.addEventListener("scroll", function () {
+        clearTimeout(tm);
+        tm = setTimeout(function () {
+          var n = Math.max(0, Math.min(MINI_TIMES.length - 1, Math.round(w.scrollTop / 36)));
+          if (state.daysEdit) state.daysEdit.times[w.getAttribute("data-wr-mini")] = n;
+        }, 80);
+      }, { passive: true });
+    });
+    if (card._wrDaysBound) return;
+    card._wrDaysBound = true;
+    card.addEventListener("click", function (e) {
+      if (!state.daysEdit) return;
+      var vb = e.target.closest && e.target.closest("[data-wr-dayvis]");
+      if (vb) {
+        var id = vb.getAttribute("data-wr-dayvis");
+        var nv = state.daysEdit.vis[id] === "privat" ? "team" : "privat";
+        state.daysEdit.vis[id] = nv;
+        vb.classList.toggle("is-on", nv === "team");
+        vb.textContent = nv === "privat" ? "privat" : "zeigen";
+        return;
+      }
+      if (e.target.closest && e.target.closest("[data-wr-days-save]")) saveDaysEditor();
+    });
+    /* Ziehen am Griff */
+    var drag = null;
+    card.addEventListener("pointerdown", function (e) {
+      var g = e.target.closest && e.target.closest("[data-wr-grip]");
+      if (!g || !state.daysEdit) return;
+      e.preventDefault();
+      var row = g.closest(".wr-dayrow");
+      var r = row.getBoundingClientRect();
+      var ghost = row.cloneNode(true);
+      ghost.classList.add("wr-dayrow--ghost");
+      ghost.style.width = r.width + "px";
+      ghost.style.left = r.left + "px";
+      ghost.style.top = r.top + "px";
+      document.body.appendChild(ghost);
+      row.classList.add("is-drag");
+      drag = { from: Number(g.getAttribute("data-wr-grip")), row: row, ghost: ghost, dy: e.clientY - r.top };
+      try { g.setPointerCapture(e.pointerId); } catch (eC) {}
+    });
+    card.addEventListener("pointermove", function (e) {
+      if (!drag) return;
+      drag.ghost.style.top = (e.clientY - drag.dy) + "px";
+    });
+    function endDrag(e) {
+      if (!drag) return;
+      var d = drag;
+      drag = null;
+      d.ghost.remove();
+      d.row.classList.remove("is-drag");
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var target = el && el.closest ? el.closest("[data-wr-dayslot]") : null;
+      if (!target) return;
+      var to = Number(target.getAttribute("data-wr-dayslot"));
+      if (to === d.from) return;
+      var sl = state.daysEdit.slots;
+      var tmp = sl[to];
+      sl[to] = sl[d.from];
+      sl[d.from] = tmp;
+      paintDaysEditor();
+    }
+    card.addEventListener("pointerup", endDrag);
+    card.addEventListener("pointercancel", function () {
+      if (drag) { drag.ghost.remove(); drag.row.classList.remove("is-drag"); drag = null; }
+    });
+  }
+
+  function saveDaysEditor() {
+    var de = state.daysEdit;
+    if (!de) return;
+    var jobs = [];
+    de.slots.forEach(function (ev, i) {
+      if (!ev) return;
+      var iso = de.days[i];
+      var hhmm = MINI_TIMES[de.times[ev.id]] || formatTime(ev.starts_at) || "18:00";
+      var starts = iso + "T" + hhmm + ":00" + berlinOffsetSuffix(iso);
+      var vis = de.vis[ev.id] || "team";
+      var sameDay = dayKey(ev.starts_at) === iso && formatTime(ev.starts_at) === hhmm;
+      if (sameDay && (ev.visibility || "team") === vis) return;
+      jobs.push(materializeEvent(ev).then(function (real) {
+        return rest("events?id=eq." + encodeURIComponent(real.id), {
+          method: "PATCH", prefer: "return=minimal", body: { starts_at: starts, visibility: vis }
+        });
+      }));
+    });
+    Promise.all(jobs).then(function () {
+      state.daysEdit = null;
+      closeSheet();
+      if (global.GoTama) global.GoTama.invalidate();
+      return refresh().then(notifyAktuell);
+    }).catch(function () {
+      if (host.toast) host.toast("Speichern ging nicht");
+    });
+  }
+
+  /* Ein Dialog für alles, was Freunde für eine Einladung wissen müssen */
+  function openEventSettings(eventId) {
+    var ev = findOwnEvent(eventId);
+    if (!ev) return;
+    if (ev.status === "erledigt") return lockedToast();
+    var hhmm = formatTime(ev.starts_at) || "18:00";
+    var vis = ev.visibility === "privat" ? "privat" : "team";
+    openSheet(
+      '<p class="wr-sheet-title">' + esc(ev.title || "Training") + "</p>" +
+        '<p class="wr-sheet-hint">Leg den Ort, die Uhrzeit und die Privatsphäre fest.</p>' +
+        '<div class="wr-set-vis" role="radiogroup" aria-label="Privatsphäre">' +
+        '<button type="button" class="wr-set-vis__btn' + (vis === "team" ? " is-on" : "") + '" data-wr-set-vis="team" role="radio" aria-checked="' + (vis === "team") + '">Zeigen</button>' +
+        '<button type="button" class="wr-set-vis__btn' + (vis === "privat" ? " is-on" : "") + '" data-wr-set-vis="privat" role="radio" aria-checked="' + (vis === "privat") + '">Privat</button>' +
+        "</div>" +
+        timeWheelHtml(hhmm) +
+        '<div id="wr-set-place-picker"><label class="wr-field">Ort<input type="text" id="wr-set-place" maxlength="80" value="' +
+        esc(ev.location || "") + '" /></label></div>' +
+        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-set-save="' + esc(eventId) + '">Speichern</button>' +
+        '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+    );
+    mountPlacePicker("wr-set-place-picker", ev.location || "");
+    var card = $("wr-sheet-card");
+    if (card) card.setAttribute("data-vis", vis);
+    if (card && !card._wrSetBound) {
+      card._wrSetBound = true;
+      card.addEventListener("click", function (e) {
+        var b = e.target.closest && e.target.closest("[data-wr-set-vis]");
+        if (b) {
+          card.setAttribute("data-vis", b.getAttribute("data-wr-set-vis"));
+          card.querySelectorAll("[data-wr-set-vis]").forEach(function (x) {
+            var on = x === b;
+            x.classList.toggle("is-on", on);
+            x.setAttribute("aria-checked", on ? "true" : "false");
+          });
+          return;
+        }
+        var sv = e.target.closest && e.target.closest("[data-wr-set-save]");
+        if (sv) saveEventSettings(sv.getAttribute("data-wr-set-save"));
+      });
+    }
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        scrollTimeColsToSelection();
+        bindTimeWheelScroll();
+        syncTimeWheelFromScroll();
+      });
+    });
+  }
+
+  function saveEventSettings(eventId) {
+    syncTimeWheelFromScroll();
+    var wheel = $("wr-time-wheel");
+    var h = wheel ? Number(wheel.getAttribute("data-h") || 18) : 18;
+    var m = wheel ? Number(wheel.getAttribute("data-m") || 0) : 0;
+    var place = pickedPlaceName("wr-set-place");
+    rememberPickedPlace();
+    var card = $("wr-sheet-card");
+    var vis = (card && card.getAttribute("data-vis")) || "team";
+    var ev = findOwnEvent(eventId);
+    if (!ev) return;
+    var iso = dayKey(ev.starts_at);
+    var starts = iso + "T" + pad2(h) + ":" + pad2(m) + ":00" + berlinOffsetSuffix(iso);
+    if (isNaN(new Date(starts).getTime())) return;
+    return materializeEvent(ev)
+      .then(function (real) {
+        eventId = real.id;
+        return rest("events?id=eq." + encodeURIComponent(eventId), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { starts_at: starts, location: place || null, visibility: vis }
+        });
+      })
+      .then(function () {
+        closeSheet();
+        return refreshKeepDay(iso);
+      })
+      .then(function () { return notifyAktuell(); })
+      .catch(function () {
+        if (host.toast) host.toast("Speichern ging nicht");
+      });
+  }
+
   function openPlaceSheet(eventId) {
     var ev = findOwnEvent(eventId);
     if (!ev) return;
@@ -3601,8 +3863,9 @@
           });
           return;
         }
-        if (evW && (evW.course_id || isPlanPlaceholder(evW.id)) && (evW.category === "kraft" || evW.category === "ausdauer") && host.openEventWorkout) {
-          host.openEventWorkout(evW);
+        /* Woche: Antippen startet nichts, sondern legt Ort, Uhrzeit und Privatsphäre fest */
+        if (evW && findOwnEvent(evW.id) && evW.status !== "erledigt" && (!wIso || wIso >= berlinToday())) {
+          openEventSettings(evW.id);
           return;
         }
       }
@@ -3728,26 +3991,24 @@
       return;
     }
     if (t.getAttribute("data-wr-edit")) {
-      /* Stift: Wochenplan wählen (plan-picker.js); im Bearbeiten-Modus beendet der Stift ihn wieder */
-      if (state.editMode || !global.GoPlanPicker) {
-        state.editMode = !state.editMode;
+      /* Stift: mit Wochenplan → Wochenplan ändern oder Tage bearbeiten; ohne → Wochenplan wählen */
+      if (state.editMode) {
+        state.editMode = false;
         render();
         return;
       }
-      global.GoPlanPicker.open({
-        host: { rest: rest, me: me, toast: function (m) { if (host.toast) host.toast(m); } },
-        mode: "self",
-        userId: me(),
-        onDone: function () {
-          if (global.GoTama) global.GoTama.invalidate();
-          refresh();
-          notifyAktuell();
-        },
-        onEditWeek: function () {
-          state.editMode = true;
-          render();
-        }
-      });
+      var hasPlan = (state.enrollments || []).some(function (en) { return en && en.status === "aktiv"; });
+      if (hasPlan && global.GoDialog) {
+        GoDialog.choose("Deine Woche", [
+          { label: "Wochenplan ändern", value: "plan" },
+          { label: "Tage bearbeiten", value: "days" }
+        ]).then(function (v) {
+          if (v === "plan") openPlanPicker();
+          if (v === "days") openDaysEditor();
+        });
+        return;
+      }
+      openPlanPicker();
       return;
     }
     if (t.getAttribute("data-wr-add-kind")) {
