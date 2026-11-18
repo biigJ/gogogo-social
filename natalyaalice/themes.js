@@ -192,7 +192,7 @@
 
   /* Zusatz-CSS je Theme: CTAs, dunkle Themes (Text auf Fotos bleibt weiß) */
   var CTA_SEL = [
-    ".sand-card button:not(.sand-quiet):not([class*=close])",
+    ".sand-card button:not(.sand-quiet):not([class*=close]):not(.wr-time-opt):not(.gz-pf):not(.gz-pre):not([data-gz-mode-btn])",
     ".go-slide__cta:not(.is-owned)",
     ".team-slide__cta.is-solid",
     ".wr-pill-btn--dark",
