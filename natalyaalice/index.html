@@ -3959,7 +3959,8 @@
     .friend-list__feed { flex: none; margin-left: auto; width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(42,33,24,.3); display: inline-flex; align-items: center; justify-content: center; color: transparent; cursor: pointer; box-sizing: border-box; }
     .friend-list__feed svg { width: 16px; height: 16px; }
     .friend-list__feed.is-on { background: #2A2118; color: #F6F1E8; border-color: #2A2118; }
-    .friend-list__hint { margin: 0 4px 10px; font-size: 14px; color: rgba(42,33,24,.65); line-height: 1.4; }
+    .friend-list__hint { margin: 0 4px 10px; font-size: 14px; color: rgba(42,33,24,.65); line-height: 1.4; text-align: center; }
+    .friend-list__nick { margin-left: 8px; font-size: 15px; font-weight: 500; opacity: .6; }
     .friend-list { display: flex; flex-direction: column; gap: 14px; padding: 8px 0 24px; }
     .friend-list__row { display: flex; align-items: center; gap: 14px; background: none; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
     .friend-list__row img, .friend-list__row .team-face, .friend-list__row > :first-child { flex: 0 0 auto; }
@@ -7887,7 +7888,7 @@
   <script src="/natalyaalice/exercise-links.js?v=gxl-3"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-9"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-4"></script>
-  <script src="/natalyaalice/coach-reviews.js?v=gcr-1"></script>
+  <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-2"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-4"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-54"></script>
@@ -14035,15 +14036,26 @@
         }
         rest("go_friends?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&friend_id=eq." + encodeURIComponent(pid), {
           method: "PATCH",
-          prefer: "return=minimal",
+          prefer: "return=representation",
           body: { in_feed: turnOn }
+        }).then(function (rows) {
+          if (rows && rows.length) return;
+          /* Freundschaft steht nur in Gegenrichtung: eigene Zeile anlegen */
+          return rest("go_friends", {
+            method: "POST",
+            prefer: "return=minimal",
+            body: { account_id: sessionAccount.id, friend_id: pid, in_feed: turnOn }
+          });
         }).then(function () {
           if (turnOn) delete feedMuted[pid]; else feedMuted[pid] = true;
           el.classList.toggle("is-on", turnOn);
           el.setAttribute("aria-checked", turnOn ? "true" : "false");
           try { paintHeuteCrew(); } catch (e1) {}
           if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
-        }).catch(function () { gogogoToast("Ging nicht (go-friends-feed.sql ausgeführt?)"); });
+        }).catch(function (err) {
+          var m = String((err && err.message) || "");
+          GoDialog.alert(/in_feed/.test(m) ? "Ging nicht: go-friends-feed.sql fehlt in Supabase." : "Ging gerade nicht. Bitte nochmal versuchen.");
+        });
       }
 
       function handleFriendScan() {
@@ -15792,13 +15804,17 @@
           slide.dataset.title = "Meine Freunde";
           var inGroup = {};
           myGroups().forEach(function (g) {
-            (g.members || []).forEach(function (id) { inGroup[String(id)] = g.name || "Gruppe"; });
+            (g.members || []).forEach(function (id) {
+              var k = String(id);
+              var nmG = String(g.name || "Gruppe").trim();
+              inGroup[k] = inGroup[k] ? (inGroup[k].indexOf(nmG) < 0 ? inGroup[k] + " · " + nmG : inGroup[k]) : nmG;
+            });
           });
           var list = document.createElement("div");
           list.className = "friend-list";
           var hintTop = document.createElement("p");
           hintTop.className = "friend-list__hint";
-          hintTop.textContent = "Wähle bis zu 12 Freunde.";
+          hintTop.textContent = "Wähle bis zu 12 Freunde";
           list.appendChild(hintTop);
           /* Oben: Kreis mit + → Freund per Nickname oder ID suchen */
           var addRow = document.createElement("button");
@@ -15806,7 +15822,7 @@
           addRow.className = "friend-list__row friend-list__add";
           addRow.innerHTML = '<span class="friend-list__plus" aria-hidden="true">+</span>' +
             '<span class="friend-list__text"><span class="friend-list__name">Freund hinzufügen</span>' +
-            '<span class="friend-list__meta">Nickname oder ID</span></span>';
+            '<span class="friend-list__meta">Nickname, ID oder per QR-Code</span></span>';
           addRow.addEventListener("click", function () { openTeamSearch("friend"); });
           list.appendChild(addRow);
           var people = teamPeople.filter(function (p) {
@@ -15831,13 +15847,19 @@
             var nm = document.createElement("span");
             nm.className = "friend-list__name";
             nm.textContent = String(p.name || "Freund").split(" ")[0];
+            if (p.nickname) {
+              var nk = document.createElement("span");
+              nk.className = "friend-list__nick";
+              nk.textContent = "@" + p.nickname;
+              nm.appendChild(nk);
+            }
             text.appendChild(nm);
+            /* Zeile 2: Rolle, dann Circle- und Gruppennamen ohne „Gruppe“ */
             var meta = [];
-            if (p.nickname) meta.push("@" + p.nickname);
             if (myTrainer && String(p.id) === myTrainer) meta.push("mein Coach");
             else if (p.is_trainer) meta.push("Coach");
             if (p.trainer_id && String(p.trainer_id) === mineId) meta.push("Coachee");
-            if (inGroup[String(p.id)]) meta.push("Gruppe " + inGroup[String(p.id)]);
+            if (inGroup[String(p.id)]) meta.push(inGroup[String(p.id)]);
             if (meta.length) {
               var sub = document.createElement("span");
               sub.className = "friend-list__meta";
@@ -15851,7 +15873,8 @@
             });
             /* Im Feed an/aus: höchstens 12 im Aktuell-Feed, verbunden bleiben alle */
             var isCoachRel = (myTrainer && String(p.id) === myTrainer) || (p.trainer_id && String(p.trainer_id) === mineId);
-            if (!isCoachRel) {
+            var isGoId = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(String(p.id));
+            if (!isCoachRel && isGoId) {
               var fb = document.createElement("span");
               fb.className = "friend-list__feed" + (feedMuted[String(p.id)] ? "" : " is-on");
               fb.setAttribute("role", "switch");
@@ -17364,6 +17387,22 @@
         }).catch(function () { gogogoToast("Speichern fehlgeschlagen."); });
       }
 
+      /* Coach entfernen, ohne einen neuen zu wählen */
+      function removeTrainer() {
+        GoDialog.confirm("Coach entfernen? Dein Wochenplan bleibt.", { ok: "Entfernen" }).then(function (ok) {
+          if (!ok) return;
+          return rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+            method: "PATCH",
+            prefer: "return=minimal",
+            body: { trainer_id: null }
+          }).then(function () {
+            sessionAccount.trainer_id = null;
+            if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+            loadTeam();
+          }).catch(function () { GoDialog.alert("Entfernen ging gerade nicht."); });
+        });
+      }
+
       function openTeamSearch(mode, forceSearch) {
         /* Coach wählen: Liste aller Coaches mit Sterne-Schnitt und „Über“ (Suche per ID bleibt als Link) */
         if (mode === "trainer" && !forceSearch && window.GoCoachReviews && sessionAccount) {
@@ -17371,6 +17410,7 @@
           GoCoachReviews.openCoachList({
             currentId: sessionAccount.trainer_id || "",
             onPick: pickTrainer,
+            onRemove: removeTrainer,
             onSearch: function () { openTeamSearch("trainer", true); }
           });
           return;
@@ -17419,7 +17459,7 @@
       function loadTeam() {
         if (!sessionMode || !sessionAccount) return Promise.resolve();
         var id = String(sessionAccount.id);
-        var personSelect = "id,name,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id";
+        var personSelect = "id,name,nickname,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id";
         return migrateAboutGroupsOnce()
           .then(function () { return loadMyGroups(); })
           .then(function () {
