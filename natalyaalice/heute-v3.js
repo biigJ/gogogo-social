@@ -1092,15 +1092,35 @@
     );
   }
 
+  /* Kommentare: grundsätzlich zwei Zeilen, Rest mit „mehr“ (ab ca. 80 Zeichen) */
+  var CMT_CLAMP = 80;
   function commentLineHtml(c) {
     var p = personOf(c.account_id);
+    var long = String(c.text || "").length + String(p.name || "").length > CMT_CLAMP;
     return (
-      '<div class="acc-comment"><strong>' +
+      '<div class="acc-comment acc-clamp"><span class="acc-clamp__text"><strong>' +
       esc(p.name) +
       "</strong> " +
       esc(c.text) +
+      "</span>" +
+      (long ? '<button type="button" class="acc-clamp__more" data-cmt-more>mehr</button>' : "") +
       "</div>"
     );
+  }
+  function commentsTeaserHtml(postId) {
+    var list = (state.comments[postId] || []).filter(function (c) { return c && c.text; });
+    if (!list.length) return "";
+    var len = 0;
+    var inner = list.map(function (c) {
+      var nm = String(personOf(c.account_id).name || "").split(" ")[0];
+      len += nm.length + String(c.text).length + 2;
+      return "<strong>" + esc(nm) + "</strong> " + esc(c.text);
+    }).join("<br>");
+    var long = list.length > 2 || len > CMT_CLAMP;
+    return '<div class="acc-card__teaser acc-clamp">' +
+      '<button type="button" class="acc-card__my-line acc-clamp__text" data-open-comments="' + esc(postId) + '">' + inner + "</button>" +
+      (long ? '<button type="button" class="acc-clamp__more" data-cmt-more>mehr</button>' : "") +
+      "</div>";
   }
 
   function myCommentText(postId) {
@@ -1211,12 +1231,13 @@
     var seen = {};
     var out = [];
     var uid = me();
-    /* Nach Erledigt: keine Invite-/RSVP-Gesichter mehr */
+    /* Nach Erledigt oder vergangen: nur wer zugesagt hat bleibt sichtbar */
+    var onlyAccepted = !!iso && String(iso) < todayIso();
     if (eventId) {
       var doneEv = (state.events || []).filter(function (e) {
         return String(e.id) === String(eventId);
       })[0];
-      if (doneEv && doneEv.status === "erledigt") return out;
+      if (doneEv && doneEv.status === "erledigt") onlyAccepted = true;
     }
     if (
       iso &&
@@ -1229,7 +1250,7 @@
         );
       })
     ) {
-      return out;
+      onlyAccepted = true;
     }
     function pushFace(id, name, photo, status) {
       id = String(id || "");
@@ -1258,6 +1279,9 @@
         var p = personOf(rid);
         pushFace(rid, p.name, p.photo, "accepted");
       });
+    }
+    if (onlyAccepted) {
+      return out.filter(function (f) { return String(f.status) === "accepted"; });
     }
     return out;
   }
@@ -1351,17 +1375,9 @@
     opts = opts || {};
     var postId = opts.postId || "";
     if (!postId) return opts.actions || "";
-    var mine = myCommentText(postId);
     var canInvite = opts.canInvite !== false;
-    /* Kommentar nur über Dialog (Sprechblase); teaser nur mit Text */
-    var teaserBlock = mine
-      ? '<div class="acc-card__teaser">' +
-        '<button type="button" class="acc-card__my-line" data-open-comments="' +
-        esc(postId) +
-        '">' +
-        esc(mine) +
-        "</button></div>"
-      : '<div class="acc-card__teaser is-empty" hidden></div>';
+    /* Alle Kommentare unter dem Event (auch bei vergangenen), zwei Zeilen + „mehr“; Schreiben über die Sprechblase */
+    var teaserBlock = commentsTeaserHtml(postId) || '<div class="acc-card__teaser is-empty" hidden></div>';
     var faces = inviteFaceRowHtml(
       postId,
       opts.inviteIso || "",
@@ -3484,6 +3500,7 @@
       if (full) full.hidden = false;
       return;
     }
+    if (t.closest("[data-cmt-more]")) return;
     var openC = t.closest("[data-open-comments]");
     if (openC) {
       openComments(openC.getAttribute("data-open-comments"));
@@ -3973,4 +3990,16 @@
     focusEvent: focusEvent,
     todayCardFor: todayCardFor
   };
+  /* „mehr“ / „weniger“ an Kommentaren (Feed und Kommentar-Dialog) */
+  document.addEventListener("click", function (e) {
+    var m = e.target && e.target.closest ? e.target.closest("[data-cmt-more]") : null;
+    if (!m) return;
+    e.preventDefault();
+    e.stopPropagation();
+    var box = m.closest(".acc-clamp");
+    if (!box) return;
+    var open = box.classList.toggle("is-open");
+    m.textContent = open ? "weniger" : "mehr";
+  }, true);
+
 })(window);
