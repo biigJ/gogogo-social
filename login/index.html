@@ -2,399 +2,354 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#F3EEE4" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <title>gogogo · Login</title>
-  <meta name="description" content="Login bei gogogo." />
+  <meta name="description" content="Bei gogogo anmelden oder neu starten." />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <link rel="stylesheet" href="/assets/go-orient-lock.css" />
   <script src="/assets/go-orient-lock.js" defer></script>
   <script src="/assets/go-account-session.js"></script>
-  <script>
-    document.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
-  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
   <style>
+    /* gogogo App-Design: Sand, Dunkelbraun, Rot als Marke; Playfair für Titel, Inter für Text, Space Grotesk für den Code */
     :root {
-      --red: #C7413B;
       --sand: #F3EEE4;
-      --brown: #2A2118;
-      --paper: #F3EEE4;
+      --card: #F6F1E8;
       --ink: #2A2118;
-      --placeholder: rgba(42, 33, 24, 0.45);
-      --max: 420px;
-      --pad: 24px;
-      --radius: 0;
-      --font: "Fraunces", Palatino, "Times New Roman", serif;
-      --display: "Fraunces", Palatino, "Times New Roman", serif;
+      --muted: rgba(42, 33, 24, 0.6);
+      --line: rgba(42, 33, 24, 0.18);
+      --red: #C7413B;
+      --ok: #2F6B3F;
+      --serif: "Playfair Display", Georgia, serif;
+      --body: Inter, system-ui, -apple-system, sans-serif;
+      --mono: "Space Grotesk", Inter, system-ui, sans-serif;
     }
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; touch-action: manipulation; }
-
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; }
     body {
-      font-family: var(--font);
-      font-weight: 400;
-      color: var(--brown);
-      background: var(--sand);
-      -webkit-font-smoothing: antialiased;
-      line-height: 1.45;
       min-height: 100svh;
-      touch-action: manipulation;
-      overscroll-behavior-x: none;
-    }
-
-    button, input { font: inherit; color: inherit; }
-    button { cursor: pointer; border: 0; background: none; }
-    a { color: inherit; text-decoration: none; }
-    img { display: block; max-width: 100%; }
-
-    :focus-visible {
-      outline: 2px solid var(--brown);
-      outline-offset: 2px;
-    }
-
-    .wrap {
-      width: min(100%, var(--max));
-      margin: 0 auto;
-      padding: calc(36px + env(safe-area-inset-top)) var(--pad) calc(40px + env(safe-area-inset-bottom));
-    }
-
-    .hero {
-      text-align: center;
-      margin-bottom: 28px;
-    }
-
-    .cycle-wrap {
-      position: relative;
-      width: 240px;
-      height: 240px;
-      margin: 0 auto;
-    }
-
-    .cycle {
-      width: 240px;
-      height: 240px;
-      display: block;
-    }
-
-    .cycle-portrait {
-      position: absolute;
-      inset: 50%;
-      width: 132px;
-      height: 132px;
-      margin: -66px 0 0 -66px;
-      border-radius: 50%;
-      overflow: hidden;
-      background: transparent;
+      background: var(--sand);
+      color: var(--ink);
+      font: 16px/1.45 var(--body);
+      -webkit-font-smoothing: antialiased;
       display: flex;
-      align-items: center;
-      justify-content: center;
+      flex-direction: column;
+      padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
     }
+    a { color: inherit; }
+    button, input { font: inherit; color: inherit; }
+    :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-    .cycle-portrait img {
-      width: 88%;
-      height: 88%;
-      object-fit: contain;
-      opacity: 0.85;
+    .wrap { width: 100%; max-width: 420px; margin: auto; display: grid; gap: 22px; }
+    .brand { display: flex; align-items: center; justify-content: space-between; }
+    .brand a { font: 700 22px/1 var(--mono); letter-spacing: -0.02em; text-decoration: none; }
+    .brand a span { color: var(--red); }
+    .brand small { font-size: 13px; color: var(--muted); }
+
+    .hero { display: grid; justify-items: center; gap: 8px; text-align: center; }
+    .ring { position: relative; width: 168px; height: 168px; }
+    .ring svg { position: absolute; inset: 0; }
+    .ring img { position: absolute; inset: 22px; width: 124px; height: 124px; object-fit: contain; border-radius: 50%; }
+    h1 { margin: 6px 0 0; font: 600 34px/1.1 var(--serif); text-wrap: balance; }
+    .lead { margin: 0; color: var(--muted); font-size: 15px; }
+
+    .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px; border-radius: 999px; background: rgba(42, 33, 24, 0.07); }
+    .seg[hidden] { display: none; }
+    .seg button { min-height: 44px; border: 0; border-radius: 999px; background: transparent; font-weight: 600; cursor: pointer; }
+    .seg button[aria-selected="true"] { background: var(--ink); color: var(--sand); }
+
+    form { display: grid; gap: 12px; }
+    form[hidden] { display: none; }
+    .field { display: grid; gap: 6px; }
+    .field > span { font-size: 13px; font-weight: 600; color: var(--muted); }
+    .input {
+      width: 100%; min-height: 52px; padding: 0 16px;
+      border: 1.5px solid var(--line); border-radius: 14px; background: #fff;
+      font-size: 17px;
     }
-
-    .field {
-      display: block;
-      width: 100%;
-      margin-bottom: 12px;
-      padding: 14px 14px;
-      background: transparent;
-      color: var(--brown);
-      border: 1px solid var(--brown);
-      border-radius: var(--radius);
-      font-family: var(--display);
-      font-size: 16px;
-      font-weight: 400;
-      letter-spacing: -0.02em;
+    .input:focus { border-color: var(--ink); outline: none; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .code {
+      font: 700 34px/1 var(--mono); letter-spacing: 0.6em; text-align: center; padding-left: 0.6em;
+      min-height: 64px;
     }
-
-    .field::placeholder { color: var(--placeholder); }
-
-    .field:focus {
-      outline: none;
-      border-color: var(--ink);
-    }
-
+    .code::placeholder { color: rgba(42, 33, 24, 0.25); }
+    .check { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; font-size: 14px; color: var(--muted); }
+    .check input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--ink); }
     .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      height: 56px;
-      margin-top: 4px;
-      background: transparent;
-      color: var(--brown);
-      border: 1px solid var(--brown);
-      font-family: var(--display);
-      font-weight: 600;
-      font-size: 1rem;
-      letter-spacing: -0.03em;
-      border-radius: var(--radius);
-      text-decoration: none;
-      transition: transform 0.08s ease, filter 0.08s ease;
+      min-height: 54px; border: 0; border-radius: 999px; background: var(--ink); color: var(--sand);
+      font-size: 17px; font-weight: 700; cursor: pointer;
     }
+    .btn:disabled { opacity: 0.35; cursor: default; }
+    .quiet { justify-self: center; border: 0; background: none; color: var(--muted); font-size: 14px; text-decoration: underline; cursor: pointer; padding: 6px; }
+    .msg { margin: 0; min-height: 20px; text-align: center; font-size: 14px; font-weight: 600; }
+    .msg.is-error { color: var(--red); }
+    .help { margin: 0; padding: 12px 14px; border-radius: 12px; background: var(--card); font-size: 14px; color: var(--muted); }
+    .help[hidden] { display: none; }
 
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn:not(:disabled) {
-      background: var(--red);
-      color: var(--sand);
-      border-color: var(--red);
-    }
-    .btn:hover:not(:disabled) { opacity: 0.92; }
-    .btn:active:not(:disabled) { transform: scale(0.97); filter: brightness(1.08); }
+    .done { display: grid; gap: 14px; text-align: center; justify-items: center; }
+    .done[hidden] { display: none; }
+    .done .codebig { font: 700 52px/1 var(--mono); letter-spacing: 0.25em; padding-left: 0.25em; }
+    .done p { margin: 0; color: var(--muted); }
+    .done .btn { width: 100%; }
 
-    .form-msg {
-      min-height: 1.2em;
-      margin-top: 12px;
-      font-family: var(--display);
-      font-size: 0.82rem;
-      font-weight: 400;
-      letter-spacing: -0.02em;
-      color: var(--brown);
-    }
-
-    .form-msg.is-error { text-decoration: underline; }
-
-    .foot {
-      text-align: center;
-      font-family: var(--display);
-      font-weight: 400;
-      font-size: 12px;
-      letter-spacing: -0.02em;
-      color: var(--brown);
-      padding-top: 32px;
-    }
-
-    .foot a:hover { text-decoration: underline; }
-
-    .visually-hidden {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
+    .foot { margin-top: 28px; text-align: center; font-size: 13px; color: var(--muted); }
+    .foot a { margin: 0 6px; }
+    @media (prefers-reduced-motion: no-preference) {
+      .ring line.is-lit { transition: stroke 0.4s ease; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <div class="brand"><a href="/">gogo<span>go</span></a><small>Friday Fitness Circle</small></div>
 
-    <section class="hero" aria-label="Login">
-      <div class="cycle-wrap">
-        <svg class="cycle" id="cycle-hero" viewBox="0 0 240 240" width="240" height="240" aria-hidden="true"></svg>
-        <div class="cycle-portrait">
-          <img src="/assets/vitruvian.png" alt="" width="200" height="200" decoding="async" />
-        </div>
+    <section class="hero" aria-label="gogogo">
+      <div class="ring">
+        <svg id="ring" viewBox="0 0 168 168" width="168" height="168" aria-hidden="true"></svg>
+        <img src="/assets/vitruvian.png" alt="" width="124" height="124" decoding="async" />
       </div>
+      <h1 id="title">Willkommen zurück</h1>
+      <p class="lead" id="lead">Vorname und Dein 4-stelliger Code.</p>
     </section>
 
+    <div class="seg" role="tablist" aria-label="Login oder neu">
+      <button type="button" role="tab" id="tab-login" aria-controls="login-form" aria-selected="true">Anmelden</button>
+      <button type="button" role="tab" id="tab-new" aria-controls="new-form" aria-selected="false">Neu hier</button>
+    </div>
+
     <form id="login-form" novalidate>
-      <label class="visually-hidden" for="login-name">Vorname</label>
-      <input
-        class="field"
-        id="login-name"
-        name="given-name"
-        type="text"
-        autocomplete="given-name"
-        autocapitalize="words"
-        enterkeyhint="next"
-        placeholder="Vorname"
-        required
-      />
-
-      <label class="visually-hidden" for="login-code">Code</label>
-      <input
-        class="field"
-        id="login-code"
-        name="invite"
-        type="text"
-        inputmode="numeric"
-        maxlength="4"
-        autocomplete="off"
-        enterkeyhint="done"
-        placeholder="Code"
-        required
-      />
-
-      <button class="btn" id="login-submit" type="submit" disabled>Login</button>
-      <p class="form-msg" id="login-msg" role="status" aria-live="polite"></p>
+      <label class="field"><span>Vorname</span>
+        <input class="input" id="login-name" name="given-name" type="text" autocomplete="given-name" autocapitalize="words" enterkeyhint="next" required />
+      </label>
+      <label class="field"><span>Code</span>
+        <input class="input code" id="login-code" name="one-time-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" enterkeyhint="go" placeholder="0000" required />
+      </label>
+      <button class="btn" id="login-submit" type="submit" disabled>Anmelden</button>
+      <p class="msg" id="login-msg" role="status" aria-live="polite"></p>
+      <button type="button" class="quiet" id="forgot">Code vergessen?</button>
+      <p class="help" id="forgot-help" hidden>Schreib Joscha kurz über <a href="/kontakt/">Kontakt</a> oder WhatsApp. Du bekommst Deinen Code direkt zurück. In der App findest Du ihn später unter Profil → Einstellungen → Login-Code.</p>
     </form>
 
-    <footer class="foot">
-      <a href="/impressum/">Impressum</a>
-      ·
-      <a href="/datenschutz/">Datenschutz</a>
-      ·
-      <a href="/kontakt/">Kontakt</a>
-    </footer>
+    <form id="new-form" novalidate hidden>
+      <div class="row2">
+        <label class="field"><span>Vorname</span>
+          <input class="input" id="new-first" type="text" autocomplete="given-name" autocapitalize="words" required />
+        </label>
+        <label class="field"><span>Nachname</span>
+          <input class="input" id="new-last" type="text" autocomplete="family-name" autocapitalize="words" />
+        </label>
+      </div>
+      <label class="field"><span>Handynummer (für WhatsApp)</span>
+        <input class="input" id="new-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0176 …" required />
+      </label>
+      <label class="check"><input type="checkbox" id="new-privacy" required />
+        <span>Ich habe die <a href="/datenschutz/" target="_blank" rel="noopener">Datenschutzerklärung</a> gelesen und bin einverstanden, dass meine Angaben für die App gespeichert werden.</span>
+      </label>
+      <button class="btn" id="new-submit" type="submit" disabled>Konto anlegen</button>
+      <p class="msg" id="new-msg" role="status" aria-live="polite"></p>
+    </form>
+
+    <section class="done" id="done" hidden aria-live="polite">
+      <p>Dein Code</p>
+      <div class="codebig" id="done-code">0000</div>
+      <p>Merk ihn Dir oder mach einen Screenshot. Damit meldest Du Dich mit Deinem Vornamen an.</p>
+      <button class="btn" id="done-go" type="button">Los geht’s</button>
+    </section>
   </div>
+
+  <footer class="foot">
+    <a href="/impressum/">Impressum</a>·<a href="/datenschutz/">Datenschutz</a>·<a href="/kontakt/">Kontakt</a>
+  </footer>
 
   <script>
     (function () {
       var SUPABASE_URL = "https://agpysewcsakdpmpftndp.supabase.co";
       var SUPABASE_KEY = "sb_publishable_xd3b3JYejCTc4zXaDmT6Qw_jYaLWCTQ";
-      var SESSION_KEY = "gogogo_login_draft";
+      var DRAFT = "gogogo_login_draft";
+      function $(id) { return document.getElementById(id); }
 
-      var form = document.getElementById("login-form");
-      var nameInput = document.getElementById("login-name");
-      var codeInput = document.getElementById("login-code");
-      var submitBtn = document.getElementById("login-submit");
-      var msgEl = document.getElementById("login-msg");
-
-      function drawCycle(svg, fillAll) {
-        var ns = "http://www.w3.org/2000/svg";
-        while (svg.firstChild) svg.removeChild(svg.firstChild);
-        var cx = 120, cy = 120, inner = 90, outer = 112, count = 28;
-        var lit = {};
-        if (!fillAll) {
-          var pool = [];
-          for (var i = 0; i < count; i++) pool.push(i);
-          for (var r = pool.length - 1; r > 0; r--) {
-            var j = Math.floor(Math.random() * (r + 1));
-            var t = pool[r]; pool[r] = pool[j]; pool[j] = t;
-          }
-          var n = 16 + Math.floor(Math.random() * 6);
-          for (var k = 0; k < n; k++) lit[pool[k]] = true;
-        }
+      /* Ring wie in der App: 28 Striche, ein Teil leuchtet */
+      (function drawRing() {
+        var svg = $("ring"), ns = "http://www.w3.org/2000/svg";
+        var cx = 84, cy = 84, inner = 70, outer = 82, count = 28, lit = 18 + Math.floor(Math.random() * 6);
         for (var s = 0; s < count; s++) {
-          var a = ((s / count) * Math.PI * 2) - Math.PI / 2;
-          var line = document.createElementNS(ns, "line");
-          line.setAttribute("x1", (cx + Math.cos(a) * inner).toFixed(2));
-          line.setAttribute("y1", (cy + Math.sin(a) * inner).toFixed(2));
-          line.setAttribute("x2", (cx + Math.cos(a) * outer).toFixed(2));
-          line.setAttribute("y2", (cy + Math.sin(a) * outer).toFixed(2));
-          var on = fillAll || lit[s];
-          line.setAttribute("stroke", on ? "#2A2118" : "rgba(42,33,24,0.28)");
-          line.setAttribute("stroke-width", "3");
-          line.setAttribute("stroke-linecap", "round");
-          svg.appendChild(line);
+          var a = (s / count) * Math.PI * 2 - Math.PI / 2;
+          var l = document.createElementNS(ns, "line");
+          l.setAttribute("x1", (cx + Math.cos(a) * inner).toFixed(2));
+          l.setAttribute("y1", (cy + Math.sin(a) * inner).toFixed(2));
+          l.setAttribute("x2", (cx + Math.cos(a) * outer).toFixed(2));
+          l.setAttribute("y2", (cy + Math.sin(a) * outer).toFixed(2));
+          l.setAttribute("stroke", s < lit ? "#C7413B" : "rgba(42,33,24,0.2)");
+          l.setAttribute("stroke-width", "3.2");
+          l.setAttribute("stroke-linecap", "round");
+          svg.appendChild(l);
         }
-      }
+      })();
 
-      drawCycle(document.getElementById("cycle-hero"), false);
-
-      function saveDraft() {
-        try {
-          sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-            name: nameInput.value,
-            code: codeInput.value
-          }));
-        } catch (e) {}
-      }
-
-      function restoreDraft() {
-        try {
-          var raw = sessionStorage.getItem(SESSION_KEY);
-          if (!raw) return;
-          var d = JSON.parse(raw);
-          if (d.name) nameInput.value = d.name;
-          if (d.code) codeInput.value = d.code;
-        } catch (e) {}
-      }
-
-      restoreDraft();
-
-      function updateSubmit() {
-        submitBtn.disabled = !(nameInput.value.trim() && codeInput.value.trim());
-      }
-
-      [nameInput, codeInput].forEach(function (el) {
-        el.addEventListener("input", function () { updateSubmit(); saveDraft(); });
-        el.addEventListener("change", function () { updateSubmit(); saveDraft(); });
-      });
-
-      codeInput.addEventListener("input", function () {
-        this.value = this.value.replace(/\D/g, "").slice(0, 4);
-        updateSubmit();
-        saveDraft();
-      });
-
-      updateSubmit();
-
-      async function restGet(path) {
-        var res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
-          headers: {
-            apikey: SUPABASE_KEY,
-            Authorization: "Bearer " + SUPABASE_KEY
-          }
-        });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.json();
-      }
-
-      function namesMatch(a, b) {
-        return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
-      }
-
-      async function lookupAccount(name, invite) {
-        if (!invite || !name) return null;
-        var rows = await restGet(
-          "go_accounts?invite_code=eq." + encodeURIComponent(invite) +
-          "&select=*&order=created_at.asc&limit=50"
-        );
-        if (!rows || !rows.length) return null;
-        var matches = [];
-        var i;
-        for (i = 0; i < rows.length; i++) {
-          if (namesMatch(rows[i].name, name)) matches.push(rows[i]);
-        }
-        if (!matches.length) return null;
-        for (i = 0; i < matches.length; i++) {
-          if (matches[i].photo_url) return matches[i];
-        }
-        return matches[0];
-      }
-
-      form.addEventListener("submit", async function (e) {
-        e.preventDefault();
-        var name = nameInput.value.trim();
-        var invite = codeInput.value.trim();
-        if (!name || !invite) {
-          msgEl.textContent = "Bitte Vorname und Code ausfüllen.";
-          msgEl.classList.add("is-error");
-          return;
-        }
-        msgEl.textContent = "Einen Moment …";
-        msgEl.classList.remove("is-error");
-        submitBtn.disabled = true;
-        var account = null;
-        try {
-          account = await lookupAccount(name, invite);
-        } catch (err) {}
-        if (!account) {
-          msgEl.textContent = "Kein Account zu diesem Namen und Code.";
-          msgEl.classList.add("is-error");
-          submitBtn.disabled = false;
-          return;
-        }
-        try {
-          if (window.GoAccountSession) GoAccountSession.save(account);
-          else localStorage.setItem("gogogo_go_account", JSON.stringify(account));
-          sessionStorage.removeItem(SESSION_KEY);
-        } catch (err) {}
+      function nextUrl() {
         var next = "/workout/";
         try {
           var asked = new URLSearchParams(location.search).get("next") || "";
           if (asked.charAt(0) === "/" && asked.charAt(1) !== "/" && asked.indexOf("\\") < 0) next = asked;
-        } catch (eNext) {}
-        window.location.href = next;
+        } catch (e) {}
+        return next;
+      }
+
+      async function rest(path, opts) {
+        opts = opts || {};
+        var headers = { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY };
+        if (opts.body) headers["Content-Type"] = "application/json";
+        if (opts.prefer) headers.Prefer = opts.prefer;
+        var res = await fetch(SUPABASE_URL + "/rest/v1/" + path, {
+          method: opts.method || "GET",
+          headers: headers,
+          body: opts.body ? JSON.stringify(opts.body) : undefined
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status + " " + (await res.text()));
+        var t = await res.text();
+        return t ? JSON.parse(t) : null;
+      }
+
+      function same(a, b) { return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase(); }
+      function firstName(n) { return String(n || "").trim().split(/\s+/)[0] || ""; }
+
+      function saveSession(account) {
+        try {
+          if (window.GoAccountSession) GoAccountSession.save(account);
+          else localStorage.setItem("gogogo_go_account", JSON.stringify(account));
+          sessionStorage.removeItem(DRAFT);
+        } catch (e) {}
+      }
+
+      /* ---------- Umschalten ---------- */
+      function show(mode) {
+        var isNew = mode === "new";
+        $("tab-login").setAttribute("aria-selected", isNew ? "false" : "true");
+        $("tab-new").setAttribute("aria-selected", isNew ? "true" : "false");
+        $("login-form").hidden = isNew;
+        $("new-form").hidden = !isNew;
+        $("done").hidden = true;
+        $("title").textContent = isNew ? "Neu bei gogogo" : "Willkommen zurück";
+        $("lead").textContent = isNew ? "Drei Angaben, dann bekommst Du Deinen Code." : "Vorname und Dein 4-stelliger Code.";
+        try { history.replaceState(null, "", isNew ? "#neu" : location.pathname + location.search); } catch (e) {}
+      }
+      $("tab-login").addEventListener("click", function () { show("login"); });
+      $("tab-new").addEventListener("click", function () { show("new"); });
+      if (/neu|register/.test(location.hash) || /[?&]neu\b/.test(location.search)) show("new");
+      $("forgot").addEventListener("click", function () { $("forgot-help").hidden = !$("forgot-help").hidden; });
+
+      /* ---------- Anmelden ---------- */
+      var nameIn = $("login-name"), codeIn = $("login-code"), loginBtn = $("login-submit"), loginMsg = $("login-msg");
+      try {
+        var d = JSON.parse(sessionStorage.getItem(DRAFT) || "{}");
+        if (d.name) nameIn.value = d.name;
+      } catch (e) {}
+      function updLogin() { loginBtn.disabled = !(nameIn.value.trim() && /^\d{4}$/.test(codeIn.value)); }
+      nameIn.addEventListener("input", function () {
+        updLogin();
+        try { sessionStorage.setItem(DRAFT, JSON.stringify({ name: nameIn.value })); } catch (e) {}
       });
+      codeIn.addEventListener("input", function () {
+        codeIn.value = codeIn.value.replace(/\D/g, "").slice(0, 4);
+        updLogin();
+        if (codeIn.value.length === 4 && nameIn.value.trim()) $("login-form").requestSubmit();
+      });
+      updLogin();
+
+      $("login-form").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        if (loginBtn.disabled && !(nameIn.value.trim() && codeIn.value.length === 4)) return;
+        loginMsg.className = "msg";
+        loginMsg.textContent = "Einen Moment …";
+        loginBtn.disabled = true;
+        var account = null;
+        try {
+          var rows = await rest("go_accounts?invite_code=eq." + encodeURIComponent(codeIn.value) + "&select=*&order=created_at.asc&limit=50");
+          var hits = (rows || []).filter(function (r) { return same(firstName(r.name), firstName(nameIn.value)) || same(r.name, nameIn.value); });
+          account = hits.filter(function (r) { return r.photo_url; })[0] || hits[0] || null;
+        } catch (err) {}
+        if (!account) {
+          loginMsg.className = "msg is-error";
+          loginMsg.textContent = "Vorname und Code passen nicht zusammen.";
+          loginBtn.disabled = false;
+          codeIn.select();
+          return;
+        }
+        saveSession(account);
+        location.href = nextUrl();
+      });
+
+      /* ---------- Neu hier: Konto anlegen ---------- */
+      var fIn = $("new-first"), lIn = $("new-last"), pIn = $("new-phone"), okIn = $("new-privacy"), newBtn = $("new-submit"), newMsg = $("new-msg");
+      function phoneOk(v) { return String(v || "").replace(/[^0-9]/g, "").length >= 8; }
+      function updNew() { newBtn.disabled = !(fIn.value.trim() && phoneOk(pIn.value) && okIn.checked); }
+      [fIn, lIn, pIn, okIn].forEach(function (el) { el.addEventListener("input", updNew); el.addEventListener("change", updNew); });
+      updNew();
+
+      function randomCode() { return String(1000 + Math.floor(Math.random() * 9000)); }
+
+      var created = null;
+      $("new-form").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        if (newBtn.disabled) return;
+        newBtn.disabled = true;
+        newMsg.className = "msg";
+        newMsg.textContent = "Konto wird angelegt …";
+        var first = fIn.value.trim().replace(/\s+/g, " ");
+        var name = (first + " " + lIn.value.trim()).trim();
+        var phone = pIn.value.trim();
+        try {
+          /* Gibt es die Nummer schon? Dann nicht doppelt anlegen */
+          var digits = phone.replace(/[^0-9]/g, "").slice(-8);
+          var existing = await rest("go_accounts?phone=like.*" + encodeURIComponent(digits) + "&select=id&limit=1").catch(function () { return []; });
+          if (existing && existing.length) {
+            newMsg.className = "msg is-error";
+            newMsg.textContent = "Zu dieser Nummer gibt es schon ein Konto. Melde Dich an oder nutz „Code vergessen?“.";
+            newBtn.disabled = false;
+            return;
+          }
+          /* Code wählen, der mit diesem Vornamen noch frei ist */
+          var code = randomCode();
+          for (var i = 0; i < 6; i++) {
+            var taken = await rest("go_accounts?invite_code=eq." + code + "&select=name&limit=50").catch(function () { return []; });
+            if (!(taken || []).some(function (r) { return same(firstName(r.name), first); })) break;
+            code = randomCode();
+          }
+          var rows = await rest("go_accounts", {
+            method: "POST",
+            prefer: "return=representation",
+            body: { name: name, phone: phone, invite_code: code }
+          });
+          created = rows && rows[0];
+          if (!created) throw new Error("leer");
+          /* Einwilligung festhalten (go-datenschutz-1.sql), still bei fehlender Spalte */
+          rest("go_accounts?id=eq." + encodeURIComponent(created.id), {
+            method: "PATCH", prefer: "return=minimal", body: { privacy_ack_at: new Date().toISOString() }
+          }).catch(function () {});
+        } catch (err) {
+          newMsg.className = "msg is-error";
+          newMsg.textContent = "Anlegen hat nicht geklappt. Versuch es gleich nochmal.";
+          newBtn.disabled = false;
+          return;
+        }
+        saveSession(created);
+        $("new-form").hidden = true;
+        $("done-code").textContent = created.invite_code;
+        $("title").textContent = "Willkommen, " + firstName(created.name);
+        $("lead").textContent = "Dein Konto ist da.";
+        document.querySelector(".seg").hidden = true;
+        $("done").hidden = false;
+      });
+      $("done-go").addEventListener("click", function () { location.href = nextUrl(); });
     })();
   </script>
 </body>
