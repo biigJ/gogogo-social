@@ -2196,6 +2196,13 @@
     .go-online-cta { display: inline-flex; align-items: center; min-height: 36px; margin: 8px 0 0; padding: 0 14px; border-radius: 999px; border: 0; background: #111; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
     .acc-tool-badge { display: inline-flex; align-items: center; justify-content: center; min-height: 30px; }
     button.acc-tool-badge { border: 0; background: transparent; color: inherit; padding: 0; cursor: pointer; font: inherit; }
+    .acc-face--outbox { width: 34px !important; height: 34px !important; background: transparent !important; color: inherit !important; border: 0 !important; box-shadow: none !important; display: inline-grid; place-items: center; padding: 0; }
+    .acc-tool--wave.is-on { opacity: 0.45; }
+    .train-pop { z-index: 10040; }
+    .train-pop__card { width: min(100%, 420px); max-height: calc(100dvh - 48px); overflow: hidden; display: grid; gap: 10px; cursor: pointer; }
+    .train-pop__who { margin: 0; text-align: center; color: #F6F1E8; font-weight: 700; font-size: 17px; }
+    .train-pop__ev { pointer-events: none; border-radius: 18px; overflow: hidden; }
+    .train-pop__ev .acc-card__tools, .train-pop__ev .acc-card__teaser { display: none; }
     .acc-badge-ico { display: block; color: #2A2118; width: 30px; height: 30px; }
     /* Pill-Woche-Kalender bleibt bei .app-pill svg (24px) — hier nur Event-Zeile */
     .acc-card__emoji { display: none !important; }
@@ -7836,7 +7843,7 @@
   <script src="/natalyaalice/coach-reviews.js?v=gcr-1"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-4"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-52"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-53"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-42"></script>
   <script src="/natalyaalice/support.js?v=support-20"></script>
@@ -18231,6 +18238,65 @@
         invitePromptOn = true;
         openIncoming(next);
       }
+      /* Winken: Freund fragt, ob er bei meinem Event mitmachen darf (go_event_requests) */
+      var joinPromptOn = false;
+      function promptJoinRequests() {
+        if (!sessionMode || !sessionAccount || joinPromptOn || !window.GoDialog) return;
+        rest("go_event_requests?to_id=eq." + encodeURIComponent(sessionAccount.id) +
+          "&status=eq.pending&select=id,event_id,from_id,events(title,starts_at,location)&order=created_at.asc&limit=10")
+          .then(function (rows) {
+            rows = (rows || []).filter(function (r) { return r.events; });
+            if (!rows.length) return;
+            joinPromptOn = true;
+            var ids = rows.map(function (r) { return r.from_id; });
+            return rest("go_accounts?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=id,name,nickname")
+              .catch(function () { return []; })
+              .then(function (people) {
+                var nameOf = {};
+                (people || []).forEach(function (p) { nameOf[String(p.id)] = String(p.nickname || p.name || "Jemand").split(" ")[0]; });
+                function next(i) {
+                  if (i >= rows.length) { joinPromptOn = false; return; }
+                  var r = rows[i];
+                  var ev = r.events;
+                  var when = new Date(ev.starts_at);
+                  var whenTxt = when.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "numeric", timeZone: "Europe/Berlin" }) +
+                    " " + when.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+                  var who = nameOf[String(r.from_id)] || "Jemand";
+                  GoDialog.choose(who + " möchte mitmachen: " + (ev.title || "Training") + ", " + whenTxt + (ev.location ? ", " + ev.location : ""), [
+                    { label: "Annehmen", value: "accepted" },
+                    { label: "Ablehnen", value: "declined" }
+                  ], { cancel: "Später" }).then(function (v) {
+                    if (!v) return next(i + 1);
+                    var jobs = [rest("go_event_requests?id=eq." + encodeURIComponent(r.id), {
+                      method: "PATCH", prefer: "return=minimal", body: { status: v, decided_at: new Date().toISOString() }
+                    })];
+                    if (v === "accepted") {
+                      jobs.push(rest("go_workout_invites", {
+                        method: "POST", prefer: "return=minimal",
+                        body: {
+                          from_id: sessionAccount.id, to_id: r.from_id,
+                          workout_date: when.toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }),
+                          workout_label: ev.title || "Training", from_name: personName(),
+                          place: ev.location || null,
+                          meet_time: when.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }),
+                          status: "accepted", event_id: r.event_id
+                        }
+                      }));
+                    }
+                    Promise.all(jobs.map(function (j) { return j.catch(function () {}); })).then(function () {
+                      if (v === "accepted") loadInvites().then(function () {
+                        if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
+                      });
+                      next(i + 1);
+                    });
+                  });
+                }
+                next(0);
+              });
+          })
+          .catch(function () { joinPromptOn = false; });
+      }
+
       function invitePromptDone(invite) {
         if (invite) {
           invitePromptSkip[String(invite.id)] = true;
@@ -20597,6 +20663,35 @@
         syncTrainingPresence("active", label);
       }
 
+      function openTrainingPopup(person) {
+        if (!window.HeuteAccountability || !HeuteAccountability.todayCardFor) return false;
+        var card = HeuteAccountability.todayCardFor(person.id);
+        if (!card) return false;
+        var wrap = document.getElementById("train-pop");
+        if (!wrap) {
+          wrap = document.createElement("div");
+          wrap.id = "train-pop";
+          wrap.className = "sand-modal train-pop";
+          wrap.innerHTML = '<div class="train-pop__card" role="dialog" aria-modal="true"><p class="train-pop__who"></p><div class="train-pop__ev"></div></div>';
+          document.body.appendChild(wrap);
+          wrap.addEventListener("click", function (e) {
+            if (e.target === wrap) { wrap.hidden = true; return; }
+            var id = wrap.getAttribute("data-ev");
+            wrap.hidden = true;
+            if (window.HeuteAccountability) {
+              HeuteAccountability.setFilter("team");
+              setTimeout(function () { HeuteAccountability.focusEvent(id); }, 600);
+            }
+          });
+        }
+        var nm = person.isSelf ? "Du trainierst:" : String(person.nickname || person.name || "").split(" ")[0] + " trainiert:";
+        wrap.querySelector(".train-pop__who").textContent = nm;
+        wrap.querySelector(".train-pop__ev").innerHTML = card.html;
+        wrap.setAttribute("data-ev", card.id);
+        wrap.hidden = false;
+        return true;
+      }
+
       function paintHeuteCrew() {
         var box = document.getElementById("heute-stories-team");
         if (!box) return;
@@ -20618,7 +20713,10 @@
           return nick && byNick[nick] && !byNick[nick].is_me ? byNick[nick] : null;
         }
         function openFor(person, story) {
-          return function () {
+          return function (e) {
+            /* Pulsierender Kreis: heutiges Training als Karte zeigen */
+            var item = e && e.currentTarget;
+            if (item && item.classList && item.classList.contains("is-training") && openTrainingPopup(person)) return;
             if (story && window.FFC && FFC.openStory && FFC.openStory(story.index)) return;
             openProfile(person);
           };
@@ -20921,6 +21019,7 @@
           HeuteAccountability.install(accHost);
           handleStampScan();
           handleFriendScan();
+          setTimeout(promptJoinRequests, 2500);
           /* FFC-Punkte spiegeln (Gesamt- und Double-Leaderboard), sobald der FFC-Login steht */
           setTimeout(function () {
             if (window.GoFfcPoints && sessionAccount) GoFfcPoints.sync({ rest: rest, accountId: String(sessionAccount.id) });
@@ -21516,6 +21615,7 @@
           btn.classList.add("is-busy");
           invitePromptSkip = {};
           if (window.GoTama) GoTama.invalidate();
+          setTimeout(promptJoinRequests, 1500);
           var jobs = [loadInvites()];
           try { jobs.push(loadTeam()); } catch (eT) {}
           if (window.HeuteAccountability && HeuteAccountability.refresh) {
@@ -22452,6 +22552,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-1"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-2"></script>
 </body>
 </html>
