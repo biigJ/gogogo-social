@@ -1,6 +1,6 @@
 /* themes.js — Darstellung: Original, GTA, Bauhaus, B/W
  *
- *   GoThemes.current()        → "original" | "gta" | "bauhaus" | "bw"
+ *   GoThemes.current()        → "original" | "gta" | "bauhaus" | "bw" | "postmodern"
  *   GoThemes.apply(id)        → Theme setzen + merken (localStorage, pro Gerät)
  *   GoThemes.list()           → [{ id, label }]
  *   GoThemes.openPicker()     → Auswahl über GoDialog.choose
@@ -32,7 +32,7 @@
       rgb: {
         "199,65,59": "224,24,122", "165,51,46": "176,16,94", "247,245,240": "255,246,251",
         "246,241,232": "255,240,245", "243,238,228": "253,232,241",
-        "42,33,24": "43,11,63", "20,16,12": "26,6,40"
+        "42,33,24": "43,11,63", "52,34,32": "43,11,63", "20,16,12": "26,6,40"
       }
     },
     bauhaus: {
@@ -41,17 +41,20 @@
       display: "Jost",
       body: "Jost",
       serif: "Jost",
+      /* Weiß, Dessau-Rot für graue Flächen, Rot-Akzente → Blau (Stempelkarte bleibt blau), CTAs Orange-Gelb */
       hex: {
         C7413B: "1E4FA3", A5332E: "163C7E", F7F5F0: "FFFFFF",
-        F6F1E8: "F4EFE1", F3EEE4: "EFE8D6", EDE6DA: "E6DEC8", E4DDD0: "DCD2B8",
-        E8E2D6: "E3DAC3", D8D0C4: "CFC4A6", ECECEB: "E6E6E3",
-        "2A2118": "141414", "1A1510": "000000", "6B6358": "5A5A5A"
+        F6F1E8: "FFFFFF", F3EEE4: "FFFFFF", EDE6DA: "C8102E", E4DDD0: "C8102E",
+        E8E2D6: "C8102E", D8D0C4: "A50D26", ECECEB: "C8102E",
+        "2A2118": "111111", "1A1510": "000000", "6B6358": "555555"
       },
       rgb: {
         "199,65,59": "30,79,163", "165,51,46": "22,60,126", "247,245,240": "255,255,255",
-        "246,241,232": "244,239,225", "243,238,228": "239,232,214",
-        "42,33,24": "20,20,20", "20,16,12": "10,10,10"
-      }
+        "246,241,232": "255,255,255", "243,238,228": "255,255,255",
+        "42,33,24": "17,17,17", "20,16,12": "0,0,0", "52,34,32": "17,17,17"
+      },
+      cta: { bg: "#F5A400", ink: "#111111" },
+      extra: ".app-pill nav{color:#fff}"
     },
     bw: {
       label: "B/W",
@@ -59,20 +62,44 @@
       display: "Bodoni Moda",
       body: "IBM Plex Sans",
       serif: "Bodoni Moda",
+      dark: true,
+      /* Umgedreht: schwarzer Grund, weiße Schrift */
       hex: {
-        C7413B: "111111", A5332E: "000000", F7F5F0: "FFFFFF",
-        F6F1E8: "FFFFFF", F3EEE4: "F5F5F5", EDE6DA: "EBEBEB", E4DDD0: "E0E0E0",
-        E8E2D6: "E6E6E6", D8D0C4: "D0D0D0", ECECEB: "E8E8E8",
-        "2A2118": "111111", "1A1510": "000000", "6B6358": "666666"
+        C7413B: "FFFFFF", A5332E: "D9D9D9", F7F5F0: "FFFFFF",
+        F6F1E8: "0A0A0A", F3EEE4: "000000", EDE6DA: "1A1A1A", E4DDD0: "262626",
+        E8E2D6: "1F1F1F", D8D0C4: "333333", ECECEB: "1F1F1F",
+        "2A2118": "F2F2F2", "1A1510": "FFFFFF", "6B6358": "A3A3A3"
       },
       rgb: {
-        "199,65,59": "17,17,17", "165,51,46": "0,0,0", "247,245,240": "255,255,255",
-        "246,241,232": "255,255,255", "243,238,228": "245,245,245",
-        "42,33,24": "17,17,17", "20,16,12": "0,0,0"
-      }
+        "199,65,59": "255,255,255", "165,51,46": "217,217,217", "247,245,240": "255,255,255",
+        "246,241,232": "10,10,10", "243,238,228": "0,0,0",
+        "42,33,24": "242,242,242", "52,34,32": "242,242,242", "20,16,12": "0,0,0"
+      },
+      cta: { bg: "#FFFFFF", ink: "#000000" }
+    },
+    postmodern: {
+      label: "Postmodern",
+      fonts: "family=Archivo+Black&family=Archivo:wght@500;600;700;800",
+      display: "Archivo Black",
+      body: "Archivo",
+      serif: "Archivo Black",
+      /* Memphis: knallige Neonfarben, fette Schrift, CTAs in Gold */
+      hex: {
+        C7413B: "FF2E93", A5332E: "D4007A", F7F5F0: "FFFFFF",
+        F6F1E8: "FFF9EC", F3EEE4: "FFF4DA", EDE6DA: "7DF9FF", E4DDD0: "B4FF39",
+        E8E2D6: "7DF9FF", D8D0C4: "B4FF39", ECECEB: "7DF9FF",
+        "2A2118": "1B0B3A", "1A1510": "0D0420", "6B6358": "5B3F8C"
+      },
+      rgb: {
+        "199,65,59": "255,46,147", "165,51,46": "212,0,122", "247,245,240": "255,255,255",
+        "246,241,232": "255,249,236", "243,238,228": "255,244,218",
+        "42,33,24": "27,11,58", "52,34,32": "27,11,58", "20,16,12": "13,4,32"
+      },
+      cta: { bg: "#E6B325", ink: "#1B0B3A" },
+      extra: "body{font-weight:600}"
     }
   };
-  var ORDER = ["original", "gta", "bauhaus", "bw"];
+  var ORDER = ["original", "gta", "bauhaus", "bw", "postmodern"];
 
   var current = "original";
   var originals = new WeakMap(); // <style> → Originaltext
@@ -115,6 +142,7 @@
     for (var i = 0; i < list.length; i++) paintStyle(list[i]);
     paintLinks();
     paintMeta();
+    paintExtra();
     busy = false;
   }
 
@@ -160,6 +188,39 @@
       META_ORIG[next] = base;
       m.setAttribute("content", next);
     }
+  }
+
+  /* Zusatz-CSS je Theme: CTAs, dunkle Themes (Text auf Fotos bleibt weiß) */
+  var CTA_SEL = [
+    ".sand-card button:not(.sand-quiet):not([class*=close])",
+    ".go-slide__cta:not(.is-owned)",
+    ".team-slide__cta.is-solid",
+    ".wr-pill-btn--dark",
+    ".acc-rsvp:not(.is-on)",
+    ".go-primary",
+    ".god__btn--primary"
+  ].join(",");
+  var extraEl = null;
+  function paintExtra() {
+    var t = THEMES[current] || {};
+    var css = "";
+    if (t.cta) css += CTA_SEL + "{background:" + t.cta.bg + " !important;color:" + t.cta.ink + " !important;border-color:" + t.cta.bg + " !important}";
+    if (t.dark) {
+      css +=
+        "html,body{background:#000}" +
+        ".acc-card__media,.acc-card__media *,.wr-slide__body,.wr-slide__body *,.go-slide__art,.go-slide__art *{--ink:#fff}" +
+        ".acc-card .acc-media-text,.acc-card__overlay,.acc-card__overlay *{color:#fff !important}" +
+        ".woche-reels .wr-bottom .wr-title,.woche-reels .wr-bottom .wr-when,.woche-reels .wr-bottom .wr-place,.woche-reels .wr-progress p{color:#fff !important}" +
+        "img{filter:none}";
+    }
+    if (t.extra) css += t.extra;
+    if (!extraEl) {
+      extraEl = document.createElement("style");
+      extraEl.id = "go-theme-extra";
+      extraEl.setAttribute("data-theme-skip", "");
+      document.head.appendChild(extraEl);
+    }
+    extraEl.textContent = css;
   }
 
   var fontLink = null;
