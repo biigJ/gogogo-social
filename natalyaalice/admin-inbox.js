@@ -35,6 +35,7 @@
     ".ga-item.is-new .ga-copy p::before{content:'';display:inline-block;width:8px;height:8px;margin:0 6px 1px 0;border-radius:50%;background:#111}" +
     ".ga-act{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer}" +
     ".ga-act.is-on{background:#111;color:#fff}" +
+    ".ga-del{margin-left:6px;color:#C7413B;border-color:#C7413B}" +
     ".ga-wa{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:#128C7E;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-grid;place-items:center}" +
     ".ga-item.is-sent{opacity:.5}" +
     ".ga-msg{display:block;font-size:13px;color:rgba(42,33,24,.75);margin-top:2px}";
@@ -152,7 +153,9 @@
     return '<p class="cp-hint">Coaches sehen „Du bist Coach“, ihr Team und das Coach-Portal. Den Kurs-Editor gibt es nur hier im Admin-Bereich.</p>' +
       accs.map(function (a) {
         return '<div class="ga-item">' + face(a) + '<div class="ga-copy"><p><b>' + esc(a.name || "?") + "</b></p>" +
-          '<span class="ga-when">seit ' + esc(when(a.at).split(" · ")[0]) + "</span></div>" + coachBtn(a.account_id) + "</div>";
+          '<span class="ga-when">seit ' + esc(when(a.at).split(" · ")[0]) + "</span></div>" + coachBtn(a.account_id) +
+          (String(a.account_id) === String(me()) || ADMIN_IDS.indexOf(String(a.account_id)) !== -1 ? "" : '<button type="button" class="ga-act ga-del" data-ga-del="' + esc(a.account_id) + '" aria-label="Löschen">Löschen</button>') +
+          "</div>";
       }).join("");
   }
 
@@ -164,7 +167,7 @@
     }
     st.body.innerHTML =
       '<div class="cp-seg"><button type="button" data-ga-tab="news" class="' + (st.tab === "news" ? "is-on" : "") + '">Nachrichten</button>' +
-      '<button type="button" data-ga-tab="coaches" class="' + (st.tab === "coaches" ? "is-on" : "") + '">Coaches</button>' +
+      '<button type="button" data-ga-tab="coaches" class="' + (st.tab === "coaches" ? "is-on" : "") + '">Nutzer</button>' +
       '<button type="button" data-ga-tab="wa" class="' + (st.tab === "wa" ? "is-on" : "") + '">Erinnerungen</button>' +
       '<button type="button" data-ga-tab="ex" class="' + (st.tab === "ex" ? "is-on" : "") + '">Übungen</button></div>' +
       (st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : paintCoaches()) +
@@ -270,6 +273,39 @@
       .catch(function () { if (host.toast) host.toast("Ging nicht"); });
   }
 
+  /* Nutzer endgültig löschen (go-admin-delete-user.sql), zweimal bestätigen */
+  var ADMIN_IDS = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
+  function deleteAccount(btn) {
+    var id = btn.getAttribute("data-ga-del");
+    var person = (st.accounts || []).filter(function (a) { return String(a.account_id) === String(id); })[0];
+    var name = (person && person.name) || "Diese Person";
+    if (!global.GoDialog) return;
+    GoDialog.confirm(name + " löschen? Termine, Kommentare und Tracking sind danach weg.", { ok: "Löschen" })
+      .then(function (ok) {
+        if (!ok) return null;
+        return GoDialog.prompt("Zum Bestätigen den Namen eingeben: " + name, "", { ok: "Endgültig löschen" });
+      })
+      .then(function (typed) {
+        if (typed == null) return;
+        if (String(typed).trim().toLowerCase() !== String(name).trim().toLowerCase()) {
+          GoDialog.alert("Name stimmt nicht. Nichts gelöscht.");
+          return;
+        }
+        btn.disabled = true;
+        return host.rest("rpc/go_admin_delete_account", { method: "POST", body: { p_account: id } })
+          .then(function () {
+            st.accounts = (st.accounts || []).filter(function (a) { return String(a.account_id) !== String(id); });
+            paint();
+            if (host.toast) host.toast(name + " gelöscht");
+          })
+          .catch(function (err) {
+            btn.disabled = false;
+            var m = String((err && err.message) || "");
+            GoDialog.alert(/go_admin_delete_account|function/.test(m) ? "Löschen braucht go-admin-delete-user.sql in Supabase." : "Löschen ging nicht: " + m.slice(0, 120));
+          });
+      });
+  }
+
   function setCoach(btn) {
     var id = btn.getAttribute("data-ga-coach");
     var on = btn.getAttribute("data-on") !== "1";
@@ -298,8 +334,9 @@
       location.href = "/workout/kurse/?from=admin";
       return;
     }
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-close],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-exdone]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-close],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-exdone],[data-ga-del]") : null;
     if (!t) return;
+    if (t.hasAttribute("data-ga-del")) { deleteAccount(t); return; }
     if (t.hasAttribute("data-ga-exdone")) { exDone(t.getAttribute("data-ga-exdone")); return; }
     if (t.hasAttribute("data-ga-wa")) { markWa(t.getAttribute("data-ga-wa")); return; }
     if (t.hasAttribute("data-ga-close")) return close();
