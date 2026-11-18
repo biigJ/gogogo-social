@@ -5,7 +5,7 @@
  *     mode: "self" | "coach",      self: nur öffentliche Pläne, vorher Ziel-Frage; coach: alle Pläne
  *     userId, userName,            für wen (coach: Coachee)
  *     onDone(result),              nach dem Anwenden
- *     onEditWeek()                 optional: „Diese Woche einzeln bearbeiten“ (alter Bearbeiten-Modus)
+ *   „Individuell“ (nur self): Coach wählen, Nachricht (200 Zeichen), Einverständnis → rpc/go_request_coach
  *   })
  *
  * Anwenden: rpc/go_apply_plan (go-wochenplan-wahl.sql) beendet alte Pläne, entfernt offene Termine ab heute
@@ -64,6 +64,16 @@
     ".gpl__chip.is-drag{opacity:.35}" +
     ".gpl__ghost{position:fixed;z-index:9810;pointer-events:none;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:.95}" +
     ".gpl__grip{flex:none;width:18px;color:rgba(42,33,24,.45)}" +
+    ".gpl__indiv-h{margin:4px 0 10px;text-align:center;font:600 30px/1.15 'Playfair Display',Georgia,serif}" +
+    ".gpl__with{display:flex;align-items:center;justify-content:center;gap:10px;font-size:17px}" +
+    ".gpl__select{min-height:44px;padding:0 16px;border-radius:12px;border:1.5px solid #2A2118;background:#fff;color:#2A2118;font:inherit;font-weight:700;cursor:pointer}" +
+    ".gpl__stars{display:flex;justify-content:center;gap:6px;margin:14px 0 8px}" +
+    ".gpl__star{width:38px;height:38px;color:rgba(42,33,24,.25)}.gpl__star.is-on{color:#2A2118}.gpl__star svg{width:100%;height:100%}" +
+    ".gpl__about{margin:0 auto 14px;max-width:34ch;text-align:center;font-size:15px;line-height:1.45;color:rgba(42,33,24,.8)}" +
+    ".gpl__field{display:grid;gap:4px;margin:0 0 10px}.gpl__field textarea{width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1.5px solid rgba(42,33,24,.25);background:#fff;font:inherit;font-size:16px;resize:none}" +
+    ".gpl__field small{justify-self:end;color:rgba(42,33,24,.55);font-size:12px}" +
+    ".gpl__vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}" +
+    ".gpl__check{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;margin:0 0 8px;font-size:14px}.gpl__check input{width:20px;height:20px;margin:1px 0 0;accent-color:#2A2118}" +
     ".gpl__link{display:block;margin:14px auto 0;border:0;background:transparent;color:#2A2118;text-decoration:underline;font:inherit;font-size:14px;cursor:pointer}" +
     "@media (min-width:900px){.gpl__body{max-width:980px;margin:0 auto;width:100%}.gpl__card{flex-basis:320px}}";
 
@@ -134,7 +144,119 @@
           '<span class="gpl__tick">' + (on ? "✓" : "") + "</span><span><b>" + esc(g.label) + "</b><small>" + esc(g.sub) + "</small></span></button>";
       }).join("") +
       '<button type="button" class="gpl__btn" data-gpp-next>' + (st.goals.length ? "Passende Pläne zeigen" : "Alle Pläne zeigen") + "</button>" +
-      (st.onEditWeek ? '<button type="button" class="gpl__link" data-gpp-editweek>Diese Woche einzeln bearbeiten</button>' : "");
+      (st.mode === "self" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-indiv>Individuell</button>' : "");
+  }
+
+  /* ---------- Individuell: Coach anfragen ---------- */
+  var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.8l2.8 5.7 6.3.9-4.55 4.43 1.07 6.27L12 17.15 6.38 20.1l1.07-6.27L2.9 9.4l6.3-.9z"/></svg>';
+  var JOSCHA = "2d3ab029-0a5f-4388-8da7-52501a87dc8c";
+  var COACH_TEXT = {};
+  COACH_TEXT[JOSCHA] = "Mann mit einer ganzheitlichen Herangehensweise und Entwickler dieser App mit Hingabe und Interesse an Deiner Herausforderung und konkreten Zielen.";
+
+  function loadCoaches() {
+    if (st.coaches) return Promise.resolve(st.coaches);
+    return st.host.rest("go_accounts?is_trainer=eq.true&select=id,name,nickname,about_me&order=name.asc&limit=50")
+      .catch(function () { return []; })
+      .then(function (rows) {
+        st.coaches = (rows || []).filter(function (c) { return String(c.id) !== String(st.userId); });
+        if (!st.coaches.some(function (c) { return String(c.id) === JOSCHA; }) && String(st.userId) !== JOSCHA) {
+          st.coaches.unshift({ id: JOSCHA, name: "Joscha" });
+        }
+        var ids = st.coaches.map(function (c) { return c.id; });
+        return st.host.rest("go_coach_reviews?coach_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=coach_id,stars")
+          .catch(function () { return []; })
+          .then(function (rv) {
+            var sum = {}, n = {};
+            (rv || []).forEach(function (r) { sum[r.coach_id] = (sum[r.coach_id] || 0) + r.stars; n[r.coach_id] = (n[r.coach_id] || 0) + 1; });
+            st.coaches.forEach(function (c) { c.avg = n[c.id] ? sum[c.id] / n[c.id] : 0; c.count = n[c.id] || 0; });
+            return st.coaches;
+          });
+      });
+  }
+
+  function paintIndividual() {
+    st.step = "indiv";
+    st.title.textContent = "";
+    st.body.innerHTML = '<p class="gpl__empty">Lade …</p>';
+    loadCoaches().then(function (list) {
+      if (st.step !== "indiv") return;
+      if (!st.coach) st.coach = list.filter(function (c) { return String(c.id) === JOSCHA; })[0] || list[0] || null;
+      var c = st.coach;
+      var first = c ? String(c.nickname || c.name || "").split(" ")[0] : "";
+      var avg = c ? Math.round(c.avg || 0) : 0;
+      var text = c ? (COACH_TEXT[String(c.id)] || c.about_me || "") : "";
+      st.body.innerHTML =
+        '<h2 class="gpl__indiv-h">Direkt rein</h2>' +
+        '<div class="gpl__with"><span>mit</span><button type="button" class="gpl__select" data-gpp-coach>' + esc(first || "Coach wählen") + ' <span aria-hidden="true">▾</span></button></div>' +
+        '<div class="gpl__stars" aria-label="' + (c && c.count ? (c.avg.toFixed(1) + " von 5 Sternen") : "Noch keine Bewertung") + '">' +
+        [1, 2, 3, 4, 5].map(function (n) { return '<span class="gpl__star' + (n <= avg ? " is-on" : "") + '">' + STAR + "</span>"; }).join("") + "</div>" +
+        (text ? '<p class="gpl__about">' + esc(text) + "</p>" : "") +
+        '<label class="gpl__field"><span class="gpl__vh">Nachricht</span><textarea id="gpl-msg" maxlength="200" rows="4" placeholder="Schreib Deine Nachricht"></textarea><small id="gpl-count">0 / 200</small></label>' +
+        '<label class="gpl__check"><input type="checkbox" id="gpl-wa" checked /> <span>' + esc(first || "Der Coach") + ' darf sich per WhatsApp bei mir melden.</span></label>' +
+        '<label class="gpl__check"><input type="checkbox" id="gpl-plan" checked /> <span>' + esc(first || "Der Coach") + ' erstellt mir einen Plan und schreibt mir unter Aktuell.</span></label>' +
+        '<button type="button" class="gpl__btn" data-gpp-send' + (c ? "" : " disabled") + ">Senden</button>";
+      var ta = document.getElementById("gpl-msg");
+      ta.addEventListener("input", function () { document.getElementById("gpl-count").textContent = ta.value.length + " / 200"; });
+    });
+  }
+
+  function chooseCoach() {
+    var list = st.coaches || [];
+    if (!global.GoDialog) return;
+    GoDialog.choose("Coach wählen", list.map(function (c) {
+      return { label: String(c.nickname || c.name || "Coach").split(" ")[0] + (c.count ? " · " + c.avg.toFixed(1) + " ★" : ""), value: String(c.id) };
+    })).then(function (id) {
+      if (!id) return;
+      st.coach = list.filter(function (c) { return String(c.id) === id; })[0] || st.coach;
+      paintIndividual();
+    });
+  }
+
+  function sendIndividual(btn) {
+    var c = st.coach;
+    if (!c) return;
+    var msg = (document.getElementById("gpl-msg") || {}).value || "";
+    var wa = !!(document.getElementById("gpl-wa") || {}).checked;
+    var plan = !!(document.getElementById("gpl-plan") || {}).checked;
+    if (!wa && !plan) {
+      var note = btn.parentNode.querySelector(".gpl__err") || document.createElement("p");
+      note.className = "gpl__empty gpl__err";
+      note.textContent = "Wähl mindestens eins: WhatsApp oder Plan.";
+      btn.insertAdjacentElement("afterend", note);
+      return;
+    }
+    btn.disabled = true;
+    st.host.rest("rpc/go_request_coach", {
+      method: "POST",
+      body: { p_coach: c.id, p_message: msg.slice(0, 200), p_whatsapp: wa, p_plan: plan }
+    }).then(function () {
+      /* Mail an den Coach (web3forms geht an die gogogo-Adresse) */
+      st.host.rest("go_accounts?id=eq." + encodeURIComponent(st.userId) + "&select=name,phone").catch(function () { return []; }).then(function (rows) {
+      var meRow = (rows && rows[0]) || {};
+      try {
+        var fd = new FormData();
+        fd.append("access_key", "3ffad713-3ad6-491b-bf99-185a87b0d706");
+        fd.append("subject", "gogogo: Neuer Coachee für " + (c.name || "Coach"));
+        fd.append("from_name", "gogogo App");
+        fd.append("message", "Coach: " + (c.name || "") + "\nNeuer Coachee: " + (meRow.name || "") + (wa && meRow.phone ? " (" + meRow.phone + ")" : "") +
+          "\nWhatsApp ok: " + (wa ? "ja" : "nein") + "\nPlan + Nachricht unter Aktuell: " + (plan ? "ja" : "nein") +
+          "\n\nNachricht:\n" + msg + "\n\nIn der App: Team → Meine Coachees.");
+        fetch("https://api.web3forms.com/submit", { method: "POST", body: fd }).catch(function () {});
+      } catch (eM) {}
+      });
+      var first = String(c.nickname || c.name || "Dein Coach").split(" ")[0];
+      var done = st.onDone;
+      close();
+      if (global.GoDialog) GoDialog.alert(first + " meldet sich bei Dir.");
+      if (done) done({ coach: c.id });
+    }).catch(function (err) {
+      btn.disabled = false;
+      var m = String((err && err.message) || "");
+      var note = btn.parentNode.querySelector(".gpl__err") || document.createElement("p");
+      note.className = "gpl__empty gpl__err";
+      note.textContent = /go_request_coach|function/.test(m) ? "go-coach-request.sql fehlt noch in Supabase." : "Senden hat nicht geklappt.";
+      btn.insertAdjacentElement("afterend", note);
+    });
   }
 
   function paintList() {
@@ -308,12 +430,10 @@
     }
     if (t.closest("[data-gpp-next]")) return paintList();
     if (t.closest("[data-gpp-goals]")) return paintGoals();
-    if (t.closest("[data-gpp-editweek]")) {
-      var fn = st.onEditWeek;
-      close();
-      if (fn) fn();
-      return;
-    }
+    if (t.closest("[data-gpp-indiv]")) return paintIndividual();
+    if (t.closest("[data-gpp-coach]")) return chooseCoach();
+    var send = t.closest("[data-gpp-send]");
+    if (send) return sendIndividual(send);
     var play = t.closest("[data-gpp-play]");
     if (play) {
       var c = (st.plans || []).filter(function (p) { return String(p.id) === play.getAttribute("data-gpp-play"); })[0];
@@ -344,6 +464,7 @@
   /* Zurück: Schritt zurück, auf der ersten Seite schließen (dann ist man wieder in Woche bzw. Selbst Coaching) */
   function back() {
     if (st.step === "arrange") return paintList();
+    if (st.step === "indiv") return paintGoals();
     if (st.step === "list" && st.mode === "self") return paintGoals();
     close();
   }

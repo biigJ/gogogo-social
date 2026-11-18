@@ -213,8 +213,30 @@
     );
   }
 
+  /* Anfrage aus „Individuell“ (go_coach_requests): über der Analyse */
+  function loadRequest() {
+    st.request = null;
+    return host.rest("go_coach_requests?user_id=eq." + encodeURIComponent(st.id) + "&coach_id=eq." + encodeURIComponent(me()) +
+      "&select=message,consent_whatsapp,consent_plan,created_at&order=created_at.desc&limit=1")
+      .then(function (rows) { st.request = (rows && rows[0]) || null; })
+      .catch(function () { st.request = null; });
+  }
+  function requestHtml() {
+    var r = st.request;
+    if (!r) return "";
+    var d = new Date(r.created_at);
+    var when = isNaN(d.getTime()) ? "" : d.toLocaleDateString("de-DE", { day: "numeric", month: "numeric", year: "numeric" });
+    var ok = [];
+    if (r.consent_whatsapp) ok.push("WhatsApp");
+    if (r.consent_plan) ok.push("Plan + Nachricht unter Aktuell");
+    return '<section class="cp-sec"><h3>Anfrage</h3>' +
+      '<p class="cp-request">' + esc(r.message || "Ohne Nachricht") + "</p>" +
+      '<p class="cp-hint">' + esc(when) + (ok.length ? " · Einverstanden: " + esc(ok.join(", ")) : "") + "</p></section>";
+  }
+
   function noteHtml() {
     return (
+      requestHtml() +
       '<section class="cp-sec"><h3>Analyse</h3>' +
       '<textarea class="cp-note" id="cp-note" rows="5" maxlength="4000" placeholder="Ausgangslage, Ziel, Schwerpunkte, was die nächsten Wochen wichtig ist">' +
       esc(st.note || "") +
@@ -611,7 +633,7 @@
         paint();
       }
     });
-    Promise.all([loadPerson(), loadNote(), loadCourses(), loadWeek(), loadPlans(), loadEnrollment(), loadJoined()]).then(paint);
+    Promise.all([loadPerson(), loadNote(), loadCourses(), loadWeek(), loadPlans(), loadEnrollment(), loadJoined(), loadRequest()]).then(paint);
   }
 
   global.GoCoachPortal = { open: open, close: close };
