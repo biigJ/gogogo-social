@@ -2434,6 +2434,7 @@
     }));
   }
 
+  let onSavedCb = null;
   async function saveHistory(){
     if(!currentUser){
       return { ok:false, message:'Nicht angemeldet – Workout kann nicht gespeichert werden.' };
@@ -2453,6 +2454,10 @@
       return { ok:false, message: error.message };
     }
     lastSavedSessionId = data.id;
+    if(onSavedCb){
+      const cb = onSavedCb; onSavedCb = null;
+      try{ cb({ id: data.id, rounds: data.rounds, workSec: data.work_sec, restSec: data.rest_sec, totalSec: data.total_sec }); }catch(e){ console.error(e); }
+    }
     cachedHistory.unshift({
       id: data.id,
       date: data.date,
@@ -3401,6 +3406,8 @@
       }catch(err){ return { error: err }; }
     },
     async openSetup(preset){
+      /* gogogo: nach dem Speichern Bescheid geben (Event erledigt bzw. neu anlegen) */
+      onSavedCb = preset && typeof preset.onSaved === 'function' ? preset.onSaved : null;
       /* Voreinstellung aus gogogo-Event (Modus, Rundenzeit, Pause) */
       if(preset && typeof preset === 'object'){
         if(preset.mode === 'team' || preset.mode === 'standard'){

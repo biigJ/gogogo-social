@@ -2,6 +2,9 @@
 (function (global) {
   var host = null;
   var state = {
+    waved: {},
+    altReplace: null,
+    zirkelFor: null,
     events: [],
     invites: {},
     ffcEvents: [],
@@ -1298,11 +1301,11 @@
         '<button type="button" class="acc-card__plus-label" data-shell-plus="1" aria-label="Plus">Plus</button>';
     } else if (canInvite !== false && canInviteOnDay(inviteIso)) {
       add =
-        '<button type="button" class="acc-face acc-face--add" data-invite-post="' +
+        '<button type="button" class="acc-face acc-face--add acc-face--outbox" data-invite-post="' +
         esc(postId || "") +
         '" data-invite-iso="' +
         esc(inviteIso || "") +
-        '" aria-label="Einladen"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>';
+        '" aria-label="Einladen">' + OUTBOX_SVG + "</button>";
     }
     void mePerson;
     return (
@@ -1397,13 +1400,19 @@
     '<circle cx="14.5" cy="4.5" r="1.8"/><path d="M9 21l3-6 3 2.5V21"/><path d="M6.5 12.5l3-4 4 1 2.5 3 3 .5"/><path d="M9.5 8.5L12 15"/></svg>' +
     "</button>";
 
-  /* Sportler-Icon nur einmal: am ersten eigenen Event ab heute abwärts */
+  var CIRCLE_SVG =
+    '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.5"/></svg>';
+  var WAVE_SVG =
+    '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M8.5 12.5V6.8a1.3 1.3 0 0 1 2.6 0v4.7"/><path d="M11.1 11.5V5.3a1.3 1.3 0 0 1 2.6 0v6.2"/><path d="M13.7 11.5V6.3a1.3 1.3 0 0 1 2.6 0v7.4"/>' +
+    '<path d="M16.3 10.2a1.3 1.3 0 0 1 2.6 0v4.3a6.2 6.2 0 0 1-6.2 6.2h-.6a6 6 0 0 1-4.5-2.1L4.6 15a1.4 1.4 0 0 1 2-1.9l1.9 1.6"/>' +
+    '<path d="M4 7.2c.4-1.3 1.2-2.4 2.3-3.1M19.6 4.3c1 .7 1.7 1.7 2 2.9"/></svg>';
+  /* Postausgang statt Plus: Einladen */
+  var OUTBOX_SVG =
+    '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M4 13.5h4.2l1.3 2.5h5l1.3-2.5H20"/><path d="M5.2 13.5 7 7.5h2.5M18.8 13.5 17 7.5h-2.5"/><path d="M4 13.5V19h16v-5.5"/><path d="M12 11V3.5M9.3 6.2 12 3.5l2.7 2.7"/></svg>';
   function placeSpontan(html) {
-    var from = html.indexOf('data-acc-zone="today"');
-    if (from < 0) from = 0;
-    var at = html.indexOf("<!--spontan-->", from);
-    if (at < 0) return html;
-    return html.slice(0, at) + SPONTAN_BTN + html.slice(at + "<!--spontan-->".length);
+    return html;
   }
 
   function eventToolRowHtml(opts) {
@@ -1412,14 +1421,20 @@
     var postId = opts.postId || eventId;
     var done = !!opts.canDone;
     var isDone = !!opts.isDone;
+    /* Kreis: offen = Menü (Start, Alternative, Schieben), erledigt = Haken */
     var check = opts.noCheck ? "" :
       '<button type="button" class="acc-tool acc-tool--check' +
       (isDone ? " is-done" : "") +
       '"' +
-      (done ? ' data-done="' + esc(eventId) + '"' : isDone ? " disabled" : "") +
-      ' aria-label="Erledigt">' +
-      checkSvg(isDone) +
+      (isDone ? " disabled" : opts.menu ? ' data-ev-menu="' + esc(eventId) + '"' : done ? ' data-done="' + esc(eventId) + '"' : " disabled") +
+      ' aria-label="' + (isDone ? "Erledigt" : "Start, Alternative oder Schieben") + '">' +
+      (isDone ? checkSvg(true) : CIRCLE_SVG) +
       "</button>";
+    /* Fremde Events: Winken = Anfrage zum Mitmachen */
+    var wave = opts.wave
+      ? '<button type="button" class="acc-tool acc-tool--wave' + (opts.waved ? " is-on" : "") + '" data-wave-ev="' + esc(eventId) +
+        '" aria-label="' + (opts.waved ? "Anfrage gesendet" : "Fragen, ob ich mitmachen kann") + '">' + WAVE_SVG + "</button>"
+      : "";
     var bubble =
       '<button type="button" class="acc-tool acc-tool--bubble" data-open-comments="' +
       esc(postId) +
@@ -1446,8 +1461,8 @@
       '<div class="acc-card__tools">' +
       '<div class="acc-card__tools-left">' +
       check +
-      (check && !opts.noCheck ? "<!--spontan-->" : "") +
       bubble +
+      wave +
       remove +
       "<!--faces-->" +
       "</div>" +
@@ -1705,6 +1720,7 @@
           postId: String(ev.id),
           canDone: upcoming && day === todayIso(),
           isDone: ev.status === "erledigt",
+          menu: ev.status !== "erledigt" && day >= todayIso(),
           badge: eventBadgeKind(ev),
           removeId: "",
           removeMode: "delete"
@@ -1714,7 +1730,9 @@
           eventId: ev.id,
           postId: String(ev.id),
           noCheck: true,
-          badge: invite ? "" : eventBadgeKind(ev)
+          /* Freunde-Events: links Sprechblase, daneben Winken (Anfrage). Kein Herkunfts-Icon. */
+          wave: !invite && !iAmGoing(ev.id) && day >= todayIso(),
+          waved: !!state.waved[String(ev.id)]
         });
     return renderCardShell({
       attrs:
@@ -3037,7 +3055,7 @@
       note: payload.note || null,
       visibility: normalizeVisibility(payload.visibility || state.pendingVis || "team"),
       is_unplanned: true,
-      status: "geplant",
+      status: payload.status || "geplant",
       title: payload.title || payload.category
     };
     var err = host.validateOwnEvent ? host.validateOwnEvent(body) : null;
@@ -3051,6 +3069,14 @@
       body: body
     }).then(function (rows) {
       var ev = Array.isArray(rows) ? rows[0] : rows;
+      /* „Statt dem Plan“: geplantes Event erst jetzt als ausgefallen markieren (die Alternative zählt als erledigt) */
+      if (state.altReplace && ev && ev.id) {
+        var repl = state.altReplace;
+        state.altReplace = null;
+        rest("events?id=eq." + encodeURIComponent(repl) + "&status=eq.geplant", {
+          method: "PATCH", prefer: "return=minimal", body: { status: "ausgefallen" }
+        }).catch(function () {});
+      }
       var inviteIds = payload.inviteIds || [];
       var inviteP =
         ev && ev.id && inviteIds.length && host.inviteToEvent
@@ -3171,15 +3197,25 @@
             if (host.toast) host.toast("Kurs Zirkeltraining fehlt (go-trainings-to-courses.sql)");
             return;
           }
-          return finishCreate({
-            category: "zirkel",
-            course_id: cid,
-            title: "Zirkeltraining",
-            note: GoZirkelSetup.toNote(z),
-            visibility: vis
-          }).then(function () {
-            if (host.openZirkel) host.openZirkel(z);
-          });
+          /* Kein Event vorab: FFC-Training läuft, beim Speichern entsteht das erledigte Event */
+          modal.hidden = true;
+          if (host.closeGoPick) host.closeGoPick();
+          var forEv = state.zirkelFor || null;
+          state.zirkelFor = null;
+          if (host.openZirkel) host.openZirkel(Object.assign({}, z, {
+            onSaved: function () {
+              if (forEv && forEv.id) {
+                return rest("events?id=eq." + encodeURIComponent(forEv.id), {
+                  method: "PATCH", prefer: "return=minimal", body: { status: "erledigt" }
+                }).then(refresh).catch(function () {});
+              }
+              return createUnplannedEvent({
+                category: "zirkel", course_id: cid, title: "Zirkeltraining",
+                note: GoZirkelSetup.toNote(z), visibility: vis, status: "erledigt"
+              }).then(refresh).catch(function () {});
+            }
+          }));
+          return null;
         });
       });
       pick.appendChild(go);
@@ -3344,6 +3380,99 @@
     );
   }
 
+  function evById(id) {
+    return (state.events || []).filter(function (x) { return String(x.id) === String(id); })[0] || null;
+  }
+  function evDayIso(ev) {
+    return new Date(ev.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+  }
+
+  /* Kreis unter dem eigenen Event: Start · Alternative · Schieben */
+  function openEventMenu(id) {
+    var ev = evById(id);
+    if (!ev || !global.GoDialog) return;
+    var today = evDayIso(ev) === todayIso();
+    var choices = [];
+    if (today) choices.push({ label: ev.category === "zirkel" ? "Start: Zirkeltraining" : "Start", value: "start" });
+    choices.push({ label: "Alternative", value: "alt" });
+    choices.push({ label: "Schieben auf morgen", value: "move" });
+    GoDialog.choose(String(ev.title || "Training"), choices).then(function (v) {
+      if (v === "start") return startEvent(ev);
+      if (v === "alt") return alternativeFor(ev);
+      if (v === "move") return moveToTomorrow(ev);
+    });
+  }
+
+  function startEvent(ev) {
+    if (ev.category === "zirkel") {
+      var z = global.GoZirkelSetup && GoZirkelSetup.parse ? GoZirkelSetup.parse(ev.note) : {};
+      if (host.openZirkel) host.openZirkel(Object.assign({}, z || {}, {
+        eventId: ev.id,
+        onSaved: function () {
+          return rest("events?id=eq." + encodeURIComponent(ev.id), {
+            method: "PATCH", prefer: "return=minimal", body: { status: "erledigt" }
+          }).then(function () {
+            if (global.GoTama) GoTama.invalidate();
+            return refresh();
+          }).catch(function () {});
+        }
+      }));
+      return;
+    }
+    if ((ev.category === "kraft" || ev.category === "ausdauer") && ev.course_id && host.openEventWorkout) {
+      host.openEventWorkout(ev);
+      return;
+    }
+    openDoneModal(ev.id);
+  }
+
+  function alternativeFor(ev) {
+    var today = evDayIso(ev) === todayIso();
+    var ask = today
+      ? GoDialog.choose("Alternativ oder zusätzlich zum heutigen Plan?", [
+          { label: "Statt " + (ev.title || "Plan"), value: "instead" },
+          { label: "Zusätzlich", value: "extra" }
+        ])
+      : Promise.resolve("extra");
+    ask.then(function (v) {
+      if (!v) return;
+      state.altReplace = v === "instead" ? String(ev.id) : null;
+      if (host.openGoPick) host.openGoPick();
+    });
+  }
+
+  function moveToTomorrow(ev) {
+    var d = new Date(ev.starts_at);
+    d.setDate(d.getDate() + 1);
+    return rest("events?id=eq." + encodeURIComponent(ev.id), {
+      method: "PATCH", prefer: "return=minimal", body: { starts_at: d.toISOString() }
+    }).then(function () {
+      try { if (global.GoTama) GoTama.invalidate(); } catch (e1) {}
+      try { if (global.WocheReels && WocheReels.refresh) WocheReels.refresh(); } catch (e2) {}
+      Promise.resolve().then(refresh).catch(function () {});
+      return GoDialog.alert("Verschoben auf morgen.");
+    }, function () {
+      if (host.toast) host.toast("Verschieben ging nicht.");
+    });
+  }
+
+  /* Winken: Anfrage an den Ersteller, ob ich mitmachen kann (go-event-requests.sql) */
+  function sendJoinRequest(id, btn) {
+    var ev = evById(id);
+    if (!ev || state.waved[String(id)]) return;
+    rest("go_event_requests", {
+      method: "POST",
+      prefer: "resolution=ignore-duplicates,return=minimal",
+      body: { event_id: ev.id, from_id: me(), to_id: ev.user_id, status: "pending" }
+    }).then(function () {
+      state.waved[String(id)] = true;
+      if (btn) { btn.classList.add("is-on"); btn.setAttribute("aria-label", "Anfrage gesendet"); }
+      if (host.toast) host.toast("Anfrage gesendet. Du bekommst Bescheid.");
+    }).catch(function (err) {
+      if (host.toast) host.toast(/go_event_requests|relation/.test(String((err && err.message) || "")) ? "go-event-requests.sql fehlt noch in Supabase" : "Anfrage ging nicht.");
+    });
+  }
+
   function onRootClick(e) {
     var t = e.target;
     var moreDesc = t.closest("[data-more-desc]");
@@ -3425,6 +3554,16 @@
     var rm = t.closest("[data-remove-event]");
     if (rm) {
       removeEvent(rm.getAttribute("data-remove-event"), rm.getAttribute("data-remove-mode"));
+      return;
+    }
+    var evMenu = t.closest("[data-ev-menu]");
+    if (evMenu) {
+      openEventMenu(evMenu.getAttribute("data-ev-menu"));
+      return;
+    }
+    var wave = t.closest("[data-wave-ev]");
+    if (wave) {
+      sendJoinRequest(wave.getAttribute("data-wave-ev"), wave);
       return;
     }
     var done = t.closest("[data-done]");
@@ -3807,6 +3946,17 @@
     return true;
   }
 
+  /* Heutiges Event einer Person als Karte (für das Popup beim Tipp auf den pulsierenden Kreis) */
+  function todayCardFor(personId) {
+    var t = todayIso();
+    var ev = (state.events || []).filter(function (e) {
+      return String(e.user_id) === String(personId) && e.status !== "ausgefallen" &&
+        evDayIso(e) === t && eventVisibleToMe(e);
+    }).sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); })[0];
+    if (!ev) return null;
+    try { return { id: ev.id, html: renderEventCard(ev) }; } catch (e) { return null; }
+  }
+
   global.HeuteAccountability = {
     install: install,
     refresh: refresh,
@@ -3820,6 +3970,7 @@
     afterKindChosen: afterKindChosen,
     createUnplanned: createUnplannedEvent,
     todayActivity: todayActivity,
-    focusEvent: focusEvent
+    focusEvent: focusEvent,
+    todayCardFor: todayCardFor
   };
 })(window);
