@@ -1005,6 +1005,8 @@
       if (inv.status === "accepted") return true;
       return !!flags.showOthersUpcoming;
     }
+    /* Freund verbunden, aber nicht im Feed (Team → Meine Freunde): seine Events nur, wenn ich dabei bin */
+    if (!mine && !inv && host.feedMuted && host.feedMuted[String(ev.user_id)] && !iAmGoing(ev.id)) return false;
     if (ev.status === "geplant") {
       /* Eigene Events von heute bleiben bis Mitternacht sichtbar, damit man sie nachträglich abschließen kann */
       if (mine && t <= week && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString())) return true;
