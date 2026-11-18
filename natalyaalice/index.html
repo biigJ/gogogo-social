@@ -5424,6 +5424,8 @@
       border-radius: 12px;
       font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
     }
+    .team-qr { margin-top: 18px; text-align: center; }
+    .team-qr img { display: block; width: 200px; height: 200px; margin: 0 auto 8px; background: #fff; }
     #stamp-book-modal .sand-card,
     #initial-call-modal .sand-card,
     #coach-playbook-modal .sand-card,
@@ -6869,6 +6871,10 @@
       <input class="team-id" id="team-id" maxlength="20" placeholder="ID oder Nickname" aria-label="ID oder Nickname" autocomplete="off" autocapitalize="off" spellcheck="false" />
       <button type="button" id="team-search">Suchen</button>
       <p class="team-msg" id="team-msg"></p>
+      <div class="team-qr" id="team-qr" hidden>
+        <img id="team-qr-img" alt="" width="200" height="200" />
+        <p class="team-msg">Oder: Dein Freund scannt diesen Code mit der Handykamera. Dann seid Ihr verbunden.</p>
+      </div>
     </div>
   </div>
   <div class="sand-modal" id="go-modal" hidden>
@@ -7015,7 +7021,7 @@
       <p class="team-msg">Gratis und sofort aktiv.</p>
       <p class="team-msg" id="stamp-book-msg"></p>
       <button type="button" id="stamp-book-pay">Aktivieren</button>
-      <button type="button" class="sand-quiet" id="stamp-book-show">Nur Anzeige öffnen</button>
+      <button type="button" class="sand-quiet" id="stamp-book-show">Anzeige öffnen</button>
       <button type="button" class="sand-quiet" id="stamp-book-cancel">Abbrechen</button>
     </div>
   </div>
@@ -7806,7 +7812,7 @@
   <script src="/natalyaalice/heute-v3.js?v=feed-51"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-41"></script>
-  <script src="/natalyaalice/support.js?v=support-18"></script>
+  <script src="/natalyaalice/support.js?v=support-19"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -13843,6 +13849,37 @@
         });
       }
 
+      /* QR aus Team → Freund: ?freund=<ID> verbindet (vor dem Login gemerkt) */
+      (function rememberFriendScan() {
+        var fid = "";
+        try { fid = new URLSearchParams(location.search).get("freund") || ""; } catch (eF) {}
+        if (fid) { try { localStorage.setItem("gogogo_pending_friend", fid); } catch (eS) {} }
+      })();
+      function handleFriendScan() {
+        var fid = "";
+        try { fid = new URLSearchParams(location.search).get("freund") || localStorage.getItem("gogogo_pending_friend") || ""; } catch (eU) {}
+        if (!fid || !sessionAccount || !sessionAccount.id) return;
+        try { localStorage.removeItem("gogogo_pending_friend"); } catch (eR) {}
+        try {
+          var sp = new URLSearchParams(location.search);
+          if (sp.has("freund")) { sp.delete("freund"); history.replaceState(null, "", location.pathname + (sp.toString() ? "?" + sp : "") + location.hash); }
+        } catch (eH) {}
+        if (String(fid) === String(sessionAccount.id)) return;
+        rest("go_accounts?id=eq." + encodeURIComponent(fid) + "&select=id,name,nickname&limit=1")
+          .then(function (rows) {
+            var f = rows && rows[0];
+            if (!f) { gogogoToast("Freund nicht gefunden."); return; }
+            return ensureFriendLink(f.id).then(function () {
+              gogogoToast("Ihr seid jetzt verbunden: " + (f.nickname || f.name || "Freund"));
+              if (f.nickname && window.FFC && FFC.user() && FFC.friendRequest) FFC.friendRequest(f.nickname).then(onFfcFriendsChanged).catch(function () {});
+              loadTeam();
+            });
+          })
+          .catch(function (err) {
+            gogogoToast(/friend_limit/.test(String((err && err.message) || "")) ? "Maximal 12 Freunde. Coachees zählen nicht mit." : "Verbinden nicht möglich.");
+          });
+      }
+
       /* QR-Scan einer fremden Stempelkarte: ?stamp=<Gastgeber-ID> → Stempel für mich */
       function handleStampScan() {
         var host = "";
@@ -13859,7 +13896,7 @@
           .then(function (res) {
             var r = res || {};
             var msg = r.ok
-              ? "Stempel erhalten · " + r.stamps + " von 12"
+              ? "Stempel erhalten · " + r.stamps + " von 12" + (r.host_stamped ? ". Dein Gastgeber hat auch einen." : "")
               : r.reason === "already" ? "Für dieses Training hast Du schon einen Stempel."
               : r.reason === "no_event" ? "Kein Stempel: Du bist heute bei keinem Event dieser Person dabei."
               : r.reason === "no_card" ? "Kein Stempel: Buche zuerst Deine Stempelkarte unter Plus."
@@ -14012,6 +14049,9 @@
         var modal = document.getElementById("stamp-book-modal");
         var msg = document.getElementById("stamp-book-msg");
         if (msg) msg.textContent = "";
+        /* Anzeige erst nach Buchung */
+        var showBtn = document.getElementById("stamp-book-show");
+        if (showBtn) showBtn.hidden = !(window.GoSupport && GoSupport.activeOrderFor && GoSupport.activeOrderFor("stempelkarte"));
         if (modal) modal.hidden = false;
       }
 
@@ -15354,35 +15394,6 @@
         editBtn.addEventListener("click", function () {
           openProfile(mePerson);
         });
-        meSlide.appendChild(editBtn);
-        var stampOrder = window.GoSupport && GoSupport.activeOrderFor
-          ? GoSupport.activeOrderFor("stempelkarte")
-          : null;
-        var stampBtn = document.createElement("button");
-        stampBtn.type = "button";
-        stampBtn.className = "team-slide__cta is-solid";
-        stampBtn.textContent = "Stempelkarte";
-        stampBtn.setAttribute("aria-label", "Stempelkarte öffnen");
-        /* Erst nach Buchung unter Plus nutzbar, vorher ausgegraut */
-        var stampOwned = !!stampOrder || !!(window.GoSupport && GoSupport.offerOwned && GoSupport.offerOwned("stempelkarte"));
-        if (!stampOwned) {
-          stampBtn.classList.add("is-locked");
-          stampBtn.setAttribute("aria-disabled", "true");
-        }
-        stampBtn.addEventListener("click", function (ev) {
-          ev.preventDefault();
-          ev.stopPropagation();
-          if (!stampOwned) {
-            gogogoToast("Die Stempelkarte buchst Du gratis unter Plus.");
-            return;
-          }
-          try {
-            openStampCardModal(stampOrder || null);
-          } catch (eStamp) {
-            try { GoDialog.alert("Stempelkarte konnte nicht geöffnet werden."); } catch (eA) {}
-          }
-        });
-        meSlide.appendChild(stampBtn);
         var feedbackBtn = document.createElement("button");
         feedbackBtn.type = "button";
         feedbackBtn.className = "team-slide__cta is-solid";
@@ -15390,7 +15401,6 @@
         feedbackBtn.addEventListener("click", function () {
           openFeedbackForm();
         });
-        meSlide.appendChild(feedbackBtn);
         var settingsBtn = document.createElement("button");
         settingsBtn.type = "button";
         settingsBtn.className = "team-slide__cta is-solid";
@@ -15398,7 +15408,7 @@
         settingsBtn.addEventListener("click", function () {
           showPlan("settings");
         });
-        meSlide.appendChild(settingsBtn);
+        /* Reihenfolge: Admin, Bearbeiten, Einstellungen, Feedback. Stempelkarte nur unter Plus */
         /* Admin (Joscha / Ben): Nachrichten zu neuen Nutzern + Buchungen, Coaches freischalten */
         var adminIds = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
         if (window.GoAdmin && sessionAccount && (sessionAccount.is_admin || adminIds.indexOf(String(sessionAccount.id)) !== -1)) {
@@ -15423,6 +15433,9 @@
           meSlide.appendChild(adminBtn);
           paintAdminBadge();
         }
+        meSlide.appendChild(editBtn);
+        meSlide.appendChild(settingsBtn);
+        meSlide.appendChild(feedbackBtn);
         box.appendChild(meSlide);
       }
 
@@ -16382,7 +16395,7 @@
                   key: "stempelkarte",
                   type: "stempelkarte",
                   title: "Stempelkarte",
-                  description: "12er-Stempelkarte, gratis. Trainierst Du mit einem Freund bei seinem Event, scannst Du seine Karte und bekommst einen Stempel. Volle Karte: T-Shirt oder Selfiestick."
+                  description: "12er-Stempelkarte, gratis. Trainierst Du mit einem Freund bei seinem Event, scannst Du seine Karte. Ihr bekommt beide einen Stempel: Du als Gast, er als Gastgeber. Volle Karte: T-Shirt oder Selfiestick."
                 },
                 {
                   key: "web_call",
@@ -16519,6 +16532,14 @@
             var mini = '<div class="stamp-mini"><div class="stamp-mini__top"><span class="stamp-mini__brand">gogogo</span><span class="stamp-mini__count">' + stampN + ' / 12</span></div><div class="stamp-mini__grid">';
             for (var si = 0; si < 12; si++) mini += '<span class="stamp-mini__slot' + (si < stampN ? " is-filled" : "") + '"></span>';
             art.innerHTML = mini + '</div><div class="stamp-mini__foot">Stempelkarte</div></div>';
+            /* Tipp auf die Karte: gebucht → Karte zeigen, sonst Buchen */
+            art.removeAttribute("aria-hidden");
+            art.style.cursor = "pointer";
+            art.addEventListener("click", function () {
+              var ownedNow = !!(window.GoSupport && ((GoSupport.activeOrderFor && GoSupport.activeOrderFor("stempelkarte")) || (GoSupport.offerOwned && GoSupport.offerOwned("stempelkarte"))));
+              if (ownedNow) openStampCardModal(GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null);
+              else openStampBookModal();
+            });
           } else {
             var img = document.createElement("img");
             img.src = IMG[offer.type] || IMG.routine;
@@ -16540,7 +16561,13 @@
           }
           if (owned) cta.textContent = isCoachSelf ? "Du bist Coach" : "Gebucht";
           else cta.textContent = "Buchen";
-          if (owned) {
+          if (owned && offer.key === "stempelkarte") {
+            /* Stempelkarte: nach Buchung öffnet der CTA die Karte */
+            cta.textContent = "Karte zeigen";
+            cta.addEventListener("click", function () {
+              openStampCardModal(window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null);
+            });
+          } else if (owned) {
             cta.disabled = true;
             cta.setAttribute("aria-disabled", "true");
           } else {
@@ -17027,6 +17054,18 @@
           : "Freund: ID oder Nickname eingeben";
         document.getElementById("team-id").value = "";
         document.getElementById("team-msg").textContent = "";
+        /* Freund: QR mit Link ?freund=<meine ID>, Scan mit der Kamera verbindet */
+        var qrBox = document.getElementById("team-qr");
+        var qrImg = document.getElementById("team-qr-img");
+        if (qrBox && qrImg) {
+          var showQr = teamSearchMode === "friend" && sessionAccount && sessionAccount.id;
+          qrBox.hidden = !showQr;
+          if (showQr) {
+            var qrUrl = location.origin + "/workout/?freund=" + encodeURIComponent(String(sessionAccount.id));
+            qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=8&data=" + encodeURIComponent(qrUrl);
+            qrImg.alt = "QR-Code für " + (sessionAccount.nickname || sessionAccount.name || "mich");
+          }
+        }
         document.getElementById("team-modal").hidden = false;
       }
 
@@ -17164,7 +17203,9 @@
           method: "POST",
           prefer: "return=minimal",
           body: { account_id: sessionAccount.id, friend_id: friendId }
-        }).catch(function () {}).then(function () {
+        }).catch(function (err) {
+          if (/friend_limit/.test(String((err && err.message) || err || ""))) throw new Error("friend_limit");
+        }).then(function () {
           return rest("go_friends", {
             method: "POST",
             prefer: "return=minimal",
@@ -17213,7 +17254,7 @@
             accepted.forEach(function (f) {
               var hit = byNick[String(f.nickname).toLowerCase()];
               if (hit && String(hit.id) !== String(sessionAccount.id)) {
-                jobs.push(ensureFriendLink(hit.id));
+                jobs.push(ensureFriendLink(hit.id).catch(function () {}));
                 if (!seen[String(hit.id)]) {
                   hit.isTrainerPerson = !!hit.is_trainer || String(hit.id) === String(sessionAccount.trainer_id || "");
                   teamPeople.push(hit);
@@ -17423,7 +17464,9 @@
               done();
               return;
             }
-            ensureFriendLink(found.id).then(done);
+            ensureFriendLink(found.id).then(done).catch(function () {
+              msg.textContent = "Maximal 12 Freunde. Coachees zählen nicht mit.";
+            });
           })
           .catch(function () {
             if (!serial && window.FFC && FFC.user() && FFC.friendRequest) {
@@ -20632,6 +20675,7 @@
           };
           HeuteAccountability.install(accHost);
           handleStampScan();
+          handleFriendScan();
           HeuteAccountability.refresh();
         }
       }
