@@ -1,4 +1,7 @@
-/* exercise-links.js — Plus → Übungen: Liste aller Übungen, eigene Video-Links speichern, Sterne vergeben
+/* exercise-links.js — Plus → Videos: Link einfügen, Übung aus der Liste wählen, Sterne vergeben
+ *
+ * Übungen kommen aus go_exercise_catalog (eine Liste, Labels, go-uebungen-katalog.sql).
+ * Nutzer schreiben keinen Übungsnamen selbst, sie wählen ihn aus.
  *
  *   GoExLinks.init({ rest, me })
  *   GoExLinks.mount(el)
@@ -13,6 +16,9 @@
   var names = null;
   var myStars = {};
   var query = "";
+  var label = "";
+  var labelsOf = {};
+  var LABELS = ["Push", "Pull", "Beine", "Glutes", "Oberkörper", "Arme", "Rumpf", "Mehrgelenkig", "Sprung", "Mobility", "Ausdauer"];
 
   var CSS =
     ".gxl{margin:18px 0 8px;text-align:left;color:#2A2118}" +
@@ -32,7 +38,14 @@
     ".gxl__add{display:flex;gap:6px;margin:6px 0 12px}" +
     ".gxl__add input{flex:1;min-width:0;min-height:40px;box-sizing:border-box;padding:0 10px;border:1px solid rgba(42,33,24,.25);border-radius:10px;background:#fff;font:inherit;font-size:14px}" +
     ".gxl__add button{flex:none;min-height:40px;padding:0 14px;border:0;border-radius:999px;background:#2A2118;color:#F6F1E8;font:inherit;font-weight:700;cursor:pointer}" +
-    ".gxl__empty{margin:8px 0;font-size:14px;color:rgba(42,33,24,.65)}";
+    ".gxl__empty{margin:8px 0;font-size:14px;color:rgba(42,33,24,.65)}" +
+    ".gxl__new{display:block;width:100%;box-sizing:border-box;min-height:46px;padding:0 12px;border:1.5px solid #2A2118;border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118;margin:0 0 6px}" +
+    ".gxl__newhint{margin:0 0 12px;font-size:13px;font-weight:600;color:#2A2118;min-height:18px}" +
+    ".gxl__chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}" +
+    ".gxl__chip{min-height:32px;padding:0 12px;border-radius:999px;border:1px solid rgba(42,33,24,.3);background:transparent;color:#2A2118;font:inherit;font-size:13px;font-weight:600;cursor:pointer}" +
+    ".gxl__chip.is-on{background:#2A2118;color:#F6F1E8;border-color:#2A2118}" +
+    ".gxl__pick{flex:none;min-height:30px;padding:0 12px;border-radius:999px;border:0;background:#2A2118;color:#F6F1E8;font:inherit;font-size:12px;font-weight:700;cursor:pointer}" +
+    ".gxl__tags{display:block;font-size:11px;color:rgba(42,33,24,.55);font-weight:500}";
 
   function ensureCss() {
     if (document.getElementById("gxl-css")) return;
@@ -48,8 +61,7 @@
     });
   }
 
-  function loadNames() {
-    if (names) return Promise.resolve(names);
+  function loadNamesFromBlocks() {
     return host.rest("courses?is_active=eq.true&select=course_sessions!course_sessions_course_id_fkey(blocks)&limit=500").then(function (rows) {
       var seen = {};
       (rows || []).forEach(function (c) {
@@ -61,9 +73,26 @@
           });
         });
       });
-      names = Object.keys(seen).map(function (k) { return seen[k]; }).sort(function (a, b) { return a.localeCompare(b, "de"); });
-      return names;
+      return Object.keys(seen).map(function (k) { return seen[k]; });
     });
+  }
+
+  function loadNames() {
+    if (names) return Promise.resolve(names);
+    return host.rest("go_exercise_catalog?select=name,labels&order=name.asc&limit=1000")
+      .then(function (rows) {
+        if (!rows || !rows.length || !("labels" in rows[0])) return loadNamesFromBlocks();
+        labelsOf = {};
+        return rows.map(function (r) {
+          labelsOf[GoExMedia.key(r.name)] = r.labels || [];
+          return r.name;
+        });
+      })
+      .catch(loadNamesFromBlocks)
+      .then(function (list) {
+        names = list.sort(function (a, b) { return a.localeCompare(b, "de"); });
+        return names;
+      });
   }
 
   function loadMyStars() {
@@ -86,29 +115,53 @@
       "</div>";
   }
 
-  function exHtml(name, open) {
+  function exHtml(name, open, picking) {
     var links = GoExMedia.linksFor(name);
+    var tags = labelsOf[GoExMedia.key(name)] || [];
     return '<details class="gxl__ex" data-gxl-ex="' + esc(name) + '"' + (open ? " open" : "") + ">" +
-      '<summary><span class="gxl__name">' + esc(name) + '</span><span class="gxl__count">' +
-      (links.length ? links.length + (links.length === 1 ? " Video" : " Videos") : "kein Video") + "</span></summary>" +
+      '<summary><span class="gxl__name">' + esc(name) +
+      (tags.length ? '<span class="gxl__tags">' + esc(tags.join(" · ")) + "</span>" : "") +
+      '</span><span class="gxl__count">' +
+      (links.length ? links.length + (links.length === 1 ? " Video" : " Videos") : "kein Video") + "</span>" +
+      (picking ? '<button type="button" class="gxl__pick" data-gxl-pick>Hierhin</button>' : "") +
+      "</summary>" +
       links.map(function (l) { return linkRow(l, name); }).join("") +
-      '<div class="gxl__add"><input type="url" inputmode="url" placeholder="Instagram- oder YouTube-Link" data-gxl-url />' +
-      '<button type="button" data-gxl-add>Speichern</button></div></details>';
+      "</details>";
+  }
+
+  function pendingUrl(el) {
+    var inp = el.querySelector("[data-gxl-new]");
+    var url = inp ? inp.value.trim() : "";
+    var info = url ? GoExMedia.parse(url) : null;
+    return info && info.embed ? url : "";
   }
 
   function paint(el) {
     var box = el.querySelector("[data-gxl-list]");
     var open = {};
     box.querySelectorAll("details[open]").forEach(function (d) { open[d.getAttribute("data-gxl-ex")] = true; });
-    var list = (names || []).filter(function (n) { return !query || n.toLowerCase().indexOf(query.toLowerCase()) !== -1; });
+    var picking = !!pendingUrl(el);
+    var list = (names || []).filter(function (n) {
+      if (query && n.toLowerCase().indexOf(query.toLowerCase()) === -1) return false;
+      if (label && (labelsOf[GoExMedia.key(n)] || []).indexOf(label) === -1) return false;
+      return true;
+    });
     box.innerHTML = list.length
-      ? list.map(function (n) { return exHtml(n, open[n]); }).join("")
+      ? list.map(function (n) { return exHtml(n, open[n], picking); }).join("")
       : '<p class="gxl__empty">Keine Übung gefunden.</p>';
+    el.querySelectorAll("[data-gxl-label]").forEach(function (c) {
+      c.classList.toggle("is-on", c.getAttribute("data-gxl-label") === label);
+    });
+    var hint = el.querySelector("[data-gxl-newhint]");
+    if (hint) {
+      var raw = (el.querySelector("[data-gxl-new]") || {}).value || "";
+      hint.textContent = picking ? "Jetzt die passende Übung wählen: „Hierhin“ tippen." : raw.trim() ? "Bitte einen Instagram- oder YouTube-Link einfügen." : "";
+    }
   }
 
   function refreshOne(el, name) {
     var d = el.querySelector('details[data-gxl-ex="' + (global.CSS && CSS.escape ? CSS.escape(name) : name) + '"]');
-    if (d) d.outerHTML = exHtml(name, true);
+    if (d) d.outerHTML = exHtml(name, true, !!pendingUrl(el));
   }
 
   function mount(el) {
@@ -118,13 +171,18 @@
       el.dataset.gxlReady = "1";
       el.className = "gxl";
       el.innerHTML =
-        '<p class="gxl__hint">Kennst Du ein gutes Video zu einer Übung? Link speichern, andere vergeben Sterne. Die besten rücken nach vorn.</p>' +
+        '<input type="url" inputmode="url" class="gxl__new" placeholder="Link aus Instagram oder YouTube" data-gxl-new />' +
+        '<p class="gxl__newhint" data-gxl-newhint></p>' +
+        '<div class="gxl__chips">' + LABELS.map(function (l) {
+          return '<button type="button" class="gxl__chip" data-gxl-label="' + esc(l) + '">' + esc(l) + "</button>";
+        }).join("") + "</div>" +
         '<input type="search" class="gxl__search" placeholder="Übung suchen" data-gxl-q />' +
         '<div data-gxl-list><p class="gxl__empty">Lädt …</p></div>';
       el.querySelector("[data-gxl-q]").addEventListener("input", function () {
         query = this.value;
         paint(el);
       });
+      el.querySelector("[data-gxl-new]").addEventListener("input", function () { paint(el); });
       el.addEventListener("click", function (e) { onClick(el, e); });
     }
     Promise.all([GoExMedia.ready(), loadNames(), loadMyStars()]).then(function () { paint(el); })
@@ -153,25 +211,33 @@
         .catch(function () { star.disabled = false; if (host.toast) host.toast("Stern konnte nicht gespeichert werden"); });
       return;
     }
-    var add = e.target.closest("[data-gxl-add]");
-    if (add) {
-      var ex = add.closest("[data-gxl-ex]");
-      var exName = ex.getAttribute("data-gxl-ex");
-      var url = ex.querySelector("[data-gxl-url]").value.trim();
-      var info = GoExMedia.parse(url);
-      if (!info || !info.embed) {
-        if (host.toast) host.toast("Bitte einen Instagram- oder YouTube-Link einfügen");
-        return;
-      }
-      add.disabled = true;
+    var chip = e.target.closest("[data-gxl-label]");
+    if (chip) {
+      var l = chip.getAttribute("data-gxl-label");
+      label = label === l ? "" : l;
+      paint(el);
+      return;
+    }
+    var pick = e.target.closest("[data-gxl-pick]");
+    if (pick) {
+      e.preventDefault();
+      var exName = pick.closest("[data-gxl-ex]").getAttribute("data-gxl-ex");
+      var url = pendingUrl(el);
+      if (!url) return;
+      pick.disabled = true;
       host.rest("go_exercise_links", { method: "POST", prefer: "return=minimal",
         body: { name_key: GoExMedia.key(exName), name: exName, url: url, added_by: host.me() } })
         .then(function () { return GoExMedia.reload(); })
-        .then(function () { refreshOne(el, exName); if (host.toast) host.toast("Link gespeichert"); })
+        .then(function () {
+          el.querySelector("[data-gxl-new]").value = "";
+          paint(el);
+          refreshOne(el, exName);
+          if (host.toast) host.toast("Gespeichert bei " + exName);
+        })
         .catch(function (err) {
-          add.disabled = false;
+          pick.disabled = false;
           var m = String((err && err.message) || "");
-          if (host.toast) host.toast(/duplicate|23505/.test(m) ? "Diesen Link gibt es schon" : /go_exercise_links|relation/.test(m) ? "Tabelle fehlt: go-exercise-links.sql ausführen" : "Speichern fehlgeschlagen");
+          if (host.toast) host.toast(/duplicate|23505/.test(m) ? "Diesen Link gibt es bei der Übung schon" : /go_exercise_links|relation/.test(m) ? "Tabelle fehlt: go-exercise-links.sql ausführen" : "Speichern fehlgeschlagen");
         });
     }
   }
