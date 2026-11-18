@@ -820,7 +820,7 @@
       color: #F6F1E8;
     }
     .sand-actions { display: flex; gap: 8px; }
-    .sand-actions button { margin-top: 18px; }
+    .sand-actions button { margin-top: 18px; flex: 1 1 0; min-width: 0; width: auto; padding-left: 8px; padding-right: 8px; }
     #days-place { margin-top: 8px; text-align: left; }
     #days-place button {
       display: block;
@@ -1608,6 +1608,7 @@
       transition: color .15s ease, opacity .15s ease;
     }
     .wr-icon-btn.is-on { background: transparent; color: #fff; opacity: 1; }
+    .wr-icon-btn[data-wr-edit] svg { width: 26px; height: 26px; }
     .wr-icon-btn.is-on svg { stroke-width: 2.2; }
     /* Komplementär S/W zum Tageshintergrund */
     .woche-reels.is-light-day .wr-day-label {
@@ -1639,7 +1640,7 @@
     .woche-reels.is-dark-day .wr-week-label,
     .woche-reels.is-dark-day .wr-icon-btn { color: #fff; }
     .wr-travel-emoji {
-      font-size: 20px; line-height: 1;
+      font-size: 26px; line-height: 1;
       filter: grayscale(1);
       display: block;
     }
@@ -5591,8 +5592,14 @@
       font-size: 13px;
       letter-spacing: 0.04em;
     }
+    #travel-plan-modal .sand-card { max-height: calc(100dvh - 40px); overflow-y: auto; box-sizing: border-box; }
     #travel-plan-modal .sand-card input[type="date"] {
       display: block;
+      box-sizing: border-box;
+      min-width: 0;
+      max-width: 100%;
+      -webkit-appearance: none;
+      appearance: none;
       width: 100%;
       margin-top: 6px;
       min-height: 46px;
@@ -18549,15 +18556,15 @@
           if (tab === "woche") showWoche();
           else if (tab === "team") showPlan("team");
           else if (tab === "kurse") {
-            /* Schon in Plus (Rail sichtbar, kein Unterseiten-Overlay): Position halten statt zum Inhaltsverzeichnis */
+            /* Tipp auf Plus springt immer zum Inhaltsverzeichnis (auch wenn Plus schon offen ist) */
             var sub = document.getElementById("go-subpage");
-            if (
+            var inPlus =
               document.body.dataset.shell === "kurse" &&
               document.body.dataset.plan === "training" &&
               !document.body.classList.contains("is-diary") &&
-              (!sub || sub.hidden)
-            ) return;
-            showPlan("training");
+              (!sub || sub.hidden);
+            if (!inPlus) showPlan("training");
+            requestAnimationFrame(function () { jumpToGoOffer("toc"); });
           }
           else if (tab === "profil") showPlan("profil");
           else {
