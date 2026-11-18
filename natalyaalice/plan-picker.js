@@ -29,48 +29,48 @@
   var st = null;
 
   var CSS =
-    ".gpp{position:fixed;inset:0;z-index:9800;background:#F3EEE4;color:#2A2118;display:flex;flex-direction:column;overflow:hidden}" +
-    ".gpp__bar{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;padding:max(10px,env(safe-area-inset-top)) 8px 6px}" +
-    ".gpp__bar h2{margin:0;text-align:center;font:600 24px/1.15 'Playfair Display',Georgia,serif}" +
-    ".gpp__back{width:44px;height:44px;border:0;background:transparent;color:inherit;display:grid;place-items:center;padding:0;cursor:pointer}" +
-    ".gpp__body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 16px calc(28px + env(safe-area-inset-bottom))}" +
-    ".gpp__lead{margin:4px 0 14px;font-size:15px;line-height:1.4}" +
-    ".gpp__goal{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:0 0 8px;padding:12px 14px;border-radius:14px;border:1.5px solid rgba(42,33,24,.2);background:#F6F1E8;color:inherit;font:inherit;cursor:pointer}" +
-    ".gpp__goal b{display:block;font-size:16px}.gpp__goal small{display:block;font-size:13px;color:rgba(42,33,24,.65)}" +
-    ".gpp__goal.is-on{border-color:#2A2118;background:#2A2118;color:#F6F1E8}.gpp__goal.is-on small{color:rgba(246,241,232,.75)}" +
-    ".gpp__tick{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid currentColor;display:grid;place-items:center;font-size:13px}" +
-    ".gpp__btn{display:block;width:100%;min-height:50px;margin:12px 0 0;border:0;border-radius:999px;background:#2A2118;color:#F6F1E8;font:inherit;font-size:16px;font-weight:700;cursor:pointer}" +
-    ".gpp__btn--quiet{background:transparent;color:#2A2118;border:1.5px solid #2A2118}" +
-    ".gpp__btn:disabled{opacity:.4}" +
-    ".gpp__rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:4px 16px 12px;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}" +
-    ".gpp__card{flex:0 0 82%;scroll-snap-align:center;background:#F6F1E8;border-radius:18px;overflow:hidden;border:1px solid rgba(42,33,24,.12);display:flex;flex-direction:column}" +
-    ".gpp__art{position:relative;aspect-ratio:5/3;background:#E4DDD0;overflow:hidden}" +
-    ".gpp__art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}" +
-    ".gpp__play{position:absolute;right:10px;bottom:10px;min-height:34px;padding:0 12px;border-radius:999px;border:0;background:rgba(0,0,0,.65);color:#fff;font:inherit;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;cursor:pointer}" +
-    ".gpp__cbody{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;flex:1}" +
-    ".gpp__cbody h3{margin:0;font:600 21px/1.2 'Playfair Display',Georgia,serif;overflow-wrap:anywhere}" +
-    ".gpp__meta{font-size:13px;color:rgba(42,33,24,.7)}" +
-    ".gpp__days{margin:4px 0 0;padding:0;list-style:none;font-size:13px;line-height:1.5}" +
-    ".gpp__days b{display:inline-block;width:32px}" +
-    "body.gpp-open .app-pill{display:none !important}" +
-    ".gpp__cbody .gpp__btn{margin-top:auto}" +
-    ".gpp__empty{padding:24px 4px;font-size:15px;color:rgba(42,33,24,.7)}" +
-    ".gpp .gpp__row{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;margin:0 0 8px;padding:0;border:0;border-radius:0;background:none;box-shadow:none}" +
-    ".gpp__row>b{font-size:15px}" +
-    ".gpp__slot{min-height:52px;border-radius:12px;border:1.5px dashed rgba(42,33,24,.25);display:flex}" +
-    ".gpp__chip{flex:1;display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:11px;background:#F6F1E8;border:1.5px solid rgba(42,33,24,.18);cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}" +
-    ".gpp__chip small{display:block;font-size:12px;color:rgba(42,33,24,.6)}" +
-    ".gpp__chip.is-picked{border-color:#2A2118;box-shadow:0 0 0 2px #2A2118}" +
-    ".gpp__chip.is-drag{opacity:.35}" +
-    ".gpp__ghost{position:fixed;z-index:9810;pointer-events:none;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:.95}" +
-    ".gpp__grip{flex:none;width:18px;color:rgba(42,33,24,.45)}" +
-    ".gpp__link{display:block;margin:14px auto 0;border:0;background:transparent;color:#2A2118;text-decoration:underline;font:inherit;font-size:14px;cursor:pointer}" +
-    "@media (min-width:900px){.gpp__body{max-width:980px;margin:0 auto;width:100%}.gpp__card{flex-basis:320px}}";
+    ".gpl{position:fixed;inset:0;z-index:9800;background:#F3EEE4;color:#2A2118;display:flex;flex-direction:column;overflow:hidden}" +
+    ".gpl__bar{display:grid;grid-template-columns:44px 1fr 44px;align-items:center;padding:max(10px,env(safe-area-inset-top)) 8px 6px}" +
+    ".gpl__bar h2{margin:0;text-align:center;font:600 24px/1.15 'Playfair Display',Georgia,serif}" +
+    ".gpl__back{width:44px;height:44px;border:0;background:transparent;color:inherit;display:grid;place-items:center;padding:0;cursor:pointer}" +
+    ".gpl__body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 16px calc(28px + env(safe-area-inset-bottom))}" +
+    ".gpl__lead{margin:4px 0 14px;font-size:15px;line-height:1.4}" +
+    ".gpl__goal{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:0 0 8px;padding:12px 14px;border-radius:14px;border:1.5px solid rgba(42,33,24,.2);background:#F6F1E8;color:inherit;font:inherit;cursor:pointer}" +
+    ".gpl__goal b{display:block;font-size:16px}.gpl__goal small{display:block;font-size:13px;color:rgba(42,33,24,.65)}" +
+    ".gpl__goal.is-on{border-color:#2A2118;background:#2A2118;color:#F6F1E8}.gpl__goal.is-on small{color:rgba(246,241,232,.75)}" +
+    ".gpl__tick{flex:none;width:22px;height:22px;border-radius:50%;border:1.5px solid currentColor;display:grid;place-items:center;font-size:13px}" +
+    ".gpl__btn{display:block;width:100%;min-height:50px;margin:12px 0 0;border:0;border-radius:999px;background:#2A2118;color:#F6F1E8;font:inherit;font-size:16px;font-weight:700;cursor:pointer}" +
+    ".gpl__btn--quiet{background:transparent;color:#2A2118;border:1.5px solid #2A2118}" +
+    ".gpl__btn:disabled{opacity:.4}" +
+    ".gpl__rail{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -16px;padding:4px 16px 12px;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}" +
+    ".gpl__card{flex:0 0 82%;scroll-snap-align:center;background:#F6F1E8;border-radius:18px;overflow:hidden;border:1px solid rgba(42,33,24,.12);display:flex;flex-direction:column}" +
+    ".gpl__art{position:relative;aspect-ratio:5/3;background:#E4DDD0;overflow:hidden}" +
+    ".gpl__art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}" +
+    ".gpl__play{position:absolute;right:10px;bottom:10px;min-height:34px;padding:0 12px;border-radius:999px;border:0;background:rgba(0,0,0,.65);color:#fff;font:inherit;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:6px;cursor:pointer}" +
+    ".gpl__cbody{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;flex:1}" +
+    ".gpl__cbody h3{margin:0;font:600 21px/1.2 'Playfair Display',Georgia,serif;overflow-wrap:anywhere}" +
+    ".gpl__meta{font-size:13px;color:rgba(42,33,24,.7)}" +
+    ".gpl__days{margin:4px 0 0;padding:0;list-style:none;font-size:13px;line-height:1.5}" +
+    ".gpl__days b{display:inline-block;width:32px}" +
+    "body.gpl-open .app-pill{display:none !important}" +
+    ".gpl__cbody .gpl__btn{margin-top:auto}" +
+    ".gpl__empty{padding:24px 4px;font-size:15px;color:rgba(42,33,24,.7)}" +
+    ".gpl .gpl__row{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;margin:0 0 8px;padding:0;border:0;border-radius:0;background:none;box-shadow:none}" +
+    ".gpl__row>b{font-size:15px}" +
+    ".gpl__slot{min-height:52px;border-radius:12px;border:1.5px dashed rgba(42,33,24,.25);display:flex}" +
+    ".gpl__chip{flex:1;display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:11px;background:#F6F1E8;border:1.5px solid rgba(42,33,24,.18);cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}" +
+    ".gpl__chip small{display:block;font-size:12px;color:rgba(42,33,24,.6)}" +
+    ".gpl__chip.is-picked{border-color:#2A2118;box-shadow:0 0 0 2px #2A2118}" +
+    ".gpl__chip.is-drag{opacity:.35}" +
+    ".gpl__ghost{position:fixed;z-index:9810;pointer-events:none;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:.95}" +
+    ".gpl__grip{flex:none;width:18px;color:rgba(42,33,24,.45)}" +
+    ".gpl__link{display:block;margin:14px auto 0;border:0;background:transparent;color:#2A2118;text-decoration:underline;font:inherit;font-size:14px;cursor:pointer}" +
+    "@media (min-width:900px){.gpl__body{max-width:980px;margin:0 auto;width:100%}.gpl__card{flex-basis:320px}}";
 
   function ensureCss() {
-    if (document.getElementById("gpp-css")) return;
+    if (document.getElementById("gpl-css")) return;
     var s = document.createElement("style");
-    s.id = "gpp-css";
+    s.id = "gpl-css";
     s.textContent = CSS;
     document.head.appendChild(s);
   }
@@ -127,14 +127,14 @@
     st.step = "goals";
     st.title.textContent = "Dein Ziel";
     st.body.innerHTML =
-      '<p class="gpp__lead">Was willst Du erreichen? Mehrere gehen.</p>' +
+      '<p class="gpl__lead">Was willst Du erreichen? Mehrere gehen.</p>' +
       GOALS.map(function (g) {
         var on = st.goals.indexOf(g.key) !== -1;
-        return '<button type="button" class="gpp__goal' + (on ? " is-on" : "") + '" data-gpp-goal="' + g.key + '">' +
-          '<span class="gpp__tick">' + (on ? "✓" : "") + "</span><span><b>" + esc(g.label) + "</b><small>" + esc(g.sub) + "</small></span></button>";
+        return '<button type="button" class="gpl__goal' + (on ? " is-on" : "") + '" data-gpp-goal="' + g.key + '">' +
+          '<span class="gpl__tick">' + (on ? "✓" : "") + "</span><span><b>" + esc(g.label) + "</b><small>" + esc(g.sub) + "</small></span></button>";
       }).join("") +
-      '<button type="button" class="gpp__btn" data-gpp-next>' + (st.goals.length ? "Passende Pläne zeigen" : "Alle Pläne zeigen") + "</button>" +
-      (st.onEditWeek ? '<button type="button" class="gpp__link" data-gpp-editweek>Diese Woche einzeln bearbeiten</button>' : "");
+      '<button type="button" class="gpl__btn" data-gpp-next>' + (st.goals.length ? "Passende Pläne zeigen" : "Alle Pläne zeigen") + "</button>" +
+      (st.onEditWeek ? '<button type="button" class="gpl__link" data-gpp-editweek>Diese Woche einzeln bearbeiten</button>' : "");
   }
 
   function paintList() {
@@ -151,28 +151,28 @@
       ? "Für " + esc(st.userName || "Coachee") + ": Plan wählen, dann die Tage schieben."
       : st.goals.length ? "Passend zu Deinem Ziel. Wischen, dann „Anwenden“." : "Wischen, dann „Anwenden“.";
     if (!list.length) {
-      st.body.innerHTML = '<p class="gpp__empty">' +
+      st.body.innerHTML = '<p class="gpl__empty">' +
         (st.newCols === false ? "Noch keine Pläne freigegeben (go-wochenplan-wahl.sql ausführen)." :
           st.goals.length ? "Zu diesem Ziel gibt es noch keinen Plan." : "Noch keine Pläne freigegeben.") + "</p>" +
-        (st.mode === "self" ? '<button type="button" class="gpp__btn gpp__btn--quiet" data-gpp-goals>Ziel ändern</button>' : "");
+        (st.mode === "self" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-goals>Ziel ändern</button>' : "");
       return;
     }
-    st.body.innerHTML = '<p class="gpp__lead">' + lead + "</p>" +
-      '<div class="gpp__rail">' + list.map(function (c) {
+    st.body.innerHTML = '<p class="gpl__lead">' + lead + "</p>" +
+      '<div class="gpl__rail">' + list.map(function (c) {
         var thumb = thumbOf(c.preview_url);
         var img = thumb || coverOf(c);
-        return '<article class="gpp__card">' +
-          '<div class="gpp__art">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy" />' : "") +
-          (c.preview_url ? '<button type="button" class="gpp__play" data-gpp-play="' + esc(c.id) + '">▶ Video</button>' : "") +
+        return '<article class="gpl__card">' +
+          '<div class="gpl__art">' + (img ? '<img src="' + esc(img) + '" alt="" loading="lazy" />' : "") +
+          (c.preview_url ? '<button type="button" class="gpl__play" data-gpp-play="' + esc(c.id) + '">▶ Video</button>' : "") +
           "</div>" +
-          '<div class="gpp__cbody"><h3>' + esc(c.title) + "</h3>" +
-          '<span class="gpp__meta">' + (c.level ? "Level " + c.level + " · " : "") + esc(mixText(c)) + "</span>" +
-          '<ul class="gpp__days">' + days(c).map(function (s) {
+          '<div class="gpl__cbody"><h3>' + esc(c.title) + "</h3>" +
+          '<span class="gpl__meta">' + (c.level ? "Level " + c.level + " · " : "") + esc(mixText(c)) + "</span>" +
+          '<ul class="gpl__days">' + days(c).map(function (s) {
             return "<li><b>" + DAYS[s.session_no - 1] + "</b>" + esc(s.title) + "</li>";
           }).join("") + "</ul>" +
-          '<button type="button" class="gpp__btn" data-gpp-apply="' + esc(c.id) + '">Anwenden</button></div></article>';
+          '<button type="button" class="gpl__btn" data-gpp-apply="' + esc(c.id) + '">Anwenden</button></div></article>';
       }).join("") + "</div>" +
-      (st.mode === "self" ? '<button type="button" class="gpp__link" data-gpp-goals>Ziel ändern</button>' : "");
+      (st.mode === "self" ? '<button type="button" class="gpl__link" data-gpp-goals>Ziel ändern</button>' : "");
   }
 
   function startArrange(id) {
@@ -197,19 +197,19 @@
     st.title.textContent = "Tage schieben";
     var a = st.arr;
     st.body.innerHTML =
-      '<p class="gpp__lead"><b>' + esc(a.plan.title) + "</b>" + (a.plan.level ? " · Level " + a.plan.level : "") +
+      '<p class="gpl__lead"><b>' + esc(a.plan.title) + "</b>" + (a.plan.level ? " · Level " + a.plan.level : "") +
       "<br>Zieh die Einheiten auf den passenden Tag. Oder tipp zwei an, dann tauschen sie.</p>" +
       DAYS.map(function (d, wd) {
         var i = a.order[wd];
         var s = i == null ? null : a.ds[i];
-        return '<div class="gpp__row"><b>' + d + '</b><div class="gpp__slot" data-gpp-slot="' + wd + '">' +
-          (s ? '<div class="gpp__chip' + (a.picked === wd ? " is-picked" : "") + '" data-gpp-chip="' + wd + '">' +
-            '<svg class="gpp__grip" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>' +
+        return '<div class="gpl__row"><b>' + d + '</b><div class="gpl__slot" data-gpp-slot="' + wd + '">' +
+          (s ? '<div class="gpl__chip' + (a.picked === wd ? " is-picked" : "") + '" data-gpp-chip="' + wd + '">' +
+            '<svg class="gpl__grip" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>' +
             "<span>" + esc(s.title) + "<small>" + esc(CAT[s.category] || s.category || "") + "</small></span></div>" : "") +
           "</div></div>";
       }).join("") +
-      '<button type="button" class="gpp__btn" data-gpp-confirm>' + (st.mode === "coach" ? "Zuordnen" : "Übernehmen") + "</button>" +
-      '<button type="button" class="gpp__link" data-gpp-back-list>Anderen Plan wählen</button>';
+      '<button type="button" class="gpl__btn" data-gpp-confirm>' + (st.mode === "coach" ? "Zuordnen" : "Übernehmen") + "</button>" +
+      '<button type="button" class="gpl__link" data-gpp-back-list>Anderen Plan wählen</button>';
   }
 
   function swap(a, b) {
@@ -241,8 +241,8 @@
       btn.disabled = false;
       var m = String((err && err.message) || "");
       var msg = /go_apply_plan|function/.test(m) ? "go-wochenplan-wahl.sql fehlt noch in Supabase." : /not public/.test(m) ? "Dieser Plan ist nicht freigegeben." : "Anwenden hat nicht geklappt.";
-      var note = btn.parentNode.querySelector(".gpp__err") || document.createElement("p");
-      note.className = "gpp__empty gpp__err";
+      var note = btn.parentNode.querySelector(".gpl__err") || document.createElement("p");
+      note.className = "gpl__empty gpl__err";
       note.textContent = msg;
       btn.insertAdjacentElement("afterend", note);
     });
@@ -264,7 +264,7 @@
       if (!drag.moved) {
         drag.moved = true;
         drag.ghost = drag.chip.cloneNode(true);
-        drag.ghost.classList.add("gpp__ghost");
+        drag.ghost.classList.add("gpl__ghost");
         drag.ghost.style.width = drag.w + "px";
         drag.ghost.style.left = drag.left + "px";
         document.body.appendChild(drag.ghost);
@@ -351,7 +351,7 @@
   function close() {
     if (!st) return;
     if (st.root) st.root.remove();
-    document.body.classList.remove("gpp-open");
+    document.body.classList.remove("gpl-open");
     st = null;
   }
 
@@ -361,18 +361,18 @@
     ensureCss();
     if (st) close();
     var root = document.createElement("div");
-    root.className = "gpp";
+    root.className = "gpl";
     root.setAttribute("role", "dialog");
     root.setAttribute("aria-modal", "true");
     root.innerHTML =
-      '<div class="gpp__bar"><button type="button" class="gpp__back" data-gpp-close aria-label="Zurück">' +
+      '<div class="gpl__bar"><button type="button" class="gpl__back" data-gpp-close aria-label="Zurück">' +
       '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
       "</button><h2></h2><span></span></div>" +
-      '<div class="gpp__body"><p class="gpp__empty">Lade …</p></div>';
+      '<div class="gpl__body"><p class="gpl__empty">Lade …</p></div>';
     document.body.appendChild(root);
-    document.body.classList.add("gpp-open");
+    document.body.classList.add("gpl-open");
     st = {
-      root: root, body: root.querySelector(".gpp__body"), title: root.querySelector("h2"),
+      root: root, body: root.querySelector(".gpl__body"), title: root.querySelector("h2"),
       host: opts.host, mode: opts.mode === "coach" ? "coach" : "self",
       userId: opts.userId || (opts.host.me && opts.host.me()), userName: opts.userName || "",
       onDone: opts.onDone, onEditWeek: opts.onEditWeek, goals: [], plans: null, step: "load"
@@ -386,7 +386,7 @@
       if (st.mode === "self") paintGoals(); else paintList();
     }).catch(function () {
       if (st !== s0) return;
-      st.body.innerHTML = '<p class="gpp__empty">Pläne konnten nicht geladen werden.</p>';
+      st.body.innerHTML = '<p class="gpl__empty">Pläne konnten nicht geladen werden.</p>';
     });
   }
 

@@ -2240,7 +2240,7 @@
     if (state.dayIndex > 6) state.dayIndex = 6;
     root.hidden = false;
     root.classList.toggle("is-edit", !!state.editMode);
-    root.innerHTML =
+    var nextHtml =
       headerHtml() +
       editPanelHtml() +
       '<div class="wr-vtrack" id="wr-vtrack">' +
@@ -2256,6 +2256,18 @@
       "</div>" +
       progressHtml() +
       sheetHtml();
+    /* Gleicher Inhalt wie zuletzt: DOM stehen lassen (sonst blitzt die Woche beim Öffnen,
+       weil show() sofort zeichnet und refresh() danach mit denselben Daten noch einmal) */
+    if (root.__wrHtml === nextHtml && root.firstChild && !($("wr-sheet") && !$("wr-sheet").hidden)) {
+      var trackSame = $("wr-vtrack");
+      if (trackSame && trackSame.clientHeight && Math.round(trackSame.scrollTop / trackSame.clientHeight) !== state.dayIndex) {
+        trackSame.scrollTop = state.dayIndex * trackSame.clientHeight;
+      }
+      requestAnimationFrame(syncSurface);
+      return;
+    }
+    root.innerHTML = nextHtml;
+    root.__wrHtml = nextHtml;
     if (state.lastDeleted) showUndoBar();
     var track = $("wr-vtrack");
     if (track && track.clientHeight) {
