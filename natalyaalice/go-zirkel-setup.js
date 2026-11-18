@@ -16,6 +16,42 @@
   for (var w = 60; w <= 480; w += 30) WORKS.push(w);
   var PAUSES = [30, 45, 60];
   var DEF = { mode: "single", rounds: 6, workSec: 240, restSec: 30, online: false };
+  /* Schnellwahl: ein Tipp stellt alle Räder */
+  var PRESETS = [
+    { key: "einstieg", label: "Einstieg", rounds: 4, workSec: 120, restSec: 60 },
+    { key: "kurz", label: "Kurz", rounds: 4, workSec: 180, restSec: 30 },
+    { key: "ffc", label: "Freitag", rounds: 6, workSec: 240, restSec: 30 },
+    { key: "lang", label: "Lang", rounds: 8, workSec: 240, restSec: 45 }
+  ];
+
+  /* Eigenes CSS: der Dialog sitzt in .sand-card (dort sind Buttons schwarze Pillen), deshalb höher gewichtet */
+  var CSS =
+    ".sand-card .gz,.gz{text-align:left}" +
+    ".sand-card .gz button{width:auto;margin:0;min-height:0;box-shadow:none}" +
+    ".sand-card .gz .gz-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 14px}" +
+    ".sand-card .gz .gz-seg button{min-height:44px;border-radius:999px;border:1.5px solid #2A2118;background:transparent;color:#2A2118;font:inherit;font-weight:700;padding:0}" +
+    ".sand-card .gz .gz-seg button.is-on{background:#2A2118;color:#F6F1E8}" +
+    ".sand-card .gz .gz-presets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 0 12px}" +
+    ".sand-card .gz .gz-presets::-webkit-scrollbar{display:none}" +
+    ".sand-card .gz .gz-pre{min-width:0;min-height:42px;padding:2px 4px;border-radius:999px;border:1px solid rgba(42,33,24,.25);background:#F6F1E8;color:#2A2118;font:inherit;font-size:14px;font-weight:600;line-height:1.1;text-align:center}" +
+    ".sand-card .gz .gz-pre small{display:block;font-size:11px;font-weight:500;color:rgba(42,33,24,.6)}" +
+    ".sand-card .gz .gz-pre.is-on{border-color:#2A2118;box-shadow:0 0 0 1.5px #2A2118}" +
+    ".sand-card .gz .gz-row{margin:2px 0 6px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:rgba(42,33,24,.6);text-align:left}" +
+    ".sand-card .gz .wr-time-wheel{background:#fff;border:1px solid rgba(42,33,24,.12);border-radius:14px}" +
+    ".sand-card .gz .wr-time-opt{display:flex;width:100%;height:44px;border:0;border-radius:0;background:none;padding:0;color:rgba(42,33,24,.35);font:inherit;font-size:18px;font-weight:600;justify-content:center;align-items:center}" +
+    ".sand-card .gz .wr-time-opt.is-on{color:#111;font-size:20px;background:none}" +
+    ".sand-card .gz .gz-partner__h{text-align:left;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:rgba(42,33,24,.6)}" +
+    ".sand-card .gz .gz-partner__list{justify-content:flex-start}" +
+    ".sand-card .gz .gz-pf{min-height:36px;padding:0 14px;border-radius:999px;border:1px solid #2A2118;background:transparent;color:#2A2118;font:inherit;font-weight:600}" +
+    ".sand-card .gz .gz-pf.is-on{background:#2A2118;color:#F6F1E8}" +
+    ".sand-card .gz .gz-total{text-align:center;margin:8px 0 0}";
+  function injectCss() {
+    if (document.getElementById("gz-css")) return;
+    var st = document.createElement("style");
+    st.id = "gz-css";
+    st.textContent = CSS;
+    document.head.appendChild(st);
+  }
 
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
@@ -154,6 +190,12 @@
       '<button type="button" data-gz-mode-btn="single"' + (z.mode !== "double" ? ' class="is-on"' : "") + ">Single</button>" +
       '<button type="button" data-gz-mode-btn="double"' + (z.mode === "double" ? ' class="is-on"' : "") + ">Double</button>" +
       "</div>" +
+      '<div class="gz-presets" role="group" aria-label="Schnellwahl">' +
+      PRESETS.map(function (p) {
+        var on = p.rounds === z.rounds && p.workSec === z.workSec && p.restSec === z.restSec;
+        return '<button type="button" class="gz-pre' + (on ? " is-on" : "") + '" data-gz-pre="' + p.key + '">' + esc(p.label) +
+          "<small>" + p.rounds + " × " + mmss(p.workSec) + "</small></button>";
+      }).join("") + "</div>" +
       '<div class="gz-partner"' + (z.mode === "double" ? "" : " hidden") + ">" +
       '<p class="gz-partner__h">Partner</p>' +
       (friends.length
@@ -234,10 +276,30 @@
 
   /* Nach dem Einfügen ins DOM aufrufen. */
   function bind(root) {
+    injectCss();
     var box = root && root.querySelector(".gz");
     if (!box || box._gzBound) return;
     box._gzBound = true;
+    function setCol(key, v) {
+      var c = box.querySelector('[data-gz-col="' + key + '"]');
+      var o = c && c.querySelector('[data-gz-val="' + v + '"]');
+      if (!o) return;
+      c.scrollTo({ top: o.offsetTop - c.clientHeight / 2 + o.clientHeight / 2, behavior: "smooth" });
+    }
+    function markPreset() {
+      var z = read(box.parentNode || box);
+      box.querySelectorAll("[data-gz-pre]").forEach(function (b) {
+        var p = PRESETS.filter(function (x) { return x.key === b.getAttribute("data-gz-pre"); })[0];
+        b.classList.toggle("is-on", !!p && p.rounds === z.rounds && p.workSec === z.workSec && p.restSec === z.restSec);
+      });
+    }
     box.addEventListener("click", function (e) {
+      var pre = e.target.closest("[data-gz-pre]");
+      if (pre) {
+        var p = PRESETS.filter(function (x) { return x.key === pre.getAttribute("data-gz-pre"); })[0];
+        if (p) { setCol("rounds", p.rounds); setCol("work", p.workSec); setCol("pause", p.restSec); }
+        return;
+      }
       var b = e.target.closest("[data-gz-mode-btn]");
       if (b) {
         box.setAttribute("data-gz-mode", b.getAttribute("data-gz-mode-btn"));
@@ -270,7 +332,7 @@
       var t = 0;
       c.addEventListener("scroll", function () {
         clearTimeout(t);
-        t = setTimeout(function () { syncCol(c); paintTotal(box); }, 40);
+        t = setTimeout(function () { syncCol(c); paintTotal(box); markPreset(); }, 40);
       }, { passive: true });
     });
     paintTotal(box);
@@ -285,6 +347,7 @@
   global.GoZirkelSetup = {
     html: html,
     bind: bind,
+    PRESETS: PRESETS,
     read: read,
     parse: parse,
     toNote: toNote,

@@ -2090,6 +2090,15 @@
     .acc-zset__seg button { flex: 1; padding: 10px; border-radius: 999px; border: 1px solid #2A2118; background: transparent; color: #2A2118; font: inherit; }
     .acc-zset__seg button.is-on { background: #2A2118; color: #F7F5F0; }
     /* Zirkel-Dialog (go-zirkel-setup.js) */
+    /* Offener Start-Dialog: Pill ausblenden, sonst liegt sie über „Jetzt starten“ */
+    body:has(#go-modal:not([hidden])) .app-pill { display: none; }
+    #go-modal .sand-card { max-height: calc(100dvh - 32px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto; box-sizing: border-box; }
+    /* Sichtbarkeit privat/Team als Umschalter (Aktuell-Dialoge) */
+    .sand-card .acc-vis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0 0 12px; }
+    .sand-card .acc-vis label { position: relative; display: flex; align-items: center; justify-content: center; min-height: 40px; border-radius: 999px; border: 1px solid rgba(42,33,24,.25); font-weight: 600; cursor: pointer; text-transform: capitalize; }
+    .sand-card .acc-vis input { position: absolute; opacity: 0; pointer-events: none; }
+    .sand-card .acc-vis label:has(input:checked) { border-color: #2A2118; background: rgba(42,33,24,.08); }
+    .sand-card .acc-vis label:has(input:focus-visible) { outline: 2px solid #2A2118; outline-offset: 2px; }
     .gz-seg { display: flex; justify-content: center; gap: 8px; margin: 0 0 12px; }
     .gz-seg button { min-width: 112px; min-height: 40px; border-radius: 999px; border: 1px solid #2A2118; background: transparent; color: #2A2118; font: inherit; font-weight: 600; cursor: pointer; }
     .gz-seg button.is-on { background: #111; color: #fff; border-color: #111; }
@@ -3895,6 +3904,9 @@
       border-top: 1px solid rgba(42, 33, 24, 0.2);
     }
     /* Meine Freunde: schlichte Liste ohne Trennlinien */
+    .friend-list__feed { flex: none; margin-left: auto; min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(42,33,24,.3); display: inline-flex; align-items: center; font-size: 12px; font-weight: 600; color: rgba(42,33,24,.6); cursor: pointer; }
+    .friend-list__feed.is-on { background: #2A2118; color: #F6F1E8; border-color: #2A2118; }
+    .friend-list__hint { margin: 12px 4px 0; font-size: 12px; color: rgba(42,33,24,.6); line-height: 1.4; }
     .friend-list { display: flex; flex-direction: column; gap: 14px; padding: 8px 0 24px; }
     .friend-list__row { display: flex; align-items: center; gap: 14px; background: none; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
     .friend-list__row img, .friend-list__row .team-face, .friend-list__row > :first-child { flex: 0 0 auto; }
@@ -6123,7 +6135,7 @@
       padding: 0 12px;
     }
   </style>
-  <script src="/natalyaalice/themes.js?v=thm-2"></script>
+  <script src="/natalyaalice/themes.js?v=thm-3"></script>
 </head>
 <body class="is-home">
   <section id="welcome" class="welcome">
@@ -7817,8 +7829,8 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-2"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-1"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-1"></script>
-  <script src="/natalyaalice/go-zirkel-setup.js?v=gz-3"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-51"></script>
+  <script src="/natalyaalice/go-zirkel-setup.js?v=gz-4"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-52"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-1"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-42"></script>
   <script src="/natalyaalice/support.js?v=support-20"></script>
@@ -7877,6 +7889,7 @@
         }
       } catch (ePlan) {}
       var teamPeople = [];
+      var feedMuted = {}; /* Freunde, die nicht im Aktuell-Feed erscheinen (go_friends.in_feed = false) */
       var myGroupsCache = [];
       var myGroupsMigrateTried = false;
       var remoteInvites = [];
@@ -12617,6 +12630,7 @@
           rest: rest,
           get sessionAccount() { return sessionAccount; },
           get teamPeople() { return teamPeople; },
+          get feedMuted() { return feedMuted; },
           openEventWorkout: function (ev) { openEventWorkout(ev); },
           /* Zirkel beitreten: Mitglieder der FFC-Gruppe zuerst, sonst aller Gruppen */
           groupMemberIds: function () {
@@ -13902,6 +13916,33 @@
         try { fid = new URLSearchParams(location.search).get("freund") || ""; } catch (eF) {}
         if (fid) { try { localStorage.setItem("gogogo_pending_friend", fid); } catch (eS) {} }
       })();
+      function toggleFeed(p, el) {
+        var pid = String(p.id);
+        var turnOn = !!feedMuted[pid];
+        if (turnOn) {
+          var onCount = teamPeople.filter(function (x) {
+            var rel = String(x.trainer_id || "") === String(sessionAccount.id) || x.isTrainerPerson;
+            return x && x.id && !rel && !feedMuted[String(x.id)] && String(x.id) !== String(sessionAccount.id);
+          }).length;
+          if (onCount >= 12) {
+            gogogoToast("Im Feed sind schon 12. Nimm erst jemanden raus.");
+            return;
+          }
+        }
+        rest("go_friends?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&friend_id=eq." + encodeURIComponent(pid), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { in_feed: turnOn }
+        }).then(function () {
+          if (turnOn) delete feedMuted[pid]; else feedMuted[pid] = true;
+          el.classList.toggle("is-on", turnOn);
+          el.setAttribute("aria-checked", turnOn ? "true" : "false");
+          el.textContent = turnOn ? "im Feed" : "nicht im Feed";
+          try { paintHeuteCrew(); } catch (e1) {}
+          if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
+        }).catch(function () { gogogoToast("Ging nicht (go-friends-feed.sql ausgeführt?)"); });
+      }
+
       function handleFriendScan() {
         var fid = "";
         try { fid = new URLSearchParams(location.search).get("freund") || localStorage.getItem("gogogo_pending_friend") || ""; } catch (eU) {}
@@ -13917,7 +13958,13 @@
             var f = rows && rows[0];
             if (!f) { gogogoToast("Freund nicht gefunden."); return; }
             return ensureFriendLink(f.id).then(function () {
-              gogogoToast("Ihr seid jetzt verbunden: " + (f.nickname || f.name || "Freund"));
+              rest("go_friends?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&friend_id=eq." + encodeURIComponent(f.id) + "&select=in_feed")
+                .then(function (r) {
+                  var muted = r && r[0] && r[0].in_feed === false;
+                  gogogoToast("Ihr seid jetzt verbunden: " + (f.nickname || f.name || "Freund") +
+                    (muted ? ". Im Feed sind schon 12, umstellen unter Team → Meine Freunde." : ""));
+                })
+                .catch(function () { gogogoToast("Ihr seid jetzt verbunden: " + (f.nickname || f.name || "Freund")); });
               if (f.nickname && window.FFC && FFC.user() && FFC.friendRequest) FFC.friendRequest(f.nickname).then(onFfcFriendsChanged).catch(function () {});
               loadTeam();
             });
@@ -15582,9 +15629,33 @@
               text.appendChild(sub);
             }
             row.appendChild(text);
-            row.addEventListener("click", function () { openProfile(p); });
+            row.addEventListener("click", function (ev) {
+              if (ev.target.closest(".friend-list__feed")) return;
+              openProfile(p);
+            });
+            /* Im Feed an/aus: höchstens 12 im Aktuell-Feed, verbunden bleiben alle */
+            var isCoachRel = (myTrainer && String(p.id) === myTrainer) || (p.trainer_id && String(p.trainer_id) === mineId);
+            if (!isCoachRel) {
+              var fb = document.createElement("span");
+              fb.className = "friend-list__feed" + (feedMuted[String(p.id)] ? "" : " is-on");
+              fb.setAttribute("role", "switch");
+              fb.setAttribute("tabindex", "0");
+              fb.setAttribute("aria-checked", feedMuted[String(p.id)] ? "false" : "true");
+              fb.setAttribute("aria-label", "In Aktuell zeigen");
+              fb.textContent = feedMuted[String(p.id)] ? "nicht im Feed" : "im Feed";
+              fb.addEventListener("click", function () { toggleFeed(p, fb); });
+              row.appendChild(fb);
+            }
             list.appendChild(row);
           });
+          var feedCount = people.filter(function (p) {
+            var rel = (myTrainer && String(p.id) === myTrainer) || (p.trainer_id && String(p.trainer_id) === mineId);
+            return !rel && !feedMuted[String(p.id)];
+          }).length;
+          var hintFeed = document.createElement("p");
+          hintFeed.className = "friend-list__hint";
+          hintFeed.textContent = "Im Aktuell-Feed: " + feedCount + " von 12. Coach und Coachees zählen nicht. Alle anderen bleiben verbunden (Leaderboard, Gruppe, Partner).";
+          list.appendChild(hintFeed);
           slide.appendChild(list);
           box.appendChild(slide);
         })();
@@ -17185,7 +17256,9 @@
               if (!selfIds.length) selfIds.push(id);
               var selfFilter = "in.(" + selfIds.map(encodeURIComponent).join(",") + ")";
               return Promise.all([
-                rest("go_friends?account_id=" + selfFilter + "&select=account_id,friend_id").catch(function () { return []; }),
+                rest("go_friends?account_id=" + selfFilter + "&select=account_id,friend_id,in_feed").catch(function () {
+                  return rest("go_friends?account_id=" + selfFilter + "&select=account_id,friend_id").catch(function () { return []; });
+                }),
                 rest("go_friends?friend_id=" + selfFilter + "&select=account_id,friend_id").catch(function () { return []; }),
                 rest("go_accounts?trainer_id=" + selfFilter + "&select=" + personSelect).catch(function () { return []; })
               ]).then(function (pack) {
@@ -17197,7 +17270,11 @@
                   seenFriend[pid] = true;
                   ids.push(pid);
                 }
-                (pack[0] || []).forEach(function (row) { addPerson(row && row.friend_id); });
+                feedMuted = {};
+                (pack[0] || []).forEach(function (row) {
+                  addPerson(row && row.friend_id);
+                  if (row && row.in_feed === false) feedMuted[String(row.friend_id)] = true;
+                });
                 (pack[1] || []).forEach(function (row) { addPerson(row && row.account_id); });
                 if (trainerId) addPerson(trainerId);
                 var peopleQuery = ids.length
@@ -20459,6 +20536,7 @@
         var friends = teamPeople.filter(function (person) {
           if (!person || !person.id || person.isSelf || String(person.id) === String(sessionAccount.id)) return false;
           if (seenIds[person.id]) return false;
+          if (feedMuted[String(person.id)]) return false;
           seenIds[person.id] = true;
           return true;
         }).map(function (person) {
@@ -20626,6 +20704,7 @@
             rest: rest,
             get sessionAccount() { return sessionAccount; },
             get teamPeople() { return teamPeople; },
+            get feedMuted() { return feedMuted; },
             todayIso: function () { return Log.berlinToday(); },
             activityEmoji: activityEmoji,
             validateOwnEvent: validateOwnEvent,
