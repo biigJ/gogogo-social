@@ -7824,6 +7824,7 @@
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-1"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpp-1"></script>
+  <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-2"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-7"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-2"></script>
@@ -14354,6 +14355,42 @@
         /* Leaderboard: Single (Filter Freunde / Gruppe) und Double (Paare aus Zirkel-Double-Events dieser Woche) */
         var lbMode = "single";
         var lbFilter = "friends";
+        var lbPeriod = "week"; /* week = FFC-Wochenpunkte, all = gesamt aus go_ffc_sessions */
+        var lbPartner = ""; /* Double: Partner-Filter */
+        function lbHost() {
+          return { rest: rest, accountId: sessionAccount ? String(sessionAccount.id) : "" };
+        }
+        function mondayIso() {
+          var d = new Date();
+          var m = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+          return m.getFullYear() + "-" + String(m.getMonth() + 1).padStart(2, "0") + "-" + String(m.getDate()).padStart(2, "0");
+        }
+        function lbPeopleIndex() {
+          var people = {};
+          (teamPeople || []).forEach(function (p) { if (p && p.id) people[String(p.id)] = p; });
+          if (sessionAccount) people[String(sessionAccount.id)] = sessionAccount;
+          return people;
+        }
+        /* Gesamt-Liste (Single) aus gespiegelten FFC-Punkten */
+        function paintAllTime(listEl, ids, emptyText) {
+          listEl.textContent = "Lädt …";
+          var people = lbPeopleIndex();
+          var meId = sessionAccount ? String(sessionAccount.id) : "";
+          GoFfcPoints.sync(lbHost()).then(function () {
+            return GoFfcPoints.load(lbHost(), ids, null);
+          }).then(function (rows) {
+            if (GoFfcPoints.missing()) {
+              listEl.textContent = "Gesamtpunkte brauchen go-ffc-punkte.sql in Supabase.";
+              return;
+            }
+            var tot = GoFfcPoints.totals(rows);
+            var list = Object.keys(tot).map(function (id) {
+              var p = people[id] || {};
+              return { name: String(p.name || p.nickname || "Athlet").split(" ")[0], points: tot[id].points, workouts: tot[id].workouts, is_me: id === meId };
+            }).sort(function (a, b) { return b.points - a.points; });
+            paintRows(listEl, list, emptyText);
+          });
+        }
         function lbChips(items, cur, onPick) {
           var row = document.createElement("div");
           row.className = "go-ffc-chips";
@@ -14380,29 +14417,61 @@
             lbMode = m;
             paintLbShell(lastPack);
           }));
+          lbBox.appendChild(lbChips([["week", "Diese Woche"], ["all", "Gesamt"]], lbPeriod, function (m) {
+            lbPeriod = m;
+            paintLbShell(lastPack);
+          }));
           if (lbMode === "double") {
             var dSec = document.createElement("section");
             dSec.className = "go-ffc-sec";
+            var pChips = document.createElement("div");
+            dSec.appendChild(pChips);
+            var mine = document.createElement("p");
+            mine.className = "go-ffc-msg";
+            dSec.appendChild(mine);
             var dList = document.createElement("div");
             dList.className = "go-ffc-lb-list";
             dList.textContent = "Lädt …";
             dSec.appendChild(dList);
             var dHint = document.createElement("p");
             dHint.className = "go-ffc-msg";
-            dHint.textContent = "Paare aus Zirkeltrainings im Modus Double dieser Woche. Punkte = Wochenpunkte beider zusammen.";
+            dHint.textContent = "Paare aus Zirkeltrainings im Modus Double. Punkte wie bei Single: jede Runde nach derselben Formel, beide Partner zusammen.";
             dSec.appendChild(dHint);
             lbBox.appendChild(dSec);
-            loadDoublePairs(stdRows).then(function (pairs) {
+            loadDoublePairs(lbPeriod).then(function (res) {
+              var pairs = res.pairs;
               dList.textContent = "";
-              if (!pairs.length) {
-                dList.textContent = "Diese Woche noch kein Double. Leg ein Zirkeltraining als Double mit Partner an.";
+              /* Partner wählen: meine Partner als Chips */
+              var partners = res.myPartners;
+              pChips.textContent = "";
+              if (partners.length) {
+                if (lbPartner && !partners.some(function (x) { return x[0] === lbPartner; })) lbPartner = "";
+                pChips.appendChild(lbChips([["", "Alle Paare"]].concat(partners), lbPartner, function (k) {
+                  lbPartner = k;
+                  paintLbShell(lastPack);
+                }));
+              }
+              var shown = lbPartner ? pairs.filter(function (pr) { return pr.ids.indexOf(lbPartner) !== -1 && pr.me; }) : pairs;
+              if (lbPartner && shown[0]) {
+                var rank = pairs.indexOf(shown[0]) + 1;
+                mine.textContent = "Ihr: Platz " + rank + " von " + pairs.length + " · " + shown[0].count + "× zusammen · " +
+                  (shown[0].points != null ? shown[0].points.toLocaleString("de-DE") + " P" : "Punkte fehlen");
+              } else mine.textContent = "";
+              if (res.missing) {
+                dList.textContent = "Punkte für Double brauchen go-ffc-punkte.sql in Supabase.";
                 return;
               }
-              pairs.forEach(function (pr, i) {
+              if (!shown.length) {
+                dList.textContent = lbPeriod === "week"
+                  ? "Diese Woche noch kein Double. Leg ein Zirkeltraining als Double mit Partner an."
+                  : "Noch kein Double. Leg ein Zirkeltraining als Double mit Partner an.";
+                return;
+              }
+              shown.forEach(function (pr) {
                 var row = document.createElement("div");
                 row.className = "go-slide__ffc-row" + (pr.me ? " is-me" : "");
                 var left = document.createElement("span");
-                left.textContent = String(i + 1) + ". " + pr.names.join(" + ") + " · " + pr.count + "×";
+                left.textContent = String(pairs.indexOf(pr) + 1) + ". " + pr.names.join(" + ") + " · " + pr.count + "×";
                 var right = document.createElement("span");
                 right.textContent = pr.points != null ? pr.points.toLocaleString("de-DE") + " P" : "–";
                 row.appendChild(left);
@@ -14417,6 +14486,28 @@
             lbFilter = f;
             paintLbShell(lastPack);
           }));
+          if (lbPeriod === "all") {
+            var allSec = document.createElement("section");
+            allSec.className = "go-ffc-sec";
+            var allList = document.createElement("div");
+            allList.className = "go-ffc-lb-list";
+            allSec.appendChild(allList);
+            var ids = [];
+            if (lbFilter === "group") {
+              var gg = ffcContextGroup() || (typeof myGroups === "function" && myGroups()[0]) || null;
+              ids = ((gg && gg.members) || []).map(String);
+            } else {
+              ids = (teamPeople || []).map(function (p) { return p && p.id ? String(p.id) : ""; }).filter(Boolean);
+            }
+            if (sessionAccount && ids.indexOf(String(sessionAccount.id)) === -1) ids.push(String(sessionAccount.id));
+            paintAllTime(allList, ids, "Noch keine Punkte. Sie erscheinen, sobald Ihr die App nach einem Zirkel einmal öffnet.");
+            var allHint = document.createElement("p");
+            allHint.className = "go-ffc-msg";
+            allHint.textContent = "Alle Zirkel seit Beginn. Mitglieder zählen, sobald sie gogogo einmal mit FFC-Login geöffnet haben.";
+            allSec.appendChild(allHint);
+            lbBox.appendChild(allSec);
+            return;
+          }
           if (lbFilter === "friends") {
             var stdSec = document.createElement("section");
             stdSec.className = "go-ffc-sec";
@@ -14517,25 +14608,23 @@
           return teamSec;
         }
         /* Double-Paare: eigene und Freundes-Zirkel im Modus Double dieser Woche (gogogo-Events + Zusagen mit Partner) */
-        function loadDoublePairs(stdRows) {
-          var now = new Date();
-          var monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
-          var people = {};
-          (teamPeople || []).forEach(function (p) { if (p && p.id) people[String(p.id)] = p; });
-          if (sessionAccount) people[String(sessionAccount.id)] = sessionAccount;
-          var pts = {};
-          (stdRows || []).forEach(function (r) { if (r && r.nickname) pts[String(r.nickname).toLowerCase()] = Number(r.points) || 0; });
+        /* Double-Paare aus gogogo-Zirkel-Events (note zirkel:double) + Zusagen mit Partner.
+           Punkte je gemeinsamem Tag = Punkte beider an diesem Tag (go_ffc_sessions, gleiche Formel wie Single). */
+        function loadDoublePairs(period) {
+          var people = lbPeopleIndex();
+          var meId = sessionAccount ? String(sessionAccount.id) : "";
+          var from = period === "week" ? mondayIso() : null;
           function nameOf(id, fallback) {
             var p = people[String(id)];
-            return (p && (p.name || p.nickname)) || fallback || "Partner";
+            return String((p && (p.name || p.nickname)) || fallback || "Partner").split(" ")[0];
           }
-          function pointsOf(id) {
-            var p = people[String(id)];
-            var n = p && p.nickname ? String(p.nickname).toLowerCase() : "";
-            return n && pts[n] != null ? pts[n] : null;
+          function dayOf(ts) {
+            try { return new Date(ts).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }); } catch (e) { return String(ts).slice(0, 10); }
           }
-          return rest("events?category=eq.zirkel&note=like.zirkel:double*&starts_at=gte." + encodeURIComponent(monday.toISOString()) +
-              "&starts_at=lte." + encodeURIComponent(now.toISOString()) + "&status=neq.ausgefallen&select=id,user_id,note&limit=200")
+          var q = "events?category=eq.zirkel&note=like.zirkel:double*&status=neq.ausgefallen" +
+            (from ? "&starts_at=gte." + encodeURIComponent(from + "T00:00:00Z") : "") +
+            "&starts_at=lte." + encodeURIComponent(new Date().toISOString()) + "&select=id,user_id,note,starts_at&limit=1000";
+          return GoFfcPoints.sync(lbHost()).then(function () { return rest(q); })
             .then(function (evs) {
               evs = (evs || []).filter(function (e) { return people[String(e.user_id)]; });
               if (!evs.length) return [[], []];
@@ -14545,30 +14634,53 @@
             })
             .then(function (res) {
               var pairs = {};
-              function add(a, aName, b, bName) {
+              var evDay = {};
+              res[0].forEach(function (e) { evDay[e.id] = dayOf(e.starts_at); });
+              function add(a, b, bName, day) {
                 if (!a || (!b && !bName)) return;
                 var ka = String(a), kb = b ? String(b) : "n:" + String(bName).toLowerCase();
                 var key = [ka, kb].sort().join("|");
-                var pr = pairs[key] || (pairs[key] = { ids: [ka, kb], names: [nameOf(a, aName), b ? nameOf(b, bName) : bName], count: 0 });
-                pr.count += 1;
+                var pr = pairs[key] || (pairs[key] = { ids: [ka, kb], names: [nameOf(a), b ? nameOf(b, bName) : bName], days: {}, count: 0 });
+                if (!pr.days[day]) { pr.days[day] = true; pr.count += 1; }
               }
               res[0].forEach(function (e) {
                 var z = window.GoZirkelSetup && GoZirkelSetup.parse ? GoZirkelSetup.parse(e.note) : null;
-                if (z && z.mode === "double" && (z.partnerId || z.partnerName)) add(e.user_id, "", z.partnerId, z.partnerName);
+                if (z && z.mode === "double" && (z.partnerId || z.partnerName)) add(e.user_id, z.partnerId, z.partnerName, evDay[e.id]);
               });
               res[1].forEach(function (r) {
-                if (r.partner_id || r.partner_name) add(r.user_id, "", r.partner_id, r.partner_name);
+                if (r.partner_id || r.partner_name) add(r.user_id, r.partner_id, r.partner_name, evDay[r.event_id]);
               });
-              var meId = sessionAccount ? String(sessionAccount.id) : "";
-              return Object.keys(pairs).map(function (k) {
-                var pr = pairs[k];
-                var pa = pointsOf(pr.ids[0]), pb = /^n:/.test(pr.ids[1]) ? null : pointsOf(pr.ids[1]);
-                pr.points = pa == null && pb == null ? null : (pa || 0) + (pb || 0);
-                pr.me = pr.ids.indexOf(meId) !== -1;
-                return pr;
-              }).sort(function (a, b) { return (b.points || 0) - (a.points || 0) || b.count - a.count; });
+              var list = Object.keys(pairs).map(function (k) { return pairs[k]; });
+              var ids = {};
+              list.forEach(function (pr) { pr.ids.forEach(function (id) { if (!/^n:/.test(id)) ids[id] = true; }); });
+              return GoFfcPoints.load(lbHost(), Object.keys(ids), from).then(function (rows) {
+                var byDay = {};
+                (rows || []).forEach(function (r) {
+                  var k = String(r.account_id) + "|" + r.day;
+                  byDay[k] = (byDay[k] || 0) + (Number(r.points) || 0);
+                });
+                list.forEach(function (pr) {
+                  var sum = 0, any = false;
+                  Object.keys(pr.days).forEach(function (day) {
+                    pr.ids.forEach(function (id) {
+                      var v = byDay[id + "|" + day];
+                      if (v != null) { sum += v; any = true; }
+                    });
+                  });
+                  pr.points = any ? sum : null;
+                  pr.me = pr.ids.indexOf(meId) !== -1;
+                });
+                list.sort(function (a, b) { return (b.points || 0) - (a.points || 0) || b.count - a.count; });
+                var myPartners = [];
+                list.forEach(function (pr) {
+                  if (!pr.me) return;
+                  var other = pr.ids[0] === meId ? 1 : 0;
+                  myPartners.push([pr.ids[other], pr.names[other]]);
+                });
+                return { pairs: list, myPartners: myPartners, missing: GoFfcPoints.missing() };
+              });
             })
-            .catch(function () { return []; });
+            .catch(function () { return { pairs: [], myPartners: [], missing: GoFfcPoints.missing() }; });
         }
         /* FFC-Gruppe zur Team-Gruppe: gleicher Name (Groß/Klein egal) */
         function linkedFfcGroup(goGroup) {
@@ -20802,6 +20914,10 @@
           HeuteAccountability.install(accHost);
           handleStampScan();
           handleFriendScan();
+          /* FFC-Punkte spiegeln (Gesamt- und Double-Leaderboard), sobald der FFC-Login steht */
+          setTimeout(function () {
+            if (window.GoFfcPoints && sessionAccount) GoFfcPoints.sync({ rest: rest, accountId: String(sessionAccount.id) });
+          }, 9000);
           (function openFromGoParam() {
             /* ?go=<Angebot> (z. B. zurück aus dem Kurs-Editor): Plus öffnen und zu diesem Angebot springen */
             var goKey = "";
