@@ -518,6 +518,21 @@
     .modal-actions .quiet { border: 1px solid var(--line); }
     .modal-actions .primary { background: var(--ink); color: var(--bg); }
     body.is-home, body.is-diary { background: #F3EEE4; color: #2A2118; }
+    /* gogogo-Konten: Workout-Ansicht im Sand-Design statt Natalya-Rot (Themes ersetzen die Hex-Werte mit) */
+    body.is-session {
+      --bg: #F3EEE4;
+      --ink: #2A2118;
+      --dim: rgba(42, 33, 24, 0.75);
+      --faint: rgba(42, 33, 24, 0.55);
+      --line: rgba(42, 33, 24, 0.16);
+      --panel: #F6F1E8;
+      --panel-2: #F6F1E8;
+    }
+    html:has(body.is-session) { background: #F3EEE4; }
+    body.is-session #workout-title { font-family: "Playfair Display", Georgia, serif; font-weight: 600; letter-spacing: 0; }
+    body.is-session main .tabs button.is-active { background: #2A2118; color: #F6F1E8; border-color: #2A2118; }
+    body.is-session main #finish-workout { background: #2A2118; color: #F6F1E8; }
+    body.is-session main th:first-child, body.is-session main td:first-child { background: #F6F1E8; }
     body.is-home :focus-visible, body.is-diary :focus-visible { outline-color: #2A2118; }
     .welcome {
       width: min(100%, 440px);
@@ -8139,7 +8154,7 @@
         return Log.projectLogs(serverLogs, date, draft);
       }
 
-      var CHECK_SVG = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7.2 5.2 10.5 12 3.5" fill="none" stroke="#C7413B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      var CHECK_SVG = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7.2 5.2 10.5 12 3.5" fill="none" style="stroke:var(--bg)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       var WHEEL_MAX = 30;
       var WHEEL_ITEM = 44;
       var wheelInput = null;
@@ -8315,10 +8330,49 @@
         return box;
       }
 
+      /* gogogo: Historie zeigt nur beendete Workouts (Event erledigt an dem Tag) */
+      var finishedDays = null;
+      var finishedLoading = false;
+      function loadFinishedDays() {
+        if (finishedLoading || !sessionAccount || !sessionAccount.id) return;
+        finishedLoading = true;
+        rest("events?user_id=eq." + encodeURIComponent(sessionAccount.id) +
+          "&status=eq.erledigt&category=in.(kraft,ausdauer,alternative)&select=starts_at&order=starts_at.desc&limit=1000")
+          .then(function (rows) {
+            var map = {};
+            (rows || []).forEach(function (r) {
+              map[new Date(r.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" })] = true;
+            });
+            finishedDays = map;
+          })
+          .catch(function () { finishedDays = {}; })
+          .then(function () {
+            finishedLoading = false;
+            renderHistory();
+          });
+      }
       function renderHistory() {
         var logs = viewLogs();
         var dates = Log.historyDates(logs);
         historyEl.textContent = "";
+        if (sessionMode && !linkedNatalya) {
+          if (!finishedDays) {
+            loadFinishedDays();
+            var wait = document.createElement("p");
+            wait.className = "empty";
+            wait.textContent = "Lädt …";
+            historyEl.appendChild(wait);
+            return;
+          }
+          dates = dates.filter(function (d) { return finishedDays[d]; });
+          if (!dates.length) {
+            var none = document.createElement("p");
+            none.className = "empty";
+            none.textContent = "Noch kein Workout beendet.";
+            historyEl.appendChild(none);
+            return;
+          }
+        }
         if (!dates.length) {
           var empty = document.createElement("p");
           empty.className = "empty";
@@ -8362,6 +8416,9 @@
         });
         table.appendChild(tbody);
 
+        var shownDay = {};
+        dates.forEach(function (d) { shownDay[d] = true; });
+        var statLogs = (logs || []).filter(function (row) { return row && shownDay[row.workout_date]; });
         var tfoot = document.createElement("tfoot");
         ["Ø", "Best"].forEach(function (label) {
           var tr = document.createElement("tr");
@@ -8370,8 +8427,8 @@
           tr.appendChild(th);
           Log.EXERCISES.forEach(function (ex) {
             var cell = document.createElement("td");
-            var stats = Log.statsFor(logs, ex);
-            cell.textContent = label === "Ø" ? Log.avgText(ex, stats, logs) : Log.bestText(ex, stats);
+            var stats = Log.statsFor(statLogs, ex);
+            cell.textContent = label === "Ø" ? Log.avgText(ex, stats, statLogs) : Log.bestText(ex, stats);
             tr.appendChild(cell);
           });
           tfoot.appendChild(tr);
@@ -8927,6 +8984,7 @@
         }
         job.catch(function () {}).then(function () {
           btn.disabled = false;
+          finishedDays = null;
           try {
             if (window.WocheReels && WocheReels.refresh) WocheReels.refresh();
           } catch (eW) {}
@@ -9751,7 +9809,7 @@
         document.getElementById("wa-modal").hidden = true;
         mainEl.hidden = on;
         var theme = document.querySelector('meta[name="theme-color"]');
-        if (theme) theme.setAttribute("content", on ? "#F3EEE4" : "#C7413B");
+        if (theme) theme.setAttribute("content", on || sessionMode ? "#F3EEE4" : "#C7413B");
         /* Aktuell: nicht nach oben springen — Feed zentriert das heutige Event direkt */
         if (!(on && sessionMode && shellTab === "heute")) scrollShellTop();
       }
