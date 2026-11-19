@@ -8016,9 +8016,10 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-10"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-7"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-8"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-3"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
@@ -21488,6 +21489,15 @@
           setTimeout(promptJoinRequests, 2500);
           setTimeout(promptCoachRequests, 4000);
           setTimeout(syncSessionAccount, 600);
+          /* Mitteilungen (go-messages.js): einmal mittig in Aktuell */
+          if (window.GoMessages) {
+            GoMessages.init({
+              rest: rest,
+              me: function () { return sessionAccount ? sessionAccount.id : ""; },
+              createdAt: function () { return (sessionAccount && sessionAccount.created_at) || ""; }
+            });
+            document.addEventListener("go:aktuell-ready", function () { setTimeout(GoMessages.check, 1200); });
+            setTimeout(GoMessages.check, 8000);
           /* Erste Schritte für neue Konten (go-onboarding.js); Test: /workout/?onboarding=1 */
           if (window.GoOnboarding) {
             var obHost = {
