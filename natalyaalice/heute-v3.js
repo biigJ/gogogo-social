@@ -2347,8 +2347,13 @@
     var html = "";
     /* Oben = Zukunft: weiter weg oben, nah an heute unten (umgekehrt zur Zeit) */
     html += '<div class="acc-feed-future" data-acc-zone="future">';
+    /* Ab morgen wie im Wallet: Karten zusammengeschoben, Tipp schiebt eine frei. Heute bleibt offen. */
+    var todayK = todayIso();
     for (var ui = feed.upcoming.length - 1; ui >= 0; ui--) {
-      html += renderFeedItem(feed.upcoming[ui]);
+      var itU = feed.upcoming[ui];
+      var hU = renderFeedItem(itU);
+      if (dayKey(itU.starts_at) > todayK) hU = hU.replace('<article class="acc-card', '<article class="acc-card is-wallet');
+      html += hU;
     }
     html += "</div>";
     html += '<div class="acc-feed-today" data-acc-zone="today" id="acc-feed-today">';
@@ -2376,6 +2381,10 @@
     root.classList.remove("is-centering");
     patchFeed(root, placeSpontan(html));
     state.paintedAktuell = true;
+    if (state.walletOpen) {
+      var wOpen = root.querySelector('.acc-card.is-wallet[data-post-id="' + state.walletOpen + '"]');
+      if (wOpen) wOpen.classList.add("is-open"); else state.walletOpen = "";
+    }
     bindObserver(root);
     bindHeuteScrollFilter();
     requestAnimationFrame(function () {
@@ -2746,6 +2755,9 @@
         };
         if (note) body.note = note;
         if (photo) body.photo_url = photo;
+        /* Heute beendet: Uhrzeit des Beendens wird Zeitstempel des Posts (Reihenfolge in Aktuell) */
+        var evNow = state.events.find(function (e) { return String(e.id) === String(eventId); });
+        if (evNow && dayKey(evNow.starts_at) === todayIso()) body.starts_at = new Date().toISOString();
         return patchEventDone(eventId, body).then(function (r) {
           if (global.GoTama) global.GoTama.invalidate();
           return r;
@@ -3338,7 +3350,7 @@
             onSaved: function () {
               if (forEv && forEv.id) {
                 return rest("events?id=eq." + encodeURIComponent(forEv.id), {
-                  method: "PATCH", prefer: "return=minimal", body: { status: "erledigt" }
+                  method: "PATCH", prefer: "return=minimal", body: { status: "erledigt", starts_at: new Date().toISOString() }
                 }).then(refresh).catch(function () {});
               }
               return createUnplannedEvent({
@@ -3636,7 +3648,7 @@
         eventId: ev.id,
         onSaved: function () {
           return rest("events?id=eq." + encodeURIComponent(ev.id), {
-            method: "PATCH", prefer: "return=minimal", body: { status: "erledigt" }
+            method: "PATCH", prefer: "return=minimal", body: { status: "erledigt", starts_at: new Date().toISOString() }
           }).then(function () {
             if (global.GoTama) GoTama.invalidate();
             return refresh();
@@ -4332,6 +4344,25 @@
     focusEvent: focusEvent,
     todayCardFor: todayCardFor
   };
+  /* Wallet: Tipp auf eine zusammengeschobene Karte schiebt sie frei (andere bleiben zu);
+     Tipp aufs Bild einer offenen Karte schiebt sie zurück. Werkzeuge unter der offenen Karte bleiben bedienbar. */
+  document.addEventListener("click", function (e) {
+    var card = e.target && e.target.closest ? e.target.closest(".acc-card.is-wallet") : null;
+    if (!card) return;
+    var open = card.classList.contains("is-open");
+    if (open && !e.target.closest(".acc-card__media")) return;
+    if (open && e.target.closest("button, a, input, label")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    [].forEach.call(document.querySelectorAll(".acc-card.is-wallet.is-open"), function (c) { c.classList.remove("is-open"); });
+    if (open) { state.walletOpen = ""; return; }
+    card.classList.add("is-open");
+    state.walletOpen = card.getAttribute("data-post-id") || "";
+    setTimeout(function () {
+      try { card.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (e2) { card.scrollIntoView(); }
+    }, 60);
+  }, true);
+
   /* „mehr“ / „weniger“ an Kommentaren (Feed und Kommentar-Dialog) */
   document.addEventListener("click", function (e) {
     var m = e.target && e.target.closest ? e.target.closest("[data-cmt-more]") : null;

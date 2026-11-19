@@ -1500,6 +1500,30 @@
       border: 1px solid #2A2118; background: #2A2118; color: #F6F1E8; font-weight: 600; cursor: pointer;
     }
     .acc-card { margin: 0 0 28px; color: #2A2118; }
+    /* Wallet (Events ab morgen): Kopf mit Name links, Tag rechts, darunter Eventname linksbündig */
+    .acc-card.is-wallet { position: relative; border-radius: 16px; transition: margin .28s ease; }
+    .acc-card.is-wallet .acc-card__media { border-radius: 16px; transition: height .28s ease; }
+    .acc-card.is-wallet .acc-card__overlay {
+      justify-content: flex-start; align-items: stretch; text-align: left; padding: 14px 14px 12px;
+      background: linear-gradient(180deg, rgba(20,16,12,.5) 0, rgba(20,16,12,.12) 120px, rgba(20,16,12,.25) 100%);
+      color: #F6F1E8;
+    }
+    .acc-card.is-wallet .acc-card__overlay > .acc-card__author { top: 14px; left: 14px; color: #F6F1E8; }
+    .acc-card.is-wallet .acc-card__when {
+      position: absolute; top: 20px; right: 14px; margin: 0; max-width: 55%;
+      text-align: right; font-size: 13px; color: #F6F1E8 !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .acc-card.is-wallet .acc-card__title { margin: 40px 0 0; font-size: 21px; text-align: left; color: #F6F1E8; }
+    .acc-card.is-wallet .acc-card__place, .acc-card.is-wallet .acc-card__desc { text-align: left; color: rgba(246,241,232,.9) !important; }
+    .acc-card.is-wallet:not(.is-open) { margin: 0 0 -18px; box-shadow: 0 -6px 16px rgba(20,16,12,.18); cursor: pointer; }
+    .acc-card.is-wallet:not(.is-open) .acc-card__media { aspect-ratio: auto; height: 104px; }
+    .acc-card.is-wallet:not(.is-open) .acc-card__bar,
+    .acc-card.is-wallet:not(.is-open) .acc-card__place,
+    .acc-card.is-wallet:not(.is-open) .acc-card__desc,
+    .acc-card.is-wallet:not(.is-open) .acc-card__desc-full,
+    .acc-card.is-wallet:not(.is-open) .acc-card__emoji { display: none !important; }
+    .acc-card.is-wallet.is-open { margin: 26px 0 30px; }
+    .acc-feed-future .acc-card.is-wallet:last-child:not(.is-open) { margin-bottom: 28px; }
     .acc-card__media {
       position: relative; width: 100%; aspect-ratio: 4 / 5; overflow: hidden;
       display: grid; place-items: center;
@@ -8077,7 +8101,7 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-65"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-66"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-2"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-48"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
@@ -9194,7 +9218,10 @@
             return rest("events?id=eq." + encodeURIComponent(hit.id), {
               method: "PATCH",
               prefer: "return=minimal",
-              body: { status: "erledigt", visibility: logVis }
+              /* Heute beendet: Post bekommt die Uhrzeit des Beendens (Reihenfolge in Aktuell) */
+              body: date === Log.berlinToday()
+                ? { status: "erledigt", visibility: logVis, starts_at: new Date().toISOString() }
+                : { status: "erledigt", visibility: logVis }
             });
           });
         }
@@ -12971,7 +12998,7 @@
             "&user_id=eq." +
             encodeURIComponent(sessionAccount.id) +
             "&status=neq.erledigt",
-          { method: "PATCH", prefer: "return=minimal", body: { status: "erledigt" } }
+          { method: "PATCH", prefer: "return=minimal", body: { status: "erledigt", starts_at: new Date().toISOString() } }
         )
           .then(function () {
             if (window.WocheReels && WocheReels.refresh) WocheReels.refresh();
