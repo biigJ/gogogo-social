@@ -1463,6 +1463,7 @@
       background: #F3EEE4; color: #2A2118; transition: opacity .3s ease;
     }
     .go-boot.is-done { opacity: 0; pointer-events: none; }
+    .go-boot--again { z-index: 9600; }
     .go-boot__wheel { width: 64px; height: 64px; animation: heute-spin 1.6s linear infinite; }
     .go-boot__txt { margin: 0; font: 600 15px/1 Inter, system-ui, sans-serif; letter-spacing: .04em; }
     .heute-info { display: none; }
@@ -6323,6 +6324,34 @@
       setTimeout(function () { if (!document.body.classList.contains("is-session")) hide(); }, 3000);
       setTimeout(hide, 10000);
     })();
+    /* Gleiches Rad für spätere Ladezeiten (z. B. Wechsel auf Woche): GoLoader.show() → { hide() } */
+    window.GoLoader = {
+      show: function () {
+        var src = document.querySelector(".go-boot__wheel");
+        var box = null, done = false;
+        /* erst nach 120 ms zeigen: wenn es schneller geht, kein Aufblitzen */
+        var t = setTimeout(function () {
+          if (done) return;
+          box = document.createElement("div");
+          box.className = "go-boot go-boot--again";
+          box.setAttribute("role", "status");
+          box.innerHTML = (window.__goWheel || "") + '<p class="go-boot__txt">Lädt</p>';
+          document.body.appendChild(box);
+        }, 120);
+        var safety = setTimeout(hide, 4000);
+        function hide() {
+          if (done) return;
+          done = true;
+          clearTimeout(t); clearTimeout(safety);
+          if (!box) return;
+          var b = box;
+          b.classList.add("is-done");
+          setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 320);
+        }
+        return { hide: hide };
+      }
+    };
+    window.__goWheel = (document.querySelector(".go-boot__wheel") || {}).outerHTML || "";
   </script>
   <section id="welcome" class="welcome">
     <div class="plan-tabs" role="tablist" aria-label="Einstellungen">
@@ -12755,7 +12784,25 @@
         paintPill();
         paintWelcome();
         scrollShellTop();
-        installWocheReels();
+        var wLoad = window.GoLoader ? GoLoader.show() : null;
+        var wShown = installWocheReels();
+        /* Rad, bis Woche geladen und die Bilder der sichtbaren Tage da sind */
+        Promise.resolve(wShown)
+          .then(function () {
+            var imgs = [].slice.call(document.querySelectorAll("#woche-reels img")).filter(function (im) { return !im.complete && im.loading !== "lazy"; });
+            var bgs = [];
+            [].forEach.call(document.querySelectorAll("#woche-reels [style*='background-image']"), function (el) {
+              var m = /url\(["']?([^"')]+)["']?\)/.exec(el.getAttribute("style") || "");
+              if (m) bgs.push(m[1]);
+            });
+            var waits = imgs.map(function (im) {
+              return new Promise(function (res) { im.addEventListener("load", res, { once: true }); im.addEventListener("error", res, { once: true }); });
+            }).concat(bgs.slice(0, 3).map(function (u) {
+              return new Promise(function (res) { var i = new Image(); i.onload = i.onerror = res; i.src = u; });
+            }));
+            return Promise.race([Promise.all(waits), new Promise(function (res) { setTimeout(res, 1500); })]);
+          })
+          .then(function () { if (wLoad) wLoad.hide(); }, function () { if (wLoad) wLoad.hide(); });
       }
 
       function goToAktuellShell() {
@@ -13106,7 +13153,7 @@
           openTravelPlanModal: openTravelPlanModal
         };
         WocheReels.install(host);
-        WocheReels.show();
+        return WocheReels.show();
       }
 
       document.addEventListener("click", function (event) {
