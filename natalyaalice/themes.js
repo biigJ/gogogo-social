@@ -75,7 +75,29 @@
         "246,241,232": "10,10,10", "243,238,228": "0,0,0",
         "42,33,24": "242,242,242", "52,34,32": "242,242,242", "20,16,12": "0,0,0"
       },
-      cta: { bg: "#FFFFFF", ink: "#000000" }
+      cta: { bg: "#FFFFFF", ink: "#000000" },
+      /* Harte Kontraste: Weiß auf Schwarz, Schwarz auf Weiß (feste #fff/#111-Flächen der Module) */
+      extra:
+        "input:not([type=checkbox]):not([type=radio]):not([type=range]),select:not(#heute-filter-select),textarea,.gpl__select,.god__input{background-color:#000 !important;color:#fff !important;border-color:rgba(255,255,255,.7) !important}" +
+        "#heute-filter-select{color:#fff !important}" +
+        "input::placeholder,textarea::placeholder{color:rgba(255,255,255,.55) !important}" +
+        ".cp-seg button{color:#fff !important;border-color:#fff !important;background:transparent !important}" +
+        ".cp-seg button.is-on{background:#fff !important;color:#000 !important}" +
+        ".cp-btn--ghost,.cp-pill,.gpl__btn--quiet,.gtm__btn--quiet{color:#fff !important;border-color:#fff !important;background:transparent !important}" +
+        ".cp-btn:not(.cp-btn--ghost){background:#fff !important;color:#000 !important}" +
+        ".friend-list__feed{border-color:#fff !important}.friend-list__feed.is-on{background:#fff !important;color:#000 !important;border-color:#fff !important}" +
+        ".wr-mini-wheel,.cp-wheel,.gtm__wheel{background:#000 !important;border-color:#fff !important}" +
+        ".wr-mini-opt,.cp-wheel__opt,.gtm__opt{color:#fff !important}" +
+        "#plan-settings>button,#plan-settings>a,.plan-backbar h2{color:#fff !important}" +
+        ".profile-back,.profile-pencil{color:#fff !important;border-color:#fff !important}" +
+        ".gpl__row,.gpl__vday,.gpl__day,.gpp__row,.gpp__fav{background:#000 !important;color:#fff !important;border-color:rgba(255,255,255,.5) !important}" +
+        ".gpp__row.is-on,.gpp__fav.is-on{background:#fff !important;color:#000 !important}" +
+        ".ga-item,.ga-copy p,.ga-msg,.cp-hint,.cp-body,.cp-field{color:#fff !important}" +
+        ".god__card,.sand-card{background:#0A0A0A !important;color:#fff !important;border:1px solid rgba(255,255,255,.25)}" +
+        ".god__btn:not(.god__btn--quiet):not(.god__btn--choice){background:#fff !important;color:#000 !important}" +
+        ".god__btn--quiet,.god__btn--choice{color:#fff !important;border-color:#fff !important}" +
+        ".profile-goal,.gcr-pill:not(.is-solid),.acc-heart-me{background-color:#000 !important;color:#fff !important;border:1px solid #fff !important}" +
+        ".gcr-pill.is-solid{background:#fff !important;color:#000 !important}"
     },
     postmodern: {
       label: "Postmodern",
@@ -117,6 +139,11 @@
     var out = text.replace(/#([0-9a-fA-F]{6})\b/g, function (m, h) {
       var n = t.hex[h.toUpperCase()];
       return n ? "#" + n : m;
+    });
+    /* Farben in SVG-Daten-URLs (z. B. Dropdown-Pfeil: stroke='%232A2118') */
+    out = out.replace(/%23([0-9a-fA-F]{6})/g, function (m, h) {
+      var n = t.hex[h.toUpperCase()];
+      return n ? "%23" + n : m;
     });
     out = out.replace(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/g, function (m, r, g, b) {
       var n = t.rgb[r + "," + g + "," + b];

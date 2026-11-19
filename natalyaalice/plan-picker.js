@@ -166,7 +166,7 @@
     st.step = "goals";
     st.title.textContent = "Dein Ziel";
     st.body.innerHTML =
-      '<p class="gpl__lead">Was willst Du erreichen? Mehrere gehen.</p>' +
+      '<p class="gpl__lead">Was ist wichtig? Mehrauswahl möglich.</p>' +
       GOALS.map(function (g) {
         var on = st.goals.indexOf(g.key) !== -1;
         return '<button type="button" class="gpl__goal' + (on ? " is-on" : "") + '" data-gpp-goal="' + g.key + '">' +
@@ -188,8 +188,9 @@
     return st.host.rest("go_accounts?is_trainer=eq.true&select=id,name,nickname,about_me&order=name.asc&limit=50")
       .catch(function () { return []; })
       .then(function (rows) {
-        st.coaches = (rows || []).filter(function (c) { return String(c.id) !== String(st.userId); });
-        if (!st.coaches.some(function (c) { return String(c.id) === JOSCHA; }) && String(st.userId) !== JOSCHA) {
+        /* auch der eigene Account bleibt drin (Joscha testet als Coach); Joscha immer dabei */
+        st.coaches = (rows || []).slice();
+        if (!st.coaches.some(function (c) { return String(c.id) === JOSCHA; })) {
           st.coaches.unshift({ id: JOSCHA, name: "Joscha" });
         }
         var ids = st.coaches.map(function (c) { return c.id; });
@@ -212,7 +213,7 @@
       if (st.step !== "indiv") return;
       if (!st.coach) st.coach = list.filter(function (c) { return String(c.id) === JOSCHA; })[0] || list[0] || null;
       var c = st.coach;
-      var first = c ? String(c.nickname || c.name || "").split(" ")[0] : "";
+      var first = c ? String(c.name || c.nickname || "").split(" ")[0] : "";
       var avg = c ? Math.round(c.avg || 0) : 0;
       var text = c ? (COACH_TEXT[String(c.id)] || c.about_me || "") : "";
       st.body.innerHTML =
@@ -234,7 +235,7 @@
     var list = st.coaches || [];
     if (!global.GoDialog) return;
     GoDialog.choose("Coach wählen", list.map(function (c) {
-      return { label: String(c.nickname || c.name || "Coach").split(" ")[0] + (c.count ? " · " + c.avg.toFixed(1) + " ★" : ""), value: String(c.id) };
+      return { label: String(c.name || c.nickname || "Coach").split(" ")[0] + (c.count ? " · " + c.avg.toFixed(1) + " ★" : ""), value: String(c.id) };
     })).then(function (id) {
       if (!id) return;
       st.coach = list.filter(function (c) { return String(c.id) === id; })[0] || st.coach;
@@ -274,7 +275,7 @@
         fetch("https://api.web3forms.com/submit", { method: "POST", body: fd }).catch(function () {});
       } catch (eM) {}
       });
-      var first = String(c.nickname || c.name || "Dein Coach").split(" ")[0];
+      var first = String(c.name || c.nickname || "Dein Coach").split(" ")[0];
       var done = st.onDone;
       close();
       if (global.GoDialog) GoDialog.alert(first + " meldet sich bei Dir.");
