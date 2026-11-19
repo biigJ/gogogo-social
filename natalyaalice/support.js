@@ -183,7 +183,7 @@
         })
         .then(function (rows) {
           var order = Array.isArray(rows) ? rows[0] : rows || existing;
-          return afterBook(product, order);
+          return afterBook(product, order, meta);
         });
     }
     var body = {
@@ -219,7 +219,7 @@
             ref_id: order && order.id ? order.id : product.id
           }
         }).catch(function () {});
-        return afterBook(product, order);
+        return afterBook(product, order, meta);
       });
   }
 
@@ -250,27 +250,23 @@
     });
   }
 
-  function afterBook(product, order) {
+  function afterBook(product, order, opts) {
     var type = product.type;
     var jobs = [];
+    opts = opts || {};
     if (type === "web_call") {
-      var when = new Date();
-      when.setDate(when.getDate() + 2);
-      when.setHours(11, 0, 0, 0);
-      jobs.push(
-        createSupportEvent({
-          title: "Web-Call Trainingsplan",
-          category: "alternative",
-          starts_at: when.toISOString(),
-          location: "Online",
-          visibility: "privat",
-          item_type: "support_session"
-        })
-      );
-      if (host.openCalendlyPt) {
-        try {
-          host.openCalendlyPt();
-        } catch (e) {}
+      /* Buchung entsteht erst nach gewähltem Calendly-Termin (index.html), Event zur echten Uhrzeit */
+      if (opts.startsAt) {
+        jobs.push(
+          createSupportEvent({
+            title: "Initialgespräch",
+            category: "alternative",
+            starts_at: opts.startsAt,
+            location: "Online",
+            visibility: "privat",
+            item_type: "support_session"
+          })
+        );
       }
     } else if (type === "personal_training") {
       if (host.openCalendlyPt) {
@@ -378,15 +374,15 @@
       title: "Stempelkarte",
       price: "gratis",
       description:
-        "12er-Stempelkarte, gratis. Trainierst Du mit einem Freund bei seinem Event, scannst Du seine Karte. Ihr bekommt beide einen Stempel: Du als Gast, er als Gastgeber. Volle Karte: T-Shirt oder Selfiestick."
+        "Trainierst Du mit einem Freund bei seinem oder Deinem Workout-Event zusammen, scannt Ihr die Karten und bekommt so einen digitalen Stempel. Wenn Du alle 12 Punkte voll hast, erhältst Du ein robustes gogogo-T-Shirt in Bio-Baumwollqualität."
     },
     {
       key: "web_call",
       type: "web_call",
       title: "Initialgespräch",
-      price: "gratis",
+      price: "",
       description:
-        "Triff Joscha für 30 Minuten zu einem Erstgespräch, gratis. Sprich mit ihm über Deine Trainingsziele, Deine Ressourcen, Deinen Alltag und Herausforderungen. Als Ergebnis fasst er Dir einen Trainingsplan zusammen, der für Deinen Alltag passt. Webmeeting über Calendly."
+        "Triff Joscha für 30 Minuten zu einem Erstgespräch. Sprich mit ihm über Deine Trainingsziele, Deine Ressourcen, Deinen Alltag und Herausforderungen. Als Ergebnis fasst er Dir einen Trainingsplan zusammen, der für Deinen Alltag passt. Webmeeting über Calendly."
     },
     {
       key: "routine",
@@ -640,7 +636,7 @@
     return STATIC_OFFERS.slice();
   }
 
-  function bookOffer(key) {
+  function bookOffer(key, opts) {
     key = String(key || "");
     if (key === "routine") {
       return bookStaticOffer("routine").then(function () {
@@ -664,7 +660,7 @@
       key === "nutrition"
     ) {
       var type = key === "nutrition" ? "ernaehrung" : key;
-      return bookStaticOffer(type).then(function (order) {
+      return bookStaticOffer(type, opts).then(function (order) {
         /* coach_offer: WhatsApp öffnet der Consent-Dialog in index.html — hier nicht nochmal */
         if (host.paintProfil) host.paintProfil();
         if (host.onOffersReady) host.onOffersReady(STATIC_OFFERS.slice());
@@ -750,7 +746,7 @@
     }
   }
 
-  function bookStaticOffer(type) {
+  function bookStaticOffer(type, opts) {
     if (type === "kraft_tracking") {
       /* Merker lokal, falls go-kraft-tracking.sql (Produkt) noch nicht läuft */
       try {
@@ -758,7 +754,7 @@
       } catch (eLs) {}
     }
     var db = dbProductForType(type);
-    if (db) return bookProduct(db, { source: "plus_static" });
+    if (db) return bookProduct(db, { source: "plus_static", startsAt: opts && opts.startsAt });
     /* Ohne Katalog-Produkt: lokale Order-Merker über Community/activity nicht nötig —
        speichere angefragte Buchung als support_orders nur wenn Produkt existiert.
        Fallback: meta in activity_log */
@@ -792,7 +788,7 @@
           support_products: { type: type, title: TYPE_LABELS[type] || type }
         };
         state.orders = state.orders.concat([order]);
-        return afterBook({ type: type, title: TYPE_LABELS[type] || type }, order).then(function () {
+        return afterBook({ type: type, title: TYPE_LABELS[type] || type }, order, opts).then(function () {
           return order;
         });
       });
