@@ -301,7 +301,7 @@
     if (en) {
       var c = en.courses || {};
       return (
-        '<section class="cp-sec"><h3>Wochenplan</h3>' +
+        '<section class="cp-sec">' +
         '<div class="cp-plan"><div class="cp-plan__top"><p class="cp-plan__name">' + esc(shortTitle(c.title || "Wochenplan")) + (c.level ? " · Level " + c.level : "") + "</p>" +
         (global.GoPlanPicker && GoPlanPicker.view ? '<button type="button" class="cp-pill" data-cp="view-plan">Anschauen</button>' : "") + "</div>" +
         '<p class="cp-hint">ab ' + esc(String(en.start_date || "").split("-").reverse().join(".")) + "</p>" +
@@ -318,19 +318,15 @@
     var pick = plans.filter(function (c) { return String(c.id) === String(sel); })[0];
     var hasZ = pick && planMix(pick).zirkel;
     return (
-      '<section class="cp-sec"><h3>Wochenplan</h3>' +
+      '<section class="cp-sec">' +
       (plans.length
-        ? '<label class="cp-field">Plan<select id="cp-plan">' +
-          plans.map(function (c) {
-            return '<option value="' + esc(c.id) + '"' + (String(c.id) === String(sel) ? " selected" : "") + ">" +
-              esc(shortTitle(c.title) + (c.level ? " · L" + c.level : "")) + "</option>";
-          }).join("") +
-          "</select></label>" +
+        ? '<div class="cp-field">Wochenplan<button type="button" class="cp-fieldbtn" data-cp="pick-plan">' +
+          esc(pick ? shortTitle(pick.title) + (pick.level ? " · L" + pick.level : "") : "Wählen") + "</button></div>" +
           '<label class="cp-field">Start (Montag)<input type="date" id="cp-start" value="' + esc(st.planStart || mondayOf(todayIso())) + '" /></label>' +
           (hasZ ? '<p class="cp-hint">Zirkeltraining läuft über FFC und erzeugt keinen Termin.</p>' : "") +
           weeksWheelHtml(st.planWeeks || 12, "cp-weeks") +
           '<button type="button" class="cp-btn" data-cp="assign">Zuordnen</button>' +
-          (global.GoPlanPicker ? '<button type="button" class="cp-btn cp-btn--ghost" data-cp="picker" style="margin-top:8px">Alle Wochenpläne ansehen und Tage schieben</button>' : "")
+          (global.GoPlanPicker ? '<button type="button" class="cp-btn cp-btn--ghost" data-cp="picker" style="margin-top:8px">Wochentage schieben</button>' : "")
         : '<p class="cp-hint">Noch keine Wochenpläne.</p>') +
       "</section>"
     );
@@ -361,9 +357,15 @@
           var nv = wheelVal(el);
           if (el.id === "cp-weeks") { st.planWeeks = nv; return; }
           if (el.id === "cp-weeks-active" && st.enrollment && nv !== Number(st.enrollment.weeks || 12)) {
-            rest("enrollments?id=eq." + encodeURIComponent(st.enrollment.id), { method: "PATCH", prefer: "return=minimal", body: { weeks: nv } })
-              .then(function () { st.enrollment.weeks = nv; toast("Dauer: " + nv + (nv === 1 ? " Woche" : " Wochen")); })
-              .catch(function () { toast("Dauer speichern ging nicht"); });
+            var old = Number(st.enrollment.weeks || 12);
+            var label = nv + (nv === 1 ? " Woche" : " Wochen");
+            var ask = global.GoDialog ? GoDialog.confirm("Dauer geändert auf: " + label + ".", { ok: "Bestätigen" }) : Promise.resolve(true);
+            ask.then(function (ok) {
+              if (!ok) { el.scrollTop = (old - 1) * WHEEL_H; return; }
+              rest("enrollments?id=eq." + encodeURIComponent(st.enrollment.id), { method: "PATCH", prefer: "return=minimal", body: { weeks: nv } })
+                .then(function () { st.enrollment.weeks = nv; toast("Dauer: " + label); })
+                .catch(function () { el.scrollTop = (old - 1) * WHEEL_H; toast("Dauer speichern ging nicht"); });
+            });
           }
         }, 260);
       }, { passive: true });
@@ -485,7 +487,28 @@
       t.classList.toggle("is-on");
       return;
     }
-    if (act === "assign") return assignPlan(t);
+    if (act === "assign") {
+      readPlanForm();
+      var pk = (st.plans || []).filter(function (c) { return String(c.id) === String(st.planPick); })[0];
+      if (!pk) return;
+      var w = st.planWeeks || 12;
+      var q = "„" + shortTitle(pk.title) + "“ ab " + String(mondayOf(st.planStart || todayIso())).split("-").reverse().join(".") +
+        " für " + w + (w === 1 ? " Woche" : " Wochen") + " zuordnen?";
+      var ask2 = global.GoDialog ? GoDialog.confirm(q, { ok: "Zuordnen" }) : Promise.resolve(true);
+      ask2.then(function (ok) { if (ok) assignPlan(t); });
+      return;
+    }
+    if (act === "pick-plan") {
+      readPlanForm();
+      global.GoPlanPicker.open({
+        host: { rest: rest, me: me, toast: toast },
+        mode: "coach",
+        userId: st.id,
+        userName: (st.person && st.person.name) || "",
+        onPick: function (id) { if (!st) return; st.planPick = id; st.planDays = null; paint(); }
+      });
+      return;
+    }
     if (act === "picker") {
       global.GoPlanPicker.open({
         host: { rest: rest, me: me, toast: toast },
@@ -564,8 +587,7 @@
   }
 
   function readPlanForm() {
-    var selEl = document.getElementById("cp-plan");
-    st.planPick = selEl ? selEl.value : st.planPick;
+    if (!st.planPick && st.plans && st.plans[0]) st.planPick = st.plans[0].id;
     st.planStart = (document.getElementById("cp-start") || {}).value || st.planStart;
     var wEl = document.getElementById("cp-weeks");
     if (wEl) st.planWeeks = wheelVal(wEl);
@@ -610,7 +632,7 @@
     var first = String(p.name || "diese Person").split(" ")[0];
     var meId = String((host.sessionAccount && host.sessionAccount.id) || "");
     var ask = global.GoDialog
-      ? GoDialog.confirm("Coaching mit " + first + " beenden? " + first + " steht dann nicht mehr in Deinem Team und in Deinen Freunden. Der Wochenplan bleibt.", { ok: "Beenden" })
+      ? GoDialog.confirm("Coaching mit " + first + " beenden? Ihr bleibt befreundet, " + first + "s Events erscheinen aber nicht mehr in Deinem Aktuell. Der Wochenplan bleibt.", { ok: "Beenden" })
       : Promise.resolve(true);
     ask.then(function (ok) {
       if (!ok) return;
@@ -618,8 +640,14 @@
         method: "PATCH", prefer: "return=minimal", body: { trainer_id: null }
       })
         .then(function () {
-          var both = "or=(and(account_id.eq." + meId + ",friend_id.eq." + p.id + "),and(account_id.eq." + p.id + ",friend_id.eq." + meId + "))";
-          return host.rest("go_friends?" + both, { method: "DELETE", prefer: "return=minimal" }).catch(function () {});
+          /* Freundschaft bleibt, nur nicht mehr im eigenen Aktuell-Feed (Haken aus) */
+          var q = "go_friends?account_id=eq." + encodeURIComponent(meId) + "&friend_id=eq." + encodeURIComponent(p.id);
+          return host.rest(q, { method: "PATCH", prefer: "return=representation", body: { in_feed: false } })
+            .then(function (rows) {
+              if (rows && rows.length) return null;
+              return host.rest("go_friends", { method: "POST", prefer: "return=minimal", body: { account_id: meId, friend_id: p.id, in_feed: false } });
+            })
+            .catch(function () {});
         })
         .then(function () {
           if (host.toast) host.toast("Coaching mit " + first + " beendet");
