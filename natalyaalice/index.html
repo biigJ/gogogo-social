@@ -75,6 +75,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-clean-18" />
   <style>
+    /* Haken überall im gogogo-Stil statt System-Blau (Module dürfen Größe/Abstand weiter selbst setzen) */
+    input[type="checkbox"], input[type="radio"] {
+      -webkit-appearance: none; appearance: none; flex: none;
+      width: 20px; height: 20px; margin: 0; box-sizing: border-box;
+      border: 1.5px solid #2A2118; border-radius: 6px;
+      background: #F6F1E8 center / 72% no-repeat; cursor: pointer; vertical-align: middle;
+    }
+    input[type="radio"] { border-radius: 50%; }
+    input[type="checkbox"]:checked {
+      background-color: #2A2118;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23F6F1E8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+    input[type="radio"]:checked { background-color: #F6F1E8; box-shadow: inset 0 0 0 4px #F6F1E8, inset 0 0 0 10px #2A2118; }
+    input[type="checkbox"]:disabled, input[type="radio"]:disabled { opacity: .45; cursor: default; }
+    input[type="checkbox"]:focus-visible, input[type="radio"]:focus-visible { outline: 2px solid #C7413B; outline-offset: 2px; }
     :root {
       --bg: #C7413B;
       --ink: #F7F5F0;
@@ -1442,6 +1457,22 @@
       background: transparent; color: #2A2118; cursor: pointer;
     }
     .heute-refresh svg { width: 22px; height: 22px; }
+    .go-boot {
+      position: fixed; inset: 0; z-index: 10060; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: #F3EEE4; color: #2A2118; transition: opacity .3s ease;
+    }
+    .go-boot.is-done { opacity: 0; pointer-events: none; }
+    .go-boot__wheel { width: 64px; height: 64px; animation: heute-spin 1.6s linear infinite; }
+    .go-boot__txt { margin: 0; font: 600 15px/1 Inter, system-ui, sans-serif; letter-spacing: .04em; }
+    .heute-info { display: none; }
+    body.is-session[data-shell="heute"] .heute-info {
+      display: grid; place-items: center; position: absolute; left: 12px;
+      top: calc(max(6px, env(safe-area-inset-top, 0px)) + var(--heute-filter-line) - 4.5px);
+      min-width: 36px; height: 36px; padding: 0 2px; border: 0;
+      background: transparent; color: #2A2118; cursor: pointer;
+      font: 600 13px/1 Inter, system-ui, sans-serif; letter-spacing: .02em;
+    }
     .heute-refresh.is-busy svg { animation: heute-spin .8s linear infinite; }
     @keyframes heute-spin { to { transform: rotate(360deg); } }
     body.is-session[data-shell="heute"] .heute-filter-pick select {
@@ -1653,7 +1684,7 @@
     .woche-reels.is-dark-day .wr-day-label { color: #fff; }
     /* Fotos: Abdunklung oben und unten, damit Icons und Text auch auf hellen/unruhigen Bildern lesbar bleiben */
     .woche-reels.is-photo-day .wr-top {
-      background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.25) 70%, transparent 100%);
+      background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.25) 70%, transparent 100%) top / 100% 50% no-repeat;
     }
     .woche-reels.is-photo-day .wr-icon-btn,
     .woche-reels.is-photo-day .wr-week-label { color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
@@ -6270,6 +6301,29 @@
   <script src="/natalyaalice/themes.js?v=thm-4"></script>
 </head>
 <body class="is-home">
+  <div class="go-boot" id="go-boot" role="status" aria-live="polite">
+    <svg class="go-boot__wheel" viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="16.00" y1="7.80" x2="16.00" y2="4.00"/><line x1="18.53" y1="8.20" x2="19.71" y2="4.59"/><line x1="20.82" y1="9.37" x2="23.05" y2="6.29"/><line x1="22.63" y1="11.18" x2="25.71" y2="8.95"/><line x1="23.80" y1="13.47" x2="27.41" y2="12.29"/><line x1="24.20" y1="16.00" x2="28.00" y2="16.00"/><line x1="23.80" y1="18.53" x2="27.41" y2="19.71"/><line x1="22.63" y1="20.82" x2="25.71" y2="23.05"/><line x1="20.82" y1="22.63" x2="23.05" y2="25.71"/><line x1="18.53" y1="23.80" x2="19.71" y2="27.41"/><line x1="16.00" y1="24.20" x2="16.00" y2="28.00"/><line x1="13.47" y1="23.80" x2="12.29" y2="27.41"/><line x1="11.18" y1="22.63" x2="8.95" y2="25.71"/><line x1="9.37" y1="20.82" x2="6.29" y2="23.05"/><line x1="8.20" y1="18.53" x2="4.59" y2="19.71"/><line x1="7.80" y1="16.00" x2="4.00" y2="16.00"/><line x1="8.20" y1="13.47" x2="4.59" y2="12.29"/><line x1="9.37" y1="11.18" x2="6.29" y2="8.95"/><line x1="11.18" y1="9.37" x2="8.95" y2="6.29"/><line x1="13.47" y1="8.20" x2="12.29" y2="4.59"/></svg>
+    <p class="go-boot__txt">Lädt</p>
+  </div>
+  <script>
+    (function () {
+      var el = document.getElementById("go-boot");
+      var t0 = Date.now();
+      function hide() {
+        if (!el) return;
+        var box = el; el = null;
+        box.classList.add("is-done");
+        setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 320);
+      }
+      var has = false;
+      try { has = !!localStorage.getItem("gogogo_go_account") || /(?:^|;\s*)gogogo_go_account=/.test(document.cookie); } catch (e) {}
+      if (!has) { hide(); return; }
+      document.addEventListener("go:aktuell-ready", function () { setTimeout(hide, Math.max(0, 400 - (Date.now() - t0))); });
+      /* ohne Sitzung (Login) oder wenn etwas hängt: nicht ewig drehen */
+      setTimeout(function () { if (!document.body.classList.contains("is-session")) hide(); }, 3000);
+      setTimeout(hide, 10000);
+    })();
+  </script>
   <section id="welcome" class="welcome">
     <div class="plan-tabs" role="tablist" aria-label="Einstellungen">
       <button type="button" data-plan="profil" class="is-on" role="tab">Profil</button>
@@ -6713,6 +6767,7 @@
       <img id="photo-img" alt="" hidden />
     </div>
     <div class="heute-filter-row shell-heute">
+      <button type="button" class="heute-info" id="heute-info">Info</button>
       <label class="heute-filter-pick">
         <select id="heute-filter-select" aria-label="Heute filtern">
           <option value="ich">Ich</option>
@@ -7956,19 +8011,19 @@
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-2"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
-  <script src="/natalyaalice/tamagotchi.js?v=tama-4"></script>
+  <script src="/natalyaalice/tamagotchi.js?v=tama-5"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-7"></script>
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-10"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-6"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-7"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-2"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-3"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-58"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-59"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-2"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-45"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-46"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -8025,6 +8080,10 @@
         if (sessionMode && new URLSearchParams(location.search).get("plan") === "team") {
           shellTab = "team";
           planPane = "team";
+        }
+        /* ?admin=1 (zurück aus dem Editor): Profil malen, dort öffnet sich Admin */
+        if (sessionMode && new URLSearchParams(location.search).get("admin")) {
+          setTimeout(function () { showPlan("profil"); }, 0);
         }
       } catch (ePlan) {}
       var teamPeople = [];
@@ -9884,6 +9943,7 @@
         closeDaysPrompt();
         ["moved-modal", "team-modal", "invite-modal", "time-modal", "invite-in-modal", "goal-modal", "ausdauer-modal", "photo-modal", "short-modal", "quick-wa", "go-modal", "pt-accept-modal", "pt-day-modal", "group-delete-modal", "stamp-card-modal", "group-edit-modal", "nutrition-log-modal"].forEach(function (id) {
           var el = document.getElementById(id);
+          if (el && id === "invite-in-modal" && !el.hidden) invitePromptOn = false;
           if (el) el.hidden = true;
         });
       }
@@ -9896,6 +9956,8 @@
           shellTab = on ? "heute" : "workout";
           document.body.dataset.shell = shellTab;
           paintPill();
+          /* Einladungen erscheinen mittig in Aktuell (nicht in anderen Tabs) */
+          if (on) setTimeout(promptPendingInvites, 500);
         }
         document.body.classList.toggle("is-home", on);
         document.body.classList.remove("is-diary");
@@ -15855,6 +15917,15 @@
           adminBtn.addEventListener("click", function () { GoAdmin.open(adminHost); });
           meSlide.appendChild(adminBtn);
           paintAdminBadge();
+          /* Zurück aus dem Editor (?admin=1): wieder auf Admin-Ebene, nicht in die App */
+          try {
+            var adminQ = new URLSearchParams(location.search).get("admin");
+            if (adminQ && !window.__goAdminOpened) {
+              window.__goAdminOpened = true;
+              history.replaceState(null, "", location.pathname);
+              setTimeout(function () { GoAdmin.open(adminHost, adminQ === "1" ? "news" : adminQ); }, 50);
+            }
+          } catch (eAdm) {}
         }
         meSlide.appendChild(editBtn);
         meSlide.appendChild(settingsBtn);
@@ -18264,6 +18335,7 @@
               gbtn.type = "button";
               gbtn.className = "invite-group__btn";
               gbtn.textContent = "Gruppe: " + (group.name || "Gruppe");
+              gbtn.setAttribute("data-group-name", String(group.name || "").trim().toLowerCase());
               gbtn.addEventListener("click", function () {
                 var members = (group.members || []).map(String);
                 list.forEach(function (person) {
@@ -18278,6 +18350,19 @@
               gwrap.appendChild(gbtn);
             });
             box.appendChild(gwrap);
+            /* Gruppen, die auch FFC-Circle sind: „XYZ Circle“ */
+            if (window.FFC && FFC.myGroups && FFC.user && FFC.user()) {
+              FFC.myGroups().then(function (circles) {
+                var names = (circles || []).map(function (c) { return String(c && c.name || "").trim().toLowerCase(); });
+                [].forEach.call(gwrap.querySelectorAll("[data-group-name]"), function (b) {
+                  var n = b.getAttribute("data-group-name");
+                  if (n && names.indexOf(n) >= 0) {
+                    var g = myGroups().filter(function (x) { return String(x && x.name || "").trim().toLowerCase() === n; })[0];
+                    b.textContent = (g && g.name ? g.name : n) + " Circle";
+                  }
+                });
+              }).catch(function () {});
+            }
           }
           if (!list.length) {
             var note = document.createElement("p");
@@ -18532,6 +18617,7 @@
       }
       function promptPendingInvites() {
         if (!sessionMode || !sessionAccount || invitePromptOn) return;
+        if (document.body.dataset.shell !== "heute") return;
         var modal = document.getElementById("invite-in-modal");
         if (!modal || !modal.hidden) return;
         var me = String(sessionAccount.id);
@@ -21988,6 +22074,37 @@
       document.getElementById("invite-accept").addEventListener("click", function () { decideIncoming("accepted"); });
       document.getElementById("invite-decline").addEventListener("click", function () { decideIncoming("declined"); });
       document.getElementById("invite-later").addEventListener("click", laterIncoming);
+      (function bindHeuteInfo() {
+        var btn = document.getElementById("heute-info");
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          if (!window.GoDialog) return;
+          GoDialog.note("Halte Deinen Ring auf Grün, indem Du keinen Tag auslässt. Einfach, denn Du kannst eine einfache Alternative loggen oder einmal schieben und es ist in Ordnung. Der Count bedeutet, wie viele Tage Du lückenlos abgehakt hast. Es geht hier nicht ums Abhaken, sondern darum, Deinem Alltag einen Fokus auf Bewegung zu geben. Jeder in seiner Kapazität! Viel Spaß bei Deiner Reise, Dich immer und immer mehr zu bewegen.");
+        });
+      })();
+      /* Dropdown: Breite = gewähltes Wort, damit Wort + Pfeil mittig stehen und der Pfeil immer gleich nah ist */
+      (function fitHeuteFilter() {
+        var sel = document.getElementById("heute-filter-select");
+        if (!sel) return;
+        var cv = document.createElement("canvas").getContext("2d");
+        var last = "";
+        function fit() {
+          var opt = sel.options[sel.selectedIndex];
+          if (!opt || !sel.offsetParent) return;
+          var cs = getComputedStyle(sel);
+          var key = opt.text + "|" + cs.font;
+          if (key === last) return;
+          last = key;
+          cv.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+          var w = cv.measureText(opt.text).width;
+          sel.style.width = Math.ceil(w + parseFloat(cs.paddingRight || 0) + parseFloat(cs.paddingLeft || 0) + 2) + "px";
+        }
+        window.GoFitHeuteFilter = function () { last = ""; fit(); };
+        sel.addEventListener("change", fit);
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(window.GoFitHeuteFilter);
+        /* Wert wird auch per Code gesetzt (Filter laden, Shellwechsel): leicht nachziehen */
+        setInterval(fit, 700);
+      })();
       (function bindHeuteRefresh() {
         var btn = document.getElementById("heute-refresh");
         if (!btn) return;
@@ -22952,6 +23069,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-3"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-4"></script>
 </body>
 </html>

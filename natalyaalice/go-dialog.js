@@ -5,6 +5,7 @@
  *   GoDialog.prompt(text, value, { ok, type }) → Promise<string|null>
  *   GoDialog.choose(text, [{ label, value }])  → Promise<value|null>
  *   GoDialog.pick(text, [{ label, value }], { ok }) → Promise<value[]|null>  (Mehrfachauswahl)
+ *   GoDialog.note(text)                        → Promise<void>  (nur Text, Tippen schließt)
  *
  * Stil wie .sand-modal / .sand-card (Sandfläche, Playfair-Titel, schwarze Pill-Buttons).
  */
@@ -22,7 +23,9 @@
     ".god__list{max-height:46vh;overflow-y:auto;margin:0 0 14px;display:grid;gap:6px}" +
     ".god__pick{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:12px;background:#fff;font-size:16px;cursor:pointer}" +
     ".god__pick input{width:20px;height:20px;accent-color:#2A2118;margin:0}" +
-    ".god__empty{margin:0 0 14px;color:rgba(42,33,24,.65);font-size:14px}";
+    ".god__empty{margin:0 0 14px;color:rgba(42,33,24,.65);font-size:14px}" +
+    ".god__card--note{padding:22px 20px;cursor:pointer}" +
+    ".god__note{margin:0;font-size:16px;line-height:1.5;white-space:pre-wrap;text-align:left}";
 
   function ensureCss() {
     if (document.getElementById("go-dialog-css")) return;
@@ -161,5 +164,18 @@
     });
   }
 
-  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg };
+  /* Nur Text, kein Titel, kein Button: Tippen auf die Karte oder daneben schließt. */
+  function noteDlg(msg) {
+    return open(function (card, close) {
+      card.classList.add("god__card--note");
+      var p = document.createElement("p");
+      p.className = "god__note";
+      p.textContent = String(msg == null ? "" : msg);
+      card.appendChild(p);
+      card.addEventListener("click", function () { close(); });
+      return undefined;
+    });
+  }
+
+  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg };
 })(window);

@@ -150,6 +150,14 @@
     return host.rest(path, opts);
   }
 
+  /* Plan-Events ohne gewählte Uhrzeit stehen auf genau 12:00:00 UTC. */
+  function hasTime(ev) {
+    if (!ev || !ev.starts_at) return false;
+    var d = new Date(ev.starts_at);
+    if (isNaN(d.getTime())) return false;
+    return !(d.getUTCHours() === 12 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0);
+  }
+
   function logActivity(type, refId, meta) {
     var id = me();
     if (!id) return Promise.resolve();
@@ -1793,7 +1801,7 @@
           postId: String(ev.id),
           noCheck: true,
           /* Freunde-Events: links Sprechblase, daneben Winken (Anfrage). Angenommen: Herz + mein Bild, Herz tippen = absagen. */
-          wave: !invite && !iAmGoing(ev.id) && ev.status === "geplant" && new Date(ev.starts_at).getTime() > Date.now(),
+          wave: !invite && !iAmGoing(ev.id) && ev.status === "geplant" && new Date(ev.starts_at).getTime() > Date.now() && hasTime(ev),
           waved: !!state.waved[String(ev.id)],
           heart: acceptedInv || (upcoming && !invite && iAmGoing(ev.id))
         });
@@ -3700,6 +3708,16 @@
     var invitePost = t.closest("[data-invite-post]");
     if (invitePost) {
       var invIso = invitePost.getAttribute("data-invite-iso") || "";
+      var invId = invitePost.getAttribute("data-invite-post") || "";
+      var invEv = (state.events || []).find(function (x) { return String(x.id) === String(invId); });
+      var dayMine = (state.events || []).filter(function (x) {
+        return String(x.user_id) === me() && dayKey(x.starts_at) === invIso && x.status !== "ausgefallen";
+      });
+      var timed = invEv ? hasTime(invEv) : dayMine.some(hasTime);
+      if (!timed && (invEv || dayMine.length)) {
+        if (global.GoDialog) GoDialog.note("Setz die Uhrzeit unter Woche fest, um Freunde einzuladen.");
+        return;
+      }
       if (host.openInviteForPost) host.openInviteForPost(invIso, invitePost.getAttribute("data-invite-post") || "");
       else if (host.openPlanDay && invIso) host.openPlanDay(invIso);
       return;
@@ -4017,6 +4035,10 @@
           mergeDiaryComments(host.heuteDiaryComments() || {});
         }
         render();
+        if (!state.readySent) {
+          state.readySent = true;
+          try { document.dispatchEvent(new CustomEvent("go:aktuell-ready")); } catch (eR) {}
+        }
       })
       .then(function () {
         if (!stillCurrent()) return;
