@@ -14,7 +14,7 @@
 
   var CSS =
     ".god{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(20,16,12,.42)}" +
-    ".god__card{width:min(100%,380px);box-sizing:border-box;background:#F3EEE4;color:#2A2118;border-radius:22px;padding:22px 18px 16px;box-shadow:0 18px 50px rgba(0,0,0,.25);font-family:Inter,system-ui,sans-serif}" +
+    ".god__card{width:min(100%,380px);max-height:86vh;overflow-y:auto;box-sizing:border-box;background:#F3EEE4;color:#2A2118;border-radius:22px;padding:22px 18px 16px;box-shadow:0 18px 50px rgba(0,0,0,.25);font-family:Inter,system-ui,sans-serif}" +
     ".god__card .god__text{margin:0 0 16px !important;font-family:'Playfair Display',Georgia,serif;font-size:21px;font-weight:600;line-height:1.25;white-space:pre-wrap}" +
     ".god__input{width:100%;box-sizing:border-box;min-height:46px;margin:0 0 14px;padding:0 12px;border:1px solid rgba(42,33,24,.25);border-radius:12px;background:#fff;font:inherit;font-size:16px;color:#2A2118}" +
     ".god__btn{display:block;width:100%;min-height:48px;margin:0 0 8px;border:0;border-radius:999px;background:#111;color:#fff;font:inherit;font-weight:700;font-size:16px;cursor:pointer}" +

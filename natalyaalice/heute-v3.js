@@ -1315,9 +1315,12 @@
     if (host && typeof host.inviteFacesForIso === "function") {
       (host.inviteFacesForIso(iso) || []).forEach(function (f) {
         if (!f) return;
+        /* Einladung gehört zu einem bestimmten Event: nur dort zeigen */
+        if (f.eventId && eventId && String(f.eventId) !== String(eventId)) return;
+        var known = personOf(f.id);
         pushFace(
           f.id,
-          f.name || f.nickname,
+          (known && known.name && known.name !== "?" ? known.name : "") || f.name || f.nickname,
           f.photo || f.photo_url || "",
           f.status || "pending"
         );
@@ -2527,6 +2530,8 @@
   function closeDoneModal() {
     var modal = $("acc-done-modal");
     if (modal) modal.hidden = true;
+    state.doneDraft = null;
+    state.altReplace = null;
   }
 
   /* Original nur behalten, wenn es ohnehin klein ist (sonst lieber ohne Foto als Upload-Fehler) */
@@ -2715,7 +2720,19 @@
     var vis = normalizeVisibility(modal.dataset.vis || "team");
     if (vis === "gruppe") vis = "team";
     var note = (($("acc-done-note") && $("acc-done-note").value) || "").trim().slice(0, 500);
-    readDonePhoto()
+    var draft = eventId === "draft" ? state.doneDraft : null;
+    if (eventId === "draft" && !draft) return;
+    var ready = draft
+      ? createUnplannedEvent(Object.assign({}, draft.payload, { visibility: vis })).then(function (nev) {
+          state.doneDraft = null;
+          eventId = String(nev.id);
+          modal.dataset.eventId = eventId;
+          state.events.push(nev);
+          return markReplaced(draft.replace);
+        })
+      : Promise.resolve();
+    ready
+      .then(readDonePhoto)
       .then(function (photo) {
         var body = {
           status: "erledigt",
@@ -3251,12 +3268,12 @@
       startBtn.textContent = "Jetzt starten";
       startBtn.addEventListener("click", function () {
         var vis = readCreateVis(pick);
-        /* Sonstiges: gleich abschließen, mit Foto und Notiz */
-        createUnplannedEvent({ category: "alternative", title: "Sonstiges", visibility: vis }).then(function (ev) {
-          modal.hidden = true;
-          if (host.closeGoPick) host.closeGoPick();
-          return refresh().then(function () { if (ev && ev.id) openDoneModal(ev.id); });
-        });
+        /* Sonstiges: gleich loggen, mit Foto und Notiz; angelegt wird erst beim Speichern */
+        modal.hidden = true;
+        if (host.closeGoPick) host.closeGoPick();
+        var repl = state.altReplace;
+        state.altReplace = null;
+        openDraftDone({ category: "alternative", title: "Sonstiges", visibility: vis }, repl, "Sonstiges");
       });
       pick.appendChild(startBtn);
       return;
@@ -3648,9 +3665,75 @@
       : Promise.resolve("extra");
     ask.then(function (v) {
       if (!v) return;
-      state.altReplace = v === "instead" ? String(ev.id) : null;
-      if (host.openGoPick) host.openGoPick();
+      var replace = v === "instead" ? String(ev.id) : null;
+      setTimeout(function () { pickAltUnit(replace); }, 0);
     });
+  }
+
+  /* Alternative aus der Liste der Einzeleinheiten: erst Art, dann Einheit, dann loggen.
+     Ein Event entsteht erst beim Loggen (Abbrechen legt nichts an). */
+  var ALT_KINDS = [
+    { label: "🤸 Bewegung (z. B. Schritte)", value: "alternative" },
+    { label: "🏋️ Kraft", value: "kraft" },
+    { label: "🏃 Ausdauer", value: "ausdauer" },
+    { label: "🔥 Zirkeltraining", value: "zirkel" }
+  ];
+  function pickAltUnit(replace) {
+    GoDialog.choose("Was machst Du stattdessen?", ALT_KINDS).then(function (kind) {
+      if (!kind) return;
+      if (kind === "zirkel") {
+        return loadZirkelCourse().then(function (cid) {
+          if (host.openZirkel) host.openZirkel({
+            onSaved: function () {
+              return createUnplannedEvent({ category: "zirkel", course_id: cid, title: "Zirkeltraining", status: "erledigt" })
+                .then(function () { return markReplaced(replace); })
+                .then(function () { if (global.GoTama) GoTama.invalidate(); return refresh(); })
+                .catch(function () {});
+            }
+          });
+        });
+      }
+      return loadSingleUnits(kind).then(function (units) {
+        if (!units.length) { GoDialog.alert("Noch keine Einheiten in dieser Kategorie."); return; }
+        return GoDialog.choose("Welche Einheit?", units.map(function (u) {
+          return { label: (emojiFor(kind, u.title) + " " + u.title).trim(), value: String(u.id) };
+        })).then(function (uid) {
+          if (!uid) return;
+          var unit = units.filter(function (u) { return String(u.id) === uid; })[0] || {};
+          /* Bewegung (alternative) hat in der DB keinen Kurs, nur den Titel */
+          var payload = { category: kind, course_id: kind === "alternative" ? null : unit.id, title: unit.title, visibility: "team" };
+          if (kind === "alternative") {
+            /* Bewegung: direkt loggen (Foto, Notiz, privat oder zeigen) */
+            openDraftDone(payload, replace, unit.title);
+            return;
+          }
+          /* Kraft und Ausdauer brauchen ein Event fürs Workout bzw. die Uhr */
+          return createUnplannedEvent(payload).then(function (nev) {
+            return markReplaced(replace).then(function () { return refresh(); }).then(function () {
+              if (kind === "kraft" && host.openEventWorkout) { host.openEventWorkout(nev); return; }
+              if (kind === "ausdauer" && global.GoTimer) {
+                GoTimer.start({ id: nev.id, title: nev.title || "Ausdauer", minutes: 30 });
+                return;
+              }
+              openDoneModal(nev.id, { title: "Schreib, wie es war", placeholder: "Wie war es?" });
+            });
+          });
+        });
+      });
+    });
+  }
+  function markReplaced(replace) {
+    if (!replace) return Promise.resolve();
+    return rest("events?id=eq." + encodeURIComponent(replace) + "&status=eq.geplant", {
+      method: "PATCH", prefer: "return=minimal", body: { status: "ausgefallen" }
+    }).catch(function () {});
+  }
+  /* Erledigt-Dialog ohne Event: angelegt wird erst bei „Speichern“ */
+  function openDraftDone(payload, replace, title) {
+    state.doneDraft = { payload: payload, replace: replace || null };
+    var modal = $("acc-done-modal");
+    if (!modal) return;
+    openDoneModal("draft", { title: title || "Erledigt", placeholder: "Wie war es? (optional)" });
   }
 
   function moveToTomorrow(ev) {
