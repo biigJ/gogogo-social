@@ -323,8 +323,9 @@
           '<ul class="gpl__days">' + days(c).map(function (s) {
             return "<li><b>" + DAYS[s.session_no - 1] + "</b>" + esc(s.title) + "</li>";
           }).join("") + "</ul>" +
-          '<button type="button" class="gpl__btn" data-gpp-apply="' + esc(c.id) + '">Anwenden</button></div></article>';
+          '<button type="button" class="gpl__btn" data-gpp-apply="' + esc(c.id) + '">' + (st.onPick ? "Auswählen" : "Anwenden") + "</button></div></article>";
       }).join("") + "</div>" +
+      (st.mode === "coach" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-close>Abbrechen</button>' : "") +
       (st.mode === "self" ? '<button type="button" class="gpl__link" data-gpp-goals>Ziel ändern</button>' : "");
   }
 
@@ -490,7 +491,11 @@
       return;
     }
     var ap = t.closest("[data-gpp-apply]");
-    if (ap) return startArrange(ap.getAttribute("data-gpp-apply"));
+    if (ap) {
+      /* Nur auswählen (Coach-Portal: Feld „Wochenplan“): Plan zurückgeben, nichts anlegen */
+      if (st.onPick) { var cb = st.onPick, pid = ap.getAttribute("data-gpp-apply"); close(); cb(pid); return; }
+      return startArrange(ap.getAttribute("data-gpp-apply"));
+    }
     if (t.closest("[data-gpp-back-list]")) return paintList();
     var conf = t.closest("[data-gpp-confirm]");
     if (conf) return confirmApply(conf);
@@ -544,7 +549,7 @@
       root: root, body: root.querySelector(".gpl__body"), title: root.querySelector("h2"),
       host: opts.host, mode: opts.mode === "coach" ? "coach" : "self",
       userId: opts.userId || (opts.host.me && opts.host.me()), userName: opts.userName || "",
-      onDone: opts.onDone, onEditWeek: opts.onEditWeek, goals: [], plans: null, step: "load",
+      onDone: opts.onDone, onEditWeek: opts.onEditWeek, onPick: opts.onPick, goals: [], plans: null, step: "load",
       arrangeOnly: !!(opts.arrange && opts.arrange.courseId), weeks: (opts.arrange && opts.arrange.weeks) || 0
     };
     st.title.textContent = "Wochenpläne";
