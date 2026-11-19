@@ -8016,7 +8016,7 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-10"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-6"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-7"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-3"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
@@ -8080,6 +8080,10 @@
         if (sessionMode && new URLSearchParams(location.search).get("plan") === "team") {
           shellTab = "team";
           planPane = "team";
+        }
+        /* ?admin=1 (zurück aus dem Editor): Profil malen, dort öffnet sich Admin */
+        if (sessionMode && new URLSearchParams(location.search).get("admin")) {
+          setTimeout(function () { showPlan("profil"); }, 0);
         }
       } catch (ePlan) {}
       var teamPeople = [];
@@ -15913,6 +15917,15 @@
           adminBtn.addEventListener("click", function () { GoAdmin.open(adminHost); });
           meSlide.appendChild(adminBtn);
           paintAdminBadge();
+          /* Zurück aus dem Editor (?admin=1): wieder auf Admin-Ebene, nicht in die App */
+          try {
+            var adminQ = new URLSearchParams(location.search).get("admin");
+            if (adminQ && !window.__goAdminOpened) {
+              window.__goAdminOpened = true;
+              history.replaceState(null, "", location.pathname);
+              setTimeout(function () { GoAdmin.open(adminHost, adminQ === "1" ? "news" : adminQ); }, 50);
+            }
+          } catch (eAdm) {}
         }
         meSlide.appendChild(editBtn);
         meSlide.appendChild(settingsBtn);
