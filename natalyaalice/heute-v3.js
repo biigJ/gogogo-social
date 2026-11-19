@@ -1056,7 +1056,10 @@
     if (ev.status === "geplant") {
       /* Eigene Events von heute bleiben bis Mitternacht sichtbar, damit man sie nachträglich abschließen kann */
       if (mine && t <= week && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString())) return true;
-      if (t < now - 3600000 || t > week) return false;
+      /* Kreise oben (todayAll): heutige Trainings der Freunde bis Mitternacht, auch wenn die Uhrzeit vorbei ist
+         (Plan-Events ohne Uhrzeit stehen auf 12:00 UTC und fielen sonst ab 14 Uhr raus) */
+      var todayKeep = flags.todayAll && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString());
+      if ((t < now - 3600000 && !todayKeep) || t > week) return false;
       if (mine) return true;
       if (flags.showRsvpdUpcoming && iAmGoing(ev.id)) {
         return inGroupFilter(ev.user_id, flags);
@@ -4183,6 +4186,7 @@
   function todayActivity() {
     var today = todayIso();
     var flags = viewFlags("alles");
+    flags.todayAll = true;
     var out = {};
     (state.events || []).forEach(function (ev) {
       if (!ev || dayKey(ev.starts_at) !== today || ev.status === "ausgefallen") return;
@@ -4209,6 +4213,7 @@
     var t = todayIso();
     /* Flags mitgeben: ohne sie scheiterte die Prüfung bei Freunden (ging nur beim eigenen Kreis) */
     var flags = viewFlags("alles");
+    flags.todayAll = true;
     var list = (state.events || []).filter(function (e) {
       return String(e.user_id) === String(personId) && e.status !== "ausgefallen" &&
         evDayIso(e) === t && eventVisibleToMe(e, flags);
