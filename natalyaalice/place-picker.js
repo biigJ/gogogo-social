@@ -1,5 +1,6 @@
 /* Ortswähler: gemeinsame Ortsliste (go_workout_places, wächst für alle) + Suche + Karte.
-   GoPlacePicker.mount(el, { rest, accountId, value, onChange })  → { value(), remember() } */
+   GoPlacePicker.mount(el, { rest, accountId, value, onChange })  → { value(), remember() }
+   Favoriten: ★ merkt den Ort in go_accounts.workout_places (höchstens 12), Favoriten stehen vorn. */
 (function (global) {
   var places = null;
   var loading = null;
@@ -51,24 +52,99 @@
     var marker = null;
     var searchTimer = null;
 
+    var favs = [];
     el.innerHTML =
       '<div class="gpp">' +
-      '<input class="gpp__search" type="search" placeholder="Ort suchen oder eingeben" value="' + esc(current ? current.name : "") + '" />' +
+      '<div class="gpp__top"><input class="gpp__search" type="search" placeholder="Ort suchen oder eingeben" value="' + esc(current ? current.name : "") + '" />' +
+      '<button type="button" class="gpp__fav" aria-label="Als Favorit merken" aria-pressed="false">☆</button></div>' +
       '<div class="gpp__list"></div>' +
       '<div class="gpp__map" aria-label="Karte: tippen setzt den Ort"></div>' +
       "</div>";
     var input = el.querySelector(".gpp__search");
     var list = el.querySelector(".gpp__list");
     var mapEl = el.querySelector(".gpp__map");
+    var favBtn = el.querySelector(".gpp__fav");
+
+    function isFav(name) {
+      var n = String(name || "").toLowerCase();
+      return favs.some(function (f) { return f.toLowerCase() === n; });
+    }
+    function paintFav() {
+      var on = !!(current && isFav(current.name));
+      favBtn.textContent = on ? "★" : "☆";
+      favBtn.classList.toggle("is-on", on);
+      favBtn.setAttribute("aria-pressed", on ? "true" : "false");
+      favBtn.disabled = !current;
+    }
+    function loadFavs() {
+      if (!opts.accountId) return Promise.resolve();
+      return rest("go_accounts?id=eq." + encodeURIComponent(opts.accountId) + "&select=workout_places")
+        .then(function (rows) {
+          var raw = rows && rows[0] && rows[0].workout_places;
+          if (typeof raw === "string") { try { raw = JSON.parse(raw); } catch (e) { raw = []; } }
+          favs = (Array.isArray(raw) ? raw : []).map(function (x) { return x && typeof x === "object" ? x.name : x; })
+            .filter(function (x) { return x && String(x).trim(); }).map(function (x) { return String(x).trim(); });
+        })
+        .catch(function () { favs = []; });
+    }
+    function saveFavs() {
+      if (!opts.accountId) return;
+      rest("go_accounts?id=eq." + encodeURIComponent(opts.accountId), {
+        method: "PATCH",
+        prefer: "return=minimal",
+        body: { workout_places: favs.slice(0, 12), workout_place: favs[0] || "" }
+      }).catch(function () {});
+    }
+    favBtn.addEventListener("click", function () {
+      if (!current) return;
+      if (isFav(current.name)) {
+        favs = favs.filter(function (f) { return f.toLowerCase() !== current.name.toLowerCase(); });
+      } else {
+        if (favs.length >= 12) favs.pop();
+        favs.unshift(current.name);
+      }
+      saveFavs();
+      paintFav();
+      renderShared(input.value.trim() === (current && current.name) ? "" : input.value.trim());
+    });
+
+    /* Ort ohne Koordinaten: einmal nachschlagen, damit die Karte stimmt */
+    function locate(p) {
+      if (!p || p.lat != null || p._looked) return;
+      p._looked = true;
+      fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(p.name + ", Berlin") +
+        "&viewbox=13.088,52.338,13.761,52.675&bounded=1", { headers: { "Accept-Language": "de" } })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (rows) {
+          var r = rows && rows[0];
+          if (!r || !current || current.name !== p.name) return;
+          p.lat = parseFloat(r.lat);
+          p.lng = parseFloat(r.lon);
+          setCurrent(p, true);
+        })
+        .catch(function () {});
+    }
+    function catalogHit(name) {
+      var n = String(name || "").toLowerCase();
+      return (places || []).filter(function (x) { return x.name.toLowerCase() === n; })[0] || null;
+    }
 
     function setCurrent(p, fromTyping) {
       current = p && p.name ? p : null;
       if (!fromTyping && current) input.value = current.name;
-      if (current && current.lat != null && map) {
-        map.setView([current.lat, current.lng], 15);
-        if (marker) map.removeLayer(marker);
-        marker = global.L.marker([current.lat, current.lng]).addTo(map);
+      if (current && current.lat == null) {
+        var hit = catalogHit(current.name);
+        if (hit && hit.lat != null) current = hit;
       }
+      if (map) {
+        if (marker) { map.removeLayer(marker); marker = null; }
+        if (current && current.lat != null) {
+          map.setView([current.lat, current.lng], 15);
+          marker = global.L.marker([current.lat, current.lng]).addTo(map);
+        }
+      }
+      if (current && current.lat == null && !fromTyping) locate(current);
+      paintFav();
       [].forEach.call(list.children, function (b) {
         b.classList.toggle("is-on", current && b.getAttribute("data-name") === current.name);
       });
@@ -88,10 +164,15 @@
     function renderShared(q) {
       list.textContent = "";
       var needle = String(q || "").toLowerCase();
+      favs.filter(function (f) { return !needle || f.toLowerCase().indexOf(needle) >= 0; })
+        .forEach(function (f) { list.appendChild(row(catalogHit(f) || { name: f }, "★")); });
       (places || [])
-        .filter(function (p) { return !needle || p.name.toLowerCase().indexOf(needle) >= 0; })
+        .filter(function (p) { return !isFav(p.name) && (!needle || p.name.toLowerCase().indexOf(needle) >= 0); })
         .slice(0, 8)
         .forEach(function (p) { list.appendChild(row(p, "")); });
+      [].forEach.call(list.children, function (b) {
+        b.classList.toggle("is-on", !!(current && b.getAttribute("data-name") === current.name));
+      });
     }
 
     function searchOsm(q) {
@@ -126,16 +207,22 @@
       if (q.length >= 3) searchTimer = setTimeout(function () { searchOsm(q); }, 400);
     });
 
-    loadPlaces(rest).then(function () { renderShared(""); });
+    var dataReady = Promise.all([loadPlaces(rest), loadFavs()]).then(function () { renderShared(""); });
+    paintFav();
 
     ensureLeaflet()
       .then(function (L) {
         map = L.map(mapEl, { zoomControl: false, attributionControl: false }).setView([52.5, 13.4], 11);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
         if (map.tap) map.tap.disable();
+        /* Sheet animiert noch: Größe neu messen, sobald die Karte sichtbar ist */
         setTimeout(function () { map.invalidateSize(); }, 200);
-        var known = current && (places || []).filter(function (p) { return p.name === current.name; })[0];
-        if (known && known.lat != null) setCurrent(known);
+        setTimeout(function () { map.invalidateSize(); if (current && current.lat != null) map.setView([current.lat, current.lng], 15); }, 700);
+        if (global.ResizeObserver) {
+          new ResizeObserver(function () { if (map) map.invalidateSize(); }).observe(mapEl);
+        }
+        /* erst wenn Ortsliste UND Karte da sind, gespeicherten Ort setzen */
+        dataReady.then(function () { if (current) setCurrent(current, false); });
         map.on("click", function (e) {
           var lat = e.latlng.lat, lng = e.latlng.lng;
           var name = input.value.trim() || "Treffpunkt";
