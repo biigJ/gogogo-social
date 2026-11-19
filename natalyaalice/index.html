@@ -4086,6 +4086,32 @@
     .friend-list__feed svg { width: 16px; height: 16px; }
     .friend-list__feed.is-on { background: #2A2118; color: #F3EEE4; border-color: #2A2118; }
     .friend-list__feed.is-fixed { background: transparent; color: #2A2118; border-color: #2A2118; cursor: default; }
+    /* Meine Freunde: Liste (Kreis) oder Wallet (Quadrat) */
+    .friend-view { display: flex; justify-content: center; gap: 10px; margin: -2px 0 12px; }
+    .friend-view button { width: 36px; height: 36px; padding: 0; border: 0; background: none; color: rgba(42,33,24,.4); display: grid; place-items: center; cursor: pointer; }
+    .friend-view button.is-on { color: #2A2118; }
+    .friend-view svg { width: 22px; height: 22px; }
+    .friend-wallet { height: max(420px, calc(100dvh - 330px)); overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-width: none; display: grid; gap: 12px; grid-auto-rows: 100%; }
+    .friend-wallet::-webkit-scrollbar { display: none; }
+    .friend-wallet[hidden], .friend-list > [hidden] { display: none !important; }
+    .fw-card { position: relative; scroll-snap-align: start; scroll-snap-stop: always; border-radius: 22px; overflow: hidden; background: #2A2118 center/cover no-repeat; color: #fff; display: flex; flex-direction: column; justify-content: flex-end; cursor: pointer; }
+    .fw-card::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 22%, rgba(0,0,0,.55) 55%, rgba(0,0,0,.82) 100%); }
+    .fw-card__body { position: relative; padding: 18px 18px 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; max-height: 86%; overflow: hidden; }
+    .friend-wallet .fw-card__name { margin: 0; font: 600 30px/1.1 'Playfair Display', Georgia, serif !important; color: #fff; }
+    .friend-wallet .fw-card__nick { display: block; margin-top: 2px; font: 500 15px/1.3 Inter, system-ui, sans-serif; color: rgba(255,255,255,.8); }
+    .fw-card__tags { display: grid; gap: 6px; }
+    .fw-tag { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #fff; }
+    .fw-tag i { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; box-sizing: border-box; display: grid; place-items: center; }
+    .fw-tag i svg { width: 11px; height: 11px; }
+    .fw-tag.is-on i { background: #fff; color: #2A2118; }
+    .fw-tag:not(.is-on) i { color: #fff; }
+    .fw-card__text { margin: 0; font-size: 15px; line-height: 1.4; color: #fff; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .fw-card__mantra { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin: 0; font: italic 500 16px/1.35 'Playfair Display', Georgia, serif; color: #fff; }
+    .fw-card__links { display: flex; gap: 14px; flex-wrap: wrap; }
+    .fw-card__links a { color: #fff; text-decoration: underline; text-underline-offset: 3px; font-size: 15px; }
+    .fw-card__orte { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+    .fw-card__orte span { max-width: 100%; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 4px 10px; border: 1px solid rgba(255,255,255,.6); border-radius: 999px; font-size: 13px; color: #fff; }
+    .fw-card__face { position: absolute; inset: 0; display: grid; place-items: center; font: 600 96px/1 'Playfair Display', Georgia, serif !important; color: rgba(255,255,255,.25); }
     .friend-list__hint { margin: 0 4px 10px; font-size: 14px; color: rgba(42,33,24,.65); line-height: 1.4; text-align: center; }
     .friend-list__nick { margin-left: 8px; font-size: 15px; font-weight: 500; opacity: .6; }
     .friend-list { display: flex; flex-direction: column; gap: 14px; padding: 8px 0 24px; }
@@ -15731,6 +15757,125 @@
       function ffcContextGroup() {
         return myGroups().filter(isFfcGroup)[0] || null;
       }
+      /* Wallet in Meine Freunde: eine Karte je Freund, Foto als Hintergrund.
+         Ohne 12-Wochenroutine und Zirkel-Score. Details (Über mich, Links, Orte, Mantra) einmal nachgeladen */
+      var friendExtras = {};
+      var CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+      function fillFriendCard(card, p, circles) {
+        var x = friendExtras[String(p.id)] || {};
+        var about = profileAbout(x);
+        var body = card.querySelector(".fw-card__body");
+        body.textContent = "";
+        var h = document.createElement("h3");
+        h.className = "fw-card__name";
+        h.textContent = String(p.name || p.nickname || "Freund").split(" ")[0];
+        if (p.nickname) {
+          var nk = document.createElement("span");
+          nk.className = "fw-card__nick";
+          nk.textContent = "@" + p.nickname;
+          h.appendChild(nk);
+        }
+        body.appendChild(h);
+        var tags = document.createElement("div");
+        tags.className = "fw-card__tags";
+        function tag(label, on) {
+          var t = document.createElement("span");
+          t.className = "fw-tag" + (on ? " is-on" : "");
+          t.innerHTML = "<i>" + CHECK_SVG + "</i>";
+          t.appendChild(document.createTextNode(label));
+          tags.appendChild(t);
+        }
+        var isGo = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(String(p.id));
+        var mineId = String((sessionAccount && sessionAccount.id) || "");
+        var isMyCoach = sessionAccount && sessionAccount.trainer_id && String(p.id) === String(sessionAccount.trainer_id);
+        var isCoachee = p.trainer_id && String(p.trainer_id) === mineId;
+        if (isMyCoach) tag("mein Coach", false);
+        else if (isCoachee) tag("Coachee", false);
+        else if (isGo && !feedMuted[String(p.id)]) tag("aktiver Freund", true);
+        circles.forEach(function (c) { tag(c, false); });
+        if (tags.childElementCount) body.appendChild(tags);
+        if (about.text) {
+          var t = document.createElement("p");
+          t.className = "fw-card__text";
+          t.textContent = String(about.text);
+          body.appendChild(t);
+        }
+        var links = document.createElement("div");
+        links.className = "fw-card__links";
+        [["instagram", "Instagram"], ["linkedin", "LinkedIn"]].forEach(function (k) {
+          var url = about[k[0]] ? socialUrl(k[0], about[k[0]]) : "";
+          if (!url) return;
+          var a = document.createElement("a");
+          a.href = url;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.textContent = k[1];
+          links.appendChild(a);
+        });
+        if (links.childElementCount) body.appendChild(links);
+        var orte = placeNamesOf(x);
+        if (orte.length) {
+          var o = document.createElement("div");
+          o.className = "fw-card__orte";
+          orte.slice(0, 3).forEach(function (n) {
+            var sp = document.createElement("span");
+            sp.textContent = n;
+            o.appendChild(sp);
+          });
+          if (orte.length > 3) {
+            var more = document.createElement("span");
+            more.textContent = "+" + (orte.length - 3);
+            o.appendChild(more);
+          }
+          body.appendChild(o);
+        }
+        var mantra = String(x.mantra || "").trim();
+        if (mantra) {
+          var m = document.createElement("p");
+          m.className = "fw-card__mantra";
+          m.textContent = mantra;
+          body.appendChild(m);
+        }
+      }
+      function paintFriendWallet(wallet, people, inGroup) {
+        wallet.textContent = "";
+        var cards = [];
+        people.forEach(function (p) {
+          var circles = [];
+          String(inGroup[String(p.id)] || "").split(" · ").forEach(function (c) { if (c) circles.push(c); });
+          var ffcC = ffcCircleByNick[String(p.nickname || "").toLowerCase()];
+          if (ffcC && circles.indexOf("Circle " + ffcC) < 0) circles.push("Circle " + ffcC);
+          var card = document.createElement("article");
+          card.className = "fw-card";
+          if (p.photo_url) card.style.backgroundImage = "url(\"" + String(p.photo_url).replace(/"/g, "%22") + "\")";
+          else {
+            var face = document.createElement("span");
+            face.className = "fw-card__face";
+            face.textContent = String(p.name || p.nickname || "?").slice(0, 1).toUpperCase();
+            card.appendChild(face);
+          }
+          var body = document.createElement("div");
+          body.className = "fw-card__body";
+          card.appendChild(body);
+          card.addEventListener("click", function (e) {
+            if (e.target.closest("a")) return;
+            openProfile(p);
+          });
+          fillFriendCard(card, p, circles);
+          cards.push({ card: card, p: p, circles: circles });
+          wallet.appendChild(card);
+        });
+        var ids = people.map(function (p) { return String(p.id); })
+          .filter(function (id) { return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id) && !friendExtras[id]; });
+        if (!ids.length) return;
+        rest("go_accounts?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=id,about_me,mantra,workout_places")
+          .then(function (rows) {
+            (rows || []).forEach(function (r) { if (r && r.id) friendExtras[String(r.id)] = r; });
+            cards.forEach(function (c) { if (c.card.isConnected) fillFriendCard(c.card, c.p, c.circles); });
+          })
+          .catch(function () {});
+      }
+
       /* FFC-Circle je Nickname, auch für Freunde ohne gogogo-Konto (Zeile 2 in Meine Freunde) */
       var ffcCircleByNick = {};
       function syncFfcGroupIntoTeam() {
@@ -16161,6 +16306,37 @@
           hintTop.className = "friend-list__hint";
           hintTop.textContent = "Wähle 5 Freunde, mit denen Du Deine täglichen Events teilst.";
           list.appendChild(hintTop);
+          /* Ansicht: Kreis = Liste, Quadrat = Wallet mit Profilkarten (hoch/runter wischen) */
+          var walletOn = false;
+          try { walletOn = localStorage.getItem("gogogo_friends_view") === "wallet"; } catch (eV) {}
+          var viewBar = document.createElement("div");
+          viewBar.className = "friend-view";
+          viewBar.setAttribute("role", "radiogroup");
+          viewBar.setAttribute("aria-label", "Ansicht");
+          viewBar.innerHTML =
+            '<button type="button" role="radio" data-fview="list" aria-label="Liste"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></button>' +
+            '<button type="button" role="radio" data-fview="wallet" aria-label="Wallet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/></svg></button>';
+          list.appendChild(viewBar);
+          var wallet = document.createElement("div");
+          wallet.className = "friend-wallet";
+          wallet.hidden = true;
+          function applyFriendView() {
+            [].forEach.call(viewBar.querySelectorAll("[data-fview]"), function (b) {
+              var on = (b.getAttribute("data-fview") === "wallet") === walletOn;
+              b.classList.toggle("is-on", on);
+              b.setAttribute("aria-checked", on ? "true" : "false");
+            });
+            [].forEach.call(list.querySelectorAll(".friend-list__row:not(.friend-list__add), .coach-empty"), function (r) { r.hidden = walletOn; });
+            wallet.hidden = !walletOn;
+            if (walletOn && !wallet.childElementCount) paintFriendWallet(wallet, people, inGroup);
+          }
+          viewBar.addEventListener("click", function (e) {
+            var b = e.target.closest("[data-fview]");
+            if (!b) return;
+            walletOn = b.getAttribute("data-fview") === "wallet";
+            try { localStorage.setItem("gogogo_friends_view", walletOn ? "wallet" : "list"); } catch (eV2) {}
+            applyFriendView();
+          });
           /* Oben: Kreis mit + → Freund per Nickname oder ID suchen */
           var addRow = document.createElement("button");
           addRow.type = "button";
@@ -16245,6 +16421,8 @@
             }
             list.appendChild(row);
           });
+          list.appendChild(wallet);
+          applyFriendView();
           slide.appendChild(list);
           box.appendChild(slide);
         })();
