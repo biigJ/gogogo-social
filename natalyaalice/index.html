@@ -1431,7 +1431,8 @@
     .heute-refresh { display: none; }
     body.is-session[data-shell="heute"] .heute-refresh {
       display: grid; place-items: center; position: absolute; right: 12px;
-      top: calc(max(6px, env(safe-area-inset-top, 0px)) + var(--heute-filter-line) + 4px);
+      /* mittig zur Dropdown-Zeile (vorher 8px tiefer) */
+      top: calc(max(6px, env(safe-area-inset-top, 0px)) + var(--heute-filter-line) - 4.5px);
       width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%;
       background: transparent; color: #2A2118; cursor: pointer;
     }
@@ -2259,7 +2260,8 @@
     .train-pop__card { width: min(100%, 420px); max-height: calc(100dvh - 48px); overflow: hidden; display: grid; gap: 10px; cursor: pointer; }
     .train-pop__who { margin: 0; text-align: center; color: #F6F1E8; font-weight: 700; font-size: 17px; }
     .train-pop__ev { pointer-events: none; border-radius: 18px; overflow: hidden; }
-    .train-pop__ev .acc-card__tools, .train-pop__ev .acc-card__teaser { display: none; }
+    .train-pop__ev .acc-card__tools, .train-pop__ev .acc-card__teaser, .train-pop__ev .acc-card__bar { display: none !important; }
+    .train-pop__ev .acc-card, .train-pop__ev .acc-card__media { border-radius: 18px !important; overflow: hidden; margin: 0 !important; }
     .train-pop.is-square .train-pop__ev .acc-card__media { aspect-ratio: 1 / 1 !important; height: auto !important; min-height: 0 !important; }
     .acc-badge-ico { display: block; color: #2A2118; width: 30px; height: 30px; }
     /* Pill-Woche-Kalender bleibt bei .app-pill svg (24px) — hier nur Event-Zeile */
@@ -7932,7 +7934,7 @@
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-2"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
-  <script src="/natalyaalice/tamagotchi.js?v=tama-3"></script>
+  <script src="/natalyaalice/tamagotchi.js?v=tama-4"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-6"></script>
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
@@ -7942,7 +7944,7 @@
   <script src="/natalyaalice/go-dialog.js?v=dlg-2"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-4"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-56"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-57"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-2"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-43"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
@@ -19176,6 +19178,15 @@
           else if (tab === "profil") showPlan("profil");
           else {
             if (window.WocheReels) WocheReels.hide();
+            /* Aktuell erneut tippen: Profilkreise zurück an den Anfang */
+            if (tab === "heute" && document.body.dataset.shell === "heute") {
+              ["heute-stories-row", "heute-stories"].forEach(function (sid) {
+                var storyRow = document.getElementById(sid);
+                if (!storyRow) return;
+                if (storyRow.scrollTo) storyRow.scrollTo({ left: 0, behavior: "smooth" });
+                else storyRow.scrollLeft = 0;
+              });
+            }
             if (
               tab === "heute" &&
               window.HeuteAccountability &&
