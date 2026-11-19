@@ -1,7 +1,7 @@
 /* admin-inbox.js — Admin in der App (nur Joscha / Ben)
  *
- *   GoAdmin.open(host)        → Vollbild: Nachrichten (neue Nutzer, Buchungen), Coaches freischalten,
- *                               Erinnerungen (WhatsApp 19 Uhr als Checkliste, go-wa-reminder.sql)
+ *   GoAdmin.open(host, tab)   → Vollbild mit Burger-Menü: Nachrichten, Erinnerungen, Nutzer (Ziele, Coach nach Anfrage,
+ *                               Löschen), Videos (Einreichungen aufnehmen/ablehnen), Editor (/workout/kurse/)
  *   GoAdmin.unread(host)      → Promise<Anzahl neuer Nachrichten seit dem letzten Öffnen>
  *
  * host: rest(path, opts), sessionAccount, toast(msg)
@@ -38,7 +38,21 @@
     ".ga-del{margin-left:6px;color:#C7413B;border-color:#C7413B}" +
     ".ga-wa{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:#128C7E;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-grid;place-items:center}" +
     ".ga-item.is-sent{opacity:.5}" +
-    ".ga-msg{display:block;font-size:13px;color:rgba(42,33,24,.75);margin-top:2px}";
+    ".ga-msg{display:block;font-size:13px;color:rgba(42,33,24,.75);margin-top:2px}" +
+    ".ga-bar{display:grid;grid-template-columns:31px 1fr 31px;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 8px;position:relative}" +
+    ".ga-bar h2{margin:0;text-align:center;font:600 22px/1.2 'Playfair Display',Georgia,serif}" +
+    ".ga-round{width:31px;height:31px;padding:0;border:1px solid #2A2118;border-radius:50%;display:grid;place-items:center;background:transparent;color:#2A2118;cursor:pointer}" +
+    ".ga-burger span{display:block;width:13px;height:1.5px;background:currentColor;border-radius:1px;box-shadow:0 -4px 0 currentColor,0 4px 0 currentColor}" +
+    ".ga-menu{position:absolute;left:0;right:0;top:100%;z-index:3;background:#F3EEE4;padding:0 20px 10px;box-shadow:0 14px 24px rgba(42,33,24,.12)}" +
+    ".ga-menu[hidden]{display:none}" +
+    ".ga-menu button{display:block;width:100%;padding:14px 2px;border:0;border-bottom:1px solid rgba(42,33,24,.2);border-radius:0;background:transparent;color:#2A2118;font:500 16px/1.35 Inter,system-ui,sans-serif;text-align:left;cursor:pointer}" +
+    ".ga-menu button.is-on{font-weight:700}" +
+    ".ga-new{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#C7413B;color:#fff;font-size:11px;font-weight:700;vertical-align:2px}" +
+    ".ga-req{display:inline-block;margin-top:3px;padding:2px 8px;border-radius:999px;border:1px solid #2A2118;font-size:12px;font-weight:600}" +
+    ".ga-goal{display:block;margin-top:2px;font-size:13px;color:rgba(42,33,24,.75);text-decoration:underline;background:none;border:0;padding:0;font-family:inherit;cursor:pointer;text-align:left}" +
+    ".ga-acts{display:flex;flex-direction:column;gap:6px;align-items:flex-end}" +
+    ".ga-acts .ga-del{margin-left:0}" +
+    "@media (min-width:900px){.cp .cp-body{max-width:760px;margin:0 auto;width:100%;box-sizing:border-box}}";
 
   function ensureCss() {
     if (document.getElementById("ga-css")) return;
@@ -129,10 +143,17 @@
     return !!(acc && acc.is_trainer);
   }
 
+  /* Coach-Rolle vergeben nur nach eigener Anfrage („möchte Coach werden“); bestehende Coaches können entzogen werden */
+  function coachRequested(id) {
+    return ((st.data && st.data.bookings) || []).some(function (b) {
+      return b && b.type === "coach_offer" && String(b.account_id) === String(id);
+    });
+  }
   function coachBtn(id) {
     var on = trainerOf(id);
+    if (!on && !coachRequested(id)) return "";
     return '<button type="button" class="ga-act' + (on ? " is-on" : "") + '" data-ga-coach="' + esc(id) + '" data-on="' + (on ? "1" : "0") + '">' +
-      (on ? "Coach ✓" : "Freischalten") + "</button>";
+      (on ? "Coach ✓" : "Als Coach freischalten") + "</button>";
   }
 
   function paintNews() {
@@ -161,28 +182,95 @@
       if (!!y.is_trainer !== !!x.is_trainer) return y.is_trainer ? 1 : -1;
       return String(x.name || "").localeCompare(String(y.name || ""), "de");
     });
-    return '<p class="cp-hint">Coaches sehen „Du bist Coach“, ihr Team und das Coach-Portal. Den Kurs-Editor gibt es nur hier im Admin-Bereich.</p>' +
+    if (!st.goals) loadGoals();
+    return '<p class="cp-hint">„Als Coach freischalten“ macht eine Person zum Coach: Sie sieht dann „Du bist Coach“, ihr Team und das Coach-Portal. Das geht nur, wenn sie es selbst angefragt hat (Plus → Coach werden). Tipp auf das Ziel ändert es.</p>' +
       accs.map(function (a) {
+        var id = String(a.account_id);
+        var req = !a.is_trainer && coachRequested(id);
+        var goal = st.goals && st.goals[id];
+        var del = id === String(me()) || ADMIN_IDS.indexOf(id) !== -1 ? "" :
+          '<button type="button" class="ga-act ga-del" data-ga-del="' + esc(id) + '" aria-label="Löschen">Löschen</button>';
+        var coach = coachBtn(id);
         return '<div class="ga-item">' + face(a) + '<div class="ga-copy"><p><b>' + esc(a.name || "?") + "</b></p>" +
-          '<span class="ga-when">seit ' + esc(when(a.at).split(" · ")[0]) + "</span></div>" + coachBtn(a.account_id) +
-          (String(a.account_id) === String(me()) || ADMIN_IDS.indexOf(String(a.account_id)) !== -1 ? "" : '<button type="button" class="ga-act ga-del" data-ga-del="' + esc(a.account_id) + '" aria-label="Löschen">Löschen</button>') +
+          '<span class="ga-when">seit ' + esc(when(a.at).split(" · ")[0]) + "</span>" +
+          '<button type="button" class="ga-goal" data-ga-goal="' + esc(id) + '">' + esc(goal || "Ziel hinzufügen") + "</button>" +
+          (req ? '<span class="ga-req">Coach-Anfrage gestellt</span>' : "") + "</div>" +
+          (coach || del ? '<div class="ga-acts">' + coach + del + "</div>" : "") +
           "</div>";
       }).join("");
   }
 
+  var TABS = [
+    { id: "news", label: "Nachrichten" },
+    { id: "wa", label: "Erinnerungen" },
+    { id: "coaches", label: "Nutzer" },
+    { id: "ex", label: "Videos" },
+    { id: "editor", label: "Editor" }
+  ];
+  function tabLabel(id) {
+    var t = TABS.filter(function (x) { return x.id === id; })[0];
+    return t ? t.label : "Admin";
+  }
+  function paintMenu() {
+    if (!st || !st.menu) return;
+    st.menu.innerHTML = TABS.map(function (t) {
+      return '<button type="button" data-ga-tab="' + t.id + '" class="' + (st.tab === t.id ? "is-on" : "") + '">' + t.label + "</button>";
+    }).join("");
+  }
   function paint() {
     if (!st) return;
+    if (st.title) st.title.textContent = tabLabel(st.tab);
+    paintMenu();
     if (st.error) {
       st.body.innerHTML = '<p class="cp-hint">' + esc(st.error) + "</p>";
       return;
     }
-    st.body.innerHTML =
-      '<div class="cp-seg"><button type="button" data-ga-tab="news" class="' + (st.tab === "news" ? "is-on" : "") + '">Nachrichten</button>' +
-      '<button type="button" data-ga-tab="coaches" class="' + (st.tab === "coaches" ? "is-on" : "") + '">Nutzer</button>' +
-      '<button type="button" data-ga-tab="wa" class="' + (st.tab === "wa" ? "is-on" : "") + '">Erinnerungen</button>' +
-      '<button type="button" data-ga-tab="ex" class="' + (st.tab === "ex" ? "is-on" : "") + '">Übungen</button></div>' +
-      (st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : paintCoaches()) +
-      '<button type="button" class="cp-btn cp-btn--ghost" data-ga-editor="1" style="margin-top:18px">Kurs-Editor (alle Wochenpläne)</button>';
+    st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : paintCoaches();
+  }
+
+  /* ---------- Ziele der Nutzer (go_accounts.training_goal, mehrere mit Komma) ---------- */
+  var GOAL_OPTIONS = ["Gesund laufen", "Rücken stärken", "Gesund bleiben", "Abnehmen", "Muskeln erhalten", "Gelenke schonen", "Hybrid Athlet"];
+  function loadGoals() {
+    st.goals = {};
+    var ids = (st.accounts || []).map(function (a) { return a.account_id; }).filter(Boolean);
+    if (!ids.length) return;
+    host.rest("go_accounts?id=in.(" + ids.join(",") + ")&select=id,training_goal")
+      .then(function (rows) {
+        if (!st) return;
+        (rows || []).forEach(function (r) { if (r.training_goal) st.goals[String(r.id)] = r.training_goal; });
+        if (st.tab === "coaches") paint();
+      })
+      .catch(function () {});
+  }
+  function editGoal(id) {
+    if (!global.GoDialog) return;
+    var person = (st.accounts || []).filter(function (a) { return String(a.account_id) === String(id); })[0];
+    var cur = String((st.goals && st.goals[id]) || "").split(/\s*,\s*/).filter(Boolean);
+    var opts = GOAL_OPTIONS.concat(cur.filter(function (c) { return GOAL_OPTIONS.indexOf(c) < 0; }));
+    var own = { label: "Eigenes Ziel …", value: "__own" };
+    GoDialog.pick("Ziele für " + ((person && person.name) || "diese Person"),
+      opts.map(function (o) { return { label: o, value: o, checked: cur.indexOf(o) >= 0 }; }).concat([own]), { ok: "Speichern" })
+      .then(function (vals) {
+        if (vals == null) return null;
+        var list = vals.filter(function (v) { return v !== "__own"; });
+        if (vals.indexOf("__own") < 0) return list;
+        return GoDialog.prompt("Eigenes Ziel", "", { ok: "Hinzufügen" }).then(function (t) {
+          t = String(t || "").trim();
+          if (t) list.push(t.slice(0, 60));
+          return list;
+        });
+      })
+      .then(function (list) {
+        if (list == null) return;
+        var val = list.join(", ") || null;
+        return host.rest("go_accounts?id=eq." + encodeURIComponent(id), { method: "PATCH", prefer: "return=minimal", body: { training_goal: val } })
+          .then(function () {
+            if (!st) return;
+            if (val) st.goals[String(id)] = val; else delete st.goals[String(id)];
+            paint();
+          })
+          .catch(function () { if (host.toast) host.toast("Ziel nicht gespeichert"); });
+      });
   }
 
   /* ---------- Erinnerungen: WhatsApp 19 Uhr als Checkliste ---------- */
@@ -268,23 +356,66 @@
     if (st.ex === "error") return '<p class="cp-hint">Liste nicht geladen. Ist go-uebung-einreichen.sql in Supabase ausgeführt?</p>';
     if (!st.ex) { loadEx(); return '<p class="cp-hint">Lade…</p>'; }
     if (!st.ex.rows.length) return '<p class="cp-hint">Keine offenen Einreichungen. Nutzer reichen unter Plus → Videos Übungen ein.</p>';
-    return st.ex.rows.map(function (r) {
-      return '<div class="ga-item"><div class="ga-copy"><p><b>' + esc(r.name) + "</b></p>" +
+    return '<p class="cp-hint">Tipp auf eine Einreichung: in die Liste aufnehmen oder ablehnen.</p>' + st.ex.rows.map(function (r) {
+      return '<div class="ga-item" data-ga-sub="' + esc(r.id) + '" style="cursor:pointer"><div class="ga-copy"><p><b>' + esc(r.name) + '</b><span class="ga-new">neu</span></p>' +
         '<span class="ga-msg">' + esc(st.ex.names[r.account_id] || "?") +
         (r.note ? (/^https?:\/\//.test(r.note)
           ? ' · <a href="' + esc(r.note) + '" target="_blank" rel="noopener">Video ansehen</a>'
           : " · " + esc(r.note)) : "") + "</span>" +
-        '<span class="ga-when">' + esc(when(r.created_at)) + "</span></div>" +
-        '<button type="button" class="ga-wa" style="background:#2A2118" data-ga-exdone="' + esc(r.id) + '">Erledigt</button></div>';
+        '<span class="ga-when">' + esc(when(r.created_at)) + "</span></div></div>";
     }).join("");
   }
-  function exDone(id) {
-    host.rest("go_exercise_submissions?id=eq." + encodeURIComponent(id), { method: "PATCH", prefer: "return=minimal", body: { done_at: new Date().toISOString() } })
+  function nameKey(n) { return String(n || "").trim().toLowerCase().replace(/\s+/g, " "); }
+  function decideSub(id) {
+    var row = ((st.ex && st.ex.rows) || []).filter(function (r) { return String(r.id) === String(id); })[0];
+    if (!row || !global.GoDialog) return;
+    GoDialog.choose(row.name, [
+      { label: "In Liste aufnehmen", value: "take" },
+      { label: "Ablehnen", value: "drop" }
+    ]).then(function (v) {
+      if (v === "take") acceptSub(row);
+      else if (v === "drop") rejectSub(row);
+    });
+  }
+  function dropRow(row) {
+    if (!st || !st.ex) return;
+    st.ex.rows = st.ex.rows.filter(function (r) { return String(r.id) !== String(row.id); });
+    paint();
+  }
+  function acceptSub(row) {
+    var key = nameKey(row.name);
+    var url = /^https?:\/\//.test(String(row.note || "")) ? String(row.note).trim() : "";
+    host.rest("go_exercise_catalog?on_conflict=name_key", {
+      method: "POST", prefer: "resolution=ignore-duplicates,return=minimal",
+      body: { name_key: key, name: String(row.name).trim(), created_by: me() }
+    })
       .then(function () {
-        st.ex.rows = st.ex.rows.filter(function (r) { return String(r.id) !== String(id); });
-        paint();
+        if (!url) return null;
+        return host.rest("go_exercise_media?on_conflict=name_key", {
+          method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+          body: { name_key: key, name: String(row.name).trim(), url: url, updated_by: me(), updated_at: new Date().toISOString() }
+        });
       })
-      .catch(function () { if (host.toast) host.toast("Ging nicht"); });
+      .then(function () {
+        return host.rest("go_exercise_submissions?id=eq." + encodeURIComponent(row.id), { method: "PATCH", prefer: "return=minimal", body: { done_at: new Date().toISOString() } });
+      })
+      .then(function () {
+        dropRow(row);
+        if (host.toast) host.toast("„" + row.name + "“ ist in der Liste");
+      })
+      .catch(function (err) {
+        if (host.toast) host.toast("Aufnehmen ging nicht: " + String((err && err.message) || "").slice(0, 80));
+      });
+  }
+  /* Ablehnen löscht die Einreichung (go-uebung-ablehnen.sql); ohne die Datei wird sie nur ausgeblendet */
+  function rejectSub(row) {
+    host.rest("go_exercise_submissions?id=eq." + encodeURIComponent(row.id), { method: "DELETE", prefer: "return=representation" })
+      .then(function (gone) {
+        if (gone && gone.length) return null;
+        return host.rest("go_exercise_submissions?id=eq." + encodeURIComponent(row.id), { method: "PATCH", prefer: "return=minimal", body: { done_at: new Date().toISOString() } });
+      })
+      .then(function () { dropRow(row); if (host.toast) host.toast("Abgelehnt"); })
+      .catch(function () { if (host.toast) host.toast("Ablehnen ging nicht"); });
   }
 
   /* Nutzer endgültig löschen (go-admin-delete-user.sql), zweimal bestätigen */
@@ -344,18 +475,19 @@
   }
 
   function onClick(e) {
-    if (e.target && e.target.closest && e.target.closest("[data-ga-editor]")) {
-      location.href = "/workout/kurse/?from=admin";
-      return;
-    }
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-close],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-exdone],[data-ga-del]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-del],[data-ga-goal]") : null;
+    if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
+    if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
     if (t.hasAttribute("data-ga-del")) { deleteAccount(t); return; }
-    if (t.hasAttribute("data-ga-exdone")) { exDone(t.getAttribute("data-ga-exdone")); return; }
+    if (t.hasAttribute("data-ga-goal")) { editGoal(t.getAttribute("data-ga-goal")); return; }
+    if (t.hasAttribute("data-ga-sub")) { decideSub(t.getAttribute("data-ga-sub")); return; }
     if (t.hasAttribute("data-ga-wa")) { markWa(t.getAttribute("data-ga-wa")); return; }
     if (t.hasAttribute("data-ga-close")) return close();
     if (t.hasAttribute("data-ga-tab")) {
-      st.tab = t.getAttribute("data-ga-tab");
+      var tab = t.getAttribute("data-ga-tab");
+      if (tab === "editor") { location.href = "/workout/kurse/?from=admin"; return; }
+      st.tab = tab;
       paint();
       return;
     }
@@ -376,14 +508,16 @@
     var root = document.createElement("div");
     root.className = "cp";
     root.innerHTML =
-      '<div class="cp-bar">' +
-      '<button type="button" class="cp-back" data-ga-close aria-label="Zurück">' +
-      '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-      "</button><h2>Admin</h2></div>" +
+      '<div class="ga-bar">' +
+      '<button type="button" class="ga-round" data-ga-close aria-label="Zurück">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      '</button><h2>Admin</h2><button type="button" class="ga-round ga-burger" data-ga-burger aria-label="Menü"><span></span></button>' +
+      '<div class="ga-menu" hidden></div></div>' +
       '<div class="cp-body"><p class="cp-hint">Lade…</p></div>';
     document.body.appendChild(root);
     document.body.classList.add("cp-open");
-    st = { root: root, body: root.querySelector(".cp-body"), tab: tab || "news", seenBefore: lastSeen(), data: null, accounts: [] };
+    st = { root: root, body: root.querySelector(".cp-body"), title: root.querySelector(".ga-bar h2"), menu: root.querySelector(".ga-menu"),
+      tab: tab || "news", seenBefore: lastSeen(), data: null, accounts: [] };
     root.addEventListener("click", onClick);
     load().then(function (data) {
       if (!st) return;
