@@ -42,7 +42,8 @@
     ".ga-bar{display:grid;grid-template-columns:31px 1fr 31px;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 8px;position:relative}" +
     ".ga-bar h2{margin:0;text-align:center;font:600 22px/1.2 'Playfair Display',Georgia,serif}" +
     ".ga-round{width:31px;height:31px;padding:0;border:1px solid #2A2118;border-radius:50%;display:grid;place-items:center;background:transparent;color:#2A2118;cursor:pointer}" +
-    ".ga-burger span{display:block;width:13px;height:1.5px;background:currentColor;border-radius:1px;box-shadow:0 -4px 0 currentColor,0 4px 0 currentColor}" +
+    ".ga-round.ga-burger{border:0;border-radius:0}" +
+    ".ga-burger span{display:block;width:30px;height:2.5px;background:currentColor;border-radius:2px;box-shadow:0 -11px 0 currentColor,0 11px 0 currentColor}" +
     ".ga-menu{position:absolute;left:0;right:0;top:100%;z-index:3;background:#F3EEE4;padding:0 20px 10px;box-shadow:0 14px 24px rgba(42,33,24,.12)}" +
     ".ga-menu[hidden]{display:none}" +
     ".ga-menu button{display:block;width:100%;padding:14px 2px;border:0;border-bottom:1px solid rgba(42,33,24,.2);border-radius:0;background:transparent;color:#2A2118;font:500 16px/1.35 Inter,system-ui,sans-serif;text-align:left;cursor:pointer}" +

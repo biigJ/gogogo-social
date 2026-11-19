@@ -957,6 +957,8 @@
   }
 
   function timeLabel(isoTs) {
+    /* Plan-Events ohne gewählte Uhrzeit (12:00 UTC): keine Uhrzeit anzeigen */
+    if (!hasTime({ starts_at: isoTs })) return "";
     try {
       return new Date(isoTs).toLocaleTimeString("de-DE", {
         timeZone: "Europe/Berlin",
@@ -981,8 +983,9 @@
       }
     })();
     var t = timeLabel(isoTs);
-    if (day === today) return "Heute · " + t;
-    if (day === tom) return "Morgen · " + t;
+    var sep = t ? " · " + t : "";
+    if (day === today) return "Heute" + sep;
+    if (day === tom) return "Morgen" + sep;
     try {
       var label = new Date(isoTs).toLocaleDateString("de-DE", {
         timeZone: "Europe/Berlin",
@@ -990,9 +993,9 @@
         day: "numeric",
         month: "short"
       });
-      return label.replace(/\.$/, "") + " · " + t;
+      return label.replace(/\.$/, "") + sep;
     } catch (e) {
-      return day + " · " + t;
+      return day + sep;
     }
   }
 

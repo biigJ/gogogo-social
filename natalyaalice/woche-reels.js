@@ -200,6 +200,15 @@
     }
   }
 
+  /* Anzeige: Plan-Events ohne gewählte Uhrzeit (genau 12:00 UTC) zeigen keine Uhrzeit */
+  function displayTime(ts) {
+    if (!ts) return "";
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    if (d.getUTCHours() === 12 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) return "";
+    return formatTime(ts);
+  }
+
   function toneClass(cat) {
     if (cat === "zirkel") return "tone-zirkel";
     if (cat === "ausdauer") return "tone-ausdauer";
@@ -1253,7 +1262,7 @@
     }
     var cat = ev.category || "kraft";
     var title = (emojiFor(cat, ev.title) + " " + (ev.title || cat)).trim();
-    var when = ev.starts_at ? formatTime(ev.starts_at) : "";
+    var when = ev.starts_at ? displayTime(ev.starts_at) : "";
     var zSet = parseZirkelNote(ev.note);
     var notePack = truncNote(zSet ? zirkelLabel(zSet) : ev.note || ev.description || "", 2);
     var place = ev.location || "";
@@ -3393,7 +3402,7 @@
   function shareTextFor(iso, eventId) {
     var ev = findOwnEvent(eventId);
     var title = (ev && ev.title) || "Training";
-    var when = formatDayLong(iso) + (ev ? " · " + formatTime(ev.starts_at) : "");
+    var when = formatDayLong(iso) + (ev && displayTime(ev.starts_at) ? " · " + displayTime(ev.starts_at) : "");
     return "Komm mit zu gogogo: " + title + " · " + when;
   }
 
