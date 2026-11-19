@@ -2139,7 +2139,7 @@
     .wr-course-card {
       display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
       width: 100%; text-align: left; border: 1px solid rgba(42,33,24,.18);
-      background: #fff; border-radius: 12px; padding: 12px; font: inherit; cursor: pointer;
+      background: #F6F1E8; color: #2A2118; border-radius: 12px; padding: 12px; font: inherit; cursor: pointer;
       margin-bottom: 8px;
     }
     .wr-course-card.is-on { border-color: #2A2118; background: #2A2118; color: #F6F1E8; }
@@ -6924,9 +6924,8 @@
       <span>Jetzt starten</span>
     </button>
     <div class="sand-modal" id="acc-comment-modal" hidden>
-      <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="acc-comment-title">
-        <h2 class="ask" id="acc-comment-title">Kommentar</h2>
-        <div class="acc-comment-modal__list" id="acc-comment-list"></div>
+      <div class="sand-card" role="dialog" aria-modal="true" aria-label="Kommentar schreiben">
+        <div class="acc-comment-modal__list" id="acc-comment-list" hidden></div>
         <form id="acc-comment-form">
           <textarea id="acc-comment-text" rows="4" maxlength="500" placeholder="Schreiben…" aria-label="Kommentar"></textarea>
           <button type="submit" class="routine-start" id="acc-comment-send">Senden</button>
@@ -8174,7 +8173,7 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-67"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-69"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-48"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
@@ -19615,7 +19614,10 @@
             if (it.dist_m) bits.push(it.dist_m >= 1000 ? (it.dist_m / 1000).toString().replace(".", ",") + " km" : it.dist_m + " m");
             if (it.load) bits.push(it.load);
             if (it.note) bits.push(it.note);
-            var counted = !!(it.sets && (it.reps || it.load));
+            /* Sätze, Wdh. und Gewicht immer loggbar (Pläne geben keine Sätze mehr vor);
+               nur reine Zeit/Strecke und Ausdauer-Blöcke bleiben zum Abhaken */
+            var timeOnly = !!((it.time_s || it.dist_m) && !it.reps);
+            var counted = !!(it.sets && (it.reps || it.load)) || (!timeOnly && bl.type !== "ausdauer");
             var ex = {
               id: "cs-" + sid + "-" + bi + "-" + ii,
               name: it.name,
@@ -19627,7 +19629,7 @@
             };
             if (counted) {
               ex.sets = Number(it.sets) || 3;
-              if (bl.type === "grund" || bl.type === "hypertrophie" || bl.type === "hybrid") {
+              if (bl.type === "grund" || bl.type === "hypertrophie" || bl.type === "hybrid" || bl.type === "finisher" || !bl.type) {
                 ex.weight = true;
                 ex.step = 1;
               }
@@ -21413,8 +21415,9 @@
           if (row.status !== "pending" && row.status !== "accepted") return false;
           var iso = String(row.workout_date || "").slice(0, 10);
           if (iso < today || iso > last) return false;
-          /* Ich: nur angenommene; Team+: auch offene von Freunden */
-          if (!showIncoming && row.status !== "accepted") return false;
+          /* Angenommene stehen als eigenes Event im Feed (heute-v3), hier nur noch offene */
+          if (row.status !== "pending") return false;
+          if (!showIncoming) return false;
           var key = String(row.from_id) + ":" + iso;
           if (seen[key]) return false;
           seen[key] = true;
