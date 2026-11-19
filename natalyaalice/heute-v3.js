@@ -593,6 +593,13 @@
         state.invites = {};
       })
       .then(function () {
+        /* Angenommene Einladungen ohne Event (z. B. Zirkel von Freunden): als eigenes Event im Feed */
+        /* nicht vorab leeren: parallele Renders würden die Karten sonst kurz verlieren */
+        var freeJob = rest("go_workout_invites?to_id=eq." + encodeURIComponent(id) +
+          "&event_id=is.null&status=eq.accepted&workout_date=gte." + encodeURIComponent(todayIso()) +
+          "&select=id,from_id,workout_date,workout_label,meet_time,place,status&order=workout_date.asc")
+          .then(function (rows) { state.freeInvites = rows || []; })
+          .catch(function () {});
         /* angenommene Einladungen zu meinen Events: Freund → meine Event-IDs (gegen Dopplung) */
         state.sentAccepted = {};
         var sentJob = rest("go_workout_invites?from_id=eq." + encodeURIComponent(id) + "&status=eq.accepted&event_id=not.is.null&workout_date=gte." +
@@ -605,7 +612,7 @@
           })
           .catch(function () {});
         /* eigene offene Anfragen (Winken) bleiben nach Neuladen ausgegraut */
-        return Promise.all([sentJob, rest("go_event_requests?from_id=eq." + encodeURIComponent(id) + "&status=eq.pending&select=event_id")
+        return Promise.all([freeJob, sentJob, rest("go_event_requests?from_id=eq." + encodeURIComponent(id) + "&status=eq.pending&select=event_id")
           .then(function (rows) {
             (rows || []).forEach(function (r) { if (r && r.event_id) state.waved[String(r.event_id)] = true; });
           })
@@ -984,6 +991,14 @@
     })();
     var t = timeLabel(isoTs);
     var sep = t ? " · " + t : "";
+    if (day === today && t) {
+      /* Countdown bis zum Start */
+      var ms = new Date(isoTs).getTime() - Date.now();
+      if (ms > 60000) {
+        var h = Math.floor(ms / 3600000), mi = Math.floor((ms % 3600000) / 60000);
+        sep += " · in " + (h ? h + " Std. " : "") + mi + " Min.";
+      }
+    }
     if (day === today) return "Heute" + sep;
     if (day === tom) return "Morgen" + sep;
     try {
@@ -2129,6 +2144,13 @@
       });
     }
 
+    (state.freeInvites || []).forEach(function (inv) {
+      var at = inviteStartsAt(inv);
+      var item = { kind: "inv", starts_at: at, _mine: true, inv: inv };
+      if (dayKey(at) === today) myToday.push(item);
+      else upcoming.push(item);
+    });
+
     ffc.forEach(function (ev) {
       if (flags.groupOnly && !ev.is_mine && ev.my_going !== true) return;
       var item = {
@@ -2228,9 +2250,92 @@
     if (item.kind === "ffc_post") return renderFfcPostCard(item.post);
     if (item.kind === "diary") return renderDiaryCard(item.item);
     if (item.kind === "plan") return renderPlanCard(item.item);
+    if (item.kind === "inv") return renderInviteEventCard(item.inv, item.starts_at);
     if (item.kind === "nutrition") return renderNutritionCard(item.item);
     if (item.kind === "support") return renderSupportCard(item.item);
     return renderEventCard(item.ev);
+  }
+
+  /* Zeitpunkt einer Einladung: Tag + Treffzeit (Berlin); ohne Zeit 12:00 UTC wie Plan-Events */
+  function inviteStartsAt(inv) {
+    var iso = String(inv.workout_date || "").slice(0, 10);
+    var m = /^(\d{1,2}):(\d{2})/.exec(String(inv.meet_time || ""));
+    if (!m) return iso + "T12:00:00+00:00";
+    var d = new Date(iso + "T" + (m[1].length < 2 ? "0" : "") + m[1] + ":" + m[2] + ":00");
+    try {
+      var berlin = new Date(d.toLocaleString("en-US", { timeZone: "Europe/Berlin" }));
+      var diff = berlin.getTime() - d.getTime();
+      return new Date(d.getTime() - diff).toISOString();
+    } catch (e) { return d.toISOString(); }
+  }
+  function inviteCategory(label) {
+    var l = String(label || "").toLowerCase();
+    if (/zirkel/.test(l)) return "zirkel";
+    return "alternative";
+  }
+  /* Angenommene Einladung = mein Event: Kreis startet/loggt, Absagen möglich */
+  function renderInviteEventCard(inv, at) {
+    var owner = personOf(inv.from_id);
+    var cat = inviteCategory(inv.workout_label);
+    var label = inv.workout_label || "Training";
+    var id = String(inv.id);
+    var today = dayKey(at) === todayIso();
+    return renderCardShell({
+      extraClass: "acc-card--inv",
+      attrs: ' data-post-id="inv-' + esc(id) + '" data-inv-card="' + esc(id) + '"',
+      category: cat,
+      emoji: emojiFor(cat, label),
+      author: authorHtml(personOf(me()), true),
+      when: whenLine(at),
+      title: (emojiFor(cat, label) + " " + label).trim(),
+      place: (inv.place ? inv.place + " · " : "") + "mit " + String(owner.name || "Freund").split(" ")[0],
+      actions:
+        '<div class="acc-card__tools"><div class="acc-card__tools-left">' +
+        (today
+          ? '<button type="button" class="acc-tool acc-tool--check" data-inv-start="' + esc(id) + '" aria-label="Starten und loggen">' + CIRCLE_SVG + "</button>"
+          : "") +
+        '<button type="button" class="acc-rsvp" data-inv-cancel="' + esc(id) + '">Absagen</button>' +
+        "</div></div>"
+    });
+  }
+  function inviteById(id) {
+    return (state.freeInvites || []).filter(function (r) { return String(r.id) === String(id); })[0] || null;
+  }
+  /* Starten: eigenes Event anlegen (an die Einladung gebunden), dann wie ein eigenes Event starten */
+  function startInvite(id) {
+    var inv = inviteById(id);
+    if (!inv) return;
+    var cat = inviteCategory(inv.workout_label);
+    var courseP = cat === "zirkel" ? loadZirkelCourse() : Promise.resolve(null);
+    courseP.then(function (cid) {
+      return createUnplannedEvent({
+        category: cat, course_id: cat === "zirkel" ? cid : null,
+        title: inv.workout_label || "Training", starts_at: inviteStartsAt(inv),
+        location: inv.place || null, visibility: "team"
+      });
+    }).then(function (ev) {
+      return rest("go_workout_invites?id=eq." + encodeURIComponent(inv.id), {
+        method: "PATCH", prefer: "return=minimal", body: { event_id: ev.id }
+      }).catch(function () {}).then(function () { return refresh(); }).then(function () {
+        var real = evById(ev.id) || ev;
+        startEvent(real);
+      });
+    }).catch(function () { if (host.toast) host.toast("Starten ging gerade nicht"); });
+  }
+  function cancelInvite(id) {
+    var inv = inviteById(id);
+    if (!inv) return;
+    var who = String(personOf(inv.from_id).name || "Deinem Freund").split(" ")[0];
+    ask("Bei " + who + " absagen?\n\n" + (inv.workout_label || "Training"), "Absagen").then(function (yes) {
+      if (!yes) return;
+      rest("go_workout_invites?id=eq." + encodeURIComponent(inv.id), {
+        method: "PATCH", prefer: "return=minimal", body: { status: "declined" }
+      }).then(function () {
+        state.freeInvites = (state.freeInvites || []).filter(function (r) { return String(r.id) !== String(id); });
+        render();
+        if (host.onInvitesChanged) host.onInvitesChanged();
+      }).catch(function () { if (host.toast) host.toast("Absagen ging gerade nicht"); });
+    });
   }
 
   function renderSupportCard(item) {
@@ -3892,6 +3997,10 @@
       removeEvent(rm.getAttribute("data-remove-event"), rm.getAttribute("data-remove-mode"));
       return;
     }
+    var invStart = t.closest("[data-inv-start]");
+    if (invStart) { startInvite(invStart.getAttribute("data-inv-start")); return; }
+    var invCancel = t.closest("[data-inv-cancel]");
+    if (invCancel) { cancelInvite(invCancel.getAttribute("data-inv-cancel")); return; }
     var evMenu = t.closest("[data-ev-menu]");
     if (evMenu) {
       openEventMenu(evMenu.getAttribute("data-ev-menu"));
