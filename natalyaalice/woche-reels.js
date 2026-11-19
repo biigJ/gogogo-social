@@ -2107,6 +2107,192 @@
     return best;
   }
 
+  /* ---------- Zirkeltraining wiederkehrend: Tag wählen, dann Circle/Freunde/Uhrzeit/Sichtbarkeit ---------- */
+  var ZREC_WEEKS = 12;
+  var WD_ORDER = [1, 2, 3, 4, 5, 6, 0];
+  var WD_NAME = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+  function zrecTimes() {
+    var out = [];
+    for (var h = 5; h <= 22; h++) for (var m = 0; m < 60; m += 15) out.push((h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m);
+    return out;
+  }
+  function openZirkelRecurring() {
+    /* aktuelle Verteilung aus den nächsten 7 Tagen (eigene Plan-Einheiten) */
+    var byWd = {};
+    for (var i = 0; i < 7; i++) {
+      var iso = addDays(berlinToday(), i);
+      var wd = new Date(iso + "T12:00:00").getDay();
+      var ev = state.events.filter(function (e) {
+        return e && String(e.user_id) === me() && e.status !== "ausgefallen" && e.item_type !== "support_session" && dayKey(e.starts_at) === iso;
+      })[0];
+      byWd[wd] = ev ? ev.title || "" : "";
+    }
+    openSheet(
+      '<p class="wr-sheet-title">Zirkeltraining wiederkehrend</p>' +
+      '<p class="wr-sheet-hint">Wähle einen Tag für Dein Zirkeltraining</p>' +
+      '<div class="wr-days">' + WD_ORDER.map(function (wd) {
+        return '<button type="button" class="wr-dayrow wr-zrec-day" data-wr-zrec-day="' + wd + '"><b>' + WD_NAME[wd].slice(0, 2) + '</b>' +
+          '<span class="wr-dayrow__title">' + esc(byWd[wd] || "frei") + "</span><span></span></button>";
+      }).join("") + "</div>" +
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button></div>'
+    );
+    var card = $("wr-sheet-card");
+    if (!card || card._wrZrecBound) return;
+    card._wrZrecBound = true;
+    card.addEventListener("click", function (e) {
+      /* Inhalt wird neu gezeichnet: Klick nicht weiterreichen (sonst gilt er als „außerhalb“ und schließt das Sheet) */
+      var d = e.target.closest("[data-wr-zrec-day]");
+      if (d) {
+        e.stopPropagation();
+        var wdSel = Number(d.getAttribute("data-wr-zrec-day"));
+        setTimeout(function () { openZrecDay(wdSel); }, 0);
+        return;
+      }
+      var act = e.target.closest("[data-wr-zrec]");
+      if (!act || !state.zrec) return;
+      e.stopPropagation();
+      var k = act.getAttribute("data-wr-zrec");
+      if (k === "circle") return zrecCircle();
+      if (k === "friends") return zrecFriends();
+      if (k === "vis") { state.zrec.vis = state.zrec.vis === "privat" ? "team" : "privat"; return paintZrecDay(); }
+      if (k === "save") return saveZrec(act);
+      if (k === "back") return openZirkelRecurring();
+    });
+  }
+  function openZrecDay(wd) {
+    state.zrec = { wd: wd, time: "18:00", vis: "team", friends: [], circle: null };
+    paintZrecDay();
+  }
+  function paintZrecDay() {
+    var z = state.zrec;
+    var times = zrecTimes();
+    var names = z.friends.map(function (id) { return String(personOf(id).name || "").split(" ")[0]; }).filter(Boolean);
+    openSheet(
+      '<p class="wr-sheet-title">Jeden ' + WD_NAME[z.wd] + "</p>" +
+      '<p class="wr-sheet-hint">Zirkeltraining für die nächsten ' + ZREC_WEEKS + " Wochen.</p>" +
+      '<div class="wr-zrec-acts">' +
+      '<button type="button" class="wr-pill-btn" data-wr-zrec="circle">' + (z.circle ? "Circle: " + esc(z.circle.name) : "Circle hinzufügen") + "</button>" +
+      '<button type="button" class="wr-pill-btn" data-wr-zrec="friends">' + (names.length ? "Freunde: " + esc(names.join(", ")) : "Freunde hinzufügen") + "</button>" +
+      '<p class="wr-zrec-lab">Uhrzeit setzen</p><div class="gz-time"><div class="gz-time__col" data-wr-zrec-time>' +
+      times.map(function (t) { return '<span class="gz-time__opt">' + t + "</span>"; }).join("") + "</div></div>" +
+      '<button type="button" class="wr-dayrow__vis' + (z.vis === "privat" ? "" : " is-on") + '" data-wr-zrec="vis">' + (z.vis === "privat" ? "privat" : "sichtbar") + "</button>" +
+      "</div>" +
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-zrec="back">Zurück</button>' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zrec="save">Speichern</button></div>'
+    );
+    var col = document.querySelector("[data-wr-zrec-time]");
+    if (col) {
+      var idx = Math.max(0, times.indexOf(z.time));
+      requestAnimationFrame(function () { col.scrollTop = idx * 44; });
+      var tm = null;
+      col.addEventListener("scroll", function () {
+        clearTimeout(tm);
+        tm = setTimeout(function () {
+          z.time = times[Math.max(0, Math.min(times.length - 1, Math.round(col.scrollTop / 44)))];
+        }, 80);
+      }, { passive: true });
+    }
+  }
+  function zrecCircle() {
+    if (!global.FFC || !FFC.user || !FFC.user()) {
+      if (global.GoDialog) GoDialog.alert("Circles gibt es mit FFC-Zugang. Unter Plus → FFC anmelden.");
+      return;
+    }
+    Promise.resolve(FFC.groups()).then(function (groups) {
+      if (!(groups || []).length) { GoDialog.alert("Du bist noch in keinem Circle. Unter Plus → FFC → Deine Circle verwalten."); return; }
+      return GoDialog.choose("Circle hinzufügen", groups.map(function (g) { return { label: g.name, value: String(g.group_id) }; }))
+        .then(function (gid) {
+          if (!gid) return;
+          var g = groups.filter(function (x) { return String(x.group_id) === gid; })[0];
+          state.zrec.circle = { id: Number(gid), name: g ? g.name : "Circle" };
+          paintZrecDay();
+        });
+    }).catch(function () {});
+  }
+  function zrecFriends() {
+    loadFriends().then(function () {
+      var items = (state.friends || []).map(function (fid) {
+        var p = personOf(fid);
+        return { label: String(p.name || "Freund").split(" ")[0], value: String(fid), checked: state.zrec.friends.indexOf(String(fid)) >= 0 };
+      });
+      return GoDialog.pick("Freunde hinzufügen", items, { ok: "Übernehmen", empty: "Noch keine Freunde. Unter Team → Meine Freunde hinzufügen." });
+    }).then(function (ids) {
+      if (!ids) return;
+      state.zrec.friends = ids;
+      paintZrecDay();
+    });
+  }
+  function berlinOffsetOf(iso) {
+    try {
+      var d = new Date(iso + "T12:00:00Z");
+      var b = new Date(d.toLocaleString("en-US", { timeZone: "Europe/Berlin" }));
+      var u = new Date(d.toLocaleString("en-US", { timeZone: "UTC" }));
+      var off = Math.round((b - u) / 60000);
+      return (off >= 0 ? "+" : "-") + String(Math.floor(Math.abs(off) / 60)).padStart(2, "0") + ":" + String(Math.abs(off) % 60).padStart(2, "0");
+    } catch (e) { return "+01:00"; }
+  }
+  function saveZrec(btn) {
+    var z = state.zrec;
+    btn.disabled = true;
+    var first = berlinToday();
+    while (new Date(first + "T12:00:00").getDay() !== z.wd) first = addDays(first, 1);
+    var dates = [];
+    for (var i = 0; i < ZREC_WEEKS; i++) {
+      var d = addDays(first, i * 7);
+      var at = new Date(d + "T" + z.time + ":00" + berlinOffsetOf(d));
+      if (at.getTime() > Date.now()) dates.push({ day: d, at: at.toISOString() });
+    }
+    var note = global.GoZirkelSetup ? GoZirkelSetup.toNote({ mode: "single", rounds: 6, workSec: 240, restSec: 30 }) : null;
+    rest("courses?title=eq.Zirkeltraining&select=id&limit=1").catch(function () { return []; })
+      .then(function (rows) {
+        var cid = rows && rows[0] ? rows[0].id : null;
+        return rest("events", {
+          method: "POST",
+          prefer: "return=representation",
+          body: dates.map(function (x) {
+            return { user_id: me(), category: "zirkel", course_id: cid, title: "Zirkeltraining", starts_at: x.at,
+              status: "geplant", visibility: z.vis, is_unplanned: false, note: note };
+          })
+        });
+      })
+      .then(function (evs) {
+        evs = evs || [];
+        var jobs = [];
+        if (z.friends.length && evs.length) {
+          var inv = [];
+          evs.forEach(function (ev) {
+            z.friends.forEach(function (fid) {
+              inv.push({ event_id: ev.id, from_id: me(), to_id: fid, status: "pending", workout_date: dayKey(ev.starts_at) });
+            });
+          });
+          jobs.push(rest("go_workout_invites", { method: "POST", prefer: "return=minimal", body: inv }).catch(function () {}));
+        }
+        if (z.circle && global.FFC && FFC.createEvent) {
+          jobs.push(Promise.resolve(FFC.weeklyPoints ? FFC.weeklyPoints(z.circle.id) : []).then(function (rows) {
+            var ids = (rows || []).filter(function (r) { return !r.is_me; }).map(function (r) { return r.user_id; });
+            var chain = Promise.resolve();
+            dates.forEach(function (x) {
+              chain = chain.then(function () {
+                return FFC.createEvent({ title: "Zirkeltraining · " + z.circle.name, startsAt: x.at, inviteeIds: ids }).catch(function () {});
+              });
+            });
+            return chain;
+          }).catch(function () {}));
+        }
+        return Promise.all(jobs).then(function () { return evs.length; });
+      })
+      .then(function (n) {
+        state.zrec = null;
+        closeSheet();
+        if (global.GoDialog) GoDialog.alert("Zirkeltraining jeden " + WD_NAME[z.wd] + " um " + z.time + " Uhr steht (" + n + " Termine).");
+        refresh();
+      })
+      .catch(function () {
+        btn.disabled = false;
+        if (global.GoDialog) GoDialog.alert("Speichern ging gerade nicht.");
+      });
+  }
+
   function openDaysEditor() {
     var days = [];
     for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
@@ -4007,10 +4193,27 @@
       if (hasPlan && global.GoDialog) {
         GoDialog.choose("Deine Woche", [
           { label: "Wochenplan ändern", value: "plan" },
-          { label: "Tage bearbeiten", value: "days" }
+          { label: "Tage bearbeiten", value: "days" },
+          { label: "Zirkeltraining wiederkehrend", value: "zrec" }
         ]).then(function (v) {
-          if (v === "plan") openPlanPicker();
-          if (v === "days") openDaysEditor();
+          /* erst nach dem Dialog-Klick öffnen, sonst schließt derselbe Klick das neue Sheet wieder */
+          setTimeout(function () {
+            if (v === "plan") openPlanPicker();
+            if (v === "days") openDaysEditor();
+            if (v === "zrec") openZirkelRecurring();
+          }, 0);
+        });
+        return;
+      }
+      if (global.GoDialog) {
+        GoDialog.choose("Deine Woche", [
+          { label: "Wochenplan wählen", value: "plan" },
+          { label: "Zirkeltraining wiederkehrend", value: "zrec" }
+        ]).then(function (v) {
+          setTimeout(function () {
+            if (v === "plan") openPlanPicker();
+            if (v === "zrec") openZirkelRecurring();
+          }, 0);
         });
         return;
       }
@@ -4648,6 +4851,7 @@
 
   global.WocheReels = {
     refreshKeepDay: refreshKeepDay,
+    openZirkelRecurring: function () { openZirkelRecurring(); },
     install: install,
     show: show,
     hide: hide,

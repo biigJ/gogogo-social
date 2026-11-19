@@ -3142,7 +3142,7 @@
       category: payload.category,
       course_id: payload.course_id || null,
       enrollment_id: payload.enrollment_id || null,
-      starts_at: new Date().toISOString(),
+      starts_at: payload.starts_at || new Date().toISOString(),
       location: payload.location || null,
       note: payload.note || null,
       visibility: normalizeVisibility(payload.visibility || state.pendingVis || "team"),
@@ -3195,7 +3195,7 @@
             '"' +
             (v === cur ? " checked" : "") +
             " /> " +
-            (v === "team" ? "Team" : "privat") +
+            (v === "team" ? "zeigen" : "privat") +
             "</label>"
           );
         })
@@ -3267,19 +3267,21 @@
       pick.hidden = false;
       pick.innerHTML =
         visPickerHtml() +
-        GoZirkelSetup.html(
-          { mode: "single" },
-          {
-            friends: (host.teamPeople || []).filter(function (p) {
-              return p && p.id && String(p.id) !== String(me());
-            })
-          }
-        ) +
+        GoZirkelSetup.html({ mode: "single" }, { friends: ffcPartners() }) +
         '<label class="gz-online"><input type="checkbox" id="acc-z-online" /> Optional: online mitmachen</label>';
       GoZirkelSetup.bind(pick);
+      var later = document.createElement("button");
+      later.type = "button";
+      later.className = "sand-quiet";
+      later.textContent = "Startzeit festlegen";
+      later.addEventListener("click", function () {
+        var zl = GoZirkelSetup.read(pick);
+        zl.online = !!(($("acc-z-online") || {}).checked);
+        openZirkelLater(zl, readCreateVis(pick));
+      });
       var go = document.createElement("button");
       go.type = "button";
-      go.textContent = "Jetzt starten";
+      go.textContent = "Start";
       go.addEventListener("click", function () {
         var z = GoZirkelSetup.read(pick);
         z.online = !!(($("acc-z-online") || {}).checked);
@@ -3295,6 +3297,7 @@
           var forEv = state.zirkelFor || null;
           state.zirkelFor = null;
           if (host.openZirkel) host.openZirkel(Object.assign({}, z, {
+            autostart: true,
             onSaved: function () {
               if (forEv && forEv.id) {
                 return rest("events?id=eq." + encodeURIComponent(forEv.id), {
@@ -3311,6 +3314,100 @@
         });
       });
       pick.appendChild(go);
+      pick.appendChild(later);
+    }
+
+    /* Partner für Double: nur Freunde, die bei FFC (Nickname + Passwort) sind */
+    function ffcPartners() {
+      var nick = {};
+      try {
+        ((global.FFC && FFC.friends && FFC.friends()) || []).forEach(function (f) {
+          if (f && f.status === "accepted" && f.nickname) nick[String(f.nickname).toLowerCase()] = f.friend_id;
+        });
+      } catch (e) {}
+      return (host.teamPeople || []).filter(function (p) {
+        return p && p.id && String(p.id) !== String(me()) && p.nickname && nick[String(p.nickname).toLowerCase()];
+      }).map(function (p) {
+        return { id: p.id, name: String(p.name || p.nickname).split(" ")[0], ffcId: nick[String(p.nickname).toLowerCase()] };
+      });
+    }
+
+    /* „Startzeit festlegen“: Tag + Uhrzeit wählen → Event in Aktuell/Woche, FFC-Event, Partner bestätigt bei sich */
+    function openZirkelLater(z, vis) {
+      title.textContent = "Wann startest Du?";
+      var days = [];
+      for (var i = 0; i < 7; i++) {
+        var d = new Date(Date.now() + i * 86400000).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+        days.push(d);
+      }
+      var times = [];
+      for (var h = 5; h <= 22; h++) for (var m = 0; m < 60; m += 15) times.push((h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m);
+      var dayPick = days[0];
+      pick.innerHTML =
+        '<div class="gz-days">' + days.map(function (d, i) {
+          var lab = i === 0 ? "Heute" : i === 1 ? "Morgen" : new Date(d + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric" });
+          return '<button type="button" class="gz-day' + (i === 0 ? " is-on" : "") + '" data-gz-day="' + d + '">' + lab + "</button>";
+        }).join("") + "</div>" +
+        '<div class="gz-time"><div class="gz-time__col" data-gz-time>' + times.map(function (t) { return '<span class="gz-time__opt">' + t + "</span>"; }).join("") + "</div></div>";
+      var col = pick.querySelector("[data-gz-time]");
+      var nowMin = new Date().getHours() * 60 + new Date().getMinutes() + 30;
+      var idx = Math.max(0, times.findIndex(function (t) { var p = t.split(":"); return Number(p[0]) * 60 + Number(p[1]) >= nowMin; }));
+      requestAnimationFrame(function () { col.scrollTop = idx * 44; });
+      pick.querySelectorAll("[data-gz-day]").forEach(function (b) {
+        b.addEventListener("click", function () {
+          dayPick = b.getAttribute("data-gz-day");
+          pick.querySelectorAll("[data-gz-day]").forEach(function (x) { x.classList.toggle("is-on", x === b); });
+        });
+      });
+      var save = document.createElement("button");
+      save.type = "button";
+      save.textContent = "Event anlegen";
+      save.addEventListener("click", function () {
+        var t = times[Math.max(0, Math.min(times.length - 1, Math.round(col.scrollTop / 44)))];
+        var startsAt = new Date(dayPick + "T" + t + ":00" + berlinOffset(dayPick)).toISOString();
+        save.disabled = true;
+        loadZirkelCourse().then(function (cid) {
+          return createUnplannedEvent({
+            category: "zirkel", course_id: cid || null, title: "Zirkeltraining",
+            note: GoZirkelSetup.toNote(z), visibility: vis, status: "geplant", starts_at: startsAt
+          });
+        }).then(function (ev) {
+          var jobs = [];
+          /* Double: Partner bekommt eine Einladung und bestätigt bei sich (Popup nach Aktualisieren) */
+          if (ev && ev.id && z.mode === "double" && z.partnerId) {
+            jobs.push(rest("go_workout_invites", {
+              method: "POST", prefer: "return=minimal",
+              body: { event_id: ev.id, from_id: me(), to_id: z.partnerId, status: "pending", workout_date: dayPick }
+            }).catch(function () {}));
+          }
+          /* FFC: Event in Hendriks App, Partner eingeladen */
+          if (global.FFC && FFC.createEvent) {
+            var partner = ffcPartners().filter(function (p) { return String(p.id) === String(z.partnerId); })[0];
+            jobs.push(Promise.resolve(FFC.createEvent({ title: "Zirkeltraining", startsAt: startsAt, inviteeIds: partner ? [partner.ffcId] : [] })).catch(function () {}));
+          }
+          return Promise.all(jobs);
+        }).then(function () {
+          modal.hidden = true;
+          if (host.closeGoPick) host.closeGoPick();
+          if (global.GoDialog) GoDialog.alert("Zirkeltraining steht" + (z.mode === "double" && z.partnerName ? ". " + z.partnerName + " bestätigt bei sich." : "."));
+          return refresh();
+        }).catch(function () {
+          save.disabled = false;
+          if (host.toast) host.toast("Event anlegen ging nicht.");
+        });
+      });
+      pick.appendChild(save);
+    }
+    function berlinOffset(iso) {
+      try {
+        var d = new Date(iso + "T12:00:00Z");
+        var berlin = new Date(d.toLocaleString("en-US", { timeZone: "Europe/Berlin" }));
+        var utc = new Date(d.toLocaleString("en-US", { timeZone: "UTC" }));
+        var off = Math.round((berlin - utc) / 60000);
+        var sign = off >= 0 ? "+" : "-";
+        off = Math.abs(off);
+        return sign + String(Math.floor(off / 60)).padStart(2, "0") + ":" + String(off % 60).padStart(2, "0");
+      } catch (e) { return "+01:00"; }
     }
 
     /* Kraft / Ausdauer: Einzeleinheit wählen → direkt tracken. Das Event entsteht erst beim Abschluss. */

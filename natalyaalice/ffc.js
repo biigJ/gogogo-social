@@ -3427,6 +3427,29 @@
       await refreshCachedHistory();
       buildExercisePlan();
       showScreen('setup');
+      /* gogogo „Start“: Einstellungen kamen aus dem gogogo-Dialog → direkt ins Workout */
+      if(preset && preset.autostart){
+        setTimeout(()=>{
+          const b = document.getElementById('startBtn');
+          if(b && !b.disabled) b.click();
+        }, 60);
+      }
+    },
+    /* gogogo „Startzeit festlegen“: FFC-Event anlegen (Hendriks create_event), Einladung an Partner/Circle */
+    async createEvent(opts){
+      if(!currentUser) return { error: { message: 'Nicht angemeldet' } };
+      opts = opts || {};
+      const ids = (opts.inviteeIds || []).filter(Boolean);
+      const params = {
+        p_title: String(opts.title || 'Zirkeltraining'),
+        p_starts_at: new Date(opts.startsAt).toISOString(),
+        p_location: String(opts.location || ''),
+        p_all_friends: !ids.length && !!opts.allFriends,
+        p_invitee_ids: ids
+      };
+      const res = await sb.rpc('create_event', params);
+      if(!res.error) await loadEvents();
+      return res;
     },
     async openEvent(pre){
       pre = pre || {};
