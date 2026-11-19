@@ -131,6 +131,11 @@
       border: 1.5px solid var(--ink); border-radius: 5px; background: #fff center / 72% no-repeat; cursor: pointer; }
     input[type="checkbox"]:checked { background-color: var(--ink);
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23F6F1E8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+    .view-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 14px; }
+    .view-tabs.hidden { display: none; }
+    .view-tabs a { padding: 8px 14px; border: 1.5px solid var(--ink); border-radius: 999px; color: var(--ink); text-decoration: none; font-weight: 600; font-size: 14px; }
+    .view-tabs a.is-on { background: var(--ink); color: #F6F1E8; }
+    .vlink-inline { width: 100%; padding: 6px 8px; font-size: 13px; }
     .list-tools { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
     .list-tools input[type="search"] { flex: 1; }
     .item .vlink { grid-column: 1 / -1; font-size: 13px; padding: 6px 8px; }
@@ -192,6 +197,11 @@
       <p class="muted">Wochenpläne pflegt gogogo zentral. Coaches ordnen sie im Coach-Portal (Team → Coachee) zu.</p>
     </div>
 
+    <nav class="view-tabs" id="view-tabs" aria-label="Bereich">
+      <a href="#plans" data-tab="plans">Wochenpläne</a>
+      <a href="#units" data-tab="units">Einzeleinheiten</a>
+      <a href="#exercises" data-tab="exercises">Übungen + Videos</a>
+    </nav>
     <div class="panes" id="panes">
       <main id="list-view" class="hidden"></main>
       <main id="detail-view" class="hidden"></main>
@@ -352,9 +362,11 @@
     backUrl();
 
     function setHeader(detailTitle) {
-      $("view-sel").classList.toggle("hidden", !!detailTitle);
-      $("detail-title").classList.toggle("hidden", !detailTitle);
-      $("detail-title").textContent = detailTitle || "";
+      $("view-sel").classList.add("hidden");
+      $("detail-title").classList.remove("hidden");
+      $("detail-title").textContent = detailTitle || "Editor";
+      $("view-tabs").classList.toggle("hidden", !!detailTitle && !(desktop && desktop.matches));
+      [].forEach.call(document.querySelectorAll("[data-tab]"), function (a) { a.classList.toggle("is-on", a.getAttribute("data-tab") === state.view); });
       $("view-sel").value = state.view;
       $("back").setAttribute("aria-label", detailTitle ? "Zurück zur Liste" : "Zurück zur App");
     }
@@ -378,8 +390,8 @@
       box.classList.remove("hidden");
       if (state.view === "videos") return renderVideos(box);
       var v = state.view, html = "";
-      var filt = v === "plans" || v === "units"
-        ? '<div class="list-tools"><input type="search" class="list-filter" id="list-filter" placeholder="Filtern" value="' + esc(state.listFilter || "") + '" />' +
+      var filt = v === "plans" || v === "units" || v === "exercises"
+        ? '<div class="list-tools"><input type="search" class="list-filter" id="list-filter" placeholder="Filtern" value="' + esc((state.listFilters || {})[v] || "") + '" />' +
           '<button type="button" id="list-new">Neu</button></div>'
         : "";
       if (v === "plans") {
@@ -407,19 +419,19 @@
       } else if (v === "exercises") {
         var ex = Object.keys(state.exIndex).map(function (k) { return state.exIndex[k]; })
           .sort(function (a, b) { return a.name.localeCompare(b.name, "de"); });
-        html = '<table class="tbl"><colgroup><col class="col-name"><col><col class="col-s"><col class="col-xs"></colgroup>' +
-          '<thead><tr><th>Name</th><th>Block</th><th class="num">Einheiten</th><th class="num">Video</th></tr></thead><tbody>' +
+        html = '<table class="tbl"><colgroup><col class="col-name"><col class="col-s"><col class="col-xs"><col></colgroup>' +
+          '<thead><tr><th>Name</th><th>Block</th><th class="num">Einheiten</th><th>Video-Link (einfügen, speichert sofort)</th></tr></thead><tbody>' +
           '<tr class="new-row" data-open="new-ex"><td>Neu</td><td></td><td></td><td></td></tr>' +
           ex.map(function (e) {
             return '<tr data-open="ex/' + encodeURIComponent(e.key) + '"><td class="name">' + esc(e.name) + "</td><td>" + esc(blockLabel(e.block)) +
-              '</td><td class="num">' + (e.units.length || "–") + '</td><td class="num">' + (GoExMedia.urlFor(e.name) ? "✓" : "–") + "</td></tr>";
+              '</td><td class="num">' + (e.units.length || "–") + '</td><td><input type="url" class="vlink-inline" data-vlink data-vname="' + esc(e.name) + '" placeholder="https://…" value="' + esc(GoExMedia.urlFor(e.name) || "") + '" /></td></tr>';
           }).join("") + "</tbody></table>";
       }
       box.innerHTML = filt + html;
       applyListFilter();
     }
     function applyListFilter() {
-      var q = String(state.listFilter || "").trim().toLowerCase();
+      var q = String((state.listFilters || {})[state.view] || "").trim().toLowerCase();
       [].forEach.call($("list-view").querySelectorAll("tr[data-open]"), function (tr) {
         if (/^new-/.test(tr.getAttribute("data-open"))) { tr.classList.toggle("hidden", !!filtToolsOn()); return; }
         tr.classList.toggle("hidden", !!q && tr.textContent.toLowerCase().indexOf(q) < 0);
@@ -428,12 +440,16 @@
     function filtToolsOn() { return !!$("list-filter"); }
     $("list-view").addEventListener("input", function (e) {
       if (e.target.id !== "list-filter") return;
-      state.listFilter = e.target.value;
+      (state.listFilters = state.listFilters || {})[state.view] = e.target.value;
       applyListFilter();
     });
 
     $("list-view").addEventListener("click", function (e) {
-      if (e.target.closest("#list-new")) return state.view === "units" ? createUnit() : createPlan();
+      if (e.target.closest("[data-vname]")) return;
+      if (e.target.closest("#list-new")) {
+        if (state.view === "exercises") return createExercise();
+        return state.view === "units" ? createUnit() : createPlan();
+      }
       var tr = e.target.closest("tr[data-open]");
       if (!tr) return;
       var to = tr.getAttribute("data-open");
@@ -895,7 +911,8 @@
     document.addEventListener("change", function (e) {
       if (!e.target.hasAttribute || !e.target.hasAttribute("data-vlink")) return;
       var row = e.target.closest(".item");
-      var name = row && row.querySelector('[data-if="name"]') ? row.querySelector('[data-if="name"]').value.trim() : "";
+      var name = e.target.getAttribute("data-vname") ||
+        (row && row.querySelector('[data-if="name"]') ? row.querySelector('[data-if="name"]').value.trim() : "");
       var url = e.target.value.trim();
       if (!name) { toast("Erst den Namen der Übung eintragen"); return; }
       if (url && !GoExMedia.parse(url)) { toast("Bitte einen vollständigen Link mit https:// einfügen"); return; }
