@@ -1164,7 +1164,7 @@
     return (
       '<div class="acc-comment acc-clamp"><span class="acc-clamp__text"><strong>' +
       esc(p.name) +
-      "</strong> " +
+      "</strong>&nbsp;&nbsp;" +
       esc(c.text) +
       "</span>" +
       (long ? '<button type="button" class="acc-clamp__more" data-cmt-more>mehr</button>' : "") +
@@ -1178,7 +1178,7 @@
     if (!list.length) return "";
     function line(c) {
       var nm = String(personOf(c.account_id).name || "").split(" ")[0];
-      return "<strong>" + esc(nm) + "</strong> " + esc(c.text);
+      return "<strong>" + esc(nm) + "</strong>&nbsp;&nbsp;" + esc(c.text);
     }
     var last = list[list.length - 1];
     var older = list.slice(0, -1);
@@ -3142,9 +3142,10 @@
     var listEl = $("acc-comment-list");
     if (!listEl) return;
     var list = state.comments[postId] || [];
-    listEl.innerHTML = list.length
-      ? list.map(commentLineHtml).join("")
-      : '<p class="acc-comment-modal__empty">Noch keine Kommentare.</p>';
+    /* Dialog ist nur zum Schreiben: Kommentare stehen unter dem Event */
+    listEl.hidden = true;
+    listEl.innerHTML = "";
+    void list;
   }
 
   function openComments(postId) {
