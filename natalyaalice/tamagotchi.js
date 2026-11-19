@@ -5,13 +5,15 @@
  *   GoTama.invalidate()          nach Erledigt / Verschieben / Ausfallen
  *
  * Regeln (Tag für Tag, letzte 12 Wochen, nur eigene Events der Person):
- *   Tag mit erledigtem Event              → eine Stufe zurück (bis 0)
+ *   Jeder Wechsel geht genau EINE Stufe. Ausnahme: von Rot zurück springt es über Gelb-Orange direkt auf Gelb.
+ *   Tag mit erledigtem Event              → eine Stufe zurück (bis 0; 3 → 1)
  *   Tag mit geplantem, nicht erledigtem   → eine Stufe hoch (bis Rot)
+ *   Event ausdrücklich ausfallen lassen   → eine Stufe hoch, außer am Tag steht ein Ersatz (Alternative)
  *   Event von diesem Tag verschoben       → eine Stufe hoch, höchstens Gelb-Orange (2)
- *   Event ausdrücklich ausfallen lassen   → Rot (3), außer am Tag steht ein Ersatz (Alternative)
  *   Tag ohne Event                        → bleibt
  *   Stufen: 0 normal · 1 Gelb · 2 Gelb-Orange · 3 Rot
- *   Ziffer (nur am eigenen Kreis): Wochen am Stück (Mo bis So), in denen an allen 7 Tagen etwas abgehakt wurde.
+ *   Ziffer (nur am eigenen Kreis): Tage am Stück, an denen abgehakt wurde. Tage ohne Event zählen nicht und
+ *   brechen nicht ab; ein Tag mit offenem oder ausgefallenem Event bricht ab. Heute zählt erst, wenn abgehakt.
  *   Verschieben merkt sich die Datenbank in events.moved_days (go-tamagotchi.sql).
  */
 (function (global) {
@@ -63,23 +65,19 @@
     var start = addDays(mondayOf(todayIso), -7 * 12);
     var level = 0;
     for (var d = start; d <= todayIso; d = addDays(d, 1)) {
-      if (done[d]) level = Math.max(0, level - 1);
-      else if (d < todayIso && cancelled[d] && !other[d]) level = 3;
+      if (done[d]) level = level >= 3 ? 1 : Math.max(0, level - 1);
+      else if (d < todayIso && cancelled[d] && !other[d]) level = Math.min(3, level + 1);
       else if (d < todayIso && missed[d]) level = Math.min(3, level + 1);
-      else if (moved[d]) level = level >= 3 ? 3 : Math.min(2, level + moved[d]);
+      else if (moved[d]) level = level >= 2 ? level : level + 1;
     }
-    var weeks = 0;
-    var wk = addDays(mondayOf(todayIso), -7);
-    while (wk >= start) {
-      var all = true;
-      for (var i = 0; i < 7; i++) {
-        if (!done[addDays(wk, i)]) { all = false; break; }
-      }
-      if (!all) break;
-      weeks += 1;
-      wk = addDays(wk, -7);
+    /* Tage am Stück abgehakt (rückwärts ab heute) */
+    var days = 0;
+    for (var k = todayIso; k >= start; k = addDays(k, -1)) {
+      if (done[k]) { days += 1; continue; }
+      if (k === todayIso) continue;
+      if (missed[k] || (cancelled[k] && !other[k])) break;
     }
-    return { level: level, weeks: weeks };
+    return { level: level, weeks: days };
   }
 
   function isAccountId(id) {
@@ -133,7 +131,7 @@
       var b = document.createElement("span");
       b.className = "tama-badge";
       b.textContent = String(s.weeks);
-      b.setAttribute("aria-label", s.weeks + (s.weeks === 1 ? " Woche" : " Wochen") + " am Stück");
+      b.setAttribute("aria-label", s.weeks + (s.weeks === 1 ? " Tag" : " Tage") + " am Stück abgehakt");
       ring.appendChild(b);
     }
     if (s.level) el.title = (el.title ? el.title + " · " : "") + LABEL[s.level];
