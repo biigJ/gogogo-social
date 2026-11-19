@@ -1156,18 +1156,22 @@
       "</div>"
     );
   }
+  /* Unter dem Event: neuester Kommentar in zwei Zeilen, „mehr“ am Ende der letzten Zeile.
+     „mehr“ klappt den ganzen neuesten Kommentar und die älteren auf. */
   function commentsTeaserHtml(postId) {
     var list = (state.comments[postId] || []).filter(function (c) { return c && c.text; });
     if (!list.length) return "";
-    var len = 0;
-    var inner = list.map(function (c) {
+    function line(c) {
       var nm = String(personOf(c.account_id).name || "").split(" ")[0];
-      len += nm.length + String(c.text).length + 2;
       return "<strong>" + esc(nm) + "</strong> " + esc(c.text);
-    }).join("<br>");
-    var long = list.length > 2 || len > CMT_CLAMP;
-    return '<div class="acc-card__teaser acc-clamp">' +
-      '<button type="button" class="acc-card__my-line acc-clamp__text" data-open-comments="' + esc(postId) + '">' + inner + "</button>" +
+    }
+    var last = list[list.length - 1];
+    var older = list.slice(0, -1);
+    var nmLast = String(personOf(last.account_id).name || "").split(" ")[0];
+    var long = older.length > 0 || nmLast.length + String(last.text).length + 1 > CMT_CLAMP;
+    return '<div class="acc-card__teaser acc-clamp' + (long ? " has-more" : "") + '">' +
+      (older.length ? '<div class="acc-clamp__older">' + older.map(function (c) { return "<p>" + line(c) + "</p>"; }).join("") + "</div>" : "") +
+      '<button type="button" class="acc-card__my-line acc-clamp__text" data-open-comments="' + esc(postId) + '">' + line(last) + "</button>" +
       (long ? '<button type="button" class="acc-clamp__more" data-cmt-more>mehr</button>' : "") +
       "</div>";
   }
