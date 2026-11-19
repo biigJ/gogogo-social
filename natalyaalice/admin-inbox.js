@@ -77,7 +77,14 @@
   }
 
   function load() {
-    return host.rest("rpc/go_admin_inbox", { method: "POST", body: { p_limit: 80 } });
+    var fb = host.rest("go_feedback?select=id,account_id,name,text,created_at&order=created_at.desc&limit=50")
+      .catch(function () { return []; });
+    return Promise.all([host.rest("rpc/go_admin_inbox", { method: "POST", body: { p_limit: 80 } }), fb])
+      .then(function (r) {
+        var data = r[0] || {};
+        data.feedback = r[1] || [];
+        return data;
+      });
   }
 
   function items(data) {
@@ -87,6 +94,9 @@
     });
     ((data && data.bookings) || []).forEach(function (b) {
       list.push({ kind: b.type === "coach_offer" ? "coach" : "booking", at: b.at, a: b });
+    });
+    ((data && data.feedback) || []).forEach(function (f) {
+      list.push({ kind: "feedback", at: f.created_at, a: { name: f.name, account_id: f.account_id, text: f.text } });
     });
     list.sort(function (x, y) { return String(y.at).localeCompare(String(x.at)); });
     return list;
@@ -135,6 +145,7 @@
       var text;
       var act = "";
       if (it.kind === "account") text = name + " ist neu dabei";
+      else if (it.kind === "feedback") text = name + " schreibt Feedback:<span class=\"ga-msg\" style=\"white-space:pre-wrap\">" + esc(a.text) + "</span>";
       else if (it.kind === "coach") {
         text = name + " möchte Coach werden";
         act = coachBtn(a.account_id);
