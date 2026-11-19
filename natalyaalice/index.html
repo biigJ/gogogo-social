@@ -532,6 +532,11 @@
     body.is-session #workout-title { font-family: "Playfair Display", Georgia, serif; font-weight: 600; letter-spacing: 0; }
     body.is-session main .tabs button.is-active { background: #2A2118; color: #F6F1E8; border-color: #2A2118; }
     body.is-session main #finish-workout { background: #2A2118; color: #F6F1E8; }
+    /* Workout-Log: kein Tagebuch-Icon, Zurück wie Profil bearbeiten, privat/zeigen statt „Datum“ */
+    body.is-session main #plan-book { display: none !important; }
+    body.is-session main #back-welcome.profile-back { width: 31px !important; height: 31px !important; min-width: 0 !important; padding: 0 !important; border: 1px solid #2A2118 !important; border-radius: 50% !important; display: grid !important; place-items: center; background: transparent !important; color: #2A2118 !important; }
+    .log-vis { min-height: 32px; padding: 0 14px; border-radius: 999px; border: 1.5px solid #2A2118; background: transparent; color: #2A2118; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .log-vis.is-on { background: #2A2118; color: #F6F1E8; }
     body.is-session main th:first-child, body.is-session main td:first-child { background: #F6F1E8; }
     body.is-home :focus-visible, body.is-diary :focus-visible { outline-color: #2A2118; }
     .welcome {
@@ -1668,6 +1673,9 @@
     .wr-dayrow__mid { min-width: 0; display: grid; gap: 4px; }
     .wr-dayrow__title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .wr-dayrow__ctl { display: flex; align-items: center; gap: 8px; }
+    .wr-btnrow { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 14px 0 0; }
+    .wr-btnrow > button { flex: 1 1 0; max-width: 180px; margin: 0 !important; min-height: 48px; }
+    .wr-btnrow .wr-sheet-cancel { border: 1.5px solid #2A2118; border-radius: 999px; background: transparent; color: #2A2118; font-weight: 600; }
     .wr-mini-wheel { height: 36px; width: 72px; overflow-y: auto; scroll-snap-type: y mandatory; border-radius: 8px; background: #fff; border: 1px solid rgba(42,33,24,.15); scrollbar-width: none; touch-action: pan-y; }
     .wr-mini-wheel::-webkit-scrollbar { display: none; }
     .wr-mini-opt { display: block; height: 36px; line-height: 36px; text-align: center; scroll-snap-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -7380,8 +7388,8 @@
   </div>
   <main hidden>
     <div class="plan-bar">
-      <button type="button" id="back-welcome" class="home-btn is-back" aria-label="Zurück">
-        <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <button type="button" id="back-welcome" class="home-btn is-back profile-back" aria-label="Zurück">
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <h1 id="workout-title">Einfache Basics</h1>
       <button type="button" id="plan-book" class="book-btn" aria-label="Tagebuch sichtbar für">
@@ -7394,8 +7402,8 @@
 
     <div class="sticky-bar" id="sticky-bar">
       <div class="date-row">
-        <label for="date">Datum</label>
-        <input id="date" type="date" />
+        <button type="button" class="log-vis is-on" id="log-vis" aria-label="Sichtbarkeit nach Abschluss">zeigen</button>
+        <input id="date" type="date" aria-label="Datum" />
       </div>
       <div class="meta">
         <p id="progress"></p>
@@ -7946,7 +7954,7 @@
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-57"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-2"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-43"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-44"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -8997,6 +9005,22 @@
         document.getElementById("done-ok").focus();
       }
 
+      /* privat/zeigen im Workout-Log: entscheidet, ob der fertige Log bei Freunden unter Aktuell erscheint */
+      var logVis = "team";
+      (function bindLogVis() {
+        var b = document.getElementById("log-vis");
+        if (!b) return;
+        b.addEventListener("click", function () {
+          logVis = logVis === "privat" ? "team" : "privat";
+          b.textContent = logVis === "privat" ? "privat" : "zeigen";
+          b.classList.toggle("is-on", logVis !== "privat");
+        });
+      })();
+      function setLogVis(v) {
+        logVis = v === "privat" ? "privat" : "team";
+        var b = document.getElementById("log-vis");
+        if (b) { b.textContent = logVis === "privat" ? "privat" : "zeigen"; b.classList.toggle("is-on", logVis !== "privat"); }
+      }
       /* Trainingsplan: Workout machen, dann "Fertig" → Tag im Tagebuch + geplantes Event erledigt */
       function finishWorkoutNow() {
         var btn = document.getElementById("finish-workout");
@@ -9014,7 +9038,7 @@
             category: sp.category,
             course_id: sp.course_id || null,
             title: sp.label,
-            visibility: sp.visibility || "team"
+            visibility: logVis || sp.visibility || "team"
           }).then(function (evNew) {
             btn.disabled = false;
             setHome(true);
@@ -9041,7 +9065,7 @@
             return rest("events?id=eq." + encodeURIComponent(hit.id), {
               method: "PATCH",
               prefer: "return=minimal",
-              body: { status: "erledigt" }
+              body: { status: "erledigt", visibility: logVis }
             });
           });
         }
@@ -18961,6 +18985,8 @@
       var spontanPick = null;
       function openEventWorkout(ev) {
         if (!ev || !sessionMode) return;
+        /* Sichtbarkeit des Logs startet mit der des Events */
+        setLogVis(ev.visibility === "privat" ? "privat" : "team");
         function sessionsOf(courseId) {
           return rest("course_sessions?course_id=eq." + encodeURIComponent(courseId) + "&block_no=eq.1&is_travel=eq.false&select=id,title,category,blocks,session_no&order=session_no.asc&limit=1");
         }

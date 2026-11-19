@@ -2111,9 +2111,15 @@
     var days = [];
     for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
     var slots = days.map(function (iso) {
+      /* je Tag die Einheit aus dem Wochenplan; Termine wie Initialgespräch (support_session) verdrängen sie nicht */
       return state.events.filter(function (e) {
-        return e && String(e.user_id) === me() && e.status !== "erledigt" && e.status !== "ausgefallen" && dayKey(e.starts_at) === iso;
-      }).sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); })[0] || null;
+        return e && String(e.user_id) === me() && e.status !== "erledigt" && e.status !== "ausgefallen" &&
+          e.item_type !== "support_session" && dayKey(e.starts_at) === iso;
+      }).sort(function (a, b) {
+        var pa = a.enrollment_id || a.course_id ? 0 : 1;
+        var pb = b.enrollment_id || b.course_id ? 0 : 1;
+        return pa - pb || String(a.starts_at).localeCompare(String(b.starts_at));
+      })[0] || null;
     });
     state.daysEdit = { days: days, slots: slots, times: {}, vis: {} };
     slots.forEach(function (ev) {
@@ -2145,10 +2151,10 @@
     }).join("");
     openSheet(
       '<p class="wr-sheet-title">Tage bearbeiten</p>' +
-      '<p class="wr-sheet-hint">Rechts anfassen und auf einen anderen Tag ziehen. Uhrzeit drehen, Privat oder Zeigen antippen.</p>' +
+      '<p class="wr-sheet-hint">Du kannst Einheiten in den Tagen verschieben, Uhrzeit anpassen, privat/zeigen wählen, um zu entscheiden, ob Freunde es sehen dürfen.</p>' +
       '<div class="wr-days">' + rows + "</div>" +
-      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-days-save="1">Speichern</button>' +
-      '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-days-save="1">Speichern</button></div>'
     );
     var card = $("wr-sheet-card");
     if (!card) return;
