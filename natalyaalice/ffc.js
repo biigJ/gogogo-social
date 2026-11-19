@@ -3389,6 +3389,23 @@
   }
   window.FFC = {
     user: ()=> currentUser,
+    /* gogogo: Circle per Name finden und beitreten. Braucht RPCs search_groups(p_query) und join_group(p_group_id)
+       in Hendriks Backend; fehlen sie, kommt { missing: true } zurück. */
+    async searchGroups(q){
+      if(!currentUser) return { data: [] };
+      try{
+        const { data, error } = await sb.rpc('search_groups', { p_query: String(q || '') });
+        if(error){ return /search_groups|PGRST202|does not exist|Could not find/i.test(error.message || error.code || '') ? { missing: true } : { error }; }
+        return { data: data || [] };
+      }catch(e){ return { missing: true }; }
+    },
+    async joinGroup(groupId){
+      if(!currentUser) return { error: { message: 'Nicht eingeloggt' } };
+      try{
+        const { data, error } = await sb.rpc('join_group', { p_group_id: Number(groupId) || groupId });
+        return error ? { error } : { data };
+      }catch(e){ return { error: e }; }
+    },
     /* gogogo: eigene Circle (Hendriks my_groups), z. B. für Beschriftung „XYZ Circle“ */
     async myGroups(){
       if(!currentUser) return [];
