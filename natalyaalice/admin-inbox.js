@@ -159,8 +159,10 @@
   function paintNews() {
     var since = st.seenBefore;
     var list = items(st.data);
-    if (!list.length) return '<p class="cp-hint">Noch keine Nachrichten.</p>';
-    return list.map(function (it) {
+    var compose = '<button type="button" class="cp-btn cp-btn--ghost" data-ga-broadcast="1" style="margin:0 0 10px">Mitteilung an alle Nutzer</button>' +
+      '<p class="cp-hint">Erscheint bei allen einmal mittig in Aktuell. Tippen schließt. Neue öffentliche Wochenpläne melden sich von selbst.</p>';
+    if (!list.length) return compose + '<p class="cp-hint">Noch keine Nachrichten.</p>';
+    return compose + list.map(function (it) {
       var a = it.a;
       var name = "<b>" + esc(a.name || "Jemand") + "</b>";
       var text;
@@ -475,10 +477,11 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-del],[data-ga-goal]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-del],[data-ga-goal]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
+    if (t.hasAttribute("data-ga-broadcast")) { broadcast(); return; }
     if (t.hasAttribute("data-ga-del")) { deleteAccount(t); return; }
     if (t.hasAttribute("data-ga-goal")) { editGoal(t.getAttribute("data-ga-goal")); return; }
     if (t.hasAttribute("data-ga-sub")) { decideSub(t.getAttribute("data-ga-sub")); return; }
@@ -492,6 +495,25 @@
       return;
     }
     if (t.hasAttribute("data-ga-coach")) setCoach(t);
+  }
+
+  /* Mitteilung an alle (go-messages.sql) */
+  function broadcast() {
+    if (!global.GoDialog) return;
+    GoDialog.prompt("Mitteilung an alle Nutzer", "", { ok: "Prüfen" }).then(function (text) {
+      text = String(text || "").trim();
+      if (!text) return;
+      text = text.slice(0, 600);
+      return GoDialog.confirm("So senden?\n\n" + text, { ok: "An alle senden" }).then(function (ok) {
+        if (!ok) return;
+        return host.rest("go_messages", { method: "POST", prefer: "return=minimal", body: { body: text, kind: "update", from_id: me() } })
+          .then(function () { if (host.toast) host.toast("Mitteilung ist raus"); })
+          .catch(function (err) {
+            var m = String((err && err.message) || "");
+            GoDialog.alert(/go_messages|relation|schema/.test(m) ? "Dafür muss go-messages.sql in Supabase laufen." : "Senden ging nicht: " + m.slice(0, 120));
+          });
+      });
+    });
   }
 
   function close() {
