@@ -689,6 +689,7 @@
     )
       .then(function (rows) {
         state.enrollments = rows || [];
+        state.enrollLoaded = true;
       })
       .catch(function () {
         return rest(
@@ -698,9 +699,11 @@
         )
           .then(function (rows) {
             state.enrollments = rows || [];
+            state.enrollLoaded = true;
           })
           .catch(function () {
             state.enrollments = [];
+            state.enrollLoaded = true;
           });
       });
   }
@@ -1205,6 +1208,19 @@
   }
 
   function emptyCardHtml(iso) {
+    var hasPlan = (state.enrollments || []).some(function (en) { return en && en.status === "aktiv"; });
+    if (!hasPlan) {
+      /* Ohne Wochenplan keine Einzeleinheiten anbieten, nur den Weg zum Plan */
+      return (
+        '<div class="wr-slide wr-slide--empty" data-day="' + esc(iso) + '">' +
+        '<div class="wr-media tone-neutral"><div class="wr-overlay wr-overlay--empty">' +
+        '<p class="wr-empty-title">' + (state.enrollLoaded ? "Noch kein Wochenplan" : "Noch nichts geplant") + "</p>" +
+        (state.enrollLoaded
+          ? '<div class="wr-empty-btns"><button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-pick-plan="1">Wochenplan wählen</button></div>'
+          : "") +
+        "</div></div></div>"
+      );
+    }
     return (
       '<div class="wr-slide wr-slide--empty" data-day="' +
       esc(iso) +
@@ -4030,7 +4046,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-pick-plan],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -4180,6 +4196,10 @@
       setWeekMode(t.getAttribute("data-wr-set-mode"));
       closeSheet();
       refresh();
+      return;
+    }
+    if (t.getAttribute("data-wr-pick-plan")) {
+      setTimeout(openPlanPicker, 0);
       return;
     }
     if (t.getAttribute("data-wr-edit")) {
