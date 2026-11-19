@@ -1,7 +1,7 @@
 /* go-dialog.js — gogogo-Dialoge statt System-alert/confirm/prompt
  *
  *   GoDialog.alert(text)                       → Promise<void>
- *   GoDialog.confirm(text, { ok, cancel })     → Promise<boolean>
+ *   GoDialog.confirm(text, { ok, cancel, photo, initial }) → Promise<boolean>  (photo: rundes Bild über dem Text)
  *   GoDialog.prompt(text, value, { ok, type }) → Promise<string|null>
  *   GoDialog.choose(text, [{ label, value }])  → Promise<value|null>
  *   GoDialog.pick(text, [{ label, value }], { ok }) → Promise<value[]|null>  (Mehrfachauswahl)
@@ -25,7 +25,9 @@
     ".god__pick input{width:20px;height:20px;accent-color:#2A2118;margin:0}" +
     ".god__empty{margin:0 0 14px;color:rgba(42,33,24,.65);font-size:14px}" +
     ".god__card--note{padding:22px 20px;cursor:pointer}" +
-    ".god__note{margin:0;font-size:16px;line-height:1.5;white-space:pre-wrap;text-align:left}";
+    ".god__note{margin:0;font-size:16px;line-height:1.5;white-space:pre-wrap;text-align:left}" +
+    ".god__face{width:96px;height:96px;margin:2px auto 14px;border-radius:50%;background:#E6DED0 center/cover no-repeat;display:grid;place-items:center;font:700 34px/1 Inter,system-ui,sans-serif;color:#2A2118}" +
+    ".god__face + .god__text{text-align:center}";
 
   function ensureCss() {
     if (document.getElementById("go-dialog-css")) return;
@@ -93,6 +95,13 @@
   function confirmDlg(msg, opts) {
     opts = opts || {};
     return open(function (card, close) {
+      if (opts.photo || opts.initial) {
+        var face = document.createElement("div");
+        face.className = "god__face";
+        if (opts.photo) face.style.backgroundImage = "url(\"" + String(opts.photo).replace(/"/g, "%22") + "\")";
+        else face.textContent = String(opts.initial).slice(0, 1).toUpperCase();
+        card.appendChild(face);
+      }
       text(card, msg);
       button(card, opts.ok || "Ja", "", function () { close(true); });
       button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(false); });
