@@ -145,6 +145,7 @@
     st.id = "tama-css";
     st.textContent =
       ".crew-story__ring{position:relative}" +
+      ".crew-story.tama-0:not(.is-training) .crew-story__ring{outline:2px solid #2E9E5B;outline-offset:6px}" +
       ".crew-story.tama-1 .crew-story__ring{outline:3px solid #F2C94C;outline-offset:6px}" +
       ".crew-story.tama-2 .crew-story__ring{outline:3px solid #F29A2E;outline-offset:6px}" +
       ".crew-story.tama-3 .crew-story__ring{outline:3px solid #E5251B;outline-offset:6px}" +

@@ -585,12 +585,23 @@
         state.invites = {};
       })
       .then(function () {
+        /* angenommene Einladungen zu meinen Events: Freund → meine Event-IDs (gegen Dopplung) */
+        state.sentAccepted = {};
+        var sentJob = rest("go_workout_invites?from_id=eq." + encodeURIComponent(id) + "&status=eq.accepted&event_id=not.is.null&workout_date=gte." +
+          encodeURIComponent(todayIso()) + "&select=event_id,to_id")
+          .then(function (rows) {
+            (rows || []).forEach(function (r) {
+              var k = String(r.to_id);
+              (state.sentAccepted[k] = state.sentAccepted[k] || {})[String(r.event_id)] = true;
+            });
+          })
+          .catch(function () {});
         /* eigene offene Anfragen (Winken) bleiben nach Neuladen ausgegraut */
-        return rest("go_event_requests?from_id=eq." + encodeURIComponent(id) + "&status=eq.pending&select=event_id")
+        return Promise.all([sentJob, rest("go_event_requests?from_id=eq." + encodeURIComponent(id) + "&status=eq.pending&select=event_id")
           .then(function (rows) {
             (rows || []).forEach(function (r) { if (r && r.event_id) state.waved[String(r.event_id)] = true; });
           })
-          .catch(function () {});
+          .catch(function () {})]);
       });
   }
 
@@ -1001,6 +1012,16 @@
       });
   }
 
+  function duplicateOfMine(ev) {
+    var mineIds = (state.sentAccepted || {})[String(ev.user_id)];
+    if (!mineIds) return false;
+    var d = dayKey(ev.starts_at);
+    return (state.events || []).some(function (m) {
+      if (!mineIds[String(m.id)] || String(m.user_id) !== me()) return false;
+      return dayKey(m.starts_at) === d &&
+        (String(m.starts_at) === String(ev.starts_at) || String(m.title || "") === String(ev.title || ""));
+    });
+  }
   function eventVisibleToMe(ev, flags) {
     if (!ev) return false;
     var uid = me();
@@ -1013,6 +1034,10 @@
     var week = now + 7 * 86400000;
     var t = new Date(ev.starts_at).getTime();
     var inv = !mine ? inviteFor(ev.id) : null;
+    /* Nicht abgehakt und Tag vorbei: in keiner Ansicht (auch nicht über Einladung) */
+    if (ev.status === "geplant" && dayKey(ev.starts_at) < dayKey(new Date(now).toISOString())) return false;
+    /* Freund hat meine Einladung angenommen: sein eigenes gleiches Event nicht doppelt zeigen */
+    if (!mine && ev.status === "geplant" && duplicateOfMine(ev)) return false;
     if (inv && ev.status === "geplant") {
       /* angenommen: überall wie eigene Zusage; offen: ab Team */
       if (inv.status === "accepted") return true;
@@ -1768,7 +1793,7 @@
           postId: String(ev.id),
           noCheck: true,
           /* Freunde-Events: links Sprechblase, daneben Winken (Anfrage). Angenommen: Herz + mein Bild, Herz tippen = absagen. */
-          wave: !invite && !iAmGoing(ev.id) && day >= todayIso(),
+          wave: !invite && !iAmGoing(ev.id) && ev.status === "geplant" && new Date(ev.starts_at).getTime() > Date.now(),
           waved: !!state.waved[String(ev.id)],
           heart: acceptedInv || (upcoming && !invite && iAmGoing(ev.id))
         });
@@ -2090,6 +2115,7 @@
         ev: ev
       };
       if (item._mine && dayKey(ev.starts_at) === today) myToday.push(item);
+      else if (dayKey(ev.starts_at) < today) history.push(item);
       else upcoming.push(item);
     });
 
@@ -2102,12 +2128,10 @@
         _mine: !!post.is_me,
         post: post
       };
+      /* gestern beendet = Historie (stand vorher über dem heutigen Event) */
       if (item._mine && dayKey(post.created_at) === today) myToday.push(item);
-      else if (dayKey(post.created_at) === today || new Date(post.created_at).getTime() >= Date.now() - 86400000) {
-        upcoming.push(item);
-      } else {
-        history.push(item);
-      }
+      else if (dayKey(post.created_at) === today) upcoming.push(item);
+      else history.push(item);
     });
 
     pack.past.forEach(function (ev) {
@@ -2319,8 +2343,12 @@
     var firstPaint = !state.paintedAktuell;
     var scroller = welcomeScrollEl();
     /* Boot: auf Heute zentrieren — sonst bleibt man auf Zukunft (z. B. 25.11.) */
+    /* In den ersten 15 s nach dem Öffnen (solange nicht selbst gescrollt) bei jedem Nachladen neu
+       auf das aktuelle Event zentrieren: spätere Zukunfts-Karten schoben es sonst nach unten */
+    if (!state.bootAt) state.bootAt = Date.now();
+    var bootPhase = !state.userScrolledAktuell && Date.now() - state.bootAt < 15000;
     var keepScroll =
-      !firstPaint && !state.bootNeedsCenter ? scroller.scrollTop || 0 : null;
+      !firstPaint && !state.bootNeedsCenter && !bootPhase ? scroller.scrollTop || 0 : null;
     /* Feed sichtbar lassen — kein opacity-Flash bei Refresh */
     root.classList.remove("is-centering");
     patchFeed(root, placeSpontan(html));
@@ -2357,7 +2385,12 @@
     if (!today) return null;
     var cards = today.querySelectorAll(".acc-card:not(.acc-card--spontan)");
     if (cards && cards.length) return cards[0];
-    return today.querySelector(".acc-card") || today;
+    var any = today.querySelector(".acc-card");
+    if (any) return any;
+    /* kein eigenes Event heute: nächstes kommendes (unterste Karte der Zukunft) */
+    var fut = document.querySelectorAll('[data-acc-zone="future"] .acc-card');
+    if (fut.length) return fut[fut.length - 1];
+    return today;
   }
 
   /* Aktuelles Event in Screen-Mitte unter dem Filter-Header; soft nur auf Wunsch */
@@ -2386,6 +2419,7 @@
       var delta = elMid - mid;
       if (Math.abs(delta) < 4) return;
       var next = Math.max(0, (scroller.scrollTop || 0) + delta);
+      state.progScrollUntil = Date.now() + 400;
       if (soft && typeof scroller.scrollTo === "function") {
         scroller.scrollTo({ top: next, behavior: "smooth" });
       } else {
@@ -2410,7 +2444,7 @@
       function () {
         if (document.body.dataset.shell !== "heute") return;
         var y = scroller.scrollTop || 0;
-        if (Math.abs(y - last) > 8) state.userScrolledAktuell = true;
+        if (Math.abs(y - last) > 8 && Date.now() > (state.progScrollUntil || 0)) state.userScrolledAktuell = true;
         var todayEl = $("acc-feed-today");
         var goingDown = y > last + 2;
         var goingUp = y < last - 2;
