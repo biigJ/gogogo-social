@@ -3719,7 +3719,9 @@
           if (!uid) return;
           var unit = units.filter(function (u) { return String(u.id) === uid; })[0] || {};
           /* Bewegung (alternative) hat in der DB keinen Kurs, nur den Titel */
-          var payload = { category: kind, course_id: kind === "alternative" ? null : unit.id, title: unit.title, visibility: "team" };
+          /* Schritte sind standardmäßig privat; zeigen muss man bewusst wählen */
+          var payload = { category: kind, course_id: kind === "alternative" ? null : unit.id, title: unit.title,
+            visibility: /schritte/i.test(unit.title || "") ? "privat" : "team" };
           if (kind === "alternative") {
             /* Bewegung: direkt loggen (Foto, Notiz, privat oder zeigen) */
             openDraftDone(payload, replace, unit.title);
@@ -3752,6 +3754,7 @@
     var modal = $("acc-done-modal");
     if (!modal) return;
     openDoneModal("draft", { title: title || "Erledigt", placeholder: "Wie war es? (optional)" });
+    setDoneVis(normalizeVisibility(payload.visibility || "team"));
   }
 
   function moveToTomorrow(ev) {
