@@ -30,6 +30,8 @@
     ".gcr-coach__copy{flex:1;min-width:0}" +
     ".gcr-coach__name{font-weight:700;font-size:16px}" +
     ".gcr-mini{font-size:13px;color:rgba(42,33,24,.7)}" +
+    ".gcr-coach .gcr-mini{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    ".gcr-coach__acts{display:flex;gap:8px;margin-top:8px}" +
     ".gcr-mini b{color:#2A2118}" +
     ".gcr-pill{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer}" +
     ".gcr-pill.is-solid{background:#111;color:#fff}" +
@@ -298,10 +300,14 @@
         sh.el.querySelector("[data-gcr-list]").innerHTML = coaches.length
           ? coaches.map(function (c) {
               var cur = String(c.id) === String(opts.currentId || "");
+              /* Name, darunter Bewertung in einer Zeile, darunter Über + Wählen/Entfernen */
               return '<div class="gcr-coach">' + face(c) + '<div class="gcr-coach__copy"><div class="gcr-coach__name">' + esc(c.name || c.nickname || "Coach") +
-                '</div><div class="gcr-mini">' + summaryLine(sum[c.id]) + "</div></div>" +
-                '<button type="button" class="gcr-pill" data-gcr-about="' + esc(c.id) + '">Über</button>' +
-                '<button type="button" class="gcr-pill is-solid" data-gcr-pick="' + esc(c.id) + '"' + (cur ? " disabled" : "") + ">" + (cur ? "Dein Coach" : "Wählen") + "</button></div>";
+                '</div><div class="gcr-mini">' + summaryLine(sum[c.id]) + "</div>" +
+                '<div class="gcr-coach__acts"><button type="button" class="gcr-pill" data-gcr-about="' + esc(c.id) + '">Über</button>' +
+                (cur
+                  ? (opts.onRemove ? '<button type="button" class="gcr-pill" data-gcr-remove="1">Als Coach entfernen</button>' : "")
+                  : '<button type="button" class="gcr-pill is-solid" data-gcr-pick="' + esc(c.id) + '">Wählen</button>') +
+                "</div></div></div>";
             }).join("")
           : '<p class="gcr-sub">Noch keine Coaches.</p>';
       })
@@ -322,6 +328,11 @@
           sh.close();
           opts.onPick(cp);
         }
+        return;
+      }
+      if (e.target.closest("[data-gcr-remove]") && opts.onRemove) {
+        sh.close();
+        opts.onRemove();
         return;
       }
       if (e.target.closest("[data-gcr-search]")) {
