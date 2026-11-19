@@ -259,7 +259,10 @@
     if (!st.ex.rows.length) return '<p class="cp-hint">Keine offenen Einreichungen. Nutzer reichen unter Plus → Videos Übungen ein.</p>';
     return st.ex.rows.map(function (r) {
       return '<div class="ga-item"><div class="ga-copy"><p><b>' + esc(r.name) + "</b></p>" +
-        '<span class="ga-msg">' + esc((st.ex.names[r.account_id] || "?") + (r.note ? " · " + r.note : "")) + "</span>" +
+        '<span class="ga-msg">' + esc(st.ex.names[r.account_id] || "?") +
+        (r.note ? (/^https?:\/\//.test(r.note)
+          ? ' · <a href="' + esc(r.note) + '" target="_blank" rel="noopener">Video ansehen</a>'
+          : " · " + esc(r.note)) : "") + "</span>" +
         '<span class="ga-when">' + esc(when(r.created_at)) + "</span></div>" +
         '<button type="button" class="ga-wa" style="background:#2A2118" data-ga-exdone="' + esc(r.id) + '">Erledigt</button></div>';
     }).join("");

@@ -51,9 +51,9 @@
     ".gxl__frame{position:relative;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:rgba(42,33,24,.08);display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;color:rgba(42,33,24,.55)}" +
     ".gxl__frame img,.gxl__frame iframe{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0}" +
     ".gxl__frame--video{background:#111;color:rgba(246,241,232,.7)}" +
-    ".gxl__submit{margin:22px 0 8px;display:grid;gap:8px}" +
-    ".gxl__submit h3{margin:0;font-size:16px;font-weight:700}" +
-    ".gxl__submit input{min-height:44px;box-sizing:border-box;padding:0 12px;border:1px solid rgba(42,33,24,.25);border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118}" +
+    ".gxl__submit{margin:14px 0 8px;display:grid;gap:8px}" +
+    ".gxl__submit p{margin:0;font-size:14px;line-height:1.4}" +
+    ".gxl__submit button:disabled{opacity:.4}" +
     ".gxl__submit button{justify-self:start;min-height:42px;padding:0 18px;border:0;border-radius:999px;background:#2A2118;color:#F6F1E8;font:inherit;font-weight:700;cursor:pointer}";
 
   function ensureCss() {
@@ -172,14 +172,25 @@
     var open = {};
     box.querySelectorAll("details[open]").forEach(function (d) { open[d.getAttribute("data-gxl-ex")] = true; });
     var picking = !!pendingUrl(el);
-    var list = (names || []).filter(function (n) {
-      if (query && n.toLowerCase().indexOf(query.toLowerCase()) === -1) return false;
-      if (label && (labelsOf[GoExMedia.key(n)] || []).indexOf(label) === -1) return false;
-      return true;
-    });
-    box.innerHTML = list.length
-      ? list.map(function (n) { return exHtml(n, open[n], picking); }).join("")
-      : '<p class="gxl__empty">Keine Übung gefunden.</p>';
+    var q = String(query || "").trim();
+    /* Liste erst nach Label („Alle“ inklusive) oder Übungsname */
+    if (!label && !q) {
+      box.innerHTML = "";
+    } else {
+      var list = (names || []).filter(function (n) {
+        if (q && n.toLowerCase().indexOf(q.toLowerCase()) === -1) return false;
+        if (label && label !== "Alle" && (labelsOf[GoExMedia.key(n)] || []).indexOf(label) === -1) return false;
+        return true;
+      });
+      var exact = q && (names || []).some(function (n) { return n.toLowerCase() === q.toLowerCase(); });
+      box.innerHTML = (list.length
+        ? list.map(function (n) { return exHtml(n, open[n], picking); }).join("")
+        : '<p class="gxl__empty">Keine Übung gefunden.</p>') +
+        (q.length >= 2 && !exact
+          ? '<div class="gxl__submit"><p>„' + esc(q) + '“ fehlt? ' + (picking ? "Sende das Video mit diesem Namen ein." : "Link oben einfügen, dann einreichen.") + "</p>" +
+            '<button type="button" data-gxl-submit' + (picking ? "" : " disabled") + ">Mit Video einreichen</button></div>"
+          : "");
+    }
     box.querySelectorAll("details[open]").forEach(loadEmbed);
     el.querySelectorAll("[data-gxl-label]").forEach(function (c) {
       c.classList.toggle("is-on", c.getAttribute("data-gxl-label") === label);
@@ -208,15 +219,11 @@
       el.innerHTML =
         '<input type="url" inputmode="url" class="gxl__new" placeholder="Link aus Instagram oder YouTube" data-gxl-new />' +
         '<p class="gxl__newhint" data-gxl-newhint></p>' +
-        '<div class="gxl__chips">' + LABELS.map(function (l) {
+        '<div class="gxl__chips">' + ["Alle"].concat(LABELS).map(function (l) {
           return '<button type="button" class="gxl__chip" data-gxl-label="' + esc(l) + '">' + esc(l) + "</button>";
         }).join("") + "</div>" +
-        '<input type="search" class="gxl__search" placeholder="Übung suchen" data-gxl-q />' +
-        '<div data-gxl-list><p class="gxl__empty">Lädt …</p></div>' +
-        '<div class="gxl__submit"><h3>Übung einreichen</h3>' +
-        '<input type="text" maxlength="80" placeholder="Name der Übung, die fehlt" data-gxl-subname />' +
-        '<input type="text" maxlength="300" placeholder="Kurz beschreiben (optional)" data-gxl-subnote />' +
-        '<button type="button" data-gxl-submit>Einreichen</button></div>';
+        '<input type="search" class="gxl__search" placeholder="Übungsname" data-gxl-q />' +
+        '<div data-gxl-list></div>';
       el.querySelector("[data-gxl-list]").addEventListener("toggle", function (e) {
         if (e.target && e.target.open) loadEmbed(e.target);
       }, true);
@@ -233,18 +240,20 @@
 
   function onClick(el, e) {
     if (e.target.closest("[data-gxl-submit]")) {
-      var nmEl = el.querySelector("[data-gxl-subname]");
-      var ntEl = el.querySelector("[data-gxl-subnote]");
-      var nm = String(nmEl.value || "").trim();
+      var nm = String(query || "").trim();
+      var vid = pendingUrl(el);
       if (nm.length < 2) { if (host.toast) host.toast("Wie heißt die Übung?"); return; }
+      if (!vid) { if (host.toast) host.toast("Bitte erst einen Instagram- oder YouTube-Link einfügen."); return; }
       var btn = e.target.closest("[data-gxl-submit]");
       btn.disabled = true;
       host.rest("go_exercise_submissions", { method: "POST", prefer: "return=minimal",
-        body: { account_id: host.me(), name: nm, note: String(ntEl.value || "").trim() || null } })
+        body: { account_id: host.me(), name: nm, note: vid } })
         .then(function () {
-          nmEl.value = ""; ntEl.value = "";
-          btn.disabled = false;
-          if (global.GoDialog) GoDialog.alert("Danke! gogogo schaut sich „" + nm + "“ an.");
+          el.querySelector("[data-gxl-new]").value = "";
+          el.querySelector("[data-gxl-q]").value = "";
+          query = "";
+          paint(el);
+          if (global.GoDialog) GoDialog.alert("Danke! Wir schauen uns „" + nm + "“ an und geben die Übung frei.");
         })
         .catch(function (err) {
           btn.disabled = false;

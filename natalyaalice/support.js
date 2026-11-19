@@ -410,7 +410,7 @@
       title: "Videos",
       price: "gratis",
       description:
-        "Kopier Links aus Instagram oder Youtube hierher und such die passende Übung aus der Liste. Dann wird es Dir beim Üben angezeigt."
+        "Kopier Links von Instagram oder YouTube hierher und such die Übung dazu aus der Liste. Wenn Dir eine Übung fehlt, sende das Video mit einem Namen ein. Wir geben die Übung frei."
     },
     {
       key: "kraft_tracking",
