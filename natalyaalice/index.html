@@ -3159,6 +3159,24 @@
     #profile-places-block[hidden],
     #profile-photos-label[hidden] { display: none !important; }
     .profile-place { margin-top: 4px; font-size: 15px; }
+    /* Orte im Profil (unter dem Mantra) */
+    .profile-orte { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(42, 33, 24, 0.28); }
+    .profile-orte__modes { display: grid; gap: 6px; margin-bottom: 12px; }
+    .profile-orte__mode { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: center; width: 100%; min-height: 40px; padding: 0; border: 0; background: none; color: #2A2118; font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+    .profile-orte__mode::before { content: ""; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #2A2118; box-sizing: border-box; }
+    .profile-orte__mode.is-on::before { background: #2A2118; box-shadow: inset 0 0 0 3px #F6F1E8; }
+    .profile-orte__list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .profile-orte__place { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px; border: 1px solid rgba(42, 33, 24, 0.25); border-radius: 999px; background: transparent; color: #2A2118; font: inherit; font-size: 14px; }
+    button.profile-orte__place { cursor: pointer; }
+    .profile-orte__x { font-size: 16px; line-height: 1; opacity: .6; }
+    .profile-orte__add { margin-top: 10px; min-height: 40px; padding: 0 16px; border: 1.5px solid #2A2118; border-radius: 999px; background: transparent; color: #2A2118; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .orte-pick { position: fixed; inset: 0; z-index: 10040; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(20, 16, 12, 0.42); }
+    .orte-pick__card { width: min(100%, 420px); max-height: 88vh; overflow-y: auto; box-sizing: border-box; background: #F3EEE4; color: #2A2118; border-radius: 22px; padding: 20px 16px 14px; }
+    .orte-pick__card h2 { margin: 0 0 12px; font: 600 21px/1.25 'Playfair Display', Georgia, serif; }
+    .orte-pick__card .gpp__map { height: 220px; }
+    .orte-pick__btn { display: block; width: 100%; min-height: 48px; margin: 0 0 8px; border: 0; border-radius: 999px; background: #111; color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+    .orte-pick__btn:disabled { opacity: .4; }
+    .orte-pick__btn--quiet { background: transparent; color: rgba(42, 33, 24, 0.7); font-weight: 600; }
     .profile-challenge { margin-top: 8px; font-family: Inter, system-ui, sans-serif; font-size: 16px; font-weight: 500; }
     .profile-notes p { margin: 4px 0 0; font-size: 12px; line-height: 1.35; }
     .profile-photos {
@@ -5613,6 +5631,17 @@
       font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
     }
     .team-qr { margin-top: 18px; text-align: center; }
+    /* Freunde finden: Ort durchsuchen */
+    #team-modal .team-alt { background: transparent; color: #2A2118; border: 1.5px solid #2A2118; margin-top: 10px; }
+    #team-modal .team-alt[hidden] { display: none; }
+    .team-place__head { margin: 12px 0 0; font-weight: 600; text-align: left; }
+    .team-place__list { display: grid; gap: 6px; margin-top: 12px; max-height: 46vh; overflow-y: auto; text-align: left; }
+    #team-modal .team-place__row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px; margin: 0; padding: 6px 12px; border: 0; border-radius: 12px; background: #fff; color: #2A2118; font: inherit; font-size: 16px; font-weight: 500; text-align: left; }
+    #team-modal .team-place__row:disabled { opacity: 1; }
+    .team-place__face { flex: none; width: 36px; height: 36px; border-radius: 50%; background: #E6DED0 center/cover no-repeat; display: grid; place-items: center; font-weight: 700; font-size: 15px; }
+    .team-place__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .team-place__tag { flex: none; font-size: 13px; opacity: .6; }
+    .team-place__empty { margin: 4px 0 0; font-size: 15px; color: rgba(42, 33, 24, .7); text-align: left; }
     .team-qr img { display: block; width: 200px; height: 200px; margin: 0 auto 8px; background: #fff; }
     #stamp-book-modal .sand-card,
     #initial-call-modal .sand-card,
@@ -7156,13 +7185,21 @@
   </div>
   <div class="sand-modal" id="team-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="team-title">
-      <h2 class="ask" id="team-title">ID oder Nickname eingeben</h2>
-      <input class="team-id" id="team-id" maxlength="20" placeholder="ID oder Nickname" aria-label="ID oder Nickname" autocomplete="off" autocapitalize="off" spellcheck="false" />
-      <button type="button" id="team-search">Suchen</button>
+      <h2 class="ask" id="team-title">Freunde finden</h2>
+      <div id="team-find">
+        <input class="team-id" id="team-id" maxlength="20" placeholder="ID oder Nickname" aria-label="ID oder Nickname" autocomplete="off" autocapitalize="off" spellcheck="false" />
+        <button type="button" id="team-search">Suchen</button>
+        <button type="button" class="team-alt" id="team-place-open" hidden>Ort durchsuchen</button>
+      </div>
+      <div class="team-place" id="team-place" hidden>
+        <input class="team-id" id="team-place-q" maxlength="60" placeholder="Ort suchen" aria-label="Ort suchen" autocomplete="off" spellcheck="false" />
+        <p class="team-place__head" id="team-place-head" hidden></p>
+        <div class="team-place__list" id="team-place-list"></div>
+        <button type="button" class="team-alt" id="team-place-back">Zurück</button>
+      </div>
       <p class="team-msg" id="team-msg"></p>
       <div class="team-qr" id="team-qr" hidden>
         <img id="team-qr-img" alt="" width="200" height="200" />
-        <p class="team-msg">Oder: Dein Freund scannt diesen Code mit der Handykamera. Dann seid Ihr verbunden.</p>
       </div>
     </div>
   </div>
@@ -7434,6 +7471,14 @@
     <div class="profile-block">
       <p class="profile-label" data-hide-label="1">Mantra</p>
       <textarea class="profile-mantra" id="profile-mantra" maxlength="220" placeholder="Mantra" readonly></textarea>
+    </div>
+    <div class="profile-block profile-orte" id="profile-orte-block" hidden>
+      <div class="profile-orte__modes" id="profile-orte-modes" role="radiogroup" aria-label="Wer sieht meine Orte">
+        <button type="button" class="profile-orte__mode" role="radio" data-orte-findable="1">Man kann mich unter den Orten finden.</button>
+        <button type="button" class="profile-orte__mode" role="radio" data-orte-findable="0">Die Orte sind nur zur Info für meine Freunde.</button>
+      </div>
+      <div class="profile-orte__list" id="profile-orte-list"></div>
+      <button type="button" class="profile-orte__add" id="profile-orte-add">+ Ort hinzufügen</button>
     </div>
     <div class="profile-block profile-split" id="profile-zirkel-block" hidden>
       <p class="profile-text-head">Zirkeltraining</p>
@@ -8098,13 +8143,13 @@
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-9"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-4"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-5"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-67"></script>
-  <script src="/natalyaalice/place-picker.js?v=pp-2"></script>
+  <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-48"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
@@ -8147,6 +8192,14 @@
         return;
       }
       if (sessionMode && (!sessionAccount || !sessionAccount.id)) {
+        /* QR eines Freundes ohne eigenes Konto: Freund merken, direkt „Neu anmelden“ */
+        var scanFriend = "";
+        try { scanFriend = new URLSearchParams(location.search).get("freund") || ""; } catch (eQ) {}
+        if (scanFriend) {
+          try { localStorage.setItem("gogogo_pending_friend", scanFriend); } catch (eQ2) {}
+          location.replace("/login/?neu=1&next=" + encodeURIComponent("/workout/"));
+          return;
+        }
         location.replace("/login/?next=" + encodeURIComponent("/workout/"));
         return;
       }
@@ -14339,10 +14392,18 @@
           if (sp.has("freund")) { sp.delete("freund"); history.replaceState(null, "", location.pathname + (sp.toString() ? "?" + sp : "") + location.hash); }
         } catch (eH) {}
         if (String(fid) === String(sessionAccount.id)) return;
-        rest("go_accounts?id=eq." + encodeURIComponent(fid) + "&select=id,name,nickname&limit=1")
+        rest("go_accounts?id=eq." + encodeURIComponent(fid) + "&select=id,name,nickname,photo_url&limit=1")
           .then(function (rows) {
             var f = rows && rows[0];
             if (!f) { gogogoToast("Freund nicht gefunden."); return; }
+            return rest("go_friends?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&friend_id=eq." + encodeURIComponent(f.id) + "&select=friend_id&limit=1")
+              .catch(function () { return []; })
+              .then(function (have) {
+                if (have && have.length) { gogogoToast("Ihr seid schon verbunden: " + (f.nickname || f.name || "Freund")); return false; }
+                return confirmAddFriend(f);
+              })
+              .then(function (ok) {
+            if (!ok) return;
             return ensureFriendLink(f.id).then(function () {
               rest("go_friends?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&friend_id=eq." + encodeURIComponent(f.id) + "&select=in_feed")
                 .then(function (r) {
@@ -14353,6 +14414,7 @@
                 .catch(function () { gogogoToast("Ihr seid jetzt verbunden: " + (f.nickname || f.name || "Freund")); });
               if (f.nickname && window.FFC && FFC.user() && FFC.friendRequest) FFC.friendRequest(f.nickname).then(onFfcFriendsChanged).catch(function () {});
               loadTeam();
+            });
             });
           })
           .catch(function (err) {
@@ -15670,6 +15732,8 @@
       function ffcContextGroup() {
         return myGroups().filter(isFfcGroup)[0] || null;
       }
+      /* FFC-Circle je Nickname, auch für Freunde ohne gogogo-Konto (Zeile 2 in Meine Freunde) */
+      var ffcCircleByNick = {};
       function syncFfcGroupIntoTeam() {
         if (ffcGroupSyncing || !sessionAccount || !window.FFC || !FFC.user || !FFC.user() || !FFC.groups) {
           return Promise.resolve();
@@ -15688,6 +15752,7 @@
               .then(function (rows) {
                 var nicks = (rows || []).filter(function (r) { return r && r.nickname && !r.is_me; })
                   .map(function (r) { return String(r.nickname).replace(/[(),*]/g, ""); });
+                nicks.forEach(function (n) { ffcCircleByNick[n.toLowerCase()] = name; });
                 if (!nicks.length) return [];
                 return rest("go_accounts?or=(" + nicks.map(function (n) {
                   return "nickname.ilike." + encodeURIComponent(n);
@@ -16103,7 +16168,7 @@
           addRow.className = "friend-list__row friend-list__add";
           addRow.innerHTML = '<span class="friend-list__plus" aria-hidden="true">+</span>' +
             '<span class="friend-list__text"><span class="friend-list__name">Freund hinzufügen</span>' +
-            '<span class="friend-list__meta">Nickname, ID oder per QR-Code</span></span>';
+            '<span class="friend-list__meta">Nickname, ID, Ort oder QR-Code</span></span>';
           addRow.addEventListener("click", function () { openTeamSearch("friend"); });
           list.appendChild(addRow);
           var people = teamPeople.filter(function (p) {
@@ -16141,6 +16206,8 @@
             else if (p.is_trainer) meta.push("Coach");
             if (p.trainer_id && String(p.trainer_id) === mineId) meta.push("Coachee");
             if (inGroup[String(p.id)]) meta.push(inGroup[String(p.id)]);
+            var ffcCircle = ffcCircleByNick[String(p.nickname || "").toLowerCase()];
+            if (ffcCircle && String(inGroup[String(p.id)] || "").indexOf("Circle " + ffcCircle) < 0) meta.push("Circle " + ffcCircle);
             if (meta.length) {
               var sub = document.createElement("span");
               sub.className = "friend-list__meta";
@@ -17729,7 +17796,10 @@
         teamSearchMode = mode === "trainer" ? "trainer" : "friend";
         document.getElementById("team-title").textContent = teamSearchMode === "trainer"
           ? "Trainer: ID oder Nickname eingeben"
-          : "Freund: ID oder Nickname eingeben";
+          : "Freunde finden";
+        document.getElementById("team-find").hidden = false;
+        document.getElementById("team-place").hidden = true;
+        document.getElementById("team-place-open").hidden = teamSearchMode !== "friend" || !window.GoPlacePicker;
         document.getElementById("team-id").value = "";
         document.getElementById("team-msg").textContent = "";
         /* Freund: QR mit Link ?freund=<meine ID>, Scan mit der Kamera verbindet */
@@ -18193,6 +18263,142 @@
           .catch(function () { return false; });
       }
 
+      /* Vor dem Verbinden: „biigJ / Ben hinzufügen?“ mit Foto (Suche und QR-Scan) */
+      function confirmAddFriend(f) {
+        var nick = String((f && f.nickname) || "").trim();
+        var name = String((f && f.name) || "").trim().split(/\s+/)[0] || "";
+        var label = nick && name && nick.toLowerCase() !== name.toLowerCase() ? nick + " / " + name : (nick || name || "Freund");
+        if (!window.GoDialog) return Promise.resolve(true);
+        return GoDialog.confirm(label + " hinzufügen?", {
+          ok: "Hinzufügen",
+          cancel: "Abbrechen",
+          photo: (f && f.photo_url) || "",
+          initial: label
+        });
+      }
+
+      /* Freunde finden → Ort durchsuchen: bekannte Orte (gleicher Ort in anderer Schreibweise zählt mit),
+         dann Leute, die dort trainieren und „Man kann mich unter den Orten finden.“ gewählt haben */
+      var teamPlaceTimer = null;
+      function teamPlaceView(on) {
+        document.getElementById("team-find").hidden = on;
+        document.getElementById("team-place").hidden = !on;
+        document.getElementById("team-msg").textContent = "";
+        var qr = document.getElementById("team-qr");
+        if (qr) qr.hidden = on || !(teamSearchMode === "friend" && sessionAccount && sessionAccount.id);
+      }
+      function placeRowEl(label, face, tag) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "team-place__row";
+        if (face) {
+          var f = document.createElement("span");
+          f.className = "team-place__face";
+          if (face.photo) f.style.backgroundImage = "url(\"" + String(face.photo).replace(/"/g, "%22") + "\")";
+          else f.textContent = String(face.initial || "?").slice(0, 1).toUpperCase();
+          b.appendChild(f);
+        }
+        var n = document.createElement("span");
+        n.className = "team-place__name";
+        n.textContent = label;
+        b.appendChild(n);
+        if (tag) {
+          var t = document.createElement("span");
+          t.className = "team-place__tag";
+          t.textContent = tag;
+          b.appendChild(t);
+        }
+        return b;
+      }
+      function paintTeamPlaces() {
+        var list = document.getElementById("team-place-list");
+        var head = document.getElementById("team-place-head");
+        var q = document.getElementById("team-place-q");
+        q.hidden = false;
+        head.hidden = true;
+        GoPlacePicker.search(rest, q.value).then(function (rows) {
+          list.textContent = "";
+          if (!rows.length) {
+            var p = document.createElement("p");
+            p.className = "team-place__empty";
+            p.textContent = "Kein Ort gefunden.";
+            list.appendChild(p);
+            return;
+          }
+          rows.slice(0, 40).forEach(function (place) {
+            var b = placeRowEl(place.name, null, "");
+            b.addEventListener("click", function () { paintPlacePeople(place); });
+            list.appendChild(b);
+          });
+        });
+      }
+      function paintPlacePeople(place) {
+        var list = document.getElementById("team-place-list");
+        var head = document.getElementById("team-place-head");
+        var msg = document.getElementById("team-msg");
+        document.getElementById("team-place-q").hidden = true;
+        head.hidden = false;
+        head.textContent = place.name;
+        list.textContent = "";
+        msg.textContent = "";
+        Promise.all([
+          GoPlacePicker.sameSpot(rest, place),
+          rest("go_accounts?places_findable=is.true&select=id,name,nickname,photo_url,workout_places&limit=1000")
+        ]).then(function (r) {
+          var keys = r[0];
+          var mine = String(sessionAccount && sessionAccount.id);
+          var people = (r[1] || []).filter(function (a) {
+            if (!a || String(a.id) === mine) return false;
+            return placeNames(a.workout_places).some(function (n) { return keys[GoPlacePicker.norm(n)]; });
+          });
+          if (!people.length) {
+            var p = document.createElement("p");
+            p.className = "team-place__empty";
+            p.textContent = "Hier ist noch niemand auffindbar.";
+            list.appendChild(p);
+            return;
+          }
+          people.forEach(function (a) {
+            var label = a.nickname || a.name || "Freund";
+            var friend = teamPeople.some(function (x) { return String(x.id) === String(a.id); });
+            var b = placeRowEl(label, { photo: a.photo_url, initial: label }, friend ? "verbunden" : "");
+            if (friend) b.disabled = true;
+            b.addEventListener("click", function () {
+              if (friend) return;
+              confirmAddFriend(a).then(function (ok) {
+                if (!ok) return;
+                ensureFriendLink(a.id).then(function () {
+                  document.getElementById("team-modal").hidden = true;
+                  gogogoToast("Ihr seid jetzt verbunden: " + label);
+                  if (a.nickname && window.FFC && FFC.user() && FFC.friendRequest) FFC.friendRequest(a.nickname).then(onFfcFriendsChanged).catch(function () {});
+                  loadTeam();
+                }).catch(function () {
+                  msg.textContent = "Maximal 12 Freunde. Coachees zählen nicht mit.";
+                });
+              });
+            });
+            list.appendChild(b);
+          });
+        }).catch(function (err) {
+          msg.textContent = /places_findable/.test(String((err && err.message) || ""))
+            ? "Ort durchsuchen fehlt noch: go-orte-suche.sql in Supabase ausführen."
+            : "Ging gerade nicht. Bitte nochmal versuchen.";
+        });
+      }
+      document.getElementById("team-place-open").addEventListener("click", function () {
+        document.getElementById("team-place-q").value = "";
+        teamPlaceView(true);
+        paintTeamPlaces();
+      });
+      document.getElementById("team-place-back").addEventListener("click", function () {
+        if (document.getElementById("team-place-q").hidden) { paintTeamPlaces(); return; }
+        teamPlaceView(false);
+      });
+      document.getElementById("team-place-q").addEventListener("input", function () {
+        clearTimeout(teamPlaceTimer);
+        teamPlaceTimer = setTimeout(paintTeamPlaces, 150);
+      });
+
       function searchTeam() {
         var msg = document.getElementById("team-msg");
         var raw = String(document.getElementById("team-id").value || "").trim().replace(/^@/, "");
@@ -18235,8 +18441,11 @@
               done();
               return;
             }
-            ensureFriendLink(found.id).then(done).catch(function () {
-              msg.textContent = "Maximal 12 Freunde. Coachees zählen nicht mit.";
+            confirmAddFriend(found).then(function (ok) {
+              if (!ok) return;
+              ensureFriendLink(found.id).then(done).catch(function () {
+                msg.textContent = "Maximal 12 Freunde. Coachees zählen nicht mit.";
+              });
             });
           })
           .catch(function () {
@@ -22112,6 +22321,7 @@
         fitProfileAbout();
         var placesBlock = document.getElementById("profile-places-block");
         if (placesBlock) placesBlock.hidden = true;
+        paintProfileOrte(account, mine);
         var mantra = document.getElementById("profile-mantra");
         if (mantra) mantra.readOnly = !mine;
         paintProfileMantra(account);
@@ -22136,6 +22346,139 @@
         var photosBlock = document.getElementById("profile-photos-block");
         if (photosBlock) photosBlock.hidden = !list.length && !mine;
       }
+
+      /* Orte im Profil: Liste unter dem Mantra, hinzufügen über die Karte (nur bekannte Orte), Tippen entfernt.
+         places_findable (go-orte-suche.sql): true = über „Ort durchsuchen“ auffindbar */
+      var profileOrte = { list: [], findable: false, mine: false, id: "" };
+      function placeNames(raw) {
+        if (typeof raw === "string") { try { raw = JSON.parse(raw); } catch (e) { raw = []; } }
+        return (Array.isArray(raw) ? raw : []).map(function (x) { return x && typeof x === "object" ? x.name : x; })
+          .map(function (x) { return String(x || "").trim(); }).filter(Boolean);
+      }
+      function paintProfileOrte(account, mine) {
+        var block = document.getElementById("profile-orte-block");
+        if (!block) return;
+        profileOrte.mine = !!mine;
+        profileOrte.id = String((account && account.id) || (mine && sessionAccount && sessionAccount.id) || "");
+        profileOrte.list = placeNames(account && account.workout_places);
+        profileOrte.findable = false;
+        profileOrte.loaded = false;
+        renderProfileOrte();
+        if (!profileOrte.id) return;
+        var askedId = profileOrte.id;
+        /* frisch aus der Datenbank (die gemerkte Sitzung kann veraltet sein), erst dann bearbeitbar */
+        rest("go_accounts?id=eq." + encodeURIComponent(askedId) + "&select=workout_places")
+          .then(function (rows) {
+            if (profileOrte.id !== askedId || !rows || !rows[0]) return;
+            profileOrte.list = placeNames(rows[0].workout_places);
+            profileOrte.loaded = true;
+            if (mine && sessionAccount) sessionAccount.workout_places = profileOrte.list.slice();
+            renderProfileOrte();
+          })
+          .catch(function () {});
+        rest("go_accounts?id=eq." + encodeURIComponent(askedId) + "&select=places_findable")
+          .then(function (rows) {
+            if (profileOrte.id !== askedId) return;
+            profileOrte.findable = !!(rows && rows[0] && rows[0].places_findable);
+            renderProfileOrte();
+          })
+          .catch(function () {});
+      }
+      function renderProfileOrte() {
+        var block = document.getElementById("profile-orte-block");
+        var list = document.getElementById("profile-orte-list");
+        if (!block || !list) return;
+        var mine = profileOrte.mine;
+        block.hidden = !mine && !profileOrte.list.length;
+        document.getElementById("profile-orte-modes").hidden = !mine;
+        document.getElementById("profile-orte-add").hidden = !mine || !profileOrte.loaded || profileOrte.list.length >= 12;
+        [].forEach.call(block.querySelectorAll("[data-orte-findable]"), function (b) {
+          var on = (b.getAttribute("data-orte-findable") === "1") === profileOrte.findable;
+          b.classList.toggle("is-on", on);
+          b.setAttribute("aria-checked", on ? "true" : "false");
+        });
+        list.textContent = "";
+        profileOrte.list.forEach(function (name) {
+          var el = document.createElement(mine ? "button" : "span");
+          el.className = "profile-orte__place";
+          el.textContent = name;
+          if (mine) {
+            el.type = "button";
+            el.setAttribute("data-orte-remove", name);
+            el.setAttribute("aria-label", name + " entfernen");
+            var x = document.createElement("span");
+            x.className = "profile-orte__x";
+            x.setAttribute("aria-hidden", "true");
+            x.textContent = "×";
+            el.appendChild(x);
+          }
+          list.appendChild(el);
+        });
+      }
+      function saveProfileOrte() {
+        saveProfileFields({ workout_places: profileOrte.list.slice(0, 12), workout_place: profileOrte.list[0] || "" });
+      }
+      function setOrteFindable(on) {
+        if (!sessionAccount || profileOrte.findable === on) return;
+        profileOrte.findable = on;
+        renderProfileOrte();
+        rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+          method: "PATCH",
+          prefer: "return=minimal",
+          body: { places_findable: on }
+        }).catch(function (err) {
+          profileOrte.findable = !on;
+          renderProfileOrte();
+          var m = String((err && err.message) || "");
+          GoDialog.alert(/places_findable/.test(m) ? "Ging nicht: go-orte-suche.sql fehlt in Supabase." : "Ging gerade nicht. Bitte nochmal versuchen.");
+        });
+      }
+      function openOrtePicker() {
+        if (!window.GoPlacePicker) return;
+        var box = document.createElement("div");
+        box.className = "orte-pick";
+        box.innerHTML = '<div class="orte-pick__card" role="dialog" aria-modal="true" aria-label="Ort hinzufügen">' +
+          "<h2>Ort hinzufügen</h2><div class=\"orte-pick__host\"></div>" +
+          '<button type="button" class="orte-pick__btn" data-orte-ok disabled>Hinzufügen</button>' +
+          '<button type="button" class="orte-pick__btn orte-pick__btn--quiet" data-orte-cancel>Abbrechen</button></div>';
+        document.body.appendChild(box);
+        var okBtn = box.querySelector("[data-orte-ok]");
+        var picker = GoPlacePicker.mount(box.querySelector(".orte-pick__host"), {
+          rest: rest,
+          accountId: "",
+          value: "",
+          noFav: true,
+          onChange: function (p) { okBtn.disabled = !p; }
+        });
+        function close() { if (box.parentNode) box.parentNode.removeChild(box); }
+        box.addEventListener("click", function (e) {
+          if (e.target === box || e.target.closest("[data-orte-cancel]")) { close(); return; }
+          if (!e.target.closest("[data-orte-ok]")) return;
+          var p = picker.value();
+          if (!p || !p.name) return;
+          var have = profileOrte.list.some(function (n) { return n.toLowerCase() === p.name.toLowerCase(); });
+          if (!have) profileOrte.list.push(p.name);
+          picker.remember();
+          saveProfileOrte();
+          renderProfileOrte();
+          close();
+        });
+      }
+      document.getElementById("profile-orte-block").addEventListener("click", function (e) {
+        if (!profileOrte.mine || !profileOrte.loaded) return;
+        var mode = e.target.closest("[data-orte-findable]");
+        if (mode) { setOrteFindable(mode.getAttribute("data-orte-findable") === "1"); return; }
+        if (e.target.closest("#profile-orte-add")) { openOrtePicker(); return; }
+        var rm = e.target.closest("[data-orte-remove]");
+        if (!rm) return;
+        var name = rm.getAttribute("data-orte-remove");
+        GoDialog.confirm(name + " entfernen?", { ok: "Entfernen" }).then(function (ok) {
+          if (!ok) return;
+          profileOrte.list = profileOrte.list.filter(function (n) { return n !== name; });
+          saveProfileOrte();
+          renderProfileOrte();
+        });
+      });
 
       function openProfile(person) {
         profilePerson = person;

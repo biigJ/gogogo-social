@@ -1,6 +1,9 @@
 /* Ortswähler: gemeinsame Ortsliste (go_workout_places, wächst für alle) + Suche + Karte.
-   GoPlacePicker.mount(el, { rest, accountId, value, onChange })  → { value(), remember() }
-   Favoriten: ★ merkt den Ort in go_accounts.workout_places (höchstens 12), Favoriten stehen vorn. */
+   GoPlacePicker.mount(el, { rest, accountId, value, onChange, noFav })  → { value(), remember() }
+   Favoriten: ★ merkt den Ort in go_accounts.workout_places (höchstens 12), Favoriten stehen vorn.
+   Abgleich mit der Datenbank: Tippen filtert nur, gewählt wird ein Eintrag aus Liste, Suche oder Karte.
+   Liegt ein gewählter Ort ≤ 150 m neben einem bekannten (oder heißt bis auf Schreibweise gleich, ≤ 2 km),
+   gilt der bekannte Eintrag. So bleiben Orte einheitlich und in „Ort durchsuchen“ auffindbar. */
 (function (global) {
   var places = null;
   var loading = null;
@@ -9,6 +12,48 @@
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
+  }
+
+  /* Schreibweise angleichen: klein, Umlaute, Satzzeichen, „Fitness First“ = „FF“ */
+  function norm(s) {
+    return String(s || "").toLowerCase()
+      .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+      .replace(/[^a-z0-9]+/g, " ")
+      .replace(/\bfitness first\b/g, "ff")
+      .replace(/\bstrasse\b/g, "str").replace(/str\b/g, "str")
+      .trim();
+  }
+  /* jedes Suchwort ist Anfang eines Wortes im Namen („fitness first“ findet „FF …“, nicht „Dieffenbach…“) */
+  function matches(name, q) {
+    var words = norm(name).split(" ");
+    return norm(q).split(" ").filter(Boolean).every(function (w) {
+      return words.some(function (x) { return x.indexOf(w) === 0; });
+    });
+  }
+  function meters(a, b) {
+    var r = 6371000, t = Math.PI / 180;
+    var dLat = (b.lat - a.lat) * t, dLng = (b.lng - a.lng) * t;
+    var x = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(a.lat * t) * Math.cos(b.lat * t) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * r * Math.asin(Math.sqrt(x));
+  }
+  /* bekannter Eintrag für einen Ort: gleicher Name (angeglichen) oder ≤ 150 m entfernt */
+  function knownPlace(p) {
+    if (!p || !places) return null;
+    var n = norm(p.name);
+    var hasPos = p.lat != null && p.lng != null && !isNaN(p.lat);
+    var best = null, bestD = 1e12;
+    places.forEach(function (x) {
+      if (!x || !x.name) return;
+      var xPos = x.lat != null && x.lng != null;
+      var d = hasPos && xPos ? meters({ lat: +p.lat, lng: +p.lng }, { lat: +x.lat, lng: +x.lng }) : null;
+      var same = norm(x.name) === n;
+      if ((same && (d == null || d <= 2000)) || (d != null && d <= 150)) {
+        var score = same ? -1 : d;
+        if (score < bestD) { bestD = score; best = x; }
+      }
+    });
+    return best;
   }
 
   function loadPlaces(rest) {
@@ -56,14 +101,14 @@
     el.innerHTML =
       '<div class="gpp">' +
       '<div class="gpp__top"><input class="gpp__search" type="search" placeholder="Ort suchen oder eingeben" value="' + esc(current ? current.name : "") + '" />' +
-      '<button type="button" class="gpp__fav" aria-label="Als Favorit merken" aria-pressed="false">☆</button></div>' +
+      (opts.noFav ? "" : '<button type="button" class="gpp__fav" aria-label="Als Favorit merken" aria-pressed="false">☆</button>') + "</div>" +
       '<div class="gpp__list"></div>' +
       '<div class="gpp__map" aria-label="Karte: tippen setzt den Ort"></div>' +
       "</div>";
     var input = el.querySelector(".gpp__search");
     var list = el.querySelector(".gpp__list");
     var mapEl = el.querySelector(".gpp__map");
-    var favBtn = el.querySelector(".gpp__fav");
+    var favBtn = el.querySelector(".gpp__fav") || document.createElement("button");
 
     function isFav(name) {
       var n = String(name || "").toLowerCase();
@@ -131,6 +176,10 @@
 
     function setCurrent(p, fromTyping) {
       current = p && p.name ? p : null;
+      if (current && !fromTyping && !current.id) {
+        var known = knownPlace(current);
+        if (known) current = known;
+      }
       if (!fromTyping && current) input.value = current.name;
       if (current && current.lat == null) {
         var hit = catalogHit(current.name);
@@ -163,11 +212,11 @@
 
     function renderShared(q) {
       list.textContent = "";
-      var needle = String(q || "").toLowerCase();
-      favs.filter(function (f) { return !needle || f.toLowerCase().indexOf(needle) >= 0; })
+      var needle = norm(q);
+      favs.filter(function (f) { return !needle || matches(f, needle); })
         .forEach(function (f) { list.appendChild(row(catalogHit(f) || { name: f }, "★")); });
       (places || [])
-        .filter(function (p) { return !isFav(p.name) && (!needle || p.name.toLowerCase().indexOf(needle) >= 0); })
+        .filter(function (p) { return !isFav(p.name) && (!needle || matches(p.name, needle)); })
         .slice(0, 8)
         .forEach(function (p) { list.appendChild(row(p, "")); });
       [].forEach.call(list.children, function (b) {
@@ -187,13 +236,17 @@
           (rows || []).forEach(function (r) {
             var name = String(r.display_name || "").split(",")[0].trim();
             if (!name || have[name]) return;
+            var cand = { name: name, lat: parseFloat(r.lat), lng: parseFloat(r.lon), external_id: "osm:" + r.osm_type + ":" + r.osm_id };
+            /* schon bekannt (gleicher Ort, andere Schreibweise): bekannten Eintrag zeigen */
+            var known = knownPlace(cand);
+            if (known) {
+              if (have[known.name]) return;
+              have[known.name] = 1;
+              list.appendChild(row(known, ""));
+              return;
+            }
             have[name] = 1;
-            list.appendChild(row({
-              name: name,
-              lat: parseFloat(r.lat),
-              lng: parseFloat(r.lon),
-              external_id: "osm:" + r.osm_type + ":" + r.osm_id
-            }, "neu"));
+            list.appendChild(row(cand, "neu"));
           });
         })
         .catch(function () {});
@@ -201,7 +254,12 @@
 
     input.addEventListener("input", function () {
       var q = input.value.trim();
-      setCurrent(q ? { name: q } : null, true);
+      /* Tippen filtert nur; gewählt ist erst ein Eintrag (oder exakt ein bekannter Name) */
+      if (!q) setCurrent(null, true);
+      else {
+        var exact = (places || []).filter(function (x) { return norm(x.name) === norm(q); })[0];
+        if (exact) setCurrent(exact, true);
+      }
       renderShared(q);
       clearTimeout(searchTimer);
       if (q.length >= 3) searchTimer = setTimeout(function () { searchOsm(q); }, 400);
@@ -233,7 +291,7 @@
             .then(function (r) {
               var a = (r && r.address) || {};
               var nice = a.park || a.leisure || a.amenity || a.road || name;
-              setCurrent({ name: input.value.trim() || nice, lat: lat, lng: lng, external_id: "pin:" + lat.toFixed(5) + "," + lng.toFixed(5) });
+              setCurrent({ name: nice, lat: lat, lng: lng, external_id: "pin:" + lat.toFixed(5) + "," + lng.toFixed(5) });
             })
             .catch(function () {
               setCurrent({ name: name, lat: lat, lng: lng, external_id: "pin:" + lat.toFixed(5) + "," + lng.toFixed(5) });
@@ -247,8 +305,7 @@
       /* Neuen Ort in die gemeinsame Liste aufnehmen */
       remember: function () {
         if (!current || !current.name) return Promise.resolve();
-        var exists = (places || []).some(function (p) { return p.name.toLowerCase() === current.name.toLowerCase(); });
-        if (exists) return Promise.resolve();
+        if (current.id || knownPlace(current)) return Promise.resolve();
         var body = {
           name: current.name,
           lat: current.lat != null ? current.lat : null,
@@ -268,5 +325,33 @@
     };
   }
 
-  global.GoPlacePicker = { mount: mount };
+  /* Für „Ort durchsuchen“: Ortsliste, Suche und alle Schreibweisen desselben Orts (≤ 150 m, gleicher Name) */
+  function search(rest, q) {
+    return loadPlaces(rest).then(function (all) {
+      var needle = norm(q);
+      var seen = [];
+      return all.filter(function (p) {
+        if (needle && !matches(p.name, needle)) return false;
+        var dup = seen.some(function (x) {
+          if (norm(x.name) === norm(p.name)) return true;
+          return x.lat != null && p.lat != null && meters({ lat: +x.lat, lng: +x.lng }, { lat: +p.lat, lng: +p.lng }) <= 150;
+        });
+        if (!dup) seen.push(p);
+        return !dup;
+      });
+    });
+  }
+  function sameSpot(rest, place) {
+    return loadPlaces(rest).then(function (all) {
+      var keys = {};
+      keys[norm(place.name)] = 1;
+      all.forEach(function (x) {
+        if (norm(x.name) === norm(place.name)) keys[norm(x.name)] = 1;
+        else if (x.lat != null && place.lat != null && meters({ lat: +x.lat, lng: +x.lng }, { lat: +place.lat, lng: +place.lng }) <= 150) keys[norm(x.name)] = 1;
+      });
+      return keys;
+    });
+  }
+
+  global.GoPlacePicker = { mount: mount, search: search, sameSpot: sameSpot, norm: norm };
 })(window);
