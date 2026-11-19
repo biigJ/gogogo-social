@@ -231,10 +231,14 @@
           toast("go-wochenplan-slots.sql fehlt noch: Tage ohne Einzeleinheiten");
           return rest("courses?select=" + sel.replace(",unit_course_id", "").replace("image_url,", "") + "&order=title.asc,level.asc");
         }),
-        rest("go_exercise_catalog?select=name_key,name,block_type,cue&order=name.asc").catch(function () { return []; })
+        rest("go_exercise_catalog?select=name_key,name,block_type,cue&order=name.asc").catch(function () { return []; }),
+        /* gelöschte Pläne mit Trainingshistorie (go-kurs-loeschen.sql) */
+        rest("courses?deleted_at=not.is.null&select=id").catch(function () { return []; })
       ]).then(function (res) {
+        var gone = {};
+        (res[2] || []).forEach(function (g) { gone[g.id] = true; });
         state.courses = (res[0] || []).filter(function (c) {
-          return HIDE_SLUGS.indexOf(c.slug) === -1 && !/preset/.test(c.slug || "");
+          return HIDE_SLUGS.indexOf(c.slug) === -1 && !/preset/.test(c.slug || "") && !gone[c.id];
         });
         state.catalog = res[1] || [];
         buildExIndex();
@@ -492,9 +496,36 @@
         if (blocked) { toast(blocked); return; }
         return GoDialog.confirm("„" + c.title + "“ endgültig löschen?", { ok: "Löschen" }).then(function (ok) {
           if (!ok) return;
-          return rest("courses?id=eq." + c.id, { method: "DELETE" })
-            .then(loadAll)
-            .then(function () { toast("Gelöscht"); location.hash = isUnit ? "units" : "plans"; });
+          /* Hartes Löschen scheitert, sobald es erledigte Trainings mit diesem Plan gibt
+             (events.course_id darf bei Kraft/Ausdauer nicht leer werden). Dann: offene künftige Termine
+             entfernen und den Plan als gelöscht markieren, die Historie bleibt. */
+          return rest("courses?id=eq." + c.id, { method: "DELETE", prefer: "return=representation" })
+            .then(function (rows) {
+              if (rows && rows.length) return "hard";
+              throw new Error("nicht gelöscht");
+            })
+            .catch(function () {
+              var today = new Date().toISOString().slice(0, 10);
+              return rest("events?course_id=eq." + c.id + "&status=eq.geplant&starts_at=gte." + today, { method: "DELETE", prefer: "return=minimal" })
+                .catch(function () {})
+                .then(function () {
+                  return rest("courses?id=eq." + c.id, {
+                    method: "PATCH", prefer: "return=representation",
+                    body: { deleted_at: new Date().toISOString(), is_active: false, is_public: false }
+                  });
+                })
+                .then(function (rows) {
+                  if (!rows || !rows.length) throw new Error("Löschen ging nicht (keine Berechtigung?)");
+                  return "soft";
+                }, function (err) {
+                  if (/deleted_at/.test(String(err && err.message))) throw new Error("Löschen braucht go-kurs-loeschen.sql in Supabase.");
+                  throw err;
+                });
+            })
+            .then(function () {
+              location.hash = isUnit ? "units" : "plans";
+              return loadAll().then(function () { if (state.view) showList(); toast("Gelöscht"); });
+            });
         });
       }).catch(function (err) { toast(err.message); });
     }
