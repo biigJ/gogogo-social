@@ -16,6 +16,7 @@
   for (var w = 60; w <= 480; w += 30) WORKS.push(w);
   var PAUSES = [30, 45, 60];
   var DEF = { mode: "single", rounds: 6, workSec: 240, restSec: 30, online: false };
+  var lastFriends = [];
   /* Schnellwahl: ein Tipp stellt alle Räder */
   var PRESETS = [
     { key: "einstieg", label: "Einstieg", rounds: 4, workSec: 120, restSec: 60 },
@@ -44,7 +45,25 @@
     ".sand-card .gz .gz-partner__list{justify-content:flex-start}" +
     ".sand-card .gz .gz-pf{min-height:36px;padding:0 14px;border-radius:999px;border:1px solid #2A2118;background:transparent;color:#2A2118;font:inherit;font-weight:600}" +
     ".sand-card .gz .gz-pf.is-on{background:#2A2118;color:#F6F1E8}" +
-    ".sand-card .gz .gz-total{text-align:center;margin:8px 0 0}";
+    ".sand-card .gz .gz-total{text-align:center;margin:8px 0 0}" +
+    ".sand-card .gz{margin-top:30px}" +
+    ".sand-card .gz .gz-three{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:6px 0 4px}" +
+    ".sand-card .gz .gz-cell .gz-row{text-align:center;margin:0 0 4px}" +
+    ".sand-card .gz .gz-wheel--one{height:52px;min-height:0;border:1.5px solid #2A2118;border-radius:14px;overflow:hidden;display:block;position:relative;background:#fff}" +
+    ".sand-card .gz .gz-wheel--one .wr-time-fade,.sand-card .gz .gz-wheel--one .wr-time-center{display:none}" +
+    ".sand-card .gz .gz-wheel--one .wr-time-col{height:52px;padding:4px 0;box-sizing:border-box;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;width:100%}" +
+    ".sand-card .gz .gz-wheel--one .wr-time-col::-webkit-scrollbar{display:none}" +
+    ".sand-card .gz .gz-wheel--one .wr-time-opt{height:44px;scroll-snap-align:center;color:#2A2118;font-size:18px}" +
+    ".sand-card .gz .gz-plist{display:block;width:100%;min-height:44px;margin:0 0 6px;border-radius:999px;border:1.5px solid #2A2118;background:transparent;color:#2A2118;font:inherit;font-weight:700}" +
+    ".sand-card .gz .gz-partner__hint{margin:0 0 10px;font-size:13px;color:rgba(42,33,24,.7);text-align:center}" +
+    ".gz-pl{position:fixed;inset:0;z-index:10060;background:rgba(20,16,12,.45);display:grid;place-items:center;padding:20px}" +
+    ".gz-pl__card{width:min(100%,400px);max-height:76vh;display:flex;flex-direction:column;gap:10px;padding:18px;border-radius:22px;background:#F6F1E8;color:#2A2118}" +
+    ".gz-pl__h{margin:0;font:600 20px/1.2 'Playfair Display',Georgia,serif;text-align:center}" +
+    ".gz-pl__q{min-height:44px;padding:0 14px;border-radius:12px;border:1px solid rgba(42,33,24,.25);background:#fff;font:inherit;font-size:16px}" +
+    ".gz-pl__list{flex:1;min-height:0;overflow-y:auto;display:grid;gap:6px;align-content:start}" +
+    ".gz-pl__row{min-height:46px;border-radius:12px;border:1px solid rgba(42,33,24,.15);background:#fff;color:#2A2118;font:inherit;font-size:16px;font-weight:600;text-align:left;padding:0 14px}" +
+    ".gz-pl__empty{margin:0;font-size:14px;color:rgba(42,33,24,.65)}" +
+    ".gz-pl__x{min-height:44px;border:0;background:none;color:#2A2118;font:inherit;font-weight:600}";
   function injectCss() {
     if (document.getElementById("gz-css")) return;
     var st = document.createElement("style");
@@ -181,6 +200,7 @@
   function html(preset, opts) {
     var z = Object.assign({}, DEF, preset || {});
     var friends = (opts && opts.friends) || [];
+    lastFriends = friends;
     z.rounds = nearest(ROUNDS, z.rounds);
     z.workSec = nearest(WORKS, z.workSec);
     z.restSec = nearest(PAUSES, z.restSec);
@@ -190,40 +210,19 @@
       '<button type="button" data-gz-mode-btn="single"' + (z.mode !== "double" ? ' class="is-on"' : "") + ">Single</button>" +
       '<button type="button" data-gz-mode-btn="double"' + (z.mode === "double" ? ' class="is-on"' : "") + ">Double</button>" +
       "</div>" +
-      '<div class="gz-presets" role="group" aria-label="Schnellwahl">' +
-      PRESETS.map(function (p) {
-        var on = p.rounds === z.rounds && p.workSec === z.workSec && p.restSec === z.restSec;
-        return '<button type="button" class="gz-pre' + (on ? " is-on" : "") + '" data-gz-pre="' + p.key + '">' + esc(p.label) +
-          "<small>" + p.rounds + " × " + mmss(p.workSec) + "</small></button>";
-      }).join("") + "</div>" +
+      /* Partner nur aus Freunden mit FFC-Zugang (Nickname + Passwort), Auswahl über „Partnerliste“ */
       '<div class="gz-partner"' + (z.mode === "double" ? "" : " hidden") + ">" +
-      '<p class="gz-partner__h">Partner</p>' +
-      (friends.length
-        ? '<div class="gz-partner__list">' +
-          friends.slice(0, 20).map(function (f) {
-            return (
-              '<button type="button" class="gz-pf' + (String(f.id) === String(z.partnerId) ? " is-on" : "") +
-              '" data-gz-partner="' + esc(f.id) + '" data-gz-pname="' + esc(f.name || "") + '">' +
-              esc(f.name || "Freund") + "</button>"
-            );
-          }).join("") +
-          "</div>"
-        : "") +
-      '<input type="text" class="gz-partner__name" maxlength="40" placeholder="' +
-      (friends.length ? "oder Name eintragen" : "Name eintragen") + '" value="' +
-      esc(z.partnerId ? "" : z.partnerName || "") + '" />' +
+      '<button type="button" class="gz-plist" data-gz-plist="1">' + (z.partnerName ? "Partner: " + esc(z.partnerName) : "Partnerliste") + "</button>" +
+      '<input type="hidden" class="gz-partner__id" value="' + esc(z.partnerId || "") + '" />' +
+      '<input type="hidden" class="gz-partner__nm" value="' + esc(z.partnerName || "") + '" />' +
+      '<p class="gz-partner__hint"' + (z.partnerName ? "" : " hidden") + ">" + (z.partnerName ? "Du wählst " + esc(z.partnerName) + ", bitte sie/ihn bei sich zu bestätigen." : "") + "</p>" +
       "</div>" +
-      '<p class="gz-row">Laufen + Workout</p>' +
-      wheel(
-        col("rounds", ROUNDS, z.rounds, function (v) { return v + " Runden"; }) +
-        '<span class="wr-time-sep" aria-hidden="true">×</span>' +
-        col("work", WORKS, z.workSec, function (v) { return mmss(v) + " min"; }),
-        "gz-wheel--two"
-      ) +
-      wheel(
-        col("pause", PAUSES, z.restSec, function (v) { return pauseText(v) + " Pause"; }),
-        "gz-wheel--one"
-      ) +
+      /* Runden, Workout, Pause nebeneinander, je nur der aktuelle Wert sichtbar */
+      '<div class="gz-three">' +
+      '<div class="gz-cell"><p class="gz-row">Runden</p>' + wheel(col("rounds", ROUNDS, z.rounds, function (v) { return String(v); }), "gz-wheel--one") + "</div>" +
+      '<div class="gz-cell"><p class="gz-row">Workout</p>' + wheel(col("work", WORKS, z.workSec, function (v) { return mmss(v); }), "gz-wheel--one") + "</div>" +
+      '<div class="gz-cell"><p class="gz-row">Pause</p>' + wheel(col("pause", PAUSES, z.restSec, function (v) { return pauseText(v); }), "gz-wheel--one") + "</div>" +
+      "</div>" +
       '<p class="gz-total" data-gz-total="1"></p>' +
       "</div>"
     );
@@ -237,16 +236,16 @@
       var v = c ? Number(c.getAttribute("data-val")) : NaN;
       return isNaN(v) ? d : v;
     }
-    var pf = box.querySelector(".gz-pf.is-on");
-    var nameIn = box.querySelector(".gz-partner__name");
+    var pid = box.querySelector(".gz-partner__id");
+    var pnm = box.querySelector(".gz-partner__nm");
     return {
       mode: box.getAttribute("data-gz-mode") === "double" ? "double" : "single",
       rounds: val("rounds", DEF.rounds),
       workSec: val("work", DEF.workSec),
       restSec: val("pause", DEF.restSec),
       online: false,
-      partnerId: pf ? pf.getAttribute("data-gz-partner") : "",
-      partnerName: pf ? pf.getAttribute("data-gz-pname") : nameIn ? String(nameIn.value || "").trim() : ""
+      partnerId: pid ? pid.value : "",
+      partnerName: pnm ? pnm.value : ""
     };
   }
 
@@ -280,6 +279,7 @@
     var box = root && root.querySelector(".gz");
     if (!box || box._gzBound) return;
     box._gzBound = true;
+    if (!box._gzFriends) box._gzFriends = lastFriends || [];
     function setCol(key, v) {
       var c = box.querySelector('[data-gz-col="' + key + '"]');
       var o = c && c.querySelector('[data-gz-val="' + v + '"]');
@@ -310,14 +310,8 @@
         if (pBox) pBox.hidden = b.getAttribute("data-gz-mode-btn") !== "double";
         return;
       }
-      var pfb = e.target.closest("[data-gz-partner]");
-      if (pfb) {
-        var on = !pfb.classList.contains("is-on");
-        box.querySelectorAll(".gz-pf").forEach(function (x) {
-          x.classList.toggle("is-on", on && x === pfb);
-        });
-        var inp = box.querySelector(".gz-partner__name");
-        if (on && inp) inp.value = "";
+      if (e.target.closest("[data-gz-plist]")) {
+        openPartnerList(box);
         return;
       }
       var o = e.target.closest("[data-gz-val]");
@@ -336,17 +330,55 @@
       }, { passive: true });
     });
     paintTotal(box);
-    var nIn = box.querySelector(".gz-partner__name");
-    if (nIn) {
-      nIn.addEventListener("input", function () {
-        if (nIn.value) box.querySelectorAll(".gz-pf").forEach(function (x) { x.classList.remove("is-on"); });
-      });
+  }
+
+  /* Partnerliste: Popup zum Scrollen mit Suche oben (nur Freunde mit FFC-Zugang) */
+  function openPartnerList(box) {
+    var list = box._gzFriends || [];
+    var ov = document.createElement("div");
+    ov.className = "gz-pl";
+    ov.innerHTML =
+      '<div class="gz-pl__card" role="dialog" aria-modal="true">' +
+      '<p class="gz-pl__h">Partner wählen</p>' +
+      '<input type="search" class="gz-pl__q" placeholder="Suchen" />' +
+      '<div class="gz-pl__list"></div>' +
+      '<button type="button" class="gz-pl__x" data-gz-pl-close="1">Abbrechen</button></div>';
+    document.body.appendChild(ov);
+    var q = ov.querySelector(".gz-pl__q");
+    var box2 = ov.querySelector(".gz-pl__list");
+    function paintList() {
+      var n = String(q.value || "").trim().toLowerCase();
+      var rows = list.filter(function (f) { return !n || String(f.name || "").toLowerCase().indexOf(n) >= 0; });
+      box2.innerHTML = rows.length
+        ? rows.map(function (f) { return '<button type="button" class="gz-pl__row" data-gz-pick="' + esc(f.id) + '" data-gz-pick-nm="' + esc(f.name) + '">' + esc(f.name) + "</button>"; }).join("")
+        : '<p class="gz-pl__empty">' + (list.length ? "Niemand gefunden." : "Noch keine Freunde mit FFC-Zugang. Partner brauchen Nickname und Passwort bei FFC.") + "</p>";
     }
+    paintList();
+    q.addEventListener("input", paintList);
+    ov.addEventListener("click", function (e) {
+      if (e.target === ov || e.target.closest("[data-gz-pl-close]")) { ov.remove(); return; }
+      var r = e.target.closest("[data-gz-pick]");
+      if (!r) return;
+      var nm = r.getAttribute("data-gz-pick-nm");
+      box.querySelector(".gz-partner__id").value = r.getAttribute("data-gz-pick");
+      box.querySelector(".gz-partner__nm").value = nm;
+      box.querySelector("[data-gz-plist]").textContent = "Partner: " + nm;
+      var hint = box.querySelector(".gz-partner__hint");
+      hint.hidden = false;
+      hint.textContent = "Du wählst " + nm + ", bitte sie/ihn bei sich zu bestätigen.";
+      ov.remove();
+    });
+  }
+  /* opts.friends nach dem Einfügen setzen (für die Partnerliste) */
+  function setFriends(root, friends) {
+    var box = root && root.querySelector(".gz");
+    if (box) box._gzFriends = friends || [];
   }
 
   global.GoZirkelSetup = {
     html: html,
     bind: bind,
+    setFriends: setFriends,
     PRESETS: PRESETS,
     read: read,
     parse: parse,

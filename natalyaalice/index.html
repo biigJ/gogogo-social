@@ -1673,6 +1673,12 @@
     .wr-dayrow__mid { min-width: 0; display: grid; gap: 4px; }
     .wr-dayrow__title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .wr-dayrow__ctl { display: flex; align-items: center; gap: 8px; }
+    .wr-zrec-day { width: 100%; text-align: left; border: 0; background: transparent; font: inherit; color: inherit; cursor: pointer; }
+    .wr-zrec-acts { display: grid; gap: 10px; justify-items: stretch; margin: 6px 0 4px; }
+    .wr-zrec-acts .wr-pill-btn { margin: 0; }
+    .wr-zrec-acts .wr-dayrow__vis { justify-self: center; min-width: 120px; }
+    .wr-zrec-lab { margin: 6px 0 -4px; text-align: center; font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: rgba(42,33,24,.6); }
+    .wr-zrec-acts .gz-time { margin: 0 auto; }
     .wr-btnrow { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 14px 0 0; }
     .wr-btnrow > button { flex: 1 1 0; max-width: 180px; margin: 0 !important; min-height: 48px; }
     .wr-btnrow .wr-sheet-cancel { border: 1.5px solid #2A2118; border-radius: 999px; background: transparent; color: #2A2118; font-weight: 600; }
@@ -2251,6 +2257,14 @@
     .gz-total { margin: 4px 0 14px; text-align: center; font-size: 15px; }
     .gz-total strong { font-size: 20px; }
     .gz-calc { display: block; margin-top: 2px; font-size: 12px; color: rgba(42,33,24,.55); }
+    .gz-days { display: flex; gap: 6px; overflow-x: auto; margin: 0 0 12px; scrollbar-width: none; }
+    .gz-days::-webkit-scrollbar { display: none; }
+    .gz-day { flex: none; min-height: 40px !important; width: auto !important; padding: 0 14px !important; margin: 0 !important; border-radius: 999px !important; border: 1.5px solid #2A2118 !important; background: transparent !important; color: #2A2118 !important; font-weight: 700; }
+    .gz-day.is-on { background: #2A2118 !important; color: #F6F1E8 !important; }
+    .gz-time { margin: 0 auto 14px; width: 140px; height: 52px; border: 1.5px solid #2A2118; border-radius: 14px; overflow: hidden; }
+    .gz-time__col { height: 52px; padding: 4px 0; box-sizing: border-box; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; }
+    .gz-time__col::-webkit-scrollbar { display: none; }
+    .gz-time__opt { display: block; height: 44px; line-height: 44px; text-align: center; scroll-snap-align: center; font-size: 20px; font-weight: 700; color: #2A2118; font-variant-numeric: tabular-nums; }
     .gz-online { display: flex; align-items: center; gap: 10px; min-height: 44px; margin: 0 0 12px; font-weight: 600; }
     .gz-online input { width: 20px; height: 20px; accent-color: #111; }
     .go-online-cta--ghost { background: transparent !important; color: #111 !important; border: 1.5px solid #111 !important; margin-left: 6px; }
@@ -7035,7 +7049,7 @@
   <div class="sand-modal" id="zirkel-register" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="zirkel-register-title">
       <h2 class="ask" id="zirkel-register-title">Zirkeltraining buchen</h2>
-      <p class="team-msg" id="zirkel-register-hint">Nutzername, E-Mail und Passwort (zweimal). Danach ist Zirkeltraining gebucht — starten tust Du über ein Event oder spontan.</p>
+      <p class="team-msg" id="zirkel-register-hint">Werde Teil des Zirkeltrainings, ob vor Ort oder online. Der Nutzername und ein Passwort sind notwendig, um Deine Daten auf Supabase für das Leaderboard und Deine Historie zu speichern.</p>
       <input id="zirkel-reg-nick" type="text" maxlength="20" placeholder="Nutzername / Nickname" autocomplete="username" autocapitalize="off" spellcheck="false" />
       <input id="zirkel-reg-email" type="email" placeholder="E-Mail" autocomplete="email" />
       <input id="zirkel-reg-pass" type="password" placeholder="Passwort (mind. 6 Zeichen)" autocomplete="new-password" />
@@ -7950,11 +7964,11 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-6"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-2"></script>
-  <script src="/natalyaalice/go-zirkel-setup.js?v=gz-4"></script>
+  <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-57"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-58"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-2"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-44"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-45"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -12740,6 +12754,33 @@
       }
 
       /* Zirkel-Event → FFC-Preset mit gemeinsamem Start (Startzeit, Admin-Halt, Spät-Einstieg) */
+      /* FFC-Zirkel öffnen (Plus und Aktuell): Login, Subpage, Setup mit Voreinstellung; autostart → direkt ins Workout */
+      function openZirkelFlow(preset) {
+        /* Erst Login sichtbar, dann Tracking — Subpage nicht über Login legen */
+        if (typeof requireFfc === "function") {
+          requireFfc(
+            function () {
+              closeGoSub();
+              openGoSub("zirkel", "Friday Fitness Circle");
+              refreshZirkel();
+              if (window.FFC && FFC.openSetup) {
+                zirkelSyncPreset(preset && preset.eventId, preset).then(function (pr) {
+                  try {
+                    FFC.openSetup(pr && Object.keys(pr).length ? pr : null);
+                  } catch (eS) {}
+                });
+              }
+            },
+            {
+              title: "FFC Login",
+              tagline: "Mit Deiner Friday-Fitness-Circle E-Mail und Passwort anmelden (nicht der gogogo-Code)."
+            }
+          );
+        } else {
+          openGoSub("zirkel", "Friday Fitness Circle");
+        }
+      }
+      window.GoOpenZirkel = openZirkelFlow;
       function zirkelSyncPreset(eventId, preset) {
         var base = Object.assign({}, preset || {});
         if (!eventId || !/^[0-9a-f-]{36}$/i.test(String(eventId)) || !window.GoZirkelSetup) {
@@ -13074,31 +13115,7 @@
             if (btn) btn.click();
             else openGoSub("routine", "12-Wochen-Routine");
           },
-          openZirkel: function (preset) {
-            /* Erst Login sichtbar, dann Tracking — Subpage nicht über Login legen */
-            if (typeof requireFfc === "function") {
-              requireFfc(
-                function () {
-                  closeGoSub();
-                  openGoSub("zirkel", "Friday Fitness Circle");
-                  refreshZirkel();
-                  if (window.FFC && FFC.openSetup) {
-                    zirkelSyncPreset(preset && preset.eventId, preset).then(function (pr) {
-                      try {
-                        FFC.openSetup(pr && Object.keys(pr).length ? pr : null);
-                      } catch (eS) {}
-                    });
-                  }
-                },
-                {
-                  title: "FFC Login",
-                  tagline: "Mit Deiner Friday-Fitness-Circle E-Mail und Passwort anmelden (nicht der gogogo-Code)."
-                }
-              );
-            } else {
-              openGoSub("zirkel", "Friday Fitness Circle");
-            }
-          },
+          openZirkel: function (preset) { openZirkelFlow(preset); },
           requireFfc: function (fn, opts) {
             if (typeof requireFfc === "function") requireFfc(fn || function () {}, opts || {});
           },
@@ -17086,7 +17103,7 @@
             var circleBtn = document.createElement("button");
             circleBtn.type = "button";
             circleBtn.className = "go-slide__cta go-slide__cta--editor";
-            circleBtn.textContent = "Circle beitreten";
+            circleBtn.textContent = "Deine Circle verwalten";
             circleBtn.addEventListener("click", function () { openCircleJoin(); });
             card.appendChild(circleBtn);
           }
@@ -17809,8 +17826,29 @@
             if (!v) return;
             if (v === "new") { createCircle(); return; }
             var gid = Number(String(v).slice(2));
-            if (FFC.setLeaderboardScope) FFC.setLeaderboardScope(gid);
-            gogogoToast("Leaderboard zeigt jetzt diesen Circle.");
+            var g = (groups || []).filter(function (x) { return Number(x.group_id) === gid; })[0] || {};
+            /* Tipp auf einen Circle: Leaderboard zeigen oder austreten */
+            return GoDialog.choose(g.name || "Circle", [
+              { label: "Leaderboard zeigen", value: "show" },
+              { label: "Circle verlassen", value: "leave" }
+            ]).then(function (act) {
+              if (act === "show") {
+                if (FFC.setLeaderboardScope) FFC.setLeaderboardScope(gid);
+                gogogoToast("Leaderboard zeigt jetzt diesen Circle.");
+                return;
+              }
+              if (act !== "leave") return;
+              return GoDialog.confirm("„" + (g.name || "Circle") + "“ wirklich verlassen? Circle und Leaderboard sind danach für Dich weg.", { ok: "Verlassen" })
+                .then(function (ok) {
+                  if (!ok) return;
+                  return Promise.resolve(FFC.leaveGroup(gid)).then(function (res) {
+                    if (res && res.error) { GoDialog.alert("Ging nicht: " + (res.error.message || "Fehler")); return; }
+                    if (typeof syncFfcGroupIntoTeam === "function") { try { syncFfcGroupIntoTeam(); } catch (eS) {} }
+                    if (typeof renderTeam === "function") renderTeam();
+                    GoDialog.alert("Du hast „" + (g.name || "Circle") + "“ verlassen.");
+                  });
+                });
+            });
           });
         }).catch(function () { GoDialog.alert("Circles laden ging gerade nicht."); });
       }
@@ -21321,14 +21359,8 @@
               }
               if (typeof fn === "function") fn();
             },
-            openZirkel: function (preset) {
-              if (window.GoHost && typeof GoHost.openZirkel === "function") {
-                return GoHost.openZirkel(preset);
-              }
-              if (window.GoFFC && typeof GoFFC.openSetup === "function") {
-                GoFFC.openSetup();
-              }
-            },
+            /* vorher GoHost/GoFFC (gibt es nicht) → „Start“ brach ab */
+            openZirkel: function (preset) { openZirkelFlow(preset); },
             inviteFacesForIso: inviteFacesForIso,
             clearInvitesForDay: clearInvitesForDay,
             groupMemberIds: groupMemberIds,
@@ -22920,6 +22952,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-2"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-3"></script>
 </body>
 </html>
