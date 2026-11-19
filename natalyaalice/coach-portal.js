@@ -302,11 +302,13 @@
       var c = en.courses || {};
       return (
         '<section class="cp-sec"><h3>Wochenplan</h3>' +
-        '<div class="cp-plan"><p class="cp-plan__name">' + esc(c.title || "Wochenplan") + (c.level ? " · Level " + c.level : "") + "</p>" +
+        '<div class="cp-plan"><div class="cp-plan__top"><p class="cp-plan__name">' + esc(shortTitle(c.title || "Wochenplan")) + (c.level ? " · Level " + c.level : "") + "</p>" +
+        (global.GoPlanPicker && GoPlanPicker.view ? '<button type="button" class="cp-pill" data-cp="view-plan">Anschauen</button>' : "") + "</div>" +
         '<p class="cp-hint">ab ' + esc(String(en.start_date || "").split("-").reverse().join(".")) + "</p>" +
         weeksWheelHtml(en.weeks || 12, "cp-weeks-active") +
         '<button type="button" class="cp-btn cp-btn--ghost" data-cp="end-plan">Wochenplan beenden</button>' +
         (global.GoPlanPicker ? '<button type="button" class="cp-btn" data-cp="picker" style="margin-top:8px">Wochenplan bearbeiten</button>' : "") +
+        (global.GoPlanPicker ? '<button type="button" class="cp-btn cp-btn--ghost" data-cp="arrange" style="margin-top:8px">Wochentage schieben</button>' : "") +
         "</div>" +
         "</section>"
       );
@@ -321,12 +323,11 @@
         ? '<label class="cp-field">Plan<select id="cp-plan">' +
           plans.map(function (c) {
             return '<option value="' + esc(c.id) + '"' + (String(c.id) === String(sel) ? " selected" : "") + ">" +
-              esc(c.title + (c.level ? " · L" + c.level : "") + " — " + mixText(planMix(c))) + "</option>";
+              esc(shortTitle(c.title) + (c.level ? " · L" + c.level : "")) + "</option>";
           }).join("") +
           "</select></label>" +
           '<label class="cp-field">Start (Montag)<input type="date" id="cp-start" value="' + esc(st.planStart || mondayOf(todayIso())) + '" /></label>' +
-          '<p class="cp-hint">Der Plan füllt Mo bis So automatisch. Einzelne Tage kannst Du danach in der Woche verschieben (Event antippen).' +
-          (hasZ ? " Zirkeltraining läuft über FFC und erzeugt keinen Termin." : "") + "</p>" +
+          (hasZ ? '<p class="cp-hint">Zirkeltraining läuft über FFC und erzeugt keinen Termin.</p>' : "") +
           weeksWheelHtml(st.planWeeks || 12, "cp-weeks") +
           '<button type="button" class="cp-btn" data-cp="assign">Zuordnen</button>' +
           (global.GoPlanPicker ? '<button type="button" class="cp-btn cp-btn--ghost" data-cp="picker" style="margin-top:8px">Alle Wochenpläne ansehen und Tage schieben</button>' : "")
@@ -337,10 +338,13 @@
 
   /* Dauer als Drehauswahl (1 bis 52 Wochen), Zeilen 36px, Mitte = Auswahl */
   var WHEEL_H = 36;
+  function shortTitle(t) {
+    return global.GoPlanPicker && GoPlanPicker.shortTitle ? GoPlanPicker.shortTitle(t) : String(t || "");
+  }
   function weeksWheelHtml(val, id) {
     var opts = "";
     for (var w = 1; w <= 52; w++) opts += '<div class="cp-wheel__opt">' + w + (w === 1 ? " Woche" : " Wochen") + "</div>";
-    return '<div class="cp-field">Dauer<div class="cp-wheel" id="' + id + '" data-val="' + esc(val) + '">' + opts + "</div></div>";
+    return '<div class="cp-field">Dauer<div class="cp-wheel cp-wheel--one" id="' + id + '" data-val="' + esc(val) + '">' + opts + "</div></div>";
   }
   function wheelVal(el) {
     if (!el) return 0;
@@ -369,7 +373,8 @@
   function paint() {
     if (!st || !st.root) return;
     var scroll = st.body ? st.body.scrollTop : 0;
-    st.body.innerHTML = headHtml() + noteHtml() + planHtml() + weekHtml();
+    /* Woche nicht mehr als Liste: „Wochentage schieben“ im Wochenplan öffnet die Tage wie bei der Planwahl */
+    st.body.innerHTML = headHtml() + noteHtml() + planHtml();
     bindWheels();
     st.body.scrollTop = scroll;
   }
@@ -487,6 +492,26 @@
         userId: st.id,
         userName: (st.person && st.person.name) || "",
         onDone: function () { Promise.all([loadEnrollment(), loadWeek()]).then(paint); }
+      });
+      return;
+    }
+    if (act === "arrange" && st.enrollment) {
+      var en = st.enrollment;
+      global.GoPlanPicker.open({
+        host: { rest: rest, me: me, toast: toast },
+        mode: "coach",
+        userId: st.id,
+        userName: (st.person && st.person.name) || "",
+        arrange: { courseId: en.course_id, weekdays: en.weekdays || null, weeks: en.weeks || 12 },
+        onDone: function () { Promise.all([loadEnrollment(), loadWeek()]).then(paint); }
+      });
+      return;
+    }
+    if (act === "view-plan" && st.enrollment) {
+      global.GoPlanPicker.view({
+        host: { rest: rest },
+        courseId: st.enrollment.course_id,
+        exercisesOf: global.GoExercisesFromSession || null
       });
       return;
     }

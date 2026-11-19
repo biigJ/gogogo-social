@@ -6,7 +6,9 @@
  *     userId, userName,            für wen (coach: Coachee)
  *     onDone(result),              nach dem Anwenden
  *   „Individuell“ (nur self): Coach wählen, Nachricht (200 Zeichen), Einverständnis → rpc/go_request_coach
+ *     arrange: { courseId, weekdays, weeks }   direkt „Tage schieben“ für den laufenden Plan
  *   })
+ *   GoPlanPicker.view({ host, courseId, exercisesOf(session) })   Plan nur ansehen, mit Übungen je Einheit
  *
  * Anwenden: rpc/go_apply_plan (go-wochenplan-wahl.sql) beendet alte Pläne, entfernt offene Termine ab heute
  * und erzeugt die neuen ab heute. Zurück oben links schließt die Ansicht, man landet wieder dort,
@@ -74,6 +76,11 @@
     ".gpl__field small{justify-self:end;color:rgba(42,33,24,.55);font-size:12px}" +
     ".gpl__vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}" +
     ".gpl__check{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;margin:0 0 8px;font-size:14px}.gpl__check input{width:20px;height:20px;margin:1px 0 0;accent-color:#2A2118}" +
+    ".gpl__vday{margin:0 0 8px;border-radius:14px;background:#F6F1E8;border:1px solid rgba(42,33,24,.14);overflow:hidden}" +
+    ".gpl__vday summary{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;padding:12px 14px;list-style:none;cursor:pointer}" +
+    ".gpl__vday summary::-webkit-details-marker{display:none}" +
+    ".gpl__vday summary span{font-size:15px;font-weight:600}.gpl__vday summary small{display:block;font-size:12px;font-weight:500;color:rgba(42,33,24,.6)}" +
+    ".gpl__vlist{margin:0;padding:0 14px 12px 58px;font-size:14px;line-height:1.6}.gpl__vlist small{color:rgba(42,33,24,.6)}" +
     ".gpl__link{display:block;margin:14px auto 0;border:0;background:transparent;color:#2A2118;text-decoration:underline;font:inherit;font-size:14px;cursor:pointer}" +
     "@media (min-width:900px){.gpl__body{max-width:980px;margin:0 auto;width:100%}.gpl__card{flex-basis:320px}}";
 
@@ -115,8 +122,9 @@
     return m ? "https://img.youtube.com/vi/" + m[1] + "/hqdefault.jpg" : "";
   }
 
+  var PLAN_SEL = "id,title,level,description,image_url,is_active,private_for,course_sessions!course_sessions_course_id_fkey(session_no,block_no,is_travel,category,title,unit_course_id)";
   function load() {
-    var sel = "id,title,level,description,image_url,is_active,private_for,course_sessions!course_sessions_course_id_fkey(session_no,block_no,is_travel,category,title,unit_course_id)";
+    var sel = PLAN_SEL;
     var extra = ",is_public,goals,preview_url";
     var q = "courses?is_active=eq.true&private_for=is.null&order=title.asc,level.asc&limit=300&select=";
     return st.host.rest(q + sel + extra)
@@ -315,10 +323,20 @@
       (st.mode === "self" ? '<button type="button" class="gpl__link" data-gpp-goals>Ziel ändern</button>' : "");
   }
 
-  function startArrange(id) {
+  function startArrange(id, weekdays) {
     var c = (st.plans || []).filter(function (p) { return String(p.id) === String(id); })[0];
     if (!c) return;
     var ds = days(c);
+    if (weekdays && weekdays.length === ds.length) {
+      /* laufender Plan: aktuelle Wochentage übernehmen */
+      var cur = [null, null, null, null, null, null, null];
+      weekdays.forEach(function (wd, i) { if (wd >= 0 && wd < 7 && cur[wd] == null) cur[wd] = i; });
+      if (cur.filter(function (x) { return x != null; }).length === ds.length) {
+        st.arr = { plan: c, ds: ds, order: cur, picked: null };
+        paintArrange();
+        return;
+      }
+    }
     /* order[weekday] = Index in ds. Start: Reihenfolge des Plans, Zirkel auf Freitag */
     var order = [0, 1, 2, 3, 4, 5, 6].map(function (i) { return i < ds.length ? i : null; });
     var zi = ds.findIndex(function (s) { return s.category === "zirkel"; });
@@ -348,8 +366,8 @@
             "<span>" + esc(s.title) + "<small>" + esc(CAT[s.category] || s.category || "") + "</small></span></div>" : "") +
           "</div></div>";
       }).join("") +
-      '<button type="button" class="gpl__btn" data-gpp-confirm>' + (st.mode === "coach" ? "Zuordnen" : "Übernehmen") + "</button>" +
-      '<button type="button" class="gpl__link" data-gpp-back-list>Anderen Plan wählen</button>';
+      '<button type="button" class="gpl__btn" data-gpp-confirm>' + (st.arrangeOnly ? "Speichern" : st.mode === "coach" ? "Zuordnen" : "Übernehmen") + "</button>" +
+      (st.arrangeOnly ? "" : '<button type="button" class="gpl__link" data-gpp-back-list>Anderen Plan wählen</button>');
   }
 
   function swap(a, b) {
@@ -370,7 +388,7 @@
     btn.disabled = true;
     st.host.rest("rpc/go_apply_plan", {
       method: "POST",
-      body: { p_user: st.userId, p_course: a.plan.id, p_weekdays: weekdays }
+      body: st.weeks ? { p_user: st.userId, p_course: a.plan.id, p_weekdays: weekdays, p_weeks: st.weeks } : { p_user: st.userId, p_course: a.plan.id, p_weekdays: weekdays }
     }).then(function (res) {
       var r = res || {};
       if (st.host.toast) st.host.toast((r.events || 0) + " Termine ab heute eingetragen");
@@ -484,7 +502,7 @@
 
   /* Zurück: Schritt zurück, auf der ersten Seite schließen (dann ist man wieder in Woche bzw. Selbst Coaching) */
   function back() {
-    if (st.step === "arrange") return paintList();
+    if (st.step === "arrange" && !st.arrangeOnly) return paintList();
     if (st.step === "indiv") return paintGoals();
     if (st.step === "list" && st.mode === "self") return paintGoals();
     close();
@@ -517,14 +535,30 @@
       root: root, body: root.querySelector(".gpl__body"), title: root.querySelector("h2"),
       host: opts.host, mode: opts.mode === "coach" ? "coach" : "self",
       userId: opts.userId || (opts.host.me && opts.host.me()), userName: opts.userName || "",
-      onDone: opts.onDone, onEditWeek: opts.onEditWeek, goals: [], plans: null, step: "load"
+      onDone: opts.onDone, onEditWeek: opts.onEditWeek, goals: [], plans: null, step: "load",
+      arrangeOnly: !!(opts.arrange && opts.arrange.courseId), weeks: (opts.arrange && opts.arrange.weeks) || 0
     };
     st.title.textContent = "Wochenpläne";
     root.addEventListener("click", onClick);
     bindDrag(root);
     var s0 = st;
-    load().then(function () {
+    var arr = opts.arrange;
+    var ready = load();
+    if (arr && arr.courseId) {
+      /* privater Coachee-Plan fehlt in der Liste: einzeln nachladen */
+      ready = ready.then(function () {
+        if ((st.plans || []).some(function (p) { return String(p.id) === String(arr.courseId); })) return;
+        return st.host.rest("courses?id=eq." + encodeURIComponent(arr.courseId) + "&select=" + PLAN_SEL)
+          .then(function (rows) { if (rows && rows[0]) st.plans.push(rows[0]); });
+      });
+    }
+    ready.then(function () {
       if (st !== s0) return;
+      if (arr && arr.courseId) {
+        startArrange(arr.courseId, arr.weekdays);
+        if (st.step !== "arrange") st.body.innerHTML = '<p class="gpl__empty">Plan nicht gefunden.</p>';
+        return;
+      }
       if (st.mode === "self") paintGoals(); else paintList();
     }).catch(function () {
       if (st !== s0) return;
@@ -532,5 +566,63 @@
     });
   }
 
-  global.GoPlanPicker = { open: open, close: close, GOALS: GOALS };
+  /* ---------- Nur ansehen: Tage mit Übungen, nichts änderbar ---------- */
+  function view(opts) {
+    opts = opts || {};
+    if (!opts.host || !opts.host.rest || !opts.courseId) return;
+    ensureCss();
+    if (st) close();
+    var root = document.createElement("div");
+    root.className = "gpl";
+    root.setAttribute("role", "dialog");
+    root.setAttribute("aria-modal", "true");
+    root.innerHTML =
+      '<div class="gpl__bar"><button type="button" class="gpl__back" data-gpp-close aria-label="Zurück">' +
+      '<svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      "</button><h2>Plan ansehen</h2><span></span></div>" +
+      '<div class="gpl__body"><p class="gpl__empty">Lade …</p></div>';
+    document.body.appendChild(root);
+    document.body.classList.add("gpl-open");
+    st = { root: root, body: root.querySelector(".gpl__body"), title: root.querySelector("h2"), host: opts.host, step: "view", mode: "view" };
+    root.addEventListener("click", function (e) { if (e.target.closest("[data-gpp-close]")) close(); });
+    var s0 = st;
+    var plan = null;
+    opts.host.rest("courses?id=eq." + encodeURIComponent(opts.courseId) + "&select=" + PLAN_SEL)
+      .then(function (rows) {
+        plan = rows && rows[0];
+        if (!plan) throw new Error("none");
+        var units = days(plan).map(function (d) { return d.unit_course_id; }).filter(Boolean);
+        if (!units.length) return [];
+        return opts.host.rest("course_sessions?course_id=in.(" + units.map(encodeURIComponent).join(",") +
+          ")&block_no=eq.1&is_travel=eq.false&select=course_id,title,category,blocks,session_no&order=session_no.asc")
+          .catch(function () { return []; });
+      })
+      .then(function (unitRows) {
+        if (st !== s0) return;
+        var byUnit = {};
+        (unitRows || []).forEach(function (r) { if (!byUnit[r.course_id]) byUnit[r.course_id] = r; });
+        st.title.textContent = shortTitle(plan.title);
+        st.body.innerHTML = '<p class="gpl__lead">' + (plan.level ? "Level " + plan.level + " · " : "") + esc(mixText(plan)) + "</p>" +
+          days(plan).map(function (d) {
+            var ses = d.unit_course_id ? byUnit[d.unit_course_id] : null;
+            var ex = ses && opts.exercisesOf ? (opts.exercisesOf(ses) || []) : [];
+            return '<details class="gpl__vday"' + (ex.length ? "" : " disabled") + "><summary><b>" + DAYS[d.session_no - 1] + "</b><span>" + esc(d.title) +
+              "<small>" + esc(CAT[d.category] || d.category || "") + (ex.length ? " · " + ex.length + (ex.length === 1 ? " Übung" : " Übungen") : "") + "</small></span></summary>" +
+              (ex.length ? '<ol class="gpl__vlist">' + ex.map(function (x) {
+                return "<li>" + esc(x.name || x.label || "") + (x.note ? " <small>" + esc(x.note) + "</small>" : "") + "</li>";
+              }).join("") + "</ol>" : "") + "</details>";
+          }).join("");
+      })
+      .catch(function () {
+        if (st !== s0) return;
+        st.body.innerHTML = '<p class="gpl__empty">Plan konnte nicht geladen werden.</p>';
+      });
+  }
+
+  /* „Bulletproof Knees – Läuferkraft …“ → „Bulletproof Knees“ */
+  function shortTitle(t) {
+    return String(t || "").split(/\s[–—-]\s|\s·\s|:|\(/)[0].trim() || String(t || "");
+  }
+
+  global.GoPlanPicker = { open: open, close: close, view: view, shortTitle: shortTitle, GOALS: GOALS };
 })(window);
