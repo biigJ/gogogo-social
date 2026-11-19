@@ -4036,7 +4036,8 @@
     /* Meine Freunde: schlichte Liste ohne Trennlinien */
     .friend-list__feed { flex: none; margin-left: auto; width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(42,33,24,.3); display: inline-flex; align-items: center; justify-content: center; color: transparent; cursor: pointer; box-sizing: border-box; }
     .friend-list__feed svg { width: 16px; height: 16px; }
-    .friend-list__feed.is-on { background: #2A2118; color: #F6F1E8; border-color: #2A2118; }
+    .friend-list__feed.is-on { background: #2A2118; color: #F3EEE4; border-color: #2A2118; }
+    .friend-list__feed.is-fixed { background: transparent; color: #2A2118; border-color: #2A2118; cursor: default; }
     .friend-list__hint { margin: 0 4px 10px; font-size: 14px; color: rgba(42,33,24,.65); line-height: 1.4; text-align: center; }
     .friend-list__nick { margin-left: 8px; font-size: 15px; font-weight: 500; opacity: .6; }
     .friend-list { display: flex; flex-direction: column; gap: 14px; padding: 8px 0 24px; }
@@ -8044,7 +8045,7 @@
   <script src="/natalyaalice/plan-picker.js?v=gpl-7"></script>
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
-  <script src="/natalyaalice/coach-portal.js?v=cp-10"></script>
+  <script src="/natalyaalice/coach-portal.js?v=cp-11"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-9"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-3"></script>
@@ -14245,8 +14246,8 @@
             var rel = String(x.trainer_id || "") === String(sessionAccount.id) || x.isTrainerPerson;
             return x && x.id && !rel && !feedMuted[String(x.id)] && String(x.id) !== String(sessionAccount.id);
           }).length;
-          if (onCount >= 12) {
-            gogogoToast("Du hast schon 12 gewählt. Nimm erst jemanden raus.");
+          if (onCount >= 5) {
+            gogogoToast("Du hast schon 5 gewählt. Nimm erst jemanden raus.");
             return;
           }
         }
@@ -16039,7 +16040,7 @@
           list.className = "friend-list";
           var hintTop = document.createElement("p");
           hintTop.className = "friend-list__hint";
-          hintTop.textContent = "Wähle bis zu 12 Freunde";
+          hintTop.textContent = "Wähle 5 Freunde, mit denen Du Deine täglichen Events teilst.";
           list.appendChild(hintTop);
           /* Oben: Kreis mit + → Freund per Nickname oder ID suchen */
           var addRow = document.createElement("button");
@@ -16109,6 +16110,17 @@
               fb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
               fb.addEventListener("click", function () { toggleFeed(p, fb); });
               row.appendChild(fb);
+            } else {
+              /* Coach-Verbindung oder FFC-Freund ohne gogogo-Konto: immer dabei, nicht wählbar */
+              var fx = document.createElement("span");
+              fx.className = "friend-list__feed is-fixed";
+              fx.setAttribute("aria-label", isCoachRel ? "Immer dabei (Coaching)" : "Immer dabei (FFC)");
+              fx.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+              fx.addEventListener("click", function (evx) {
+                evx.stopPropagation();
+                gogogoToast(isCoachRel ? "Coaching: immer dabei" : "FFC-Freund: immer dabei");
+              });
+              row.appendChild(fx);
             }
             list.appendChild(row);
           });
@@ -17691,6 +17703,7 @@
             toast: function (msg) { gogogoToast(msg); },
             isAdmin: ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"].indexOf(String(sessionAccount && sessionAccount.id)) !== -1,
             openKursEditor: function () { location.href = "/workout/kurse/?from=team"; },
+            onChanged: function () { loadTeam(); },
             openLegacyAdmin: function (uid) {
               location.href = "/workout/admin/?trainer=1&user=" + encodeURIComponent(uid) + "&back=team";
             }
@@ -17940,11 +17953,13 @@
           var choices = (groups || []).map(function (g) {
             return { label: g.name + " · " + g.member_count, value: "g:" + g.group_id };
           });
+          choices.push({ label: "Circle beitreten", value: "join" });
           choices.push({ label: "Neuen Circle gründen", value: "new" });
           var msg = (groups || []).length ? "Deine Circles" : "Noch in keinem Circle. In einen bestehenden holt Dich der Gründer. Oder gründe selbst einen.";
           return GoDialog.choose(msg, choices).then(function (v) {
             if (!v) return;
             if (v === "new") { createCircle(); return; }
+            if (v === "join") { setTimeout(joinCircleSearch, 0); return; }
             var gid = Number(String(v).slice(2));
             var g = (groups || []).filter(function (x) { return Number(x.group_id) === gid; })[0] || {};
             /* Tipp auf einen Circle: Leaderboard zeigen oder austreten */
@@ -17971,6 +17986,32 @@
             });
           });
         }).catch(function () { GoDialog.alert("Circles laden ging gerade nicht."); });
+      }
+      /* Bestehendem Circle beitreten: Name suchen (braucht FFC search_groups/join_group bei Hendrik) */
+      function joinCircleSearch() {
+        GoDialog.prompt("Name des Circles", "", { ok: "Suchen" }).then(function (q) {
+          q = String(q || "").trim();
+          if (!q) return;
+          return FFC.searchGroups(q).then(function (res) {
+            if (res && res.missing) {
+              GoDialog.alert("Beitreten per Suche ist bei FFC noch nicht freigeschaltet. Bis dahin holt Dich der Gründer in den Circle.");
+              return;
+            }
+            var rows = (res && res.data) || [];
+            if (!rows.length) { GoDialog.alert("Kein Circle mit „" + q + "“ gefunden."); return; }
+            return GoDialog.choose("Welchem Circle beitreten?", rows.map(function (g) {
+              return { label: g.name + (g.member_count != null ? " · " + g.member_count : ""), value: String(g.group_id || g.id) };
+            })).then(function (gid) {
+              if (!gid) return;
+              return FFC.joinGroup(gid).then(function (r2) {
+                if (r2 && r2.error) { GoDialog.alert("Beitreten ging nicht: " + (r2.error.message || "Fehler")); return; }
+                if (typeof syncFfcGroupIntoTeam === "function") { try { syncFfcGroupIntoTeam(); } catch (eS) {} }
+                if (typeof renderTeam === "function") renderTeam();
+                GoDialog.alert("Du bist jetzt im Circle.");
+              });
+            });
+          });
+        });
       }
       function createCircle() {
         GoDialog.prompt("Wie heißt Dein Circle?", "", { ok: "Weiter" }).then(function (name) {
@@ -23150,6 +23191,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-4"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-5"></script>
 </body>
 </html>

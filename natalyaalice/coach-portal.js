@@ -374,7 +374,8 @@
     if (!st || !st.root) return;
     var scroll = st.body ? st.body.scrollTop : 0;
     /* Woche nicht mehr als Liste: „Wochentage schieben“ im Wochenplan öffnet die Tage wie bei der Planwahl */
-    st.body.innerHTML = headHtml() + noteHtml() + planHtml();
+    st.body.innerHTML = headHtml() + noteHtml() + planHtml() +
+      '<section class="cp-sec"><button type="button" class="cp-btn cp-btn--ghost" data-cp="end-coaching" style="color:#C7413B;border-color:#C7413B">Coaching beenden</button></section>';
     bindWheels();
     st.body.scrollTop = scroll;
   }
@@ -520,6 +521,7 @@
       return moveEvent(t.getAttribute("data-id"));
     }
     if (act === "end-plan") return endPlan();
+    if (act === "end-coaching") return endCoaching();
     if (act === "add") return openAdd(t.getAttribute("data-iso"));
     if (act === "save-note") {
       var note = String((document.getElementById("cp-note") || {}).value || "");
@@ -600,6 +602,32 @@
         btn.disabled = false;
         toast("Zuordnen fehlgeschlagen (go-coach-enroll.sql ausgeführt?)");
       });
+  }
+
+  /* Coach löst das Coaching: trainer_id leer, Verbindung in „Meine Freunde“ weg. Wochenplan der Person bleibt. */
+  function endCoaching() {
+    var p = st.person || {};
+    var first = String(p.name || "diese Person").split(" ")[0];
+    var meId = String((host.sessionAccount && host.sessionAccount.id) || "");
+    var ask = global.GoDialog
+      ? GoDialog.confirm("Coaching mit " + first + " beenden? " + first + " steht dann nicht mehr in Deinem Team und in Deinen Freunden. Der Wochenplan bleibt.", { ok: "Beenden" })
+      : Promise.resolve(true);
+    ask.then(function (ok) {
+      if (!ok) return;
+      return host.rest("go_accounts?id=eq." + encodeURIComponent(p.id) + "&trainer_id=eq." + encodeURIComponent(meId), {
+        method: "PATCH", prefer: "return=minimal", body: { trainer_id: null }
+      })
+        .then(function () {
+          var both = "or=(and(account_id.eq." + meId + ",friend_id.eq." + p.id + "),and(account_id.eq." + p.id + ",friend_id.eq." + meId + "))";
+          return host.rest("go_friends?" + both, { method: "DELETE", prefer: "return=minimal" }).catch(function () {});
+        })
+        .then(function () {
+          if (host.toast) host.toast("Coaching mit " + first + " beendet");
+          close();
+          if (host.onChanged) host.onChanged();
+        })
+        .catch(function () { if (host.toast) host.toast("Beenden ging gerade nicht"); });
+    });
   }
 
   function endPlan() {
