@@ -126,6 +126,39 @@
     .goal-chips label.check { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; background: #fff; font-size: 13px; }
     .pill.on { border-color: var(--ink); color: var(--ink); }
     .del-row { margin-top: 18px; display: flex; justify-content: flex-end; }
+    /* Haken im gogogo-Stil */
+    input[type="checkbox"] { -webkit-appearance: none; appearance: none; width: 18px !important; height: 18px; flex: none; margin: 0; padding: 0;
+      border: 1.5px solid var(--ink); border-radius: 5px; background: #fff center / 72% no-repeat; cursor: pointer; }
+    input[type="checkbox"]:checked { background-color: var(--ink);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23F6F1E8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); }
+    .list-tools { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
+    .list-tools input[type="search"] { flex: 1; }
+    .item .vlink { grid-column: 1 / -1; font-size: 13px; padding: 6px 8px; }
+    .item.ihead .vlink { display: none; }
+    /* Desktop-Wochenplan: Einheiten links (2/3), Plan rechts (1/3), beide so hoch wie der Bildschirm */
+    .panes.is-desk { display: block; }
+    .pd { display: grid; grid-template-columns: minmax(0, 2fr) minmax(340px, 1fr); gap: 24px; height: calc(100vh - 92px); }
+    .pd-units, .pd-plan { min-height: 0; overflow-y: auto; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+    .pd-plan { display: flex; flex-direction: column; gap: 8px; }
+    .pd-lab { margin-top: 6px; }
+    .pd-media { display: grid; grid-template-columns: 96px auto minmax(0, 1fr); gap: 10px; align-items: start; margin-top: 4px; }
+    .pd-media__btns { display: flex; flex-direction: column; gap: 6px; }
+    .pd-media textarea { min-height: 120px; height: 120px; }
+    .pd-aud { gap: 18px; margin-top: 4px; }
+    .pd-week .day-row { margin: 2px 0; border-radius: 10px; padding: 1px 4px; }
+    .pd-week select { padding: 5px 8px; }
+    .pd-plan > input, .pd-plan select { padding: 7px 9px; }
+    .pd-plan .goal-chips label.check { padding: 3px 9px; }
+    .pd-drop.is-over { background: rgba(199,65,59,.12); outline: 1.5px dashed var(--accent); }
+    .pd-mix { margin: 2px 0 0; font-weight: 600; }
+    .pd-level { gap: 10px; }
+    .pd-foot { margin-top: auto; padding: 10px 0 2px; border-top: 1px solid var(--line); position: sticky; bottom: -14px; background: var(--card); }
+    .pd-ulist { display: grid; gap: 6px; }
+    .pd-unit { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto 80px; gap: 10px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: grab; }
+    .pd-unit:hover { border-color: var(--ink); }
+    .pd-unit img, .pd-unit__ph { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; background: #E6DED0; display: block; }
+    .pd-unit__name { font-weight: 600; overflow-wrap: anywhere; }
+    .pd-units .card { background: transparent; border: 0; padding: 0; }
     /* Desktop: Liste links, Detail rechts */
     @media (min-width: 1100px) {
       .wrap { max-width: 1320px; padding-left: 28px; padding-right: 28px; }
@@ -327,6 +360,7 @@
 
     // ---------- Listen ----------
     function showList() {
+      $("panes").classList.remove("is-desk");
       setHeader("");
       $("detail-view").classList.add("hidden");
       $("panes").classList.remove("is-split");
@@ -343,6 +377,10 @@
       box.classList.remove("hidden");
       if (state.view === "videos") return renderVideos(box);
       var v = state.view, html = "";
+      var filt = v === "plans" || v === "units"
+        ? '<div class="list-tools"><input type="search" class="list-filter" id="list-filter" placeholder="Filtern" value="' + esc(state.listFilter || "") + '" />' +
+          '<button type="button" id="list-new">Neu</button></div>'
+        : "";
       if (v === "plans") {
         html = '<table class="tbl"><colgroup><col class="col-name"><col><col class="col-xs"></colgroup>' +
           '<thead><tr><th>Name</th><th>Verteilung</th><th class="num">Level</th></tr></thead><tbody>' +
@@ -376,10 +414,25 @@
               '</td><td class="num">' + (e.units.length || "–") + '</td><td class="num">' + (GoExMedia.urlFor(e.name) ? "✓" : "–") + "</td></tr>";
           }).join("") + "</tbody></table>";
       }
-      box.innerHTML = html;
+      box.innerHTML = filt + html;
+      applyListFilter();
     }
+    function applyListFilter() {
+      var q = String(state.listFilter || "").trim().toLowerCase();
+      [].forEach.call($("list-view").querySelectorAll("tr[data-open]"), function (tr) {
+        if (/^new-/.test(tr.getAttribute("data-open"))) { tr.classList.toggle("hidden", !!filtToolsOn()); return; }
+        tr.classList.toggle("hidden", !!q && tr.textContent.toLowerCase().indexOf(q) < 0);
+      });
+    }
+    function filtToolsOn() { return !!$("list-filter"); }
+    $("list-view").addEventListener("input", function (e) {
+      if (e.target.id !== "list-filter") return;
+      state.listFilter = e.target.value;
+      applyListFilter();
+    });
 
     $("list-view").addEventListener("click", function (e) {
+      if (e.target.closest("#list-new")) return state.view === "units" ? createUnit() : createPlan();
       var tr = e.target.closest("tr[data-open]");
       if (!tr) return;
       var to = tr.getAttribute("data-open");
@@ -407,7 +460,7 @@
           .catch(function (err) { toast(err.message); });
       });
     }
-    function createUnit() {
+    function createUnit(stay) {
       GoDialog.prompt("Name der Einzeleinheit", "").then(function (title) {
         if (!title) return;
         insertCourse({ title: title, category_default: "kraft", sessions_per_week: 1, duration_weeks: 1, is_active: false })
@@ -416,7 +469,7 @@
               body: { course_id: c.id, block_no: 1, session_no: 1, is_travel: false, title: title, category: "kraft", blocks: [] } })
               .then(function () { return c; });
           })
-          .then(function (c) { return loadAll().then(function () { location.hash = "unit/" + c.id; }); })
+          .then(function (c) { return loadAll().then(function () { if (stay && $("pd-units")) openUnitInDesk(c.id); else location.hash = "unit/" + c.id; }); })
           .then(function () { toast("Angelegt, noch nicht im Katalog"); })
           .catch(function (err) { toast(err.message); });
       });
@@ -437,13 +490,24 @@
     var desktop = window.matchMedia ? window.matchMedia("(min-width: 1100px)") : { matches: false };
     function showDetail(kind, id) {
       var box = $("detail-view");
-      var split = desktop.matches;
+      /* Desktop-Wochenplan: eigener Editor (Einheiten links, Plan rechts), Liste ausgeblendet */
+      var deskPlan = desktop.matches && kind === "plan";
+      var split = desktop.matches && !deskPlan;
       $("panes").classList.toggle("is-split", split);
+      $("panes").classList.toggle("is-desk", deskPlan);
       if (split) {
         var v = kind === "plan" ? "plans" : kind === "unit" ? "units" : "exercises";
         if (state.view !== v || $("list-view").classList.contains("hidden") || !$("list-view").firstChild) { state.view = v; renderListOnly(); }
         markCurrent(kind + "/" + id);
       } else $("list-view").classList.add("hidden");
+      if (deskPlan) {
+        var cp = byId(id);
+        box.classList.remove("hidden");
+        if (!cp) { box.innerHTML = '<p class="muted">Nicht gefunden.</p>'; setHeader("–"); return; }
+        state.view = "plans";
+        setHeader(cp.title);
+        return planDesk(box, cp);
+      }
       box.classList.remove("hidden");
       window.scrollTo(0, 0);
       if (kind === "ex") return exerciseDetail(box, decodeURIComponent(id));
@@ -584,12 +648,148 @@
       }).join("");
       box.innerHTML = baseFormHtml(c, false) +
         "<h2>Woche</h2>" +
-        '<p class="muted" id="mix">' + esc(mixText(mixOf(c))) + " · Die Wochentage verteilt der Coach beim Zuordnen, Coach und Coachee können schieben.</p>" +
+        '<p class="muted" id="mix">' + esc(mixText(mixOf(c))) + "</p>" +
         '<div class="card">' + days + "</div>";
       bindBaseForm(c, false);
       box.querySelectorAll("[data-day]").forEach(function (sel) {
         sel.addEventListener("change", function () { saveSlot(c, parseInt(sel.getAttribute("data-day"), 10), sel.value); });
       });
+    }
+
+    /* ---------- Desktop: Wochenplan-Editor ----------
+       Links alle Einzeleinheiten (Filter, Neu, Klick öffnet die Einheit), rechts der Plan.
+       Einheiten per Drag & Drop auf die Wochentage ziehen. */
+    function planDesk(box, c) {
+      var slots = mainSessions(c);
+      var unitOpts = function (sel) {
+        var html = '<option value="">– frei –</option>';
+        CATS.forEach(function (k) {
+          var us = units().filter(function (u) { return (u.category_default || "kraft") === k[0]; })
+            .sort(function (a, b) { return a.title.localeCompare(b.title, "de"); });
+          if (!us.length) return;
+          html += '<optgroup label="' + k[1] + '">' + us.map(function (u) {
+            return '<option value="' + u.id + '"' + (u.id === sel ? " selected" : "") + ">" + esc(u.title) + "</option>";
+          }).join("") + "</optgroup>";
+        });
+        return html;
+      };
+      var days = DAYS.map(function (d, i) {
+        var sl = slots.find(function (x) { return x.session_no === i + 1; });
+        return '<div class="day-row pd-drop" data-drop="' + (i + 1) + '"><b>' + d + '</b><select data-day="' + (i + 1) + '">' + unitOpts(sl && sl.unit_course_id) + "</select></div>";
+      }).join("");
+      box.innerHTML =
+        '<div class="pd">' +
+        '<section class="pd-units" id="pd-units"></section>' +
+        '<aside class="pd-plan">' +
+        '<label>Titel</label><input id="p-title" value="' + esc(c.title) + '" />' +
+        (state.newCols ? '<label class="pd-lab">Ziele</label><div class="goal-chips">' +
+          GOALS.map(function (g) {
+            return '<label class="check"><input type="checkbox" data-pgoal="' + g[0] + '"' + ((c.goals || []).indexOf(g[0]) !== -1 ? " checked" : "") + " /> " + g[1] + "</label>";
+          }).join("") + "</div>" : "") +
+        '<div class="pd-media"><div class="cover-prev" id="p-cover-prev"></div>' +
+        '<div class="pd-media__btns"><label class="file-btn"><input id="p-cover" type="file" accept="image/*" hidden />Bild wählen</label>' +
+        '<button class="ghost small" id="p-cover-del" type="button">Entfernen</button></div>' +
+        '<textarea id="p-desc" placeholder="Beschreibung">' + esc(c.description || "") + "</textarea></div>" +
+        '<div class="row pd-aud"><label class="check"><input id="p-coaches" type="checkbox"' + (c.is_active ? " checked" : "") + " /> Coaches</label>" +
+        (state.newCols ? '<label class="check"><input id="p-users" type="checkbox"' + (c.is_public ? " checked" : "") + " /> Nutzer</label>" : "") + "</div>" +
+        '<label class="pd-lab">Woche</label><div class="pd-week">' + days + "</div>" +
+        '<p class="pd-mix" id="mix">' + esc(mixText(mixOf(c))) + "</p>" +
+        '<div class="row pd-level"><label class="pd-lab" style="margin:0">Level</label><select id="p-level" style="width:auto"><option value="">–</option>' +
+        [1, 2, 3].map(function (l) { return "<option" + (c.level === l ? " selected" : "") + ">" + l + "</option>"; }).join("") + "</select></div>" +
+        '<div class="row pd-foot"><button id="p-save">Speichern</button><span class="grow"></span><button type="button" class="danger" id="p-del">Löschen</button></div>' +
+        "</aside></div>";
+      paintCover(c.image_url, "p");
+      paintUnitList();
+      $("p-cover").addEventListener("change", function () { uploadCover(c, this, "p"); });
+      $("p-cover-del").addEventListener("click", function () {
+        saveCoverUrl(c, null, "p").then(function () { toast("Bild entfernt"); }).catch(function (err) { toast(err.message); });
+      });
+      $("p-del").addEventListener("click", function () { deleteCourse(c, false); });
+      $("p-save").addEventListener("click", function () {
+        var f = {
+          title: $("p-title").value.trim(),
+          level: $("p-level").value ? parseInt($("p-level").value, 10) : null,
+          description: $("p-desc").value.trim() || null,
+          is_active: $("p-coaches").checked
+        };
+        if (state.newCols) {
+          f.is_public = $("p-users").checked;
+          f.goals = [].map.call(document.querySelectorAll("[data-pgoal]:checked"), function (x) { return x.getAttribute("data-pgoal"); });
+        }
+        if (!f.title) { toast("Titel fehlt"); return; }
+        /* Nutzer sehen nur, was auch im Katalog ist */
+        if (f.is_public && !f.is_active) f.is_active = true;
+        rest("courses?id=eq." + c.id, { method: "PATCH", body: f }).then(loadAll)
+          .then(function () { setHeader(f.title); $("p-coaches").checked = f.is_active; toast("Gespeichert"); })
+          .catch(function (err) { toast(err.message); });
+      });
+      box.querySelectorAll("[data-day]").forEach(function (sel) {
+        sel.addEventListener("change", function () { saveSlot(c, parseInt(sel.getAttribute("data-day"), 10), sel.value); });
+      });
+      /* Drag & Drop: Einheit aus der Liste links auf einen Tag */
+      box.querySelectorAll("[data-drop]").forEach(function (row) {
+        row.addEventListener("dragover", function (e) { e.preventDefault(); row.classList.add("is-over"); });
+        row.addEventListener("dragleave", function () { row.classList.remove("is-over"); });
+        row.addEventListener("drop", function (e) {
+          e.preventDefault();
+          row.classList.remove("is-over");
+          var uid = e.dataTransfer.getData("text/plain");
+          if (!uid || !byId(uid)) return;
+          var day = parseInt(row.getAttribute("data-drop"), 10);
+          row.querySelector("select").value = uid;
+          saveSlot(c, day, uid);
+        });
+      });
+    }
+
+    function paintUnitList() {
+      var host = $("pd-units");
+      if (!host) return;
+      var q = String(state.unitFilter || "").trim().toLowerCase();
+      var cat = state.unitCat || "";
+      var list = units().filter(function (u) {
+        if (cat && (u.category_default || "kraft") !== cat) return false;
+        return !q || u.title.toLowerCase().indexOf(q) >= 0;
+      }).sort(function (a, b) {
+        var ca = CATS.findIndex(function (k) { return k[0] === a.category_default; }), cb = CATS.findIndex(function (k) { return k[0] === b.category_default; });
+        return ca !== cb ? ca - cb : a.title.localeCompare(b.title, "de");
+      });
+      host.innerHTML =
+        '<div class="list-tools"><input type="search" id="pd-ufilter" placeholder="Einheiten filtern" value="' + esc(state.unitFilter || "") + '" />' +
+        '<select id="pd-ucat" style="width:auto"><option value="">Alle</option>' +
+        CATS.map(function (k) { return '<option value="' + k[0] + '"' + (cat === k[0] ? " selected" : "") + ">" + k[1] + "</option>"; }).join("") + "</select>" +
+        '<button type="button" id="pd-unew">Neu</button></div>' +
+        '<p class="muted" style="margin:0 0 8px">Auf einen Wochentag rechts ziehen. Klick öffnet die Einheit.</p>' +
+        '<div class="pd-ulist">' + list.map(function (u) {
+          return '<div class="pd-unit" draggable="true" data-unit="' + u.id + '">' +
+            (u.image_url ? '<img src="' + esc(u.image_url) + '" alt="" />' : '<span class="pd-unit__ph"></span>') +
+            '<span class="pd-unit__name">' + esc(u.title) + (u.is_active ? "" : ' <span class="pill">nicht im Katalog</span>') + "</span>" +
+            '<span class="pill">' + esc(catLabel(u.category_default)) + "</span>" +
+            '<span class="muted">' + (exCount(u) ? exCount(u) + " Übungen" : "") + "</span></div>";
+        }).join("") + "</div>";
+      $("pd-ufilter").addEventListener("input", function () {
+        state.unitFilter = this.value;
+        var pos = this.selectionStart;
+        paintUnitList();
+        var f = $("pd-ufilter"); f.focus(); try { f.setSelectionRange(pos, pos); } catch (e) {}
+      });
+      $("pd-ucat").addEventListener("change", function () { state.unitCat = this.value; paintUnitList(); });
+      $("pd-unew").addEventListener("click", function () { createUnit(true); });
+      host.querySelectorAll("[data-unit]").forEach(function (el) {
+        el.addEventListener("dragstart", function (e) { e.dataTransfer.setData("text/plain", el.getAttribute("data-unit")); e.dataTransfer.effectAllowed = "copy"; });
+        el.addEventListener("click", function () { openUnitInDesk(el.getAttribute("data-unit")); });
+      });
+    }
+
+    /* Einheit links im Desktop-Editor öffnen: Übungen hinzufügen/löschen, Bild, Videos */
+    function openUnitInDesk(id) {
+      var host = $("pd-units");
+      var u = byId(id);
+      if (!host || !u) return;
+      host.innerHTML = '<div class="row" style="margin-bottom:8px"><button type="button" class="ghost small" id="pd-uback">← Alle Einheiten</button>' +
+        '<h3 class="grow" style="margin-left:6px">' + esc(u.title) + "</h3></div><div id=\"pd-ubox\"></div>";
+      $("pd-uback").addEventListener("click", function () { paintUnitList(); });
+      unitDetail($("pd-ubox"), u, { inDesk: true });
     }
 
     function saveSlot(plan, day, unitId) {
@@ -608,7 +808,7 @@
       job.then(loadAll).then(function () {
         var p = byId(plan.id);
         if (p) {
-          $("mix").textContent = mixText(mixOf(p)) + " · Die Wochentage verteilt der Coach beim Zuordnen, Coach und Coachee können schieben.";
+          if ($("mix")) $("mix").textContent = mixText(mixOf(p));
           var n = mainSessions(p).length;
           if (n && p.sessions_per_week !== 7) rest("courses?id=eq." + p.id, { method: "PATCH", body: { sessions_per_week: 7 } });
         }
@@ -616,7 +816,8 @@
       }).catch(function (err) { toast(err.message); });
     }
 
-    function unitDetail(box, c) {
+    function unitDetail(box, c, uopts) {
+      uopts = uopts || {};
       var s = mainSessions(c)[0] || { title: c.title, blocks: [], category: c.category_default || "kraft" };
       var cat = c.category_default || s.category || "kraft";
       var usedIn = plans().filter(function (p) { return mainSessions(p).some(function (x) { return x.unit_course_id === c.id; }); });
@@ -645,7 +846,7 @@
         else if (act === "del-block") btn.closest(".block").remove();
         else if (act === "add-item") btn.closest(".block").querySelector("[data-items]").insertAdjacentHTML("beforeend", itemHtml({}));
         else if (act === "del-item") btn.closest(".item").remove();
-        else if (act === "save-blocks") saveBlocks(c, readBlocks(sesBox));
+        else if (act === "save-blocks") saveBlocks(c, readBlocks(sesBox)).then(function () { if (uopts.inDesk) paintVideoMarks(sesBox); });
       });
       $("ai-copy").addEventListener("click", function () {
         var text = "Das ist eine gogogo-Einzeleinheit (" + c.title + ", " + catLabel(cat) + ") als JSON. Blöcke vom Typ mobility, skill, grund, hybrid, hypertrophie, finisher, ausdauer; " +
@@ -677,10 +878,29 @@
     function itemHtml(it) {
       it = it || {};
       function f(k, ph, cls, type, list) { return '<input class="' + (cls || "") + '" data-if="' + k + '" placeholder="' + ph + '"' + (type ? ' type="' + type + '"' : "") + (list ? ' list="' + list + '"' : "") + ' value="' + esc(it[k]) + '" />'; }
+      var vid = it.name && window.GoExMedia ? GoExMedia.urlFor(it.name) : "";
       return '<div class="item">' + f("name", "Übung", "n", "", "ex-names") + f("sets", "Sätze", "", "number") + f("reps", "Wdh.") + f("time_s", "Sek.", "", "number") +
         f("dist_m", "m", "", "number") + f("load", "z. B. RPE 7") + f("note", "Hinweis", "note") +
-        '<button class="small danger" data-act="del-item" aria-label="Übung entfernen">×</button></div>';
+        '<button class="small danger" data-act="del-item" aria-label="Übung entfernen">×</button>' +
+        '<input class="vlink" data-vlink type="url" placeholder="Video-Link (YouTube/Instagram)" value="' + esc(vid) + '" /></div>';
     }
+    function paintVideoMarks(box) {
+      [].forEach.call(box.querySelectorAll(".item:not(.ihead)"), function (iEl) {
+        var n = iEl.querySelector('[data-if="name"]'), v = iEl.querySelector("[data-vlink]");
+        if (n && v && !v.value && n.value) v.value = GoExMedia.urlFor(n.value.trim()) || "";
+      });
+    }
+    /* Video-Link einer Übung direkt speichern (gilt überall, go_exercise_media) */
+    document.addEventListener("change", function (e) {
+      if (!e.target.hasAttribute || !e.target.hasAttribute("data-vlink")) return;
+      var row = e.target.closest(".item");
+      var name = row && row.querySelector('[data-if="name"]') ? row.querySelector('[data-if="name"]').value.trim() : "";
+      var url = e.target.value.trim();
+      if (!name) { toast("Erst den Namen der Übung eintragen"); return; }
+      if (url && !GoExMedia.parse(url)) { toast("Bitte einen vollständigen Link mit https:// einfügen"); return; }
+      saveVideo(name, url).then(function () { toast(url ? "Video für „" + name + "“ gespeichert" : "Video entfernt"); })
+        .catch(function (err) { toast(err.message); });
+    });
     function readBlocks(box) {
       var out = [];
       [].forEach.call(box.querySelectorAll(".block"), function (bEl) {
@@ -742,9 +962,11 @@
     }
 
     // ---------- Coverbild (Bucket go-covers, go-covers-bucket.sql) ----------
-    function paintCover(url) {
-      $("f-cover-prev").innerHTML = url ? '<img src="' + esc(url) + '" alt="" />' : '<span class="muted">Kein Coverbild</span>';
-      $("f-cover-del").classList.toggle("hidden", !url);
+    function paintCover(url, pfx) {
+      pfx = pfx || "f";
+      var prev = $(pfx + "-cover-prev"), del = $(pfx + "-cover-del");
+      if (prev) prev.innerHTML = url ? '<img src="' + esc(url) + '" alt="" />' : '<span class="muted">Kein Bild</span>';
+      if (del) del.classList.toggle("hidden", !url);
     }
     function shrinkImage(file, maxSide) {
       return new Promise(function (resolve, reject) {
@@ -761,13 +983,13 @@
         img.src = URL.createObjectURL(file);
       });
     }
-    function saveCoverUrl(c, url) {
+    function saveCoverUrl(c, url, pfx) {
       return rest("courses?id=eq." + c.id, { method: "PATCH", body: { image_url: url } }).then(function () {
         c.image_url = url;
-        paintCover(url);
+        paintCover(url, pfx);
       });
     }
-    function uploadCover(c, input) {
+    function uploadCover(c, input, pfx) {
       var file = input.files && input.files[0];
       input.value = "";
       if (!file) return;
@@ -781,7 +1003,7 @@
         });
       }).then(function (r) {
         if (!r.ok) return r.text().then(function (t) { throw new Error(/Bucket not found/i.test(t) ? "Speicher fehlt: go-covers-bucket.sql ausführen" : "Upload fehlgeschlagen " + t.slice(0, 80)); });
-        return saveCoverUrl(c, SUPABASE_URL + "/storage/v1/object/public/go-covers/" + path);
+        return saveCoverUrl(c, SUPABASE_URL + "/storage/v1/object/public/go-covers/" + path, pfx);
       }).then(function () { toast("Coverbild gespeichert"); })
         .catch(function (err) { toast(/image_url/.test(err.message) ? "Spalte fehlt: go-medien.sql ausführen" : err.message); });
     }
