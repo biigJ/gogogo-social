@@ -3389,6 +3389,14 @@
   }
   window.FFC = {
     user: ()=> currentUser,
+    /* gogogo: eigene Circle (Hendriks my_groups), z. B. für Beschriftung „XYZ Circle“ */
+    async myGroups(){
+      if(!currentUser) return [];
+      try{
+        const { data, error } = await sb.rpc('my_groups');
+        return error ? [] : (data || []);
+      }catch(e){ return []; }
+    },
     showAuth(mode, opts){
       opts = opts || {};
       setAuthMode(mode || 'login');
