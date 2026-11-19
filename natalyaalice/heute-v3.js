@@ -1168,11 +1168,13 @@
     var last = list[list.length - 1];
     var older = list.slice(0, -1);
     var nmLast = String(personOf(last.account_id).name || "").split(" ")[0];
-    var long = older.length > 0 || nmLast.length + String(last.text).length + 1 > CMT_CLAMP;
-    return '<div class="acc-card__teaser acc-clamp' + (long ? " has-more" : "") + '">' +
+    var long = older.length > 0 || nmLast.length + String(last.text).length + 1 > 44;
+    var isOpen = long && state.cmtOpen && state.cmtOpen[String(postId)];
+    return '<div class="acc-card__teaser acc-clamp' + (long ? " has-more" : "") + (isOpen ? " is-open" : "") + '">' +
       (older.length ? '<div class="acc-clamp__older">' + older.map(function (c) { return "<p>" + line(c) + "</p>"; }).join("") + "</div>" : "") +
-      '<button type="button" class="acc-card__my-line acc-clamp__text" data-open-comments="' + esc(postId) + '">' + line(last) + "</button>" +
-      (long ? '<button type="button" class="acc-clamp__more" data-cmt-more>mehr</button>' : "") +
+      /* div statt button: Safari kürzt Text in Buttons nicht */
+      '<div class="acc-card__my-line acc-clamp__text acc-clamp__one" role="button" tabindex="0" data-open-comments="' + esc(postId) + '">' + line(last) + "</div>" +
+      (long ? '<button type="button" class="acc-clamp__more" data-cmt-more>' + (isOpen ? "weniger" : "mehr") + "</button>" : "") +
       "</div>";
   }
 
@@ -4340,6 +4342,13 @@
     if (!box) return;
     var open = box.classList.toggle("is-open");
     m.textContent = open ? "weniger" : "mehr";
+    /* Zustand merken: Aktuell malt beim Nachladen neu */
+    var pid = box.querySelector("[data-open-comments]");
+    if (pid) {
+      state.cmtOpen = state.cmtOpen || {};
+      if (open) state.cmtOpen[pid.getAttribute("data-open-comments")] = true;
+      else delete state.cmtOpen[pid.getAttribute("data-open-comments")];
+    }
   }, true);
 
 })(window);
