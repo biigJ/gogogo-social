@@ -4852,6 +4852,7 @@
   global.WocheReels = {
     refreshKeepDay: refreshKeepDay,
     openZirkelRecurring: function () { openZirkelRecurring(); },
+    openPlanPicker: function () { openPlanPicker(); },
     install: install,
     show: show,
     hide: hide,

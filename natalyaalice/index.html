@@ -7964,11 +7964,12 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-6"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-2"></script>
+  <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-58"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-2"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-45"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-45b"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -21401,6 +21402,28 @@
           setTimeout(promptJoinRequests, 2500);
           setTimeout(promptCoachRequests, 4000);
           setTimeout(syncSessionAccount, 600);
+          /* Erste Schritte für neue Konten (go-onboarding.js); Test: /workout/?onboarding=1 */
+          if (window.GoOnboarding) {
+            var obHost = {
+              rest: rest,
+              toast: gogogoToast,
+              account: function () { return sessionAccount; },
+              savePhoto: function (file, done) {
+                compressPhoto(file, function (url) {
+                  if (!url || !sessionAccount) return;
+                  sessionAccount.photo_url = url;
+                  saveProfileFields({ photo_url: url });
+                  try { loadTeam(); } catch (eT) {}
+                  if (done) done(url);
+                });
+              },
+              openPlan: function () { if (window.WocheReels && WocheReels.openPlanPicker) WocheReels.openPlanPicker(); },
+              openCircle: function () { openCircleJoin(); }
+            };
+            var obForce = false;
+            try { obForce = new URLSearchParams(location.search).get("onboarding") === "1"; } catch (eOb) {}
+            setTimeout(function () { if (obForce) GoOnboarding.start(obHost); else GoOnboarding.maybeStart(obHost); }, 1500);
+          }
           /* FFC-Punkte spiegeln (Gesamt- und Double-Leaderboard), sobald der FFC-Login steht */
           setTimeout(function () {
             if (window.GoFfcPoints && sessionAccount) GoFfcPoints.sync({ rest: rest, accountId: String(sessionAccount.id) });
