@@ -8019,12 +8019,13 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-8"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-3"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-1"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
+  <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-59"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-2"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-46"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-47"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -21497,6 +21498,27 @@
             });
             document.addEventListener("go:aktuell-ready", function () { setTimeout(GoMessages.check, 1200); });
             setTimeout(GoMessages.check, 8000);
+          /* Erste Schritte für neue Konten (go-onboarding.js); Test: /workout/?onboarding=1 */
+          if (window.GoOnboarding) {
+            var obHost = {
+              rest: rest,
+              toast: gogogoToast,
+              account: function () { return sessionAccount; },
+              savePhoto: function (file, done) {
+                compressPhoto(file, function (url) {
+                  if (!url || !sessionAccount) return;
+                  sessionAccount.photo_url = url;
+                  saveProfileFields({ photo_url: url });
+                  try { loadTeam(); } catch (eT) {}
+                  if (done) done(url);
+                });
+              },
+              openPlan: function () { if (window.WocheReels && WocheReels.openPlanPicker) WocheReels.openPlanPicker(); },
+              openCircle: function () { openCircleJoin(); }
+            };
+            var obForce = false;
+            try { obForce = new URLSearchParams(location.search).get("onboarding") === "1"; } catch (eOb) {}
+            setTimeout(function () { if (obForce) GoOnboarding.start(obHost); else GoOnboarding.maybeStart(obHost); }, 1500);
           }
           /* FFC-Punkte spiegeln (Gesamt- und Double-Leaderboard), sobald der FFC-Login steht */
           setTimeout(function () {

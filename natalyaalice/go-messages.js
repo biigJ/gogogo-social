@@ -85,7 +85,7 @@
 
   function blocked() {
     if (document.body.dataset.shell !== "heute") return true;
-    if (document.querySelector(".god, .gtm, .cp, .gpl, #go-boot")) return true;
+    if (document.querySelector(".god, .gtm, .cp, .gpl, .gob, #go-boot")) return true;
     if (document.querySelector(".sand-modal:not([hidden])")) return true;
     return false;
   }
