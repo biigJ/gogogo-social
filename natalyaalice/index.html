@@ -73,7 +73,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-clean-18" />
+  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-clean-19" />
   <style>
     /* Haken überall im gogogo-Stil statt System-Blau (Module dürfen Größe/Abstand weiter selbst setzen) */
     input[type="checkbox"], input[type="radio"] {
@@ -7801,7 +7801,12 @@
       <div class="item"><div class="num" id="sumTotal">0:00</div><div class="lbl">Gesamt</div></div>
     </div>
 
-    <button class="start-btn" id="startBtn">Workout starten</button>
+    <div class="start-row">
+      <button class="start-btn" id="startBtn">Workout starten</button>
+      <button class="sync-btn" id="setupSyncBtn" type="button" aria-label="Zeit synchronisieren" hidden>
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg>
+      </button>
+    </div>
   </div>
   <div class="screen run" id="run">
     <div class="run-top">
@@ -7809,6 +7814,9 @@
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
       </button>
       <div class="lane" id="lane"></div>
+      <button class="run-home run-sync" id="runSyncBtn" type="button" aria-label="Zeit synchronisieren" hidden>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 4v4h4"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20v-4h-4"/></svg>
+      </button>
     </div>
     <div class="phase-label" id="phaseLabel">ARBEIT</div>
     <div class="round-of" id="roundOf">Runde 1 / 8</div>
@@ -8221,9 +8229,9 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-75"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-76"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-56"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-57"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -13201,13 +13209,17 @@
 
       /* Admin (Event-Ersteller): Countdown anhalten / wieder starten. Steht in events.note,
          alle Teilnehmer (Woche, Aktuell, Workout) lesen es alle 5 s mit.
-         Starten: vor der Startzeit → Countdown auf die Startzeit, danach → 5 Minuten Countdown */
+         Starten: vor der Startzeit → Countdown auf die Startzeit, danach → 5 Minuten Countdown.
+         Sofortstart („now“): alle starten zusammen in 10 s (Abfrage alle 5 s, so kommen alle rechtzeitig mit) */
       function zirkelAdminStart(eventId, action) {
         return rest("events?id=eq." + encodeURIComponent(eventId) + "&select=note,starts_at").then(function (rows) {
           var note = rows && rows[0] ? rows[0].note : "";
           var startMs = rows && rows[0] ? new Date(rows[0].starts_at).getTime() : 0;
           if (action === "hold") note = GoZirkelSetup.withFlag(GoZirkelSetup.withFlag(note, "go", null), "hold", 1);
-          else {
+          else if (action === "now") {
+            note = GoZirkelSetup.withFlag(note, "hold", null);
+            note = GoZirkelSetup.withFlag(note, "go", Math.floor(Date.now() / 1000) + 10);
+          } else {
             note = GoZirkelSetup.withFlag(note, "hold", null);
             note = startMs > Date.now() + 5000
               ? GoZirkelSetup.withFlag(note, "go", null)
@@ -24368,6 +24380,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-10"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-11"></script>
 </body>
 </html>

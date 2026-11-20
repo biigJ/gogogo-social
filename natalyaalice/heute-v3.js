@@ -1021,12 +1021,15 @@
     else if (target > Date.now()) {
       var sec = Math.floor((target - Date.now()) / 1000);
       var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
-      cd = '<span class="wr-zirkel-cd" data-wr-cd-start="' + target + '">Start in ' + (h ? h + ":" : "") +
+      cd = '<span class="wr-zirkel-cd" data-wr-cd-start="' + target + '">' + (h ? h + ":" : "") +
         (m < 10 ? "0" : "") + m + ":" + (x < 10 ? "0" : "") + x + "</span>";
     } else cd = '<span class="wr-zirkel-cd">läuft</span>';
     var admin = z && String(ev.user_id) === me()
       ? '<button type="button" class="go-online-cta go-online-cta--ghost" data-acc-zadmin="' + (held ? "go" : "hold") + '" data-id="' + esc(ev.id) + '">' +
-        (held ? "Starten" : "Anhalten") + "</button>"
+        (held ? "Starten" : "Anhalten") + "</button>" +
+        (held || target > Date.now() + 15000
+          ? '<button type="button" class="go-online-cta go-online-cta--ghost" data-acc-zadmin="now" data-id="' + esc(ev.id) + '">Sofortstart</button>'
+          : "")
       : "";
     return '<div class="wr-zrow acc-zrow">' + cd + admin + "</div>";
   }
@@ -4015,16 +4018,22 @@
     if (zAdmin) {
       if (!global.GoZirkelSync) return;
       var zAct = zAdmin.getAttribute("data-acc-zadmin");
-      zAdmin.disabled = true;
-      GoZirkelSync.admin(zAdmin.getAttribute("data-id"), zAct)
-        .then(function () {
-          if (host.toast) host.toast(zAct === "go" ? "Countdown läuft" : "Countdown angehalten");
-          return refresh();
-        })
-        .catch(function () {
-          zAdmin.disabled = false;
-          if (host.toast) host.toast("Hat nicht geklappt");
-        });
+      var zAsk = zAct === "now" && global.GoDialog
+        ? GoDialog.confirm("Jetzt für alle starten?", { ok: "Sofortstart" })
+        : Promise.resolve(true);
+      zAsk.then(function (yes) {
+        if (!yes) return;
+        zAdmin.disabled = true;
+        GoZirkelSync.admin(zAdmin.getAttribute("data-id"), zAct)
+          .then(function () {
+            if (host.toast) host.toast(zAct === "now" ? "Start für alle in 10 s" : zAct === "go" ? "Countdown läuft" : "Countdown angehalten");
+            return refresh();
+          })
+          .catch(function () {
+            zAdmin.disabled = false;
+            if (host.toast) host.toast("Hat nicht geklappt");
+          });
+      });
       return;
     }
     var invitePost = t.closest("[data-invite-post]");

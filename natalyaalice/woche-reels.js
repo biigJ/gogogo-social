@@ -242,11 +242,17 @@
     if (!z || !ev || String(ev.user_id) !== String(me())) return "";
     if (ev.status === "erledigt" || iso !== berlinToday()) return "";
     var held = z.hold && !z.goAt;
+    var target = z.goAt || new Date(ev.starts_at).getTime();
+    /* Sofortstart: alle Teilnehmer starten zusammen, solange es noch nicht läuft */
+    var now = held || target > Date.now() + 15000;
     return (
       '<button type="button" class="go-online-cta go-online-cta--ghost" data-wr-zadmin="' +
       (held ? "go" : "hold") + '" data-id="' + esc(ev.id) + '">' +
       (held ? "Starten" : "Anhalten") +
-      "</button>"
+      "</button>" +
+      (now
+        ? '<button type="button" class="go-online-cta go-online-cta--ghost" data-wr-zadmin="now" data-id="' + esc(ev.id) + '">Sofortstart</button>'
+        : "")
     );
   }
 
@@ -274,7 +280,7 @@
       );
     } catch (eG) {}
     if (now < gate.getTime()) {
-      return '<p class="wr-zirkel-cd">Countdown ab 07:00</p>';
+      return '<p class="wr-zirkel-cd">ab 7:00</p>';
     }
     var sec = Math.max(0, Math.floor((start - now) / 1000));
     var h = Math.floor(sec / 3600);
@@ -287,7 +293,7 @@
     return (
       '<p class="wr-zirkel-cd" data-wr-cd-start="' +
       esc(String(start)) +
-      '">Start in ' +
+      '">' +
       esc(label) +
       "</p>"
     );
@@ -302,9 +308,9 @@
       var start = Number(el.getAttribute("data-wr-cd-start"));
       if (!isFinite(start)) return;
       var sec = Math.max(0, Math.floor((start - now) / 1000));
-      if (sec <= 0) { el.textContent = "Jetzt starten"; el.removeAttribute("data-wr-cd-start"); return; }
+      if (sec <= 0) { el.textContent = "läuft"; el.removeAttribute("data-wr-cd-start"); return; }
       var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
-      el.textContent = "Start in " + (h > 0 ? h + ":" : "") + (m < 10 ? "0" : "") + m + ":" + (x < 10 ? "0" : "") + x;
+      el.textContent = (h > 0 ? h + ":" : "") + (m < 10 ? "0" : "") + m + ":" + (x < 10 ? "0" : "") + x;
     });
   }, 1000);
 
@@ -4740,16 +4746,22 @@
     if (t.getAttribute("data-wr-zadmin")) {
       if (!global.GoZirkelSync) return;
       var zAct = t.getAttribute("data-wr-zadmin");
+      var zAsk = zAct === "now" && global.GoDialog
+        ? GoDialog.confirm("Jetzt für alle starten?", { ok: "Sofortstart" })
+        : Promise.resolve(true);
+      zAsk.then(function (yes) {
+      if (!yes) return;
       t.disabled = true;
       GoZirkelSync.admin(t.getAttribute("data-id"), zAct)
         .then(function () {
-          if (host.toast) host.toast(zAct === "go" ? "Countdown läuft" : "Countdown angehalten");
+          if (host.toast) host.toast(zAct === "now" ? "Start für alle in 10 s" : zAct === "go" ? "Countdown läuft" : "Countdown angehalten");
           return refreshKeepDay(berlinToday());
         })
         .catch(function () {
           t.disabled = false;
           if (host.toast) host.toast("Hat nicht geklappt");
         });
+      });
       return;
     }
     if (t.getAttribute("data-wr-zirkel-next")) {
