@@ -4104,11 +4104,15 @@
     .friend-wallet[hidden], .friend-list > [hidden] { display: none !important; }
     .fw-stage { position: sticky; top: 0; z-index: 1; pointer-events: none; }
     .fw-snap { scroll-snap-align: start; scroll-snap-stop: always; }
-    .fw-card { position: absolute; left: 0; right: 0; top: 0; aspect-ratio: 1 / 1; pointer-events: auto; transform-origin: 50% 0; will-change: transform, opacity; border-radius: 22px; overflow: hidden; background: #2A2118 center/cover no-repeat; color: #fff; display: flex; flex-direction: column; justify-content: flex-start; cursor: pointer; box-shadow: 0 -6px 18px rgba(0,0,0,.18); }
+    .fw-card { position: absolute; left: 0; right: 0; top: 0; aspect-ratio: 4 / 5; pointer-events: auto; transform-origin: 50% 0; will-change: transform, opacity; border-radius: 22px; overflow: hidden; background: #2A2118 center/cover no-repeat; color: #fff; display: flex; flex-direction: column; justify-content: flex-start; cursor: pointer; box-shadow: 0 -6px 18px rgba(0,0,0,.18); }
     .fw-card::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.78) 0%, rgba(0,0,0,.5) 45%, rgba(0,0,0,.12) 80%, rgba(0,0,0,0) 100%); }
     .fw-card__body { position: relative; padding: 16px 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; max-height: 100%; box-sizing: border-box; overflow: hidden; align-content: start; }
     .friend-wallet .fw-card__name { margin: 0; font: 600 28px/1.1 'Playfair Display', Georgia, serif !important; color: #fff; }
     .friend-wallet .fw-card__nick { display: block; margin-top: 2px; font: 500 15px/1.3 Inter, system-ui, sans-serif; color: rgba(255,255,255,.8); }
+    .fw-card__goal { margin: -4px 0 0; font-size: 15px; font-weight: 600; color: #fff; }
+    .fw-card__plan { margin: 0; font-size: 14px; font-weight: 600; color: rgba(255,255,255,.9); }
+    .fw-card__streak { position: absolute; top: 14px; right: 14px; z-index: 2; min-width: 30px; height: 30px; padding: 0 8px; box-sizing: border-box; border-radius: 999px; background: #111; color: #fff; display: grid; place-items: center; font: 700 15px/1 Inter, system-ui, sans-serif; }
+    .friend-wallet { margin-bottom: 0 !important; }
     .fw-card__tags { display: grid; gap: 6px; }
     .fw-tag { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #fff; }
     .fw-tag i { flex: none; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; box-sizing: border-box; display: grid; place-items: center; }
@@ -15835,6 +15839,26 @@
           h.appendChild(nk);
         }
         body.appendChild(h);
+        /* Ziel unter der Nickname-Zeile (eigenes + vom Coach ergänzt) */
+        var splitG = function (v) { return String(v || "").split(/\s*,\s*/).filter(Boolean); };
+        var ownG = splitG(x.training_goal);
+        var goals = ownG.concat(splitG(x.coach_goals).filter(function (g) { return ownG.indexOf(g) < 0; }));
+        if (goals.length) {
+          var gl = document.createElement("p");
+          gl.className = "fw-card__goal";
+          gl.textContent = goals.join(" · ");
+          body.appendChild(gl);
+        }
+        /* Streak wie am eigenen Profilkreis */
+        var oldBadge = card.querySelector(".fw-card__streak");
+        if (oldBadge) oldBadge.remove();
+        if (x._streak > 0) {
+          var sb = document.createElement("span");
+          sb.className = "fw-card__streak";
+          sb.setAttribute("aria-label", x._streak + " Tage am Stück");
+          sb.textContent = String(x._streak);
+          card.appendChild(sb);
+        }
         var tags = document.createElement("div");
         tags.className = "fw-card__tags";
         function tag(label, on) {
@@ -15895,7 +15919,15 @@
           m.textContent = mantra;
           body.appendChild(m);
         }
+        if (x._plan) {
+          var pl = document.createElement("p");
+          pl.className = "fw-card__plan";
+          pl.textContent = "Wochenplan: " + x._plan;
+          body.appendChild(pl);
+        }
       }
+      /* Wallet-Stand überlebt Neuaufbau von Team (Daten-Refresh, Zurück aus dem Profil) */
+      var walletState = { id: "", touching: false, pending: false };
       function paintFriendWallet(wallet, people, inGroup) {
         wallet.textContent = "";
         var cards = [];
@@ -15922,58 +15954,75 @@
           var idx = cards.length;
           card.addEventListener("click", function (e) {
             if (e.target.closest("a")) return;
-            /* Karte unten im Stapel: erst nach vorn holen */
+            /* Karte im Stapel oben oder unten: erst nach vorn holen */
             if (Math.abs(idx - walletPos()) > 0.3) { wallet.scrollTo({ top: idx * walletStep(), behavior: "smooth" }); return; }
+            walletState.id = String(p.id);
             openProfile(p);
           });
           fillFriendCard(card, p, circles);
           cards.push({ card: card, p: p, circles: circles });
           stage.appendChild(card);
         });
-        /* Geometrie: Karte quadratisch (Breite), darunter bis zu 3 Kanten der nächsten Karten */
-        var PEEK = 30, GAP = 14, SHOW = 3;
-        function cardW() { return wallet.clientWidth || 340; }
-        function walletStep() { return Math.round(cardW() * 0.55); }
+        /* Geometrie: Karte 4:5, oben bis 3 Kanten der gesehenen Karten, unten der Rest bis zur Mitte der Pill */
+        var TP = 10, TOPN = 3, GAP = 14, SHOW = 3;
+        var geo = { w: 340, h: 425, H: 600, peek: 30 };
+        function walletStep() { return Math.round(geo.w * 0.6); }
         function walletPos() { return (wallet.scrollTop || 0) / walletStep(); }
         function layoutWallet() {
-          var w = cardW();
-          var n = cards.length;
-          var visPeeks = Math.min(SHOW, Math.max(0, n - 1));
-          var stageH = w + (visPeeks ? GAP + visPeeks * PEEK : 0);
-          wallet.style.height = stageH + "px";
-          stage.style.height = stageH + "px";
-          stage.style.marginBottom = -stageH + "px";
+          if (!wallet.isConnected || wallet.hidden) return;
+          var w = wallet.clientWidth || 340;
+          var h = Math.round(w * 1.25);
+          var top = wallet.getBoundingClientRect().top;
+          var navEl = document.querySelector(".app-pill nav") || document.querySelector(".app-pill");
+          var pr = navEl ? navEl.getBoundingClientRect() : null;
+          var bottom = pr && pr.height ? pr.top + pr.height / 2 : window.innerHeight;
+          var H = Math.max(h + TOPN * TP + GAP + 40, Math.round(bottom - top));
+          var room = H - (TOPN * TP + h + GAP);
+          geo = { w: w, h: h, H: H, peek: Math.max(18, Math.min(40, Math.floor(room / SHOW))) };
+          wallet.style.height = H + "px";
+          stage.style.height = H + "px";
+          stage.style.marginBottom = -H + "px";
+          cards.forEach(function (c) { c.card.style.height = h + "px"; });
           [].forEach.call(wallet.querySelectorAll(".fw-snap"), function (x) { x.remove(); });
+          var n = cards.length;
           for (var i = 0; i < n; i++) {
             var sn = document.createElement("div");
             sn.className = "fw-snap";
-            sn.style.height = (i < n - 1 ? walletStep() : stageH) + "px";
+            sn.style.height = (i < n - 1 ? walletStep() : H) + "px";
             wallet.appendChild(sn);
           }
+          /* zuletzt angesehenen Freund wieder vorn zeigen */
+          var want = 0;
+          cards.forEach(function (c, i) { if (String(c.p.id) === walletState.id) want = i; });
+          wallet.scrollTop = want * walletStep();
           paintWalletPos();
         }
         function paintWalletPos() {
-          var w = cardW();
           var pos = walletPos();
+          var yFront = Math.min(pos, TOPN) * TP;
+          var front = Math.round(pos);
+          if (cards[front]) walletState.id = String(cards[front].p.id);
           cards.forEach(function (c, i) {
             var d = i - pos;
-            var y, sc = 1, op = 1;
+            var y, sc = 1, op = 1, z;
             if (d < 0) {
-              /* vorderste Karte geht nach oben weg und wird kleiner */
-              var t = Math.min(1, -d);
-              y = -t * 40;
-              sc = 1 - t * 0.14;
-              op = 1 - t;
-            } else if (d <= 1) {
-              y = d * (w + GAP);
+              /* angesehene Karten wandern nach oben in den Stapel */
+              y = yFront + d * TP;
+              sc = 1 + Math.max(d, -TOPN) * 0.05;
+              if (d < -TOPN) op = Math.max(0, 1 - (-d - TOPN));
+              z = 500 + i;
+            } else if (d < 1) {
+              y = yFront + d * (geo.h + GAP);
+              z = 1000 + i;
             } else {
-              y = w + GAP + Math.min(d - 1, SHOW) * PEEK;
+              y = yFront + geo.h + GAP + Math.min(d - 1, SHOW) * geo.peek;
               sc = 1 - Math.min(d - 1, SHOW) * 0.03;
-              if (d - 1 > SHOW) op = 0;
+              if (d - 1 > SHOW) op = Math.max(0, 1 - (d - 1 - SHOW));
+              z = 1000 + i;
             }
             c.card.style.transform = "translateY(" + y.toFixed(1) + "px) scale(" + sc.toFixed(3) + ")";
-            c.card.style.opacity = String(Math.max(0, op));
-            c.card.style.zIndex = String(1000 + i);
+            c.card.style.opacity = String(op);
+            c.card.style.zIndex = String(z);
             c.card.style.visibility = op <= 0.02 ? "hidden" : "visible";
           });
         }
@@ -15982,17 +16031,58 @@
           if (raf) return;
           raf = requestAnimationFrame(function () { raf = 0; paintWalletPos(); });
         }, { passive: true });
+        /* Während des Wischens kein Neuaufbau von Team; danach nachholen */
+        wallet.addEventListener("touchstart", function () { walletState.touching = true; }, { passive: true });
+        function touchDone() {
+          setTimeout(function () {
+            walletState.touching = false;
+            if (walletState.pending) {
+              walletState.pending = false;
+              if (document.body.dataset.plan === "team") renderTeam();
+            }
+          }, 700);
+        }
+        wallet.addEventListener("touchend", touchDone, { passive: true });
+        wallet.addEventListener("touchcancel", touchDone, { passive: true });
         requestAnimationFrame(layoutWallet);
-        if (window.ResizeObserver) new ResizeObserver(function () { layoutWallet(); }).observe(wallet);
+        var lastW = 0;
+        if (window.ResizeObserver) new ResizeObserver(function () {
+          if (wallet.clientWidth === lastW) return;
+          lastW = wallet.clientWidth;
+          layoutWallet();
+        }).observe(wallet);
+        /* Details: Profilinfos, Ziele, Wochenplan, Streak */
         var ids = people.map(function (p) { return String(p.id); })
-          .filter(function (id) { return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id) && !friendExtras[id]; });
+          .filter(function (id) { return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id); });
         if (!ids.length) return;
-        rest("go_accounts?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=id,about_me,mantra,workout_places")
+        function refill() { cards.forEach(function (c) { if (c.card.isConnected) fillFriendCard(c.card, c.p, c.circles); }); }
+        function ex(id) { return friendExtras[id] || (friendExtras[id] = {}); }
+        var inList = ids.map(encodeURIComponent).join(",");
+        var need = ids.filter(function (id) { return !friendExtras[id] || !friendExtras[id]._loaded; });
+        if (!need.length) return;
+        rest("go_accounts?id=in.(" + inList + ")&select=id,about_me,mantra,workout_places,training_goal")
           .then(function (rows) {
-            (rows || []).forEach(function (r) { if (r && r.id) friendExtras[String(r.id)] = r; });
-            cards.forEach(function (c) { if (c.card.isConnected) fillFriendCard(c.card, c.p, c.circles); });
+            (rows || []).forEach(function (r) { if (r && r.id) { Object.assign(ex(String(r.id)), r); ex(String(r.id))._loaded = true; } });
+            refill();
           })
           .catch(function () {});
+        rest("go_accounts?id=in.(" + inList + ")&select=id,coach_goals")
+          .then(function (rows) { (rows || []).forEach(function (r) { if (r && r.id) ex(String(r.id)).coach_goals = r.coach_goals; }); refill(); })
+          .catch(function () {});
+        rest("enrollments?user_id=in.(" + inList + ")&status=eq.aktiv&select=user_id,start_date,courses(title)&order=start_date.desc")
+          .then(function (rows) {
+            (rows || []).forEach(function (r) {
+              var e = ex(String(r.user_id));
+              if (!e._plan && r.courses && r.courses.title) e._plan = r.courses.title;
+            });
+            refill();
+          })
+          .catch(function () {});
+        ids.forEach(function (id) {
+          rest("rpc/go_streak_days", { method: "POST", body: { p_user_id: id } })
+            .then(function (n) { ex(id)._streak = Number(n) || 0; refill(); })
+            .catch(function () {});
+        });
       }
 
       /* FFC-Circle je Nickname, auch für Freunde ohne gogogo-Konto (Zeile 2 in Meine Freunde) */
@@ -16368,6 +16458,7 @@
       function renderTeam() {
         var box = document.getElementById("plan-team");
         if (!box) return;
+        if (walletState.touching) { walletState.pending = true; return; }
         if (!box.dataset.ptLoaded) {
           box.dataset.ptLoaded = "1";
           loadPtData().then(function () {
