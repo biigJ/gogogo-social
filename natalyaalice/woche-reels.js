@@ -245,7 +245,7 @@
     return (
       '<button type="button" class="go-online-cta go-online-cta--ghost" data-wr-zadmin="' +
       (held ? "go" : "hold") + '" data-id="' + esc(ev.id) + '">' +
-      (held ? "Countdown starten" : "Countdown anhalten") +
+      (held ? "Starten" : "Anhalten") +
       "</button>"
     );
   }
@@ -495,7 +495,9 @@
       })
       .then(function (rows) {
         state.events = rows || [];
-        return loadJoinedEvents(start, end, richSelect);
+        return loadJoinedEvents(start, end, richSelect).then(function () {
+          return loadInvitedEvents(start, end, richSelect);
+        });
       })
       .then(function () {
         return mergeEventMediaFromActivity(state.events).then(function () {
@@ -530,6 +532,78 @@
         state.joined = rows || [];
       })
       .catch(function () { state.joined = []; });
+  }
+
+  /* Offene Einladungen von Freunden zu ihren Events: in Woche zusagen, dann steht die Serie hier jede Woche */
+  function loadInvitedEvents(start, end, select) {
+    state.invited = [];
+    return rest(
+      "go_workout_invites?to_id=eq." + encodeURIComponent(me()) + "&status=eq.pending&event_id=not.is.null" +
+        "&workout_date=gte." + encodeURIComponent(start) + "&workout_date=lt." + encodeURIComponent(end) +
+        "&select=id,event_id,from_id,workout_date,workout_label,meet_time,invite_kind&limit=100"
+    )
+      .then(function (inv) {
+        var have = {};
+        (state.joined || []).forEach(function (j) { have[String(j.id)] = true; });
+        var byEv = {};
+        (inv || []).forEach(function (r) {
+          if (r && r.event_id && !have[String(r.event_id)] && !byEv[String(r.event_id)]) byEv[String(r.event_id)] = r;
+        });
+        var ids = Object.keys(byEv);
+        if (!ids.length) return;
+        return rest(
+          "events?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&user_id=neq." + encodeURIComponent(me()) +
+            "&status=neq.ausgefallen&select=" + select
+        ).then(function (rows) {
+          state.invited = (rows || []).map(function (ev) {
+            ev._inv = byEv[String(ev.id)];
+            return ev;
+          });
+          return ensurePeople(state.invited.map(function (ev) { return ev.user_id; }));
+        });
+      })
+      .catch(function () { state.invited = []; });
+  }
+
+  /* Zusage/Absage gilt für die ganze Serie: gleicher Absender, Titel und Wochentag ab diesem Termin */
+  function answerInvite(inviteId, yes) {
+    var ev = (state.invited || []).filter(function (x) { return x._inv && String(x._inv.id) === String(inviteId); })[0];
+    if (!ev) return Promise.resolve();
+    var inv = ev._inv;
+    var wd = new Date(String(inv.workout_date).slice(0, 10) + "T12:00:00").getDay();
+    return rest(
+      "go_workout_invites?to_id=eq." + encodeURIComponent(me()) + "&from_id=eq." + encodeURIComponent(inv.from_id) +
+        "&workout_label=eq." + encodeURIComponent(inv.workout_label || "") +
+        "&workout_date=gte." + encodeURIComponent(String(inv.workout_date).slice(0, 10)) +
+        "&status=eq.pending&select=id,event_id,workout_date&limit=60"
+    )
+      .catch(function () { return []; })
+      .then(function (rows) {
+        var list = (rows || []).filter(function (r) {
+          return new Date(String(r.workout_date).slice(0, 10) + "T12:00:00").getDay() === wd;
+        });
+        if (!list.some(function (r) { return String(r.id) === String(inv.id); })) list.unshift(inv);
+        var patch = rest("go_workout_invites?id=in.(" + list.map(function (r) { return encodeURIComponent(r.id); }).join(",") + ")", {
+          method: "PATCH", prefer: "return=minimal", body: { status: yes ? "accepted" : "declined" }
+        });
+        var evIds = list.map(function (r) { return r.event_id; }).filter(Boolean);
+        var rsvp = yes && evIds.length
+          ? rest("event_rsvps?on_conflict=event_id,user_id", {
+              method: "POST",
+              prefer: "resolution=merge-duplicates,return=minimal",
+              body: evIds.map(function (id) { return { event_id: id, user_id: me(), status: "zugesagt" }; })
+            }).catch(function () {})
+          : null;
+        return Promise.all([patch, rsvp]).then(function () {
+          if (host.toast) host.toast(yes ? (list.length > 1 ? "Dabei, jede Woche" : "Dabei") : "Abgesagt");
+          if (host.loadInvites) { try { host.loadInvites(); } catch (eL) {} }
+          notifyAktuell();
+          return refreshKeepDay(dayKey(ev.starts_at));
+        });
+      })
+      .catch(function () {
+        if (host.toast) host.toast(yes ? "Zusagen ging gerade nicht" : "Absagen ging gerade nicht");
+      });
   }
 
   function mergeEventMediaFromActivity(events) {
@@ -1059,6 +1133,9 @@
     (state.joined || []).forEach(function (ev) {
       if (dayKey(ev.starts_at) === iso) list.push({ kind: "joined", starts_at: ev.starts_at, ev: ev });
     });
+    (state.invited || []).forEach(function (ev) {
+      if (dayKey(ev.starts_at) === iso) list.push({ kind: "invited", starts_at: ev.starts_at, ev: ev });
+    });
     /* Wochenplan-Vorlage anzeigen, wenn noch kein echtes Event (z. B. Nächste Woche) */
     var hasOwn = list.some(function (it) {
       return it.kind === "event" && it.ev && String(it.ev.user_id) === me();
@@ -1325,7 +1402,7 @@
     var isZirkel = cat === "zirkel" || /zirkel/i.test(String(ev.title || ""));
     var cd = isZirkel
       ? zSet && zSet.hold && !zSet.goAt
-        ? '<p class="wr-zirkel-cd">Countdown angehalten</p>'
+        ? '<p class="wr-zirkel-cd">Angehalten</p>'
         : zirkelCountdownHtml(zSet && zSet.goAt ? new Date(zSet.goAt).toISOString() : ev.starts_at)
       : "";
     return (
@@ -1373,6 +1450,13 @@
       (item.kind === "joined"
         ? '<p class="wr-place">Du bist dabei bei ' + esc(personOf(ev.user_id).name) + "</p>" +
           '<button type="button" class="go-online-cta go-online-cta--ghost" data-wr-leave="' + esc(ev.id) + '">Austreten</button>'
+        : "") +
+      (item.kind === "invited" && ev._inv
+        ? '<p class="wr-place">' + esc(personOf(ev.user_id).name || "Dein Freund") + " lädt Dich jede Woche ein</p>" +
+          '<div class="wr-zrow">' +
+          '<button type="button" class="go-online-cta" data-wr-inv-yes="' + esc(ev._inv.id) + '">Zusagen</button>' +
+          '<button type="button" class="go-online-cta go-online-cta--ghost" data-wr-inv-no="' + esc(ev._inv.id) + '">Absagen</button>' +
+          "</div>"
         : "") +
       (going
         ? '<div class="wr-going">' + facesHtml(ev) + "</div>"
@@ -3730,22 +3814,26 @@
     state.shareIso = iso;
     state.shareEventId = eventId;
     state.sharePick = {};
+    state.shareInvited = {};
     function paint() {
       var friends = state.friends || [];
       var list = friends
         .map(function (fid) {
           var p = personOf(fid);
-          var on = !!state.sharePick[fid];
+          var done = !!state.shareInvited[fid];
+          var on = done || !!state.sharePick[fid];
           return (
-            '<label class="wr-friend-row" data-wr-friend-pick="' +
-            esc(fid) +
-            '">' +
+            '<label class="wr-friend-row' + (done ? " is-invited" : "") + '"' +
+            (done ? "" : ' data-wr-friend-pick="' + esc(fid) + '"') +
+            ">" +
             '<input type="checkbox"' +
             (on ? " checked" : "") +
+            (done ? " disabled" : "") +
             " />" +
             avatarHtml(p) +
             "<span>" +
             esc(p.name || "?") +
+            (done ? ' <small class="wr-invited-tag">eingeladen</small>' : "") +
             "</span></label>"
           );
         })
@@ -3756,7 +3844,7 @@
         "<h3>Teilen</h3>" +
           '<div class="wr-share-block">' +
           "<h4>Freunde einladen</h4>" +
-          '<p class="wr-sheet-hint">Gilt für diesen Termin und dieselbe Uhrzeit an diesem Wochentag in den nächsten Wochen. Deine Freunde sagen in Aktuell zu.</p>' +
+          '<p class="wr-sheet-hint">Sie können dann Dein wiederkehrendes Event auch in ihrer Woche haben.</p>' +
           (list
             ? '<div class="wr-friend-list">' + list + "</div>"
             : "<p>Noch keine Freunde.</p>") +
@@ -3777,7 +3865,22 @@
           '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
       );
     }
-    loadFriends().then(paint);
+    /* Schon eingeladene Freunde: Haken gesetzt, keine zweite Einladung */
+    loadFriends().then(function () {
+      return sentInvitesFor(eventId, iso).then(function (rows) {
+        (rows || []).forEach(function (r) { state.shareInvited[String(r.to_id)] = true; });
+      });
+    }).then(paint, paint);
+  }
+
+  /* Eigene offene oder angenommene Einladungen zu diesem Termin (Event-ID, sonst Tag) */
+  function sentInvitesFor(eventId, iso) {
+    var realId = /^[0-9a-f-]{36}$/i.test(String(eventId || "")) ? String(eventId) : "";
+    return rest(
+      "go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&status=in.(pending,accepted)" +
+        (realId ? "&event_id=eq." + encodeURIComponent(realId) : "&workout_date=eq." + encodeURIComponent(iso || "")) +
+        "&select=to_id,event_id,workout_date&limit=200"
+    ).catch(function () { return []; });
   }
 
   /* Serie eines eigenen Events: gleicher Titel, Wochentag und Uhrzeit ab diesem Termin, höchstens 12 Wochen */
@@ -3943,9 +4046,26 @@
         }).catch(function () { return [{ id: realId, starts_at: ev.starts_at, location: place }]; })
       : Promise.resolve([{ id: realId, starts_at: null, location: place }]);
     var jobs = series.then(function (list) {
+      /* Regel: keine doppelten Einladungen (gleicher Freund, gleicher Termin) */
+      var evIds = list.map(function (x) { return x.id; }).filter(Boolean);
+      var dates = list.map(function (x) { return x.starts_at ? dayKey(x.starts_at) : iso; });
+      var have = rest(
+        "go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&status=in.(pending,accepted)" +
+          "&to_id=in.(" + ids.map(encodeURIComponent).join(",") + ")" +
+          (evIds.length ? "&event_id=in.(" + evIds.map(encodeURIComponent).join(",") + ")" : "&workout_date=in.(" + dates.map(encodeURIComponent).join(",") + ")") +
+          "&select=to_id,event_id,workout_date&limit=500"
+      ).catch(function () { return []; });
+      return have.then(function (rows) {
+      var taken = {};
+      (rows || []).forEach(function (r) {
+        taken[String(r.to_id) + "|" + (r.event_id ? String(r.event_id) : String(r.workout_date).slice(0, 10))] = true;
+      });
       var posts = [];
       ids.forEach(function (fid) {
         list.forEach(function (sev) {
+          var tk = String(fid) + "|" + (sev.id ? String(sev.id) : (sev.starts_at ? dayKey(sev.starts_at) : iso));
+          if (taken[tk]) return;
+          taken[tk] = true;
           posts.push(rest("go_workout_invites", {
             method: "POST",
             prefer: "return=representation",
@@ -3958,18 +4078,20 @@
               place: sev.location || place,
               meet_time: time,
               status: "pending",
-              event_id: sev.id || null
+              event_id: sev.id || null,
+              invite_kind: list.length > 1 ? "woche" : "invite"
             }
           }).catch(function () {
             return null;
           }));
         });
       });
-      return Promise.all(posts).then(function () { return list.length; });
+      return Promise.all(posts).then(function () { return posts.length ? list.length : 0; });
+      });
     });
     return jobs.then(function (weeks) {
       closeSheet();
-      if (host.toast) host.toast(weeks > 1 ? "Einladung für " + weeks + " Wochen gesendet" : "Einladung gesendet");
+      if (host.toast) host.toast(!weeks ? "Schon eingeladen" : weeks > 1 ? "Einladung für " + weeks + " Wochen gesendet" : "Einladung gesendet");
       if (host.loadInvites) {
         try {
           host.loadInvites();
@@ -4538,7 +4660,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-pick-plan],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-share-circle],[data-wr-csv],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-inv-yes],[data-wr-inv-no],[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-pick-plan],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-share-circle],[data-wr-csv],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -4606,6 +4728,13 @@
     }
     if (t.getAttribute("data-wr-leave")) {
       leaveZirkel(t.getAttribute("data-wr-leave"));
+      return;
+    }
+    if (t.getAttribute("data-wr-inv-yes") || t.getAttribute("data-wr-inv-no")) {
+      var invYes = !!t.getAttribute("data-wr-inv-yes");
+      t.disabled = true;
+      answerInvite(t.getAttribute("data-wr-inv-yes") || t.getAttribute("data-wr-inv-no"), invYes)
+        .then(function () { t.disabled = false; });
       return;
     }
     if (t.getAttribute("data-wr-zadmin")) {

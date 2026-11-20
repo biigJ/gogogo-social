@@ -1017,7 +1017,7 @@
     var total = z ? GoZirkelSetup.totalSec(z) * 1000 : 0;
     if (!held && total && Date.now() > target + total) return "";
     var cd;
-    if (held) cd = '<span class="wr-zirkel-cd">Countdown angehalten</span>';
+    if (held) cd = '<span class="wr-zirkel-cd">Angehalten</span>';
     else if (target > Date.now()) {
       var sec = Math.floor((target - Date.now()) / 1000);
       var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
@@ -1026,7 +1026,7 @@
     } else cd = '<span class="wr-zirkel-cd">läuft</span>';
     var admin = z && String(ev.user_id) === me()
       ? '<button type="button" class="go-online-cta go-online-cta--ghost" data-acc-zadmin="' + (held ? "go" : "hold") + '" data-id="' + esc(ev.id) + '">' +
-        (held ? "Countdown starten" : "Countdown anhalten") + "</button>"
+        (held ? "Starten" : "Anhalten") + "</button>"
       : "";
     return '<div class="wr-zrow acc-zrow">' + cd + admin + "</div>";
   }
