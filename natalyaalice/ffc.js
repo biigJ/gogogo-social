@@ -2580,7 +2580,8 @@
         const ex = exercises.find(e=>e.id===entry.exercise);
         const pts = roundPoints(entry.exercise, entry.amount, session.workSec, myGender);
         rows += '<div class="session-log-row"><span>R'+(i+1)+' · '+(ex?ex.name:entry.exercise)+weightSuffix(entry)+'</span><span>'+
-          (entry.amount||'0')+' '+(ex?ex.unit:'')+' <span class="sl-pts">· '+pts+' P</span></span></div>';
+          '<button type="button" class="sl-amt" data-hedit="'+esc(session.id)+'|'+i+'">'+(entry.amount||'+ nachtragen')+(entry.amount?' '+(ex?ex.unit:''):'')+'</button>'+
+          ' <span class="sl-pts">· '+pts+' P</span></span></div>';
       });
       const sessPts = sessionPoints(session.log, session.workSec, myGender);
       if(!rows) rows = '<div class="session-empty">Keine Übungen protokolliert.</div>';
@@ -2592,13 +2593,68 @@
             '<span class="session-meta">'+session.rounds+' Runden · '+fmtMin(session.workSec)+' Arbeit · '+session.restSec+'s Pause · Gesamt '+fmt(session.totalSec)+'</span>' +
           '</div>' +
           '<button class="session-delete" data-id="'+session.id+'" title="Dieses Training löschen">'+trashIconSvg+'</button>' +
-        '</div>' + rows;
+        '</div>' + rows +
+        (Date.now() - d.getTime() < 24*3600000
+          ? '<button type="button" class="ctrl-btn session-story" data-hstory="'+esc(session.id)+'">Story posten</button>' : '');
       list.appendChild(card);
     });
 
     list.querySelectorAll('.session-delete').forEach(btn=>{
       btn.addEventListener('click', ()=> deleteSession(btn.getAttribute('data-id'), btn));
     });
+    list.querySelectorAll('[data-hedit]').forEach(btn=>{
+      btn.addEventListener('click', ()=> editHistoryAmount(btn.getAttribute('data-hedit')));
+    });
+    list.querySelectorAll('[data-hstory]').forEach(btn=>{
+      btn.addEventListener('click', ()=> storyFromHistory(btn.getAttribute('data-hstory')));
+    });
+  }
+
+  /* Trainingsaufzeichnungen: Wert einer Runde nachtragen/korrigieren (gleiche Regel wie in der Endübersicht) */
+  async function editHistoryAmount(ref){
+    const [sid, idxS] = String(ref).split('|');
+    const idx = Number(idxS);
+    const session = cachedHistory.find(h=> String(h.id) === String(sid));
+    if(!session || !session.log || !session.log[idx] || !currentUser) return;
+    const entry = session.log[idx];
+    const ex = exercises.find(e=>e.id===entry.exercise);
+    const v = await GoDialog.prompt('R'+(idx+1)+' · '+(ex?ex.name:entry.exercise)+(ex?' ('+ex.unit+')':''), entry.amount || '', { ok:'Speichern' });
+    if(v === null || v === undefined) return;
+    const raw = String(v).trim().replace(',', '.');
+    const n = raw === '' ? 0 : parseFloat(raw);
+    if(isNaN(n) || n < 0){ GoDialog.alert('Bitte eine Zahl eingeben.'); return; }
+    const next = JSON.parse(JSON.stringify(session.log));
+    next[idx].amount = n > 0 ? String(n) : '';
+    const { data, error } = await sb.from('training_sessions')
+      .update({ log: next }).eq('id', session.id).eq('user_id', currentUser.id).select('id');
+    if(error || !data || !data.length){
+      GoDialog.alert(error && !/policy|permission|row-level/i.test(error.message)
+        ? 'Nicht gespeichert: ' + friendlyAuthError(error)
+        : 'Nicht gespeichert – bitte einmal supabase/nachtragen.sql in Supabase ausführen.');
+      return;
+    }
+    session.log = next;
+    if(String(session.id) === String(lastSavedSessionId)){
+      log = JSON.parse(JSON.stringify(next));
+      if(lastWorkout){ lastWorkout.log = JSON.parse(JSON.stringify(next)); lastWorkout.points = sessionPoints(next, session.workSec, myGender); }
+      buildFinishLog();
+    }
+    renderRecords();
+  }
+
+  /* Story aus den Trainingsaufzeichnungen (letzte 24 h), z. B. wenn die App nach dem Training zu war */
+  function storyFromHistory(sid){
+    const s = cachedHistory.find(h=> String(h.id) === String(sid));
+    if(!s) return;
+    lastWorkout = {
+      rounds: s.rounds, workSec: s.workSec, restSec: s.restSec, elapsed: s.totalSec, date: new Date(s.date),
+      log: JSON.parse(JSON.stringify(s.log || [])),
+      points: sessionPoints(s.log, s.workSec, myGender)
+    };
+    postSource = 'history';
+    postEventId = null;
+    postPhoto = null;
+    postCamInput.value=''; postCamInput.click();
   }
 
   async function deleteSession(sessionId, btn){
@@ -2646,6 +2702,9 @@
       points: sessionPoints(log, workSec, myGender)
     };
     resetPostCta();
+    postPhoto = null;
+    postSource = 'finish';
+    postEventId = finishedSyncEventId;
     finishEditing = -1;
     lastSavedSessionId = null;
     setFinishEditStatus('');
@@ -2699,7 +2758,30 @@
     postStatusEl.textContent = t;
   }
 
-  postCta.addEventListener('click', ()=>{ postCamInput.value=''; postCamInput.click(); });
+  /* Foto schon gewählt (z. B. nach „Werte nachtragen“): Story mit demselben Foto wieder öffnen */
+  postCta.addEventListener('click', ()=>{
+    if(postPhoto && lastWorkout){ openPostSheet(); return; }
+    postCamInput.value=''; postCamInput.click();
+  });
+  let postSource = 'finish';      // 'finish' = Endübersicht, 'history' = aus den Trainingsaufzeichnungen
+  let postEventId = null;
+  function openPostSheet(){
+    drawPost();
+    setPostStatus('');
+    document.getElementById('postFix').style.display = postSource === 'finish' ? '' : 'none';
+    postSheetEl.classList.add('open');
+    postSheetEl.setAttribute('aria-hidden','false');
+  }
+  /* Werte nachtragen: zurück zur Endübersicht, erste Runde ohne Wert direkt öffnen */
+  document.getElementById('postFix').addEventListener('click', ()=>{
+    closePostSheet();
+    const miss = log.findIndex(e=> e && e.exercise && !hasAmount(e));
+    finishEditing = miss;
+    setFinishEditStatus(miss >= 0 ? '' : 'Tippe auf einen Wert, um ihn zu korrigieren. Danach „Story posten“.');
+    buildFinishLog();
+    const box = document.getElementById('finishLog');
+    if(box) box.scrollIntoView({ block:'center', behavior:'smooth' });
+  });
   document.getElementById('postRetake').addEventListener('click', ()=>{ postCamInput.value=''; postCamInput.click(); });
   document.getElementById('postClose').addEventListener('click', closePostSheet);
   function closePostSheet(){ postSheetEl.classList.remove('open'); postSheetEl.setAttribute('aria-hidden','true'); }
@@ -2712,10 +2794,10 @@
     img.onload = async ()=>{
       postPhoto = img;
       try{ await document.fonts.ready; }catch(e){}
-      drawPost();
-      setPostStatus('');
-      postSheetEl.classList.add('open');
-      postSheetEl.setAttribute('aria-hidden','false');
+      if(goStyle()){
+        try{ await Promise.all([document.fonts.load('600 160px "Playfair Display"'), document.fonts.load('600 32px Inter')]); }catch(e){}
+      }
+      openPostSheet();
     };
     img.onerror = ()=> GoDialog.alert('Dieses Bild kann nicht geöffnet werden. Bitte ein anderes Foto wählen.');
     img.src = url;
@@ -2729,6 +2811,67 @@
     return text+'…';
   }
 
+  /* In gogogo eingebettet: Story im gogogo Design */
+  function goStyle(){ return !!window.FFC_HOST; }
+
+  function postLines(W){
+    const stations = (W.log||[]).filter(e=> e && e.exercise && e.exercise !== 'run');
+    const runMeters = (W.log||[]).filter(e=> e && e.exercise === 'run').reduce((sum,e)=> sum + (parseFloat(e.amount)||0), 0);
+    const lines = stations.map(e=>{
+      const ex = exercises.find(x=>x.id===e.exercise);
+      const amt = parseFloat(e.amount);
+      return [(ex?ex.name:e.exercise) + weightSuffix(e), amt>0 ? amt.toLocaleString('de-DE')+' '+shortUnit(e.exercise) : '–'];
+    });
+    if(runMeters > 0) lines.unshift(['Laufen', (runMeters/1000).toLocaleString('de-DE',{maximumFractionDigits:2})+' km']);
+    return lines;
+  }
+
+  function drawPostGo(ctx){
+    const W = lastWorkout, pad = 64;
+    const INK = '42,33,24', SAND = '#F3EEE4';
+    let g = ctx.createLinearGradient(0, POST_H*0.38, 0, POST_H);
+    g.addColorStop(0, 'rgba('+INK+',0)'); g.addColorStop(0.42, 'rgba('+INK+',0.62)'); g.addColorStop(1, 'rgba('+INK+',0.92)');
+    ctx.fillStyle = g; ctx.fillRect(0, POST_H*0.38, POST_W, POST_H*0.62);
+    g = ctx.createLinearGradient(0, 0, 0, 240);
+    g.addColorStop(0, 'rgba('+INK+',0.65)'); g.addColorStop(1, 'rgba('+INK+',0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, POST_W, 240);
+
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = SAND;
+    ctx.font = '600 52px "Playfair Display", Georgia, serif';
+    ctx.fillText('gogogo', pad, 108);
+    ctx.font = '500 28px Inter, sans-serif';
+    ctx.fillStyle = 'rgba(243,238,228,0.78)';
+    ctx.fillText('Zirkeltraining · ' + W.date.toLocaleDateString('de-DE',{weekday:'long', day:'numeric', month:'long'}), pad, 152);
+
+    const lines = postLines(W);
+    const shown = lines.slice(0, 5);
+    const more = lines.length - shown.length;
+    let y = POST_H - pad;
+    ctx.font = '500 28px Inter, sans-serif';
+    if(more > 0){ ctx.fillStyle = 'rgba(243,238,228,0.6)'; ctx.fillText('+ '+more+' weitere', pad, y); y -= 48; }
+    for(let i = shown.length-1; i >= 0; i--){
+      const [name, val] = shown[i];
+      ctx.fillStyle = 'rgba(243,238,228,0.86)'; ctx.font = '500 32px Inter, sans-serif';
+      ctx.fillText(fitText(ctx, name, POST_W - pad*2 - 260), pad, y);
+      ctx.fillStyle = SAND; ctx.font = '600 32px Inter, sans-serif';
+      const vw = ctx.measureText(val).width; ctx.fillText(val, POST_W - pad - vw, y);
+      y -= 50;
+    }
+    y -= 6;
+    ctx.fillStyle = 'rgba(243,238,228,0.3)'; ctx.fillRect(pad, y, POST_W - pad*2, 2);
+    y -= 40;
+    ctx.font = '500 32px Inter, sans-serif'; ctx.fillStyle = 'rgba(243,238,228,0.88)';
+    ctx.fillText(W.rounds+' Runden  ·  '+fmtMin(W.workSec)+' Arbeit  ·  Gesamt '+fmt(W.elapsed), pad, y);
+    y -= 78;   // Playfair-Ziffern haben Unterlängen
+    ctx.font = '600 176px "Playfair Display", Georgia, serif'; ctx.fillStyle = SAND;
+    const pts = String(W.points);
+    ctx.fillText(pts, pad - 4, y);
+    const pw = ctx.measureText(pts).width;
+    ctx.font = '600 38px Inter, sans-serif'; ctx.fillStyle = SAND;
+    ctx.fillText('Punkte', pad + pw + 18, y - 18);
+  }
+
   function drawPost(){
     const ctx = postCanvas.getContext('2d');
     ctx.clearRect(0,0,POST_W,POST_H);
@@ -2740,6 +2883,7 @@
       ctx.drawImage(postPhoto, (POST_W-w)/2, (POST_H-h)/2, w, h);
     }
     if(!postStatsToggle.checked || !lastWorkout) return;
+    if(goStyle()){ drawPostGo(ctx); return; }
 
     const W = lastWorkout, pad = 64;
     // Verläufe für Lesbarkeit
@@ -2821,6 +2965,8 @@
       postCta.disabled = true;
       postCta.classList.add('done');
       postCta.querySelector('span').textContent = 'Story gepostet ✓ – 24 h sichtbar';
+      host('onPosted', blob, { eventId: postSource === 'finish' ? postEventId : null, date: lastWorkout && lastWorkout.date });
+      if(postSource === 'history'){ setPostStatus(''); GoDialog.alert('Story gepostet ✓', { body: '24 h sichtbar, auch in Aktuell.' }); }
     } catch(err){
       const m = (err && err.message) || String(err);
       setPostStatus(/bucket|not found|relation|posts|policy|row-level/i.test(m)
