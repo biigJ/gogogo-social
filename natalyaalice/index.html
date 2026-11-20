@@ -13097,8 +13097,10 @@
       /* Zirkel-Event → FFC-Preset mit gemeinsamem Start (Startzeit, Admin-Halt, Spät-Einstieg) */
       /* FFC-Zirkel öffnen (Plus und Aktuell): Login, Subpage, Setup mit Voreinstellung; autostart → direkt ins Workout */
       var lastZirkelPreset = null;
+      var zirkelFlowOpen = false;
       function openZirkelFlow(preset) {
         lastZirkelPreset = preset || null;
+        zirkelFlowOpen = !!(preset && preset.eventId);
         /* Erst Login sichtbar, dann Tracking — Subpage nicht über Login legen */
         if (typeof requireFfc === "function") {
           requireFfc(
@@ -24105,6 +24107,15 @@
 
       window.FFC_HOST = {
         onStories: function () { paintHeuteCrew(); },
+        /* Zirkel-Profil: Nickname schon bei einem anderen gogogo-Konto? */
+        gogogoNickTaken: function (nick) {
+          return rest("go_accounts?nickname=ilike." + encodeURIComponent(likeExact(nick)) + "&select=id&limit=3")
+            .then(function (rows) {
+              var mine = String((sessionAccount && sessionAccount.id) || "");
+              return (rows || []).some(function (r) { return r && String(r.id) !== mine; });
+            })
+            .catch(function () { return false; });
+        },
         onScreen: function (name) {
           /* Zirkel-Login abgelaufen, während das Workout geöffnet wird: Login zeigen statt weißer Seite */
           if (name === "auth" && !ffcAuthWanted && goSubKind === "zirkel") {
@@ -24117,6 +24128,16 @@
           }
           var open = FFC_OVERLAY.indexOf(name) >= 0 || (name === "auth" && ffcAuthWanted);
           document.body.classList.toggle("ffc-open", open);
+          if (name === "home" && zirkelFlowOpen && !ffcPending) {
+            /* Zurück aus „Workout einstellen“: direkt nach Aktuell statt leerer Unterseite.
+               Die Auswahl bleibt je Event gespeichert; Kreis → Start öffnet sie wieder. */
+            zirkelFlowOpen = false;
+            ffcAuthWanted = false;
+            try { closeGoSub(); } catch (eCg) {}
+            document.body.classList.remove("ffc-open");
+            if (typeof setHome === "function") setHome(true);
+            return;
+          }
           if (name === "home") {
             ffcAuthWanted = false;
             var act = ffcPending;
@@ -24258,6 +24279,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-8"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-9"></script>
 </body>
 </html>
