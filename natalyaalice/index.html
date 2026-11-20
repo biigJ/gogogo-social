@@ -1997,12 +1997,12 @@
     }
     .wr-travel-card__body h3 { margin: 0; font-size: 16px; font-weight: 700; }
     .wr-travel-card__body p { margin: 0; font-size: 13px; line-height: 1.35; color: rgba(42,33,24,.75); }
-    .wr-zrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 8px; }
+    .wr-zrow { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; margin: 0 0 8px; }
     .acc-zrow { justify-content: center; margin: 6px 0 4px; position: relative; z-index: 2; }
     .wr-zrow .wr-zirkel-cd, .wr-zrow .go-online-cta, .wr-zrow .go-online-cta--ghost {
       display: inline-flex; align-items: center; justify-content: center; min-height: 36px; margin: 0 !important; padding: 0 14px;
       border-radius: 999px; border: 0 !important; background: #fff !important; color: #111 !important;
-      font-size: 14px !important; font-weight: 700 !important; letter-spacing: 0; font-variant-numeric: tabular-nums;
+      font-size: 14px !important; font-weight: 700 !important; letter-spacing: 0; font-variant-numeric: tabular-nums; white-space: nowrap; flex: 0 0 auto;
     }
     .wr-zirkel-cd {
       margin: 0 0 4px;
@@ -2170,6 +2170,8 @@
       padding: 6px 4px; font-size: 15px; font-weight: 600; cursor: pointer;
     }
     .wr-friend-row input { width: 20px; height: 20px; accent-color: #2A2118; }
+    .wr-friend-row.is-invited { opacity: .75; }
+    .wr-invited-tag { font-size: 12px; font-weight: 600; opacity: .7; margin-left: 4px; }
     .wr-preview { margin: 0 0 12px; padding-left: 18px; }
     .wr-comment-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; max-height: 240px; overflow: auto; }
     .wr-comment { font-size: 14px; line-height: 1.35; }
@@ -8219,9 +8221,9 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-74"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-75"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-55"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-56"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -8304,6 +8306,7 @@
       var CALENDLY_PT_URL = "https://calendly.com/biig-meeting/30min?back=1&month=2026-08";
       var mantraList = [];
       var pendingInvitePeople = [];
+      var inviteAlready = {};
       var pendingInviteIso = "";
       var pendingInviteEventId = "";
       var pendingInviteOverride = null;
@@ -19322,6 +19325,7 @@
         inviteIso = iso;
         pendingInviteIso = iso;
         pendingInvitePeople = [];
+        inviteAlready = {};
         document.getElementById("invite-title").textContent = "Einladung an:";
         var box = document.getElementById("invite-people");
         box.textContent = "";
@@ -19359,6 +19363,7 @@
                   if (!person || members.indexOf(String(person.id)) < 0) return;
                   if (personAway(person, iso)) return;
                   var id = String(person.id);
+                  if (inviteAlready[id]) return;
                   var has = pendingInvitePeople.some(function (item) { return String(item.id) === id; });
                   if (on && !has) pendingInvitePeople.push(person);
                   if (!on && has) pendingInvitePeople = pendingInvitePeople.filter(function (item) { return String(item.id) !== id; });
@@ -19417,14 +19422,23 @@
               name.appendChild(document.createTextNode(" "));
               name.appendChild(tag);
             }
+            /* Schon eingeladen: Haken gesetzt, keine zweite Einladung */
+            var done = !!inviteAlready[String(person.id)];
+            if (done && !away) {
+              var dtag = document.createElement("span");
+              dtag.className = "away-tag";
+              dtag.textContent = "eingeladen";
+              name.appendChild(document.createTextNode(" "));
+              name.appendChild(dtag);
+            }
             var check = document.createElement("button");
             check.type = "button";
-            check.className = "invite-check";
-            check.disabled = away;
+            check.className = "invite-check" + (done ? " is-on" : "");
+            check.disabled = away || done;
             check.setAttribute("aria-label", "auswählen");
             check.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
             check.addEventListener("click", function () {
-              if (away || personAway(person, iso)) return;
+              if (away || done || personAway(person, iso)) return;
               var id = String(person.id);
               var on = pendingInvitePeople.some(function (item) { return String(item.id) === id; });
               if (on) pendingInvitePeople = pendingInvitePeople.filter(function (item) { return String(item.id) !== id; });
@@ -19435,6 +19449,7 @@
                 var mem = String(gr.getAttribute("data-group-members") || "").split(",").filter(Boolean);
                 var inList = list.filter(function (pp) { return pp && mem.indexOf(String(pp.id)) >= 0 && !personAway(pp, iso); });
                 var all = inList.length > 0 && inList.every(function (pp) {
+                  if (inviteAlready[String(pp.id)]) return true;
                   return pendingInvitePeople.some(function (item) { return String(item.id) === String(pp.id); });
                 });
                 var gc = gr.querySelector(".invite-check");
@@ -19447,9 +19462,19 @@
           });
         }
         var ready = teamPeople.length ? Promise.resolve() : loadTeam();
-        Promise.resolve(ready).then(function () {
+        var evInvId = pendingInviteEventId;
+        var sentJob = sessionAccount
+          ? rest("go_workout_invites?from_id=eq." + encodeURIComponent(sessionAccount.id) + "&status=in.(pending,accepted)" +
+              (evInvId ? "&event_id=eq." + encodeURIComponent(evInvId) : "&workout_date=eq." + encodeURIComponent(iso) + "&event_id=is.null") +
+              "&select=to_id&limit=200")
+              .then(function (rows) {
+                (rows || []).forEach(function (r) { if (r && r.to_id) inviteAlready[String(r.to_id)] = true; });
+              })
+              .catch(function () {})
+          : null;
+        Promise.all([Promise.resolve(ready).then(function () {
           return refreshAbsences(false);
-        }).then(function () { fill(teamPeople); });
+        }), sentJob]).then(function () { fill(teamPeople); });
         document.getElementById("invite-modal").hidden = false;
       }
 
@@ -19544,7 +19569,7 @@
           setDayTime(wd, time);
         }
         var jobs = pendingInvitePeople.filter(function (person) {
-          return !personAway(person, iso);
+          return !personAway(person, iso) && !inviteAlready[String(person.id)];
         }).map(function (person) {
           return rest("go_workout_invites", {
             method: "POST",
@@ -19659,6 +19684,29 @@
         }).sort(function (a, b) { return String(a.workout_date).localeCompare(String(b.workout_date)); })[0];
         if (!next) return;
         invitePromptOn = true;
+        /* Wiederkehrende Einladung zu einem Event (aus der Woche des Freundes): Zusage in Woche,
+           dort steht sie danach jede Woche */
+        var sKey = inviteSeriesKey(next);
+        var sCount = next.event_id ? (remoteInvites || []).filter(function (r) {
+          return r && String(r.to_id) === me && r.status === "pending" && r.event_id && inviteSeriesKey(r) === sKey;
+        }).length : 0;
+        if (sCount > 1 && window.GoDialog && window.WocheReels) {
+          var sIso = String(next.workout_date || "").slice(0, 10);
+          var sDay = new Date(sIso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long" });
+          var sWho = String(next.from_name || "Dein Freund").split(" ")[0];
+          GoDialog.choose(sWho + " lädt Dich jeden " + sDay + " ein: " + (next.workout_label || "Training") +
+            (next.meet_time ? ", " + next.meet_time : "") + ".", [{ label: "In Woche zusagen", value: "woche" }],
+            { cancel: "Später", sub: "Dann steht es jede Woche in Deiner Woche." }).then(function (v) {
+            invitePromptSkip[sKey] = true;
+            invitePromptOn = false;
+            if (v !== "woche") { setTimeout(promptPendingInvites, 250); return; }
+            showWoche();
+            setTimeout(function () {
+              try { WocheReels.refreshKeepDay(sIso); } catch (eW) {}
+            }, 120);
+          });
+          return;
+        }
         openIncoming(next);
       }
       /* Coach: neue Coachees aus „Individuell“ (go_coach_requests) → Dialog „Neuer Coachee“ → Coach-Portal */
@@ -19796,11 +19844,20 @@
             "&from_id=eq." + encodeURIComponent(invite.from_id) +
             "&workout_label=eq." + encodeURIComponent(invite.workout_label) +
             "&workout_date=gt." + encodeURIComponent(invite.workout_date) +
-            "&status=eq.pending&select=id,workout_date")
+            "&status=eq.pending&select=id,workout_date,event_id")
             .then(function (rows) {
-              return Promise.all((rows || []).filter(function (r) {
+              var sRows = (rows || []).filter(function (r) {
                 return new Date(r.workout_date + "T12:00:00").getDay() === wdInv;
-              }).map(function (r) {
+              });
+              /* Zusage auch am Event, damit es in Woche als wiederkehrendes Element steht */
+              var evIds = [invite.event_id].concat(sRows.map(function (r) { return r.event_id; })).filter(Boolean);
+              if (evIds.length) {
+                rest("event_rsvps?on_conflict=event_id,user_id", {
+                  method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+                  body: evIds.map(function (eid) { return { event_id: eid, user_id: sessionAccount.id, status: "zugesagt" }; })
+                }).catch(function () {});
+              }
+              return Promise.all(sRows.map(function (r) {
                 remoteInvites.forEach(function (ri) { if (String(ri.id) === String(r.id)) ri.status = "accepted"; });
                 return rest("go_workout_invites?id=eq." + encodeURIComponent(r.id), { method: "PATCH", prefer: "return=minimal", body: { status: "accepted" } });
               }));
