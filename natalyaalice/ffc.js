@@ -644,6 +644,17 @@
     saveProfileBtn.disabled = true;
     profileStatusEl.style.color = 'var(--text-dim)';
     profileStatusEl.textContent = 'Wird gespeichert …';
+    /* gogogo: Nickname darf auch dort nicht schon vergeben sein (außer am eigenen gogogo-Konto) */
+    if(nickname){
+      let goTaken = false;
+      try{ goTaken = !!(await host('gogogoNickTaken', nickname)); }catch(e){}
+      if(goTaken){
+        saveProfileBtn.disabled = false;
+        profileStatusEl.style.color = 'var(--danger)';
+        profileStatusEl.textContent = 'Dieser Nickname ist schon vergeben.';
+        return;
+      }
+    }
 
     const row = {
       user_id: currentUser.id,
@@ -1743,6 +1754,9 @@
   // selectedExercises = gewählte Übungen in der Reihenfolge, in der sie angetippt wurden.
   // Die Runden gehen diese Liste der Reihe nach durch (bei mehr Runden wieder von vorn).
   let selectedExercises = [];
+  /* gogogo: Auswahl je Event merken (Zurück, Neustart der App) */
+  let selKey = null;
+  function saveSel(){ if(selKey){ try{ localStorage.setItem(selKey, JSON.stringify(selectedExercises)); }catch(e){} } }
   const exPlanEl = document.getElementById('exercisePlan');
 
   function shortUnit(exId){ const u = unitFor(exId); return u === 'Wiederholungen' ? 'Wdh.' : u === 'Kalorien' ? 'kcal' : 'm'; }
@@ -1840,6 +1854,7 @@
     renderSetupMode();
     renderRunOrder();
     computeRoundExercises();
+    saveSel();
     exPlanEl.innerHTML = exercises.filter(ex=> ex.id !== RUN_ID).map(ex=>{
       const idx = selectedExercises.indexOf(ex.id);
       return '<button class="ex-tile'+(idx>=0?' on':'')+'" data-ex="'+ex.id+'" aria-pressed="'+(idx>=0)+'">' +
@@ -3454,6 +3469,14 @@
         if(r >= 0 && r <= 300) restSec = r;
       }
       stopSync();
+      const evKey = preset && (preset.eventId || (preset.sync && preset.sync.eventId));
+      selKey = evKey ? 'ffc_sel_' + evKey : null;
+      if(selKey){
+        try{
+          const saved = JSON.parse(localStorage.getItem(selKey) || 'null');
+          if(Array.isArray(saved)) selectedExercises = saved.filter(id=> exercises.some(ex=> ex.id === id && ex.id !== RUN_ID));
+        }catch(e){}
+      }
       if(preset && preset.sync && preset.sync.startAt){
         sync = Object.assign({}, preset.sync);
         syncPollAt = Date.now();
