@@ -977,6 +977,27 @@
     }
   }
 
+  /* Countdown in den Karten läuft mit (jede halbe Minute), auch ohne neues Laden */
+  var whenTicker = null;
+  function tickWhenLines() {
+    var els = document.querySelectorAll(".acc-card__when[data-when-ts]");
+    [].forEach.call(els, function (el) {
+      var ts = el.getAttribute("data-when-ts");
+      var oldBase = el.getAttribute("data-when-base") || "";
+      var txt = el.textContent || "";
+      if (!ts || txt.indexOf(oldBase) !== 0) return;
+      var nb = whenLine(ts);
+      if (nb === oldBase) return;
+      el.textContent = nb + txt.slice(oldBase.length);
+      el.setAttribute("data-when-base", nb);
+    });
+  }
+  function startWhenTicker() {
+    if (whenTicker) return;
+    whenTicker = setInterval(tickWhenLines, 30000);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) tickWhenLines(); });
+  }
+
   function whenLine(isoTs) {
     var day = dayKey(isoTs);
     var today = todayIso();
@@ -995,8 +1016,12 @@
       /* Countdown bis zum Start */
       var ms = new Date(isoTs).getTime() - Date.now();
       if (ms > 60000) {
-        var h = Math.floor(ms / 3600000), mi = Math.floor((ms % 3600000) / 60000);
-        sep += " · in " + (h ? h + " Std. " : "") + mi + " Min.";
+        var h = Math.floor(ms / 3600000), mi = Math.ceil((ms % 3600000) / 60000);
+        if (mi === 60) { h += 1; mi = 0; }
+        sep += " · in " + (h ? h + " Std. " : "") + (mi || !h ? mi + " Min." : "").trim();
+        sep = sep.replace(/\s+$/, "");
+      } else if (ms > -60000) {
+        sep += " · jetzt";
       }
     }
     if (day === today) return "Heute" + sep;
@@ -1633,7 +1658,7 @@
       '<div class="acc-card__overlay">' +
       (opts.author || "") +
       (opts.when
-        ? '<p class="acc-card__when">' + esc(opts.when) + "</p>"
+        ? '<p class="acc-card__when"' + (opts.whenTs ? ' data-when-ts="' + esc(opts.whenTs) + '" data-when-base="' + esc(whenLine(opts.whenTs)) + '"' : "") + ">" + esc(opts.when) + "</p>"
         : "") +
       (opts.title
         ? '<h2 class="acc-card__title">' + esc(opts.title) + "</h2>"
@@ -1850,6 +1875,7 @@
       actions: (tools || "") + (actions || ""),
       author: authorHtml(p, true),
       when: whenLine(ev.starts_at),
+      whenTs: ev.starts_at,
       title: title,
       place: ev.location || "",
       desc:
@@ -1894,6 +1920,7 @@
       actions: actions,
       author: authorHtml(authorPerson, !mine),
       when: whenLine(ev.starts_at),
+      whenTs: ev.starts_at,
       title: "🔥 " + (ev.title || "Zirkeltraining"),
       place: ev.location || "",
       desc: "",
@@ -1963,6 +1990,7 @@
       actions: "",
       author: authorHtml(p, !mine),
       when: whenLine(item.starts_at),
+      whenTs: item.starts_at,
       title: title,
       place: item.location || "",
       desc: descHtml(item.note),
@@ -2007,6 +2035,7 @@
       actions: tools,
       author: "",
       when: item.when || whenLine(item.starts_at),
+      whenTs: item.when ? "" : item.starts_at,
       title: title,
       place: item.location || "",
       desc: descHtml(item.note || ""),
@@ -2353,6 +2382,7 @@
       emoji: emoji,
       author: authorHtml(personOf(me()), false),
       when: whenLine(item.starts_at) + " · privat",
+      whenTs: item.starts_at,
       title: item.title || "Support",
       place: item.location || "",
       desc: descHtml(item.note),
@@ -2377,6 +2407,7 @@
       category: "alternative",
       emoji: "🥗",
       when: whenLine(item.starts_at) + " · privat",
+      whenTs: item.starts_at,
       title: "Ernährung",
       place: "Coach-Plan",
       desc: item.note
@@ -2426,6 +2457,7 @@
   function render() {
     var root = $("heute-acc");
     if (!root) return;
+    startWhenTicker();
     paintStreak();
     var f = state.filter;
     var flags = viewFlags(f);

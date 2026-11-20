@@ -1924,6 +1924,16 @@
     });
   }
 
+  /* Gewählte Uhrzeit nie auf genau 12:00:00 UTC legen (das heißt „ohne Uhrzeit“), 13:00 im Winter bekommt 1 s */
+  function timedStarts(iso, hhmm) {
+    var starts = iso + "T" + hhmm + ":00" + berlinOffsetSuffix(iso);
+    var d = new Date(starts);
+    if (!isNaN(d.getTime()) && d.getUTCHours() === 12 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) {
+      starts = iso + "T" + hhmm + ":01" + berlinOffsetSuffix(iso);
+    }
+    return starts;
+  }
+
   function berlinOffsetSuffix(iso) {
     try {
       var probe = new Date(iso + "T12:00:00Z");
@@ -2113,8 +2123,10 @@
   }
 
   /* ---------- Tage bearbeiten: 7 Tage, ziehen, Uhrzeit-Rad, privat/zeigen ---------- */
+  /* Index 0 = keine Uhrzeit (Plan-Event wie nach der Wahl eines Wochenplans) */
+  var NO_TIME = "–:–";
   var MINI_TIMES = (function () {
-    var out = [];
+    var out = [NO_TIME];
     for (var h = 5; h <= 22; h++) for (var q = 0; q < 60; q += 15) out.push(pad2(h) + ":" + pad2(q));
     return out;
   })();
@@ -2123,8 +2135,9 @@
   function nearestTimeIdx(hhmm) {
     var p = String(hhmm || "18:00").split(":");
     var mins = Number(p[0]) * 60 + Number(p[1] || 0);
-    var best = 0, bestD = 1e9;
+    var best = 1, bestD = 1e9;
     MINI_TIMES.forEach(function (t, i) {
+      if (t === NO_TIME) return;
       var q = t.split(":");
       var d = Math.abs(Number(q[0]) * 60 + Number(q[1]) - mins);
       if (d < bestD) { bestD = d; best = i; }
@@ -2335,7 +2348,7 @@
     state.daysEdit = { days: days, slots: slots, times: {}, vis: {} };
     slots.forEach(function (ev) {
       if (!ev) return;
-      state.daysEdit.times[ev.id] = nearestTimeIdx(formatTime(ev.starts_at));
+      state.daysEdit.times[ev.id] = displayTime(ev.starts_at) ? nearestTimeIdx(formatTime(ev.starts_at)) : 0;
       state.daysEdit.vis[ev.id] = ev.visibility === "privat" ? "privat" : "team";
     });
     paintDaysEditor();
@@ -2449,10 +2462,13 @@
     de.slots.forEach(function (ev, i) {
       if (!ev) return;
       var iso = de.days[i];
-      var hhmm = MINI_TIMES[de.times[ev.id]] || formatTime(ev.starts_at) || "18:00";
-      var starts = iso + "T" + hhmm + ":00" + berlinOffsetSuffix(iso);
+      var pick = MINI_TIMES[de.times[ev.id]];
+      var untimed = pick === NO_TIME;
+      var hhmm = untimed ? "" : (pick || formatTime(ev.starts_at) || "18:00");
+      var starts = untimed ? iso + "T12:00:00Z" : timedStarts(iso, hhmm);
       var vis = de.vis[ev.id] || "team";
-      var sameDay = dayKey(ev.starts_at) === iso && formatTime(ev.starts_at) === hhmm;
+      var sameDay = dayKey(ev.starts_at) === iso &&
+        (untimed ? !displayTime(ev.starts_at) : (displayTime(ev.starts_at) && formatTime(ev.starts_at) === hhmm));
       if (sameDay && (ev.visibility || "team") === vis) return;
       jobs.push(materializeEvent(ev).then(function (real) {
         return rest("events?id=eq." + encodeURIComponent(real.id), {
@@ -2670,7 +2686,7 @@
       return;
     }
     var iso = dayKey(ev.starts_at);
-    var starts = iso + "T" + val + ":00" + berlinOffsetSuffix(iso);
+    var starts = timedStarts(iso, val);
     if (isNaN(new Date(starts).getTime())) return;
     return materializeEvent(ev)
       .then(function (real) {
