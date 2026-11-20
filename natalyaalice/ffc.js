@@ -2615,14 +2615,14 @@
     const [sid, idxS] = String(ref).split('|');
     const idx = Number(idxS);
     const session = cachedHistory.find(h=> String(h.id) === String(sid));
-    if(!session || !session.log || !session.log[idx] || !currentUser) return;
+    if(!session || !session.log || !session.log[idx] || !currentUser) return false;
     const entry = session.log[idx];
     const ex = exercises.find(e=>e.id===entry.exercise);
     const v = await GoDialog.prompt('R'+(idx+1)+' · '+(ex?ex.name:entry.exercise)+(ex?' ('+ex.unit+')':''), entry.amount || '', { ok:'Speichern' });
-    if(v === null || v === undefined) return;
+    if(v === null || v === undefined) return false;
     const raw = String(v).trim().replace(',', '.');
     const n = raw === '' ? 0 : parseFloat(raw);
-    if(isNaN(n) || n < 0){ GoDialog.alert('Bitte eine Zahl eingeben.'); return; }
+    if(isNaN(n) || n < 0){ GoDialog.alert('Bitte eine Zahl eingeben.'); return false; }
     const next = JSON.parse(JSON.stringify(session.log));
     next[idx].amount = n > 0 ? String(n) : '';
     const { data, error } = await sb.from('training_sessions')
@@ -2631,7 +2631,7 @@
       GoDialog.alert(error && !/policy|permission|row-level/i.test(error.message)
         ? 'Nicht gespeichert: ' + friendlyAuthError(error)
         : 'Nicht gespeichert – bitte einmal supabase/nachtragen.sql in Supabase ausführen.');
-      return;
+      return false;
     }
     session.log = next;
     if(String(session.id) === String(lastSavedSessionId)){
@@ -2640,6 +2640,7 @@
       buildFinishLog();
     }
     renderRecords();
+    return true;
   }
 
   /* Story aus den Trainingsaufzeichnungen (letzte 24 h), z. B. wenn die App nach dem Training zu war */
@@ -2784,7 +2785,10 @@
   });
   document.getElementById('postRetake').addEventListener('click', ()=>{ postCamInput.value=''; postCamInput.click(); });
   document.getElementById('postClose').addEventListener('click', closePostSheet);
-  function closePostSheet(){ postSheetEl.classList.remove('open'); postSheetEl.setAttribute('aria-hidden','true'); }
+  function closePostSheet(){
+    postSheetEl.classList.remove('open'); postSheetEl.setAttribute('aria-hidden','true');
+    if(postSource === 'history') host('onStoryClosed');
+  }
 
   postCamInput.addEventListener('change', ()=>{
     const file = postCamInput.files && postCamInput.files[0];
@@ -3818,6 +3822,10 @@
       await loadFeed();
       return this.feedPosts();
     },
+    /* Plus → Aufzeichnungen: Wert einer Runde nachtragen (Promise<true> wenn gespeichert) */
+    editHistoryAmount(sessionId, idx){ return editHistoryAmount(String(sessionId) + '|' + idx); },
+    /* Plus → Aufzeichnungen: Story aus einem Training der letzten 24 h (direkt im Klick aufrufen: Kamera) */
+    storyFromHistory(sessionId){ storyFromHistory(sessionId); },
     /* Trainings aus FFC-Supabase (training_sessions) für Plus/Aufzeichnungen */
     async historyRecords(){
       if(!currentUser) return [];
@@ -3833,8 +3841,10 @@
           const ex = exercises.find(e=>e.id===entry.exercise);
           const p = roundPoints(entry.exercise, entry.amount, session.workSec, myGender);
           return {
+            idx: i,
+            empty: !(parseFloat(entry.amount) > 0),
             label: 'R'+(i+1)+' · '+(ex?ex.name:entry.exercise)+weightSuffix(entry),
-            value: String(entry.amount||'0')+' '+(ex?ex.unit:'')+(p?(' · '+p+' P'):'')
+            value: (parseFloat(entry.amount) > 0 ? String(entry.amount)+' '+(ex?ex.unit:'') : '+ nachtragen')+(p?(' · '+p+' P'):'')
           };
         });
         return {
@@ -3847,6 +3857,7 @@
           totalSec: session.totalSec,
           points: pts,
           meta: (session.rounds||0)+' Runden · '+fmtMin(session.workSec||0)+' Arbeit · '+(session.restSec||0)+'s Pause',
+          canStory: !isNaN(d.getTime()) && Date.now() - d.getTime() < 24*3600000,
           lines
         };
       });

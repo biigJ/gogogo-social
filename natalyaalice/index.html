@@ -5562,6 +5562,9 @@
       gap: 8px;
       font-size: 13px !important;
     }
+    .go-rec-detail__edit { flex: none; white-space: nowrap; border: 0; background: transparent; color: rgba(42, 33, 24, 0.85); font: inherit; padding: 4px 0; text-align: right; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+    .go-rec-detail__edit.is-empty { font-weight: 700; }
+    .go-rec-detail__story { display: block; width: 100%; margin: 14px 0 4px; min-height: 48px; border-radius: 999px; border: 1.5px solid currentColor; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
     .go-rec-detail__row span:last-child {
       white-space: nowrap;
       color: rgba(42, 33, 24, 0.72);
@@ -15371,7 +15374,7 @@
               paintLbShell({ standard: [], team: [] });
             });
         }
-        function paintRecSessions(sessions) {
+        function paintRecSessions(sessions, keepIdx) {
           if (!recBox) return;
           recBox.textContent = "";
           if (!sessions || !sessions.length) {
@@ -15418,12 +15421,39 @@
               row.className = "go-rec-detail__row";
               var left = document.createElement("span");
               left.textContent = line.label || "";
-              var right = document.createElement("span");
+              /* Wert antippen → nachtragen/korrigieren (FFC training_sessions) */
+              var right = document.createElement(FFC.editHistoryAmount && line.idx != null ? "button" : "span");
               right.textContent = line.value || "";
+              if (right.tagName === "BUTTON") {
+                right.type = "button";
+                right.className = "go-rec-detail__edit" + (line.empty ? " is-empty" : "");
+                right.addEventListener("click", function () {
+                  Promise.resolve(FFC.editHistoryAmount(s.id, line.idx)).then(function (ok) {
+                    if (!ok) return;
+                    return Promise.resolve(FFC.historyRecords()).then(function (fresh) {
+                      paintRecSessions(fresh || [], idx);
+                    });
+                  }).catch(function () {});
+                });
+              }
               row.appendChild(left);
               row.appendChild(right);
               detail.appendChild(row);
             });
+            if (s.canStory && FFC.storyFromHistory) {
+              var story = document.createElement("button");
+              story.type = "button";
+              story.className = "go-rec-detail__story";
+              story.textContent = "Story posten";
+              story.addEventListener("click", function () {
+                if (!document.body.classList.contains("ffc-open")) {
+                  goStoryOpenedFfc = true;
+                  document.body.classList.add("ffc-open");
+                }
+                FFC.storyFromHistory(s.id);
+              });
+              detail.appendChild(story);
+            }
             if (!(s.lines || []).length) {
               var empty = document.createElement("div");
               empty.className = "go-rec-detail__meta";
@@ -15473,9 +15503,10 @@
           });
           recBox.appendChild(wheel);
           recBox.appendChild(detail);
-          show(0);
+          var startIdx = keepIdx > 0 && keepIdx < sessions.length ? keepIdx : 0;
+          show(startIdx);
           requestAnimationFrame(function () {
-            var first = col.querySelector(".go-rec-wheel__item");
+            var first = col.querySelectorAll(".go-rec-wheel__item")[startIdx];
             /* Nur im Rad scrollen — scrollIntoView würde den Plus-Slide hoch/runter zerren */
             centerWheelItem(first, false);
           });
@@ -24177,6 +24208,7 @@
         askLogin();
       }
 
+      var goStoryOpenedFfc = false;
       function closeFfcOverlay() {
         ffcAuthWanted = false;
         ffcPending = null;
@@ -24336,6 +24368,13 @@
           if (sessionMode) openAccountEdit("nickname");
         },
         /* Story gepostet: Bild auch ans erledigte Zirkel-Event in gogogo hängen → in Aktuell sichtbar */
+        /* Story aus Plus → Aufzeichnungen geschlossen: FFC-Overlay wieder zu */
+        onStoryClosed: function () {
+          if (goStoryOpenedFfc) {
+            goStoryOpenedFfc = false;
+            closeFfcOverlay();
+          }
+        },
         onPosted: function (blob, info) {
           if (!sessionMode || !sessionAccount || !blob || !window.GoExMedia || !GoExMedia.uploadImage) return;
           info = info || {};
@@ -24449,6 +24488,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-12"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-13"></script>
 </body>
 </html>
