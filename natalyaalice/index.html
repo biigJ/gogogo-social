@@ -1470,6 +1470,10 @@
     .go-boot .go-boot__hi { margin: 0 0 8px; font-family: "Playfair Display", Georgia, serif !important; font-size: 30px !important; font-weight: 600 !important; line-height: 1.15 !important; }
     .go-boot .go-boot__sub { margin: 0; font-family: Inter, system-ui, sans-serif !important; font-size: 16px !important; font-weight: 500 !important; line-height: 1.4 !important; opacity: .78; }
     .go-boot.has-hello .go-boot__txt { display: none; }
+    .friend-list__req { cursor: default; }
+    .friend-list__reqacts { display: flex; flex-direction: column; gap: 6px; flex: none; }
+    .friend-list__reqbtn { min-height: 34px; padding: 0 14px; border-radius: 999px; border: 1.5px solid currentColor; background: transparent; color: inherit; font: 600 14px Inter, sans-serif; cursor: pointer; }
+    .friend-list__reqbtn.is-dark { background: #1D1630; border-color: #1D1630; color: #fff; }
     /* Aktuell im Bubble-Filter: wie ein Chat, ohne die Profilkreise oben */
     body[data-heute="bubble"] #heute-joins, body[data-heute="bubble"] #heute-stories { display: none !important; }
     .acc-bubble-empty { margin: 30vh 28px 0; text-align: center; font: 500 15px/1.5 Inter, sans-serif; color: rgba(42,33,24,.7); }
@@ -14712,14 +14716,8 @@
               })
               .then(function (ok) {
             if (!ok) return;
-            return ensureFriendLink(f.id).then(function () {
-              rest("go_friends?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&friend_id=eq." + encodeURIComponent(f.id) + "&select=in_feed")
-                .then(function (r) {
-                  var muted = r && r[0] && r[0].in_feed === false;
-                  gogogoToast("Ihr seid jetzt verbunden: " + (f.nickname || f.name || "Freund") +
-                    (muted ? ". Du hast schon 12 gewählt, umstellen unter Team → Meine Freunde." : ""));
-                })
-                .catch(function () { gogogoToast("Ihr seid jetzt verbunden: " + (f.nickname || f.name || "Freund")); });
+            return sendFriendRequest(f).then(function (res) {
+              friendRequestToast(res, String(f.name || f.nickname || "Freund").split(" ")[0]);
               if (f.nickname && ffcMine() && FFC.friendRequest) FFC.friendRequest(f.nickname).then(onFfcFriendsChanged).catch(function () {});
               loadTeam();
             });
@@ -16849,6 +16847,50 @@
             '<span class="friend-list__meta">Nickname, ID, Ort oder QR-Code</span></span>';
           addRow.addEventListener("click", function () { openTeamSearch("friend"); });
           list.appendChild(addRow);
+          /* Offene Anfragen: an mich (Annehmen/Ablehnen) und von mir (gesendet, zurückziehen) */
+          function reqRow(req, incoming) {
+            var p = req.person || {};
+            var row = document.createElement("div");
+            row.className = "friend-list__row friend-list__req";
+            row.appendChild(personFace({ id: p.id, name: p.name || p.nickname || "?", photo_url: p.photo_url || "" }));
+            var tx = document.createElement("span");
+            tx.className = "friend-list__text";
+            var nm = document.createElement("span");
+            nm.className = "friend-list__name";
+            nm.textContent = String(p.name || p.nickname || "?").split(" ")[0];
+            if (p.nickname) {
+              var nk = document.createElement("span");
+              nk.className = "friend-list__nick";
+              nk.textContent = "@" + p.nickname;
+              nm.appendChild(nk);
+            }
+            var mt = document.createElement("span");
+            mt.className = "friend-list__meta";
+            mt.textContent = incoming ? "möchte mit Dir befreundet sein" : "Anfrage gesendet";
+            tx.appendChild(nm);
+            tx.appendChild(mt);
+            row.appendChild(tx);
+            var acts = document.createElement("span");
+            acts.className = "friend-list__reqacts";
+            function btn(label, dark, fn) {
+              var b = document.createElement("button");
+              b.type = "button";
+              b.className = "friend-list__reqbtn" + (dark ? " is-dark" : "");
+              b.textContent = label;
+              b.addEventListener("click", function (ev) { ev.stopPropagation(); b.disabled = true; fn(); });
+              acts.appendChild(b);
+            }
+            if (incoming) {
+              btn("Annehmen", true, function () { answerFriendRequest(req, true); });
+              btn("Ablehnen", false, function () { answerFriendRequest(req, false); });
+            } else {
+              btn("Zurückziehen", false, function () { withdrawFriendRequest(req); });
+            }
+            row.appendChild(acts);
+            list.appendChild(row);
+          }
+          (friendReqs.incoming || []).forEach(function (r) { reqRow(r, true); });
+          (friendReqs.outgoing || []).forEach(function (r) { reqRow(r, false); });
           var people = teamPeople.filter(function (p) {
             return p && p.id && String(p.id) !== mineId;
           }).slice().sort(function (a, b) {
@@ -18672,7 +18714,7 @@
         var id = String(sessionAccount.id);
         var personSelect = "id,name,nickname,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id";
         return migrateAboutGroupsOnce()
-          .then(function () { return loadMyGroups(); })
+          .then(function () { return Promise.all([loadMyGroups(), loadFriendRequests()]); })
           .then(function () {
         return rest("go_accounts?id=eq." + encodeURIComponent(id) + "&select=id,name,trainer_id,photo_url,is_trainer")
           .catch(function () { return []; })
@@ -18780,6 +18822,108 @@
 
       var ffcIncoming = [];
       var ffcFriendSyncing = false;
+
+      /* Freundschaftsanfragen (go-friend-requests.sql): die Gegenseite bestätigt.
+         Hat die andere Person mich schon angefragt, gilt meine Anfrage als Annahme.
+         Ohne SQL in Supabase: wie bisher direkt verbinden. → Promise<"requested"|"connected"> */
+      var friendReqs = { incoming: [], outgoing: [], ok: false };
+      function sendFriendRequest(f) {
+        var meId = String(sessionAccount.id);
+        return rest("go_friend_requests?from_id=eq." + encodeURIComponent(f.id) + "&to_id=eq." + encodeURIComponent(meId) + "&status=eq.pending&select=id")
+          .then(function (rows) {
+            if (rows && rows[0]) {
+              return rest("rpc/go_answer_friend_request", { method: "POST", body: { p_id: rows[0].id, p_accept: true } }).then(function () { return "connected"; });
+            }
+            return rest("go_friend_requests?on_conflict=from_id,to_id", {
+              method: "POST",
+              prefer: "resolution=merge-duplicates,return=minimal",
+              body: { from_id: meId, to_id: f.id, status: "pending", created_at: new Date().toISOString(), decided_at: null }
+            }).then(function () { return "requested"; });
+          })
+          .catch(function (err) {
+            if (/go_friend_requests|go_answer_friend_request|relation|schema cache|PGRST20/i.test(String((err && err.message) || ""))) {
+              return ensureFriendLink(f.id).then(function () { return "connected"; });
+            }
+            throw err;
+          })
+          .then(function (res) { loadFriendRequests(); return res; });
+      }
+      function friendRequestToast(res, label) {
+        gogogoToast(res === "requested"
+          ? "Anfrage an " + label + " gesendet. Ihr seid verbunden, sobald " + label + " bestätigt."
+          : "Ihr seid jetzt verbunden: " + label);
+      }
+      function loadFriendRequests() {
+        if (!sessionMode || !sessionAccount) return Promise.resolve();
+        var meId = encodeURIComponent(sessionAccount.id);
+        var sel = "&status=eq.pending&select=id,from_id,to_id,created_at";
+        return Promise.all([
+          rest("go_friend_requests?to_id=eq." + meId + sel),
+          rest("go_friend_requests?from_id=eq." + meId + sel)
+        ]).then(function (r) {
+          var ids = [];
+          (r[0] || []).forEach(function (x) { ids.push(x.from_id); });
+          (r[1] || []).forEach(function (x) { ids.push(x.to_id); });
+          var people = ids.length
+            ? rest("go_accounts?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=id,name,nickname,photo_url").catch(function () { return []; })
+            : Promise.resolve([]);
+          return people.then(function (acc) {
+            var by = {};
+            (acc || []).forEach(function (a) { by[String(a.id)] = a; });
+            friendReqs = {
+              ok: true,
+              incoming: (r[0] || []).map(function (x) { return { id: x.id, person: by[String(x.from_id)] || { id: x.from_id } }; }),
+              outgoing: (r[1] || []).map(function (x) { return { id: x.id, person: by[String(x.to_id)] || { id: x.to_id } }; })
+            };
+          });
+        }).catch(function () { friendReqs = { incoming: [], outgoing: [], ok: false }; });
+      }
+      function answerFriendRequest(req, accept) {
+        return rest("rpc/go_answer_friend_request", { method: "POST", body: { p_id: req.id, p_accept: !!accept } })
+          .then(function () {
+            var p = req.person || {};
+            var label = String(p.name || p.nickname || "Freund").split(" ")[0];
+            if (accept) {
+              gogogoToast("Ihr seid jetzt verbunden: " + label);
+              if (p.nickname && ffcMine() && FFC.friendRequest) FFC.friendRequest(p.nickname).then(onFfcFriendsChanged).catch(function () {});
+            }
+            return loadFriendRequests().then(function () { return loadTeam(); });
+          })
+          .catch(function (err) {
+            gogogoToast(/friend_limit/.test(String((err && err.message) || "")) ? "Maximal 12 Freunde. Coachees zählen nicht mit." : "Ging gerade nicht.");
+          });
+      }
+      function withdrawFriendRequest(req) {
+        return rest("go_friend_requests?id=eq." + encodeURIComponent(req.id), {
+          method: "PATCH", prefer: "return=minimal", body: { status: "withdrawn", decided_at: new Date().toISOString() }
+        }).then(function () { return loadFriendRequests(); }).then(function () { renderTeam(); }).catch(function () {});
+      }
+      /* Beim Öffnen von Aktuell: offene Anfragen an mich nacheinander zeigen (einmal je Sitzung) */
+      var friendReqAsked = {};
+      var friendReqWait = 0;
+      function promptFriendRequests() {
+        if (!window.GoDialog) return;
+        /* anderer Dialog offen: kurz warten (höchstens ~1 min) */
+        if (document.querySelector(".god, .gob, #go-boot") || document.querySelector(".sand-modal:not([hidden])")) {
+          if (friendReqWait++ < 25) setTimeout(promptFriendRequests, 2500);
+          return;
+        }
+        friendReqWait = 0;
+        var next = (friendReqs.incoming || []).filter(function (r) { return !friendReqAsked[r.id]; })[0];
+        if (!next) return;
+        friendReqAsked[next.id] = true;
+        var p = next.person || {};
+        var name = String(p.name || p.nickname || "Jemand").split(" ")[0];
+        GoDialog.choose(name + (p.nickname ? " (@" + p.nickname + ")" : "") + " möchte mit Dir befreundet sein.", [
+          { label: "Annehmen", value: "yes" },
+          { label: "Ablehnen", value: "no" }
+        ], { cancel: "Später", photo: p.photo_url || "" }).then(function (v) {
+          if (v === "yes" || v === "no") return answerFriendRequest(next, v === "yes");
+        }).then(function () { setTimeout(promptFriendRequests, 400); });
+      }
+      document.addEventListener("go:aktuell-ready", function () {
+        loadFriendRequests().then(function () { setTimeout(promptFriendRequests, 1800); });
+      });
 
       function ensureFriendLink(friendId) {
         if (!sessionAccount || !friendId || String(friendId) === String(sessionAccount.id)) return Promise.resolve();
@@ -19098,8 +19242,8 @@
         var name = String((f && f.name) || "").trim().split(/\s+/)[0] || "";
         var label = nick && name && nick.toLowerCase() !== name.toLowerCase() ? nick + " / " + name : (nick || name || "Freund");
         if (!window.GoDialog) return Promise.resolve(true);
-        return GoDialog.confirm(label + " hinzufügen?", {
-          ok: "Hinzufügen",
+        return GoDialog.confirm(label + " als Freund anfragen?", {
+          ok: "Anfragen",
           cancel: "Abbrechen",
           photo: (f && f.photo_url) || "",
           initial: label
@@ -19196,9 +19340,9 @@
               if (friend) return;
               confirmAddFriend(a).then(function (ok) {
                 if (!ok) return;
-                ensureFriendLink(a.id).then(function () {
+                sendFriendRequest(a).then(function (res) {
                   document.getElementById("team-modal").hidden = true;
-                  gogogoToast("Ihr seid jetzt verbunden: " + label);
+                  friendRequestToast(res, String(a.name || label).split(" ")[0]);
                   if (a.nickname && ffcMine() && FFC.friendRequest) FFC.friendRequest(a.nickname).then(onFfcFriendsChanged).catch(function () {});
                   loadTeam();
                 }).catch(function () {
@@ -19272,7 +19416,10 @@
             }
             confirmAddFriend(found).then(function (ok) {
               if (!ok) return;
-              ensureFriendLink(found.id).then(done).catch(function () {
+              sendFriendRequest(found).then(function (res) {
+                friendRequestToast(res, String(found.name || found.nickname || "Freund").split(" ")[0]);
+                done();
+              }).catch(function () {
                 msg.textContent = "Maximal 12 Freunde. Coachees zählen nicht mit.";
               });
             });
