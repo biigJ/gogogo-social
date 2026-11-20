@@ -1406,7 +1406,8 @@
       String(ev.item_type || "") === "nutrition_log" ||
       /ernährung|ernaehrung/i.test(String(ev.title || ""));
     var isZirkel = cat === "zirkel" || /zirkel/i.test(String(ev.title || ""));
-    var cd = isZirkel
+    /* erledigter Zirkel: keine Start-/Countdown-Pille mehr */
+    var cd = isZirkel && ev.status !== "erledigt"
       ? zSet && zSet.hold && !zSet.goAt
         ? '<p class="wr-zirkel-cd">Angehalten</p>'
         : zirkelCountdownHtml(zSet && zSet.goAt ? new Date(zSet.goAt).toISOString() : ev.starts_at)

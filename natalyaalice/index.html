@@ -1466,6 +1466,10 @@
     .go-boot--again { z-index: 9600; }
     .go-boot__wheel { width: 64px; height: 64px; animation: heute-spin 1.6s linear infinite; }
     .go-boot__txt { margin: 0; font: 600 15px/1 Inter, system-ui, sans-serif; letter-spacing: .04em; }
+    .go-boot__hello { max-width: 320px; padding: 0 24px; margin-bottom: 18px; text-align: center; }
+    .go-boot .go-boot__hi { margin: 0 0 8px; font-family: "Playfair Display", Georgia, serif !important; font-size: 30px !important; font-weight: 600 !important; line-height: 1.15 !important; }
+    .go-boot .go-boot__sub { margin: 0; font-family: Inter, system-ui, sans-serif !important; font-size: 16px !important; font-weight: 500 !important; line-height: 1.4 !important; opacity: .78; }
+    .go-boot.has-hello .go-boot__txt { display: none; }
     .heute-info { display: none; }
     body.is-session[data-shell="heute"] .heute-info {
       display: grid; place-items: center; position: absolute; left: 12px;
@@ -6489,6 +6493,57 @@
     <p class="go-boot__txt">Lädt</p>
   </div>
   <script>
+    /* Begrüßung über dem Rad: Tageszeit, Vorname, Hinweis aufs heutige Training (go_today_hint aus Aktuell) */
+    (function () {
+      var el = document.getElementById("go-boot");
+      if (!el) return;
+      var acc = null, hint = null;
+      try { acc = JSON.parse(localStorage.getItem("gogogo_go_account") || "null"); } catch (e) {}
+      if (!acc) return;
+      var first = String(acc.name || acc.nickname || "").trim().split(/\s+/)[0];
+      var now = new Date();
+      var h = Number(now.toLocaleString("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", hour12: false })) % 24;
+      var today = now.toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+      try { hint = JSON.parse(localStorage.getItem("go_today_hint") || "null"); } catch (e) {}
+      if (!hint || hint.d !== today) hint = null;
+      var n = first ? ", " + first : "";
+      var slot = h >= 5 && h < 10 ? "morgen" : h < 12 && h >= 10 ? "vormittag" : h >= 12 && h < 14 ? "mittag" : h >= 14 && h < 18 ? "nachmittag" : h >= 18 && h < 22 ? "abend" : "nacht";
+      var HELLO = {
+        morgen: ["Guten Morgen" + n + ".", "Moin" + n + ".", "Morgen" + n + ". Der Tag gehört Dir."],
+        vormittag: ["Schönen Vormittag" + n + ".", "Hallo" + n + ". Gut drauf heute?", "Na" + n + ", wie läuft der Tag?"],
+        mittag: ["Mahlzeit" + n + ".", "Hallo" + n + ". Halbzeit für heute.", "Mittag" + n + ". Kurz durchatmen."],
+        nachmittag: ["Schönen Nachmittag" + n + ".", "Hey" + n + ". Noch Energie übrig?", "Hallo" + n + ". Der Tag ist noch jung genug."],
+        abend: ["Guten Abend" + n + ".", "Abend" + n + ". Wie war Dein Tag?", "Schön, dass Du da bist" + n + "."],
+        nacht: ["Noch wach" + n + "?", "Späte Runde" + n + ".", "Gute Nacht bald" + n + "."]
+      };
+      var MOVE = {
+        morgen: ["Wie willst Du Dich heute bewegen?", "Ein paar Schritte vor dem Frühstück?"],
+        vormittag: ["Schon bewegt heute?", "Kurz aufstehen, strecken, weiter."],
+        mittag: ["Ein Spaziergang nach dem Essen zählt auch.", "Schon bewegt heute?"],
+        nachmittag: ["Hast Du Dich heute schon bewegt?", "Zehn Minuten gehen noch immer."],
+        abend: ["Hast Du Dich heute bewegt?", "Ein kurzer Abendspaziergang?"],
+        nacht: ["Morgen geht's weiter.", "Schlaf ist auch Training."]
+      };
+      var DONE = ["Heute schon trainiert. Stark.", "Training erledigt. Gönn Dir die Pause.", "Bewegt hast Du Dich heute schon. Gut so."];
+      function pick(arr) { return arr[(now.getDate() + h) % arr.length]; }
+      var sub;
+      if (hint && hint.next && slot !== "nacht") {
+        var t = hint.next.time;
+        sub = pick([
+          (t ? "Um " + t + " wartet " : "Heute wartet ") + hint.next.title + " auf Dich.",
+          "Denk dran: " + hint.next.title + (t ? " um " + t : " heute") + ".",
+          (t ? "Heute " + t + ": " : "Heute: ") + hint.next.title + ". Du schaffst das."
+        ]);
+      } else if (hint && hint.done) sub = pick(DONE);
+      else sub = pick(MOVE[slot]);
+      var box = document.createElement("div");
+      box.className = "go-boot__hello";
+      var a = document.createElement("p"); a.className = "go-boot__hi"; a.textContent = pick(HELLO[slot]);
+      var b = document.createElement("p"); b.className = "go-boot__sub"; b.textContent = sub;
+      box.appendChild(a); box.appendChild(b);
+      el.insertBefore(box, el.firstChild);
+      el.classList.add("has-hello");
+    })();
     (function () {
       var el = document.getElementById("go-boot");
       var t0 = Date.now();
@@ -6501,7 +6556,9 @@
       var has = false;
       try { has = !!localStorage.getItem("gogogo_go_account") || /(?:^|;\s*)gogogo_go_account=/.test(document.cookie); } catch (e) {}
       if (!has) { hide(); return; }
-      document.addEventListener("go:aktuell-ready", function () { setTimeout(hide, Math.max(0, 400 - (Date.now() - t0))); });
+      /* mit Begrüßung etwas länger stehen lassen, damit man sie lesen kann */
+      var minMs = el && el.classList.contains("has-hello") ? 1600 : 400;
+      document.addEventListener("go:aktuell-ready", function () { setTimeout(hide, Math.max(0, minMs - (Date.now() - t0))); });
       /* ohne Sitzung (Login) oder wenn etwas hängt: nicht ewig drehen */
       setTimeout(function () { if (!document.body.classList.contains("is-session")) hide(); }, 3000);
       setTimeout(hide, 10000);
@@ -8259,9 +8316,9 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-80"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-81"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-59"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-60"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {

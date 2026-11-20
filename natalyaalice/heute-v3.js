@@ -1102,6 +1102,22 @@
     return { text: cut, more: true, full: raw };
   }
 
+  /* Für die Begrüßung beim nächsten App-Start: heute schon erledigt? nächstes Event heute? */
+  function saveTodayHint() {
+    try {
+      var list = myTodayEvents();
+      var now = Date.now();
+      var next = list.filter(function (e) {
+        return e.status !== "erledigt" && (!hasTime(e) || new Date(e.starts_at).getTime() > now - 30 * 60000);
+      })[0];
+      localStorage.setItem("go_today_hint", JSON.stringify({
+        d: todayIso(),
+        done: list.some(function (e) { return e.status === "erledigt"; }),
+        next: next ? { title: String(next.title || "Training").replace(/^[^A-Za-zÄÖÜäöü0-9]+\s*/, ""), time: timeLabel(next.starts_at) } : null
+      }));
+    } catch (e) {}
+  }
+
   function myTodayEvents() {
     var day = todayIso();
     var uid = me();
@@ -4516,6 +4532,7 @@
           mergeDiaryComments(host.heuteDiaryComments() || {});
         }
         render();
+        saveTodayHint();
         if (!state.readySent) {
           state.readySent = true;
           try { document.dispatchEvent(new CustomEvent("go:aktuell-ready")); } catch (eR) {}
