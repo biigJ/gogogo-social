@@ -27,7 +27,10 @@
     ".god__card--note{padding:22px 20px;cursor:pointer}" +
     ".god__note{margin:0;font-size:16px;line-height:1.5;white-space:pre-wrap;text-align:left}" +
     ".god__face{width:96px;height:96px;margin:2px auto 14px;border-radius:50%;background:#E6DED0 center/cover no-repeat;display:grid;place-items:center;font:700 34px/1 Inter,system-ui,sans-serif;color:#2A2118}" +
-    ".god__face + .god__text{text-align:center}";
+    ".god__face + .god__text{text-align:center}" +
+    ".god__card .god__text.is-center{text-align:center;margin-bottom:4px !important}" +
+    ".god__sub{margin:0 0 16px;font-size:15px;font-weight:600;text-align:center;color:rgba(42,33,24,.75)}" +
+    ".god__info{margin:-2px 0 12px;font-size:14px;text-align:center;color:rgba(42,33,24,.7)}";
 
   function ensureCss() {
     if (document.getElementById("go-dialog-css")) return;
@@ -128,11 +131,29 @@
     });
   }
 
+  /* opts.center: Überschrift mittig; opts.sub: Zeile darunter; Eintrag { info: "…" }: Textzeile statt Button */
   function chooseDlg(msg, choices, opts) {
     opts = opts || {};
     return open(function (card, close) {
       text(card, msg);
+      if (opts.center || opts.sub) {
+        var tEl = card.querySelector(".god__text");
+        if (tEl) tEl.classList.add("is-center");
+      }
+      if (opts.sub) {
+        var sub = document.createElement("p");
+        sub.className = "god__sub";
+        sub.textContent = opts.sub;
+        card.appendChild(sub);
+      }
       (choices || []).forEach(function (c) {
+        if (c.info != null) {
+          var inf = document.createElement("p");
+          inf.className = "god__info";
+          inf.textContent = c.info;
+          card.appendChild(inf);
+          return;
+        }
         button(card, c.label, "god__btn--choice", function () { close(c.value); });
       });
       button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(null); });
