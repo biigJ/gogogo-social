@@ -1602,6 +1602,103 @@
     }).catch(function () {});
   }
 
+  /* Teilen am eigenen Event:
+     - mit eigenem Foto (photo_url, auch Story-Bild): nur noch Teilen (iPhone-Menü: WhatsApp, Instagram …)
+     - erledigter Zirkel ohne Foto: Story (Foto wählen, Punkte drauf, posten/teilen)
+     - sonst: Foto hinzufügen oder ohne Foto teilen */
+  function shareText(ev) {
+    var d = new Date(ev.starts_at);
+    var when = d.toLocaleDateString("de-DE", { timeZone: "Europe/Berlin", weekday: "short", day: "numeric", month: "numeric" });
+    var t = timeLabel(ev.starts_at);
+    return (ev.title || "Training") + " · " + when + (t ? " · " + t : "") + " · gogogo";
+  }
+  function shareBlob(blob, text) {
+    var file = blob ? new File([blob], "gogogo.jpg", { type: blob.type || "image/jpeg" }) : null;
+    var data = file && navigator.canShare && navigator.canShare({ files: [file] }) ? { files: [file], text: text } : { text: text, url: "https://www.gogogo.social" };
+    function go() {
+      if (navigator.share) return navigator.share(data);
+      if (file) {
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(file);
+        a.download = "gogogo.jpg";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+      return Promise.resolve();
+    }
+    return go().catch(function (err) {
+      if (err && err.name === "AbortError") return;
+      /* iPhone: nach dem Laden des Bildes ist der Tipp „verbraucht“ → einmal bestätigen */
+      if (!global.GoDialog) return;
+      return GoDialog.confirm("Bild ist bereit zum Teilen.", { ok: "Teilen" }).then(function (yes) {
+        if (yes) return go().catch(function () {});
+      });
+    });
+  }
+  function pickEventPhoto(ev) {
+    var inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    inp.style.display = "none";
+    document.body.appendChild(inp);
+    inp.addEventListener("change", function () {
+      var file = inp.files && inp.files[0];
+      inp.remove();
+      if (!file || !global.GoExMedia || !GoExMedia.uploadImage) return;
+      if (host.toast) host.toast("Lade Foto hoch …");
+      GoExMedia.uploadImage(file, "events").then(function (url) {
+        return rest("events?id=eq." + encodeURIComponent(ev.id) + "&user_id=eq." + encodeURIComponent(me()), {
+          method: "PATCH", prefer: "return=minimal", body: { photo_url: url }
+        }).then(function () {
+          ev.photo_url = url;
+          return refresh();
+        }).then(function () {
+          if (!global.GoDialog) return;
+          return GoDialog.confirm("Foto gespeichert.", { ok: "Jetzt teilen", cancel: "Später" }).then(function (yes) {
+            if (yes) return shareBlob(file, shareText(ev));
+          });
+        });
+      }).catch(function (err) {
+        if (host.toast) host.toast((err && err.message) || "Upload ging gerade nicht");
+      });
+    });
+    inp.click();
+  }
+  function openEventShare(eventId, day) {
+    var ev = (state.events || []).find(function (e) { return String(e.id) === String(eventId); });
+    if (!ev) {
+      /* Karte aus einer anderen Liste (z. B. Plan/Serie): Event kurz nachladen, dann mit Rückfrage weiter */
+      rest("events?id=eq." + encodeURIComponent(eventId) + "&select=id,user_id,title,starts_at,category,status,photo_url")
+        .then(function (rows) {
+          var e = rows && rows[0];
+          if (!e) return;
+          state.events.push(e);
+          openEventShare(eventId, day);
+        }).catch(function () {});
+      return;
+    }
+    if (ev.photo_url) {
+      fetch(ev.photo_url).then(function (r) { return r.blob(); })
+        .then(function (b) { return shareBlob(b, shareText(ev)); })
+        .catch(function () { return shareBlob(null, shareText(ev)); });
+      return;
+    }
+    var F = global.FFC;
+    if (ev.category === "zirkel" && ev.status === "erledigt" && ffcUsable() && F && F.sessionForDay) {
+      openStoryShare(day);
+      return;
+    }
+    if (!global.GoDialog) { pickEventPhoto(ev); return; }
+    GoDialog.choose("Teilen", [
+      { label: "Foto hinzufügen", value: "photo" },
+      { label: "Ohne Foto teilen", value: "text" }
+    ], { sub: "Mit eigenem Foto teilst Du danach direkt auf WhatsApp, Instagram …" }).then(function (v) {
+      if (v === "photo") pickEventPhoto(ev);
+      else if (v === "text") shareBlob(null, shareText(ev));
+    });
+  }
+
   function eventToolRowHtml(opts) {
     opts = opts || {};
     var eventId = opts.eventId || "";
@@ -1647,7 +1744,7 @@
     /* Eigener erledigter Zirkel: Story posten / teilen (FFC-Story mit Foto) */
     var share = opts.shareId
       ? '<button type="button" class="acc-tool acc-tool--share" data-acc-share="' + esc(opts.shareId) + '" data-acc-share-day="' + esc(opts.shareDay || "") +
-        '" aria-label="Story posten oder teilen">' +
+        '" aria-label="Teilen">' +
         '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
         '<path d="M12 3.5v11"/><path d="M8 7.3 12 3.5l4 3.8"/><path d="M7 10.5H5.5v9h13v-9H17"/></svg></button>'
       : "";
@@ -1926,7 +2023,7 @@
           noCheck: ev.status !== "erledigt" && day < todayIso(),
           menu: ev.status !== "erledigt" && day >= todayIso(),
           badge: eventBadgeKind(ev),
-          shareId: ev.status === "erledigt" && ev.category === "zirkel" && ffcUsable() ? String(ev.id) : "",
+          shareId: String(ev.id),
           shareDay: day,
           removeId: "",
           removeMode: "delete"
@@ -4055,7 +4152,7 @@
     if (t.closest("[data-cmt-more]")) return;
     var shareB = t.closest("[data-acc-share]");
     if (shareB) {
-      openStoryShare(shareB.getAttribute("data-acc-share-day"));
+      openEventShare(shareB.getAttribute("data-acc-share"), shareB.getAttribute("data-acc-share-day"));
       return;
     }
     var openC = t.closest("[data-open-comments]");
