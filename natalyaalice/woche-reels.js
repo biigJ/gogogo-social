@@ -293,6 +293,21 @@
     );
   }
 
+  /* Countdown in Woche läuft sekundengenau mit */
+  setInterval(function () {
+    var els = document.querySelectorAll(".wr-zirkel-cd[data-wr-cd-start]");
+    if (!els.length) return;
+    var now = Date.now();
+    [].forEach.call(els, function (el) {
+      var start = Number(el.getAttribute("data-wr-cd-start"));
+      if (!isFinite(start)) return;
+      var sec = Math.max(0, Math.floor((start - now) / 1000));
+      if (sec <= 0) { el.textContent = "Jetzt starten"; el.removeAttribute("data-wr-cd-start"); return; }
+      var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
+      el.textContent = "Start in " + (h > 0 ? h + ":" : "") + (m < 10 ? "0" : "") + m + ":" + (x < 10 ? "0" : "") + x;
+    });
+  }, 1000);
+
   function loadTravelPref() {
     var fromHost = null;
     try {
@@ -1346,7 +1361,8 @@
       (when || place
         ? '<p class="wr-when">' + esc([when, place].filter(Boolean).join(" · ")) + "</p>"
         : "") +
-      cd +
+      /* Countdown und „Start anhalten“ nebeneinander als gleiche Pillen */
+      (cd || zirkelAdminHtml(ev, zSet, iso) ? '<div class="wr-zrow">' + cd + zirkelAdminHtml(ev, zSet, iso) + "</div>" : "") +
       '<h2 class="wr-title">' +
       esc(title) +
       "</h2>" +
@@ -1354,7 +1370,6 @@
       (zSet && zSet.online
         ? '<button type="button" class="go-online-cta" data-wr-zirkel-go="1">Online mitmachen</button>'
         : "") +
-      zirkelAdminHtml(ev, zSet, iso) +
       (item.kind === "joined"
         ? '<p class="wr-place">Du bist dabei bei ' + esc(personOf(ev.user_id).name) + "</p>" +
           '<button type="button" class="go-online-cta go-online-cta--ghost" data-wr-leave="' + esc(ev.id) + '">Austreten</button>'
@@ -2439,8 +2454,7 @@
         var day = dayKey(ev.starts_at);
         if (!(day >= from && day < to)) return;
         if (ev.is_mine) {
-          /* Kopie eines eigenen gogogo-Zirkels: dort mit erledigt */
-          if (ownTimes.some(function (x) { return Math.abs(x - t) <= 600000; })) return;
+          /* Circle-Termin (Zirkel-App) immer als eigene Zeile, damit er einzeln gelöscht werden kann */
           rows.push({ key: "ffc:" + ev.id, kind: "ffcOwn", ev: ev, at: ev.starts_at, title: ev.title || "Zirkeltraining" });
         } else if (ev.my_going === true) {
           rows.push({ key: "ffc:" + ev.id, kind: "ffcJoined", ev: ev, at: ev.starts_at, title: ev.title || "Zirkeltraining", who: ev.creator_nickname || "" });
