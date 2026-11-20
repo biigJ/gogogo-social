@@ -5363,7 +5363,7 @@
       cursor: pointer;
     }
     .go-toc__item:last-child { border-bottom: 1px solid rgba(42, 33, 24, 0.14); }
-    /* Plus: „Füge weitere Features hinzu“ im Stil des Inhaltsverzeichnisses, ohne Linie */
+    /* Plus: „+ mehr Plus-Punkte“ im Stil des Inhaltsverzeichnisses, ohne Linie */
     .go-toc .go-toc__item.go-toc__add, .go-toc .go-toc__item.go-toc__add:last-child { border-bottom: 0; color: rgba(42, 33, 24, 0.55); }
     .plus-pick { position: fixed; inset: 0; z-index: 10045; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(20, 16, 12, 0.42); }
     .plus-pick__card { width: min(100%, 400px); max-height: 86vh; overflow-y: auto; box-sizing: border-box; background: #F3EEE4; color: #2A2118; border-radius: 22px; padding: 22px 18px 14px; }
@@ -8334,7 +8334,7 @@
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-4"></script>
-  <script src="/natalyaalice/bubbles.js?v=bub-4"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-5"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-5"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-8"></script>
@@ -8350,7 +8350,7 @@
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-84"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-61"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-62"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -17001,7 +17001,7 @@
           bubList.className = "friend-list";
           var bubHint = document.createElement("p");
           bubHint.className = "friend-list__hint";
-          bubHint.textContent = "Tritt einer Bubble bei und teile Events mit allen darin.";
+          bubHint.textContent = "Tritt einer Bubble bei, teile Events zum Thema, diskutiere und verknüpfe Dich vor Ort.";
           /* Ansicht wie Meine Freunde: Kreis = Liste, Quadrat = Wallet */
           var bubWalletOn = false;
           try { bubWalletOn = localStorage.getItem("gogogo_bubbles_view") === "wallet"; } catch (eBv) {}
@@ -17021,7 +17021,6 @@
               b.classList.toggle("is-on", on);
               b.setAttribute("aria-checked", on ? "true" : "false");
             });
-            bubHint.hidden = bubWalletOn;
             bubList.hidden = bubWalletOn;
             bubWallet.hidden = !bubWalletOn;
             if (bubWalletOn) {
@@ -18159,12 +18158,15 @@
               });
               tocNav.appendChild(link);
             });
-            var addFeat = document.createElement("button");
-            addFeat.type = "button";
-            addFeat.className = "go-toc__item go-toc__add";
-            addFeat.textContent = "Füge weitere Features hinzu";
-            addFeat.addEventListener("click", function () { openPlusPick(allOffers, IMG); });
-            tocNav.appendChild(addFeat);
+            /* Nur wenn es noch Plus-Punkte zum Hinzufügen gibt */
+            if (offers.length < allOffers.length) {
+              var addFeat = document.createElement("button");
+              addFeat.type = "button";
+              addFeat.className = "go-toc__item go-toc__add";
+              addFeat.textContent = "+ mehr Plus-Punkte";
+              addFeat.addEventListener("click", function () { openPlusPick(allOffers, IMG); });
+              tocNav.appendChild(addFeat);
+            }
             card.appendChild(tocNav);
             wrapGoSlideBody(card);
             rail.appendChild(card);
@@ -20711,11 +20713,17 @@
           isCoach: function () { return !!(sessionAccount && sessionAccount.is_trainer); },
           toast: function (m) { gogogoToast(m); },
           /* Karte antippen: Aktuell nur mit den Events dieser Bubble */
-          openFeed: function () {
+          openFeed: function (b) {
             syncHeuteFilterOptions();
             if (window.HeuteAccountability && HeuteAccountability.setFilter) HeuteAccountability.setFilter("bubble");
             var pillBtn = document.querySelector('.app-pill [data-shell="heute"]');
             if (pillBtn) pillBtn.click();
+            var bName = (b && b.name) || ((GoBubbles.mine() || {}).name) || "";
+            if (window.GoDialog && GoDialog.alert) {
+              setTimeout(function () {
+                GoDialog.alert("Wechsle über das Dropdown-Menü die Ansicht.", { body: "Jetzt: Bring Leben in die Bubble" + (bName ? " " + bName : "") + ".", ok: "Alles klar" });
+              }, 350);
+            }
           },
           onChange: function () {
             syncHeuteFilterOptions();
