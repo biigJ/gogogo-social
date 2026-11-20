@@ -1476,6 +1476,16 @@
     .friend-list__reqbtn.is-dark { background: #1D1630; border-color: #1D1630; color: #fff; }
     /* Aktuell im Bubble-Filter: wie ein Chat, ohne die Profilkreise oben */
     body[data-heute="bubble"] #heute-joins, body[data-heute="bubble"] #heute-stories { display: none !important; }
+    /* Orte-Leiste eigene Zeile unter dem Dropdown (wie die Profilkreise) */
+    body.is-session[data-shell="heute"] .heute-filter-row .gbub-strip { flex: 0 0 calc(100% + 24px); width: calc(100% + 24px); margin: 6px -12px 0; box-sizing: border-box; }
+    .fw-card--bubble { background-size: cover; background-position: center; }
+    .is-bubbles .friend-list[hidden], .is-bubbles .friend-list__hint[hidden] { display: none !important; }
+    /* Bubble ohne Foto: Farbkarte, dunkle Schrift, kein Schatten-Verlauf */
+    .fw-card--bubble:not([style*="background-image"])::before { display: none; }
+    .friend-wallet .fw-card--bubble:not([style*="background-image"]) .fw-card__name,
+    .fw-card--bubble:not([style*="background-image"]) .fw-card__goal,
+    .fw-card--bubble:not([style*="background-image"]) .fw-card__about { color: #1D1630 !important; }
+    .fw-card--bubble .fw-card__about { margin: 0; font: 500 15px/1.4 Inter, sans-serif; color: #fff; }
     .acc-bubble-empty { margin: 30vh 28px 0; text-align: center; font: 500 15px/1.5 Inter, sans-serif; color: rgba(42,33,24,.7); }
     /* Bubble-Chat: freie Texte als Sprechblasen, Platz für die Eingabe unten */
     .acc-msg { max-width: 78%; margin: 0 16px 12px; padding: 10px 14px; border-radius: 18px 18px 18px 6px; background: #fff; color: #2A2118; box-shadow: 0 1px 0 rgba(42,33,24,.06); }
@@ -8323,7 +8333,7 @@
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-4"></script>
-  <script src="/natalyaalice/bubbles.js?v=bub-3"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-4"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-5"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-8"></script>
@@ -16175,7 +16185,8 @@
       }
       /* Wallet-Stand überlebt Neuaufbau von Team (Daten-Refresh, Zurück aus dem Profil) */
       var walletState = { id: "", touching: false, pending: false };
-      function paintFriendWallet(wallet, people, inGroup) {
+      /* opts (Bubbles): { fill(card, item), open(item) } statt Freundeskarte und Profil */
+      function paintFriendWallet(wallet, people, inGroup, opts) {
         wallet.textContent = "";
         var cards = [];
         var stage = document.createElement("div");
@@ -16187,8 +16198,9 @@
           var ffcC = ffcCircleByNick[String(p.nickname || "").toLowerCase()];
           if (ffcC && circles.indexOf("Circle " + ffcC) < 0) circles.push("Circle " + ffcC);
           var card = document.createElement("article");
-          card.className = "fw-card";
+          card.className = "fw-card" + (opts ? " fw-card--bubble" : "");
           if (p.photo_url) card.style.backgroundImage = "url(\"" + String(p.photo_url).replace(/"/g, "%22") + "\")";
+          if (opts && p.color) card.style.backgroundColor = p.color;
           var body = document.createElement("div");
           body.className = "fw-card__body";
           card.appendChild(body);
@@ -16198,9 +16210,10 @@
             /* Karte im Stapel oben oder unten: erst nach vorn holen */
             if (Math.abs(idx - walletPos()) > 0.3) { wallet.scrollTo({ top: idx * walletStep(), behavior: "smooth" }); return; }
             walletState.id = String(p.id);
+            if (opts && opts.open) { opts.open(p); return; }
             openProfile(p);
           });
-          fillFriendCard(card, p, circles);
+          if (opts && opts.fill) opts.fill(card, p); else fillFriendCard(card, p, circles);
           cards.push({ card: card, p: p, circles: circles });
           stage.appendChild(card);
         });
@@ -16315,6 +16328,7 @@
           layoutWallet();
         }).observe(wallet);
         /* Details: Profilinfos, Ziele, Wochenplan, Streak */
+        if (opts) return;
         var ids = people.map(function (p) { return String(p.id); })
           .filter(function (id) { return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id); });
         if (!ids.length) return;
@@ -16982,10 +16996,48 @@
           var bubHint = document.createElement("p");
           bubHint.className = "friend-list__hint";
           bubHint.textContent = "Tritt einer Bubble bei und teile Events mit allen darin.";
+          /* Ansicht wie Meine Freunde: Kreis = Liste, Quadrat = Wallet */
+          var bubWalletOn = false;
+          try { bubWalletOn = localStorage.getItem("gogogo_bubbles_view") === "wallet"; } catch (eBv) {}
+          var bubView = document.createElement("div");
+          bubView.className = "friend-view";
+          bubView.setAttribute("role", "radiogroup");
+          bubView.setAttribute("aria-label", "Ansicht");
+          bubView.innerHTML =
+            '<button type="button" role="radio" data-bview="list" aria-label="Liste"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></button>' +
+            '<button type="button" role="radio" data-bview="wallet" aria-label="Wallet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/></svg></button>';
+          var bubWallet = document.createElement("div");
+          bubWallet.className = "friend-wallet bubble-wallet";
+          bubWallet.hidden = true;
+          function paintBubView() {
+            [].forEach.call(bubView.querySelectorAll("[data-bview]"), function (b) {
+              var on = (b.getAttribute("data-bview") === "wallet") === bubWalletOn;
+              b.classList.toggle("is-on", on);
+              b.setAttribute("aria-checked", on ? "true" : "false");
+            });
+            bubHint.hidden = bubWalletOn;
+            bubList.hidden = bubWalletOn;
+            bubWallet.hidden = !bubWalletOn;
+            if (bubWalletOn) {
+              GoBubbles.wallet(function (items, fill, open) {
+                paintFriendWallet(bubWallet, items, {}, { fill: fill, open: open });
+              });
+            }
+          }
+          bubView.addEventListener("click", function (e) {
+            var b = e.target.closest("[data-bview]");
+            if (!b) return;
+            bubWalletOn = b.getAttribute("data-bview") === "wallet";
+            try { localStorage.setItem("gogogo_bubbles_view", bubWalletOn ? "wallet" : "list"); } catch (eBv2) {}
+            paintBubView();
+          });
+          bubSlide.appendChild(bubView);
           bubSlide.appendChild(bubHint);
           bubSlide.appendChild(bubList);
+          bubSlide.appendChild(bubWallet);
           box.appendChild(bubSlide);
           GoBubbles.renderInto(bubList);
+          paintBubView();
         }
 
         var ffcGroup = ffcContextGroup();
