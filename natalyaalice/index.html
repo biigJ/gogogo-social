@@ -8347,7 +8347,7 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-83"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-84"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-61"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
@@ -11019,8 +11019,13 @@
               canvas.width = Math.max(1, Math.round(img.width * scale));
               canvas.height = Math.max(1, Math.round(img.height * scale));
               canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+              /* Foto in den Bildspeicher (go-covers) statt als langer Text in die Datenbank:
+                 spart Datenvolumen bei jedem Laden. Ohne Speicher/Upload-Fehler: wie bisher als data-URL. */
               function finish(dataUrl) {
-                done(dataUrl);
+                if (!sessionMode || !dataUrl || !window.GoExMedia || !GoExMedia.uploadImage) { done(dataUrl); return; }
+                fetch(dataUrl).then(function (r) { return r.blob(); })
+                  .then(function (b) { return GoExMedia.uploadImage(b, "photos"); })
+                  .then(function (url) { done(url || dataUrl); }, function () { done(dataUrl); });
               }
               if (canvas.toBlob) {
                 canvas.toBlob(
@@ -20664,6 +20669,37 @@
         }).then(function () {
           try { if (listEl && listEl.children.length) renderList(); } catch (eGx) {}
         });
+      }
+
+      /* Einmalig je Gerät: eigene Fotos, die noch als data-URL in der Datenbank liegen,
+         in den Bildspeicher verschieben (Profilbild, Event-Fotos). Spart Datenvolumen bei jedem Laden. */
+      if (sessionMode && sessionAccount && window.GoExMedia && GoExMedia.uploadImage) {
+        setTimeout(function () {
+          var mk = "gogogo_photo_migrated_" + sessionAccount.id;
+          try { if (localStorage.getItem(mk)) return; } catch (eMk) {}
+          function toUrl(dataUrl, dir) {
+            return fetch(dataUrl).then(function (r) { return r.blob(); }).then(function (b) { return GoExMedia.uploadImage(b, dir); });
+          }
+          var jobs = [];
+          if (/^data:image\//.test(String(sessionAccount.photo_url || ""))) {
+            jobs.push(toUrl(sessionAccount.photo_url, "photos").then(function (url) {
+              sessionAccount.photo_url = url;
+              if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+              return rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), { method: "PATCH", prefer: "return=minimal", body: { photo_url: url } });
+            }));
+          }
+          jobs.push(rest("events?user_id=eq." + encodeURIComponent(sessionAccount.id) + "&photo_url=like.data:*&select=id,photo_url&limit=50")
+            .then(function (rows) {
+              return Promise.all((rows || []).map(function (r) {
+                return toUrl(r.photo_url, "events").then(function (url) {
+                  return rest("events?id=eq." + encodeURIComponent(r.id), { method: "PATCH", prefer: "return=minimal", body: { photo_url: url } });
+                }).catch(function () {});
+              }));
+            }));
+          Promise.all(jobs).then(function () {
+            try { localStorage.setItem(mk, "1"); } catch (eMk2) {}
+          }).catch(function () {});
+        }, 6000);
       }
 
       /* Bubbles (bubbles.js, go-bubbles.sql): Team → Bubbles, Aktuell-Filter „Bubble“, Woche → Tage bearbeiten → Bubble */

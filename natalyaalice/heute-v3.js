@@ -3034,7 +3034,13 @@
         resolve("");
       };
       reader.readAsDataURL(file);
-    }).then(compressDonePhoto);
+    }).then(compressDonePhoto).then(function (dataUrl) {
+      /* Foto in den Bildspeicher statt als data-URL ins Event (spart Datenvolumen) */
+      if (!dataUrl || !global.GoExMedia || !GoExMedia.uploadImage) return dataUrl;
+      return fetch(dataUrl).then(function (r) { return r.blob(); })
+        .then(function (b) { return GoExMedia.uploadImage(b, "events"); })
+        .catch(function () { return dataUrl; });
+    });
   }
 
   function patchEventDone(eventId, body) {
