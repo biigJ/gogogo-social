@@ -1470,6 +1470,11 @@
     .go-boot .go-boot__hi { margin: 0 0 8px; font-family: "Playfair Display", Georgia, serif !important; font-size: 30px !important; font-weight: 600 !important; line-height: 1.15 !important; }
     .go-boot .go-boot__sub { margin: 0; font-family: Inter, system-ui, sans-serif !important; font-size: 16px !important; font-weight: 500 !important; line-height: 1.4 !important; opacity: .78; }
     .go-boot.has-hello .go-boot__txt { display: none; }
+    /* Aktuell im Bubble-Filter: wie ein Chat, ohne die Profilkreise oben */
+    body[data-heute="bubble"] #heute-joins, body[data-heute="bubble"] #heute-stories { display: none !important; }
+    .acc-bubble-empty { margin: 40vh 28px 0; text-align: center; font: 500 15px/1.5 Inter, sans-serif; color: rgba(42,33,24,.7); }
+    .wr-dayrow__bub { display: inline-flex; align-items: center; gap: 4px; }
+    .wr-dayrow__bub svg { width: 16px; height: 16px; }
     .heute-info { display: none; }
     body.is-session[data-shell="heute"] .heute-info {
       display: grid; place-items: center; position: absolute; left: 12px;
@@ -1734,7 +1739,9 @@
     .wr-dayrow__free { color: rgba(42,33,24,.45); font-size: 14px; }
     .wr-dayrow__mid { min-width: 0; display: grid; gap: 4px; }
     .wr-dayrow__title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .wr-dayrow__ctl { display: flex; align-items: center; gap: 8px; }
+    .wr-dayrow__ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .wr-when__bub { display: inline-flex; vertical-align: -3px; margin-right: 4px; }
+    .wr-when__bub svg { width: 18px; height: 18px; }
     .wr-zrec-day { width: 100%; text-align: left; border: 0; background: transparent; font: inherit; color: inherit; cursor: pointer; }
     .wr-zrec-acts { display: grid; gap: 10px; justify-items: stretch; margin: 6px 0 4px; }
     .wr-zrec-acts .wr-pill-btn { margin: 0; }
@@ -8303,6 +8310,7 @@
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-4"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-1"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-5"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-8"></script>
@@ -8316,9 +8324,9 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-81"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-82"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-60"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-61"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -13509,6 +13517,7 @@
               });
             }).catch(function () { return []; });
           },
+          bubbleId: function () { var b = window.GoBubbles ? GoBubbles.mine() : null; return b ? String(b.id) : ""; },
           planItemForDay: function (iso) {
             if (!sessionMode || !sessionAccount || !iso) return null;
             var wd = weekdayIndex(iso);
@@ -16447,7 +16456,14 @@
         html +=
           '<option value="tagebuch">Tagebuch</option>' +
           '<option value="alles">Alles</option>';
+        var bub = window.GoBubbles ? GoBubbles.mine() : null;
+        if (bub) {
+          var bo = document.createElement("option");
+          bo.textContent = "Bubble " + bub.name;
+          html += '<option value="bubble">' + bo.innerHTML + "</option>";
+        }
         heute.innerHTML = html;
+        if (cur === "bubble" && !bub) cur = "alles";
         if (cur === "gruppe" && !myGroups().length) cur = "team";
         if (cur && [].some.call(heute.options, function (o) { return o.value === cur; })) heute.value = cur;
       }
@@ -16904,6 +16920,22 @@
           slide.appendChild(list);
           box.appendChild(slide);
         })();
+
+        /* Bubbles: Themen-Communities, man ist in genau einer (bubbles.js) */
+        if (window.GoBubbles) {
+          var bubSlide = document.createElement("article");
+          bubSlide.className = "team-slide is-scroll is-friends is-bubbles";
+          bubSlide.dataset.title = "Bubbles";
+          var bubList = document.createElement("div");
+          bubList.className = "friend-list";
+          var bubHint = document.createElement("p");
+          bubHint.className = "friend-list__hint";
+          bubHint.textContent = "Tritt einer Bubble bei und teile Events mit allen darin.";
+          bubSlide.appendChild(bubHint);
+          bubSlide.appendChild(bubList);
+          box.appendChild(bubSlide);
+          GoBubbles.renderInto(bubList);
+        }
 
         var ffcGroup = ffcContextGroup();
         var myGroup = ownGroups()[0] || null;
@@ -20426,6 +20458,27 @@
         });
       }
 
+      /* Bubbles (bubbles.js, go-bubbles.sql): Team → Bubbles, Aktuell-Filter „Bubble“, Woche → Tage bearbeiten → Bubble */
+      if (window.GoBubbles && sessionMode && sessionAccount) {
+        GoBubbles.init({
+          rest: rest,
+          me: function () { return sessionAccount ? String(sessionAccount.id) : ""; },
+          isCoach: function () { return !!(sessionAccount && sessionAccount.is_trainer); },
+          toast: function (m) { gogogoToast(m); },
+          /* Karte antippen: Aktuell nur mit den Events dieser Bubble */
+          openFeed: function () {
+            syncHeuteFilterOptions();
+            if (window.HeuteAccountability && HeuteAccountability.setFilter) HeuteAccountability.setFilter("bubble");
+            var pillBtn = document.querySelector('.app-pill [data-shell="heute"]');
+            if (pillBtn) pillBtn.click();
+          },
+          onChange: function () {
+            syncHeuteFilterOptions();
+            try { if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh(); } catch (eB) {}
+          }
+        }).then(function () { syncHeuteFilterOptions(); });
+      }
+
       /* Kraft-Tracking: Historie + Verlauf (kraft-tracking.js) */
       if (window.GoKraftTracking) {
         GoKraftTracking.init({
@@ -22645,6 +22698,7 @@
             paintHeuteDiaryFeed: paintHeuteDiaryFeed,
             paintHeuteJoins: paintHeuteJoins,
             heuteHistoryItems: heuteHistoryItems,
+            bubbleId: function () { var b = window.GoBubbles ? GoBubbles.mine() : null; return b ? String(b.id) : ""; },
             heutePlanItems: heutePlanItems,
             heuteDiaryComments: heuteDiaryComments,
             prepareHeuteHistory: prepareHeuteHistory,
