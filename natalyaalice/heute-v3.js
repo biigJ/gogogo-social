@@ -2283,9 +2283,17 @@
       else upcoming.push(item);
     });
 
+    /* Eigene FFC-Story hängt schon als Bild am erledigten Zirkel (onPosted) → keine zweite Karte */
+    var storyOnEvent = {};
+    (state.events || []).forEach(function (e) {
+      if (e && String(e.user_id) === me() && e.category === "zirkel" && e.status === "erledigt" && e.photo_url) {
+        storyOnEvent[dayKey(e.starts_at)] = true;
+      }
+    });
     (state.ffcPosts || []).forEach(function (post) {
       if (!post || !post.created_at) return;
       if (flags.groupOnly && !post.is_me) return;
+      if (post.is_me && storyOnEvent[dayKey(post.created_at)]) return;
       var item = {
         kind: "ffc_post",
         starts_at: post.created_at,
