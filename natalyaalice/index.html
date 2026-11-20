@@ -10226,10 +10226,9 @@
           var y = event.currentTarget.scrollTop || 0;
           var dy = y - lastY;
           lastY = y;
-          if (y <= 8) compact = false;
-          else if (Date.now() - touchedAt > 1500) return;
-          else if (dy > 8) compact = true;
-          else if (dy < -8) compact = false;
+          /* Groß wird sie bei jeder Bewegung nach oben, klein nur durch eigenes Scrollen nach unten */
+          if (y <= 8 || dy < -8) compact = false;
+          else if (dy > 8 && Date.now() - touchedAt <= 1500) compact = true;
           nav.classList.toggle("is-compact", compact);
         }
         ["welcome", "diary"].forEach(function (id) {
@@ -10242,6 +10241,12 @@
         });
         document.addEventListener("visibilitychange", function () {
           if (document.visibilityState === "visible") { compact = false; nav.classList.remove("is-compact"); }
+        });
+        /* Tippen auf Aktuell macht die Pill wieder groß */
+        nav.addEventListener("click", function (e) {
+          if (!e.target.closest('[data-shell="heute"]')) return;
+          compact = false;
+          nav.classList.remove("is-compact");
         });
         fitScreen();
         window.addEventListener("resize", fitScreen);
