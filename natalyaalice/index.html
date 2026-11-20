@@ -13106,13 +13106,16 @@
           requireFfc(
             function () {
               closeGoSub();
-              openGoSub("zirkel", "Friday Fitness Circle");
+              /* Keine leere „Friday Fitness Circle“-Unterseite mehr unter dem Workout: schließt sich
+                 das Zirkel-Fenster, steht man wieder in Aktuell (bzw. dort, wo man gestartet hat) */
+              if (!sessionMode) openGoSub("zirkel", "Friday Fitness Circle");
               refreshZirkel();
               if (window.FFC && FFC.openSetup) {
                 zirkelSyncPreset(preset && preset.eventId, preset).then(function (pr) {
-                  try {
-                    FFC.openSetup(pr && Object.keys(pr).length ? pr : null);
-                  } catch (eS) {}
+                  return FFC.openSetup(pr && Object.keys(pr).length ? pr : null);
+                }).catch(function () {
+                  document.body.classList.remove("ffc-open");
+                  if (gogogoToast) gogogoToast("Zirkeltraining ließ sich nicht öffnen. Bitte nochmal tippen.");
                 });
               }
             },
@@ -13126,6 +13129,20 @@
         }
       }
       window.GoOpenZirkel = openZirkelFlow;
+      /* Sicherheitsnetz: leere Zirkel-Unterseite ohne Zirkel-Fenster nie stehen lassen */
+      if (window.MutationObserver) {
+        var zWatchT = null;
+        new MutationObserver(function () {
+          clearTimeout(zWatchT);
+          zWatchT = setTimeout(function () {
+            var sub = document.getElementById("go-subpage");
+            if (!sessionMode || !sub || sub.hidden || goSubKind !== "zirkel") return;
+            if (document.body.classList.contains("ffc-open")) return;
+            try { closeGoSub(); } catch (eW) {}
+            if (document.body.dataset.shell !== "heute" && typeof setHome === "function") setHome(true);
+          }, 700);
+        }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+      }
       function zirkelSyncPreset(eventId, preset) {
         var base = Object.assign({}, preset || {});
         /* Zirkel mit Uhrzeit ohne gemeinsame Einstellungen: vor dem Start antippen → Workout startet pünktlich.
