@@ -416,16 +416,13 @@
   }
 
   /* ---------- Team → Bubbles ---------- */
+  /* Kreis-Ansicht: Kreis (Foto oder Farbe mit Seifenblase) links, Name rechts; eigene Bubble mit Pillen */
   function cardHtml(b, isMine) {
-    var c = countsFor(b.id);
-    var meta = c.members + (c.members === 1 ? " Mitglied" : " Mitglieder") + (c.coaches ? " · " + c.coaches + (c.coaches === 1 ? " Coach" : " Coaches") : "");
-    return '<div class="gbub-card' + (isMine ? " is-mine" : "") + '" style="--gbub:' + esc(b.color || "#E9E1D2") + '" data-gbub="' + esc(b.id) + '" role="button" tabindex="0">' +
-      '<span class="gbub-card__img">' + (b.photo_url ? '<img src="' + esc(b.photo_url) + '" alt="" loading="lazy" />' : SOAP_SVG) + "</span>" +
-      '<span class="gbub-card__txt"><span class="gbub-card__name">' + esc(b.name) + "</span>" +
-      '<span class="gbub-card__meta">' + esc(meta) + (placesText(b) ? " · " + esc(placesText(b)) : "") + "</span>" +
-      (b.description ? '<span class="gbub-card__desc">' + esc(b.description) + "</span>" : "") + "</span>" +
-      (isMine ? '<span class="gbub-card__me">Deine Bubble</span><button type="button" class="gbub-card__leave" data-gbub-leave="' + esc(b.id) + '">Verlassen</button>' : "") +
-      "</div>";
+    return '<div class="gbub-row' + (isMine ? " is-mine" : "") + '" data-gbub="' + esc(b.id) + '" role="button" tabindex="0">' +
+      '<span class="gbub-row__img" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' + (b.photo_url ? '<img src="' + esc(b.photo_url) + '" alt="" loading="lazy" />' : SOAP_SVG) + "</span>" +
+      '<span class="gbub-row__txt">' +
+      (isMine ? '<span class="gbub-row__pills"><span class="gbub-card__me">Meine Bubble</span><button type="button" class="gbub-card__me is-leave" data-gbub-leave="' + esc(b.id) + '">Verlassen</button></span>' : "") +
+      '<span class="gbub-row__name">' + esc(b.name) + "</span></span></div>";
   }
 
   function paint(el) {
@@ -486,7 +483,7 @@
         var c = countsFor(b.id);
         var isMine = cur && String(cur.id) === String(b.id);
         body.innerHTML =
-          (isMine ? '<span class="gbub-card__me" style="position:static;display:inline-block;margin-bottom:8px">Deine Bubble</span>' : "") +
+          (isMine ? '<span class="gbub-card__me" style="position:static;display:inline-block;margin-bottom:8px">Meine Bubble</span>' : "") +
           '<h3 class="fw-card__name">' + esc(b.name) + "</h3>" +
           '<p class="fw-card__goal">' + esc(c.members + (c.members === 1 ? " Mitglied" : " Mitglieder") + (c.coaches ? " · " + c.coaches + (c.coaches === 1 ? " Coach" : " Coaches") : "")) + "</p>" +
           (b.description ? '<p class="fw-card__about">' + esc(b.description) + "</p>" : "") +
@@ -531,6 +528,15 @@
       ".gbub-card .gbub-card__meta{font:600 13px/1.3 Inter,sans-serif !important;opacity:.75}" +
       ".gbub-card .gbub-card__desc{font:500 14px/1.35 Inter,sans-serif !important;opacity:.85;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}" +
       ".gbub-card__me{position:absolute;top:10px;right:12px;font:700 11px/1 Inter,sans-serif;background:#1D1630;color:#fff;border-radius:999px;padding:5px 9px}" +
+      ".gbub-row{display:flex;align-items:center;gap:14px;cursor:pointer;color:#1D1630}" +
+      ".gbub-row__img{flex:none;width:72px;height:72px;border-radius:50%;overflow:hidden;background:var(--gbub);display:flex;align-items:center;justify-content:center}" +
+      ".gbub-row__img img{width:100%;height:100%;object-fit:cover;display:block}" +
+      ".gbub-row__img svg{width:34px;height:34px}" +
+      ".gbub-row__txt{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:6px}" +
+      ".gbub-row__pills{display:flex;gap:6px}" +
+      ".gbub-row__pills .gbub-card__me{position:static;border:0;cursor:pointer}" +
+      ".gbub-card__me.is-leave{background:#D93A3A !important;color:#fff}" +
+      ".gbub-row .gbub-row__name{font:600 18px/1.2 Inter,sans-serif !important}" +
       ".gbub-card__leave{position:absolute;bottom:10px;right:12px;border:0;background:transparent;color:inherit;font:600 12px Inter,sans-serif;text-decoration:underline;opacity:.7;cursor:pointer}" +
       ".gbub-sheet{position:fixed;inset:0;z-index:10050;background:rgba(20,16,30,.45);display:flex;align-items:flex-end;justify-content:center}" +
       ".gbub-sheet__card{width:100%;max-width:520px;background:#FBF3E2;color:#1D1630;border-radius:24px 24px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;box-sizing:border-box}" +

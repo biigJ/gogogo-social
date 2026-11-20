@@ -28,6 +28,7 @@
     ausdauerTrainings: [],
     zirkelOk: false,
     invites: [],
+    recent: [],
     pendingCreate: null
   };
 
@@ -1791,20 +1792,34 @@
     }
   }
 
+  /* Striche unten: die letzten 7 Tage bis heute (eigene Events, ohne ausgefallene) */
+  function loadRecent() {
+    var id = me();
+    if (!id) return Promise.resolve();
+    var today = berlinToday();
+    return rest(
+      "events?user_id=eq." + encodeURIComponent(id) +
+        "&select=starts_at,status&status=neq.ausgefallen" +
+        "&starts_at=gte." + encodeURIComponent(addDays(today, -6) + "T00:00:00+01:00") +
+        "&starts_at=lt." + encodeURIComponent(addDays(today, 1) + "T00:00:00+01:00") +
+        "&limit=100"
+    ).then(function (rows) {
+      state.recent = rows || [];
+    });
+  }
+
   function progressHtml() {
-    var days;
-    try {
-      days = weekDays();
-    } catch (e) {
-      days = [];
-    }
-    while (days.length < 7) days.push(addDays(berlinToday(), days.length));
+    var today = berlinToday();
+    var days = [];
+    for (var d = 6; d >= 0; d--) days.push(addDays(today, -d));
     var segs = days
       .map(function (iso) {
-        var items = itemsForDay(iso);
+        var items = (state.recent || []).filter(function (ev) {
+          return dayKey(ev.starts_at) === iso;
+        });
         var planned = items.length > 0;
-        var done = items.some(function (it) {
-          return it.ev && it.ev.status === "erledigt";
+        var done = items.some(function (ev) {
+          return ev.status === "erledigt";
         });
         return (
           '<span class="wr-seg' +
@@ -5724,7 +5739,8 @@
       loadEnrollments().catch(function () {}),
       loadCourses().catch(function () {}),
       loadTrainingLists().catch(function () {}),
-      loadInvites().catch(function () {})
+      loadInvites().catch(function () {}),
+      loadRecent().catch(function () {})
     ])
       .then(function () {
         syncZirkelAccess();
