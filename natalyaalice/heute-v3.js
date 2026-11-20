@@ -863,7 +863,8 @@
       id: c.id,
       account_id: c.account_id || c.author_id,
       text: c.text || "",
-      created_at: c.created_at
+      created_at: c.created_at,
+      reply_to_account: c.reply_to_account || null
     });
   }
 
@@ -926,11 +927,16 @@
       });
       return Promise.resolve();
     }
-    return rest(
-      "event_comments?event_id=in.(" +
-        eventIds.map(encodeURIComponent).join(",") +
-        ")&select=id,event_id,account_id,text,created_at&order=created_at.asc&limit=500"
-    )
+    function cq(extra) {
+      return rest(
+        "event_comments?event_id=in.(" +
+          eventIds.map(encodeURIComponent).join(",") +
+          ")&select=id,event_id,account_id,text,created_at" + extra + "&order=created_at.asc&limit=500"
+      );
+    }
+    /* reply_to_account erst nach go-comment-replies.sql */
+    return cq(",reply_to_account")
+      .catch(function () { return cq(""); })
       .then(function (rows) {
         (rows || []).forEach(function (c) {
           pushComment(c.event_id, c);
@@ -1273,7 +1279,14 @@
     if (!list.length) return "";
     function line(c) {
       var nm = String(personOf(c.account_id).name || "").split(" ")[0];
-      return "<strong>" + esc(nm) + "</strong>&nbsp;&nbsp;" + esc(c.text);
+      var to = c.reply_to_account ? String(personOf(c.reply_to_account).name || "").split(" ")[0] : "";
+      return "<strong>" + esc(nm) + "</strong>&nbsp;&nbsp;" + (to ? '<span class="acc-cmt-to">@' + esc(to) + "</span> " : "") + esc(c.text);
+    }
+    /* Tipp auf einen fremden Kommentar: darauf antworten */
+    function replyAttr(c) {
+      return c.account_id && String(c.account_id) !== me() && String(c.id || "").indexOf("local-") !== 0
+        ? ' data-reply-cmt="' + esc(c.id) + '" data-reply-acc="' + esc(c.account_id) + '" data-reply-post="' + esc(postId) + '"'
+        : "";
     }
     var last = list[list.length - 1];
     var older = list.slice(0, -1);
@@ -1281,9 +1294,9 @@
     var long = older.length > 0 || nmLast.length + String(last.text).length + 1 > 44;
     var isOpen = long && state.cmtOpen && state.cmtOpen[String(postId)];
     return '<div class="acc-card__teaser acc-clamp' + (long ? " has-more" : "") + (isOpen ? " is-open" : "") + '">' +
-      (older.length ? '<div class="acc-clamp__older">' + older.map(function (c) { return "<p>" + line(c) + "</p>"; }).join("") + "</div>" : "") +
+      (older.length ? '<div class="acc-clamp__older">' + older.map(function (c) { return "<p" + replyAttr(c) + ">" + line(c) + "</p>"; }).join("") + "</div>" : "") +
       /* div statt button: Safari kürzt Text in Buttons nicht */
-      '<div class="acc-card__my-line acc-clamp__text acc-clamp__one" role="button" tabindex="0" data-open-comments="' + esc(postId) + '">' + line(last) + "</div>" +
+      '<div class="acc-card__my-line acc-clamp__text acc-clamp__one" role="button" tabindex="0" data-open-comments="' + esc(postId) + '"' + replyAttr(last) + ">" + line(last) + "</div>" +
       (long ? '<button type="button" class="acc-clamp__more" data-cmt-more>' + (isOpen ? "weniger" : "mehr") + "</button>" : "") +
       "</div>";
   }
@@ -3454,6 +3467,8 @@
     if (modal) {
       modal.hidden = true;
       modal.dataset.postId = "";
+      modal.dataset.replyTo = "";
+      modal.dataset.replyAcc = "";
     }
     document.body.classList.remove("is-comment-open");
     var input = $("acc-comment-text");
@@ -3470,11 +3485,15 @@
     void list;
   }
 
-  function openComments(postId) {
+  function openComments(postId, reply) {
     if (!postId) return;
     var modal = $("acc-comment-modal");
     if (!modal) return;
     modal.dataset.postId = postId;
+    modal.dataset.replyTo = (reply && reply.id) || "";
+    modal.dataset.replyAcc = (reply && reply.account) || "";
+    var ta0 = $("acc-comment-text");
+    if (ta0) ta0.placeholder = reply && reply.account ? "Antwort an " + String(personOf(reply.account).name || "").split(" ")[0] + " …" : "Schreiben…";
     modal.hidden = false;
     document.body.classList.add("is-comment-open");
     paintCommentModalList(postId);
@@ -3502,15 +3521,18 @@
     });
   }
 
-  function addComment(postId, text) {
+  function addComment(postId, text, reply) {
     text = String(text || "").trim();
     if (!text || !postId || !me()) return;
     var temp = {
       id: "local-" + Date.now(),
       account_id: me(),
       text: text.slice(0, 500),
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      reply_to_account: (reply && reply.account) || null
     };
+    /* Antwort ohne events-UUID (Tagebuch, FFC, Plan): Bezug als @Name im Text */
+    var replyName = reply && reply.account ? String(personOf(reply.account).name || "").split(" ")[0] : "";
     if (!state.comments[postId]) state.comments[postId] = [];
     state.comments[postId].push(temp);
     personOf(me());
@@ -3526,7 +3548,7 @@
       var ownerId = parts[1] || me();
       var day = parts[2] || todayIso();
       var tagged =
-        "⟦ix:" + day + "⟧" + temp.text.slice(0, Math.max(0, 144 - (12 + String(day).length)));
+        "⟦ix:" + day + "⟧" + (replyName ? "@" + replyName + " " : "") + temp.text.slice(0, Math.max(0, 144 - (12 + String(day).length)));
       save = rest("go_community_posts", {
         method: "POST",
         prefer: "return=representation",
@@ -3539,17 +3561,17 @@
       });
     } else if (String(postId).indexOf("ffc-") === 0 || String(postId).indexOf("plan:") === 0) {
       /* Kein events-UUID — permanent über Community-Post-Marker */
-      save = saveEventCommentFallback(postId, temp.text);
+      save = saveEventCommentFallback(postId, replyName ? "@" + replyName + " " + temp.text : temp.text);
     } else {
-      save = rest("event_comments", {
-        method: "POST",
-        prefer: "return=representation",
-        body: {
-          event_id: postId,
-          account_id: me(),
-          text: temp.text
-        }
-      }).catch(function () {
+      var cBody = { event_id: postId, account_id: me(), text: temp.text };
+      var postC = function (b) { return rest("event_comments", { method: "POST", prefer: "return=representation", body: b }); };
+      save = (reply && reply.id
+        ? postC(Object.assign({ reply_to: reply.id, reply_to_account: reply.account }, cBody)).catch(function () {
+            /* ohne go-comment-replies.sql: normal speichern */
+            return postC(cBody);
+          })
+        : postC(cBody)
+      ).catch(function () {
         /* Tabelle fehlt oft — Fallback Community-Post, damit Kommentar bleibt */
         return saveEventCommentFallback(postId, temp.text);
       });
@@ -3576,7 +3598,8 @@
                 id: saved.id,
                 account_id: saved.account_id || saved.author_id || me(),
                 text: resolvedText,
-                created_at: saved.created_at || temp.created_at
+                created_at: saved.created_at || temp.created_at,
+                reply_to_account: saved.reply_to_account || null
               };
               break;
             }
@@ -4243,6 +4266,14 @@
       openEventShare(shareB.getAttribute("data-acc-share"), shareB.getAttribute("data-acc-share-day"));
       return;
     }
+    var replyC = t.closest("[data-reply-cmt]");
+    if (replyC) {
+      openComments(replyC.getAttribute("data-reply-post"), {
+        id: replyC.getAttribute("data-reply-cmt"),
+        account: replyC.getAttribute("data-reply-acc")
+      });
+      return;
+    }
     var openC = t.closest("[data-open-comments]");
     if (openC) {
       openComments(openC.getAttribute("data-open-comments"));
@@ -4606,6 +4637,7 @@
         }
         render();
         saveTodayHint();
+        checkReplies();
         if (!state.readySent) {
           state.readySent = true;
           try { document.dispatchEvent(new CustomEvent("go:aktuell-ready")); } catch (eR) {}
@@ -4626,6 +4658,101 @@
         });
       });
   }
+
+  /* Herz oben rechts: Antworten auf meine Kommentare (go-comment-replies.sql). Roter Punkt = neue Antwort seit dem letzten Tipp. */
+  function replySeenKey() { return "gogogo_reply_seen_" + me(); }
+  function replySeen() {
+    try { return localStorage.getItem(replySeenKey()) || ""; } catch (e) { return ""; }
+  }
+  function paintReplyHeart() {
+    var btn = $("heute-replies");
+    if (!btn) return;
+    var r = state.lastReply;
+    var fresh = !!(r && r.created_at && String(r.created_at) > replySeen());
+    btn.classList.toggle("has-new", fresh);
+    btn.setAttribute("aria-label", fresh ? "Neue Antwort auf Deinen Kommentar" : "Antworten auf Deine Kommentare");
+  }
+  function checkReplies() {
+    if (!me() || state.repliesMissing) return Promise.resolve();
+    var now = Date.now();
+    if (state.repliesAt && now - state.repliesAt < 15000) { paintReplyHeart(); return Promise.resolve(); }
+    state.repliesAt = now;
+    return rest(
+      "event_comments?reply_to_account=eq." + encodeURIComponent(me()) +
+        "&account_id=neq." + encodeURIComponent(me()) +
+        "&select=id,event_id,created_at&order=created_at.desc&limit=1"
+    ).then(function (rows) {
+      state.lastReply = (rows && rows[0]) || null;
+      paintReplyHeart();
+    }).catch(function () {
+      state.repliesMissing = true; /* Spalte fehlt noch */
+    });
+  }
+  function replyThreadText(eventId) {
+    return (state.comments[eventId] || []).map(function (c) {
+      var nm = String(personOf(c.account_id).name || "").split(" ")[0];
+      var to = c.reply_to_account ? "@" + String(personOf(c.reply_to_account).name || "").split(" ")[0] + " " : "";
+      return nm + ": " + to + c.text;
+    }).join("\n\n");
+  }
+  function openReplyEvent(eventId) {
+    eventId = String(eventId);
+    state.cmtOpen = state.cmtOpen || {};
+    state.cmtOpen[eventId] = true;
+    state.walletOpen = eventId;
+    function focus() {
+      var card = document.querySelector('.acc-card[data-event-id="' + eventId.replace(/"/g, "") + '"]');
+      if (!card) return false;
+      if (card.classList.contains("is-wallet")) card.classList.add("is-open");
+      var cl = card.querySelector(".acc-card__teaser.has-more");
+      if (cl && !cl.classList.contains("is-open")) {
+        cl.classList.add("is-open");
+        var mb = cl.querySelector("[data-cmt-more]");
+        if (mb) mb.textContent = "weniger";
+      }
+      setTimeout(function () {
+        try { card.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) { card.scrollIntoView(); }
+      }, 60);
+      return true;
+    }
+    if (focus()) return;
+    /* Event im aktuellen Filter nicht sichtbar: auf Alles stellen */
+    var step = state.filter !== "alles" ? (saveFilter("alles"), refresh()) : Promise.resolve();
+    step.then(function () {
+      if (focus()) return;
+      /* außerhalb des Feeds: Verlauf als Dialog */
+      return rest("event_comments?event_id=eq." + encodeURIComponent(eventId) +
+        "&select=id,event_id,account_id,text,created_at,reply_to_account&order=created_at.asc&limit=100")
+        .then(function (rows) {
+          (rows || []).forEach(function (c) { pushComment(eventId, c); });
+          var pids = [];
+          (rows || []).forEach(function (c) { pids.push(String(c.account_id)); if (c.reply_to_account) pids.push(String(c.reply_to_account)); });
+          return ensurePeople(pids);
+        })
+        .then(function () {
+          var txt = replyThreadText(eventId);
+          if (global.GoDialog && txt) GoDialog.alert("Kommentare", { body: txt, ok: "OK" });
+        })
+        .catch(function () {});
+    });
+  }
+  function onReplyHeart() {
+    function go(r) {
+      if (!r) {
+        if (host && host.toast) host.toast("Noch keine Antworten auf Deine Kommentare");
+        return;
+      }
+      try { localStorage.setItem(replySeenKey(), String(r.created_at)); } catch (e) {}
+      paintReplyHeart();
+      openReplyEvent(r.event_id);
+    }
+    if (state.lastReply) { go(state.lastReply); return; }
+    state.repliesAt = 0;
+    checkReplies().then(function () { go(state.lastReply); });
+  }
+  document.addEventListener("click", function (e) {
+    if (e.target && e.target.closest && e.target.closest("#heute-replies")) { e.preventDefault(); onReplyHeart(); }
+  });
 
   function resetAktuellPaint() {
     state.paintedAktuell = false;
@@ -4695,7 +4822,7 @@
         var postId = modal && modal.dataset.postId;
         var textEl = $("acc-comment-text");
         if (!postId || !textEl) return;
-        addComment(postId, textEl.value);
+        addComment(postId, textEl.value, modal.dataset.replyTo ? { id: modal.dataset.replyTo, account: modal.dataset.replyAcc } : null);
       });
     }
     var commentCancel = $("acc-comment-cancel");
