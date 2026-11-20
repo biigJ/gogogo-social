@@ -2957,12 +2957,10 @@
       '<div class="wr-share-block"><h4>Eventbild</h4>' +
       '<div class="wr-media-prev">' + (photo ? '<img src="' + esc(photo) + '" alt="" />' : "<span>Kein eigenes Bild</span>") + "</div>" +
       '<div class="wr-media-acts">' +
-      '<label class="wr-dayrow__vis">Foto hochladen<input type="file" accept="image/*" data-wr-media-file="event" hidden /></label>' +
-      '<button type="button" class="wr-dayrow__vis" data-wr-media-link="event">Link einfügen</button>' +
+      '<label class="wr-dayrow__vis">' + (photo ? "Foto ändern" : "Foto wählen") + '<input type="file" accept="image/*" data-wr-media-file="event" hidden /></label>' +
       (photo ? '<button type="button" class="wr-dayrow__vis" data-wr-media-del="event">Entfernen</button>' : "") +
       "</div></div>" +
       '<div class="wr-share-block"><h4>Übungen</h4>' +
-      '<p class="wr-sheet-hint">Video von YouTube, Instagram oder TikTok als Link, oder ein eigenes Foto. Deins siehst Du im Workout zuerst.</p>' +
       exHtml + "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-media-back="1">Zurück</button></div>'
     );
