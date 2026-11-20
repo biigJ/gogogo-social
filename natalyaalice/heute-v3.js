@@ -767,9 +767,15 @@
     return mergeEventMediaFromPosts(events);
   }
 
+  /* Zirkel-Login gehört zu einem anderen gogogo-Konto (index.html GoFfcSession): nichts davon zeigen */
+  function ffcUsable() {
+    if (!global.FFC || !FFC.user || !FFC.user()) return false;
+    return !(global.GoFfcSession && GoFfcSession.foreign && GoFfcSession.foreign());
+  }
+
   function loadFfcEvents() {
     state.ffcEvents = [];
-    if (!global.FFC || !FFC.user || !FFC.user() || !FFC.events) return Promise.resolve();
+    if (!ffcUsable() || !FFC.events) return Promise.resolve();
     try {
       state.ffcEvents = FFC.events() || [];
     } catch (e) {
@@ -780,7 +786,7 @@
 
   function loadFfcPosts() {
     state.ffcPosts = [];
-    if (!global.FFC || !FFC.user || !FFC.user()) return Promise.resolve();
+    if (!ffcUsable()) return Promise.resolve();
     var load =
       FFC.refreshFeed
         ? Promise.resolve(FFC.refreshFeed())
@@ -2180,8 +2186,16 @@
       else upcoming.push(item);
     });
 
+    /* Eigener Zirkel steht schon als gogogo-Event im Feed (gleiche Startzeit ±10 Min.): FFC-Kopie weglassen */
+    var ownZirkelTimes = (state.events || []).filter(function (e) {
+      return e && String(e.user_id) === me() && e.category === "zirkel";
+    }).map(function (e) { return new Date(e.starts_at).getTime(); });
     ffc.forEach(function (ev) {
       if (flags.groupOnly && !ev.is_mine && ev.my_going !== true) return;
+      if (ev.is_mine) {
+        var t = new Date(ev.starts_at).getTime();
+        if (ownZirkelTimes.some(function (x) { return Math.abs(x - t) <= 600000; })) return;
+      }
       var item = {
         kind: "ffc",
         starts_at: ev.starts_at,
