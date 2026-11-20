@@ -2922,6 +2922,7 @@
   function paintMediaSheet() {
     var ev = mediaEvent();
     if (!ev) return;
+    if (state.media.edit) { paintMediaEditor(); return; }
     var M = global.GoExMedia;
     var photo = ev.photo_url || "";
     var names = state.media.names;
@@ -2932,21 +2933,26 @@
         ? "Beim Zirkel wählst Du die Stationen im Workout."
         : "Für diese Einheit sind keine Übungen hinterlegt.") + "</p>";
     } else {
+      /* Je Übung: Name, rechts Foto-Vorschau und Video-Vorschau, dann Stift (Bearbeiten) */
       exHtml = names.map(function (n) {
-        var url = M ? M.urlFor(n) : "";
-        var info = url && M ? M.parse(url) : null;
-        var mine = M && M.mine ? M.mine(n) : null;
+        var myImg = M && M.mineOf ? M.mineOf(n, "img") : null;
+        var myVid = M && M.mineOf ? M.mineOf(n, "video") : null;
+        var vidUrl = myVid ? myVid.url : (M ? M.urlFor(n) : "");
+        var vid = vidUrl && M ? M.parse(vidUrl) : null;
+        if (vid && vid.kind === "img") vid = null;
+        var tile = function (kind, url, thumb, label) {
+          return url
+            ? '<button type="button" class="wr-mex__thumb" data-wr-media-open="' + esc(url) + '" aria-label="' + label + ' ansehen">' +
+              (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" />' : "") +
+              (kind === "video" ? '<span class="wr-mex__play">' + (M ? M.playIcon : "") + "</span>" : "") + "</button>"
+            : '<button type="button" class="wr-mex__thumb is-empty" data-wr-media-edit="1">' + label + "</button>";
+        };
         return '<div class="wr-mex" data-wr-mex="' + esc(n) + '">' +
-          (info
-            ? '<button type="button" class="wr-mex__thumb" data-wr-media-play="' + esc(n) + '" aria-label="Ansehen">' +
-              (info.thumb ? '<img src="' + esc(info.thumb) + '" alt="" loading="lazy" />' : "") +
-              '<span class="wr-mex__play">' + (M ? M.playIcon : "") + "</span></button>"
-            : '<span class="wr-mex__thumb is-empty"></span>') +
-          '<span class="wr-mex__name">' + esc(n) +
-          (info ? '<small>' + esc(mine ? "Dein " + (info.kind === "img" ? "Foto" : info.label) : info.label) + "</small>" : "") + "</span>" +
-          '<label class="wr-dayrow__vis wr-mex__btn">Foto<input type="file" accept="image/*" data-wr-media-file="ex" hidden /></label>' +
-          '<button type="button" class="wr-dayrow__vis wr-mex__btn" data-wr-media-link="ex">Link</button>' +
-          (mine ? '<button type="button" class="wr-mex__del" data-wr-media-exdel="' + esc(mine.id) + '" aria-label="Eigenes entfernen">×</button>' : "") +
+          '<span class="wr-mex__name">' + esc(n) + "</span>" +
+          tile("img", myImg ? myImg.url : "", myImg ? myImg.url : "", "Foto") +
+          tile("video", vid ? vid.url : "", vid ? vid.thumb : "", "Link") +
+          '<button type="button" class="wr-mex__pen" data-wr-media-edit="1" aria-label="Bearbeiten">' +
+          '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/></svg></button>' +
           "</div>";
       }).join("");
     }
@@ -2957,16 +2963,91 @@
       '<div class="wr-share-block"><h4>Eventbild</h4>' +
       '<div class="wr-media-prev">' + (photo ? '<img src="' + esc(photo) + '" alt="" />' : "<span>Kein eigenes Bild</span>") + "</div>" +
       '<div class="wr-media-acts">' +
-      '<label class="wr-dayrow__vis">Foto hochladen<input type="file" accept="image/*" data-wr-media-file="event" hidden /></label>' +
-      '<button type="button" class="wr-dayrow__vis" data-wr-media-link="event">Link einfügen</button>' +
+      '<label class="wr-dayrow__vis">' + (photo ? "Foto ändern" : "Foto wählen") + '<input type="file" accept="image/*" data-wr-media-file="event" hidden /></label>' +
       (photo ? '<button type="button" class="wr-dayrow__vis" data-wr-media-del="event">Entfernen</button>' : "") +
       "</div></div>" +
       '<div class="wr-share-block"><h4>Übungen</h4>' +
-      '<p class="wr-sheet-hint">Video von YouTube, Instagram oder TikTok als Link, oder ein eigenes Foto. Deins siehst Du im Workout zuerst.</p>' +
       exHtml + "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-media-back="1">Zurück</button></div>'
     );
   }
+  /* Übung bearbeiten: links Foto (antippen = wählen), rechts Video-Link; Speichern ersetzt die eigenen Einträge */
+  function paintMediaEditor() {
+    var ed = state.media.edit;
+    var M = global.GoExMedia;
+    var vid = ed.link && M ? M.parse(ed.link) : null;
+    openSheet(
+      '<p class="wr-sheet-title">' + esc(ed.name) + "</p>" +
+      '<div class="wr-mex-ed">' +
+      '<label class="wr-mex-ed__tile">' +
+      (ed.photo ? '<img src="' + esc(ed.photo) + '" alt="" />' : "<span>Foto</span>") +
+      '<input type="file" accept="image/*" data-wr-media-file="exedit" hidden /></label>' +
+      '<div class="wr-mex-ed__tile wr-mex-ed__tile--link">' +
+      (vid && vid.thumb ? '<img src="' + esc(vid.thumb) + '" alt="" />' : "") +
+      '<input type="url" inputmode="url" placeholder="Video-Link" value="' + esc(ed.link || "") + '" data-wr-media-linkin="1" /></div>' +
+      "</div>" +
+      (ed.photo || ed.origLink ? '<button type="button" class="wr-mex-ed__clear" data-wr-media-clear="1">Eigene Einträge entfernen</button>' : "") +
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-media-edcancel="1">Abbrechen</button>' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-media-edsave="1">Speichern</button></div>'
+    );
+  }
+  function openMediaEditor(name) {
+    var M = global.GoExMedia;
+    var img = M && M.mineOf ? M.mineOf(name, "img") : null;
+    var vid = M && M.mineOf ? M.mineOf(name, "video") : null;
+    state.media.edit = {
+      name: name, photo: img ? img.url : "", file: null, origImg: img, origVid: vid,
+      link: vid ? vid.url : "", origLink: vid ? vid.url : ""
+    };
+    paintMediaSheet();
+  }
+  function saveMediaEditor() {
+    var ed = state.media && state.media.edit;
+    var M = global.GoExMedia;
+    if (!ed || !M) return;
+    var inp = document.querySelector("[data-wr-media-linkin]");
+    var link = String(inp ? inp.value : ed.link || "").trim();
+    if (link && !/^https?:\/\//i.test(link)) link = "https://" + link;
+    var linkChanged = link !== (ed.origLink || "");
+    if (link && linkChanged) {
+      var info = M.parse(link);
+      if (!info || info.kind === "img") { if (host.toast) host.toast("Bitte einen Video-Link (YouTube, Instagram, TikTok)"); return; }
+    }
+    var jobs = [];
+    var done = [];
+    function del(row) {
+      return row ? rest("go_exercise_links?id=eq." + encodeURIComponent(row.id) + "&added_by=eq." + encodeURIComponent(me()), {
+        method: "DELETE", prefer: "return=minimal"
+      }).catch(function () {}) : Promise.resolve();
+    }
+    function add(url) {
+      return rest("go_exercise_links", { method: "POST", prefer: "return=minimal",
+        body: { name_key: M.key(ed.name), name: ed.name, url: url, added_by: me() } });
+    }
+    if (ed.file) {
+      jobs.push(M.uploadImage(ed.file, "exercises").then(function (url) {
+        return del(ed.origImg).then(function () { return add(url); });
+      }).then(function () { done.push("Foto"); }));
+    } else if (!ed.photo && ed.origImg) {
+      jobs.push(del(ed.origImg));
+    }
+    if (linkChanged) {
+      jobs.push(del(ed.origVid).then(function () { return link ? add(link).then(function () { done.push("Video-Link"); }) : null; }));
+    }
+    var btn = document.querySelector("[data-wr-media-edsave]");
+    if (btn) btn.disabled = true;
+    Promise.all(jobs).then(function () { return M.reload(); }).then(function () {
+      state.media.edit = null;
+      paintMediaSheet();
+      var msg = done.length === 2 ? "Foto und Video-Link gespeichert" : done.length ? done[0] + " gespeichert" : "Gespeichert";
+      if (global.GoDialog) GoDialog.alert(msg); else if (host.toast) host.toast(msg);
+    }).catch(function (err) {
+      if (btn) btn.disabled = false;
+      var m = String((err && err.message) || "");
+      if (host.toast) host.toast(/duplicate|23505/.test(m) ? "Diesen Link gibt es bei der Übung schon" : m || "Speichern ging gerade nicht");
+    });
+  }
+
   function saveEventPhoto(url) {
     var ev = mediaEvent();
     if (!ev) return Promise.resolve();
@@ -3004,8 +3085,33 @@
     return "";
   }
   document.addEventListener("click", function (e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-media-back],[data-wr-media-link],[data-wr-media-del],[data-wr-media-play],[data-wr-media-exdel]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-media-back],[data-wr-media-link],[data-wr-media-del],[data-wr-media-play],[data-wr-media-exdel],[data-wr-media-edit],[data-wr-media-open],[data-wr-media-edsave],[data-wr-media-edcancel],[data-wr-media-clear]") : null;
     if (!t || !state.media) return;
+    if (t.hasAttribute("data-wr-media-edit")) {
+      var rowE = t.closest("[data-wr-mex]");
+      if (rowE) { var nm = rowE.getAttribute("data-wr-mex"); setTimeout(function () { openMediaEditor(nm); }, 0); }
+      return;
+    }
+    if (t.hasAttribute("data-wr-media-open")) {
+      var rowO = t.closest("[data-wr-mex]");
+      if (global.GoExMedia) GoExMedia.open(rowO ? rowO.getAttribute("data-wr-mex") : "", t.getAttribute("data-wr-media-open"));
+      return;
+    }
+    if (t.hasAttribute("data-wr-media-edsave")) { saveMediaEditor(); return; }
+    if (t.hasAttribute("data-wr-media-edcancel")) {
+      setTimeout(function () { if (state.media) { state.media.edit = null; paintMediaSheet(); } }, 0);
+      return;
+    }
+    if (t.hasAttribute("data-wr-media-clear")) {
+      var edc = state.media.edit;
+      if (edc) {
+        var li = document.querySelector("[data-wr-media-linkin]");
+        if (li) li.value = "";
+        edc.link = ""; edc.photo = ""; edc.file = null;
+        setTimeout(paintMediaSheet, 0);
+      }
+      return;
+    }
     if (t.hasAttribute("data-wr-media-back")) {
       var dirty = state.mediaDirty;
       state.media = null;
@@ -3056,6 +3162,16 @@
     var file = inp.files && inp.files[0];
     if (!file || !global.GoExMedia || !GoExMedia.uploadImage) return;
     var kind = inp.getAttribute("data-wr-media-file");
+    if (kind === "exedit") {
+      var edf = state.media.edit;
+      if (!edf) return;
+      var li2 = document.querySelector("[data-wr-media-linkin]");
+      if (li2) edf.link = li2.value;
+      edf.file = file;
+      edf.photo = URL.createObjectURL(file);
+      paintMediaSheet();
+      return;
+    }
     var row = inp.closest("[data-wr-mex]");
     var exName = row ? row.getAttribute("data-wr-mex") : "";
     if (host.toast) host.toast("Lade Foto hoch …");
@@ -3378,8 +3494,19 @@
       requestAnimationFrame(syncSurface);
       return;
     }
+    /* Offenes Sheet (Tage bearbeiten, Media …) über den Neuaufbau retten, sonst ist es weg
+       und body.wr-sheet-open blendet die Pill weiter aus */
+    var oldSheet = $("wr-sheet");
+    var keepSheet = oldSheet && !oldSheet.hidden ? oldSheet : null;
+    if (keepSheet) keepSheet.remove();
     root.innerHTML = nextHtml;
     root.__wrHtml = nextHtml;
+    if (keepSheet) {
+      var freshSheet = $("wr-sheet");
+      if (freshSheet) freshSheet.replaceWith(keepSheet);
+    } else {
+      document.body.classList.remove("wr-sheet-open");
+    }
     if (state.lastDeleted) showUndoBar();
     var track = $("wr-vtrack");
     if (track && track.clientHeight) {

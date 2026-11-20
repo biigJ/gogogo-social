@@ -239,6 +239,17 @@
     set: function (name, url) { if (url) map[key(name)] = url; else delete map[key(name)]; },
     urlFor: urlFor,
     mine: function (name) { return mineFor(key(name)); },
+    /* eigenes Foto (kind "img") oder eigener Video-Link (kind "video") zu einer Übung, neuester zuerst */
+    mineOf: function (name, kind) {
+      var me = meId(), k = key(name);
+      if (!me) return null;
+      return userLinks.filter(function (l) {
+        if (l.name_key !== k || String(l.added_by) !== me) return false;
+        var info = parse(l.url);
+        var isImg = !!(info && info.kind === "img");
+        return kind === "img" ? isImg : !isImg;
+      }).sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); })[0] || null;
+    },
     uploadImage: uploadImage,
     linksFor: linksFor,
     parse: parse,
