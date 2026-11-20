@@ -10526,7 +10526,14 @@
                 try { mergeFfcFriends(); syncFfcGroupIntoTeam(); } catch (eN) {}
                 return;
               }
-              markFfcForeign(true);
+              /* Fremd nur, wenn der Zirkel-Nickname einem anderen gogogo-Konto gehört
+                 (z. B. Coach testet als Coachee). Sonst ist es mein Zirkel-Konto mit anderem Namen. */
+              return rest("go_accounts?nickname=ilike." + encodeURIComponent(likeExact(theirs)) + "&select=id&limit=3")
+                .then(function (others) {
+                  var foreign = (others || []).some(function (o) { return o && String(o.id) !== String(sessionAccount.id); });
+                  markFfcForeign(foreign);
+                  if (!foreign) { try { mergeFfcFriends(); syncFfcGroupIntoTeam(); } catch (eN2) {} }
+                });
             })
             .catch(function () {});
           return;
@@ -19290,25 +19297,43 @@
           if (groups.length) {
             var gwrap = document.createElement("div");
             gwrap.className = "invite-group";
+            /* Gruppe/Circle mit Haken wie bei Personen: setzt bzw. entfernt die Haken aller Mitglieder in der Liste */
             groups.forEach(function (group) {
               if (!group) return;
-              var gbtn = document.createElement("button");
-              gbtn.type = "button";
-              gbtn.className = "invite-group__btn";
-              gbtn.textContent = "Gruppe: " + (group.name || "Gruppe");
-              gbtn.setAttribute("data-group-name", String(group.name || "").trim().toLowerCase());
-              gbtn.addEventListener("click", function () {
-                var members = (group.members || []).map(String);
+              var members = (group.members || []).map(String);
+              var grow = document.createElement("div");
+              grow.className = "invite-person invite-person--group";
+              grow.setAttribute("data-group-members", members.join(","));
+              var gph = document.createElement("span");
+              gph.className = "invite-person__ph";
+              gph.textContent = String(group.name || "G").slice(0, 1).toUpperCase();
+              grow.appendChild(gph);
+              var gname = document.createElement("span");
+              gname.className = "invite-person__name";
+              gname.textContent = "Gruppe: " + (group.name || "Gruppe");
+              gname.setAttribute("data-group-name", String(group.name || "").trim().toLowerCase());
+              grow.appendChild(gname);
+              var gcheck = document.createElement("button");
+              gcheck.type = "button";
+              gcheck.className = "invite-check";
+              gcheck.setAttribute("aria-label", "Gruppe auswählen");
+              gcheck.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+              gcheck.addEventListener("click", function () {
+                var on = !gcheck.classList.contains("is-on");
+                gcheck.classList.toggle("is-on", on);
                 list.forEach(function (person) {
                   if (!person || members.indexOf(String(person.id)) < 0) return;
                   if (personAway(person, iso)) return;
                   var id = String(person.id);
-                  if (!pendingInvitePeople.some(function (item) { return String(item.id) === id; })) pendingInvitePeople.push(person);
-                  var row = box.querySelector('.invite-person[data-id="' + id.replace(/"/g, '\"') + '"] .invite-check');
-                  if (row) row.classList.add("is-on");
+                  var has = pendingInvitePeople.some(function (item) { return String(item.id) === id; });
+                  if (on && !has) pendingInvitePeople.push(person);
+                  if (!on && has) pendingInvitePeople = pendingInvitePeople.filter(function (item) { return String(item.id) !== id; });
+                  var c = box.querySelector('.invite-person[data-id="' + id.replace(/"/g, '\\"') + '"] .invite-check');
+                  if (c) c.classList.toggle("is-on", on);
                 });
               });
-              gwrap.appendChild(gbtn);
+              grow.appendChild(gcheck);
+              gwrap.appendChild(grow);
             });
             box.appendChild(gwrap);
             /* Gruppen, die auch FFC-Circle sind: „XYZ Circle“ */
@@ -19319,7 +19344,7 @@
                   var n = b.getAttribute("data-group-name");
                   if (n && names.indexOf(n) >= 0) {
                     var g = myGroups().filter(function (x) { return String(x && x.name || "").trim().toLowerCase() === n; })[0];
-                    b.textContent = (g && g.name ? g.name : n) + " Circle";
+                    b.textContent = "Circle " + (g && g.name ? g.name : n);
                   }
                 });
               }).catch(function () {});
@@ -19371,6 +19396,16 @@
               if (on) pendingInvitePeople = pendingInvitePeople.filter(function (item) { return String(item.id) !== id; });
               else pendingInvitePeople.push(person);
               check.classList.toggle("is-on", !on);
+              /* Gruppen-Haken nur, solange alle erreichbaren Mitglieder ausgewählt sind */
+              [].forEach.call(box.querySelectorAll(".invite-person--group"), function (gr) {
+                var mem = String(gr.getAttribute("data-group-members") || "").split(",").filter(Boolean);
+                var inList = list.filter(function (pp) { return pp && mem.indexOf(String(pp.id)) >= 0 && !personAway(pp, iso); });
+                var all = inList.length > 0 && inList.every(function (pp) {
+                  return pendingInvitePeople.some(function (item) { return String(item.id) === String(pp.id); });
+                });
+                var gc = gr.querySelector(".invite-check");
+                if (gc) gc.classList.toggle("is-on", all);
+              });
             });
             row.appendChild(name);
             row.appendChild(check);
@@ -24223,6 +24258,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-7"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-8"></script>
 </body>
 </html>
