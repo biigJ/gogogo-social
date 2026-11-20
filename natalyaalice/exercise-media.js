@@ -6,6 +6,8 @@
  *   GoExMedia.parse(url)               → { kind, embed, thumb, label } oder null
  *   GoExMedia.open(name, url)          → Bottom-Sheet mit eingebettetem Video (lädt erst nach dem Antippen)
  *   GoExMedia.key(name)                → Schlüssel für die Bibliothek
+ *   GoExMedia.uploadImage(file, dir)   → Foto verkleinern, in den öffentlichen Bucket go-covers laden → URL
+ *   Eigene Links/Fotos (go_exercise_links.added_by = ich) gehen beim Abspielen vor.
  *   GoExMedia.playIcon                 → SVG
  *
  * Wird von /workout/ und vom Kurs-Editor genutzt.
@@ -32,6 +34,7 @@
     ".gxm-frame--yt{aspect-ratio:16/9}.gxm-frame--short{aspect-ratio:9/16;max-height:70vh;margin:0 auto}" +
     ".gxm-frame--ig{aspect-ratio:4/5.6;background:#fff}" +
     ".gxm-frame iframe{position:absolute;inset:0;width:100%;height:100%;border:0}" +
+    ".gxm-img{display:block;width:100%;max-height:70vh;object-fit:contain;border-radius:14px;background:#111}" +
     ".gxm-note{margin:8px 0 0;font-size:12px;color:rgba(42,33,24,.6)}" +
     ".gxm-row{display:flex;gap:8px;margin-top:12px}" +
     ".gxm-row a,.gxm-row button{flex:1;display:flex;align-items:center;justify-content:center;min-height:46px;border-radius:999px;font:inherit;font-weight:700;font-size:15px;text-decoration:none;cursor:pointer}" +
@@ -77,6 +80,9 @@
       var kind = m[1].toLowerCase() === "p" ? "p" : "reel";
       return { kind: "ig", label: "Instagram", embed: "https://www.instagram.com/" + kind + "/" + m[2] + "/embed", thumb: "", url: u };
     }
+    if (/\/storage\/v1\/object\/public\//i.test(u) || /\.(jpe?g|png|webp|gif)(\?|#|$)/i.test(u)) {
+      return { kind: "img", label: "Foto", embed: "", thumb: u, url: u };
+    }
     m = u.match(/tiktok\.com\/@[^\/]+\/video\/(\d+)/i);
     if (m) return { kind: "short", label: "TikTok", embed: "https://www.tiktok.com/embed/v2/" + m[1], thumb: "", url: u };
     return { kind: "link", label: "Link", embed: "", thumb: "", url: u };
@@ -107,10 +113,56 @@
     });
   }
 
-  /* gogogo-Link zuerst, sonst der Nutzer-Link mit den meisten Sternen */
+  function meId() {
+    try { return host && host.me ? String(host.me() || "") : ""; } catch (e) { return ""; }
+  }
+  function mineFor(k) {
+    var me = meId();
+    if (!me) return null;
+    return userLinks.filter(function (l) { return l.name_key === k && String(l.added_by) === me; })
+      .sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); })[0] || null;
+  }
+
+  /* eigener Link/Foto zuerst, dann gogogo-Link, sonst der Nutzer-Link mit den meisten Sternen */
   function urlFor(name) {
     var k = key(name);
-    return map[k] || userBest[k] || "";
+    var mine = mineFor(k);
+    return (mine && mine.url) || map[k] || userBest[k] || "";
+  }
+
+  function shrink(file, maxSide) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var src = URL.createObjectURL(file);
+      img.onload = function () {
+        var k = Math.min(1, maxSide / Math.max(img.width, img.height));
+        var cv = document.createElement("canvas");
+        cv.width = Math.round(img.width * k);
+        cv.height = Math.round(img.height * k);
+        cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(src);
+        cv.toBlob(function (b) { if (b) resolve(b); else reject(new Error("Bild nicht lesbar")); }, "image/jpeg", 0.85);
+      };
+      img.onerror = function () { URL.revokeObjectURL(src); reject(new Error("Bild nicht lesbar")); };
+      img.src = src;
+    });
+  }
+
+  /* Foto in den öffentlichen Bucket go-covers (go-covers-bucket.sql) */
+  function uploadImage(file, dir) {
+    var st = host && host.storage;
+    if (!st || !file) return Promise.reject(new Error("Upload nicht verfügbar"));
+    var path = (dir || "media") + "/" + (meId() || "x") + "-" + Date.now() + ".jpg";
+    return shrink(file, 1400).then(function (blob) {
+      return fetch(st.url + "/storage/v1/object/go-covers/" + path, {
+        method: "POST",
+        headers: { apikey: st.key, Authorization: "Bearer " + st.key, "Content-Type": "image/jpeg", "x-upsert": "true" },
+        body: blob
+      });
+    }).then(function (r) {
+      if (!r.ok) return r.text().then(function (t) { throw new Error(/Bucket not found/i.test(t) ? "Speicher fehlt: go-covers-bucket.sql ausführen" : "Upload fehlgeschlagen"); });
+      return st.url + "/storage/v1/object/public/go-covers/" + path;
+    });
   }
 
   /* Alle Links einer Übung: gogogo zuerst, dann Nutzer nach Sternen */
@@ -127,11 +179,24 @@
   function open(name, url) {
     var info = parse(url || urlFor(name));
     if (!info) return;
-    if (!info.embed) {
+    if (!info.embed && info.kind !== "img") {
       global.open(info.url, "_blank", "noopener");
       return;
     }
     ensureCss();
+    if (info.kind === "img") {
+      var wi = document.createElement("div");
+      wi.className = "gxm-sheet";
+      wi.setAttribute("role", "dialog");
+      wi.innerHTML = '<div class="gxm-card"><h2>' + esc(name || "Übung") + "</h2>" +
+        '<img class="gxm-img" src="' + esc(info.url) + '" alt="" />' +
+        '<div class="gxm-row"><button type="button" data-gxm-close>Schließen</button></div></div>';
+      wi.addEventListener("click", function (e) {
+        if (e.target === wi || (e.target.closest && e.target.closest("[data-gxm-close]"))) wi.remove();
+      });
+      document.body.appendChild(wi);
+      return;
+    }
     var wrap = document.createElement("div");
     wrap.className = "gxm-sheet";
     wrap.setAttribute("role", "dialog");
@@ -173,6 +238,8 @@
     reload: function () { loading = null; return load(); },
     set: function (name, url) { if (url) map[key(name)] = url; else delete map[key(name)]; },
     urlFor: urlFor,
+    mine: function (name) { return mineFor(key(name)); },
+    uploadImage: uploadImage,
     linksFor: linksFor,
     parse: parse,
     open: open,
