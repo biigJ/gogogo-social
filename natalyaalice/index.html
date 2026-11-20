@@ -8218,9 +8218,9 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-72"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-73"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-54"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-55"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -13195,12 +13195,20 @@
           });
       }
 
-      /* Admin (Event-Ersteller): Start anhalten / jetzt freigeben (10 s Countdown) */
+      /* Admin (Event-Ersteller): Countdown anhalten / wieder starten. Steht in events.note,
+         alle Teilnehmer (Woche, Aktuell, Workout) lesen es alle 5 s mit.
+         Starten: vor der Startzeit → Countdown auf die Startzeit, danach → 1 Minute Countdown */
       function zirkelAdminStart(eventId, action) {
-        return rest("events?id=eq." + encodeURIComponent(eventId) + "&select=note").then(function (rows) {
+        return rest("events?id=eq." + encodeURIComponent(eventId) + "&select=note,starts_at").then(function (rows) {
           var note = rows && rows[0] ? rows[0].note : "";
+          var startMs = rows && rows[0] ? new Date(rows[0].starts_at).getTime() : 0;
           if (action === "hold") note = GoZirkelSetup.withFlag(GoZirkelSetup.withFlag(note, "go", null), "hold", 1);
-          else note = GoZirkelSetup.withFlag(GoZirkelSetup.withFlag(note, "hold", null), "go", Math.floor(Date.now() / 1000) + 10);
+          else {
+            note = GoZirkelSetup.withFlag(note, "hold", null);
+            note = startMs > Date.now() + 5000
+              ? GoZirkelSetup.withFlag(note, "go", null)
+              : GoZirkelSetup.withFlag(note, "go", Math.floor(Date.now() / 1000) + 60);
+          }
           return rest("events?id=eq." + encodeURIComponent(eventId), {
             method: "PATCH",
             prefer: "return=minimal",
@@ -24302,6 +24310,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-9"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-10"></script>
 </body>
 </html>
