@@ -1005,6 +1005,21 @@
     document.addEventListener("visibilitychange", function () { if (!document.hidden) tickWhenLines(); });
   }
 
+  /* Zirkel vom Ersteller angehalten bzw. neu gestartet (events.note hold/go): für alle Teilnehmer sichtbar */
+  function zirkelWhen(ev) {
+    if (!ev || !ev.note || !global.GoZirkelSetup) return "";
+    var z = GoZirkelSetup.parse(ev.note);
+    if (!z || dayKey(ev.starts_at) !== todayIso() || ev.status === "erledigt") return "";
+    var base = "Heute" + (timeLabel(ev.starts_at) ? " · " + timeLabel(ev.starts_at) : "");
+    if (z.hold && !z.goAt) return base + " · Countdown angehalten";
+    if (z.goAt) {
+      var ms = z.goAt - Date.now();
+      if (ms > 0) return base + " · Start in " + Math.max(1, Math.ceil(ms / 60000)) + " Min.";
+      return base + " · läuft";
+    }
+    return "";
+  }
+
   function whenLine(isoTs) {
     var day = dayKey(isoTs);
     var today = todayIso();
@@ -1881,8 +1896,8 @@
       emoji: emoji,
       actions: (tools || "") + (actions || ""),
       author: authorHtml(p, true),
-      when: whenLine(ev.starts_at),
-      whenTs: ev.starts_at,
+      when: zirkelWhen(ev) || whenLine(ev.starts_at),
+      whenTs: zirkelWhen(ev) ? "" : ev.starts_at,
       title: title,
       place: ev.location || "",
       desc:

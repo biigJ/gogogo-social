@@ -1671,7 +1671,7 @@
       }).catch(()=>{});
     }
     if(sync.hold){
-      startBtn.disabled = true; startBtn.textContent = 'Wartet auf Start durch Admin';
+      startBtn.disabled = true; startBtn.textContent = 'Countdown angehalten';
       return;
     }
     const diff = Math.round((sync.startAt - now)/1000);

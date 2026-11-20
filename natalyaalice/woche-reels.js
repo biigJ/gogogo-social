@@ -237,7 +237,7 @@
     return GoZirkelSetup.label(z);
   }
 
-  /* Admin = Ersteller: am Eventtag Start anhalten oder sofort freigeben */
+  /* Admin = Ersteller: am Eventtag Countdown anhalten bzw. wieder starten (für alle Teilnehmer synchron) */
   function zirkelAdminHtml(ev, z, iso) {
     if (!z || !ev || String(ev.user_id) !== String(me())) return "";
     if (ev.status === "erledigt" || iso !== berlinToday()) return "";
@@ -245,7 +245,7 @@
     return (
       '<button type="button" class="go-online-cta go-online-cta--ghost" data-wr-zadmin="' +
       (held ? "go" : "hold") + '" data-id="' + esc(ev.id) + '">' +
-      (held ? "Jetzt starten" : "Start anhalten") +
+      (held ? "Countdown starten" : "Countdown anhalten") +
       "</button>"
     );
   }
@@ -1325,7 +1325,7 @@
     var isZirkel = cat === "zirkel" || /zirkel/i.test(String(ev.title || ""));
     var cd = isZirkel
       ? zSet && zSet.hold && !zSet.goAt
-        ? '<p class="wr-zirkel-cd">Start angehalten</p>'
+        ? '<p class="wr-zirkel-cd">Countdown angehalten</p>'
         : zirkelCountdownHtml(zSet && zSet.goAt ? new Date(zSet.goAt).toISOString() : ev.starts_at)
       : "";
     return (
@@ -4614,7 +4614,7 @@
       t.disabled = true;
       GoZirkelSync.admin(t.getAttribute("data-id"), zAct)
         .then(function () {
-          if (host.toast) host.toast(zAct === "go" ? "Start in 10 Sekunden" : "Start angehalten");
+          if (host.toast) host.toast(zAct === "go" ? "Countdown läuft" : "Countdown angehalten");
           return refreshKeepDay(berlinToday());
         })
         .catch(function () {
