@@ -8188,7 +8188,7 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-70"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-71"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-50"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
@@ -10474,6 +10474,7 @@
       function ffcMine() {
         return !!(window.FFC && FFC.user && FFC.user()) && !ffcForeign;
       }
+      window.GoFfcSession = { foreign: function () { return ffcForeign; } };
       function markFfcForeign(on) {
         if (ffcForeign === on) return;
         ffcForeign = on;
@@ -10482,13 +10483,30 @@
         teamPeople = (teamPeople || []).filter(function (p) { return !(p && p.isFfcOnly); });
         ffcCircleByNick = {};
         if (document.body.dataset.plan === "team" && typeof renderTeam === "function") renderTeam();
+        if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
         try { paintHeuteExtras(); } catch (eF) {}
       }
       function adoptFfcNickname(profile) {
         if (!sessionMode || !sessionAccount || !profile) return;
         var mine = String(sessionAccount.nickname || "");
         var theirs = String(profile.nickname || "");
-        if (mine && theirs) markFfcForeign(mine.toLowerCase() !== theirs.toLowerCase());
+        if (mine && theirs && mine.toLowerCase() !== theirs.toLowerCase()) {
+          /* Gemerkte Sitzung kann einen alten Nickname haben: erst in der Datenbank nachsehen */
+          rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id) + "&select=nickname")
+            .then(function (rows) {
+              var fresh = String((rows && rows[0] && rows[0].nickname) || "");
+              if (fresh && fresh.toLowerCase() === theirs.toLowerCase()) {
+                sessionAccount.nickname = fresh;
+                if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+                markFfcForeign(false);
+                try { mergeFfcFriends(); syncFfcGroupIntoTeam(); } catch (eN) {}
+                return;
+              }
+              markFfcForeign(true);
+            })
+            .catch(function () {});
+          return;
+        }
         if (mine && !theirs && window.FFC) {
           FFC.setNickname(mine);
           return;
