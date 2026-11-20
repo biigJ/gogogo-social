@@ -8166,7 +8166,7 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-9"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-10"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-5"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
@@ -22509,6 +22509,20 @@
         var nickRaw = (account && account.nickname) || (profilePerson && profilePerson.nickname) || (mine && sessionAccount && sessionAccount.nickname) || "";
         if (idNick) idNick.textContent = nickRaw ? ("@" + String(nickRaw).replace(/^@/, "")) : "";
         document.getElementById("profile-goal").textContent = (account && account.training_goal) || (mine ? "Ziel wählen" : "");
+        /* Vom Coach/Admin ergänzte Ziele (go_accounts.coach_goals, go-admin-nutzer.sql) hinten anhängen */
+        var goalFor = String((account && account.id) || "");
+        if (goalFor) {
+          rest("go_accounts?id=eq." + encodeURIComponent(goalFor) + "&select=training_goal,coach_goals")
+            .then(function (rows) {
+              var r = rows && rows[0];
+              if (!r || !r.coach_goals || !profilePerson || String(profilePerson.id || "") !== goalFor) return;
+              var split = function (v) { return String(v || "").split(/\s*,\s*/).filter(Boolean); };
+              var own = split(r.training_goal);
+              var all = own.concat(split(r.coach_goals).filter(function (g) { return own.indexOf(g) < 0; }));
+              if (all.length) document.getElementById("profile-goal").textContent = all.join(" · ");
+            })
+            .catch(function () {});
+        }
         var edit = document.getElementById("profile-edit");
         if (edit) edit.hidden = true;
         setProfileEditing(!!mine);
