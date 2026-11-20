@@ -1583,6 +1583,25 @@
     return html;
   }
 
+  /* Teilen-Symbol: Training des Tages suchen → Foto wählen (Mediathek oder Kamera) → Story mit Posten und Teilen.
+     Die Dateiauswahl braucht einen direkten Tipp: ist das Training schon geladen, sofort, sonst nach einer Rückfrage. */
+  function openStoryShare(day) {
+    var F = global.FFC;
+    if (!F || !F.sessionForDay || !F.storyFromHistory) return;
+    var sid = F.sessionForDay(day);
+    if (sid) { F.storyFromHistory(sid); return; }
+    Promise.resolve(F.loadHistory && F.loadHistory()).then(function () {
+      var sid2 = F.sessionForDay(day);
+      if (!sid2) {
+        if (global.GoDialog) GoDialog.alert("Kein Zirkeltraining gefunden", { body: "Für diesen Tag gibt es keine Aufzeichnung im Friday Fitness Circle." });
+        return;
+      }
+      if (!global.GoDialog) return;
+      GoDialog.choose("Story zum Zirkeltraining", [{ label: "Foto wählen", value: "go" }], { sub: "Danach kannst Du posten oder auf WhatsApp und Instagram teilen." })
+        .then(function (v) { if (v === "go") F.storyFromHistory(sid2); });
+    }).catch(function () {});
+  }
+
   function eventToolRowHtml(opts) {
     opts = opts || {};
     var eventId = opts.eventId || "";
@@ -1625,6 +1644,13 @@
         '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>' +
         "</button>"
       : "";
+    /* Eigener erledigter Zirkel: Story posten / teilen (FFC-Story mit Foto) */
+    var share = opts.shareId
+      ? '<button type="button" class="acc-tool acc-tool--share" data-acc-share="' + esc(opts.shareId) + '" data-acc-share-day="' + esc(opts.shareDay || "") +
+        '" aria-label="Story posten oder teilen">' +
+        '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M12 3.5v11"/><path d="M8 7.3 12 3.5l4 3.8"/><path d="M7 10.5H5.5v9h13v-9H17"/></svg></button>'
+      : "";
     var badgeKind = opts.badge || "";
     var badge = badgeKind
       ? '<button type="button" class="acc-tool-badge" data-badge-info="' + esc(badgeKind) + '" aria-label="' +
@@ -1635,6 +1661,7 @@
       '<div class="acc-card__tools-left">' +
       check +
       bubble +
+      share +
       wave +
       remove +
       "<!--faces-->" +
@@ -1899,6 +1926,8 @@
           noCheck: ev.status !== "erledigt" && day < todayIso(),
           menu: ev.status !== "erledigt" && day >= todayIso(),
           badge: eventBadgeKind(ev),
+          shareId: ev.status === "erledigt" && ev.category === "zirkel" && ffcUsable() ? String(ev.id) : "",
+          shareDay: day,
           removeId: "",
           removeMode: "delete"
         })
@@ -4016,6 +4045,11 @@
       return;
     }
     if (t.closest("[data-cmt-more]")) return;
+    var shareB = t.closest("[data-acc-share]");
+    if (shareB) {
+      openStoryShare(shareB.getAttribute("data-acc-share-day"));
+      return;
+    }
     var openC = t.closest("[data-open-comments]");
     if (openC) {
       openComments(openC.getAttribute("data-open-comments"));

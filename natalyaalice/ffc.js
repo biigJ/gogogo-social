@@ -2767,6 +2767,7 @@
   let postSource = 'finish';      // 'finish' = Endübersicht, 'history' = aus den Trainingsaufzeichnungen
   let postEventId = null;
   function openPostSheet(){
+    if(postSource === 'history') host('onStoryOpen');
     drawPost();
     setPostStatus('');
     document.getElementById('postFix').style.display = postSource === 'finish' ? '' : 'none';
@@ -2784,6 +2785,23 @@
     if(box) box.scrollIntoView({ block:'center', behavior:'smooth' });
   });
   document.getElementById('postRetake').addEventListener('click', ()=>{ postCamInput.value=''; postCamInput.click(); });
+  /* Teilen über das System-Menü (WhatsApp, Instagram, Nachrichten …); ohne Web Share: Bild sichern */
+  document.getElementById('postShare').addEventListener('click', ()=>{
+    postCanvas.toBlob(async blob=>{
+      if(!blob) return;
+      const file = new File([blob], 'gogogo-zirkel.jpg', { type:'image/jpeg' });
+      try{
+        if(navigator.canShare && navigator.canShare({ files:[file] })){
+          await navigator.share({ files:[file], text:'Zirkeltraining · '+(lastWorkout ? lastWorkout.points+' Punkte' : '') });
+          return;
+        }
+      }catch(e){ if(e && e.name === 'AbortError') return; }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = 'gogogo-zirkel.jpg';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
+    }, 'image/jpeg', 0.92);
+  });
   document.getElementById('postClose').addEventListener('click', closePostSheet);
   function closePostSheet(){
     postSheetEl.classList.remove('open'); postSheetEl.setAttribute('aria-hidden','true');
@@ -3826,6 +3844,16 @@
     editHistoryAmount(sessionId, idx){ return editHistoryAmount(String(sessionId) + '|' + idx); },
     /* Plus → Aufzeichnungen: Story aus einem Training der letzten 24 h (direkt im Klick aufrufen: Kamera) */
     storyFromHistory(sessionId){ storyFromHistory(sessionId); },
+    /* Aktuell → Teilen: Training dieses Tages (Berlin) aus den geladenen Aufzeichnungen, sonst null */
+    sessionForDay(iso){
+      const day = String(iso || '').slice(0, 10);
+      const hit = (cachedHistory || []).filter(s=>{
+        const d = new Date(s.date);
+        return !isNaN(d.getTime()) && d.toLocaleDateString('en-CA', { timeZone:'Europe/Berlin' }) === day;
+      }).sort((a,b)=> new Date(b.date) - new Date(a.date))[0];
+      return hit ? String(hit.id) : null;
+    },
+    async loadHistory(){ if(currentUser) await refreshCachedHistory(); },
     /* Trainings aus FFC-Supabase (training_sessions) für Plus/Aufzeichnungen */
     async historyRecords(){
       if(!currentUser) return [];
