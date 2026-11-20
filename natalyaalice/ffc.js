@@ -3494,6 +3494,13 @@
     events(){
       return (evList || []).map(e => Object.assign({}, e));
     },
+    /* gogogo „Zirkeltrainings bearbeiten“: eigenes Event löschen (Hendriks delete_event) */
+    async deleteEvent(id){
+      if(!currentUser) return { error: { message: 'Nicht angemeldet' } };
+      const res = await sb.rpc('delete_event', { p_event_id: Number(id) });
+      if(!res.error) await loadEvents();
+      return res;
+    },
     async respondEvent(id, going){
       if(!currentUser) return { error: null };
       const res = await sb.rpc('respond_event', { p_event_id: Number(id), p_going: !!going });

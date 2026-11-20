@@ -563,7 +563,8 @@
 
   function loadFfc() {
     state.ffcEvents = [];
-    if (!global.FFC || !FFC.user || !FFC.user() || !FFC.events) return Promise.resolve();
+    /* Zirkel-Login eines anderen gogogo-Kontos: dessen Zirkel nicht in dieser Woche zeigen */
+    if (!ffcOk() || !FFC.events) return Promise.resolve();
     try {
       var start = weekStart();
       var end = addDays(start, 7);
@@ -2376,6 +2377,253 @@
         btn.disabled = false;
         if (global.GoDialog) GoDialog.alert("Speichern ging gerade nicht.");
       });
+  }
+
+  /* ---------- Zirkeltrainings bearbeiten (Stift → 4. Button) ----------
+     Woche ab heute: eigene Zirkel (gogogo), Zirkel von Freunden mit meiner Zusage (event_rsvps)
+     und Zirkel aus dem Circle (FFC), bei denen ich dabei bin. Eigene: Uhrzeit, privat/zeigen, Stift →
+     Löschen oder Format anpassen. Fremde: Stift → Absagen. */
+  var PEN_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"/><path d="M13.5 6.5l3 3"/></svg>';
+  function ffcOk() { return !!(global.FFC && FFC.user && FFC.user() && !(global.GoFfcSession && GoFfcSession.foreign && GoFfcSession.foreign())); }
+  function openZirkelEditor() {
+    state.daysEdit = null;
+    var from = berlinToday();
+    var to = addDays(from, 7);
+    var range = "&starts_at=gte." + encodeURIComponent(from + "T00:00:00Z") + "&starts_at=lt." + encodeURIComponent(to + "T00:00:00Z");
+    openSheet('<p class="wr-sheet-title">Zirkeltrainings bearbeiten</p><p class="wr-sheet-hint">Lade…</p>');
+    var own = rest("events?user_id=eq." + encodeURIComponent(me()) + "&category=eq.zirkel&status=eq.geplant" + range +
+      "&select=id,user_id,title,starts_at,visibility,note&order=starts_at.asc").catch(function () { return []; });
+    var joined = rest("event_rsvps?user_id=eq." + encodeURIComponent(me()) + "&status=eq.zugesagt&select=event_id&limit=200")
+      .then(function (rs) {
+        var ids = (rs || []).map(function (r) { return r.event_id; }).filter(Boolean);
+        if (!ids.length) return [];
+        return rest("events?id=in.(" + ids.join(",") + ")&category=eq.zirkel&status=eq.geplant" + range +
+          "&select=id,user_id,title,starts_at,visibility&order=starts_at.asc");
+      }).catch(function () { return []; });
+    var ffcEvs = [];
+    try { if (ffcOk() && FFC.events) ffcEvs = FFC.events() || []; } catch (eF) {}
+    Promise.all([own, joined]).then(function (r) {
+      var rows = [];
+      var ownTimes = [];
+      (r[0] || []).forEach(function (ev) {
+        ownTimes.push(new Date(ev.starts_at).getTime());
+        rows.push({ key: "go:" + ev.id, kind: "own", ev: ev, at: ev.starts_at, title: ev.title || "Zirkeltraining" });
+      });
+      (r[1] || []).forEach(function (ev) {
+        if (String(ev.user_id) === me()) return;
+        var who = personOf(ev.user_id);
+        rows.push({ key: "rsvp:" + ev.id, kind: "joined", ev: ev, at: ev.starts_at, title: ev.title || "Zirkeltraining", who: who && who.name });
+      });
+      ffcEvs.forEach(function (ev) {
+        var t = new Date(ev.starts_at).getTime();
+        var day = dayKey(ev.starts_at);
+        if (!(day >= from && day < to)) return;
+        if (ev.is_mine) {
+          /* Kopie eines eigenen gogogo-Zirkels: dort mit erledigt */
+          if (ownTimes.some(function (x) { return Math.abs(x - t) <= 600000; })) return;
+          rows.push({ key: "ffc:" + ev.id, kind: "ffcOwn", ev: ev, at: ev.starts_at, title: ev.title || "Zirkeltraining" });
+        } else if (ev.my_going === true) {
+          rows.push({ key: "ffc:" + ev.id, kind: "ffcJoined", ev: ev, at: ev.starts_at, title: ev.title || "Zirkeltraining", who: ev.creator_nickname || "" });
+        }
+      });
+      rows.sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
+      state.zEdit = { rows: rows, times: {}, vis: {}, orig: {}, ownFfc: ffcEvs.filter(function (e) { return e.is_mine; }) };
+      rows.forEach(function (x) {
+        if (x.kind !== "own") return;
+        var tm = displayTime(x.at) ? formatTime(x.at) : NO_TIME;
+        state.zEdit.times[x.ev.id] = tm;
+        state.zEdit.orig[x.ev.id] = tm;
+        state.zEdit.vis[x.ev.id] = x.ev.visibility === "privat" ? "privat" : "team";
+      });
+      paintZirkelEditor();
+    });
+  }
+
+  function paintZirkelEditor() {
+    var ze = state.zEdit;
+    if (!ze) return;
+    var rows = ze.rows.map(function (x, i) {
+      var d = new Date(dayKey(x.at) + "T12:00:00");
+      var label = DAYS_DE[d.getDay()] + " " + d.getDate() + ".";
+      var title = esc(x.title) + (x.who ? ' <span class="wr-dayrow__who">· ' + esc(String(x.who).split(" ")[0]) + "</span>" : "");
+      var ctl;
+      if (x.kind === "own") {
+        var opts = timeOptsFor(ze.times[x.ev.id]);
+        var ti = Math.max(0, opts.indexOf(ze.times[x.ev.id]));
+        var vis = ze.vis[x.ev.id];
+        ctl = '<div class="wr-mini-wheel" data-wr-zmini="' + esc(x.ev.id) + '" data-idx="' + ti + '">' +
+          opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
+          '<button type="button" class="wr-dayrow__vis' + (vis === "privat" ? "" : " is-on") + '" data-wr-zvis="' + esc(x.ev.id) + '">' + (vis === "privat" ? "privat" : "zeigen") + "</button>";
+      } else {
+        ctl = '<span class="wr-dayrow__time">' + esc(displayTime(x.at) ? formatTime(x.at) : "–:–") + "</span>" +
+          '<span class="wr-dayrow__tag">' + (x.kind === "ffcOwn" ? "Circle" : "dabei") + "</span>";
+      }
+      return '<div class="wr-dayrow"><b>' + label + "</b>" +
+        '<div class="wr-dayrow__mid"><span class="wr-dayrow__title">' + title + "</span>" +
+        '<div class="wr-dayrow__ctl">' + ctl + "</div></div>" +
+        '<button type="button" class="wr-dayrow__pen" data-wr-zpen="' + i + '" aria-label="Bearbeiten">' + PEN_SVG + "</button></div>";
+    }).join("");
+    openSheet(
+      '<p class="wr-sheet-title">Zirkeltrainings bearbeiten</p>' +
+      (rows ? '<div class="wr-days wr-days--all">' + rows + "</div>" :
+        '<p class="wr-sheet-hint">Diese Woche ist kein Zirkeltraining geplant.</p>') +
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">' + (rows ? "Abbrechen" : "Schließen") + "</button>" +
+      (ze.rows.some(function (x) { return x.kind === "own"; }) ? '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zedit-save="1">Speichern</button>' : "") + "</div>"
+    );
+    var card = $("wr-sheet-card");
+    if (!card) return;
+    card.classList.add("wr-sheet__card--days");
+    card.querySelectorAll("[data-wr-zmini]").forEach(function (w) {
+      w.scrollTop = (Number(w.getAttribute("data-idx")) || 0) * 36;
+      var tm = null;
+      w.addEventListener("scroll", function () {
+        clearTimeout(tm);
+        tm = setTimeout(function () {
+          if (!state.zEdit) return;
+          var id = w.getAttribute("data-wr-zmini");
+          var o = timeOptsFor(state.zEdit.orig[id]);
+          state.zEdit.times[id] = o[Math.max(0, Math.min(o.length - 1, Math.round(w.scrollTop / 36)))];
+        }, 80);
+      }, { passive: true });
+    });
+    if (card._wrZeditBound) return;
+    card._wrZeditBound = true;
+    card.addEventListener("click", function (e) {
+      if (!state.zEdit || !document.querySelector("[data-wr-zpen], [data-wr-zedit-save], .wr-zfmt")) return;
+      var vb = e.target.closest && e.target.closest("[data-wr-zvis]");
+      if (vb) {
+        var id = vb.getAttribute("data-wr-zvis");
+        var nv = state.zEdit.vis[id] === "privat" ? "team" : "privat";
+        state.zEdit.vis[id] = nv;
+        vb.classList.toggle("is-on", nv === "team");
+        vb.textContent = nv === "privat" ? "privat" : "zeigen";
+        return;
+      }
+      var pen = e.target.closest && e.target.closest("[data-wr-zpen]");
+      if (pen) { zirkelRowMenu(state.zEdit.rows[Number(pen.getAttribute("data-wr-zpen"))]); return; }
+      if (e.target.closest && e.target.closest("[data-wr-zedit-save]")) { saveZirkelEditor(); return; }
+      if (e.target.closest && e.target.closest("[data-wr-zfmt-save]")) { saveZirkelFormat(); return; }
+      if (e.target.closest && e.target.closest("[data-wr-zfmt-back]")) { paintZirkelEditor(); return; }
+    });
+  }
+
+  function zirkelRowMenu(x) {
+    if (!x || !global.GoDialog) return;
+    var d = new Date(dayKey(x.at) + "T12:00:00");
+    var when = DAYS_DE[d.getDay()] + " " + d.getDate() + "." + (displayTime(x.at) ? ", " + formatTime(x.at) : "");
+    var mine = x.kind === "own" || x.kind === "ffcOwn";
+    var opts = mine ? [{ label: "Löschen", value: "del" }] : [{ label: "Absagen", value: "del" }];
+    if (x.kind === "own") opts.push({ label: "Format anpassen", value: "fmt" });
+    GoDialog.choose(x.title + " · " + when, opts).then(function (v) {
+      if (v === "fmt") { setTimeout(function () { openZirkelFormat(x); }, 0); return; }
+      if (v !== "del") return;
+      GoDialog.confirm(mine ? "Zirkeltraining am " + when + " löschen?" : "Beim Zirkeltraining am " + when + " absagen?", {
+        ok: mine ? "Löschen" : "Absagen",
+        cancel: "Abbrechen"
+      }).then(function (ok) {
+        if (!ok) return;
+        deleteZirkelRow(x).then(function () {
+          state.zEdit.rows = state.zEdit.rows.filter(function (r) { return r !== x; });
+          paintZirkelEditor();
+          if (host.toast) host.toast(mine ? "Gelöscht" : "Abgesagt");
+          return refresh().then(notifyAktuell);
+        }).catch(function () { if (host.toast) host.toast("Hat nicht geklappt"); });
+      });
+    });
+  }
+
+  function deleteZirkelRow(x) {
+    if (x.kind === "own") {
+      /* eigenes Event weg; liegt eine Kopie im Circle (gleiche Startzeit), die auch */
+      var t = new Date(x.at).getTime();
+      var copies = ((state.zEdit && state.zEdit.ownFfc) || []).filter(function (e) {
+        return Math.abs(new Date(e.starts_at).getTime() - t) <= 600000;
+      });
+      return rest("events?id=eq." + encodeURIComponent(x.ev.id) + "&user_id=eq." + encodeURIComponent(me()), {
+        method: "DELETE", prefer: "return=minimal"
+      }).then(function () {
+        if (!copies.length || !ffcOk() || !FFC.deleteEvent) return;
+        return Promise.all(copies.map(function (c) { return Promise.resolve(FFC.deleteEvent(c.id)).catch(function () {}); }));
+      });
+    }
+    if (x.kind === "joined") {
+      return rest("event_rsvps?event_id=eq." + encodeURIComponent(x.ev.id) + "&user_id=eq." + encodeURIComponent(me()), {
+        method: "DELETE", prefer: "return=minimal"
+      });
+    }
+    if (x.kind === "ffcOwn") {
+      if (!ffcOk() || !FFC.deleteEvent) return Promise.reject(new Error("ffc"));
+      return Promise.resolve(FFC.deleteEvent(x.ev.id)).then(function (res) { if (res && res.error) throw res.error; });
+    }
+    if (!ffcOk() || !FFC.respondEvent) return Promise.reject(new Error("ffc"));
+    return Promise.resolve(FFC.respondEvent(x.ev.id, false)).then(function (res) { if (res && res.error) throw res.error; });
+  }
+
+  /* Format anpassen: dieselbe Voreinstellung wie beim Anlegen */
+  function openZirkelFormat(x) {
+    var z = (global.GoZirkelSetup && GoZirkelSetup.parse(x.ev.note)) || { mode: "single" };
+    state.zEdit.fmt = x;
+    loadFriends().then(function () {
+      var friends = (state.friends || []).map(function (fid) { return personOf(fid); });
+      openSheet(
+        '<div class="wr-zfmt"><h3>Zirkeltraining</h3>' +
+        GoZirkelSetup.html(z, { friends: friends }) +
+        '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-zfmt-back="1">Zurück</button>' +
+        '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zfmt-save="1">Speichern</button></div></div>'
+      );
+      var card = $("wr-sheet-card");
+      if (card) card.classList.remove("wr-sheet__card--days");
+      requestAnimationFrame(function () { GoZirkelSetup.bind(document.querySelector(".wr-sheet")); });
+    });
+  }
+
+  function saveZirkelFormat() {
+    var x = state.zEdit && state.zEdit.fmt;
+    if (!x) return;
+    var old = (GoZirkelSetup.parse(x.ev.note) || {});
+    var z = GoZirkelSetup.read(document.querySelector(".wr-sheet") || document);
+    z.online = !!old.online;
+    /* unbekannte Zusätze der alten Notiz (z. B. Start-Absprachen) behalten */
+    var known = /^(zirkel:|work=|pause=|rounds=|online=|partner=|pname=)/;
+    var extra = String(x.ev.note || "").split("|").filter(function (seg, i) { return i > 0 && seg && !known.test(seg); })
+      .map(function (seg) { return "|" + seg; }).join("");
+    var note = GoZirkelSetup.toNote(z, extra);
+    rest("events?id=eq." + encodeURIComponent(x.ev.id) + "&user_id=eq." + encodeURIComponent(me()), {
+      method: "PATCH", prefer: "return=minimal", body: { note: note }
+    }).then(function () {
+      x.ev.note = note;
+      showSavedNote();
+      paintZirkelEditor();
+      return refresh().then(notifyAktuell);
+    }).catch(function () { if (host.toast) host.toast("Hat nicht geklappt"); });
+  }
+
+  function saveZirkelEditor() {
+    var ze = state.zEdit;
+    if (!ze) return;
+    var jobs = [];
+    ze.rows.forEach(function (x) {
+      if (x.kind !== "own") return;
+      var id = x.ev.id;
+      var iso = dayKey(x.at);
+      var pick = ze.times[id];
+      var untimed = pick === NO_TIME;
+      var body = {};
+      if (pick !== ze.orig[id]) body.starts_at = untimed ? iso + "T12:00:00Z" : timedStarts(iso, pick);
+      var vis = ze.vis[id];
+      if (vis !== (x.ev.visibility === "privat" ? "privat" : "team")) body.visibility = vis === "privat" ? "privat" : "team";
+      if (!Object.keys(body).length) return;
+      jobs.push(rest("events?id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(me()), {
+        method: "PATCH", prefer: "return=minimal", body: body
+      }).then(function () {
+        if (body.starts_at) { x.at = body.starts_at; x.ev.starts_at = body.starts_at; ze.orig[id] = pick; }
+        if (body.visibility) x.ev.visibility = body.visibility;
+      }));
+    });
+    Promise.all(jobs).then(function () {
+      showSavedNote();
+      return refresh().then(notifyAktuell);
+    }).catch(function () { if (host.toast) host.toast("Hat nicht geklappt"); });
   }
 
   function openDaysEditor() {
@@ -4313,13 +4561,15 @@
         GoDialog.choose("Deine Woche", [
           { label: "Wochenplan ändern", value: "plan" },
           { label: "Tage bearbeiten", value: "days" },
-          { label: "Zirkeltraining wiederkehrend", value: "zrec" }
+          { label: "Zirkeltraining wiederkehrend", value: "zrec" },
+          { label: "Zirkeltrainings bearbeiten", value: "zedit" }
         ]).then(function (v) {
           /* erst nach dem Dialog-Klick öffnen, sonst schließt derselbe Klick das neue Sheet wieder */
           setTimeout(function () {
             if (v === "plan") openPlanPicker();
             if (v === "days") openDaysEditor();
             if (v === "zrec") openZirkelRecurring();
+            if (v === "zedit") openZirkelEditor();
           }, 0);
         });
         return;
@@ -4327,11 +4577,13 @@
       if (global.GoDialog) {
         GoDialog.choose("Deine Woche", [
           { label: "Wochenplan wählen", value: "plan" },
-          { label: "Zirkeltraining wiederkehrend", value: "zrec" }
+          { label: "Zirkeltraining wiederkehrend", value: "zrec" },
+          { label: "Zirkeltrainings bearbeiten", value: "zedit" }
         ]).then(function (v) {
           setTimeout(function () {
             if (v === "plan") openPlanPicker();
             if (v === "zrec") openZirkelRecurring();
+            if (v === "zedit") openZirkelEditor();
           }, 0);
         });
         return;
