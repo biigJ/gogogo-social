@@ -493,7 +493,9 @@
           "&order=starts_at.asc&limit=200"
       );
     }
-    return query(richSelect)
+    /* bubble_id erst nach go-bubbles.sql vorhanden */
+    return query(richSelect + ",bubble_id")
+      .catch(function () { return query(richSelect); })
       .catch(function () {
         return query(baseSelect + ",courses(id,title)").catch(function () {
           return query(baseSelect);
@@ -1443,7 +1445,8 @@
       inviteAvatarsHtml(iso) +
       "</div>" +
       (when || place
-        ? '<p class="wr-when">' + esc([when, place].filter(Boolean).join(" · ")) + "</p>"
+        ? '<p class="wr-when">' + (ev.bubble_id && global.GoBubbles ? '<span class="wr-when__bub" title="Bubble">' + GoBubbles.SOAP_SVG + "</span>" : "") +
+          esc([when, place].filter(Boolean).join(" · ")) + "</p>"
         : "") +
       /* Countdown und „Start anhalten“ nebeneinander als gleiche Pillen */
       (cd || zirkelAdminHtml(ev, zSet, iso) ? '<div class="wr-zrow">' + cd + zirkelAdminHtml(ev, zSet, iso) + "</div>" : "") +
@@ -2765,11 +2768,12 @@
         return pa - pb || String(a.starts_at).localeCompare(String(b.starts_at));
       })[0] || null;
     });
-    state.daysEdit = { days: days, slots: slots, times: {}, vis: {}, orig: {} };
+    state.daysEdit = { days: days, slots: slots, times: {}, vis: {}, orig: {}, bub: {} };
     slots.forEach(function (ev) {
       if (!ev) return;
       state.daysEdit.times[ev.id] = displayTime(ev.starts_at) ? formatTime(ev.starts_at) : NO_TIME;
       state.daysEdit.vis[ev.id] = ev.visibility === "privat" ? "privat" : "team";
+      state.daysEdit.bub[ev.id] = !!ev.bubble_id;
       state.daysEdit.orig[ev.id] = state.daysEdit.times[ev.id];
     });
     paintDaysEditor();
@@ -2793,7 +2797,12 @@
         '<div class="wr-dayrow__ctl"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
         opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
         '<button type="button" class="wr-dayrow__vis' + (vis === "privat" ? "" : " is-on") + '" data-wr-dayvis="' + esc(ev.id) + '">' + (vis === "privat" ? "privat" : "zeigen") + "</button>" +
-        '<button type="button" class="wr-dayrow__vis" data-wr-daymedia="' + esc(ev.id) + '">Media</button></div></div>' +
+        '<button type="button" class="wr-dayrow__vis" data-wr-daymedia="' + esc(ev.id) + '">Media</button>' +
+        (host.bubbleId && host.bubbleId()
+          ? '<button type="button" class="wr-dayrow__vis wr-dayrow__bub' + (state.daysEdit.bub[ev.id] ? " is-on" : "") + '" data-wr-daybub="' + esc(ev.id) + '" aria-pressed="' + (state.daysEdit.bub[ev.id] ? "true" : "false") + '">' +
+            (global.GoBubbles ? GoBubbles.SOAP_SVG : "") + "Bubble</button>"
+          : "") +
+        "</div></div>" +
         '<span class="wr-dayrow__grip" data-wr-grip="' + i + '" aria-label="Ziehen"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span></div>';
     }).join("");
     openSheet(
@@ -2837,6 +2846,14 @@
         return;
       }
       if (e.target.closest && e.target.closest("[data-wr-days-save]")) saveDaysEditor();
+      var bb = e.target.closest && e.target.closest("[data-wr-daybub]");
+      if (bb) {
+        var bid = bb.getAttribute("data-wr-daybub");
+        state.daysEdit.bub[bid] = !state.daysEdit.bub[bid];
+        bb.classList.toggle("is-on", state.daysEdit.bub[bid]);
+        bb.setAttribute("aria-pressed", state.daysEdit.bub[bid] ? "true" : "false");
+        return;
+      }
       var mb = e.target.closest && e.target.closest("[data-wr-daymedia]");
       if (mb) { var mid = mb.getAttribute("data-wr-daymedia"); setTimeout(function () { openMediaSheet(mid); }, 0); }
     });
@@ -3197,10 +3214,15 @@
       var vis = de.vis[ev.id] || "team";
       var sameDay = dayKey(ev.starts_at) === iso &&
         (untimed ? !displayTime(ev.starts_at) : (displayTime(ev.starts_at) && formatTime(ev.starts_at) === hhmm));
-      if (sameDay && (ev.visibility || "team") === vis) return;
+      var wantBub = !!(de.bub && de.bub[ev.id]);
+      var bubId = host.bubbleId ? host.bubbleId() : "";
+      var bubChanged = wantBub !== !!ev.bubble_id && (!!bubId || !wantBub);
+      if (sameDay && (ev.visibility || "team") === vis && !bubChanged) return;
+      var body = { starts_at: starts, visibility: vis };
+      if (bubChanged) body.bubble_id = wantBub ? bubId : null;
       jobs.push(materializeEvent(ev).then(function (real) {
         return rest("events?id=eq." + encodeURIComponent(real.id), {
-          method: "PATCH", prefer: "return=minimal", body: { starts_at: starts, visibility: vis }
+          method: "PATCH", prefer: "return=minimal", body: body
         });
       }));
     });

@@ -26,7 +26,7 @@
 
   var FILTER_KEY = "gogogo_heute_filter_v3";
   /* Ich ⊂ Team ⊂ Gruppe ⊂ Tagebuch ⊂ Alles — Gruppe nur wenn vorhanden */
-  var VIEW_LEVEL = { ich: 0, team: 1, gruppe: 1, tagebuch: 2, alles: 3 };
+  var VIEW_LEVEL = { ich: 0, team: 1, gruppe: 1, tagebuch: 2, alles: 3, bubble: 3 };
 
   function viewFlags(view) {
     view = normalizeFilter(view) || "ich";
@@ -38,6 +38,7 @@
       /* Team = Freunde + Coach/Coachees; Tagebuch = Erledigtes + heute, keine Zukunft */
       teamOnly: view === "team",
       diaryOnly: view === "tagebuch",
+      bubbleOnly: view === "bubble",
       showIncomingInvites: level >= 1,
       showOwnFfc: true,
       showAcceptedFfc: true,
@@ -97,7 +98,7 @@
     if (v === "all") return "alles";
     if (v === "mine") return "ich";
     if (String(v || "").indexOf("group:") === 0) return "gruppe";
-    if (["ich", "team", "gruppe", "tagebuch", "alles"].indexOf(v) >= 0) return v;
+    if (["ich", "team", "gruppe", "tagebuch", "alles", "bubble"].indexOf(v) >= 0) return v;
     return "";
   }
 
@@ -637,13 +638,13 @@
     to.setDate(to.getDate() + 14);
     var fromIso = from.toISOString();
     var toIso = to.toISOString();
-    return rest(
-      "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note,assigned_by,course_session_id&starts_at=gte." +
-        encodeURIComponent(fromIso) +
-        "&starts_at=lte." +
-        encodeURIComponent(toIso) +
-        "&order=starts_at.desc&limit=500"
-    )
+    var fullSel = "id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note,assigned_by,course_session_id";
+    var range = "&starts_at=gte." + encodeURIComponent(fromIso) + "&starts_at=lte." + encodeURIComponent(toIso) + "&order=starts_at.desc&limit=500";
+    /* bubble_id erst nach go-bubbles.sql vorhanden */
+    return rest("events?select=" + fullSel + ",bubble_id" + range)
+      .catch(function () {
+        return rest("events?select=" + fullSel + range);
+      })
       .catch(function () {
         return rest(
           "events?select=id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note&starts_at=gte." +
@@ -1147,6 +1148,8 @@
     var vis = normalizeVisibility(ev.visibility);
     /* privat: immer nur für den Ersteller */
     if (vis === "privat" && !mine) return false;
+    /* Bubble-Events von Nicht-Freunden nur im Bubble-Filter */
+    if (!mine && ev.bubble_id && !(host.teamPeople || []).some(function (p) { return p && String(p.id) === String(ev.user_id); })) return false;
     if (ev.status === "ausgefallen") return false;
     var now = Date.now();
     var week = now + 7 * 86400000;
@@ -2245,7 +2248,59 @@
      2) Meine Events von heute (Plan + eigene Events/FFC)
      3) Kommende (morgen zuerst, dann später; eigene vor fremden bei Gleichstand)
      4) Historie (Tagebuch+), neueste zuerst */
+  function loadBubbleMsgs() {
+    if (state.filter !== "bubble" || !global.GoBubbles || !GoBubbles.messages) { state.bubbleMsgs = []; return Promise.resolve(); }
+    return GoBubbles.messages().then(function (rows) {
+      state.bubbleMsgs = rows || [];
+      return ensurePeople(state.bubbleMsgs.map(function (m) { return String(m.author_id); }));
+    }).catch(function () { state.bubbleMsgs = []; });
+  }
+
+  function renderBubbleMsg(m) {
+    var mine = String(m.author_id) === me();
+    var p = personOf(String(m.author_id));
+    var t = new Date(m.created_at);
+    var when = dayKey(m.created_at) === todayIso()
+      ? t.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" })
+      : t.toLocaleDateString("de-DE", { timeZone: "Europe/Berlin", day: "numeric", month: "numeric" }) + " " +
+        t.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" });
+    return '<article class="acc-msg' + (mine ? " is-mine" : "") + '">' +
+      '<span class="acc-msg__who">' + esc(mine ? "Du" : String(p.name || "?").split(" ")[0]) + " · " + esc(when) + "</span>" +
+      '<p class="acc-msg__txt">' + esc(m.body || "") + "</p></article>";
+  }
+
+  /* Bubble-Filter: nur Events, die in meiner Bubble markiert sind (eigene und die der anderen Mitglieder) */
+  function bubbleFeedItems() {
+    var today = todayIso();
+    var bid = host && host.bubbleId ? String(host.bubbleId() || "") : "";
+    var out = { myToday: [], upcoming: [], history: [] };
+    if (!bid) return out;
+    var now = Date.now();
+    (state.events || []).forEach(function (ev) {
+      if (!ev || String(ev.bubble_id || "") !== bid || ev.status === "ausgefallen") return;
+      var mine = String(ev.user_id) === me();
+      if (!mine && normalizeVisibility(ev.visibility) === "privat") return;
+      var d = dayKey(ev.starts_at);
+      if (ev.status === "geplant" && d < today) return;
+      if (new Date(ev.starts_at).getTime() > now + 14 * 86400000) return;
+      var item = { kind: "event", starts_at: ev.starts_at, _mine: mine, ev: ev };
+      if (d === today) out.myToday.push(item);
+      else if (d > today) out.upcoming.push(item);
+      else out.history.push(item);
+    });
+    (state.bubbleMsgs || []).forEach(function (m) {
+      var it = { kind: "bubble_msg", starts_at: m.created_at, _mine: String(m.author_id) === me(), msg: m };
+      if (dayKey(m.created_at) === today) out.myToday.push(it);
+      else out.history.push(it);
+    });
+    out.myToday.sort(function (a, b) { return String(b.starts_at).localeCompare(String(a.starts_at)); });
+    out.upcoming.sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
+    out.history.sort(function (a, b) { return String(b.starts_at).localeCompare(String(a.starts_at)); });
+    return out;
+  }
+
   function buildFeedItems(flags) {
+    if (flags && flags.bubbleOnly) return bubbleFeedItems();
     var today = todayIso();
     var pack = filterOwnEvents(flags);
     var ffc = filterFfcEvents(flags);
@@ -2493,6 +2548,7 @@
   }
 
   function renderFeedItem(item) {
+    if (item.kind === "bubble_msg") return renderBubbleMsg(item.msg);
     if (item.kind === "ffc") return renderFfcCard(item.ev);
     if (item.kind === "ffc_post") return renderFfcPostCard(item.post);
     if (item.kind === "diary") return renderDiaryCard(item.item);
@@ -2722,6 +2778,16 @@
       html += renderFeedItem(item);
     });
     html += "</div>";
+    if (flags.bubbleOnly && global.GoBubbles && GoBubbles.paintStrip) {
+      var bid = host.bubbleId ? String(host.bubbleId() || "") : "";
+      GoBubbles.paintStrip($("bubble-strip"), (state.events || []).filter(function (ev) {
+        return ev && bid && String(ev.bubble_id || "") === bid && ev.status !== "ausgefallen" &&
+          (String(ev.user_id) === me() || normalizeVisibility(ev.visibility) !== "privat");
+      }), personOf);
+    }
+    if (flags.bubbleOnly && !feed.myToday.length && !feed.upcoming.length && !feed.history.length) {
+      html += '<p class="acc-bubble-empty">Noch ist es still hier.<br>Schreib unten etwas oder markiere ein Event in Woche → Stift → Tage bearbeiten → Bubble.</p>';
+    }
 
     var firstPaint = !state.paintedAktuell;
     var scroller = welcomeScrollEl();
@@ -4502,6 +4568,7 @@
       loadEvents().then(loadMyInvites),
       loadFfcEvents(),
       loadFfcPosts(),
+      loadBubbleMsgs(),
       histReady
     ])
       .then(function () {
