@@ -13201,7 +13201,7 @@
 
       /* Admin (Event-Ersteller): Countdown anhalten / wieder starten. Steht in events.note,
          alle Teilnehmer (Woche, Aktuell, Workout) lesen es alle 5 s mit.
-         Starten: vor der Startzeit → Countdown auf die Startzeit, danach → 1 Minute Countdown */
+         Starten: vor der Startzeit → Countdown auf die Startzeit, danach → 5 Minuten Countdown */
       function zirkelAdminStart(eventId, action) {
         return rest("events?id=eq." + encodeURIComponent(eventId) + "&select=note,starts_at").then(function (rows) {
           var note = rows && rows[0] ? rows[0].note : "";
@@ -13211,7 +13211,7 @@
             note = GoZirkelSetup.withFlag(note, "hold", null);
             note = startMs > Date.now() + 5000
               ? GoZirkelSetup.withFlag(note, "go", null)
-              : GoZirkelSetup.withFlag(note, "go", Math.floor(Date.now() / 1000) + 60);
+              : GoZirkelSetup.withFlag(note, "go", Math.floor(Date.now() / 1000) + 300);
           }
           return rest("events?id=eq." + encodeURIComponent(eventId), {
             method: "PATCH",
