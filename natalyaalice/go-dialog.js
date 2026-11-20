@@ -30,7 +30,8 @@
     ".god__face + .god__text{text-align:center}" +
     ".god__card .god__text.is-center{text-align:center;margin-bottom:4px !important}" +
     ".god__sub{margin:0 0 16px;font-size:15px;font-weight:600;text-align:center;color:rgba(42,33,24,.75)}" +
-    ".god__info{margin:-2px 0 12px;font-size:14px;text-align:center;color:rgba(42,33,24,.7)}";
+    ".god__info{margin:-2px 0 12px;font-size:14px;text-align:center;color:rgba(42,33,24,.7)}" +
+    ".god__body{margin:8px 0 18px;font-size:16px;line-height:1.5;text-align:left}";
 
   function ensureCss() {
     if (document.getElementById("go-dialog-css")) return;
@@ -86,10 +87,19 @@
     return b;
   }
 
+  /* opts.body: Erklärtext unter der Überschrift (Überschrift dann mittig) */
   function alertDlg(msg, opts) {
     opts = opts || {};
     return open(function (card, close) {
       text(card, msg);
+      if (opts.body) {
+        var tEl = card.querySelector(".god__text");
+        if (tEl) tEl.classList.add("is-center");
+        var b = document.createElement("p");
+        b.className = "god__body";
+        b.textContent = opts.body;
+        card.appendChild(b);
+      }
       button(card, opts.ok || "OK", "", function () { close(); });
       return undefined;
     });

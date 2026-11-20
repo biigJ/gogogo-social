@@ -5295,6 +5295,22 @@
       cursor: pointer;
     }
     .go-toc__item:last-child { border-bottom: 1px solid rgba(42, 33, 24, 0.14); }
+    /* Plus: „Füge weitere Features hinzu“ im Stil des Inhaltsverzeichnisses, ohne Linie */
+    .go-toc .go-toc__item.go-toc__add, .go-toc .go-toc__item.go-toc__add:last-child { border-bottom: 0; color: rgba(42, 33, 24, 0.55); }
+    .plus-pick { position: fixed; inset: 0; z-index: 10045; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(20, 16, 12, 0.42); }
+    .plus-pick__card { width: min(100%, 400px); max-height: 86vh; overflow-y: auto; box-sizing: border-box; background: #F3EEE4; color: #2A2118; border-radius: 22px; padding: 22px 18px 14px; }
+    .plus-pick__card h2 { margin: 0 0 12px; font: 600 24px/1.2 'Playfair Display', Georgia, serif; text-align: center; }
+    .plus-pick__row { display: grid; grid-template-columns: minmax(0, 1fr) 40px 40px; align-items: center; gap: 2px; min-height: 52px; border-bottom: 1px solid rgba(42, 33, 24, 0.12); }
+    .plus-pick__name { font: 600 17px/1.25 'Playfair Display', Georgia, serif; text-align: left; }
+    .plus-pick__info, .plus-pick__check { display: grid; place-items: center; width: 40px; height: 44px; padding: 0; border: 0; background: none; color: #2A2118; cursor: pointer; }
+    .plus-pick__info span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #2A2118; font: 700 13px/1 Georgia, serif; font-style: italic; }
+    .plus-pick__check span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1.8px solid #2A2118; box-sizing: border-box; }
+    .plus-pick__check.is-on span { background: #2A2118; color: #F6F1E8; }
+    .plus-pick__check span svg { width: 14px; height: 14px; opacity: 0; }
+    .plus-pick__check.is-on span svg { opacity: 1; }
+    .plus-pick__btn { display: block; width: 100%; min-height: 48px; margin: 16px 0 6px; border: 0; border-radius: 999px; background: #111; color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
+    .plus-info__img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 14px; margin: 0 0 12px; background: #E6DED0; }
+    .plus-info__text { margin: 0; font-size: 15px; line-height: 1.45; text-align: left; }
     .go-slide__copy.is-clamped { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
     .go-slide__more { display: inline; margin: 4px 0 0; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 700; color: #2A2118; text-decoration: underline; cursor: pointer; }
     .go-slide__art { margin: 0; }
@@ -8191,7 +8207,7 @@
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-10"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-6"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-7"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
@@ -17531,6 +17547,124 @@
         GoExLinks.mount(panel);
       }
 
+      /* Plus-Auswahl je Konto (dieses Gerät). null = alles zeigen (bestehende Konten), [] = nur Circle (neue Konten) */
+      var plusNewAccount = null;
+      function plusPickKey() { return "gogogo_plus_pick_" + String((sessionAccount && sessionAccount.id) || ""); }
+      function loadPlusPick() {
+        try {
+          var raw = localStorage.getItem(plusPickKey());
+          if (raw) { var arr = JSON.parse(raw); if (Array.isArray(arr)) return arr; }
+        } catch (eP) {}
+        if (plusNewAccount === null) checkPlusNewAccount();
+        return plusNewAccount ? [] : null;
+      }
+      function savePlusPick(arr) {
+        try { localStorage.setItem(plusPickKey(), JSON.stringify(arr)); } catch (eP) {}
+      }
+      function checkPlusNewAccount() {
+        if (!sessionAccount || !sessionAccount.id || checkPlusNewAccount.busy) return;
+        checkPlusNewAccount.busy = true;
+        var known = sessionAccount.created_at;
+        (known ? Promise.resolve([{ created_at: known }]) :
+          rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id) + "&select=created_at"))
+          .then(function (rows) {
+            var c = rows && rows[0] && rows[0].created_at;
+            var age = Date.now() - new Date(c || 0).getTime();
+            plusNewAccount = !!(c && age >= 0 && age < 14 * 864e5);
+            if (plusNewAccount && document.getElementById("go-rail")) paintGoRail();
+          })
+          .catch(function () { plusNewAccount = false; });
+      }
+      function escapeHtml(v) {
+        return String(v == null ? "" : v).replace(/[&<>"]/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+        });
+      }
+      var CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+      function openPlusPick(allOffers, IMG) {
+        var choices = allOffers.filter(function (o) { return !(o.key === "zirkel" || o.type === "zirkel"); });
+        var cur = loadPlusPick();
+        var sel = {};
+        choices.forEach(function (o) {
+          var owned = window.GoSupport && GoSupport.offerOwned ? !!GoSupport.offerOwned(o.type || o.key) : false;
+          sel[o.key] = cur === null || owned ? true : cur.indexOf(o.key) >= 0;
+        });
+        var box = document.createElement("div");
+        box.className = "plus-pick";
+        box.innerHTML = '<div class="plus-pick__card" role="dialog" aria-modal="true" aria-label="Plus-Punkte"><h2>Plus-Punkte</h2>' +
+          choices.map(function (o) {
+            return '<div class="plus-pick__row"><span class="plus-pick__name">' + escapeHtml(o.title) + "</span>" +
+              '<button type="button" class="plus-pick__info" data-pp-info="' + escapeHtml(o.key) + '" aria-label="Info zu ' + escapeHtml(o.title) + '"><span>i</span></button>' +
+              '<button type="button" class="plus-pick__check' + (sel[o.key] ? " is-on" : "") + '" data-pp-key="' + escapeHtml(o.key) + '" role="checkbox" aria-checked="' + (sel[o.key] ? "true" : "false") + '" aria-label="' + escapeHtml(o.title) + '"><span>' + CHECK_ICON + "</span></button></div>";
+          }).join("") +
+          '<button type="button" class="plus-pick__btn" data-pp-done="1">Fertig</button></div>';
+        document.body.appendChild(box);
+        function done() {
+          savePlusPick(choices.filter(function (o) { return sel[o.key]; }).map(function (o) { return o.key; }));
+          if (box.parentNode) box.parentNode.removeChild(box);
+          paintGoRail();
+        }
+        box.addEventListener("click", function (e) {
+          if (e.target === box || e.target.closest("[data-pp-done]")) { done(); return; }
+          var ck = e.target.closest("[data-pp-key]");
+          if (ck) {
+            var k = ck.getAttribute("data-pp-key");
+            sel[k] = !sel[k];
+            ck.classList.toggle("is-on", sel[k]);
+            ck.setAttribute("aria-checked", sel[k] ? "true" : "false");
+            return;
+          }
+          var inf = e.target.closest("[data-pp-info]");
+          if (inf) {
+            var o = choices.filter(function (x) { return x.key === inf.getAttribute("data-pp-info"); })[0];
+            if (o) openPlusInfo(o, IMG);
+          }
+        });
+      }
+      function openPlusInfo(o, IMG) {
+        var box = document.createElement("div");
+        box.className = "plus-pick";
+        box.style.zIndex = "10046";
+        var src = IMG[o.type] || IMG[o.key] || "";
+        box.innerHTML = '<div class="plus-pick__card" role="dialog" aria-modal="true"><h2>' + escapeHtml(o.title) + "</h2>" +
+          (src ? '<img class="plus-info__img" src="' + escapeHtml(src) + '" alt="" />' : "") +
+          '<p class="plus-info__text">' + escapeHtml(o.description || "") + "</p>" +
+          '<button type="button" class="plus-pick__btn" data-pp-close="1">Schließen</button></div>';
+        document.body.appendChild(box);
+        box.addEventListener("click", function (e) {
+          if (e.target === box || e.target.closest("[data-pp-close]")) box.remove();
+        });
+      }
+
+      /* Neue Konten (≤ 14 Tage): beim ersten Öffnen von Aktuell, Woche und Team je ein kurzer Hinweis */
+      var INTRO_TEXT = {
+        heute: { title: "Aktuell", text: "Hier siehst Du Deine Events von heute, darüber im Stapel die nächsten Tage und darunter, was Du schon erledigt hast. Tipp auf ein Event, um es abzuhaken, ein Foto zu posten oder eine Alternative einzutragen. Oben stellst Du ein, ob Du nur Dich, Dein Team oder alles siehst." },
+        woche: { title: "Woche", text: "Hier liegt Dein Wochenplan Tag für Tag, zur Seite wischen blättert durch die Tage. Über den Stift oben rechts wählst oder änderst Du den Plan, verschiebst Tage, setzt Uhrzeiten und legst Zirkeltrainings an. Mit privat oder zeigen entscheidest Du, ob Deine Freunde ein Event sehen." },
+        team: { title: "Team", text: "Hier findest Du Deine Freunde, Deinen Circle und Deinen Coach. Mit dem Haken wählst Du bis zu 5 Freunde, mit denen Du Deine täglichen Events teilst. Neue Freunde findest Du über Nickname, ID, Ort oder QR-Code." }
+      };
+      var introTimer = null;
+      function maybeShowIntro() {
+        clearTimeout(introTimer);
+        introTimer = setTimeout(function () {
+          if (!sessionMode || !sessionAccount || !sessionAccount.id || !window.GoDialog) return;
+          var shell = document.body.dataset.shell;
+          var it = INTRO_TEXT[shell];
+          if (!it) return;
+          var key = "gogogo_intro_" + shell + "_" + sessionAccount.id;
+          try { if (localStorage.getItem(key)) return; } catch (eI) { return; }
+          if (plusNewAccount === null) { checkPlusNewAccount(); maybeShowIntro(); return; }
+          if (!plusNewAccount) return;
+          /* nicht über Onboarding, Plan-Wahl oder anderen Dialogen */
+          if (document.querySelector(".gob, .god, .gpl, #go-boot, .plus-pick") || document.body.classList.contains("wr-sheet-open")) { maybeShowIntro(); return; }
+          try { localStorage.setItem(key, "1"); } catch (eI2) {}
+          GoDialog.alert(it.title, { body: it.text, ok: "Verstanden" });
+        }, 1200);
+      }
+      if (window.MutationObserver) {
+        new MutationObserver(maybeShowIntro).observe(document.body, { attributes: true, attributeFilter: ["data-shell"] });
+      }
+      setTimeout(maybeShowIntro, 2500);
+
       function paintGoRail(force) {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
@@ -17601,6 +17735,15 @@
                   description: "Mit Trainer-A- oder PT-Lizenz Zugang zum Admin-Bereich. CV an gogogo senden — Coaching-Playbook lesen."
                 }
               ];
+        /* Plus-Punkte wählen: Friday Fitness Circle immer, die anderen nach Auswahl (gebuchte bleiben sichtbar) */
+        var allOffers = offers;
+        var plusPick = loadPlusPick();
+        offers = offers.filter(function (o) {
+          if (o.key === "zirkel" || o.type === "zirkel" || plusPick === null) return true;
+          if (plusPick.indexOf(o.key) >= 0) return true;
+          var ownedPick = window.GoSupport && GoSupport.offerOwned ? GoSupport.offerOwned(o.type || o.key) : false;
+          return !!ownedPick;
+        });
         var sectionOffers = [
           { key: "toc", type: "toc", title: "Plus" }
         ].concat(offers);
@@ -17691,6 +17834,12 @@
               });
               tocNav.appendChild(link);
             });
+            var addFeat = document.createElement("button");
+            addFeat.type = "button";
+            addFeat.className = "go-toc__item go-toc__add";
+            addFeat.textContent = "Füge weitere Features hinzu";
+            addFeat.addEventListener("click", function () { openPlusPick(allOffers, IMG); });
+            tocNav.appendChild(addFeat);
             card.appendChild(tocNav);
             wrapGoSlideBody(card);
             rail.appendChild(card);
