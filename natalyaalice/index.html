@@ -1722,11 +1722,11 @@
     .woche-reels.is-dark-day .wr-week-label,
     .woche-reels.is-dark-day .wr-icon-btn { color: #fff; }
     .wr-days { display: grid; gap: 8px; margin: 6px 0 12px; max-height: 56dvh; overflow-y: auto; }
-    .wr-dayrow { display: grid; grid-template-columns: 52px minmax(0,1fr) 32px; gap: 8px; align-items: center; min-height: 64px; padding: 6px 8px; border-radius: 12px; background: #F6F1E8; border: 1px solid rgba(42,33,24,.12); }
+    .wr-dayrow { display: grid; grid-template-columns: 58px minmax(0,1fr) 32px; gap: 8px; align-items: center; min-height: 64px; padding: 6px 8px; border-radius: 12px; background: #F6F1E8; border: 1px solid rgba(42,33,24,.12); }
     .wr-dayrow.is-empty { border-style: dashed; background: transparent; }
     .wr-dayrow.is-drag { opacity: .35; }
     .wr-dayrow--ghost { position: fixed; z-index: 10060; pointer-events: none; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
-    .wr-dayrow > b { font-size: 14px; }
+    .wr-dayrow > b { font-size: 14px; white-space: nowrap; }
     .wr-dayrow__free { color: rgba(42,33,24,.45); font-size: 14px; }
     .wr-dayrow__mid { min-width: 0; display: grid; gap: 4px; }
     .wr-dayrow__title { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1742,7 +1742,14 @@
     .wr-btnrow .wr-sheet-cancel { border: 1.5px solid #2A2118; border-radius: 999px; background: transparent; color: #2A2118; font-weight: 600; }
     .wr-mini-wheel { height: 36px; width: 72px; overflow-y: auto; scroll-snap-type: y mandatory; border-radius: 8px; background: #fff; border: 1px solid rgba(42,33,24,.15); scrollbar-width: none; touch-action: pan-y; }
     .wr-mini-wheel::-webkit-scrollbar { display: none; }
-    .wr-mini-opt { display: block; height: 36px; line-height: 36px; text-align: center; scroll-snap-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .wr-mini-opt { display: flex; align-items: center; justify-content: center; height: 36px; line-height: 1; text-align: center; scroll-snap-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+    /* Tage bearbeiten: alle 7 Tage auf einmal sichtbar, Dialog sitzt eine Zeile höher */
+    .wr-days.wr-days--all { max-height: none; overflow: visible; }
+    body.wr-sheet-open .wr-sheet__card.wr-sheet__card--days { max-height: 94dvh; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+    .wr-sheet__card--days .wr-sheet-hint { margin-bottom: 6px; }
+    .wr-zrec-mode { margin: 4px auto 0; }
+    .wr-saved { position: fixed; left: 50%; top: 42%; z-index: 10070; transform: translate(-50%, -50%) scale(.96); padding: 16px 28px; border-radius: 18px; background: rgba(17,17,17,.88); color: #fff; font: 600 17px/1.2 Inter, system-ui, sans-serif; opacity: 0; pointer-events: none; transition: opacity 220ms ease, transform 220ms ease; }
+    .wr-saved.is-on { opacity: 1; transform: translate(-50%, -50%) scale(1); }
     .wr-dayrow__vis { min-height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(42,33,24,.3); background: transparent; color: #2A2118; font: inherit; font-size: 13px; font-weight: 600; }
     .wr-dayrow__vis.is-on { background: #2A2118; color: #F6F1E8; border-color: #2A2118; }
     .wr-dayrow__grip { display: grid; place-items: center; height: 44px; color: rgba(42,33,24,.5); touch-action: none; cursor: grab; }
@@ -3558,7 +3565,7 @@
       box-shadow: 0 8px 24px rgba(52, 34, 32, 0.18);
       transform: scale(1);
       transform-origin: center bottom;
-      transition: transform 460ms cubic-bezier(0.22, 1, 0.36, 1);
+      transition: transform 770ms cubic-bezier(0.22, 1, 0.36, 1);
     }
     .app-pill nav.is-compact { transform: scale(0.77); }
     @media (prefers-reduced-motion: reduce) {
@@ -8175,7 +8182,7 @@
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-70"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-49"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-50"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -10211,18 +10218,30 @@
         if (!nav) return;
         var lastY = 0;
         var compact = false;
+        /* Nur Scrollen durch den Finger verkleinert die Pill. Beim Öffnen springt der Feed selbst
+           (z. B. auf Heute) — davon bleibt sie groß. */
+        var touchedAt = 0;
+        function touched() { touchedAt = Date.now(); }
         function onScroll(event) {
           var y = event.currentTarget.scrollTop || 0;
           var dy = y - lastY;
+          lastY = y;
           if (y <= 8) compact = false;
+          else if (Date.now() - touchedAt > 1500) return;
           else if (dy > 8) compact = true;
           else if (dy < -8) compact = false;
-          lastY = y;
           nav.classList.toggle("is-compact", compact);
         }
         ["welcome", "diary"].forEach(function (id) {
           var el = document.getElementById(id);
-          if (el) el.addEventListener("scroll", onScroll, { passive: true });
+          if (!el) return;
+          el.addEventListener("scroll", onScroll, { passive: true });
+          ["touchstart", "touchmove", "wheel", "pointerdown", "keydown"].forEach(function (t) {
+            el.addEventListener(t, touched, { passive: true });
+          });
+        });
+        document.addEventListener("visibilitychange", function () {
+          if (document.visibilityState === "visible") { compact = false; nav.classList.remove("is-compact"); }
         });
         fitScreen();
         window.addEventListener("resize", fitScreen);

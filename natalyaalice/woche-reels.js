@@ -2127,10 +2127,17 @@
   var NO_TIME = "–:–";
   var MINI_TIMES = (function () {
     var out = [NO_TIME];
-    for (var h = 5; h <= 22; h++) for (var q = 0; q < 60; q += 15) out.push(pad2(h) + ":" + pad2(q));
+    for (var h = 5; h <= 22; h++) for (var q = 0; q < 60; q += 30) out.push(pad2(h) + ":" + pad2(q));
     return out;
   })();
   var DAYS_DE = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+
+  /* 30-Minuten-Raster; eine vorhandene Zeit außerhalb (z. B. 13:15) bleibt wählbar und wird beim Speichern nicht verschoben */
+  function timeOptsFor(orig) {
+    if (!orig || orig === NO_TIME || MINI_TIMES.indexOf(orig) >= 0) return MINI_TIMES;
+    var list = MINI_TIMES.slice(1).concat([orig]).sort();
+    return [NO_TIME].concat(list);
+  }
 
   function nearestTimeIdx(hhmm) {
     var p = String(hhmm || "18:00").split(":");
@@ -2151,7 +2158,7 @@
   var WD_NAME = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
   function zrecTimes() {
     var out = [];
-    for (var h = 5; h <= 22; h++) for (var m = 0; m < 60; m += 15) out.push((h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m);
+    for (var h = 5; h <= 22; h++) for (var m = 0; m < 60; m += 30) out.push((h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m);
     return out;
   }
   function openZirkelRecurring() {
@@ -2193,12 +2200,13 @@
       if (k === "circle") return zrecCircle();
       if (k === "friends") return zrecFriends();
       if (k === "vis") { state.zrec.vis = state.zrec.vis === "privat" ? "team" : "privat"; return paintZrecDay(); }
+      if (k === "mode-extra" || k === "mode-alt") { state.zrec.mode = k === "mode-alt" ? "alt" : "extra"; return paintZrecDay(); }
       if (k === "save") return saveZrec(act);
       if (k === "back") return openZirkelRecurring();
     });
   }
   function openZrecDay(wd) {
-    state.zrec = { wd: wd, time: "18:00", vis: "team", friends: [], circle: null };
+    state.zrec = { wd: wd, time: "18:00", vis: "team", friends: [], circle: null, mode: "extra" };
     paintZrecDay();
   }
   function paintZrecDay() {
@@ -2214,6 +2222,10 @@
       '<p class="wr-zrec-lab">Uhrzeit setzen</p><div class="gz-time"><div class="gz-time__col" data-wr-zrec-time>' +
       times.map(function (t) { return '<span class="gz-time__opt">' + t + "</span>"; }).join("") + "</div></div>" +
       '<button type="button" class="wr-dayrow__vis' + (z.vis === "privat" ? "" : " is-on") + '" data-wr-zrec="vis">' + (z.vis === "privat" ? "privat" : "sichtbar") + "</button>" +
+      '<div class="wr-set-vis wr-zrec-mode" role="radiogroup" aria-label="Zusätzlich oder Alternativ">' +
+      '<button type="button" class="wr-set-vis__btn' + (z.mode === "alt" ? "" : " is-on") + '" data-wr-zrec="mode-extra" role="radio" aria-checked="' + (z.mode !== "alt") + '">Zusätzlich</button>' +
+      '<button type="button" class="wr-set-vis__btn' + (z.mode === "alt" ? " is-on" : "") + '" data-wr-zrec="mode-alt" role="radio" aria-checked="' + (z.mode === "alt") + '">Alternativ</button></div>' +
+      '<p class="wr-sheet-hint">' + (z.mode === "alt" ? "Ersetzt die Einheit aus Deinem Wochenplan an diesem Tag." : "Kommt zur Einheit aus Deinem Wochenplan dazu.") + "</p>" +
       "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-zrec="back">Zurück</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zrec="save">Speichern</button></div>'
@@ -2269,6 +2281,40 @@
       return (off >= 0 ? "+" : "-") + String(Math.floor(Math.abs(off) / 60)).padStart(2, "0") + ":" + String(Math.abs(off) % 60).padStart(2, "0");
     } catch (e) { return "+01:00"; }
   }
+  /* Alternativ: die Plan-Einheit an diesen Tagen fällt aus (wie bei „Alternative“ in Aktuell) */
+  function replacePlanUnits(days, keepEvs) {
+    var keep = {};
+    (keepEvs || []).forEach(function (e) { keep[String(e.id)] = 1; });
+    var daySet = {};
+    days.forEach(function (d) { daySet[d] = 1; });
+    function isPlanUnit(e) {
+      return e && String(e.user_id) === me() && e.status === "geplant" && !keep[String(e.id)] &&
+        e.item_type !== "support_session" && (e.enrollment_id || isPlanPlaceholder(e.id)) && daySet[dayKey(e.starts_at)];
+    }
+    var done = {};
+    var jobs = [];
+    (state.events || []).filter(isPlanUnit).forEach(function (e) {
+      done[String(e.id)] = 1;
+      jobs.push(materializeEvent(e).then(function (real) {
+        return rest("events?id=eq." + encodeURIComponent(real.id) + "&status=eq.geplant", {
+          method: "PATCH", prefer: "return=minimal", body: { status: "ausgefallen" }
+        });
+      }).catch(function () {}));
+    });
+    var sorted = days.slice().sort();
+    var from = sorted[0], to = addDays(sorted[sorted.length - 1], 1);
+    jobs.push(rest("events?user_id=eq." + encodeURIComponent(me()) + "&status=eq.geplant&starts_at=gte." + from +
+      "&starts_at=lt." + to + "&select=id,user_id,status,item_type,enrollment_id,course_id,starts_at&limit=500")
+      .then(function (rows) {
+        var ids = (rows || []).filter(function (e) { return isPlanUnit(e) && !done[String(e.id)]; }).map(function (e) { return e.id; });
+        if (!ids.length) return;
+        return rest("events?id=in.(" + ids.join(",") + ")&status=eq.geplant", {
+          method: "PATCH", prefer: "return=minimal", body: { status: "ausgefallen" }
+        });
+      }).catch(function () {}));
+    return Promise.all(jobs);
+  }
+
   function saveZrec(btn) {
     var z = state.zrec;
     btn.disabled = true;
@@ -2317,6 +2363,7 @@
             return chain;
           }).catch(function () {}));
         }
+        if (z.mode === "alt" && evs.length) jobs.push(replacePlanUnits(dates.map(function (x) { return x.day; }), evs));
         return Promise.all(jobs).then(function () { return evs.length; });
       })
       .then(function (n) {
@@ -2345,11 +2392,12 @@
         return pa - pb || String(a.starts_at).localeCompare(String(b.starts_at));
       })[0] || null;
     });
-    state.daysEdit = { days: days, slots: slots, times: {}, vis: {} };
+    state.daysEdit = { days: days, slots: slots, times: {}, vis: {}, orig: {} };
     slots.forEach(function (ev) {
       if (!ev) return;
-      state.daysEdit.times[ev.id] = displayTime(ev.starts_at) ? nearestTimeIdx(formatTime(ev.starts_at)) : 0;
+      state.daysEdit.times[ev.id] = displayTime(ev.starts_at) ? formatTime(ev.starts_at) : NO_TIME;
       state.daysEdit.vis[ev.id] = ev.visibility === "privat" ? "privat" : "team";
+      state.daysEdit.orig[ev.id] = state.daysEdit.times[ev.id];
     });
     paintDaysEditor();
   }
@@ -2364,22 +2412,25 @@
       if (!ev) {
         return '<div class="wr-dayrow is-empty" data-wr-dayslot="' + i + '"><b>' + label + '</b><span class="wr-dayrow__free">frei</span><span></span></div>';
       }
-      var ti = de.times[ev.id];
+      var opts = timeOptsFor(de.times[ev.id]);
+      var ti = Math.max(0, opts.indexOf(de.times[ev.id]));
       var vis = de.vis[ev.id];
       return '<div class="wr-dayrow" data-wr-dayslot="' + i + '"><b>' + label + "</b>" +
         '<div class="wr-dayrow__mid"><span class="wr-dayrow__title">' + esc(ev.title || "Training") + "</span>" +
         '<div class="wr-dayrow__ctl"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
-        MINI_TIMES.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
+        opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
         '<button type="button" class="wr-dayrow__vis' + (vis === "privat" ? "" : " is-on") + '" data-wr-dayvis="' + esc(ev.id) + '">' + (vis === "privat" ? "privat" : "zeigen") + "</button></div></div>" +
         '<span class="wr-dayrow__grip" data-wr-grip="' + i + '" aria-label="Ziehen"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span></div>';
     }).join("");
     openSheet(
       '<p class="wr-sheet-title">Tage bearbeiten</p>' +
       '<p class="wr-sheet-hint">Du kannst Einheiten in den Tagen verschieben, Uhrzeit anpassen, privat/zeigen wählen, um zu entscheiden, ob Freunde es sehen dürfen.</p>' +
-      '<div class="wr-days">' + rows + "</div>" +
+      '<div class="wr-days wr-days--all">' + rows + "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-days-save="1">Speichern</button></div>'
     );
+    var cardAll = $("wr-sheet-card");
+    if (cardAll) cardAll.classList.add("wr-sheet__card--days");
     var card = $("wr-sheet-card");
     if (!card) return;
     /* Räder auf den Wert stellen und Scroll lesen */
@@ -2390,8 +2441,11 @@
       w.addEventListener("scroll", function () {
         clearTimeout(tm);
         tm = setTimeout(function () {
-          var n = Math.max(0, Math.min(MINI_TIMES.length - 1, Math.round(w.scrollTop / 36)));
-          if (state.daysEdit) state.daysEdit.times[w.getAttribute("data-wr-mini")] = n;
+          var id = w.getAttribute("data-wr-mini");
+          if (!state.daysEdit) return;
+          var o = timeOptsFor(state.daysEdit.orig[id]);
+          var n = Math.max(0, Math.min(o.length - 1, Math.round(w.scrollTop / 36)));
+          state.daysEdit.times[id] = o[n];
         }, 80);
       }, { passive: true });
     });
@@ -2455,6 +2509,20 @@
     });
   }
 
+  /* „Gespeichert“ für 2 Sekunden über dem Dialog, ohne ihn zu schließen */
+  function showSavedNote() {
+    var old = document.querySelector(".wr-saved");
+    if (old) old.remove();
+    var n = document.createElement("div");
+    n.className = "wr-saved";
+    n.setAttribute("role", "status");
+    n.textContent = "Gespeichert";
+    document.body.appendChild(n);
+    requestAnimationFrame(function () { n.classList.add("is-on"); });
+    setTimeout(function () { n.classList.remove("is-on"); }, 2000);
+    setTimeout(function () { if (n.parentNode) n.remove(); }, 2400);
+  }
+
   function saveDaysEditor() {
     var de = state.daysEdit;
     if (!de) return;
@@ -2462,7 +2530,7 @@
     de.slots.forEach(function (ev, i) {
       if (!ev) return;
       var iso = de.days[i];
-      var pick = MINI_TIMES[de.times[ev.id]];
+      var pick = de.times[ev.id];
       var untimed = pick === NO_TIME;
       var hhmm = untimed ? "" : (pick || formatTime(ev.starts_at) || "18:00");
       var starts = untimed ? iso + "T12:00:00Z" : timedStarts(iso, hhmm);
@@ -2476,12 +2544,18 @@
         });
       }));
     });
+    var saveBtn = document.querySelector("[data-wr-days-save]");
+    if (saveBtn) saveBtn.disabled = true;
     Promise.all(jobs).then(function () {
-      state.daysEdit = null;
-      closeSheet();
       if (global.GoTama) global.GoTama.invalidate();
-      return refresh().then(notifyAktuell);
+      showSavedNote();
+      return refresh().then(function () {
+        notifyAktuell();
+        /* Dialog bleibt offen und zeigt den gespeicherten Stand */
+        if (state.daysEdit && document.querySelector(".wr-sheet__card--days")) openDaysEditor();
+      });
     }).catch(function () {
+      if (saveBtn) saveBtn.disabled = false;
       if (host.toast) host.toast("Speichern ging nicht");
     });
   }
