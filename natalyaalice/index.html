@@ -1501,7 +1501,7 @@
     }
     .acc-card { margin: 0 0 28px; color: #2A2118; }
     /* Wallet (Events ab morgen): Kopf mit Name links, Tag rechts, darunter Eventname linksbündig */
-    .acc-card.is-wallet { position: relative; border-radius: 16px; transition: margin .28s ease; }
+    .acc-card.is-wallet { position: relative; isolation: isolate; border-radius: 16px; transition: margin .28s ease; }
     .acc-card.is-wallet .acc-card__media { border-radius: 16px; transition: height .28s ease; }
     .acc-card.is-wallet .acc-card__overlay {
       justify-content: flex-start; align-items: stretch; text-align: left; padding: 14px 14px 12px;
@@ -4094,17 +4094,18 @@
     .friend-list__feed.is-on { background: #2A2118; color: #F3EEE4; border-color: #2A2118; }
     .friend-list__feed.is-fixed { background: transparent; color: #2A2118; border-color: #2A2118; cursor: default; }
     /* Meine Freunde: Liste (Kreis) oder Wallet (Quadrat) */
-    .friend-view { display: flex; justify-content: center; gap: 5px; margin: -4px 0 10px; }
-    .friend-view button { width: 36px; height: 36px; padding: 0; border: 0; background: none; color: rgba(42,33,24,.4); display: grid; place-items: center; cursor: pointer; }
+    .friend-view { display: flex; justify-content: center; gap: 4px; margin: -4px 0 10px; }
+    .friend-view button { width: 50px; height: 50px; padding: 0; border: 0; background: none; color: rgba(42,33,24,.4); display: grid; place-items: center; cursor: pointer; }
     .friend-view button.is-on { color: #2A2118; }
-    .friend-view svg { width: 22px; height: 22px; }
+    .friend-view svg { width: 31px; height: 31px; }
     /* Wallet: quadratische Karte vorn, weitere schauen unten heraus; hochwischen holt die nächste nach vorn */
-    .friend-wallet { --fw-w: 100%; position: relative; margin-top: 8px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-width: none; scroll-snap-type: y mandatory; }
+    .friend-wallet { --fw-w: 100%; position: relative; margin-top: 8px; overflow-y: auto; overscroll-behavior: none; touch-action: pan-x pan-y; scrollbar-width: none; scroll-snap-type: y mandatory; }
     .friend-wallet::-webkit-scrollbar { display: none; }
     .friend-wallet[hidden], .friend-list > [hidden] { display: none !important; }
-    .fw-stage { position: sticky; top: 0; z-index: 1; pointer-events: none; }
+    .fw-stage { position: sticky; top: 0; z-index: 1; pointer-events: none; transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1); }
+    .fw-stage.is-pulling { transition: none; }
     .fw-snap { scroll-snap-align: start; scroll-snap-stop: always; }
-    .fw-card { position: absolute; left: 0; right: 0; top: 0; aspect-ratio: 4 / 5; pointer-events: auto; transform-origin: 50% 0; will-change: transform, opacity; border-radius: 22px; overflow: hidden; background: #2A2118 center/cover no-repeat; color: #fff; display: flex; flex-direction: column; justify-content: flex-start; cursor: pointer; box-shadow: 0 -6px 18px rgba(0,0,0,.18); }
+    .fw-card { position: absolute; left: 0; right: 0; top: 0; aspect-ratio: 4 / 5; pointer-events: auto; transform-origin: 50% 0; will-change: transform, opacity; border-radius: 22px; overflow: hidden; background: #2A2118 center/cover no-repeat; color: #fff; display: flex; flex-direction: column; justify-content: flex-start; cursor: pointer; transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1), opacity 140ms ease; }
     .fw-card::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.78) 0%, rgba(0,0,0,.5) 45%, rgba(0,0,0,.12) 80%, rgba(0,0,0,0) 100%); }
     .fw-card__body { position: relative; padding: 16px 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; max-height: 100%; box-sizing: border-box; overflow: hidden; align-content: start; }
     .friend-wallet .fw-card__name { margin: 0; font: 600 28px/1.1 'Playfair Display', Georgia, serif !important; color: #fff; }
@@ -15984,7 +15985,7 @@
         /* Geometrie: Karte 4:5, oben bis 3 Kanten der gesehenen Karten, unten der Rest bis zur Mitte der Pill */
         var TP = 10, TOPN = 3, GAP = 14, SHOW = 3;
         var geo = { w: 340, h: 425, H: 600, peek: 30 };
-        function walletStep() { return Math.round(geo.w * 0.6); }
+        function walletStep() { return Math.round(geo.w * 0.75); }
         function walletPos() { return (wallet.scrollTop || 0) / walletStep(); }
         function layoutWallet() {
           if (!wallet.isConnected || wallet.hidden) return;
@@ -16017,6 +16018,8 @@
         }
         function paintWalletPos() {
           var pos = walletPos();
+          /* oben am Anfang (iOS zieht nach): Karte nur ein Stück mitgehen lassen */
+          if (pos < 0) pos = pos * 0.12;
           var yFront = Math.min(pos, TOPN) * TP;
           var front = Math.round(pos);
           if (cards[front]) walletState.id = String(cards[front].p.id);
@@ -16050,7 +16053,26 @@
           raf = requestAnimationFrame(function () { raf = 0; paintWalletPos(); });
         }, { passive: true });
         /* Während des Wischens kein Neuaufbau von Team; danach nachholen */
-        wallet.addEventListener("touchstart", function () { walletState.touching = true; }, { passive: true });
+        /* Oben am Anfang nach unten ziehen: Stapel geht nur ein Stück mit und federt zurück */
+        var pullY0 = null;
+        wallet.addEventListener("touchstart", function (e) {
+          walletState.touching = true;
+          pullY0 = wallet.scrollTop <= 0 && e.touches[0] ? e.touches[0].clientY : null;
+        }, { passive: true });
+        wallet.addEventListener("touchmove", function (e) {
+          if (pullY0 == null || !e.touches[0]) return;
+          var dy = e.touches[0].clientY - pullY0;
+          if (dy <= 0 || wallet.scrollTop > 0) { stage.classList.remove("is-pulling"); stage.style.transform = ""; return; }
+          stage.classList.add("is-pulling");
+          stage.style.transform = "translateY(" + Math.min(26, dy * 0.15).toFixed(1) + "px)";
+        }, { passive: true });
+        function pullBack() {
+          pullY0 = null;
+          stage.classList.remove("is-pulling");
+          stage.style.transform = "";
+        }
+        wallet.addEventListener("touchend", pullBack, { passive: true });
+        wallet.addEventListener("touchcancel", pullBack, { passive: true });
         function touchDone() {
           setTimeout(function () {
             walletState.touching = false;
