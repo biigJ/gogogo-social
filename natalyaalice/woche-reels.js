@@ -2791,7 +2791,8 @@
         '<div class="wr-dayrow__mid"><span class="wr-dayrow__title">' + esc(ev.title || "Training") + "</span>" +
         '<div class="wr-dayrow__ctl"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
         opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
-        '<button type="button" class="wr-dayrow__vis' + (vis === "privat" ? "" : " is-on") + '" data-wr-dayvis="' + esc(ev.id) + '">' + (vis === "privat" ? "privat" : "zeigen") + "</button></div></div>" +
+        '<button type="button" class="wr-dayrow__vis' + (vis === "privat" ? "" : " is-on") + '" data-wr-dayvis="' + esc(ev.id) + '">' + (vis === "privat" ? "privat" : "zeigen") + "</button>" +
+        '<button type="button" class="wr-dayrow__vis" data-wr-daymedia="' + esc(ev.id) + '">Media</button></div></div>' +
         '<span class="wr-dayrow__grip" data-wr-grip="' + i + '" aria-label="Ziehen"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span></div>';
     }).join("");
     openSheet(
@@ -2835,6 +2836,8 @@
         return;
       }
       if (e.target.closest && e.target.closest("[data-wr-days-save]")) saveDaysEditor();
+      var mb = e.target.closest && e.target.closest("[data-wr-daymedia]");
+      if (mb) { var mid = mb.getAttribute("data-wr-daymedia"); setTimeout(function () { openMediaSheet(mid); }, 0); }
     });
     /* Ziehen am Griff */
     var drag = null;
@@ -2894,6 +2897,174 @@
     setTimeout(function () { n.classList.remove("is-on"); }, 2000);
     setTimeout(function () { if (n.parentNode) n.remove(); }, 2400);
   }
+
+  /* ---------- Tage bearbeiten → Media: Eventbild und Übungsvideos/-fotos ----------
+     Eventbild: events.photo_url (Foto hochladen oder Link; YouTube → Vorschaubild).
+     Übungen: go_exercise_links (Link von YouTube/Instagram/TikTok oder eigenes Foto), eigene gehen vor. */
+  function mediaEvent() {
+    var id = state.media && state.media.id;
+    return id ? findOwnEvent(id) : null;
+  }
+  function openMediaSheet(eventId) {
+    state.media = { id: eventId, names: null };
+    paintMediaSheet();
+    var ev = mediaEvent();
+    var job = ev && host.exercisesForEvent ? host.exercisesForEvent(ev) : Promise.resolve([]);
+    var lib = global.GoExMedia && GoExMedia.ready ? GoExMedia.ready() : null;
+    Promise.all([job, lib]).then(function (r) {
+      if (!state.media || state.media.id !== eventId) return;
+      state.media.names = r[0] || [];
+      paintMediaSheet();
+    }).catch(function () {
+      if (state.media) { state.media.names = []; paintMediaSheet(); }
+    });
+  }
+  function paintMediaSheet() {
+    var ev = mediaEvent();
+    if (!ev) return;
+    var M = global.GoExMedia;
+    var photo = ev.photo_url || "";
+    var names = state.media.names;
+    var exHtml;
+    if (names === null) exHtml = '<p class="wr-sheet-hint">Übungen werden geladen …</p>';
+    else if (!names.length) {
+      exHtml = '<p class="wr-sheet-hint">' + (ev.category === "zirkel"
+        ? "Beim Zirkel wählst Du die Stationen im Workout."
+        : "Für diese Einheit sind keine Übungen hinterlegt.") + "</p>";
+    } else {
+      exHtml = names.map(function (n) {
+        var url = M ? M.urlFor(n) : "";
+        var info = url && M ? M.parse(url) : null;
+        var mine = M && M.mine ? M.mine(n) : null;
+        return '<div class="wr-mex" data-wr-mex="' + esc(n) + '">' +
+          (info
+            ? '<button type="button" class="wr-mex__thumb" data-wr-media-play="' + esc(n) + '" aria-label="Ansehen">' +
+              (info.thumb ? '<img src="' + esc(info.thumb) + '" alt="" loading="lazy" />' : "") +
+              '<span class="wr-mex__play">' + (M ? M.playIcon : "") + "</span></button>"
+            : '<span class="wr-mex__thumb is-empty"></span>') +
+          '<span class="wr-mex__name">' + esc(n) +
+          (info ? '<small>' + esc(mine ? "Dein " + (info.kind === "img" ? "Foto" : info.label) : info.label) + "</small>" : "") + "</span>" +
+          '<label class="wr-dayrow__vis wr-mex__btn">Foto<input type="file" accept="image/*" data-wr-media-file="ex" hidden /></label>' +
+          '<button type="button" class="wr-dayrow__vis wr-mex__btn" data-wr-media-link="ex">Link</button>' +
+          (mine ? '<button type="button" class="wr-mex__del" data-wr-media-exdel="' + esc(mine.id) + '" aria-label="Eigenes entfernen">×</button>' : "") +
+          "</div>";
+      }).join("");
+    }
+    var d = new Date(ev.starts_at);
+    openSheet(
+      '<p class="wr-sheet-title">Media</p>' +
+      '<p class="wr-sheet-hint">' + esc((ev.title || "Training") + " · " + DAYS_DE[d.getDay()] + " " + d.getDate() + ".") + "</p>" +
+      '<div class="wr-share-block"><h4>Eventbild</h4>' +
+      '<div class="wr-media-prev">' + (photo ? '<img src="' + esc(photo) + '" alt="" />' : "<span>Kein eigenes Bild</span>") + "</div>" +
+      '<div class="wr-media-acts">' +
+      '<label class="wr-dayrow__vis">Foto hochladen<input type="file" accept="image/*" data-wr-media-file="event" hidden /></label>' +
+      '<button type="button" class="wr-dayrow__vis" data-wr-media-link="event">Link einfügen</button>' +
+      (photo ? '<button type="button" class="wr-dayrow__vis" data-wr-media-del="event">Entfernen</button>' : "") +
+      "</div></div>" +
+      '<div class="wr-share-block"><h4>Übungen</h4>' +
+      '<p class="wr-sheet-hint">Video von YouTube, Instagram oder TikTok als Link, oder ein eigenes Foto. Deins siehst Du im Workout zuerst.</p>' +
+      exHtml + "</div>" +
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-media-back="1">Zurück</button></div>'
+    );
+  }
+  function saveEventPhoto(url) {
+    var ev = mediaEvent();
+    if (!ev) return Promise.resolve();
+    return rest("events?id=eq." + encodeURIComponent(ev.id) + "&user_id=eq." + encodeURIComponent(me()), {
+      method: "PATCH", prefer: "return=minimal", body: { photo_url: url || null }
+    }).then(function () {
+      ev.photo_url = url || null;
+      state.mediaDirty = true;
+      paintMediaSheet();
+      if (host.toast) host.toast(url ? "Eventbild gespeichert" : "Eventbild entfernt");
+      notifyAktuell();
+    }).catch(function () { if (host.toast) host.toast("Speichern ging gerade nicht"); });
+  }
+  function saveExerciseMedia(name, url) {
+    var M = global.GoExMedia;
+    if (!M || !name || !url) return Promise.resolve();
+    return rest("go_exercise_links", {
+      method: "POST", prefer: "return=minimal",
+      body: { name_key: M.key(name), name: name, url: url, added_by: me() }
+    }).then(function () { return M.reload(); }).then(function () {
+      paintMediaSheet();
+      if (host.toast) host.toast("Gespeichert bei " + name);
+    }).catch(function (err) {
+      var m = String((err && err.message) || "");
+      if (host.toast) host.toast(/duplicate|23505/.test(m) ? "Diesen Link gibt es bei der Übung schon" : /go_exercise_links|relation/.test(m) ? "Tabelle fehlt: go-exercise-links.sql ausführen" : "Speichern ging gerade nicht");
+    });
+  }
+  /* Link für das Eventbild: Bild-URL direkt, YouTube → Vorschaubild. Instagram/TikTok liefern kein Bild ohne Login. */
+  function eventImageFromLink(url) {
+    var M = global.GoExMedia;
+    var info = M ? M.parse(url) : null;
+    if (!info) return "";
+    if (info.kind === "img") return info.url;
+    if (info.thumb) return info.thumb;
+    return "";
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-media-back],[data-wr-media-link],[data-wr-media-del],[data-wr-media-play],[data-wr-media-exdel]") : null;
+    if (!t || !state.media) return;
+    if (t.hasAttribute("data-wr-media-back")) {
+      var dirty = state.mediaDirty;
+      state.media = null;
+      state.mediaDirty = false;
+      /* erst nach dem Klick neu zeichnen: andere Klick-Handler sehen sonst ein gelöstes Ziel und schließen das Sheet */
+      /* Neuladen baut die Woche samt Sheet neu: danach Tage bearbeiten wieder zeigen */
+      setTimeout(function () {
+        var reopen = function () { if (state.daysEdit) paintDaysEditor(); else closeSheet(); };
+        if (dirty) refreshKeepDay(currentDayIso()).then(reopen, reopen);
+        else reopen();
+      }, 0);
+      return;
+    }
+    if (t.hasAttribute("data-wr-media-play")) {
+      if (global.GoExMedia) GoExMedia.open(t.getAttribute("data-wr-media-play"));
+      return;
+    }
+    if (t.hasAttribute("data-wr-media-del")) {
+      saveEventPhoto(null);
+      return;
+    }
+    if (t.hasAttribute("data-wr-media-exdel")) {
+      rest("go_exercise_links?id=eq." + encodeURIComponent(t.getAttribute("data-wr-media-exdel")) + "&added_by=eq." + encodeURIComponent(me()), {
+        method: "DELETE", prefer: "return=minimal"
+      }).then(function () { return global.GoExMedia ? GoExMedia.reload() : null; })
+        .then(function () { paintMediaSheet(); })
+        .catch(function () { if (host.toast) host.toast("Entfernen ging gerade nicht"); });
+      return;
+    }
+    var kind = t.getAttribute("data-wr-media-link");
+    var row = t.closest("[data-wr-mex]");
+    var exName = row ? row.getAttribute("data-wr-mex") : "";
+    if (!global.GoDialog) return;
+    GoDialog.prompt(kind === "event" ? "Link zum Bild oder YouTube-Video" : "Link zum Video für " + exName, "", { ok: "Speichern" }).then(function (v) {
+      var url = String(v || "").trim();
+      if (!url) return;
+      if (!/^https?:\/\//i.test(url)) { if (host.toast) host.toast("Bitte einen Link mit https:// einfügen"); return; }
+      if (kind === "event") {
+        var img = eventImageFromLink(url);
+        if (!img) { if (host.toast) host.toast("Instagram und TikTok geben kein Bild frei. Bitte Foto hochladen"); return; }
+        saveEventPhoto(img);
+      } else saveExerciseMedia(exName, url);
+    });
+  });
+  document.addEventListener("change", function (e) {
+    var inp = e.target;
+    if (!inp || !inp.getAttribute || !inp.hasAttribute("data-wr-media-file") || !state.media) return;
+    var file = inp.files && inp.files[0];
+    if (!file || !global.GoExMedia || !GoExMedia.uploadImage) return;
+    var kind = inp.getAttribute("data-wr-media-file");
+    var row = inp.closest("[data-wr-mex]");
+    var exName = row ? row.getAttribute("data-wr-mex") : "";
+    if (host.toast) host.toast("Lade Foto hoch …");
+    GoExMedia.uploadImage(file, kind === "event" ? "events" : "exercises").then(function (url) {
+      return kind === "event" ? saveEventPhoto(url) : saveExerciseMedia(exName, url);
+    }).catch(function (err) {
+      if (host.toast) host.toast((err && err.message) || "Upload ging gerade nicht");
+    });
+  });
 
   function saveDaysEditor() {
     var de = state.daysEdit;
