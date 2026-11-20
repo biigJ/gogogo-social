@@ -8198,7 +8198,7 @@
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-72"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-52"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-53"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -13073,7 +13073,9 @@
 
       /* Zirkel-Event → FFC-Preset mit gemeinsamem Start (Startzeit, Admin-Halt, Spät-Einstieg) */
       /* FFC-Zirkel öffnen (Plus und Aktuell): Login, Subpage, Setup mit Voreinstellung; autostart → direkt ins Workout */
+      var lastZirkelPreset = null;
       function openZirkelFlow(preset) {
+        lastZirkelPreset = preset || null;
         /* Erst Login sichtbar, dann Tracking — Subpage nicht über Login legen */
         if (typeof requireFfc === "function") {
           requireFfc(
@@ -13111,7 +13113,8 @@
             var t = d.getTime();
             var untimed = d.getUTCHours() === 12 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
             if (isNaN(t) || untimed || t <= Date.now()) return base;
-            base.sync = { eventId: String(eventId), startAt: t, hold: false };
+            /* ohne eigene Einstellungen: 6 Runden (Laufen + Station) wie „Freitag“ */
+            base.sync = { eventId: String(eventId), startAt: t, hold: false, phases: 12 };
             return base;
           }).catch(function () { return base; });
         }
@@ -23919,6 +23922,15 @@
       window.FFC_HOST = {
         onStories: function () { paintHeuteCrew(); },
         onScreen: function (name) {
+          /* Zirkel-Login abgelaufen, während das Workout geöffnet wird: Login zeigen statt weißer Seite */
+          if (name === "auth" && !ffcAuthWanted && goSubKind === "zirkel") {
+            var subZ = document.getElementById("go-subpage");
+            if (subZ && !subZ.hidden) {
+              ffcAuthWanted = true;
+              ffcPending = function () { openZirkelFlow(lastZirkelPreset); };
+              try { closeGoSub(); } catch (eCz) {}
+            }
+          }
           var open = FFC_OVERLAY.indexOf(name) >= 0 || (name === "auth" && ffcAuthWanted);
           document.body.classList.toggle("ffc-open", open);
           if (name === "home") {
@@ -24062,6 +24074,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-6"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-7"></script>
 </body>
 </html>

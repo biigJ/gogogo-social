@@ -1678,7 +1678,8 @@
       return;
     }
     startBtn.disabled = false;
-    startBtn.textContent = 'Einsteigen · läuft seit '+fmt(-diff);
+    /* läuft schon: verbleibende Zeit runterzählen */
+    startBtn.textContent = 'Einsteigen · noch '+fmt(Math.max(0, syncTotalSec() + diff));
   }
   function stopSync(){
     clearInterval(syncTimer); syncTimer = null; sync = null;
@@ -3449,8 +3450,11 @@
         syncPollAt = Date.now();
         syncTimer = setInterval(syncTick, 1000);
       }
-      await refreshCachedHistory();
-      buildExercisePlan();
+      /* Verlauf höchstens 2,5 s abwarten: sonst bleibt bei langsamem Netz nur eine weiße Seite */
+      try{
+        await Promise.race([refreshCachedHistory(), new Promise(res=> setTimeout(res, 2500))]);
+      }catch(e){}
+      try{ buildExercisePlan(); }catch(e){}
       showScreen('setup');
       /* gogogo „Start“: Einstellungen kamen aus dem gogogo-Dialog → direkt ins Workout */
       if(preset && preset.autostart){
