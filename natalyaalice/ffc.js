@@ -1664,12 +1664,21 @@
       return;
     }
     const diff = Math.round((sync.startAt - now)/1000);
+    /* gogogo: Runden sind vorgegeben → erst so viele Stationen wählen, dann startet es */
+    const need = sync.phases ? Math.max(0, Math.ceil((sync.phases - rounds)/2)) : 0;
+    const needTxt = need ? 'Wähle noch '+need+(need === 1 ? ' Station' : ' Stationen') : '';
     if(diff > 0){
-      startBtn.disabled = true; startBtn.textContent = 'Gemeinsamer Start in '+fmt(diff);
+      startBtn.disabled = true;
+      startBtn.textContent = (needTxt ? needTxt+' · Start in ' : 'Gemeinsamer Start in ')+fmt(diff);
       return;
     }
     if(-diff >= syncTotalSec()){
       startBtn.disabled = true; startBtn.textContent = 'Training ist vorbei';
+      return;
+    }
+    if(need){
+      startBtn.disabled = true;
+      startBtn.textContent = needTxt+' · noch '+fmt(Math.max(0, syncTotalSec() + diff));
       return;
     }
     if(diff >= -1){
