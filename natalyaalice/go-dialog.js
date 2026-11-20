@@ -6,6 +6,7 @@
  *   GoDialog.choose(text, [{ label, value }])  → Promise<value|null>
  *   GoDialog.pick(text, [{ label, value }], { ok }) → Promise<value[]|null>  (Mehrfachauswahl)
  *   GoDialog.note(text)                        → Promise<void>  (nur Text, Tippen schließt)
+ *   GoDialog.time(text, { sub, times, ok, alt, cancel }) → Promise<"HH:MM"|"alt"|null>  (Drehrad, 30-Min-Schritte)
  *
  * Stil wie .sand-modal / .sand-card (Sandfläche, Playfair-Titel, schwarze Pill-Buttons).
  */
@@ -31,7 +32,11 @@
     ".god__card .god__text.is-center{text-align:center;margin-bottom:4px !important}" +
     ".god__sub{margin:0 0 16px;font-size:15px;font-weight:600;text-align:center;color:rgba(42,33,24,.75)}" +
     ".god__info{margin:-2px 0 12px;font-size:14px;text-align:center;color:rgba(42,33,24,.7)}" +
-    ".god__body{margin:8px 0 18px;font-size:16px;line-height:1.5;text-align:left}";
+    ".god__body{margin:8px 0 18px;font-size:16px;line-height:1.5;text-align:left}" +
+    ".god__wheel{position:relative;height:176px;margin:0 0 16px;overflow-y:auto;scroll-snap-type:y mandatory;background:#fff;border-radius:14px;padding:66px 0;box-sizing:border-box;scrollbar-width:none}" +
+    ".god__wheel::-webkit-scrollbar{display:none}" +
+    ".god__wheel button{display:block;width:100%;height:44px;margin:0;border:0;background:transparent;scroll-snap-align:center;font:600 18px/44px Inter,system-ui,sans-serif;color:rgba(17,17,17,.4);cursor:pointer}" +
+    ".god__wheel button.is-on{font-size:24px;color:#111}";
 
   function ensureCss() {
     if (document.getElementById("go-dialog-css")) return;
@@ -217,5 +222,53 @@
     });
   }
 
-  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg };
+  /* Uhrzeit wählen: Drehrad wie überall (30-Minuten-Schritte). opts.times: ["7:00", "7:30", …] */
+  function timeDlg(msg, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      if (opts.sub) {
+        var tEl = card.querySelector(".god__text");
+        if (tEl) tEl.classList.add("is-center");
+        var sub = document.createElement("p");
+        sub.className = "god__sub";
+        sub.textContent = opts.sub;
+        card.appendChild(sub);
+      }
+      var times = opts.times || [];
+      if (!times.length) for (var h = 6; h <= 22; h++) { times.push(h + ":00"); times.push(h + ":30"); }
+      var wheel = document.createElement("div");
+      wheel.className = "god__wheel";
+      times.forEach(function (t, i) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = t;
+        if (i === 0) b.className = "is-on";
+        b.addEventListener("click", function () { b.scrollIntoView({ block: "center", behavior: "smooth" }); });
+        wheel.appendChild(b);
+      });
+      var tm = 0;
+      wheel.addEventListener("scroll", function () {
+        clearTimeout(tm);
+        tm = setTimeout(function () {
+          var mid = wheel.scrollTop + wheel.clientHeight / 2, best = null, bd = 1e9;
+          Array.prototype.forEach.call(wheel.children, function (b) {
+            var d = Math.abs(b.offsetTop + b.offsetHeight / 2 - mid);
+            if (d < bd) { bd = d; best = b; }
+          });
+          Array.prototype.forEach.call(wheel.children, function (b) { b.classList.toggle("is-on", b === best); });
+        }, 40);
+      }, { passive: true });
+      card.appendChild(wheel);
+      button(card, opts.ok || "Senden", "", function () {
+        var on = wheel.querySelector(".is-on");
+        close(on ? on.textContent : null);
+      });
+      if (opts.alt) button(card, opts.alt, "god__btn--choice", function () { close("alt"); });
+      button(card, opts.cancel || "Später", "god__btn--quiet", function () { close(null); });
+      return null;
+    });
+  }
+
+  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg };
 })(window);
