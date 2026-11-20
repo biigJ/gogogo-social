@@ -474,6 +474,43 @@
     load().then(function () { paint(el); });
   }
 
+  /* Wallet-Ansicht (Team → Bubbles, Quadrat): paint(items, fill(card, b), open(b)) aus index.html */
+  function wallet(paint) {
+    function run() {
+      var cur = mine();
+      var items = bubbles.slice();
+      if (cur) items.sort(function (a, b) { return (String(b.id) === String(cur.id)) - (String(a.id) === String(cur.id)); });
+      paint(items, function fill(card, b) {
+        var body = card.querySelector(".fw-card__body");
+        if (!body) return;
+        var c = countsFor(b.id);
+        var isMine = cur && String(cur.id) === String(b.id);
+        body.innerHTML =
+          (isMine ? '<span class="gbub-card__me" style="position:static;display:inline-block;margin-bottom:8px">Deine Bubble</span>' : "") +
+          '<h3 class="fw-card__name">' + esc(b.name) + "</h3>" +
+          '<p class="fw-card__goal">' + esc(c.members + (c.members === 1 ? " Mitglied" : " Mitglieder") + (c.coaches ? " · " + c.coaches + (c.coaches === 1 ? " Coach" : " Coaches") : "")) + "</p>" +
+          (b.description ? '<p class="fw-card__about">' + esc(b.description) + "</p>" : "") +
+          (placesText(b) ? '<p class="fw-card__goal">' + esc(placesText(b)) + "</p>" : "");
+        if (!b.photo_url && !card.querySelector(".gbub-wsoap")) {
+          var s2 = document.createElement("span");
+          s2.className = "gbub-wsoap";
+          s2.innerHTML = SOAP_SVG;
+          card.insertBefore(s2, card.firstChild);
+        }
+      }, function open(b) {
+        var cur2 = mine();
+        if (cur2 && String(cur2.id) === String(b.id)) { if (host.openFeed) host.openFeed(b); return; }
+        join(b).then(function (ok) {
+          run();
+          if (ok && host.openFeed) host.openFeed(b);
+        });
+      });
+    }
+    ensureCss();
+    if (loaded) run();
+    load().then(run);
+  }
+
   var cssDone = false;
   function ensureCss() {
     if (cssDone) return;
@@ -482,6 +519,10 @@
     st.textContent =
       ".gbub-card{position:relative;display:flex;gap:14px;align-items:center;width:100%;margin:0 0 12px;padding:14px;border-radius:20px;background:var(--gbub);color:#1D1630;text-align:left;cursor:pointer;box-sizing:border-box}" +
       ".gbub-card.is-mine{box-shadow:inset 0 0 0 3px #1D1630}" +
+      ".fw-card--bubble .fw-card__body{color:#1D1630}" +
+      ".fw-card--bubble[style*=background-image] .fw-card__body{color:#fff}" +
+      ".gbub-wsoap{position:absolute;right:22px;bottom:22px;color:#1D1630;opacity:.85}" +
+      ".gbub-wsoap svg{width:96px;height:96px}" +
       ".gbub-card__img{flex:none;width:72px;height:72px;border-radius:14px;overflow:hidden;background:rgba(255,255,255,.45);display:flex;align-items:center;justify-content:center}" +
       ".gbub-card__img img{width:100%;height:100%;object-fit:cover;display:block}" +
       ".gbub-card__img svg{width:36px;height:36px}" +
@@ -552,6 +593,7 @@
     openStory: openStory,
     openWiki: openWiki,
     mountComposer: mountComposer,
+    wallet: wallet,
     SOAP_SVG: SOAP_SVG
   };
 })(window);
