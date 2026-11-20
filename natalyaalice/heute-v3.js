@@ -2297,9 +2297,16 @@
               groupOnly: !!flags.groupOnly
             }) || []
           : [];
+      /* Tagebuch-Eintrag ohne Text/Foto an einem Tag mit erledigtem Event derselben Person:
+         das Event steht schon im Feed (z. B. Zirkel nach FFC-Workout → „Heute · 12:00“ doppelt) */
+      var doneDay = {};
+      (state.events || []).forEach(function (e) {
+        if (e && e.status === "erledigt" && e.starts_at) doneDay[String(e.user_id) + "|" + dayKey(e.starts_at)] = true;
+      });
       diaryItems.forEach(function (d) {
         if (!d || !d.starts_at) return;
         if (flags.groupOnly && !inGroupFilter(d.user_id, flags)) return;
+        if (!String(d.note || "").trim() && !d.photo_url && doneDay[String(d.user_id) + "|" + dayKey(d.starts_at)]) return;
         history.push({
           kind: "diary",
           starts_at: d.starts_at,
