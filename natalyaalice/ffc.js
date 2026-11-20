@@ -1702,10 +1702,47 @@
     startBtn.textContent = 'Einsteigen · noch '+fmt(Math.max(0, syncTotalSec() + diff));
   }
   function stopSync(){
-    clearInterval(syncTimer); syncTimer = null; sync = null;
+    clearInterval(syncTimer); syncTimer = null; sync = null; syncRunStart = null;
+    syncUi();
+  }
+  /* Refresh-Icon (Setup und Workout): Startzeit sofort neu holen. Läuft das Workout schon mit einer
+     anderen Startzeit (z. B. Sofortstart vom Ersteller), wird auf die gemeinsame Zeit umgestellt. */
+  let syncRunStart = null;
+  function syncUi(){
+    ['setupSyncBtn','runSyncBtn'].forEach(id=>{
+      const b = document.getElementById(id);
+      if(b) b.hidden = !(sync && sync.poll);
+    });
+  }
+  function resyncNow(btn){
+    if(!sync || !sync.poll) return;
+    if(btn){ btn.classList.add('is-spin'); setTimeout(()=> btn.classList.remove('is-spin'), 700); }
+    syncPollAt = Date.now();
+    Promise.resolve(sync.poll()).then(st=>{
+      if(!sync || !st) return;
+      sync.hold = !!st.hold;
+      if(st.startAt) sync.startAt = st.startAt;
+      const onRun = screens.run.classList.contains('active');
+      if(onRun && syncRunStart !== null){
+        if(sync.hold || Math.abs(sync.startAt - syncRunStart) < 1500) return;
+        if(sync.startAt > Date.now()){
+          /* neue Startzeit liegt noch vorn: zurück zum Countdown */
+          clearInterval(timerId);
+          syncRunStart = null;
+          showScreen('setup');
+          clearInterval(syncTimer); syncTimer = setInterval(syncTick, 1000);
+          syncTick();
+          return;
+        }
+        startRunAt(sync.startAt);
+        return;
+      }
+      syncTick();
+    }).catch(()=>{});
   }
   function startRunAt(startMs){
     clearInterval(syncTimer); syncTimer = null;
+    if(sync) syncRunStart = startMs;
     if(sync && sync.phases){
       rounds = sync.phases;
       while(roundExercises.length < rounds) roundExercises.push(roundExercises.length % 2 === (runFirst ? 0 : 1) ? RUN_ID : '');
@@ -2634,6 +2671,10 @@
   }
 
   document.getElementById('startBtn').addEventListener('click', ()=>{ if(sync) startRunAt(sync.startAt); else startRun(); });
+  ['setupSyncBtn','runSyncBtn'].forEach(id=>{
+    const b = document.getElementById(id);
+    if(b) b.addEventListener('click', ()=> resyncNow(b));
+  });
 
   // =================================================================
   // 24-STUNDEN-POSTS (Supabase: Tabelle posts + privater Speicher "posts", siehe supabase/posts.sql)
@@ -3482,6 +3523,7 @@
         syncPollAt = Date.now();
         syncTimer = setInterval(syncTick, 1000);
       }
+      syncUi();
       /* Verlauf höchstens 2,5 s abwarten: sonst bleibt bei langsamem Netz nur eine weiße Seite */
       try{
         await Promise.race([refreshCachedHistory(), new Promise(res=> setTimeout(res, 2500))]);
