@@ -1005,6 +1005,32 @@
     document.addEventListener("visibilitychange", function () { if (!document.hidden) tickWhenLines(); });
   }
 
+  /* Zirkel heute mit Uhrzeit: Countdown-Pille (läuft sekündlich über den Woche-Ticker) und für den
+     Ersteller „Countdown anhalten/starten“ – dieselben Pillen wie in Woche */
+  function zirkelPillsHtml(ev) {
+    if (!ev || ev.category !== "zirkel" || ev.status === "erledigt" || !hasTime(ev)) return "";
+    if (dayKey(ev.starts_at) !== todayIso()) return "";
+    var z = global.GoZirkelSetup ? GoZirkelSetup.parse(ev.note) : null;
+    var start = new Date(ev.starts_at).getTime();
+    var target = z && z.goAt ? z.goAt : start;
+    var held = !!(z && z.hold && !z.goAt);
+    var total = z ? GoZirkelSetup.totalSec(z) * 1000 : 0;
+    if (!held && total && Date.now() > target + total) return "";
+    var cd;
+    if (held) cd = '<span class="wr-zirkel-cd">Countdown angehalten</span>';
+    else if (target > Date.now()) {
+      var sec = Math.floor((target - Date.now()) / 1000);
+      var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
+      cd = '<span class="wr-zirkel-cd" data-wr-cd-start="' + target + '">Start in ' + (h ? h + ":" : "") +
+        (m < 10 ? "0" : "") + m + ":" + (x < 10 ? "0" : "") + x + "</span>";
+    } else cd = '<span class="wr-zirkel-cd">läuft</span>';
+    var admin = z && String(ev.user_id) === me()
+      ? '<button type="button" class="go-online-cta go-online-cta--ghost" data-acc-zadmin="' + (held ? "go" : "hold") + '" data-id="' + esc(ev.id) + '">' +
+        (held ? "Countdown starten" : "Countdown anhalten") + "</button>"
+      : "";
+    return '<div class="wr-zrow acc-zrow">' + cd + admin + "</div>";
+  }
+
   /* Zirkel vom Ersteller angehalten bzw. neu gestartet (events.note hold/go): für alle Teilnehmer sichtbar */
   function zirkelWhen(ev) {
     if (!ev || !ev.note || !global.GoZirkelSetup) return "";
@@ -1682,6 +1708,7 @@
       (opts.when
         ? '<p class="acc-card__when"' + (opts.whenTs ? ' data-when-ts="' + esc(opts.whenTs) + '" data-when-base="' + esc(whenLine(opts.whenTs)) + '"' : "") + ">" + esc(opts.when) + "</p>"
         : "") +
+      (opts.zpills || "") +
       (opts.title
         ? '<h2 class="acc-card__title">' + esc(opts.title) + "</h2>"
         : "") +
@@ -1896,8 +1923,9 @@
       emoji: emoji,
       actions: (tools || "") + (actions || ""),
       author: authorHtml(p, true),
-      when: zirkelWhen(ev) || whenLine(ev.starts_at),
-      whenTs: zirkelWhen(ev) ? "" : ev.starts_at,
+      when: zirkelPillsHtml(ev) ? "Heute · " + timeLabel(ev.starts_at) : whenLine(ev.starts_at),
+      whenTs: zirkelPillsHtml(ev) ? "" : ev.starts_at,
+      zpills: zirkelPillsHtml(ev),
       title: title,
       place: ev.location || "",
       desc:
@@ -3981,6 +4009,22 @@
     var openC = t.closest("[data-open-comments]");
     if (openC) {
       openComments(openC.getAttribute("data-open-comments"));
+      return;
+    }
+    var zAdmin = t.closest("[data-acc-zadmin]");
+    if (zAdmin) {
+      if (!global.GoZirkelSync) return;
+      var zAct = zAdmin.getAttribute("data-acc-zadmin");
+      zAdmin.disabled = true;
+      GoZirkelSync.admin(zAdmin.getAttribute("data-id"), zAct)
+        .then(function () {
+          if (host.toast) host.toast(zAct === "go" ? "Countdown läuft" : "Countdown angehalten");
+          return refresh();
+        })
+        .catch(function () {
+          zAdmin.disabled = false;
+          if (host.toast) host.toast("Hat nicht geklappt");
+        });
       return;
     }
     var invitePost = t.closest("[data-invite-post]");
