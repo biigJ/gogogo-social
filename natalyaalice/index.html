@@ -4098,7 +4098,7 @@
     .friend-list__feed.is-on { background: #2A2118; color: #F3EEE4; border-color: #2A2118; }
     .friend-list__feed.is-fixed { background: transparent; color: #2A2118; border-color: #2A2118; cursor: default; }
     /* Meine Freunde: Liste (Kreis) oder Wallet (Quadrat) */
-    .friend-view { display: flex; justify-content: center; gap: 4px; margin: -4px 0 10px; }
+    .friend-view { display: flex; justify-content: center; gap: 3px; margin: -4px 0 10px; }
     .friend-view button { width: 50px; height: 50px; padding: 0; border: 0; background: none; color: rgba(42,33,24,.4); display: grid; place-items: center; cursor: pointer; }
     .friend-view button.is-on { color: #2A2118; }
     .friend-view svg { width: 31px; height: 31px; }
@@ -4106,6 +4106,9 @@
     .friend-wallet { --fw-w: 100%; position: relative; margin-top: 8px; overflow-y: auto; overscroll-behavior: none; touch-action: pan-x pan-y; scrollbar-width: none; scroll-snap-type: y mandatory; }
     .friend-wallet::-webkit-scrollbar { display: none; }
     .friend-wallet[hidden], .friend-list > [hidden] { display: none !important; }
+    /* Bis zur ersten Anordnung unsichtbar und ohne Animation: sonst blitzen die Karten kurz übereinander */
+    .friend-wallet:not(.is-ready) .fw-stage { visibility: hidden; }
+    .friend-wallet:not(.is-ready) .fw-card { transition: none; }
     .fw-stage { position: sticky; top: 0; z-index: 1; pointer-events: none; transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1); }
     .fw-stage.is-pulling { transition: none; }
     .fw-snap { scroll-snap-align: start; scroll-snap-stop: always; }
@@ -15849,6 +15852,10 @@
       var CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
       function fillFriendCard(card, p, circles) {
         var x = friendExtras[String(p.id)] || {};
+        /* Nur neu zeichnen, wenn sich etwas geändert hat (sonst blitzt die Karte bei jedem Nachladen) */
+        var sig = JSON.stringify([x.about_me, x.mantra, x.workout_places, x.training_goal, x.coach_goals, x._plan, x._streak, circles, feedMuted[String(p.id)] ? 1 : 0, p.nickname, p.name]);
+        if (card._fwSig === sig) return;
+        card._fwSig = sig;
         var about = profileAbout(x);
         var body = card.querySelector(".fw-card__body");
         body.textContent = "";
@@ -15871,6 +15878,12 @@
           gl.className = "fw-card__goal";
           gl.textContent = goals.join(" · ");
           body.appendChild(gl);
+        }
+        if (x._plan) {
+          var pl = document.createElement("p");
+          pl.className = "fw-card__plan";
+          pl.textContent = "Wochenplan: " + x._plan;
+          body.appendChild(pl);
         }
         /* Streak wie am eigenen Profilkreis */
         var oldBadge = card.querySelector(".fw-card__streak");
@@ -15942,12 +15955,6 @@
           m.textContent = mantra;
           body.appendChild(m);
         }
-        if (x._plan) {
-          var pl = document.createElement("p");
-          pl.className = "fw-card__plan";
-          pl.textContent = "Wochenplan: " + x._plan;
-          body.appendChild(pl);
-        }
       }
       /* Wallet-Stand überlebt Neuaufbau von Team (Daten-Refresh, Zurück aus dem Profil) */
       var walletState = { id: "", touching: false, pending: false };
@@ -15965,12 +15972,6 @@
           var card = document.createElement("article");
           card.className = "fw-card";
           if (p.photo_url) card.style.backgroundImage = "url(\"" + String(p.photo_url).replace(/"/g, "%22") + "\")";
-          else {
-            var face = document.createElement("span");
-            face.className = "fw-card__face";
-            face.textContent = String(p.name || p.nickname || "?").slice(0, 1).toUpperCase();
-            card.appendChild(face);
-          }
           var body = document.createElement("div");
           body.className = "fw-card__body";
           card.appendChild(body);
@@ -16019,6 +16020,7 @@
           cards.forEach(function (c, i) { if (String(c.p.id) === walletState.id) want = i; });
           wallet.scrollTop = want * walletStep();
           paintWalletPos();
+          if (!wallet.classList.contains("is-ready")) requestAnimationFrame(function () { wallet.classList.add("is-ready"); });
         }
         function paintWalletPos() {
           var pos = walletPos();
@@ -16088,6 +16090,7 @@
         }
         wallet.addEventListener("touchend", touchDone, { passive: true });
         wallet.addEventListener("touchcancel", touchDone, { passive: true });
+        wallet._fwLayout = layoutWallet;
         requestAnimationFrame(layoutWallet);
         var lastW = 0;
         if (window.ResizeObserver) new ResizeObserver(function () {
@@ -16099,7 +16102,14 @@
         var ids = people.map(function (p) { return String(p.id); })
           .filter(function (id) { return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id); });
         if (!ids.length) return;
-        function refill() { cards.forEach(function (c) { if (c.card.isConnected) fillFriendCard(c.card, c.p, c.circles); }); }
+        var refillRaf = 0;
+        function refill() {
+          if (refillRaf) return;
+          refillRaf = requestAnimationFrame(function () {
+            refillRaf = 0;
+            cards.forEach(function (c) { if (c.card.isConnected) fillFriendCard(c.card, c.p, c.circles); });
+          });
+        }
         function ex(id) { return friendExtras[id] || (friendExtras[id] = {}); }
         var inList = ids.map(encodeURIComponent).join(",");
         var need = ids.filter(function (id) { return !friendExtras[id] || !friendExtras[id]._loaded; });
@@ -16582,8 +16592,21 @@
             });
             /* Wallet: Subline, Freund hinzufügen und Liste aus; Kreis: wieder an */
             [].forEach.call(list.querySelectorAll(".friend-list__row, .coach-empty, .friend-list__hint"), function (r) { r.hidden = walletOn; });
+            /* Neuaufbau von Team: dieselbe Wallet weiterverwenden, solange es dieselben Freunde sind (kein Blitzen) */
+            var wKey = people.map(function (p) { return String(p.id) + ":" + (p.photo_url || ""); }).join("|");
+            if (walletOn && !wallet.childElementCount && walletState.el && walletState.key === wKey && walletState.el !== wallet) {
+              list.replaceChild(walletState.el, wallet);
+              wallet = walletState.el;
+              wallet.hidden = false;
+              requestAnimationFrame(function () { if (wallet._fwLayout) wallet._fwLayout(); });
+              return;
+            }
             wallet.hidden = !walletOn;
-            if (walletOn && !wallet.childElementCount) paintFriendWallet(wallet, people, inGroup);
+            if (walletOn && !wallet.childElementCount) {
+              paintFriendWallet(wallet, people, inGroup);
+              walletState.el = wallet;
+              walletState.key = wKey;
+            }
           }
           viewBar.addEventListener("click", function (e) {
             var b = e.target.closest("[data-fview]");
