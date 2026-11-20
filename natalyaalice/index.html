@@ -3558,9 +3558,9 @@
       box-shadow: 0 8px 24px rgba(52, 34, 32, 0.18);
       transform: scale(1);
       transform-origin: center bottom;
-      transition: transform 180ms ease;
+      transition: transform 460ms cubic-bezier(0.22, 1, 0.36, 1);
     }
-    .app-pill nav.is-compact { transform: scale(0.9); }
+    .app-pill nav.is-compact { transform: scale(0.77); }
     @media (prefers-reduced-motion: reduce) {
       .app-pill nav { transition: none; }
     }
@@ -8173,9 +8173,9 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-69"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-70"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-48"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-49"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -10215,8 +10215,8 @@
           var y = event.currentTarget.scrollTop || 0;
           var dy = y - lastY;
           if (y <= 8) compact = false;
-          else if (dy > 4) compact = true;
-          else if (dy < -4) compact = false;
+          else if (dy > 8) compact = true;
+          else if (dy < -8) compact = false;
           lastY = y;
           nav.classList.toggle("is-compact", compact);
         }
@@ -10436,10 +10436,27 @@
           .catch(function (err) { msg.textContent = nicknameError(err); });
       }
 
+      /* Zirkel-Login gehört zu einem anderen gogogo-Konto (z. B. Coach testet auf seinem Handy als Coachee):
+         dann keine Zirkel-Freunde, Circles oder Anfragen in dieses Konto übernehmen */
+      var ffcForeign = false;
+      function ffcMine() {
+        return !!(window.FFC && FFC.user && FFC.user()) && !ffcForeign;
+      }
+      function markFfcForeign(on) {
+        if (ffcForeign === on) return;
+        ffcForeign = on;
+        if (!on) return;
+        ffcIncoming = [];
+        teamPeople = (teamPeople || []).filter(function (p) { return !(p && p.isFfcOnly); });
+        ffcCircleByNick = {};
+        if (document.body.dataset.plan === "team" && typeof renderTeam === "function") renderTeam();
+        try { paintHeuteExtras(); } catch (eF) {}
+      }
       function adoptFfcNickname(profile) {
         if (!sessionMode || !sessionAccount || !profile) return;
         var mine = String(sessionAccount.nickname || "");
         var theirs = String(profile.nickname || "");
+        if (mine && theirs) markFfcForeign(mine.toLowerCase() !== theirs.toLowerCase());
         if (mine && !theirs && window.FFC) {
           FFC.setNickname(mine);
           return;
@@ -10448,7 +10465,7 @@
         var me = String(sessionAccount.id);
         rest("go_accounts?nickname=ilike." + encodeURIComponent(likeExact(theirs)) + "&select=id&limit=2")
           .then(function (rows) {
-            if ((rows || []).some(function (row) { return row && String(row.id) !== me; })) return null;
+            if ((rows || []).some(function (row) { return row && String(row.id) !== me; })) { markFfcForeign(true); return null; }
             return rest("go_accounts?id=eq." + encodeURIComponent(me), {
               method: "PATCH",
               prefer: "return=minimal",
@@ -13026,6 +13043,20 @@
       window.GoOpenZirkel = openZirkelFlow;
       function zirkelSyncPreset(eventId, preset) {
         var base = Object.assign({}, preset || {});
+        /* Zirkel mit Uhrzeit ohne gemeinsame Einstellungen: vor dem Start antippen → Workout startet pünktlich.
+           Nach Beginn startet es wie bisher sofort (allein trainieren bleibt möglich). */
+        function plainTimedSync() {
+          return rest("events?id=eq." + encodeURIComponent(eventId) + "&select=starts_at,status").then(function (rows) {
+            var ev = rows && rows[0];
+            if (!ev || ev.status === "erledigt") return base;
+            var d = new Date(ev.starts_at);
+            var t = d.getTime();
+            var untimed = d.getUTCHours() === 12 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0;
+            if (isNaN(t) || untimed || t <= Date.now()) return base;
+            base.sync = { eventId: String(eventId), startAt: t, hold: false };
+            return base;
+          }).catch(function () { return base; });
+        }
         if (!eventId || !/^[0-9a-f-]{36}$/i.test(String(eventId)) || !window.GoZirkelSetup) {
           return Promise.resolve(base);
         }
@@ -13038,7 +13069,7 @@
         }
         return load()
           .then(function (info) {
-            if (!info) return base;
+            if (!info) return plainTimedSync();
             base.workSec = info.z.workSec;
             base.restSec = info.z.restSec;
             base.sync = {
@@ -14437,7 +14468,7 @@
                     (muted ? ". Du hast schon 12 gewählt, umstellen unter Team → Meine Freunde." : ""));
                 })
                 .catch(function () { gogogoToast("Ihr seid jetzt verbunden: " + (f.nickname || f.name || "Freund")); });
-              if (f.nickname && window.FFC && FFC.user() && FFC.friendRequest) FFC.friendRequest(f.nickname).then(onFfcFriendsChanged).catch(function () {});
+              if (f.nickname && ffcMine() && FFC.friendRequest) FFC.friendRequest(f.nickname).then(onFfcFriendsChanged).catch(function () {});
               loadTeam();
             });
             });
@@ -15879,7 +15910,7 @@
       /* FFC-Circle je Nickname, auch für Freunde ohne gogogo-Konto (Zeile 2 in Meine Freunde) */
       var ffcCircleByNick = {};
       function syncFfcGroupIntoTeam() {
-        if (ffcGroupSyncing || !sessionAccount || !window.FFC || !FFC.user || !FFC.user() || !FFC.groups) {
+        if (ffcGroupSyncing || !sessionAccount || !ffcMine() || !FFC.groups) {
           return Promise.resolve();
         }
         ffcGroupSyncing = true;
@@ -18147,7 +18178,7 @@
       }
 
       function mergeFfcFriends() {
-        if (!sessionMode || !sessionAccount || !window.FFC || !FFC.user() || !FFC.friends) {
+        if (!sessionMode || !sessionAccount || !ffcMine() || !FFC.friends) {
           ffcIncoming = [];
           return Promise.resolve();
         }
@@ -18216,7 +18247,7 @@
       }
 
       function syncExistingBuddiesToFfc() {
-        if (!sessionMode || !sessionAccount || !window.FFC || !FFC.user() || !FFC.friendRequest) return Promise.resolve();
+        if (!sessionMode || !sessionAccount || !ffcMine() || !FFC.friendRequest) return Promise.resolve();
         var about = profileAbout(sessionAccount);
         if (about.ffc_friends_synced) return Promise.resolve();
         var nicks = teamPeople.map(function (p) { return p && p.nickname; }).filter(Boolean);
@@ -18547,7 +18578,7 @@
                 ensureFriendLink(a.id).then(function () {
                   document.getElementById("team-modal").hidden = true;
                   gogogoToast("Ihr seid jetzt verbunden: " + label);
-                  if (a.nickname && window.FFC && FFC.user() && FFC.friendRequest) FFC.friendRequest(a.nickname).then(onFfcFriendsChanged).catch(function () {});
+                  if (a.nickname && ffcMine() && FFC.friendRequest) FFC.friendRequest(a.nickname).then(onFfcFriendsChanged).catch(function () {});
                   loadTeam();
                 }).catch(function () {
                   msg.textContent = "Maximal 12 Freunde. Coachees zählen nicht mit.";
@@ -18611,7 +18642,7 @@
             var exists = teamPeople.some(function (person) { return String(person.id) === String(found.id); });
             function done() {
               document.getElementById("team-modal").hidden = true;
-              if (found.nickname && window.FFC && FFC.user()) FFC.friendRequest(found.nickname).then(onFfcFriendsChanged).catch(function () {});
+              if (found.nickname && ffcMine()) FFC.friendRequest(found.nickname).then(onFfcFriendsChanged).catch(function () {});
               loadTeam();
             }
             if (exists) {
@@ -18626,7 +18657,7 @@
             });
           })
           .catch(function () {
-            if (!serial && window.FFC && FFC.user() && FFC.friendRequest) {
+            if (!serial && ffcMine() && FFC.friendRequest) {
               msg.textContent = "Bei gogogo nicht gefunden – sende Anfrage über Zirkeltraining …";
               FFC.friendRequest(nick).then(function (res) {
                 if (res && res.error) {
