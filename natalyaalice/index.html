@@ -4094,17 +4094,20 @@
     .friend-list__feed.is-on { background: #2A2118; color: #F3EEE4; border-color: #2A2118; }
     .friend-list__feed.is-fixed { background: transparent; color: #2A2118; border-color: #2A2118; cursor: default; }
     /* Meine Freunde: Liste (Kreis) oder Wallet (Quadrat) */
-    .friend-view { display: flex; justify-content: center; gap: 10px; margin: -2px 0 12px; }
+    .friend-view { display: flex; justify-content: center; gap: 5px; margin: -4px 0 10px; }
     .friend-view button { width: 36px; height: 36px; padding: 0; border: 0; background: none; color: rgba(42,33,24,.4); display: grid; place-items: center; cursor: pointer; }
     .friend-view button.is-on { color: #2A2118; }
     .friend-view svg { width: 22px; height: 22px; }
-    .friend-wallet { height: max(420px, calc(100dvh - 330px)); overflow-y: auto; scroll-snap-type: y mandatory; overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-width: none; display: grid; gap: 12px; grid-auto-rows: 100%; }
+    /* Wallet: quadratische Karte vorn, weitere schauen unten heraus; hochwischen holt die nächste nach vorn */
+    .friend-wallet { --fw-w: 100%; position: relative; margin-top: 8px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; scrollbar-width: none; scroll-snap-type: y mandatory; }
     .friend-wallet::-webkit-scrollbar { display: none; }
     .friend-wallet[hidden], .friend-list > [hidden] { display: none !important; }
-    .fw-card { position: relative; scroll-snap-align: start; scroll-snap-stop: always; border-radius: 22px; overflow: hidden; background: #2A2118 center/cover no-repeat; color: #fff; display: flex; flex-direction: column; justify-content: flex-end; cursor: pointer; }
-    .fw-card::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 22%, rgba(0,0,0,.55) 55%, rgba(0,0,0,.82) 100%); }
-    .fw-card__body { position: relative; padding: 18px 18px 20px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; max-height: 86%; overflow: hidden; }
-    .friend-wallet .fw-card__name { margin: 0; font: 600 30px/1.1 'Playfair Display', Georgia, serif !important; color: #fff; }
+    .fw-stage { position: sticky; top: 0; z-index: 1; pointer-events: none; }
+    .fw-snap { scroll-snap-align: start; scroll-snap-stop: always; }
+    .fw-card { position: absolute; left: 0; right: 0; top: 0; aspect-ratio: 1 / 1; pointer-events: auto; transform-origin: 50% 0; will-change: transform, opacity; border-radius: 22px; overflow: hidden; background: #2A2118 center/cover no-repeat; color: #fff; display: flex; flex-direction: column; justify-content: flex-start; cursor: pointer; box-shadow: 0 -6px 18px rgba(0,0,0,.18); }
+    .fw-card::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.78) 0%, rgba(0,0,0,.5) 45%, rgba(0,0,0,.12) 80%, rgba(0,0,0,0) 100%); }
+    .fw-card__body { position: relative; padding: 16px 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; max-height: 100%; box-sizing: border-box; overflow: hidden; align-content: start; }
+    .friend-wallet .fw-card__name { margin: 0; font: 600 28px/1.1 'Playfair Display', Georgia, serif !important; color: #fff; }
     .friend-wallet .fw-card__nick { display: block; margin-top: 2px; font: 500 15px/1.3 Inter, system-ui, sans-serif; color: rgba(255,255,255,.8); }
     .fw-card__tags { display: grid; gap: 6px; }
     .fw-tag { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: #fff; }
@@ -4112,11 +4115,12 @@
     .fw-tag i svg { width: 11px; height: 11px; }
     .fw-tag.is-on i { background: #fff; color: #2A2118; }
     .fw-tag:not(.is-on) i { color: #fff; }
-    .fw-card__text { margin: 0; font-size: 15px; line-height: 1.4; color: #fff; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-    .fw-card__mantra { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin: 0; font: italic 500 16px/1.35 'Playfair Display', Georgia, serif; color: #fff; }
+    .fw-card__text { margin: 0; font-size: 15px; line-height: 1.4; color: #fff; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .fw-card__mantra { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; font: italic 500 16px/1.35 'Playfair Display', Georgia, serif; color: #fff; }
     .fw-card__links { display: flex; gap: 14px; flex-wrap: wrap; }
     .fw-card__links a { color: #fff; text-decoration: underline; text-underline-offset: 3px; font-size: 15px; }
-    .fw-card__orte { min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+    .fw-card__orte { min-width: 0; display: flex; flex-wrap: nowrap; gap: 6px; }
+    .fw-card__orte span:last-child:not(:first-child) { flex: none; }
     .fw-card__orte span { max-width: 100%; box-sizing: border-box; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 4px 10px; border: 1px solid rgba(255,255,255,.6); border-radius: 999px; font-size: 13px; color: #fff; }
     .fw-card__face { position: absolute; inset: 0; display: grid; place-items: center; font: 600 96px/1 'Playfair Display', Georgia, serif !important; color: rgba(255,255,255,.25); }
     .friend-list__hint { margin: 0 4px 10px; font-size: 14px; color: rgba(42,33,24,.65); line-height: 1.4; text-align: center; }
@@ -15872,14 +15876,14 @@
         if (orte.length) {
           var o = document.createElement("div");
           o.className = "fw-card__orte";
-          orte.slice(0, 3).forEach(function (n) {
+          orte.slice(0, 2).forEach(function (n) {
             var sp = document.createElement("span");
             sp.textContent = n;
             o.appendChild(sp);
           });
-          if (orte.length > 3) {
+          if (orte.length > 2) {
             var more = document.createElement("span");
-            more.textContent = "+" + (orte.length - 3);
+            more.textContent = "+" + (orte.length - 2);
             o.appendChild(more);
           }
           body.appendChild(o);
@@ -15895,6 +15899,9 @@
       function paintFriendWallet(wallet, people, inGroup) {
         wallet.textContent = "";
         var cards = [];
+        var stage = document.createElement("div");
+        stage.className = "fw-stage";
+        wallet.appendChild(stage);
         people.forEach(function (p) {
           var circles = [];
           String(inGroup[String(p.id)] || "").split(" · ").forEach(function (c) { if (c) circles.push(c); });
@@ -15912,14 +15919,71 @@
           var body = document.createElement("div");
           body.className = "fw-card__body";
           card.appendChild(body);
+          var idx = cards.length;
           card.addEventListener("click", function (e) {
             if (e.target.closest("a")) return;
+            /* Karte unten im Stapel: erst nach vorn holen */
+            if (Math.abs(idx - walletPos()) > 0.3) { wallet.scrollTo({ top: idx * walletStep(), behavior: "smooth" }); return; }
             openProfile(p);
           });
           fillFriendCard(card, p, circles);
           cards.push({ card: card, p: p, circles: circles });
-          wallet.appendChild(card);
+          stage.appendChild(card);
         });
+        /* Geometrie: Karte quadratisch (Breite), darunter bis zu 3 Kanten der nächsten Karten */
+        var PEEK = 30, GAP = 14, SHOW = 3;
+        function cardW() { return wallet.clientWidth || 340; }
+        function walletStep() { return Math.round(cardW() * 0.55); }
+        function walletPos() { return (wallet.scrollTop || 0) / walletStep(); }
+        function layoutWallet() {
+          var w = cardW();
+          var n = cards.length;
+          var visPeeks = Math.min(SHOW, Math.max(0, n - 1));
+          var stageH = w + (visPeeks ? GAP + visPeeks * PEEK : 0);
+          wallet.style.height = stageH + "px";
+          stage.style.height = stageH + "px";
+          stage.style.marginBottom = -stageH + "px";
+          [].forEach.call(wallet.querySelectorAll(".fw-snap"), function (x) { x.remove(); });
+          for (var i = 0; i < n; i++) {
+            var sn = document.createElement("div");
+            sn.className = "fw-snap";
+            sn.style.height = (i < n - 1 ? walletStep() : stageH) + "px";
+            wallet.appendChild(sn);
+          }
+          paintWalletPos();
+        }
+        function paintWalletPos() {
+          var w = cardW();
+          var pos = walletPos();
+          cards.forEach(function (c, i) {
+            var d = i - pos;
+            var y, sc = 1, op = 1;
+            if (d < 0) {
+              /* vorderste Karte geht nach oben weg und wird kleiner */
+              var t = Math.min(1, -d);
+              y = -t * 40;
+              sc = 1 - t * 0.14;
+              op = 1 - t;
+            } else if (d <= 1) {
+              y = d * (w + GAP);
+            } else {
+              y = w + GAP + Math.min(d - 1, SHOW) * PEEK;
+              sc = 1 - Math.min(d - 1, SHOW) * 0.03;
+              if (d - 1 > SHOW) op = 0;
+            }
+            c.card.style.transform = "translateY(" + y.toFixed(1) + "px) scale(" + sc.toFixed(3) + ")";
+            c.card.style.opacity = String(Math.max(0, op));
+            c.card.style.zIndex = String(1000 + i);
+            c.card.style.visibility = op <= 0.02 ? "hidden" : "visible";
+          });
+        }
+        var raf = 0;
+        wallet.addEventListener("scroll", function () {
+          if (raf) return;
+          raf = requestAnimationFrame(function () { raf = 0; paintWalletPos(); });
+        }, { passive: true });
+        requestAnimationFrame(layoutWallet);
+        if (window.ResizeObserver) new ResizeObserver(function () { layoutWallet(); }).observe(wallet);
         var ids = people.map(function (p) { return String(p.id); })
           .filter(function (id) { return /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(id) && !friendExtras[id]; });
         if (!ids.length) return;
@@ -16360,7 +16424,6 @@
           var hintTop = document.createElement("p");
           hintTop.className = "friend-list__hint";
           hintTop.textContent = "Wähle 5 Freunde, mit denen Du Deine täglichen Events teilst.";
-          list.appendChild(hintTop);
           /* Ansicht: Kreis = Liste, Quadrat = Wallet mit Profilkarten (hoch/runter wischen) */
           var walletOn = false;
           try { walletOn = localStorage.getItem("gogogo_friends_view") === "wallet"; } catch (eV) {}
@@ -16372,6 +16435,7 @@
             '<button type="button" role="radio" data-fview="list" aria-label="Liste"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></button>' +
             '<button type="button" role="radio" data-fview="wallet" aria-label="Wallet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/></svg></button>';
           list.appendChild(viewBar);
+          list.appendChild(hintTop);
           var wallet = document.createElement("div");
           wallet.className = "friend-wallet";
           wallet.hidden = true;
@@ -16381,7 +16445,8 @@
               b.classList.toggle("is-on", on);
               b.setAttribute("aria-checked", on ? "true" : "false");
             });
-            [].forEach.call(list.querySelectorAll(".friend-list__row:not(.friend-list__add), .coach-empty"), function (r) { r.hidden = walletOn; });
+            /* Wallet: Subline, Freund hinzufügen und Liste aus; Kreis: wieder an */
+            [].forEach.call(list.querySelectorAll(".friend-list__row, .coach-empty, .friend-list__hint"), function (r) { r.hidden = walletOn; });
             wallet.hidden = !walletOn;
             if (walletOn && !wallet.childElementCount) paintFriendWallet(wallet, people, inGroup);
           }
