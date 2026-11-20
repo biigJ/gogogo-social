@@ -1,9 +1,11 @@
 -- go-bubbles.sql — Bubbles: Themen-Communities (HYROX, Sprinten, …), je Nutzer genau eine Bubble
 -- Idempotent. Im Supabase SQL-Editor (gogogo, agpyse…) ausführen. Voraussetzung: go-courses-support.sql (go_current_account_id).
 --
--- go_bubbles          Bubble: Name, Foto, Beschreibung, Orte, Farbe
+-- go_bubbles          Bubble: Name, Foto, Beschreibung, Orte (aus go_workout_places: [{id,name,lat,lng}]), Farbe
 -- go_bubble_members   Mitgliedschaft (account_id ist Primärschlüssel → nur eine Bubble gleichzeitig), Rolle member | coach
 -- events.bubble_id    Event aus dem Wochenplan in der Bubble zeigen (Woche → Tage bearbeiten → Bubble)
+-- go_bubble_messages  freie Texte im Bubble-Chat (nur Mitglieder lesen/schreiben)
+-- go_bubble_wiki      ein Wiki-Text je Bubble, jedes Mitglied darf schreiben
 -- RLS: Bubbles und Mitglieder sieht jeder; Bubble-Events (nicht privat) sehen alle Mitglieder derselben Bubble,
 --      dazu deren Kommentare und Zusagen.
 
@@ -99,3 +101,40 @@ begin
     using (exists (select 1 from events e where e.id = event_id and e.bubble_id is not null and go_in_my_bubble(e.bubble_id)))
   $pol$;
 end $$;
+
+-- Freie Nachrichten im Bubble-Chat
+create table if not exists go_bubble_messages (
+  id uuid primary key default gen_random_uuid(),
+  bubble_id uuid not null references go_bubbles(id) on delete cascade,
+  author_id uuid not null references go_accounts(id) on delete cascade,
+  body text not null check (length(trim(body)) between 1 and 2000),
+  created_at timestamptz not null default now()
+);
+create index if not exists go_bubble_messages_bubble_idx on go_bubble_messages (bubble_id, created_at desc);
+alter table go_bubble_messages enable row level security;
+drop policy if exists "go_bubble_messages_select" on go_bubble_messages;
+create policy "go_bubble_messages_select" on go_bubble_messages for select to anon, authenticated
+  using (go_in_my_bubble(bubble_id));
+drop policy if exists "go_bubble_messages_insert" on go_bubble_messages;
+create policy "go_bubble_messages_insert" on go_bubble_messages for insert to anon, authenticated
+  with check (author_id = go_current_account_id() and go_in_my_bubble(bubble_id));
+drop policy if exists "go_bubble_messages_delete" on go_bubble_messages;
+create policy "go_bubble_messages_delete" on go_bubble_messages for delete to anon, authenticated
+  using (author_id = go_current_account_id());
+
+-- Wiki je Bubble: ein Text, jedes Mitglied darf schreiben
+create table if not exists go_bubble_wiki (
+  bubble_id uuid primary key references go_bubbles(id) on delete cascade,
+  body text not null default '',
+  updated_by uuid references go_accounts(id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+alter table go_bubble_wiki enable row level security;
+drop policy if exists "go_bubble_wiki_select" on go_bubble_wiki;
+create policy "go_bubble_wiki_select" on go_bubble_wiki for select to anon, authenticated using (true);
+drop policy if exists "go_bubble_wiki_insert" on go_bubble_wiki;
+create policy "go_bubble_wiki_insert" on go_bubble_wiki for insert to anon, authenticated
+  with check (go_in_my_bubble(bubble_id));
+drop policy if exists "go_bubble_wiki_update" on go_bubble_wiki;
+create policy "go_bubble_wiki_update" on go_bubble_wiki for update to anon, authenticated
+  using (go_in_my_bubble(bubble_id)) with check (go_in_my_bubble(bubble_id));

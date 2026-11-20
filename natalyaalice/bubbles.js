@@ -7,6 +7,11 @@
  *   GoBubbles.mine()              { id, name, color } meiner Bubble oder null (auch aus dem Cache, sofort)
  *   GoBubbles.renderInto(el)      Karten-Liste in Team → Bubbles malen (sofort aus Cache, dann frisch)
  *   GoBubbles.SOAP_SVG            Seifenblasen-Icon (Markierung von Events)
+ *   GoBubbles.messages()          freie Texte meiner Bubble (neueste 200) → Promise<rows>
+ *   GoBubbles.post(text)          Text in den Chat → Promise
+ *   GoBubbles.paintStrip(el, events, personOf)  Aktuell oben: „Alle“ + Orte der Bubble, Tipp = Story (4 s je Event)
+ *   GoBubbles.openWiki()          Wiki der Bubble, jedes Mitglied schreibt
+ *   GoBubbles.mountComposer()     Eingabe unten im Bubble-Chat
  */
 (function (global) {
   "use strict";
@@ -81,10 +86,176 @@
     return { members: m, coaches: c };
   }
 
-  function placesText(b) {
+  function placesOf(b) {
     var p = b && b.places;
     if (typeof p === "string") { try { p = JSON.parse(p); } catch (e) { p = [p]; } }
-    return (Array.isArray(p) ? p : []).filter(Boolean).join(", ");
+    return (Array.isArray(p) ? p : []).filter(Boolean).map(function (x) {
+      return typeof x === "object" ? x : { name: String(x) };
+    }).filter(function (x) { return x.name; });
+  }
+  function placesText(b) {
+    return placesOf(b).map(function (x) { return x.name; }).join(", ");
+  }
+  function normName(s) {
+    return global.GoPlacePicker && GoPlacePicker.norm ? GoPlacePicker.norm(s) : String(s || "").toLowerCase().trim();
+  }
+
+  /* ---------- Chat: freie Texte ---------- */
+  function messages() {
+    var b = mine();
+    if (!b || !host) return Promise.resolve([]);
+    return host.rest("go_bubble_messages?bubble_id=eq." + encodeURIComponent(b.id) +
+      "&select=id,author_id,body,created_at&order=created_at.desc&limit=200").catch(function () { return []; });
+  }
+  function post(text) {
+    var b = mine();
+    var body = String(text || "").trim();
+    if (!b || !body) return Promise.resolve(false);
+    return host.rest("go_bubble_messages", {
+      method: "POST", prefer: "return=minimal",
+      body: { bubble_id: b.id, author_id: me(), body: body.slice(0, 2000) }
+    }).then(function () { return true; });
+  }
+  function mountComposer() {
+    ensureCss();
+    if (document.getElementById("gbub-compose")) return;
+    var f = document.createElement("form");
+    f.id = "gbub-compose";
+    f.className = "gbub-compose";
+    f.innerHTML = '<input type="text" maxlength="2000" placeholder="Nachricht an die Bubble" enterkeyhint="send" />' +
+      '<button type="submit" aria-label="Senden"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-2.5-6.5L4 12z"/></svg></button>';
+    f.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var inp = f.querySelector("input");
+      var t = String(inp.value || "").trim();
+      if (!t) return;
+      var btn = f.querySelector("button");
+      btn.disabled = true;
+      post(t).then(function () {
+        inp.value = "";
+        if (host.onMessage) host.onMessage();
+      }).catch(function () {
+        toast(missing ? "Bubbles fehlen noch: go-bubbles.sql ausführen" : "Senden ging gerade nicht");
+      }).then(function () { btn.disabled = false; });
+    });
+    document.body.appendChild(f);
+  }
+
+  /* ---------- Wiki ---------- */
+  function openWiki() {
+    var b = mine();
+    if (!b) return;
+    ensureCss();
+    var wrap = document.createElement("div");
+    wrap.className = "gbub-sheet";
+    wrap.innerHTML = '<form class="gbub-sheet__card gbub-wiki"><h2>Wiki · ' + esc(b.name) + "</h2>" +
+      '<textarea rows="12" placeholder="Was alle in der Bubble wissen sollten: Treffpunkte, Zeiten, Tipps, Ausrüstung …"></textarea>' +
+      '<p class="gbub-wiki__meta"></p>' +
+      '<div class="gbub-sheet__btns"><button type="button" data-gbub-cancel>Schließen</button><button type="submit" class="is-dark">Speichern</button></div></form>';
+    document.body.appendChild(wrap);
+    var ta = wrap.querySelector("textarea");
+    var meta = wrap.querySelector(".gbub-wiki__meta");
+    ta.disabled = true;
+    host.rest("go_bubble_wiki?bubble_id=eq." + encodeURIComponent(b.id) + "&select=body,updated_at,updated_by")
+      .then(function (rows) {
+        var r = rows && rows[0];
+        ta.value = r ? r.body || "" : "";
+        if (r && r.updated_at) meta.textContent = "Zuletzt geändert " + new Date(r.updated_at).toLocaleString("de-DE", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+      }).catch(function () {}).then(function () { ta.disabled = false; });
+    wrap.addEventListener("click", function (e) {
+      if (e.target === wrap || (e.target.closest && e.target.closest("[data-gbub-cancel]"))) wrap.remove();
+    });
+    wrap.querySelector("form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      host.rest("go_bubble_wiki?on_conflict=bubble_id", {
+        method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+        body: { bubble_id: b.id, body: ta.value, updated_by: me(), updated_at: new Date().toISOString() }
+      }).then(function () {
+        wrap.remove();
+        if (dlg()) dlg().alert("Wiki gespeichert"); else toast("Wiki gespeichert");
+      }).catch(function () { toast("Speichern ging gerade nicht"); });
+    });
+  }
+
+  /* ---------- Aktuell oben: Orte + Story ---------- */
+  var PIN_SVG = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>';
+  function paintStrip(el, events, personOf) {
+    var b = mine();
+    if (!el || !b) return;
+    ensureCss();
+    var list = (events || []).slice().sort(function (x, y) { return String(x.starts_at).localeCompare(String(y.starts_at)); });
+    var places = placesOf(b);
+    el.innerHTML = '<button type="button" class="gbub-strip__item" data-gbub-story="*" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' +
+      '<span class="gbub-strip__ring' + (list.length ? " has" : "") + '">' + SOAP_SVG + "</span><span>Alle</span></button>" +
+      places.map(function (p, i) {
+        var n = list.filter(function (ev) { return ev.location && normName(ev.location).indexOf(normName(p.name)) >= 0; }).length;
+        return '<button type="button" class="gbub-strip__item" data-gbub-story="' + i + '" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' +
+          '<span class="gbub-strip__ring' + (n ? " has" : "") + '">' + PIN_SVG + "</span><span>" + esc(p.name) + "</span></button>";
+      }).join("");
+    el._gbubData = { list: list, places: places, personOf: personOf, color: b.color };
+    if (!el._gbubBound) {
+      el._gbubBound = true;
+      el.addEventListener("click", function (e) {
+        var it = e.target.closest && e.target.closest("[data-gbub-story]");
+        if (!it) return;
+        var d = el._gbubData || {};
+        var k = it.getAttribute("data-gbub-story");
+        var evs = d.list || [];
+        var title = "Alle Events";
+        if (k !== "*") {
+          var p = d.places[Number(k)];
+          if (!p) return;
+          title = p.name;
+          evs = evs.filter(function (ev) { return ev.location && normName(ev.location).indexOf(normName(p.name)) >= 0; });
+          if (!evs.length) {
+            if (p.lat != null && p.lng != null) {
+              global.open("https://www.openstreetmap.org/?mlat=" + p.lat + "&mlon=" + p.lng + "#map=17/" + p.lat + "/" + p.lng, "_blank", "noopener");
+            } else toast("Noch keine Events an " + p.name);
+            return;
+          }
+        }
+        if (!evs.length) { toast("Noch keine Events in der Bubble"); return; }
+        openStory(evs, title, d.personOf, d.color);
+      });
+    }
+  }
+
+  /* Story: Events nacheinander, 4 s je Event; Tipp rechts = weiter, links = zurück */
+  function openStory(evs, title, personOf, color) {
+    ensureCss();
+    var i = 0, timer = null;
+    var wrap = document.createElement("div");
+    wrap.className = "gbub-story";
+    document.body.appendChild(wrap);
+    function close() { clearTimeout(timer); wrap.remove(); }
+    function show() {
+      clearTimeout(timer);
+      if (i >= evs.length) { close(); return; }
+      if (i < 0) i = 0;
+      var ev = evs[i];
+      var p = personOf ? personOf(ev.user_id) : { name: "" };
+      var d = new Date(ev.starts_at);
+      var when = d.toLocaleDateString("de-DE", { timeZone: "Europe/Berlin", weekday: "short", day: "numeric", month: "numeric" }) +
+        (/T12:00:00/.test(String(ev.starts_at)) ? "" : " · " + d.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" }));
+      wrap.style.setProperty("--gbub", color || "#2A2118");
+      wrap.innerHTML =
+        (ev.photo_url ? '<img class="gbub-story__bg" src="' + esc(ev.photo_url) + '" alt="" />' : "") +
+        '<div class="gbub-story__bars">' + evs.map(function (_, k) {
+          return '<span class="' + (k < i ? "is-done" : k === i ? "is-now" : "") + '"><i></i></span>';
+        }).join("") + "</div>" +
+        '<div class="gbub-story__top"><span>' + esc(title) + '</span><button type="button" data-gbub-close aria-label="Schließen">×</button></div>' +
+        '<div class="gbub-story__txt"><p class="gbub-story__who">' + esc(p && p.name || "") + "</p>" +
+        "<h3>" + esc(String(ev.title || "Training").replace(/^[^A-Za-zÄÖÜäöü0-9]+\s*/, "")) + "</h3>" +
+        "<p>" + esc(when) + (ev.location ? " · " + esc(ev.location) : "") + "</p>" +
+        (ev.status === "erledigt" ? '<p class="gbub-story__done">Erledigt ✓</p>' : "") + "</div>";
+      timer = setTimeout(function () { i++; show(); }, 4000);
+    }
+    wrap.addEventListener("click", function (e) {
+      if (e.target.closest && e.target.closest("[data-gbub-close]")) { close(); return; }
+      i += e.clientX < window.innerWidth / 3 ? -1 : 1;
+      show();
+    });
+    show();
   }
 
   /* ---------- Beitreten / Verlassen ---------- */
@@ -141,7 +312,10 @@
       '<label class="gbub-photo"><span>Foto</span><input type="file" accept="image/*" hidden /></label>' +
       '<input name="name" maxlength="40" placeholder="Name" required />' +
       '<textarea name="desc" rows="3" maxlength="400" placeholder="Beschreibung"></textarea>' +
-      '<input name="places" maxlength="200" placeholder="Orte, z. B. Tempelhofer Feld, FF Schönhauser Allee" />' +
+      '<div class="gbub-places"><div class="gbub-places__chips"></div>' +
+      '<button type="button" class="gbub-places__add" data-gbub-addplace>+ Ort hinzufügen</button>' +
+      '<div class="gbub-places__picker" hidden><div class="gbub-places__pp"></div>' +
+      '<button type="button" class="gbub-places__ok" data-gbub-placeok>Ort übernehmen</button></div></div>' +
       '<div class="gbub-sheet__btns"><button type="button" data-gbub-cancel>Abbrechen</button>' +
       '<button type="submit" class="is-dark">Anlegen</button></div></form>';
     document.body.appendChild(wrap);
@@ -154,14 +328,44 @@
       photo.classList.add("has-img");
     });
     function close() { wrap.remove(); }
+    /* Orte aus der gemeinsamen Ortsliste (go_workout_places) mit Punkt auf der Karte */
+    var chosen = [];
+    var picker = null;
+    var pkBox = wrap.querySelector(".gbub-places__picker");
+    function paintChips() {
+      wrap.querySelector(".gbub-places__chips").innerHTML = chosen.map(function (p, k) {
+        return '<span class="gbub-chip">' + esc(p.name) + '<button type="button" data-gbub-rmplace="' + k + '" aria-label="Entfernen">×</button></span>';
+      }).join("");
+    }
     wrap.addEventListener("click", function (e) {
-      if (e.target === wrap || (e.target.closest && e.target.closest("[data-gbub-cancel]"))) close();
+      if (e.target === wrap || (e.target.closest && e.target.closest("[data-gbub-cancel]"))) { close(); return; }
+      if (e.target.closest && e.target.closest("[data-gbub-addplace]")) {
+        pkBox.hidden = false;
+        if (!picker && global.GoPlacePicker) picker = GoPlacePicker.mount(wrap.querySelector(".gbub-places__pp"), { rest: host.rest, accountId: me(), noFav: true });
+        return;
+      }
+      if (e.target.closest && e.target.closest("[data-gbub-placeok]")) {
+        var v = picker && picker.value();
+        if (!v || !v.name) { toast("Bitte einen Ort aus der Liste oder auf der Karte wählen"); return; }
+        if (v.lat == null || v.lng == null) { toast("Für diesen Ort fehlt der Punkt auf der Karte. Bitte auf der Karte tippen."); return; }
+        if (!chosen.some(function (c) { return normName(c.name) === normName(v.name); })) {
+          chosen.push({ id: v.id || null, name: v.name, lat: v.lat, lng: v.lng });
+          if (picker.remember) picker.remember();
+        }
+        paintChips();
+        pkBox.hidden = true;
+        picker = null;
+        wrap.querySelector(".gbub-places__pp").innerHTML = "";
+        return;
+      }
+      var rm = e.target.closest && e.target.closest("[data-gbub-rmplace]");
+      if (rm) { chosen.splice(Number(rm.getAttribute("data-gbub-rmplace")), 1); paintChips(); }
     });
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var name = String(form.name.value || "").trim();
       var desc = String(form.desc.value || "").trim();
-      var places = String(form.places.value || "").split(/[,;\n]/).map(function (s) { return s.trim(); }).filter(Boolean);
+      var places = chosen.slice();
       if (!name) return;
       if (!file) { toast("Bitte ein Foto wählen"); return; }
       if (!desc) { toast("Bitte eine Beschreibung"); return; }
@@ -289,7 +493,44 @@
       ".gbub-photo.has-img span{display:none}" +
       ".gbub-sheet__btns{display:flex;gap:10px;margin-top:6px}" +
       ".gbub-sheet__btns button{flex:1;min-height:50px;border-radius:999px;border:1.5px solid #1D1630;background:transparent;color:#1D1630;font:700 16px Inter,sans-serif}" +
-      ".gbub-sheet__btns .is-dark{background:#1D1630;color:#fff}";
+      ".gbub-sheet__btns .is-dark{background:#1D1630;color:#fff}" +
+      ".gbub-sheet__card{max-height:92dvh;overflow:auto}" +
+      ".gbub-places__chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}" +
+      ".gbub-chip{display:inline-flex;align-items:center;gap:4px;padding:6px 6px 6px 12px;border-radius:999px;background:#1D1630;color:#fff;font:600 13px Inter,sans-serif}" +
+      ".gbub-chip button{border:0;background:transparent;color:inherit;font-size:16px;width:22px;cursor:pointer}" +
+      ".gbub-places__add,.gbub-places__ok{border:1.5px dashed rgba(29,22,48,.45);background:transparent;color:#1D1630;border-radius:12px;min-height:44px;width:100%;font:600 15px Inter,sans-serif;cursor:pointer}" +
+      ".gbub-places__ok{border-style:solid;margin-top:8px}" +
+      ".gbub-places__pp .gpp__map{height:180px}" +
+      ".gbub-compose{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 104px);z-index:60;display:none;gap:8px;align-items:center;padding:6px 6px 6px 16px;border-radius:999px;background:#fff;box-shadow:0 6px 24px rgba(29,22,48,.14)}" +
+      "body[data-shell=heute][data-heute=bubble] .gbub-compose{display:flex}" +
+      "body.wr-sheet-open .gbub-compose,body.ffc-open .gbub-compose{display:none !important}" +
+      ".gbub-compose input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:500 16px Inter,sans-serif;color:#1D1630}" +
+      ".gbub-compose button{flex:none;width:42px;height:42px;border-radius:50%;border:0;background:#1D1630;color:#fff;display:flex;align-items:center;justify-content:center}" +
+      ".gbub-strip{display:none;gap:14px;overflow-x:auto;padding:4px 20px 10px;scrollbar-width:none}" +
+      "body[data-heute=bubble] .gbub-strip{display:flex}" +
+      ".gbub-strip__item{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;width:78px;border:0;background:transparent;color:#1D1630;font:600 12px/1.2 Inter,sans-serif;text-align:center;cursor:pointer}" +
+      ".gbub-strip__item>span:last-child{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+      ".gbub-strip__ring{width:66px;height:66px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--gbub);box-shadow:inset 0 0 0 3px rgba(255,255,255,.6)}" +
+      ".gbub-strip__ring.has{box-shadow:0 0 0 3px #1D1630}" +
+      ".gbub-strip__ring svg{width:28px;height:28px}" +
+      ".gbub-wiki textarea{min-height:40dvh;resize:vertical;line-height:1.5}" +
+      ".gbub-wiki__meta{margin:0;font:500 12px Inter,sans-serif;opacity:.6;text-align:right}" +
+      ".gbub-story{position:fixed;inset:0;z-index:10080;background:var(--gbub);color:#fff;overflow:hidden;cursor:pointer}" +
+      ".gbub-story__bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}" +
+      ".gbub-story::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,0) 30%,rgba(0,0,0,0) 50%,rgba(0,0,0,.7))}" +
+      ".gbub-story__bars{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) + 10px);left:12px;right:12px;display:flex;gap:4px}" +
+      ".gbub-story__bars span{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.35);overflow:hidden}" +
+      ".gbub-story__bars i{display:block;height:100%;width:0;background:#fff}" +
+      ".gbub-story__bars .is-done i{width:100%}" +
+      ".gbub-story__bars .is-now i{animation:gbubbar 4s linear forwards}" +
+      "@keyframes gbubbar{to{width:100%}}" +
+      ".gbub-story__top{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) + 22px);left:16px;right:8px;display:flex;justify-content:space-between;align-items:center;font:700 15px Inter,sans-serif}" +
+      ".gbub-story__top button{border:0;background:transparent;color:#fff;font-size:32px;width:44px;height:44px;cursor:pointer}" +
+      ".gbub-story__txt{position:absolute;z-index:2;left:22px;right:22px;bottom:calc(env(safe-area-inset-bottom,0px) + 48px)}" +
+      ".gbub-story__txt h3{margin:4px 0 8px;font:800 34px/1.05 'Archivo Black','Space Grotesk',Inter,sans-serif}" +
+      ".gbub-story__txt p{margin:0;font:600 16px/1.4 Inter,sans-serif}" +
+      ".gbub-story__who{opacity:.85}" +
+      ".gbub-story__done{margin-top:8px !important}";
     document.head.appendChild(st);
   }
 
@@ -299,6 +540,12 @@
     mine: mine,
     renderInto: renderInto,
     openCreate: openCreate,
+    messages: messages,
+    post: post,
+    paintStrip: paintStrip,
+    openStory: openStory,
+    openWiki: openWiki,
+    mountComposer: mountComposer,
     SOAP_SVG: SOAP_SVG
   };
 })(window);

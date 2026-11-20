@@ -2248,6 +2248,27 @@
      2) Meine Events von heute (Plan + eigene Events/FFC)
      3) Kommende (morgen zuerst, dann später; eigene vor fremden bei Gleichstand)
      4) Historie (Tagebuch+), neueste zuerst */
+  function loadBubbleMsgs() {
+    if (state.filter !== "bubble" || !global.GoBubbles || !GoBubbles.messages) { state.bubbleMsgs = []; return Promise.resolve(); }
+    return GoBubbles.messages().then(function (rows) {
+      state.bubbleMsgs = rows || [];
+      return ensurePeople(state.bubbleMsgs.map(function (m) { return String(m.author_id); }));
+    }).catch(function () { state.bubbleMsgs = []; });
+  }
+
+  function renderBubbleMsg(m) {
+    var mine = String(m.author_id) === me();
+    var p = personOf(String(m.author_id));
+    var t = new Date(m.created_at);
+    var when = dayKey(m.created_at) === todayIso()
+      ? t.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" })
+      : t.toLocaleDateString("de-DE", { timeZone: "Europe/Berlin", day: "numeric", month: "numeric" }) + " " +
+        t.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" });
+    return '<article class="acc-msg' + (mine ? " is-mine" : "") + '">' +
+      '<span class="acc-msg__who">' + esc(mine ? "Du" : String(p.name || "?").split(" ")[0]) + " · " + esc(when) + "</span>" +
+      '<p class="acc-msg__txt">' + esc(m.body || "") + "</p></article>";
+  }
+
   /* Bubble-Filter: nur Events, die in meiner Bubble markiert sind (eigene und die der anderen Mitglieder) */
   function bubbleFeedItems() {
     var today = todayIso();
@@ -2267,7 +2288,12 @@
       else if (d > today) out.upcoming.push(item);
       else out.history.push(item);
     });
-    out.myToday.sort(sortOwnFirst);
+    (state.bubbleMsgs || []).forEach(function (m) {
+      var it = { kind: "bubble_msg", starts_at: m.created_at, _mine: String(m.author_id) === me(), msg: m };
+      if (dayKey(m.created_at) === today) out.myToday.push(it);
+      else out.history.push(it);
+    });
+    out.myToday.sort(function (a, b) { return String(b.starts_at).localeCompare(String(a.starts_at)); });
     out.upcoming.sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
     out.history.sort(function (a, b) { return String(b.starts_at).localeCompare(String(a.starts_at)); });
     return out;
@@ -2522,6 +2548,7 @@
   }
 
   function renderFeedItem(item) {
+    if (item.kind === "bubble_msg") return renderBubbleMsg(item.msg);
     if (item.kind === "ffc") return renderFfcCard(item.ev);
     if (item.kind === "ffc_post") return renderFfcPostCard(item.post);
     if (item.kind === "diary") return renderDiaryCard(item.item);
@@ -2751,8 +2778,15 @@
       html += renderFeedItem(item);
     });
     html += "</div>";
+    if (flags.bubbleOnly && global.GoBubbles && GoBubbles.paintStrip) {
+      var bid = host.bubbleId ? String(host.bubbleId() || "") : "";
+      GoBubbles.paintStrip($("bubble-strip"), (state.events || []).filter(function (ev) {
+        return ev && bid && String(ev.bubble_id || "") === bid && ev.status !== "ausgefallen" &&
+          (String(ev.user_id) === me() || normalizeVisibility(ev.visibility) !== "privat");
+      }), personOf);
+    }
     if (flags.bubbleOnly && !feed.myToday.length && !feed.upcoming.length && !feed.history.length) {
-      html += '<p class="acc-bubble-empty">Noch keine Events in dieser Bubble.<br>Markiere eins in Woche → Stift → Tage bearbeiten → Bubble.</p>';
+      html += '<p class="acc-bubble-empty">Noch ist es still hier.<br>Schreib unten etwas oder markiere ein Event in Woche → Stift → Tage bearbeiten → Bubble.</p>';
     }
 
     var firstPaint = !state.paintedAktuell;
@@ -4534,6 +4568,7 @@
       loadEvents().then(loadMyInvites),
       loadFfcEvents(),
       loadFfcPosts(),
+      loadBubbleMsgs(),
       histReady
     ])
       .then(function () {

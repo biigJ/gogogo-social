@@ -1472,7 +1472,15 @@
     .go-boot.has-hello .go-boot__txt { display: none; }
     /* Aktuell im Bubble-Filter: wie ein Chat, ohne die Profilkreise oben */
     body[data-heute="bubble"] #heute-joins, body[data-heute="bubble"] #heute-stories { display: none !important; }
-    .acc-bubble-empty { margin: 40vh 28px 0; text-align: center; font: 500 15px/1.5 Inter, sans-serif; color: rgba(42,33,24,.7); }
+    .acc-bubble-empty { margin: 30vh 28px 0; text-align: center; font: 500 15px/1.5 Inter, sans-serif; color: rgba(42,33,24,.7); }
+    /* Bubble-Chat: freie Texte als Sprechblasen, Platz für die Eingabe unten */
+    .acc-msg { max-width: 78%; margin: 0 16px 12px; padding: 10px 14px; border-radius: 18px 18px 18px 6px; background: #fff; color: #2A2118; box-shadow: 0 1px 0 rgba(42,33,24,.06); }
+    .acc-msg.is-mine { margin-left: auto; border-radius: 18px 18px 6px 18px; background: #2A2118; color: #F6F1E8; }
+    .acc-msg__who { display: block; font: 600 12px/1.2 Inter, sans-serif; opacity: .65; margin-bottom: 4px; }
+    .acc-msg__txt { margin: 0; font: 500 16px/1.4 Inter, sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
+    body[data-heute="bubble"] #heute-acc { padding-bottom: 90px; }
+    body[data-heute="bubble"] #heute-info { font-size: 0 !important; }
+    body[data-heute="bubble"] #heute-info::after { content: "Wiki"; font-size: 17px; }
     .wr-dayrow__bub { display: inline-flex; align-items: center; gap: 4px; }
     .wr-dayrow__bub svg { width: 16px; height: 16px; }
     .heute-info { display: none; }
@@ -7057,6 +7065,7 @@
       <div class="heute-stories shell-heute" id="heute-stories" hidden>
         <div class="heute-stories__row ffc" id="heute-stories-row"><span class="heute-stories__team" id="heute-stories-team"></span></div>
       </div>
+      <div class="gbub-strip shell-heute" id="bubble-strip"></div>
     </div>
     <div class="heute-acc shell-heute" id="heute-acc"></div>
     <button type="button" class="go-primary heute-start shell-heute" id="heute-start" hidden>
@@ -8310,7 +8319,7 @@
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-4"></script>
-  <script src="/natalyaalice/bubbles.js?v=bub-1"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-2"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-5"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-8"></script>
@@ -8324,7 +8333,7 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-82"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-83"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-61"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
@@ -20475,8 +20484,12 @@
           onChange: function () {
             syncHeuteFilterOptions();
             try { if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh(); } catch (eB) {}
+          },
+          onMessage: function () {
+            try { if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh(); } catch (eM) {}
           }
         }).then(function () { syncHeuteFilterOptions(); });
+        GoBubbles.mountComposer();
       }
 
       /* Kraft-Tracking: Historie + Verlauf (kraft-tracking.js) */
@@ -23550,6 +23563,8 @@
         var btn = document.getElementById("heute-info");
         if (!btn) return;
         btn.addEventListener("click", function () {
+          /* Im Bubble-Chat: oben links das Wiki der Bubble */
+          if (document.body.dataset.heute === "bubble" && window.GoBubbles) { GoBubbles.openWiki(); return; }
           if (!window.GoDialog) return;
           GoDialog.note("Halte Deinen Ring auf Grün, indem Du keinen Tag auslässt. Einfach, denn Du kannst eine einfache Alternative loggen oder einmal schieben und es ist in Ordnung. Der Count bedeutet, wie viele Tage Du lückenlos abgehakt hast. Es geht hier nicht ums Abhaken, sondern darum, Deinem Alltag einen Fokus auf Bewegung zu geben. Jeder in seiner Kapazität! Viel Spaß bei Deiner Reise, Dich immer und immer mehr zu bewegen.");
         });
