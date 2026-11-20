@@ -73,7 +73,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-clean-19" />
+  <link rel="stylesheet" href="/natalyaalice/ffc.css?v=nav5-clean-20" />
   <style>
     /* Haken überall im gogogo-Stil statt System-Blau (Module dürfen Größe/Abstand weiter selbst setzen) */
     input[type="checkbox"], input[type="radio"] {
@@ -8105,6 +8105,7 @@
       <input type="checkbox" id="postStatsToggle" checked>
       <span class="switch"></span>
     </label>
+    <button class="ctrl-btn post-fix" id="postFix" type="button">Werte nachtragen</button>
     <div class="post-btns">
       <button class="ctrl-btn" id="postRetake">Neues Foto</button>
       <button class="ctrl-btn primary" id="postPublish">Posten</button>
@@ -24334,6 +24335,35 @@
         onNicknameWanted: function () {
           if (sessionMode) openAccountEdit("nickname");
         },
+        /* Story gepostet: Bild auch ans erledigte Zirkel-Event in gogogo hängen → in Aktuell sichtbar */
+        onPosted: function (blob, info) {
+          if (!sessionMode || !sessionAccount || !blob || !window.GoExMedia || !GoExMedia.uploadImage) return;
+          info = info || {};
+          var d = info.date ? new Date(info.date) : new Date();
+          var dayIso = d.toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+          var me = encodeURIComponent(sessionAccount.id);
+          var findEv = info.eventId
+            ? Promise.resolve(String(info.eventId))
+            : rest("events?user_id=eq." + me + "&category=eq.zirkel&status=eq.erledigt" +
+                "&starts_at=gte." + encodeURIComponent(new Date(d.getTime() - 36 * 3600000).toISOString()) +
+                "&starts_at=lt." + encodeURIComponent(new Date(d.getTime() + 36 * 3600000).toISOString()) +
+                "&select=id,starts_at&order=starts_at.desc&limit=10")
+              .then(function (rows) {
+                var hit = (rows || []).filter(function (r) {
+                  return new Date(r.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }) === dayIso;
+                })[0];
+                return hit ? String(hit.id) : "";
+              });
+          Promise.all([GoExMedia.uploadImage(blob, "posts"), findEv]).then(function (r) {
+            if (!r[1]) return;
+            return rest("events?id=eq." + encodeURIComponent(r[1]) + "&user_id=eq." + me, {
+              method: "PATCH", prefer: "return=minimal", body: { photo_url: r[0] }
+            }).then(function () {
+              if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
+              if (window.WocheReels && WocheReels.refresh) WocheReels.refresh();
+            });
+          }).catch(function () {});
+        },
         onSaved: function (workout, syncEventId) {
           if (sessionMode) markDiaryMove(Log.berlinToday(), "Zirkeltraining");
           if (sessionMode && syncEventId && window.GoZirkelSync) GoZirkelSync.finished(syncEventId);
@@ -24419,6 +24449,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-11"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-12"></script>
 </body>
 </html>
