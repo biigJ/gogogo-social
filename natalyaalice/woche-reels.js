@@ -2379,6 +2379,26 @@
       });
   }
 
+  /* Wochentage mit Zirkel in den nächsten 7 Tagen (eigene, zugesagte, Circle) für das Stift-Menü */
+  function zirkelWeekdaysAhead() {
+    var from = berlinToday();
+    var to = addDays(from, 7);
+    var days = {};
+    (state.events || []).forEach(function (e) {
+      if (!e || e.category !== "zirkel" || e.status === "ausgefallen") return;
+      var d = dayKey(e.starts_at);
+      if (d >= from && d < to) days[d] = 1;
+    });
+    (state.ffcEvents || []).forEach(function (e) {
+      if (!e || !(e.is_mine || e.my_going === true)) return;
+      var d = dayKey(e.starts_at);
+      if (d >= from && d < to) days[d] = 1;
+    });
+    return Object.keys(days).sort().map(function (d) {
+      return DAYS_DE[new Date(d + "T12:00:00").getDay()];
+    });
+  }
+
   /* ---------- Zirkeltrainings bearbeiten (Stift → 4. Button) ----------
      Woche ab heute: eigene Zirkel (gogogo), Zirkel von Freunden mit meiner Zusage (event_rsvps)
      und Zirkel aus dem Circle (FFC), bei denen ich dabei bin. Eigene: Uhrzeit, privat/zeigen, Stift →
@@ -4556,32 +4576,26 @@
         render();
         return;
       }
-      var hasPlan = (state.enrollments || []).some(function (en) { return en && en.status === "aktiv"; });
-      if (hasPlan && global.GoDialog) {
-        GoDialog.choose("Deine Woche", [
-          { label: "Wochenplan ändern", value: "plan" },
-          { label: "Tage bearbeiten", value: "days" },
-          { label: "Zirkeltraining wiederkehrend", value: "zrec" },
-          { label: "Zirkeltrainings bearbeiten", value: "zedit" }
-        ]).then(function (v) {
+      var activeEn = (state.enrollments || []).filter(function (en) { return en && en.status === "aktiv"; });
+      var hasPlan = activeEn.length > 0;
+      if (global.GoDialog) {
+        var planNames = activeEn.map(function (en) { return en.courses && en.courses.title; })
+          .filter(function (tt) { return tt && !/^zirkeltraining$/i.test(tt); });
+        var zDays = zirkelWeekdaysAhead();
+        var items = hasPlan
+          ? [{ label: "Wochenplan ändern", value: "plan" }, { label: "Tage bearbeiten", value: "days" }]
+          : [{ label: "Wochenplan wählen", value: "plan" }];
+        items.push({ info: "Zirkeltraining am: " + (zDays.length ? zDays.join(", ") : "–") });
+        items.push({ label: "Zirkeltraining wiederkehrend", value: "zrec" });
+        items.push({ label: "Zirkeltrainings bearbeiten", value: "zedit" });
+        GoDialog.choose("Deine Woche", items, {
+          center: true,
+          sub: planNames.length ? planNames.join(" · ") : "Kein Wochenplan"
+        }).then(function (v) {
           /* erst nach dem Dialog-Klick öffnen, sonst schließt derselbe Klick das neue Sheet wieder */
           setTimeout(function () {
             if (v === "plan") openPlanPicker();
             if (v === "days") openDaysEditor();
-            if (v === "zrec") openZirkelRecurring();
-            if (v === "zedit") openZirkelEditor();
-          }, 0);
-        });
-        return;
-      }
-      if (global.GoDialog) {
-        GoDialog.choose("Deine Woche", [
-          { label: "Wochenplan wählen", value: "plan" },
-          { label: "Zirkeltraining wiederkehrend", value: "zrec" },
-          { label: "Zirkeltrainings bearbeiten", value: "zedit" }
-        ]).then(function (v) {
-          setTimeout(function () {
-            if (v === "plan") openPlanPicker();
             if (v === "zrec") openZirkelRecurring();
             if (v === "zedit") openZirkelEditor();
           }, 0);
