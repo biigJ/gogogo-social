@@ -183,12 +183,18 @@
     var b = mine();
     if (!el || !b) return;
     ensureCss();
-    var list = (events || []).slice().sort(function (x, y) { return String(x.starts_at).localeCompare(String(y.starts_at)); });
-    var places = placesOf(b);
+    /* Story nur aus Events mit Bubble-Markierung UND Ort; deren Orte tragen sich selbst in die Leiste ein */
+    var list = (events || []).filter(function (ev) { return ev && String(ev.location || "").trim(); })
+      .sort(function (x, y) { return String(x.starts_at).localeCompare(String(y.starts_at)); });
+    var places = placesOf(b).slice();
+    list.forEach(function (ev) {
+      var nm = String(ev.location).trim();
+      if (!places.some(function (p) { return normName(p.name) === normName(nm); })) places.push({ name: nm });
+    });
     el.innerHTML = '<button type="button" class="gbub-strip__item" data-gbub-story="*" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' +
       '<span class="gbub-strip__ring' + (list.length ? " has" : "") + '">' + SOAP_SVG + "</span><span>Alle</span></button>" +
       places.map(function (p, i) {
-        var n = list.filter(function (ev) { return ev.location && normName(ev.location).indexOf(normName(p.name)) >= 0; }).length;
+        var n = list.filter(function (ev) { return normName(ev.location) === normName(p.name); }).length;
         return '<button type="button" class="gbub-strip__item" data-gbub-story="' + i + '" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' +
           '<span class="gbub-strip__ring' + (n ? " has" : "") + '">' + PIN_SVG + "</span><span>" + esc(p.name) + "</span></button>";
       }).join("");
@@ -206,7 +212,7 @@
           var p = d.places[Number(k)];
           if (!p) return;
           title = p.name;
-          evs = evs.filter(function (ev) { return ev.location && normName(ev.location).indexOf(normName(p.name)) >= 0; });
+          evs = evs.filter(function (ev) { return normName(ev.location) === normName(p.name); });
           if (!evs.length) {
             if (p.lat != null && p.lng != null) {
               global.open("https://www.openstreetmap.org/?mlat=" + p.lat + "&mlon=" + p.lng + "#map=17/" + p.lat + "/" + p.lng, "_blank", "noopener");
@@ -214,7 +220,7 @@
             return;
           }
         }
-        if (!evs.length) { toast("Noch keine Events in der Bubble"); return; }
+        if (!evs.length) { toast("Noch keine Bubble-Events mit Ort"); return; }
         openStory(evs, title, d.personOf, d.color);
       });
     }
