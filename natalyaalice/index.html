@@ -8360,12 +8360,12 @@
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-10"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-7"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-8"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-85"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-86"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-62"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
@@ -20181,6 +20181,55 @@
                   var whenTxt = when.toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "numeric", timeZone: "Europe/Berlin" }) +
                     " " + when.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
                   var who = nameOf[String(r.from_id)] || "Jemand";
+                  /* Event ohne Uhrzeit (12:00 UTC = Platzhalter): Ersteller wählt die Uhrzeit, Anfragende bekommt Kommentar + Herz */
+                  if (when.getUTCHours() === 12 && when.getUTCMinutes() === 0 && GoDialog.time) {
+                    var dayIso = when.toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+                    var todayB = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+                    var dayWord = dayIso === todayB ? "heute" : "am " + when.toLocaleDateString("de-DE", { weekday: "long", timeZone: "Europe/Berlin" });
+                    var nowMin = dayIso === todayB ? (function () { var p = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Berlin" }).split(":"); return Number(p[0]) * 60 + Number(p[1]); })() : -1;
+                    var slots = [];
+                    for (var hm = 6 * 60; hm <= 23 * 60; hm += 30) if (hm > nowMin) slots.push(Math.floor(hm / 60) + ":" + (hm % 60 ? "30" : "00"));
+                    GoDialog.time("Wann geht es " + dayWord + " los?", {
+                      sub: who + " möchte bei " + (ev.title || "Deinem Training") + " mitmachen.",
+                      times: slots.length ? slots : null, ok: "Senden", alt: "Ablehnen", cancel: "Später"
+                    }).then(function (t) {
+                      if (!t) return next(i + 1);
+                      if (t === "alt") {
+                        rest("go_event_requests?id=eq." + encodeURIComponent(r.id), { method: "PATCH", prefer: "return=minimal", body: { status: "declined", decided_at: new Date().toISOString() } })
+                          .catch(function () {}).then(function () { next(i + 1); });
+                        return;
+                      }
+                      var hhmm = (t.length === 4 ? "0" : "") + t;
+                      var offM = String(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", timeZoneName: "longOffset" }).format(new Date(dayIso + "T12:00:00Z"))).match(/GMT([+-]\d{2}):?(\d{2})?/);
+                      var startsAt = dayIso + "T" + hhmm + ":00" + (offM ? offM[1] + ":" + (offM[2] || "00") : "+01:00");
+                      var msg = "Es geht um " + t + " Uhr los. Du kannst mitmachen.";
+                      var cBody = { event_id: r.event_id, account_id: sessionAccount.id, text: msg };
+                      var jobs2 = [
+                        rest("events?id=eq." + encodeURIComponent(r.event_id), { method: "PATCH", prefer: "return=minimal", body: { starts_at: startsAt } }),
+                        rest("go_event_requests?id=eq." + encodeURIComponent(r.id), { method: "PATCH", prefer: "return=minimal", body: { status: "accepted", decided_at: new Date().toISOString() } }),
+                        rest("go_workout_invites", {
+                          method: "POST", prefer: "return=minimal",
+                          body: {
+                            from_id: sessionAccount.id, to_id: r.from_id, workout_date: dayIso,
+                            workout_label: ev.title || "Training", from_name: personName(),
+                            place: ev.location || null, meet_time: hhmm, status: "accepted", event_id: r.event_id
+                          }
+                        }),
+                        /* Kommentar an die Anfragende: reply_to_account setzt bei ihr den roten Punkt am Herz (go-comment-replies.sql) */
+                        rest("event_comments", { method: "POST", prefer: "return=minimal", body: Object.assign({ reply_to_account: r.from_id }, cBody) })
+                          .catch(function () { return rest("event_comments", { method: "POST", prefer: "return=minimal", body: cBody }); })
+                      ];
+                      Promise.all(jobs2.map(function (j) { return j.catch(function () {}); })).then(function () {
+                        gogogoToast("Uhrzeit " + t + " eingetragen. " + who + " bekommt Bescheid.");
+                        loadInvites().then(function () {
+                          if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
+                        });
+                        if (window.WocheReels && WocheReels.refreshKeepDay) { try { WocheReels.refreshKeepDay(); } catch (eW) {} }
+                        next(i + 1);
+                      });
+                    });
+                    return;
+                  }
                   GoDialog.choose(who + " möchte mitmachen: " + (ev.title || "Training") + ", " + whenTxt + (ev.location ? ", " + ev.location : ""), [
                     { label: "Annehmen", value: "accepted" },
                     { label: "Ablehnen", value: "declined" }

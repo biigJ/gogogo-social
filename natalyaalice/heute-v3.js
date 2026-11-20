@@ -2066,7 +2066,9 @@
           postId: String(ev.id),
           noCheck: true,
           /* Freunde-Events: links Sprechblase, daneben Winken (Anfrage). Angenommen: Herz + mein Bild, Herz tippen = absagen. */
-          wave: !invite && !iAmGoing(ev.id) && ev.status === "geplant" && new Date(ev.starts_at).getTime() > Date.now() && hasTime(ev),
+          /* ohne Uhrzeit: winken bis Tagesende, der Ersteller wird nach der Uhrzeit gefragt */
+          wave: !invite && !iAmGoing(ev.id) && ev.status === "geplant" &&
+            (hasTime(ev) ? new Date(ev.starts_at).getTime() > Date.now() : dayKey(ev.starts_at) >= todayIso()),
           waved: !!state.waved[String(ev.id)],
           heart: acceptedInv || (upcoming && !invite && iAmGoing(ev.id))
         });
@@ -4229,8 +4231,11 @@
     if (!ev || state.waved[String(id)]) return;
     /* vorher bestätigen: Einheit, Uhrzeit, Ort, mit wem */
     var owner = String(personOf(ev.user_id).name || "").split(" ")[0];
-    var when = new Date(ev.starts_at).toLocaleString("de-DE", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
-    var text = "Ich möchte mitmachen.\n\n" + (ev.title || "Training") + "\n" + when + " Uhr" + (ev.location ? " · " + ev.location : "") + "\nmit " + owner;
+    var when = hasTime(ev)
+      ? new Date(ev.starts_at).toLocaleString("de-DE", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }) + " Uhr"
+      : (dayKey(ev.starts_at) === todayIso() ? "Heute" : new Date(ev.starts_at).toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "numeric", timeZone: "Europe/Berlin" })) + ", Uhrzeit offen";
+    var text = "Ich möchte mitmachen.\n\n" + (ev.title || "Training") + "\n" + when + (ev.location ? " · " + ev.location : "") + "\nmit " + owner +
+      (hasTime(ev) ? "" : "\n\n" + owner + " wird gefragt, wann es losgeht.");
     ask(text, "Senden").then(function (yes) {
       if (yes) sendJoinRequestNow(ev, id, btn);
     });
