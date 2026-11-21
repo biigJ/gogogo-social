@@ -6140,6 +6140,12 @@
       margin: 14px 0 6px; text-align: center; font-size: 14px !important;
     }
     .nutrition-macros { text-align: center; margin: 8px 0 12px; font-size: 14px !important; }
+    .team-slide__cta--gevents { margin-top: 28px; }
+    .team-gevents { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
+    .team-gevents__row { display: grid; grid-template-columns: 40px 34px 1fr; align-items: center; gap: 10px; text-align: left; }
+    .team-gevents__img { width: 40px; height: 40px; border-radius: 8px; background: rgba(255,255,255,.12) center / cover no-repeat; }
+    .team-gevents__day { font-weight: 700; opacity: .8; }
+    .team-gevents__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .team-slide__invite-friends {
       display: flex; align-items: center; gap: 10px;
       width: 100%; min-height: 48px; margin-top: 8px;
@@ -8409,7 +8415,7 @@
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-12"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-10"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-11"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
@@ -17420,6 +17426,7 @@
             });
             slide.appendChild(inviteNew);
           }
+          if (!detached && group && group.id) appendGroupEvents(slide, group);
           if (!detached) box.appendChild(slide);
           return slide;
         }
@@ -23281,6 +23288,57 @@
             gogogoToast(url ? "Calendly gespeichert" : "Calendly entfernt");
           }).catch(function () { gogogoToast("Speichern fehlgeschlagen (go-coach-reviews.sql ausgeführt?)"); });
         });
+      }
+
+      /* Meine Gruppe: „Events hinzufügen“ → Woche mit Hinweis aufs Postausgang-Icon; darunter die geteilten Events */
+      function appendGroupEvents(slide, group) {
+        var add = document.createElement("button");
+        add.type = "button";
+        add.className = "team-slide__cta team-slide__cta--gevents";
+        add.textContent = "Events hinzufügen";
+        add.addEventListener("click", function () {
+          showWoche();
+          var ask = window.GoDialog && GoDialog.confirm
+            ? GoDialog.confirm("Teile über das Postausgang-Icon mit Deiner Gruppe", { ok: "Verstanden", cancel: "Abbrechen", row: true })
+            : Promise.resolve(true);
+          ask.then(function (ok) { if (!ok) openGruppen(); });
+        });
+        slide.appendChild(add);
+        var list = document.createElement("ul");
+        list.className = "team-gevents";
+        list.hidden = true;
+        slide.appendChild(list);
+        var from = new Date(Log.berlinToday() + "T00:00:00").toISOString();
+        rest(
+          "events?group_id=eq." + encodeURIComponent(group.id) +
+          "&starts_at=gte." + encodeURIComponent(from) +
+          "&status=neq.ausgefallen&select=id,title,starts_at,photo_url,category,course_id,enrollment_id,courses(title)" +
+          "&order=starts_at.asc&limit=30"
+        )
+          .then(function (rows) {
+            rows = Array.isArray(rows) ? rows : [];
+            list.textContent = "";
+            rows.forEach(function (ev) {
+              var li = document.createElement("li");
+              li.className = "team-gevents__row";
+              var img = document.createElement("span");
+              img.className = "team-gevents__img";
+              var src = ev.photo_url || (window.GoCovers && GoCovers.url ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id) : "");
+              if (src) img.style.backgroundImage = 'url("' + String(src).replace(/"/g, "%22") + '")';
+              var day = document.createElement("span");
+              day.className = "team-gevents__day";
+              day.textContent = new Date(ev.starts_at).toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }).replace(".", "");
+              var name = document.createElement("span");
+              name.className = "team-gevents__name";
+              name.textContent = String(ev.title || (ev.courses && ev.courses.title) || "Event");
+              li.appendChild(img);
+              li.appendChild(day);
+              li.appendChild(name);
+              list.appendChild(li);
+            });
+            list.hidden = !rows.length;
+          })
+          .catch(function () {});
       }
 
       function openGruppen() {
