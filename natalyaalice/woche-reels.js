@@ -4374,8 +4374,8 @@
       }).join("") : "";
       var groups = host && host.myGroups ? host.myGroups() || [] : [];
       var groupRows = groups.map(function (g) {
-        var mem = (g.members || []).map(String).filter(function (m) { return friends.indexOf(m) >= 0; });
-        var on = mem.length > 0 && mem.every(function (m) { return state.shareInvited[m] || state.sharePick[m]; });
+        /* Haken = Event mit der Gruppe teilen (group_id), unabhängig davon, ob Mitglieder Freunde sind */
+        var on = !!state.shareGroupPick[String(g.id)] || (!!evS && String(evS.group_id || "") === String(g.id) && evS.visibility === "gruppe");
         return '<div class="wr-friend-row wr-friend-row--group" role="button" data-wr-group-pick="' + esc(g.id) + '">' +
           checkBox(on) + '<span class="wr-friend-row__ph">' + esc(String(g.name || "G").slice(0, 1)) + "</span><span>Gruppe " + esc(g.name || "") + "</span></div>";
       }).join("");
@@ -4391,6 +4391,7 @@
       );
     }
     state.sharePaint = paint;
+    state.shareGroupPick = {};
     state.shareCirclePick = {};
     state.shareCircles = [];
     var evZ = findOwnEvent(eventId);
@@ -4606,6 +4607,25 @@
     } catch (e) {
       location.href = wa;
     }
+  }
+
+  /* Event mit der eigenen Gruppe teilen: Sichtbarkeit Gruppe + group_id (erscheint unter Team → Meine Gruppe) */
+  function shareToGroup(eventId, iso, gid) {
+    var ev = findOwnEvent(eventId);
+    if (!ev) return Promise.resolve();
+    var g = ((host && host.myGroups ? host.myGroups() : []) || []).filter(function (x) { return String(x.id) === String(gid); })[0] || { name: "" };
+    return materializeEvent(ev).then(function (real) {
+      return rest("events?id=eq." + encodeURIComponent(real.id), {
+        method: "PATCH", prefer: "return=minimal", body: { visibility: "gruppe", group_id: gid }
+      }).then(function () {
+        ev.visibility = "gruppe";
+        ev.group_id = gid;
+        if (host.toast) host.toast("Mit Gruppe " + (g.name || "") + " geteilt");
+        return refreshKeepDay(iso || dayKey(real.starts_at || ev.starts_at));
+      });
+    }).catch(function () {
+      if (host.toast) host.toast("Teilen mit der Gruppe ging gerade nicht");
+    });
   }
 
   function inviteFriendsSelected() {
@@ -5676,9 +5696,13 @@
     if (t.hasAttribute("data-wr-group-pick")) {
       var gp = ((host && host.myGroups ? host.myGroups() : []) || []).filter(function (g) { return String(g.id) === t.getAttribute("data-wr-group-pick"); })[0];
       if (gp) {
-        var mem = (gp.members || []).map(String).filter(function (m) { return (state.friends || []).indexOf(m) >= 0 && !state.shareInvited[m]; });
-        var allOn = mem.length > 0 && mem.every(function (m) { return state.sharePick[m]; });
-        mem.forEach(function (m) { state.sharePick[m] = !allOn; });
+        var gKey = String(gp.id);
+        var gOn = !state.shareGroupPick[gKey];
+        state.shareGroupPick[gKey] = gOn;
+        /* Mitglieder, die Freunde sind, gleich mit an- bzw. abhaken */
+        (gp.members || []).map(String).forEach(function (m) {
+          if ((state.friends || []).indexOf(m) >= 0 && !state.shareInvited[m]) state.sharePick[m] = gOn;
+        });
         if (state.sharePaint) state.sharePaint();
       }
       return;
@@ -5692,8 +5716,10 @@
     if (t.getAttribute("data-wr-invite-friends")) {
       var circlesPicked = Object.keys(state.shareCirclePick || {}).filter(function (k) { return state.shareCirclePick[k]; });
       circlesPicked.forEach(function (gid) { shareToCircle(state.shareEventId, gid); });
+      var groupsPicked = Object.keys(state.shareGroupPick || {}).filter(function (k) { return state.shareGroupPick[k]; });
+      if (groupsPicked.length) shareToGroup(state.shareEventId, state.shareIso, groupsPicked[0]);
       if (Object.keys(state.sharePick || {}).some(function (k) { return state.sharePick[k]; })) inviteFriendsSelected();
-      else if (circlesPicked.length) closeSheet();
+      else if (circlesPicked.length || groupsPicked.length) closeSheet();
       return;
     }
     if (t.hasAttribute("data-wr-plane")) {
