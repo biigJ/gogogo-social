@@ -15635,7 +15635,27 @@
         }
         /* Leaderboard nur mit den Mitgliedern meines Circles (FFC-Gruppe, Abgleich über den Nickname).
            Zwei Knöpfe als Filter: Single/Double und ø Monat/ø Woche (Durchschnitt je Zirkel im Zeitraum). */
+        /* zweiter Filter: ø {Monat} → Σ Woche → {Datum letztes Workout im Circle} */
         var lbAvg = "month";
+        var lbLastDay = "";
+        var lbAvgBtn = null;
+        function lbLastFrom() {
+          var d = new Date();
+          d.setDate(d.getDate() - 120);
+          return d.toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+        }
+        function lbDayLabel(iso) {
+          if (!iso) return "Letztes Workout";
+          var d = new Date(iso + "T12:00:00");
+          return d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" }).replace(/,/, "");
+        }
+        function lbAvgLabel() {
+          return lbAvg === "month" ? "ø " + monthLabel() : lbAvg === "week" ? "Σ Woche" : lbDayLabel(lbLastDay);
+        }
+        function setLastDay(day) {
+          lbLastDay = day || "";
+          if (lbAvgBtn && lbAvg === "last") lbAvgBtn.textContent = lbAvgLabel();
+        }
         function monthStartIso() {
           var d = new Date();
           return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-01";
@@ -15697,9 +15717,10 @@
           var avg = document.createElement("button");
           avg.type = "button";
           avg.className = "go-slide__cta go-zlb-btn";
-          avg.textContent = lbAvg === "month" ? "ø " + monthLabel() : "ø Woche";
+          avg.textContent = lbAvgLabel();
+          lbAvgBtn = avg;
           avg.addEventListener("click", function () {
-            lbAvg = lbAvg === "month" ? "week" : "month";
+            lbAvg = lbAvg === "month" ? "week" : lbAvg === "week" ? "last" : "month";
             paintLb();
           });
           row.appendChild(mode);
@@ -15728,7 +15749,7 @@
           list.className = "go-ffc-lb-list";
           list.textContent = "Lädt …";
           lbBox.appendChild(list);
-          var from = lbAvg === "month" ? monthStartIso() : mondayIso();
+          var from = lbAvg === "month" ? monthStartIso() : lbAvg === "week" ? mondayIso() : lbLastFrom();
           var ready = circleInfo ? Promise.resolve(circleInfo) : loadCircleMembers().then(function (ci) { circleInfo = ci; return ci; });
           ready.then(function (ci) {
             if (!ci.circle) {
@@ -15746,12 +15767,27 @@
               return loadDoublePairs(lbAvg).then(function (res) {
                 list.textContent = "";
                 if (res.missing) { list.textContent = "Punkte für Double brauchen go-ffc-punkte.sql in Supabase."; return; }
-                var pairs = (res.pairs || []).filter(function (pr) { return pr.ids.every(function (id) { return inCircle[id]; }); })
-                  .map(function (pr) { return Object.assign({}, pr, { avg: pr.points != null && pr.count ? Math.round(pr.points / pr.count) : null }); })
+                var inC = (res.pairs || []).filter(function (pr) { return pr.ids.every(function (id) { return inCircle[id]; }); });
+                var lastD = "";
+                if (lbAvg === "last") {
+                  inC.forEach(function (pr) { Object.keys(pr.days).forEach(function (d) { if (d > lastD) lastD = d; }); });
+                  setLastDay(lastD);
+                  inC = inC.filter(function (pr) { return pr.days[lastD]; });
+                }
+                var pairs = inC.map(function (pr) {
+                    var v = lbAvg === "last" ? (pr.dayPoints && pr.dayPoints[lastD] != null ? pr.dayPoints[lastD] : null)
+                      : lbAvg === "week" ? pr.points
+                      : pr.points != null && pr.count ? Math.round(pr.points / pr.count) : null;
+                    return Object.assign({}, pr, { avg: v });
+                  })
                   .sort(function (x, y) { return (y.avg || 0) - (x.avg || 0); });
                 if (!pairs.length) { list.textContent = "Noch kein Double im Circle in diesem Zeitraum."; return; }
                 pairs.forEach(function (pr, i) {
-                  list.appendChild(lbRow(i + 1, pr.names.join(" + "), (pr.avg != null ? "ø " + pr.avg.toLocaleString("de-DE") + " P" : "–") + " · " + pr.count + "×", pr.me));
+                  var val = pr.avg != null ? pr.avg.toLocaleString("de-DE") + " P" : "–";
+                  list.appendChild(lbRow(i + 1, pr.names.join(" + "),
+                    lbAvg === "month" ? (pr.avg != null ? "ø " : "") + val + " · " + pr.count + "×"
+                    : lbAvg === "week" ? (pr.avg != null ? "Σ " : "") + val + " · " + pr.count + "×"
+                    : val, pr.me));
                 });
               });
             }
@@ -15767,11 +15803,26 @@
               });
               /* Woche: FFC-Wochenpunkte (für alle Mitglieder, auch ohne gogogo-Konto);
                  Monat: gespiegelte Einzelwerte, die es nur für Mitglieder mit gogogo-Konto gibt */
+              /* letztes Workout im Circle: jüngster Tag mit Punkten */
+              var lastD = "";
+              if (lbAvg === "last") {
+                (rows || []).forEach(function (r) { if (r.day > lastD) lastD = String(r.day); });
+                setLastDay(lastD);
+              }
+              var dayPts = {};
+              (rows || []).forEach(function (r) {
+                if (lastD && String(r.day) === lastD) dayPts[String(r.account_id)] = (dayPts[String(r.account_id)] || 0) + (Number(r.points) || 0);
+              });
               var lines = (ci.members || []).map(function (mb) {
                 var a1 = mb.accountId ? agg[mb.accountId] : null;
                 var avg = null, n = 0;
-                if (lbAvg === "week" && mb.ffcWorkouts > 0) { avg = Math.round(mb.ffcPoints / mb.ffcWorkouts); n = mb.ffcWorkouts; }
-                else if (a1 && a1.n) { avg = Math.round(a1.sum / a1.n); n = a1.n; }
+                if (lbAvg === "week") {
+                  /* Summe der Woche: FFC-Wochenpunkte (auch ohne gogogo-Konto), sonst gespiegelte Werte */
+                  if (mb.ffcWorkouts > 0) { avg = mb.ffcPoints; n = mb.ffcWorkouts; }
+                  else if (a1 && a1.n) { avg = a1.sum; n = a1.n; }
+                } else if (lbAvg === "last") {
+                  if (mb.accountId && dayPts[mb.accountId] != null) { avg = dayPts[mb.accountId]; n = 1; }
+                } else if (a1 && a1.n) { avg = Math.round(a1.sum / a1.n); n = a1.n; }
                 return { id: mb.key, me: mb.is_me, name: mb.name, avg: avg, n: n, noAcc: !mb.accountId };
               }).sort(function (x, y) {
                 if ((x.avg == null) !== (y.avg == null)) return x.avg == null ? 1 : -1;
@@ -15780,12 +15831,16 @@
               var rank = 0;
               lines.forEach(function (l) {
                 if (l.avg != null) rank += 1;
-                list.appendChild(lbRow(l.avg != null ? rank : 0, l.name, l.avg != null ? "ø " + l.avg.toLocaleString("de-DE") + " P · " + l.n + "×" : "–", l.me || l.id === meId));
+                var val = l.avg == null ? "–"
+                  : lbAvg === "month" ? "ø " + l.avg.toLocaleString("de-DE") + " P · " + l.n + "×"
+                  : lbAvg === "week" ? "Σ " + l.avg.toLocaleString("de-DE") + " P · " + l.n + "×"
+                  : l.avg.toLocaleString("de-DE") + " P";
+                list.appendChild(lbRow(l.avg != null ? rank : 0, l.name, val, l.me || l.id === meId));
               });
-              if (lbAvg === "month" && lines.some(function (l) { return l.noAcc; })) {
+              if (lbAvg !== "week" && lines.some(function (l) { return l.noAcc; })) {
                 var hint = document.createElement("p");
                 hint.className = "go-ffc-msg";
-                hint.textContent = "Monatswerte gibt es für Mitglieder mit gogogo-Konto. Die Woche zeigt alle.";
+                hint.textContent = (lbAvg === "month" ? "Monatswerte" : "Tageswerte") + " gibt es für Mitglieder mit gogogo-Konto. Σ Woche zeigt alle.";
                 list.appendChild(hint);
               }
             });
@@ -15881,7 +15936,7 @@
         function loadDoublePairs(period) {
           var people = lbPeopleIndex();
           var meId = sessionAccount ? String(sessionAccount.id) : "";
-          var from = period === "week" ? mondayIso() : period === "month" ? monthStartIso() : null;
+          var from = period === "week" ? mondayIso() : period === "month" ? monthStartIso() : period === "last" ? lbLastFrom() : null;
           function nameOf(id, fallback) {
             var p = people[String(id)];
             return String((p && (p.name || p.nickname)) || fallback || "Partner").split(" ")[0];
@@ -15929,10 +15984,11 @@
                 });
                 list.forEach(function (pr) {
                   var sum = 0, any = false;
+                  pr.dayPoints = {};
                   Object.keys(pr.days).forEach(function (day) {
                     pr.ids.forEach(function (id) {
                       var v = byDay[id + "|" + day];
-                      if (v != null) { sum += v; any = true; }
+                      if (v != null) { sum += v; any = true; pr.dayPoints[day] = (pr.dayPoints[day] || 0) + v; }
                     });
                   });
                   pr.points = any ? sum : null;
