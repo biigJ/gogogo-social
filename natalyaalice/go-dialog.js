@@ -37,7 +37,18 @@
     ".god__wheel{position:relative;height:176px;margin:0 0 16px;overflow-y:auto;scroll-snap-type:y mandatory;background:#fff;border-radius:14px;padding:66px 0;box-sizing:border-box;scrollbar-width:none}" +
     ".god__wheel::-webkit-scrollbar{display:none}" +
     ".god__wheel button{display:block;width:100%;height:44px;margin:0;border:0;background:transparent;scroll-snap-align:center;font:600 18px/44px Inter,system-ui,sans-serif;color:rgba(17,17,17,.4);cursor:pointer}" +
-    ".god__wheel button.is-on{font-size:24px;color:#111}";
+    ".god__wheel button.is-on{font-size:24px;color:#111}" +
+    ".god__center{display:flex;justify-content:center;margin:0 0 14px}" +
+    ".god__vis{min-width:96px;min-height:34px;padding:0 16px;border-radius:999px;border:1px solid rgba(42,33,24,.3);background:transparent;color:#2A2118;font:600 14px Inter,system-ui,sans-serif;cursor:pointer}" +
+    ".god__vis.is-on{background:#2A2118;border-color:#2A2118;color:#F6F1E8}" +
+    ".god__planrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;margin:0 0 12px}" +
+    ".god__planrow .god__wheel{margin:0}" +
+    ".god__wheel--sm{height:132px;padding:44px 0}" +
+    ".god__planrow .god__btn--now{margin:0;height:132px;border-radius:14px}" +
+    ".god__area{min-height:88px;padding:10px 12px;resize:none;font-family:inherit}" +
+    ".god__file{display:flex;align-items:center;justify-content:center;cursor:pointer}" +
+    ".god__row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}" +
+    ".god__row2 .god__btn{margin:0}";
 
   function ensureCss() {
     if (document.getElementById("go-dialog-css")) return;
@@ -280,5 +291,116 @@
     });
   }
 
-  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg };
+  /* Drehrad (30 Min) als Element, liefert { el, value() } */
+  function wheelEl(times, small) {
+    var wheel = document.createElement("div");
+    wheel.className = "god__wheel" + (small ? " god__wheel--sm" : "");
+    times.forEach(function (t, i) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.textContent = t;
+      if (i === 0) b.className = "is-on";
+      b.addEventListener("click", function () { b.scrollIntoView({ block: "center", behavior: "smooth" }); });
+      wheel.appendChild(b);
+    });
+    var tm = 0;
+    wheel.addEventListener("scroll", function () {
+      clearTimeout(tm);
+      tm = setTimeout(function () {
+        var mid = wheel.scrollTop + wheel.clientHeight / 2, best = null, bd = 1e9;
+        Array.prototype.forEach.call(wheel.children, function (b) {
+          var d = Math.abs(b.offsetTop + b.offsetHeight / 2 - mid);
+          if (d < bd) { bd = d; best = b; }
+        });
+        Array.prototype.forEach.call(wheel.children, function (b) { b.classList.toggle("is-on", b === best); });
+      }, 40);
+    }, { passive: true });
+    return { el: wheel, value: function () { var on = wheel.querySelector(".is-on"); return on ? on.textContent : null; } };
+  }
+
+  /* Alternative planen: Überschrift, mittig Sichtbarkeit (Pille, schaltet durch), darunter links Uhrzeit-Rad, rechts „Sofort starten“.
+     opts: { vis, visList: [{ value, label }], times } → Promise<{ action: "start"|"save", time, vis } | null> */
+  function planDlg(msg, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      var tEl = card.querySelector(".god__text");
+      if (tEl) tEl.classList.add("is-center");
+      var list = opts.visList || [{ value: "team", label: "Team" }];
+      var vi = Math.max(0, list.map(function (x) { return x.value; }).indexOf(opts.vis || "team"));
+      var pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "god__vis";
+      function paintPill() { pill.textContent = list[vi].label; pill.classList.toggle("is-on", list[vi].value !== "privat"); }
+      paintPill();
+      pill.addEventListener("click", function () { vi = (vi + 1) % list.length; paintPill(); });
+      var pw = document.createElement("div");
+      pw.className = "god__center";
+      pw.appendChild(pill);
+      card.appendChild(pw);
+      var row = document.createElement("div");
+      row.className = "god__planrow";
+      var wh = wheelEl(opts.times && opts.times.length ? opts.times : ["jetzt"], true);
+      row.appendChild(wh.el);
+      var go = document.createElement("button");
+      go.type = "button";
+      go.className = "god__btn god__btn--now";
+      go.textContent = "Sofort starten";
+      go.addEventListener("click", function () { close({ action: "start", time: null, vis: list[vi].value }); });
+      row.appendChild(go);
+      card.appendChild(row);
+      if (opts.times && opts.times.length) {
+        button(card, opts.ok || "Eintragen", "", function () { close({ action: "save", time: wh.value(), vis: list[vi].value }); });
+      }
+      button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(null); });
+      return null;
+    });
+  }
+
+  /* Sonstiges erledigt: Überschrift, „Wie war es? (optional)“, Foto auswählen, Speichern | Abbrechen → { text, file } | null */
+  function doneDlg(msg, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      var tEl = card.querySelector(".god__text");
+      if (tEl) tEl.classList.add("is-center");
+      var ta = document.createElement("textarea");
+      ta.className = "god__input god__area";
+      ta.rows = 3;
+      ta.placeholder = opts.placeholder || "Wie war es? (optional)";
+      card.appendChild(ta);
+      var file = null;
+      var lab = document.createElement("label");
+      lab.className = "god__btn god__btn--choice god__file";
+      lab.textContent = "Foto auswählen";
+      var inp = document.createElement("input");
+      inp.type = "file";
+      inp.accept = "image/*";
+      inp.hidden = true;
+      inp.addEventListener("change", function () {
+        file = inp.files && inp.files[0] || null;
+        lab.firstChild.textContent = file ? "Foto gewählt ✓" : "Foto auswählen";
+      });
+      lab.appendChild(inp);
+      card.appendChild(lab);
+      var row = document.createElement("div");
+      row.className = "god__row2";
+      var save = document.createElement("button");
+      save.type = "button";
+      save.className = "god__btn";
+      save.textContent = opts.ok || "Speichern";
+      save.addEventListener("click", function () { close({ text: String(ta.value || "").trim(), file: file }); });
+      var cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "god__btn god__btn--choice";
+      cancel.textContent = opts.cancel || "Abbrechen";
+      cancel.addEventListener("click", function () { close(null); });
+      row.appendChild(save);
+      row.appendChild(cancel);
+      card.appendChild(row);
+      return null;
+    });
+  }
+
+  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg, plan: planDlg, done: doneDlg };
 })(window);
