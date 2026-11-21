@@ -16058,12 +16058,20 @@
             pts.className = "go-rec-detail__pts";
             pts.textContent = (Number(s.points) || 0).toLocaleString("de-DE") + " Punkte";
             detail.appendChild(pts);
+            /* Eine Runde = Laufen + Workout (wie im FFC-Setup). Double mit Partner: nur Workout, ohne Laufen */
+            var isDbl = lbMode === "double";
+            var isRunL = function (l) { return l && /·\s*Laufen/.test(l.label || ""); };
+            var allLines = s.lines || [];
+            var lines = isDbl ? allLines.filter(function (l) { return !isRunL(l); }) : allLines;
+            var nRounds = isDbl ? (lines.length || Math.ceil((s.rounds || 0) / 2))
+              : (s.roundsShown != null ? s.roundsShown : (allLines.some(isRunL) ? Math.ceil((s.rounds || 0) / 2) : (s.rounds || 0)));
             var meta = document.createElement("div");
             meta.className = "go-rec-detail__meta";
-            meta.textContent = (s.rounds || 0) + " Runden / " + fmtWork(s.workSec) + " Arbeit / " + (s.restSec || 0) + "s Pause";
+            meta.textContent = isDbl
+              ? fmtWork(s.workSec) + " Workout ohne Laufen · " + nRounds + " Runden"
+              : nRounds + " Runden / " + fmtWork(s.workSec) + " Arbeit / " + (s.restSec || 0) + "s Pause";
             detail.appendChild(meta);
             /* Doppelrunden: Laufen + Station zusammen (Reihenfolge wie protokolliert) */
-            var lines = s.lines || [];
             var blocks = [];
             for (var li = 0; li < lines.length; li++) {
               var cur = lines[li], nxt = lines[li + 1];
@@ -26275,6 +26283,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-14"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-16"></script>
 </body>
 </html>
