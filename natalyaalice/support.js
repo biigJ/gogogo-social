@@ -374,7 +374,7 @@
       title: "Stempelkarte",
       price: "gratis",
       description:
-        "Trainierst Du mit einem Freund bei seinem oder Deinem Workout-Event zusammen, scannt Ihr die Karten und bekommt so einen digitalen Stempel. Wenn Du alle 12 Punkte voll hast, erhältst Du ein robustes gogogo-T-Shirt in Bio-Baumwollqualität."
+        "Trainierst Du mit einem Freund bei seinem oder Deinem Workout-Event zusammen, scannt Ihr die Karten und bekommt so einen digitalen Stempel. Wenn Du alle 12 Punkte voll hast, erhältst Du ein robustes gogogo-T-Shirt in Bio-Baumwollqualität.\nZum Punktesammeln tippe auf das Event unter Aktuell. Die Stempelkarte öffnet sich und Dein Freund hält seine/ihre Kamera auf den QR-Code. Dann tippt er/sie, ob Du pünktlich warst. Du musst dann auch bestätigen, ob er/sie pünktlich war. Wer pünktlich war, erhält zwei Stempel."
     },
     {
       key: "web_call",
