@@ -2297,31 +2297,68 @@
     for (var h = 5; h <= 22; h++) for (var m = 0; m < 60; m += 30) out.push((h < 10 ? "0" : "") + h + ":" + (m < 10 ? "0" : "") + m);
     return out;
   }
+  /* Zirkeltrainings eintragen: die 7 Tage wie „Tage bearbeiten“, das Zirkeltraining am Griff auf einen Tag schieben.
+     Es ersetzt dort die Einheit aus dem Wochenplan (Reihenfolge des Plans: Tage bearbeiten). Weiter → Uhrzeit, Circle, Freunde. */
   function openZirkelRecurring() {
-    /* aktuelle Verteilung aus den nächsten 7 Tagen (eigene Plan-Einheiten) */
-    var byWd = {};
-    for (var i = 0; i < 7; i++) {
-      var iso = addDays(berlinToday(), i);
-      var wd = new Date(iso + "T12:00:00").getDay();
-      var ev = state.events.filter(function (e) {
+    state.daysEdit = null;
+    var days = [];
+    for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
+    var plan = {};
+    var zDay = "";
+    days.forEach(function (iso) {
+      var evs = state.events.filter(function (e) {
         return e && String(e.user_id) === me() && e.status !== "ausgefallen" && e.item_type !== "support_session" && dayKey(e.starts_at) === iso;
-      })[0];
-      byWd[wd] = ev ? ev.title || "" : "";
+      });
+      var z = evs.filter(function (e) { return e.category === "zirkel"; })[0];
+      if (z && !zDay) zDay = iso;
+      var p = evs.filter(function (e) { return e.category !== "zirkel"; })[0];
+      plan[iso] = p ? p.title || "Training" : "";
+    });
+    if (!state.zrecPick || days.indexOf(state.zrecPick) < 0) {
+      state.zrecPick = zDay || days.filter(function (d) { return !plan[d]; })[0] || days[0];
     }
+    var rows = days.map(function (iso) {
+      var d = new Date(iso + "T12:00:00");
+      var label = DAYS_DE[d.getDay()] + " " + d.getDate() + ".";
+      var on = iso === state.zrecPick;
+      return '<div class="wr-dayrow wr-zrec-row' + (on ? " is-zirkel" : plan[iso] ? "" : " is-empty") + '" data-wr-zrec-pick="' + iso + '">' +
+        '<div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " +
+        (on
+          ? "🔥 Zirkeltraining" + (plan[iso] ? ' <s class="wr-dayrow__free">' + esc(plan[iso]) + "</s>" : "")
+          : plan[iso] ? esc(plan[iso]) : '<span class="wr-dayrow__free">frei</span>') +
+        "</span></div>" +
+        (on
+          ? '<span class="wr-dayrow__grip" data-wr-zrec-grip="1" aria-label="Zirkeltraining schieben"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>'
+          : "<span></span>") +
+        "</div>";
+    }).join("");
     openSheet(
-      '<p class="wr-sheet-title">Zirkeltraining wiederkehrend</p>' +
-      '<p class="wr-sheet-hint">Wähle einen Tag für Dein Zirkeltraining</p>' +
-      '<div class="wr-days">' + WD_ORDER.map(function (wd) {
-        return '<button type="button" class="wr-dayrow wr-zrec-day" data-wr-zrec-day="' + wd + '"><b>' + WD_NAME[wd].slice(0, 2) + '</b>' +
-          '<span class="wr-dayrow__title">' + esc(byWd[wd] || "frei") + "</span><span></span></button>";
-      }).join("") + "</div>" +
-      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button></div>'
+      '<p class="wr-sheet-hint">Schieb das Zirkeltraining auf Deinen Tag. Es ersetzt dort die Einheit aus Deinem Wochenplan.</p>' +
+      '<div class="wr-days wr-days--all">' + rows + "</div>" +
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Verlassen</button>' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zrec-next="1">Weiter</button></div>'
     );
+    var cardZ = $("wr-sheet-card");
+    if (cardZ) cardZ.classList.add("wr-sheet__card--days");
     var card = $("wr-sheet-card");
     if (!card || card._wrZrecBound) return;
     card._wrZrecBound = true;
     card.addEventListener("click", function (e) {
       /* Inhalt wird neu gezeichnet: Klick nicht weiterreichen (sonst gilt er als „außerhalb“ und schließt das Sheet) */
+      if (e.target.closest("[data-wr-zrec-next]")) {
+        e.stopPropagation();
+        var wdN = new Date(state.zrecPick + "T12:00:00").getDay();
+        setTimeout(function () { openZrecDay(wdN); }, 0);
+        return;
+      }
+      var pr = e.target.closest("[data-wr-zrec-pick]");
+      if (pr && !card._zrecDragged) {
+        e.stopPropagation();
+        state.zrecPick = pr.getAttribute("data-wr-zrec-pick");
+        setTimeout(openZirkelRecurring, 0);
+        return;
+      }
+      card._zrecDragged = false;
       var d = e.target.closest("[data-wr-zrec-day]");
       if (d) {
         e.stopPropagation();
@@ -2340,9 +2377,50 @@
       if (k === "save") return saveZrec(act);
       if (k === "back") return openZirkelRecurring();
     });
+    /* Zirkeltraining am Griff auf einen anderen Tag ziehen */
+    var zdrag = null;
+    card.addEventListener("pointerdown", function (e) {
+      var g = e.target.closest && e.target.closest("[data-wr-zrec-grip]");
+      if (!g) return;
+      e.preventDefault();
+      var row = g.closest(".wr-dayrow");
+      var r = row.getBoundingClientRect();
+      var ghost = row.cloneNode(true);
+      ghost.classList.add("wr-dayrow--ghost");
+      ghost.style.width = r.width + "px";
+      ghost.style.left = r.left + "px";
+      ghost.style.top = r.top + "px";
+      document.body.appendChild(ghost);
+      zdrag = { ghost: ghost, dy: e.clientY - r.top, over: null };
+      try { g.setPointerCapture(e.pointerId); } catch (eC) {}
+    });
+    card.addEventListener("pointermove", function (e) {
+      if (!zdrag) return;
+      zdrag.ghost.style.top = (e.clientY - zdrag.dy) + "px";
+      zdrag.ghost.style.visibility = "hidden";
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      zdrag.ghost.style.visibility = "";
+      var over = el && el.closest ? el.closest("[data-wr-zrec-pick]") : null;
+      if (zdrag.over && zdrag.over !== over) zdrag.over.classList.remove("is-drop");
+      if (over) over.classList.add("is-drop");
+      zdrag.over = over;
+    });
+    function endZ() {
+      if (!zdrag) return;
+      var d = zdrag;
+      zdrag = null;
+      d.ghost.remove();
+      card._zrecDragged = true;
+      if (d.over) {
+        state.zrecPick = d.over.getAttribute("data-wr-zrec-pick");
+        openZirkelRecurring();
+      }
+    }
+    card.addEventListener("pointerup", endZ);
+    card.addEventListener("pointercancel", endZ);
   }
   function openZrecDay(wd) {
-    state.zrec = { wd: wd, time: "18:00", vis: "team", friends: [], circle: null, mode: "extra" };
+    state.zrec = { wd: wd, time: "18:00", vis: "team", friends: [], circle: null, mode: "alt" };
     paintZrecDay();
   }
   function paintZrecDay() {
@@ -2358,10 +2436,7 @@
       '<p class="wr-zrec-lab">Uhrzeit setzen</p><div class="gz-time"><div class="gz-time__col" data-wr-zrec-time>' +
       times.map(function (t) { return '<span class="gz-time__opt">' + t + "</span>"; }).join("") + "</div></div>" +
       '<button type="button" class="wr-dayrow__vis' + (z.vis === "privat" ? "" : " is-on") + '" data-wr-zrec="vis">' + (z.vis === "privat" ? "privat" : "sichtbar") + "</button>" +
-      '<div class="wr-set-vis wr-zrec-mode" role="radiogroup" aria-label="Zusätzlich oder Alternativ">' +
-      '<button type="button" class="wr-set-vis__btn' + (z.mode === "alt" ? "" : " is-on") + '" data-wr-zrec="mode-extra" role="radio" aria-checked="' + (z.mode !== "alt") + '">Zusätzlich</button>' +
-      '<button type="button" class="wr-set-vis__btn' + (z.mode === "alt" ? " is-on" : "") + '" data-wr-zrec="mode-alt" role="radio" aria-checked="' + (z.mode === "alt") + '">Alternativ</button></div>' +
-      '<p class="wr-sheet-hint">' + (z.mode === "alt" ? "Ersetzt die Einheit aus Deinem Wochenplan an diesem Tag." : "Kommt zur Einheit aus Deinem Wochenplan dazu.") + "</p>" +
+      '<p class="wr-sheet-hint">Ersetzt die Einheit aus Deinem Wochenplan an diesem Tag.</p>' +
       "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-zrec="back">Zurück</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zrec="save">Speichern</button></div>'
@@ -5270,7 +5345,7 @@
           ? [{ label: "Wochenplan ändern", value: "plan" }, { label: "Tage bearbeiten", value: "days" }]
           : [{ label: "Wochenplan wählen", value: "plan" }];
         items.push({ info: "Zirkeltraining am: " + (zDays.length ? zDays.join(", ") : "–") });
-        items.push({ label: "Zirkeltraining wiederkehrend", value: "zrec" });
+        items.push({ label: "Zirkeltrainings eintragen", value: "zrec" });
         items.push({ label: "Zirkeltrainings bearbeiten", value: "zedit" });
         GoDialog.choose("Deine Woche", items, {
           center: true,
