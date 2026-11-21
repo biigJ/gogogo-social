@@ -55,7 +55,7 @@
   function normalizeVisibility(v) {
     /* Legacy-UI/DB: alle|gruppe (Freundeskreis) → team. Neu: gruppe = groups.group_id. */
     if (v === "alle" || v === "all" || v === "friends") return "team";
-    if (v === "privat" || v === "team" || v === "gruppe") return v;
+    if (v === "privat" || v === "team" || v === "gruppe" || v === "bubble" || v === "circle") return v;
     return "team";
   }
 
@@ -3067,8 +3067,11 @@
     modal.hidden = false;
     modal.dataset.eventId = String(eventId);
     var want = normalizeVisibility((ev && ev.visibility) || "team");
+    /* feine Sichtbarkeit (Gruppe, Circle, Bubble aus Tage bearbeiten) beim Abhaken behalten, solange nicht umgeschaltet */
+    modal.dataset.origVis = want;
     if (want === "gruppe") want = "team";
     setDoneVis(want);
+    modal.dataset.initVis = modal.dataset.vis || "";
     var note = $("acc-done-note");
     if (note) note.value = (ev && ev.note) || "";
     var photo = $("acc-done-photo");
@@ -3278,6 +3281,7 @@
     if (!eventId) return;
     var vis = normalizeVisibility(modal.dataset.vis || "team");
     if (vis === "gruppe") vis = "team";
+    if (modal.dataset.origVis && modal.dataset.vis === modal.dataset.initVis && modal.dataset.origVis !== "privat") vis = modal.dataset.origVis;
     var note = (($("acc-done-note") && $("acc-done-note").value) || "").trim().slice(0, 500);
     var draft = eventId === "draft" ? state.doneDraft : null;
     if (eventId === "draft" && !draft) return;

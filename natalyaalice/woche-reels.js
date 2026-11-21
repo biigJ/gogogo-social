@@ -2925,7 +2925,7 @@
     slots.forEach(function (ev) {
       if (!ev) return;
       state.daysEdit.times[ev.id] = displayTime(ev.starts_at) ? formatTime(ev.starts_at) : NO_TIME;
-      state.daysEdit.vis[ev.id] = ev.visibility === "privat" ? "privat" : "team";
+      state.daysEdit.vis[ev.id] = VIS_LABEL[ev.visibility] ? ev.visibility : "team";
       state.daysEdit.bub[ev.id] = !!ev.bubble_id;
       state.daysEdit.orig[ev.id] = state.daysEdit.times[ev.id];
     });
@@ -2950,7 +2950,7 @@
         '<div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " + esc(ev.title || "Training") + "</span>" +
         '<div class="wr-dayrow__ctl"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
         opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
-        '<button type="button" class="wr-dayrow__vis' + (vis === "privat" ? "" : " is-on") + '" data-wr-dayvis="' + esc(ev.id) + '">' + (vis === "privat" ? "privat" : "zeigen") + "</button>" +
+        '<button type="button" class="wr-dayrow__vis' + (vis === "privat" ? "" : " is-on") + '" data-wr-dayvis="' + esc(ev.id) + '">' + VIS_LABEL[vis] + "</button>" +
         (host.bubbleId && host.bubbleId()
           ? '<button type="button" class="wr-dayrow__vis wr-dayrow__bub' + (state.daysEdit.bub[ev.id] ? " is-on" : "") + '" data-wr-daybub="' + esc(ev.id) + '" aria-pressed="' + (state.daysEdit.bub[ev.id] ? "true" : "false") + '">' +
             (global.GoBubbles ? GoBubbles.SOAP_SVG : "") + "Bubble</button>"
@@ -2961,7 +2961,7 @@
     }).join("");
     openSheet(
       '<p class="wr-sheet-title">Tage bearbeiten</p>' +
-      '<p class="wr-sheet-hint">Du kannst Einheiten in den Tagen verschieben, Uhrzeit anpassen, privat/zeigen wählen, um zu entscheiden, ob Freunde es sehen dürfen.</p>' +
+      '<p class="wr-sheet-hint">Einheiten verschieben, Uhrzeit anpassen und wählen, wer sie sieht: privat, Gruppe, Circle, Bubble oder Team.</p>' +
       '<div class="wr-days wr-days--all">' + rows + "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Verlassen</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-days-save="1">Speichern</button></div>'
@@ -2993,10 +2993,18 @@
       var vb = e.target.closest && e.target.closest("[data-wr-dayvis]");
       if (vb) {
         var id = vb.getAttribute("data-wr-dayvis");
-        var nv = state.daysEdit.vis[id] === "privat" ? "team" : "privat";
+        /* privat → Gruppe → Circle → Bubble → Team (nur was es gibt) */
+        var cyc = visCycle();
+        var nv = cyc[(cyc.indexOf(state.daysEdit.vis[id]) + 1) % cyc.length];
         state.daysEdit.vis[id] = nv;
-        vb.classList.toggle("is-on", nv === "team");
-        vb.textContent = nv === "privat" ? "privat" : "zeigen";
+        /* Bubble schaltet die Bubble-Markierung mit ein (und beim Weiterschalten wieder aus, wenn sie nur dafür an war) */
+        var bb2 = document.querySelector('[data-wr-daybub="' + id + '"]');
+        state.daysEdit.bubAuto = state.daysEdit.bubAuto || {};
+        if (nv === "bubble" && !state.daysEdit.bub[id]) { state.daysEdit.bub[id] = true; state.daysEdit.bubAuto[id] = true; }
+        else if (nv !== "bubble" && state.daysEdit.bubAuto[id]) { state.daysEdit.bub[id] = false; state.daysEdit.bubAuto[id] = false; }
+        if (bb2) { bb2.classList.toggle("is-on", !!state.daysEdit.bub[id]); bb2.setAttribute("aria-pressed", state.daysEdit.bub[id] ? "true" : "false"); }
+        vb.classList.toggle("is-on", nv !== "privat");
+        vb.textContent = VIS_LABEL[nv];
         return;
       }
       if (e.target.closest && e.target.closest("[data-wr-days-save]")) saveDaysEditor();
@@ -3367,6 +3375,18 @@
     });
   });
 
+  /* Sichtbarkeit je Event: privat (nur ich), Gruppe (meine Gruppe), Circle (nur im Circle der Zirkel-App),
+     Bubble (nur meine Bubble), Team (alle Freunde). go-visibility-fein.sql */
+  var VIS_LABEL = { privat: "privat", gruppe: "Gruppe", circle: "Circle", bubble: "Bubble", team: "Team" };
+  function visCycle() {
+    var out = ["privat"];
+    if (host.myGroups && (host.myGroups() || []).length) out.push("gruppe");
+    if (ffcOk() && FFC.groups) out.push("circle");
+    if (host.bubbleId && host.bubbleId()) out.push("bubble");
+    out.push("team");
+    return out;
+  }
+
   function saveDaysEditor() {
     var de = state.daysEdit;
     if (!de) return;
@@ -3381,15 +3401,25 @@
       var vis = de.vis[ev.id] || "team";
       var sameDay = dayKey(ev.starts_at) === iso &&
         (untimed ? !displayTime(ev.starts_at) : (displayTime(ev.starts_at) && formatTime(ev.starts_at) === hhmm));
-      var wantBub = !!(de.bub && de.bub[ev.id]);
+      var wantBub = !!(de.bub && de.bub[ev.id]) || vis === "bubble";
       var bubId = host.bubbleId ? host.bubbleId() : "";
       var bubChanged = wantBub !== !!ev.bubble_id && (!!bubId || !wantBub);
-      if (sameDay && (ev.visibility || "team") === vis && !bubChanged) return;
+      var grp = vis === "gruppe" && host.myGroups ? (host.myGroups() || [])[0] : null;
+      if (sameDay && (ev.visibility || "team") === vis && !bubChanged && !(grp && String(ev.group_id || "") !== String(grp.id))) return;
       var body = { starts_at: starts, visibility: vis };
       if (bubChanged) body.bubble_id = wantBub ? bubId : null;
+      if (grp) body.group_id = grp.id;
+      var toCircle = vis === "circle" && ev.visibility !== "circle";
       jobs.push(materializeEvent(ev).then(function (real) {
         return rest("events?id=eq." + encodeURIComponent(real.id), {
           method: "PATCH", prefer: "return=minimal", body: body
+        }).catch(function (err) {
+          /* ohne go-visibility-fein.sql kennt die Datenbank Circle/Bubble noch nicht */
+          if (vis === "circle" || vis === "bubble") throw new Error("go-visibility-fein.sql fehlt");
+          throw err;
+        }).then(function () {
+          /* Circle: Termin im Circle der Zirkel-App teilen (Auswahl, wenn mehrere) */
+          if (toCircle) { ev.visibility = "circle"; ev.id = real.id; return shareToCircle(real.id); }
         });
       }));
     });
@@ -3403,9 +3433,10 @@
         /* Dialog bleibt offen und zeigt den gespeicherten Stand */
         if (state.daysEdit && document.querySelector(".wr-sheet__card--days")) openDaysEditor();
       });
-    }).catch(function () {
+    }).catch(function (err) {
       if (saveBtn) saveBtn.disabled = false;
-      if (host.toast) host.toast("Speichern ging nicht");
+      var m = String((err && err.message) || "");
+      if (host.toast) host.toast(/sql/.test(m) ? "Speichern ging nicht: " + m : "Speichern ging nicht");
     });
   }
 
