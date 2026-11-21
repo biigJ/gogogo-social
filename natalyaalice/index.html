@@ -15647,15 +15647,33 @@
             try { scope = FFC.leaderboardScope ? FFC.leaderboardScope() : null; } catch (eS) {}
             var g = lbGroups.filter(function (x) { return String(x.group_id) === String(scope); })[0] || lbGroups[0];
             return Promise.resolve(FFC.weeklyPoints ? FFC.weeklyPoints(g.group_id) : []).then(function (rows) {
-              var nicks = (rows || []).map(function (r) { return String((r && r.nickname) || "").replace(/^@/, ""); }).filter(Boolean);
+              rows = rows || [];
+              var nicks = rows.map(function (r) { return String((r && r.nickname) || "").replace(/^@/, ""); }).filter(Boolean);
               var people = {};
               if (sessionAccount) people[String(sessionAccount.id)] = sessionAccount;
-              if (!nicks.length) return { circle: g, ids: Object.keys(people), people: people };
+              /* Alle Circle-Mitglieder aus FFC, auch ohne gogogo-Konto (z. B. hendrikfit): Woche aus FFC-Punkten */
+              function build(accs) {
+                var byNick = {};
+                (accs || []).forEach(function (acc) {
+                  if (!acc || !acc.id) return;
+                  people[String(acc.id)] = acc;
+                  if (acc.nickname) byNick[String(acc.nickname).replace(/^@/, "").toLowerCase()] = acc;
+                });
+                var myNick = String((sessionAccount && sessionAccount.nickname) || "").replace(/^@/, "").toLowerCase();
+                var members = rows.map(function (r) {
+                  var nk = String(r.nickname || "").replace(/^@/, "");
+                  var acc = r.is_me && sessionAccount ? sessionAccount : byNick[nk.toLowerCase()] || null;
+                  return { key: acc ? String(acc.id) : "ffc-" + r.user_id, accountId: acc ? String(acc.id) : "", name: String((acc && acc.name) || nk || "Athlet").split(" ")[0],
+                    is_me: !!r.is_me || (!!myNick && nk.toLowerCase() === myNick), ffcPoints: Number(r.points) || 0, ffcWorkouts: Number(r.workouts) || 0 };
+                });
+                if (sessionAccount && !members.some(function (m) { return m.is_me; })) {
+                  members.push({ key: String(sessionAccount.id), accountId: String(sessionAccount.id), name: String(sessionAccount.name || "Du").split(" ")[0], is_me: true, ffcPoints: 0, ffcWorkouts: 0 });
+                }
+                return { circle: g, ids: Object.keys(people), people: people, members: members };
+              }
+              if (!nicks.length) return build([]);
               var orq = nicks.map(function (n) { return "nickname.ilike." + encodeURIComponent('"' + n.replace(/"/g, "") + '"'); }).join(",");
-              return rest("go_accounts?or=(" + orq + ")&select=id,name,nickname&limit=200").catch(function () { return []; }).then(function (accs) {
-                (accs || []).forEach(function (acc) { if (acc && acc.id) people[String(acc.id)] = acc; });
-                return { circle: g, ids: Object.keys(people), people: people };
-              });
+              return rest("go_accounts?or=(" + orq + ")&select=id,name,nickname&limit=200").catch(function () { return []; }).then(build);
             });
           });
         }
@@ -15740,10 +15758,14 @@
                 a0.sum += Number(r.points) || 0;
                 a0.n += 1;
               });
-              var lines = ci.ids.map(function (id) {
-                var p = ci.people[id] || {};
-                var a1 = agg[id];
-                return { id: id, name: String(p.name || p.nickname || "Athlet").split(" ")[0], avg: a1 && a1.n ? Math.round(a1.sum / a1.n) : null, n: a1 ? a1.n : 0 };
+              /* Woche: FFC-Wochenpunkte (für alle Mitglieder, auch ohne gogogo-Konto);
+                 Monat: gespiegelte Einzelwerte, die es nur für Mitglieder mit gogogo-Konto gibt */
+              var lines = (ci.members || []).map(function (mb) {
+                var a1 = mb.accountId ? agg[mb.accountId] : null;
+                var avg = null, n = 0;
+                if (lbAvg === "week" && mb.ffcWorkouts > 0) { avg = Math.round(mb.ffcPoints / mb.ffcWorkouts); n = mb.ffcWorkouts; }
+                else if (a1 && a1.n) { avg = Math.round(a1.sum / a1.n); n = a1.n; }
+                return { id: mb.key, me: mb.is_me, name: mb.name, avg: avg, n: n, noAcc: !mb.accountId };
               }).sort(function (x, y) {
                 if ((x.avg == null) !== (y.avg == null)) return x.avg == null ? 1 : -1;
                 return (y.avg || 0) - (x.avg || 0) || x.name.localeCompare(y.name, "de");
@@ -15751,8 +15773,14 @@
               var rank = 0;
               lines.forEach(function (l) {
                 if (l.avg != null) rank += 1;
-                list.appendChild(lbRow(l.avg != null ? rank : 0, l.name, l.avg != null ? "ø " + l.avg.toLocaleString("de-DE") + " P · " + l.n + "×" : "–", l.id === meId));
+                list.appendChild(lbRow(l.avg != null ? rank : 0, l.name, l.avg != null ? "ø " + l.avg.toLocaleString("de-DE") + " P · " + l.n + "×" : "–", l.me || l.id === meId));
               });
+              if (lbAvg === "month" && lines.some(function (l) { return l.noAcc; })) {
+                var hint = document.createElement("p");
+                hint.className = "go-ffc-msg";
+                hint.textContent = "Monatswerte gibt es für Mitglieder mit gogogo-Konto. Die Woche zeigt alle.";
+                list.appendChild(hint);
+              }
             });
           }).catch(function () { list.textContent = "Leaderboard konnte nicht geladen werden."; });
         }
