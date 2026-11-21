@@ -1694,7 +1694,7 @@
         }).then(function () {
           if (!global.GoDialog) return;
           return GoDialog.confirm("Foto gespeichert.", { ok: "Jetzt teilen", cancel: "Später" }).then(function (yes) {
-            if (yes) return shareBlob(file, shareText(ev));
+            if (yes) return openEventShare(ev.id, dayKey(ev.starts_at));
           });
         });
       }).catch(function (err) {
@@ -1716,12 +1716,23 @@
         }).catch(function () {});
       return;
     }
-    if (ev.photo_url) {
-      fetch(ev.photo_url).then(function (r) { return r.blob(); })
-        .then(function (b) { return shareBlob(b, shareText(ev)); })
-        .catch(function () { return shareBlob(null, shareText(ev)); });
-      return;
+    /* Bild wie die Aktuell-Karte (eigenes Foto oder Cover, Name, Zeit, Titel) + Text für die Nachricht */
+    function shareCard() {
+      if (!global.GoShareCard) { shareBlob(null, shareText(ev)); return; }
+      var owner = personOf(String(ev.user_id));
+      GoShareCard.share({
+        title: String(ev.title || "Training").replace(/^[^A-Za-zÄÖÜäöü0-9]+\s*/, ""),
+        emoji: emojiFor(ev.category, ev.title),
+        startsAt: ev.starts_at,
+        hasTime: hasTime(ev),
+        location: ev.location || "",
+        photo: ev.photo_url || "",
+        cover: global.GoCovers ? GoCovers.url(ev.course_id, /ernährung|ernaehrung/i.test(String(ev.title || "")) ? "ernaehrung" : ev.category, ev.enrollment_id) : "",
+        who: String(owner.name || "").split(" ")[0],
+        whoPhoto: owner.photo || ""
+      });
     }
+    if (ev.photo_url) { shareCard(); return; }
     var F = global.FFC;
     if (ev.category === "zirkel" && ev.status === "erledigt" && ffcUsable() && F && F.sessionForDay) {
       openStoryShare(day);
@@ -1730,10 +1741,10 @@
     if (!global.GoDialog) { pickEventPhoto(ev); return; }
     GoDialog.choose("Teilen", [
       { label: "Foto hinzufügen", value: "photo" },
-      { label: "Ohne Foto teilen", value: "text" }
+      { label: "Mit Standard-Foto teilen", value: "text" }
     ], { sub: "Mit eigenem Foto teilst Du danach direkt auf WhatsApp, Instagram …" }).then(function (v) {
       if (v === "photo") pickEventPhoto(ev);
-      else if (v === "text") shareBlob(null, shareText(ev));
+      else if (v === "text") shareCard();
     });
   }
 
