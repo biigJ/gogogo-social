@@ -3758,15 +3758,22 @@
       status: payload.status || "geplant",
       title: payload.title || payload.category
     };
+    if (payload.photo_url) body.photo_url = payload.photo_url;
+    if (payload.group_id) body.group_id = payload.group_id;
+    if (payload.bubble_id) body.bubble_id = payload.bubble_id;
     var err = host.validateOwnEvent ? host.validateOwnEvent(body) : null;
     if (err) {
       if (host.toast) host.toast(err);
       return Promise.reject(new Error(err));
     }
-    return rest("events", {
-      method: "POST",
-      prefer: "return=representation",
-      body: body
+    /* item_type 'alternative' (go-alternative.sql): Kreis zeigt dann nur Start; ohne SQL ohne Kennzeichen */
+    var post = function (b) { return rest("events", { method: "POST", prefer: "return=representation", body: b }); };
+    var bodyT = payload.item_type ? Object.assign({ item_type: payload.item_type }, body) : body;
+    return post(bodyT).catch(function (e1) {
+      if (!payload.item_type && !/circle|bubble/.test(body.visibility)) throw e1;
+      var b2 = Object.assign({}, body);
+      if (/circle|bubble/.test(b2.visibility)) b2.visibility = b2.visibility === "circle" ? "privat" : "team";
+      return post(b2);
     }).then(function (rows) {
       var ev = Array.isArray(rows) ? rows[0] : rows;
       /* „Statt dem Plan“: geplantes Event erst jetzt als ausgefallen markieren (die Alternative zählt als erledigt) */
@@ -4191,8 +4198,12 @@
     var today = evDayIso(ev) === todayIso();
     var choices = [];
     if (today) choices.push({ label: ev.category === "zirkel" ? "Start: Zirkeltraining" : "Start", value: "start" });
-    choices.push({ label: "Alternative", value: "alt" });
-    choices.push({ label: "Schieben auf morgen", value: "move" });
+    /* eingetragene Alternative: nur noch starten, kein zweites Ausweichen */
+    if (ev.item_type !== "alternative") {
+      choices.push({ label: "Alternative", value: "alt" });
+      choices.push({ label: "Schieben auf morgen", value: "move" });
+    }
+    if (!choices.length) return;
     GoDialog.choose(String(ev.title || "Training"), choices).then(function (v) {
       if (v === "start") return startEvent(ev);
       if (v === "alt") return alternativeFor(ev);
@@ -4281,26 +4292,79 @@
           /* Schritte sind standardmäßig privat; zeigen muss man bewusst wählen */
           var payload = { category: kind, course_id: kind === "alternative" ? null : unit.id, title: unit.title,
             visibility: /schritte/i.test(unit.title || "") ? "privat" : "team" };
-          if (kind === "alternative") {
-            /* Bewegung: direkt loggen (Foto, Notiz, privat oder zeigen) */
-            openDraftDone(payload, replace, unit.title);
-            return;
-          }
-          /* Kraft und Ausdauer brauchen ein Event fürs Workout bzw. die Uhr */
-          return createUnplannedEvent(payload).then(function (nev) {
-            return markReplaced(replace).then(function () { return refresh(); }).then(function () {
-              if (kind === "kraft" && host.openEventWorkout) { host.openEventWorkout(nev); return; }
-              if (kind === "ausdauer" && global.GoTimer) {
-                GoTimer.start({ id: nev.id, title: nev.title || "Ausdauer", minutes: 30 });
-                return;
-              }
-              openDoneModal(nev.id, { title: "Schreib, wie es war", placeholder: "Wie war es?" });
-            });
-          });
+          return planAlternative(kind, unit, payload, replace);
         });
       });
     });
   }
+  /* Sichtbarkeit wie in Woche → Tage bearbeiten */
+  function altVisList() {
+    var out = [{ value: "privat", label: "privat" }];
+    var g = host.myGroups ? (host.myGroups() || [])[0] : null;
+    if (g) out.push({ value: "gruppe", label: "Gruppe", group_id: g.id });
+    if (ffcUsable()) out.push({ value: "circle", label: "Circle" });
+    var bid = host.bubbleId ? host.bubbleId() : "";
+    if (bid) out.push({ value: "bubble", label: "Bubble", bubble_id: bid });
+    out.push({ value: "team", label: "Team" });
+    return out;
+  }
+  function altTimes() {
+    var now = new Date();
+    var p = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Berlin" }).split(":");
+    var nowMin = Number(p[0]) * 60 + Number(p[1]);
+    var out = [];
+    for (var m = 6 * 60; m <= 23 * 60 + 30; m += 30) if (m > nowMin) out.push(Math.floor(m / 60) + ":" + (m % 60 ? "30" : "00"));
+    return out;
+  }
+  /* Alternative: Sichtbarkeit, Uhrzeit (eintragen) oder sofort starten.
+     Kraft → Workout, Ausdauer → Uhr, Bewegung/Sonstiges → „Wie war es?“ + Foto. */
+  function planAlternative(kind, unit, payload, replace) {
+    var list = altVisList();
+    return GoDialog.plan((emojiFor(kind, unit.title) + " " + (unit.title || "Training")).trim(), {
+      vis: normalizeVisibility(payload.visibility || "team"), visList: list, times: altTimes()
+    }).then(function (r) {
+      if (!r) return;
+      var vo = list.filter(function (x) { return x.value === r.vis; })[0] || {};
+      var p = Object.assign({}, payload, { visibility: r.vis, item_type: "alternative" });
+      if (vo.group_id) p.group_id = vo.group_id;
+      if (vo.bubble_id) p.bubble_id = vo.bubble_id;
+      if (r.action === "save") {
+        var day = todayIso();
+        var hh = (r.time.length === 4 ? "0" : "") + r.time;
+        var off = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", timeZoneName: "longOffset" }).format(new Date(day + "T12:00:00Z")).match(/GMT([+-]\d{2}):?(\d{2})?/);
+        p.starts_at = day + "T" + hh + ":00" + (off ? off[1] + ":" + (off[2] || "00") : "+01:00");
+        return createUnplannedEvent(p)
+          .then(function () { return markReplaced(replace); })
+          .then(function () { if (global.GoTama) GoTama.invalidate(); return refresh(); })
+          .then(function () { if (host.toast) host.toast(unit.title + " um " + r.time + " eingetragen"); })
+          .catch(function () { if (host.toast) host.toast("Eintragen ging nicht"); });
+      }
+      if (kind === "kraft" || kind === "ausdauer") {
+        return createUnplannedEvent(p).then(function (nev) {
+          return markReplaced(replace).then(function () { return refresh(); }).then(function () {
+            if (kind === "kraft" && host.openEventWorkout) { host.openEventWorkout(nev); return; }
+            if (kind === "ausdauer" && global.GoTimer) { GoTimer.start({ id: nev.id, title: nev.title || "Ausdauer", minutes: 30 }); return; }
+            openDoneModal(nev.id, { title: "Schreib, wie es war", placeholder: "Wie war es?" });
+          });
+        });
+      }
+      /* Bewegung / Sonstiges: gleich erledigt eintragen */
+      return GoDialog.done(unit.title || "Erledigt").then(function (d) {
+        if (!d) return;
+        var up = d.file && global.GoExMedia && GoExMedia.uploadImage ? GoExMedia.uploadImage(d.file, "events").catch(function () { return ""; }) : Promise.resolve("");
+        return up.then(function (url) {
+          p.status = "erledigt";
+          p.starts_at = new Date().toISOString();
+          if (d.text) p.note = d.text.slice(0, 500);
+          if (url) p.photo_url = url;
+          return createUnplannedEvent(p);
+        }).then(function () { return markReplaced(replace); })
+          .then(function () { if (global.GoTama) GoTama.invalidate(); return refresh(); })
+          .catch(function () { if (host.toast) host.toast("Speichern ging nicht"); });
+      });
+    });
+  }
+
   function markReplaced(replace) {
     if (!replace) return Promise.resolve();
     return rest("events?id=eq." + encodeURIComponent(replace) + "&status=eq.geplant", {
