@@ -2306,10 +2306,9 @@
     var plan = {};
     var zDay = "";
     days.forEach(function (iso) {
-      var evs = state.events.filter(function (e) {
-        return e && String(e.user_id) === me() && e.status !== "ausgefallen" && e.item_type !== "support_session" && dayKey(e.starts_at) === iso;
-      });
-      var z = evs.filter(function (e) { return e.category === "zirkel"; })[0];
+      /* Normalfall des Wochenplans: Alternativen und Reise-Ersatz zählen hier nicht */
+      var evs = normalDayEvents(iso);
+      var z = evs.filter(function (e) { return e.category === "zirkel" && e.status !== "ausgefallen"; })[0];
       if (z && !zDay) zDay = iso;
       var p = evs.filter(function (e) { return e.category !== "zirkel"; })[0];
       plan[iso] = p ? p.title || "Training" : "";
@@ -2907,19 +2906,30 @@
     }).catch(function () { if (host.toast) host.toast("Hat nicht geklappt"); });
   }
 
+  /* Normalfall des Wochenplans für einen Tag: ohne Alternativen und Reise-Ersatz.
+     Hat eine Alternative die Einheit ersetzt (status ausgefallen), steht trotzdem die Einheit aus dem Plan da. */
+  function isAltEvent(e) {
+    return !!(e && (e.item_type === "alternative" || e.travel_auto || e.item_type === "hotel_workout"));
+  }
+  function normalDayEvents(iso) {
+    return state.events.filter(function (e) {
+      return e && String(e.user_id) === me() && e.item_type !== "support_session" && !isAltEvent(e) &&
+        dayKey(e.starts_at) === iso &&
+        (e.status !== "ausgefallen" || !!(e.enrollment_id || e.course_id));
+    }).sort(function (a, b) {
+      var sa = a.status === "ausgefallen" ? 1 : 0, sb = b.status === "ausgefallen" ? 1 : 0;
+      var pa = a.enrollment_id || a.course_id ? 0 : 1;
+      var pb = b.enrollment_id || b.course_id ? 0 : 1;
+      return sa - sb || pa - pb || String(a.starts_at).localeCompare(String(b.starts_at));
+    });
+  }
+
   function openDaysEditor() {
     var days = [];
     for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
     var slots = days.map(function (iso) {
-      /* je Tag die Einheit aus dem Wochenplan; Termine wie Initialgespräch (support_session) verdrängen sie nicht */
-      return state.events.filter(function (e) {
-        return e && String(e.user_id) === me() && e.status !== "erledigt" && e.status !== "ausgefallen" &&
-          e.item_type !== "support_session" && dayKey(e.starts_at) === iso;
-      }).sort(function (a, b) {
-        var pa = a.enrollment_id || a.course_id ? 0 : 1;
-        var pb = b.enrollment_id || b.course_id ? 0 : 1;
-        return pa - pb || String(a.starts_at).localeCompare(String(b.starts_at));
-      })[0] || null;
+      /* je Tag die Einheit aus dem Wochenplan (Normalfall); Termine wie Initialgespräch verdrängen sie nicht */
+      return normalDayEvents(iso).filter(function (e) { return e.status !== "erledigt"; })[0] || null;
     });
     state.daysEdit = { days: days, slots: slots, times: {}, vis: {}, orig: {}, bub: {} };
     slots.forEach(function (ev) {
@@ -3407,6 +3417,8 @@
       var grp = vis === "gruppe" && host.myGroups ? (host.myGroups() || [])[0] : null;
       if (sameDay && (ev.visibility || "team") === vis && !bubChanged && !(grp && String(ev.group_id || "") !== String(grp.id))) return;
       var body = { starts_at: starts, visibility: vis };
+      /* Durch eine Alternative ersetzte Einheit auf einen anderen Tag gelegt: dort wieder geplant */
+      if (ev.status === "ausgefallen" && dayKey(ev.starts_at) !== iso) body.status = "geplant";
       if (bubChanged) body.bubble_id = wantBub ? bubId : null;
       if (grp) body.group_id = grp.id;
       var toCircle = vis === "circle" && ev.visibility !== "circle";
