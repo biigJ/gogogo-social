@@ -2279,7 +2279,8 @@
       ? t.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" })
       : t.toLocaleDateString("de-DE", { timeZone: "Europe/Berlin", day: "numeric", month: "numeric" }) + " " +
         t.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" });
-    return '<article class="acc-msg' + (mine ? " is-mine" : "") + '">' +
+    return '<article class="acc-msg' + (mine ? " is-mine" : "") + '" data-msg-id="' + esc(m.id) + '">' +
+      (mine ? '<button type="button" class="acc-msg__more" data-msg-more="' + esc(m.id) + '" aria-label="Optionen"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>' : "") +
       '<span class="acc-msg__who">' + esc(mine ? "Du" : String(p.name || "?").split(" ")[0]) + " · " + esc(when) + "</span>" +
       '<p class="acc-msg__txt">' + esc(m.body || "") + "</p></article>";
   }
@@ -2291,8 +2292,15 @@
     var out = { myToday: [], upcoming: [], history: [] };
     if (!bid) return out;
     var now = Date.now();
+    /* Suche (Lupe in der Leiste): Events, Nachrichten und Namen */
+    var q = String(state.bubbleQuery || "").trim().toLowerCase();
+    function hit() {
+      if (!q) return true;
+      return Array.prototype.some.call(arguments, function (v) { return String(v || "").toLowerCase().indexOf(q) >= 0; });
+    }
     (state.events || []).forEach(function (ev) {
       if (!ev || String(ev.bubble_id || "") !== bid || ev.status === "ausgefallen") return;
+      if (!hit(ev.title, ev.note, ev.location, personOf(String(ev.user_id)).name)) return;
       var mine = String(ev.user_id) === me();
       if (!mine && normalizeVisibility(ev.visibility) === "privat") return;
       var d = dayKey(ev.starts_at);
@@ -2304,6 +2312,7 @@
       else out.history.push(item);
     });
     (state.bubbleMsgs || []).forEach(function (m) {
+      if (!hit(m.body, personOf(String(m.author_id)).name)) return;
       var it = { kind: "bubble_msg", starts_at: m.created_at, _mine: String(m.author_id) === me(), msg: m };
       if (dayKey(m.created_at) === today) out.myToday.push(it);
       else out.history.push(it);
@@ -2798,9 +2807,24 @@
       GoBubbles.paintStrip($("bubble-strip"), (state.events || []).filter(function (ev) {
         return ev && bid && String(ev.bubble_id || "") === bid && ev.status !== "ausgefallen" &&
           (String(ev.user_id) === me() || normalizeVisibility(ev.visibility) !== "privat");
-      }), personOf);
+      }), personOf, {
+        query: state.bubbleQuery || "",
+        onSearch: function (q) { state.bubbleQuery = String(q || "").trim(); render(); },
+        onAdd: function () {
+          var ask = global.GoDialog && GoDialog.confirm
+            ? GoDialog.confirm("Zu Deiner Woche wechseln, um Events der Bubble hinzuzufügen?", { ok: "Ja", cancel: "Nein" })
+            : Promise.resolve(global.confirm("Zu Deiner Woche wechseln, um Events der Bubble hinzuzufügen?"));
+          ask.then(function (yes) {
+            if (!yes) return;
+            var pb = document.querySelector('.app-pill [data-shell="woche"]');
+            if (pb) pb.click();
+          });
+        }
+      });
     }
-    if (flags.bubbleOnly && !feed.myToday.length && !feed.upcoming.length && !feed.history.length) {
+    if (flags.bubbleOnly && state.bubbleQuery && !feed.myToday.length && !feed.upcoming.length && !feed.history.length) {
+      html += '<p class="acc-bubble-empty">Nichts gefunden für „' + esc(state.bubbleQuery) + '“.</p>';
+    } else if (flags.bubbleOnly && !feed.myToday.length && !feed.upcoming.length && !feed.history.length) {
       html += '<p class="acc-bubble-empty">Noch ist es still hier.<br>Schreib unten etwas oder markiere ein Event in Woche → Stift → Tage bearbeiten → Bubble.</p>';
     }
 
@@ -4269,6 +4293,25 @@
     var shareB = t.closest("[data-acc-share]");
     if (shareB) {
       openEventShare(shareB.getAttribute("data-acc-share"), shareB.getAttribute("data-acc-share-day"));
+      return;
+    }
+    /* eigene Bubble-Nachricht: drei Punkte → löschen */
+    var msgMore = t.closest("[data-msg-more]");
+    if (msgMore) {
+      var mid = msgMore.getAttribute("data-msg-more");
+      var ask = global.GoDialog && GoDialog.confirm
+        ? GoDialog.confirm("Nachricht löschen?", { ok: "Löschen", cancel: "Abbrechen" })
+        : Promise.resolve(global.confirm("Nachricht löschen?"));
+      ask.then(function (yes) {
+        if (!yes) return;
+        rest("go_bubble_messages?id=eq." + encodeURIComponent(mid), { method: "DELETE", prefer: "return=minimal" })
+          .then(function () {
+            state.bubbleMsgs = (state.bubbleMsgs || []).filter(function (m) { return String(m.id) !== String(mid); });
+            var art = document.querySelector('.acc-msg[data-msg-id="' + String(mid).replace(/"/g, "") + '"]');
+            if (art) art.remove();
+          })
+          .catch(function () { if (host && host.toast) host.toast("Löschen hat nicht geklappt"); });
+      });
       return;
     }
     var replyC = t.closest("[data-reply-cmt]");

@@ -33,6 +33,7 @@
     ".god__sub{margin:0 0 16px;font-size:15px;font-weight:600;text-align:center;color:rgba(42,33,24,.75)}" +
     ".god__info{margin:-2px 0 12px;font-size:14px;text-align:center;color:rgba(42,33,24,.7)}" +
     ".god__body{margin:8px 0 18px;font-size:16px;line-height:1.5;text-align:left}" +
+    ".god__body.is-plain{margin:4px 0 20px;font-size:17px;text-align:center;white-space:pre-wrap}" +
     ".god__wheel{position:relative;height:176px;margin:0 0 16px;overflow-y:auto;scroll-snap-type:y mandatory;background:#fff;border-radius:14px;padding:66px 0;box-sizing:border-box;scrollbar-width:none}" +
     ".god__wheel::-webkit-scrollbar{display:none}" +
     ".god__wheel button{display:block;width:100%;height:44px;margin:0;border:0;background:transparent;scroll-snap-align:center;font:600 18px/44px Inter,system-ui,sans-serif;color:rgba(17,17,17,.4);cursor:pointer}" +
@@ -96,6 +97,15 @@
   function alertDlg(msg, opts) {
     opts = opts || {};
     return open(function (card, close) {
+      /* plain: alles in Fließtext-Größe (ohne Überschrift) */
+      if (opts.plain) {
+        var pb = document.createElement("p");
+        pb.className = "god__body is-plain";
+        pb.textContent = String(msg || "") + (opts.body ? "\n" + opts.body : "");
+        card.appendChild(pb);
+        button(card, opts.ok || "OK", "", function () { close(); });
+        return undefined;
+      }
       text(card, msg);
       if (opts.body) {
         var tEl = card.querySelector(".god__text");

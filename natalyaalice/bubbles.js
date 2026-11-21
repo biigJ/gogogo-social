@@ -24,6 +24,8 @@
   var missing = false;
   var CACHE = "gogogo_bubble_mine";
   var PALETTE = ["#FFD84D", "#FF7A59", "#5EC8F2", "#9BD49B", "#C9A7F5", "#F6A6C8", "#7FD6C2", "#FFB35C"];
+  var SEARCH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#1D1630" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>';
+  var PLUS_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="#1D1630" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
   var SOAP_SVG =
     '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
     '<circle cx="10" cy="13" r="7"/><circle cx="18" cy="6" r="3"/><path d="M6.6 10.2a4 4 0 0 1 3-2.4"/></svg>';
@@ -179,7 +181,8 @@
 
   /* ---------- Aktuell oben: Orte + Story ---------- */
   var PIN_SVG = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg>';
-  function paintStrip(el, events, personOf) {
+  function paintStrip(el, events, personOf, opts) {
+    opts = opts || {};
     var b = mine();
     if (!el || !b) return;
     ensureCss();
@@ -191,20 +194,38 @@
       var nm = String(ev.location).trim();
       if (!places.some(function (p) { return normName(p.name) === normName(nm); })) places.push({ name: nm });
     });
-    el.innerHTML = '<button type="button" class="gbub-strip__item" data-gbub-story="*" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' +
+    var q = String(opts.query || "");
+    /* Suche (Lupe) · Alle · Plus (Events hinzufügen) · Orte */
+    el.innerHTML = '<button type="button" class="gbub-strip__item" data-gbub-search style="--gbub:' + esc(b.color || "#E9E1D2") + '">' +
+      '<span class="gbub-strip__ring' + (q ? " has" : "") + '">' + SEARCH_SVG + "</span><span>" + esc(q || "Suchen") + "</span></button>" +
+      '<button type="button" class="gbub-strip__item" data-gbub-story="*" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' +
       '<span class="gbub-strip__ring' + (list.length ? " has" : "") + '">' + SOAP_SVG + "</span><span>Alle</span></button>" +
+      '<button type="button" class="gbub-strip__item" data-gbub-plus>' +
+      '<span class="gbub-strip__ring is-empty">' + PLUS_SVG + "</span><span>Event</span></button>" +
       places.map(function (p, i) {
         var n = list.filter(function (ev) { return normName(ev.location) === normName(p.name); }).length;
         return '<button type="button" class="gbub-strip__item" data-gbub-story="' + i + '" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' +
           '<span class="gbub-strip__ring' + (n ? " has" : "") + '">' + PIN_SVG + "</span><span>" + esc(p.name) + "</span></button>";
       }).join("");
-    el._gbubData = { list: list, places: places, personOf: personOf, color: b.color };
+    el._gbubData = { list: list, places: places, personOf: personOf, color: b.color, opts: opts };
     if (!el._gbubBound) {
       el._gbubBound = true;
       el.addEventListener("click", function (e) {
+        var d0 = el._gbubData || {};
+        var o = d0.opts || {};
+        if (e.target.closest && e.target.closest("[data-gbub-search]")) {
+          var ask = global.GoDialog && GoDialog.prompt
+            ? GoDialog.prompt("In der Bubble suchen", o.query || "", { ok: "Suchen", cancel: "Abbrechen" })
+            : Promise.resolve(global.prompt("In der Bubble suchen", o.query || ""));
+          ask.then(function (v) { if (v != null && o.onSearch) o.onSearch(v); });
+          return;
+        }
+        if (e.target.closest && e.target.closest("[data-gbub-plus]")) { if (o.onAdd) o.onAdd(); return; }
         var it = e.target.closest && e.target.closest("[data-gbub-story]");
         if (!it) return;
         var d = el._gbubData || {};
+        /* Alle bei aktiver Suche: Suche aufheben */
+        if (it.getAttribute("data-gbub-story") === "*" && o.query && o.onSearch) { o.onSearch(""); return; }
         var k = it.getAttribute("data-gbub-story");
         var evs = d.list || [];
         var title = "Alle Events";
@@ -430,8 +451,7 @@
     var html =
       '<button type="button" class="friend-list__row friend-list__add" data-gbub-add>' +
       '<span class="friend-list__plus" aria-hidden="true">+</span>' +
-      '<span class="friend-list__text"><span class="friend-list__name">Bubble hinzufügen</span>' +
-      '<span class="friend-list__meta">Name, Foto, Beschreibung, Orte</span></span></button>';
+      '<span class="friend-list__text"><span class="friend-list__name">Bubble hinzufügen</span></span></button>';
     if (missing) html += '<p class="coach-empty">Bubbles fehlen noch: go-bubbles.sql in Supabase ausführen.</p>';
     else if (!loaded && !bubbles.length) html += '<p class="coach-empty">Lädt …</p>';
     var list = bubbles.slice();
@@ -483,7 +503,7 @@
         var c = countsFor(b.id);
         var isMine = cur && String(cur.id) === String(b.id);
         body.innerHTML =
-          (isMine ? '<span class="gbub-card__me" style="position:static;display:inline-block;margin-bottom:8px">Meine Bubble</span>' : "") +
+          (isMine ? '<span class="gbub-card__me" style="position:static;display:inline-block;align-self:flex-start;width:auto;margin-bottom:8px">Meine Bubble</span>' : "") +
           '<h3 class="fw-card__name">' + esc(b.name) + "</h3>" +
           '<p class="fw-card__goal">' + esc(c.members + (c.members === 1 ? " Mitglied" : " Mitglieder") + (c.coaches ? " · " + c.coaches + (c.coaches === 1 ? " Coach" : " Coaches") : "")) + "</p>" +
           (b.description ? '<p class="fw-card__about">' + esc(b.description) + "</p>" : "") +
@@ -559,13 +579,15 @@
       "body.wr-sheet-open .gbub-compose,body.ffc-open .gbub-compose{display:none !important}" +
       ".gbub-compose input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:500 16px Inter,sans-serif;color:#1D1630}" +
       ".gbub-compose button{flex:none;width:42px;height:42px;border-radius:50%;border:0;background:#1D1630;color:#fff;display:flex;align-items:center;justify-content:center}" +
-      ".gbub-strip{display:none;gap:14px;overflow-x:auto;padding:4px 20px 10px;scrollbar-width:none}" +
+      /* Kante des ersten Kreises auf das W von Wiki */
+      ".gbub-strip{display:none;gap:14px;overflow-x:auto;padding:4px 20px 10px 9px;scrollbar-width:none}" +
       "body[data-heute=bubble] .gbub-strip{display:flex}" +
       ".gbub-strip__item{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;width:78px;border:0;background:transparent;color:#1D1630;font:600 12px/1.2 Inter,sans-serif;text-align:center;cursor:pointer}" +
       ".gbub-strip__item>span:last-child{max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
       ".gbub-strip__ring{width:66px;height:66px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--gbub);box-shadow:inset 0 0 0 3px rgba(255,255,255,.6)}" +
       ".gbub-strip__ring.has{box-shadow:0 0 0 3px #1D1630}" +
       ".gbub-strip__ring svg{width:28px;height:28px}" +
+      ".gbub-strip__ring.is-empty{background:transparent;box-shadow:inset 0 0 0 2px #1D1630}" +
       ".gbub-wiki textarea{min-height:40dvh;resize:vertical;line-height:1.5}" +
       ".gbub-wiki__meta{margin:0;font:500 12px Inter,sans-serif;opacity:.6;text-align:right}" +
       ".gbub-story{position:fixed;inset:0;z-index:10080;background:var(--gbub);color:#fff;overflow:hidden;cursor:pointer}" +
