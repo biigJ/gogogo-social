@@ -353,7 +353,7 @@
     kraft_tracking: "Kraft-Tracking",
     uebungen: "Videos",
     web_call: "Initialgespräch",
-    coach_offer: "Selbst Coaching anbieten",
+    coach_offer: "Ich als Coach",
     stempelkarte: "Stempelkarte",
     personal_training: "Personal Training",
     merch: "Merch"
@@ -374,7 +374,7 @@
       title: "Stempelkarte",
       price: "gratis",
       description:
-        "Trainierst Du mit einem Freund bei seinem oder Deinem Workout-Event zusammen, scannt Ihr die Karten und bekommt so einen digitalen Stempel. Wenn Du alle 12 Punkte voll hast, erhältst Du ein robustes gogogo-T-Shirt in Bio-Baumwollqualität.\nZum Punktesammeln tippe auf das Event unter Aktuell. Die Stempelkarte öffnet sich und Dein Freund hält seine/ihre Kamera auf den QR-Code. Dann tippt er/sie, ob Du pünktlich warst. Du musst dann auch bestätigen, ob er/sie pünktlich war. Wer pünktlich war, erhält zwei Stempel."
+        "Trainierst Du mit einem Freund bei seinem oder Deinem Workout-Event zusammen, scannt Ihr die Karten und bekommt so einen digitalen Stempel. Was es für eine volle Karte gibt, macht Ihr in der Challenge Eurer Gruppe aus. Zum Punktesammeln tippe auf das Event unter Aktuell. Die Stempelkarte öffnet sich und Dein Freund hält seine/ihre Kamera auf den QR-Code. Dann tippt er/sie, ob Du pünktlich warst. Du musst dann auch bestätigen, ob er/sie pünktlich war. Wer pünktlich war, erhält zwei Stempel."
     },
     {
       key: "web_call",
@@ -419,10 +419,10 @@
     {
       key: "coach_offer",
       type: "coach_offer",
-      title: "Selbst Coaching anbieten",
+      title: "Ich als Coach",
       price: "Zugang",
       description:
-        "Mit der Trainer-A-Lizenz oder PT-Lizenz und mit Erfahrung in der Fitnesswelt kannst Du hier einen Zugang zum Admin-Bereich erhalten und Freunde finden Dich in der Coach-Liste. Über Buchen sendest Du Deinen CV an gogogo (WhatsApp) nach Zustimmung."
+        "Melde Dich als Coach an, um die Leitung einer Gruppe zu haben. Wenn Du Freunde als Coachees betreuen und Trainingspläne erstellen willst, benötigst Du ein gogogo-Zertifikat. Mit der Trainer-A-Lizenz und/oder einer PT-Lizenz und mit Erfahrung in der Fitnesswelt kannst Du hier einen Zugang zum Admin-Bereich erhalten. Freunde finden Dich dann in der Coach-Liste mit einem blauen c. Für das Zertifikat sendest Du an uns Dein CV."
     }
   ];
   var PAYPAL_DONATE_URL =

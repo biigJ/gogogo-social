@@ -4362,6 +4362,10 @@
       font-size: 20px;
     }
     .crew-story__ring .team-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    /* Drei weiße Punkte unten rechts an eigenen, aufgeklappten Event-Karten → Sichtbarkeit */
+    .acc-card__visdots { position: absolute; right: 8px; bottom: 8px; z-index: 4; display: flex; gap: 4px; align-items: center; justify-content: center; width: 44px; height: 32px; padding: 0; border: 0; background: transparent; cursor: pointer; }
+    .acc-card__visdots i { width: 5px; height: 5px; border-radius: 50%; background: #fff; box-shadow: 0 0 3px rgba(0,0,0,.55); }
+    .acc-card.is-wallet:not(.is-open) .acc-card__visdots { display: none; }
     .crew-story--bub .crew-story__ring { padding: 0; border: 5px solid var(--gbub, #E9E1D2); background: transparent; }
     .crew-story--bub.is-seen .crew-story__ring { border-width: 3px; opacity: .85; }
     .go-boot__txt--top { margin: 0 24px 18px; text-align: center; font-family: "Playfair Display", Georgia, serif; font-size: 24px; font-weight: 600; line-height: 1.2; letter-spacing: 0; }
@@ -5159,6 +5163,13 @@
       color: rgba(42, 33, 24, 0.28);
       cursor: default;
     }
+    .team-slide__cta.team-slide__cta--search { margin-top: 12px; background: transparent; color: #2A2118; border: 1.5px solid #2A2118; }
+    .go-group-search__hint { margin: 4px 0 0; font-size: 15px; color: rgba(42,33,24,.75); }
+    .go-slide__cta.go-slide__cta--quiet { background: transparent !important; color: #2A2118 !important; border: 1.5px solid #2A2118; margin-top: 10px; }
+    .group-edit-photo { display: flex; align-items: center; justify-content: center; min-height: 44px; margin: 6px 0 10px; border: 1.5px solid #2A2118; font-weight: 600; cursor: pointer; }
+    #go-rail .go-slide__cta--signup + .go-slide__cta { margin-top: 12px !important; }
+    /* Blaues c (verifizierter Coach): wie der Haken bei Instagram, oben rechts am Namen */
+    .go-vc { display: inline-grid; place-items: center; width: .62em; height: .62em; min-width: 13px; min-height: 13px; margin-left: 3px; vertical-align: super; border-radius: 50%; background: #1D9BF0; color: #fff; font: 700 9px/1 Inter, system-ui, sans-serif !important; letter-spacing: 0; text-transform: none; }
     .team-slide__cta--challenge { margin-top: 12px !important; }
     .team-challenge { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 14px 0 0; padding: 12px 14px; border: 1.5px solid #2A2118; border-radius: 14px; text-align: left; }
     .team-challenge__label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .65; width: 100%; }
@@ -7686,6 +7697,7 @@
       <label class="wr-field" style="display:block;margin:10px 0;">Beschreibung
         <input id="group-edit-desc" type="text" maxlength="160" style="width:100%;min-height:44px;margin-top:6px;padding:0 12px;border:1px solid #2A2118;background:transparent;color:#2A2118;" />
       </label>
+      <label class="group-edit-photo" id="group-edit-photo">Gruppenfoto speichern<input id="group-edit-photo-file" type="file" accept="image/*" hidden /></label>
       <button type="button" id="group-edit-save">Speichern</button>
       <button type="button" class="sand-quiet" id="group-edit-delete" style="color:#C7413B;">Gruppe löschen</button>
       <button type="button" class="sand-quiet" id="group-edit-cancel">Abbrechen</button>
@@ -8445,18 +8457,18 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-12"></script>
-  <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-13"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-13"></script>
+  <script src="/natalyaalice/coach-reviews.js?v=gcr-3"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-15"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-100"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-102"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-72"></script>
-  <script src="/natalyaalice/support.js?v=support-23"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-73"></script>
+  <script src="/natalyaalice/support.js?v=support-24"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -14558,7 +14570,7 @@
             var idMap = {};
             (memberships || []).forEach(function (row) {
               /* offene Gruppenanfrage: erst nach Bestätigen (Herz) dabei */
-              if (row && row.group_id && row.status !== "pending") idMap[String(row.group_id)] = true;
+              if (row && row.group_id && row.status !== "pending" && row.status !== "requested") idMap[String(row.group_id)] = true;
             });
             return rest("groups?created_by=eq." + encodeURIComponent(me) + "&select=" + selectFull)
               .catch(function () {
@@ -14579,12 +14591,13 @@
                   .catch(function () { return fetchGroupsByIds(ids, selectBasic).catch(function () { return created || []; }); })
                   .then(function (rows) {
                     var groupRows = rows || [];
-                    return rest(
-                      "group_members?group_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=group_id,account_id,role"
-                    ).catch(function () { return memberships || []; }).then(function (memberRows) {
+                    var memQ = "group_members?group_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=group_id,account_id,role";
+                    return rest(memQ + ",status").catch(function () { return rest(memQ); }).catch(function () { return memberships || []; }).then(function (memberRows) {
                       var byGroup = {};
                       (memberRows || []).forEach(function (m) {
                         if (!m || !m.group_id || !m.account_id) return;
+                        /* Beitrittsanfragen sind noch keine Mitglieder (go-group-search.sql) */
+                        if (m.status === "requested") return;
                         var gid = String(m.group_id);
                         if (!byGroup[gid]) byGroup[gid] = [];
                         byGroup[gid].push(String(m.account_id));
@@ -14743,6 +14756,33 @@
         modal.dataset.groupId = String(group.id || "");
         nameIn.value = String(group.name || "");
         descIn.value = String(group.description || "");
+        /* Gruppenfoto: Geräte-Auswahl öffnet sich, Foto wird gleich gespeichert */
+        var pf = document.getElementById("group-edit-photo-file");
+        if (pf && !pf._bound) {
+          pf._bound = true;
+          pf.addEventListener("change", function (event) {
+            var f = event.target.files && event.target.files[0];
+            event.target.value = "";
+            var gid = String((document.getElementById("group-edit-modal") || {}).dataset.groupId || "");
+            if (!f || !gid) return;
+            var lab = document.getElementById("group-edit-photo");
+            if (lab) lab.firstChild.textContent = "Speichert …";
+            compressPhoto(f, function (url) {
+              if (!url) { if (lab) lab.firstChild.textContent = "Gruppenfoto speichern"; return; }
+              var list = myGroups().slice();
+              list.forEach(function (g) { if (g && String(g.id) === gid) g.photo_url = url; });
+              saveMyGroups(list).then(function () {
+                if (lab) lab.firstChild.textContent = "Gruppenfoto gespeichert ✓";
+                renderTeam();
+              }).catch(function () {
+                if (lab) lab.firstChild.textContent = "Gruppenfoto speichern";
+                gogogoToast("Foto speichern ging nicht");
+              });
+            });
+          });
+        }
+        var labR = document.getElementById("group-edit-photo");
+        if (labR) labR.firstChild.textContent = "Gruppenfoto speichern";
         modal.hidden = false;
       }
 
@@ -14764,6 +14804,10 @@
         if (idx == null) return;
         var person = list[idx];
         if (!person || !person.id) return;
+        if ((group.members || []).length >= 10) {
+          GoDialog.alert("Deine Gruppe ist voll", { body: "In eine Gruppe passen höchstens 10 Mitglieder." });
+          return;
+        }
         var groups = myGroups().slice();
         groups.forEach(function (g) {
           if (!g || String(g.id) !== String(group.id)) return;
@@ -15262,18 +15306,100 @@
         );
       }
 
+      /* ---------- Ich als Coach: Selbst-Anmeldung + blaues c (go-coach-self.sql) ---------- */
+      var COACH_SELF_TEXT = "Ich melde mich als Coach für gogogo an. Ich handle im Sinne der Community und bin einverstanden, dass mein Name, mein Über-mich-Text, meine Orte und Profilbild für alle Nutzer sichtbar sind. Um mit Nutzern befreundet zu sein, müssen diese mein Nickname kennen oder meinen QR-Code scannen. Sie können meine Coachees werden, wenn ich mich als Coach mit gogogo-Zertifikat registriert habe. Als Coach ohne Zertifikat kann ich Challenges und Orte in meiner Gruppe organisieren. Wenn mich Nutzer als Coach gewählt haben, kann ich sie in meiner Gruppe aufnehmen. Ich kann nicht mehr als 10 Nutzer in meine Gruppe aufnehmen.";
+      var verifiedCoaches = {};
+      function isCoachAny() {
+        var a = sessionAccount || {};
+        return !!(sessionIsTrainer || a.is_trainer || a.coach_self_at || a.coach_verified_at);
+      }
+      function paintCoachSignupBtn(btn) {
+        if (!btn) return;
+        var a = sessionAccount || {};
+        var on = !!(a.coach_self_at || a.is_trainer || sessionIsTrainer || a.coach_verified_at);
+        btn.textContent = on ? "Angemeldet" : "Anmelden";
+        btn.disabled = on;
+        btn.classList.toggle("is-owned", on);
+      }
+      /* Slide in place anpassen (kein Rail-Rebuild) */
+      function syncCoachSlide() {
+        var rail = document.getElementById("go-rail");
+        if (!rail) return;
+        var slide = rail.querySelector('.go-slide[data-offer="coach_offer"]');
+        if (!slide) return;
+        paintCoachSignupBtn(slide.querySelector(".go-slide__cta--signup"));
+        var copy = slide.querySelector(".go-slide__copy--coach");
+        if (copy) copy.hidden = isCoachAny();
+      }
+      function openCoachSelfSignup(btn) {
+        if (!window.GoDialog) return;
+        GoDialog.confirm("Als Coach anmelden", { body: COACH_SELF_TEXT, ok: "Anmelden", cancel: "Abbrechen", row: true }).then(function (yes) {
+          if (!yes) return;
+          if (btn) btn.disabled = true;
+          rest("rpc/go_coach_self_signup", { method: "POST", body: {} })
+            .then(function (at) {
+              sessionAccount.coach_self_at = at || new Date().toISOString();
+              if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+              syncCoachSlide();
+              gogogoToast("Du bist als Coach angemeldet. Gruppe leiten: Team → Meine Gruppe.");
+            })
+            .catch(function () {
+              if (btn) btn.disabled = false;
+              gogogoToast("Anmelden ging nicht (go-coach-self.sql ausgeführt?)");
+            });
+        });
+      }
+      /* Blaues c: oben rechts am Namen. el bekommt data-vc-id, das c kommt, sobald die Liste geladen ist */
+      function addVc(el, id) {
+        if (!el) return;
+        id = String(id || "");
+        el.setAttribute("data-vc-id", id);
+        var old = el.querySelector(":scope > .go-vc");
+        if (old) old.remove();
+        if (!id || !verifiedCoaches[id]) return;
+        var b = document.createElement("span");
+        b.className = "go-vc";
+        b.setAttribute("aria-label", "Verifizierter Coach");
+        b.title = "Verifizierter Coach";
+        b.textContent = "c";
+        el.appendChild(b);
+      }
+      function applyVcAll() {
+        document.querySelectorAll("[data-vc-id]").forEach(function (el) { addVc(el, el.getAttribute("data-vc-id")); });
+      }
+      function loadCoachStatus() {
+        if (!sessionMode || !sessionAccount || !sessionAccount.id) return;
+        rest("go_accounts?coach_verified_at=not.is.null&select=id&limit=500")
+          .then(function (rows) {
+            verifiedCoaches = {};
+            (rows || []).forEach(function (r) { if (r && r.id) verifiedCoaches[String(r.id)] = true; });
+            applyVcAll();
+          })
+          .catch(function () {});
+        rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id) + "&select=coach_self_at,coach_verified_at")
+          .then(function (rows) {
+            var r = rows && rows[0];
+            if (!r) return;
+            sessionAccount.coach_self_at = r.coach_self_at || null;
+            sessionAccount.coach_verified_at = r.coach_verified_at || null;
+            syncCoachSlide();
+          })
+          .catch(function () {});
+      }
+      window.GoCoachBadge = { add: function (el, id) { addVc(el, id); }, isVerified: function (id) { return !!verifiedCoaches[String(id || "")]; } };
+
       /* Coach-Status kommt nach dem ersten Rail-Paint: CTA in place umstellen, kein Rail-Rebuild */
       function markCoachOfferOwned() {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
         Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (slide) {
           var h = slide.querySelector(".go-slide__title");
-          if (!h || h.textContent !== "Selbst Coaching anbieten") return;
-          var cta = slide.querySelector(".go-slide__cta");
-          if (!cta || cta.textContent === "Du bist Coach") return;
+          if (!h || h.textContent !== "Ich als Coach") return;
+          var cta = slide.querySelector(".go-slide__cta:not(.go-slide__cta--signup)");
+          if (!cta || cta.textContent === "Registriert") return;
           var fresh = cta.cloneNode(false);
           fresh.className = "go-slide__cta is-owned";
-          fresh.textContent = "Du bist Coach";
+          fresh.textContent = "Registriert";
           fresh.disabled = true;
           fresh.setAttribute("aria-disabled", "true");
           cta.parentNode.replaceChild(fresh, cta);
@@ -16282,6 +16408,33 @@
           .then(function () { try { renderTeam(); } catch (eR) {} })
           .catch(function () { gogogoToast("Ging gerade nicht"); });
       }
+      /* Beitrittsanfragen an meine Gruppe (go-group-search.sql): Herz in Aktuell → Bestätigen / Ablehnen */
+      function loadGroupJoinRequests() {
+        if (!sessionAccount) return Promise.resolve([]);
+        return rest("rpc/go_my_group_requests", { method: "POST", body: {} }).catch(function () { return []; });
+      }
+      function openGroupJoinRequest(gr) {
+        if (!window.GoDialog) return;
+        var who = String(gr.name || gr.nickname || "Jemand").split(" ")[0];
+        GoDialog.choose(who + " möchte Deiner Gruppe " + (gr.group_name || "") + " beitreten", [
+          { label: "Bestätigen", value: "yes" },
+          { label: "Ablehnen", value: "no" }
+        ], { center: true, cancel: "Später" }).then(function (v) {
+          if (v !== "yes" && v !== "no") return;
+          rest("rpc/go_answer_group_request", { method: "POST", body: { p_group: gr.group_id, p_account: gr.account_id, p_accept: v === "yes" } })
+            .then(function () {
+              gogogoToast(v === "yes" ? who + " ist jetzt in " + (gr.group_name || "Deiner Gruppe") : "Abgelehnt");
+              return loadMyGroups();
+            })
+            .then(function () {
+              try { renderTeam(); } catch (eR) {}
+              if (window.HeuteAccountability && HeuteAccountability.refreshHeart) HeuteAccountability.refreshHeart();
+            })
+            .catch(function (err) {
+              gogogoToast(/group_full/.test(String((err && err.message) || "")) ? "Deine Gruppe ist voll (10 Mitglieder)." : "Ging gerade nicht");
+            });
+        });
+      }
       function openGroupInvite(gi) {
         if (!window.GoDialog) return;
         var who = String(gi.owner_name || "Jemand").split(" ")[0];
@@ -16417,6 +16570,7 @@
         var h = document.createElement("h3");
         h.className = "fw-card__name";
         h.textContent = String(p.name || p.nickname || "Freund").split(" ")[0];
+        addVc(h, p.id);
         if (p.nickname) {
           var nk = document.createElement("span");
           nk.className = "fw-card__nick";
@@ -17082,7 +17236,18 @@
           var src = img.getAttribute("src") || "";
           if (src && img.complete && img.naturalWidth) (pool[src] = pool[src] || []).push(img);
         });
+        /* Neu zeichnen (Nachladen alle paar Sekunden) ohne Sprung nach oben: Scrollstand je Slide merken */
+        var keepTop = {};
+        Array.prototype.forEach.call(box.querySelectorAll(".team-slide"), function (sl) {
+          if (sl.dataset.title && sl.scrollTop) keepTop[sl.dataset.title] = sl.scrollTop;
+        });
+        var keepLeft = box.scrollLeft;
         renderTeamNow();
+        Array.prototype.forEach.call(box.querySelectorAll(".team-slide"), function (sl) {
+          var top = keepTop[sl.dataset.title];
+          if (top) sl.scrollTop = top;
+        });
+        if (keepLeft && Math.abs(box.scrollLeft - keepLeft) > 1) box.scrollLeft = keepLeft;
         Array.prototype.forEach.call(box.querySelectorAll("img"), function (img) {
           var list = pool[img.getAttribute("src") || ""];
           var old = list && list.shift();
@@ -17538,9 +17703,27 @@
           createBtn.className = "team-slide__cta is-solid";
           createBtn.textContent = "Gruppe erstellen";
           createBtn.addEventListener("click", function () {
+            /* Gruppen leiten Coaches (Plus → Ich als Coach → Anmelden) */
+            if (typeof isCoachAny === "function" && !isCoachAny()) {
+              GoDialog.confirm("Gruppen leiten Coaches", {
+                body: "Melde Dich unter Plus → Ich als Coach an. Danach erstellst Du hier Deine Gruppe. Einer Gruppe beitreten kannst Du über „Gruppe suchen“.",
+                ok: "Ich als Coach", cancel: "Abbrechen", row: true
+              }).then(function (yes) {
+                if (!yes) return;
+                showPlan("training");
+                requestAnimationFrame(function () { jumpToGoOffer("coach_offer"); });
+              });
+              return;
+            }
             openGoSub("group", "Gruppe erstellen");
           });
           emptyGroup.appendChild(createBtn);
+          var searchBtn = document.createElement("button");
+          searchBtn.type = "button";
+          searchBtn.className = "team-slide__cta team-slide__cta--search";
+          searchBtn.textContent = "Gruppe suchen";
+          searchBtn.addEventListener("click", function () { openGoSub("groupsearch", "Gruppe suchen"); });
+          emptyGroup.appendChild(searchBtn);
           var emptyHint = document.createElement("p");
           emptyHint.className = "team-slide__about team-slide__about--hint";
           emptyHint.textContent = "Deine Gruppe zum schnellen Organisieren von Events und zum aktuellen Austausch.";
@@ -17611,6 +17794,7 @@
         var nameEl = document.createElement("h3");
         nameEl.className = "team-slide__coach-name-text";
         nameEl.textContent = trainer ? (trainer.name || "Coach") : "Noch kein Coach";
+        if (trainer) addVc(nameEl, trainer.id);
         nameRow.appendChild(nameEl);
         var pick = document.createElement("button");
         pick.type = "button";
@@ -17736,6 +17920,15 @@
         });
       }
 
+      /* Position eines Slides im Rail-Scrollbereich. offsetLeft zählt ab dem offsetParent:
+         auf dem Desktop ist das Rail zentriert (x≈440), dann lag jeder Sprung um diese Breite daneben */
+      function railSlideLeft(rail, el) {
+        if (!rail || !el) return 0;
+        if (el.offsetParent === rail) return el.offsetLeft;
+        if (el.offsetParent && el.offsetParent === rail.offsetParent) return el.offsetLeft - rail.offsetLeft - (rail.clientLeft || 0);
+        return el.getBoundingClientRect().left - rail.getBoundingClientRect().left - (rail.clientLeft || 0) + rail.scrollLeft;
+      }
+
       function railCurrentIndex(rail) {
         var list = railSlides(rail);
         if (!list.length) return 0;
@@ -17743,7 +17936,7 @@
         var best = 0;
         var bestDist = Infinity;
         list.forEach(function (el, i) {
-          var d = Math.abs(el.offsetLeft - left);
+          var d = Math.abs(railSlideLeft(rail, el) - left);
           if (d < bestDist) {
             bestDist = d;
             best = i;
@@ -17796,7 +17989,7 @@
             syncRailNav(rail, nav);
             return;
           }
-          rail.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
+          rail.scrollTo({ left: railSlideLeft(rail, slide), behavior: "smooth" });
           window.setTimeout(function () { syncRailNav(rail, nav); }, 280);
         }
         if (prev) prev.addEventListener("click", function () { go(-1); });
@@ -17829,7 +18022,7 @@
         var i = Math.min(list.length - 1, Math.max(0, index | 0));
         var slide = list[i];
         if (!slide) return;
-        var left = Math.round(slide.offsetLeft);
+        var left = Math.round(railSlideLeft(rail, slide));
         rail.dataset.snapLock = "";
         if (smooth) rail.scrollTo({ left: left, behavior: "smooth" });
         else rail.scrollLeft = left;
@@ -17874,7 +18067,7 @@
           var list = railSlides(rail);
           var slide = list[i];
           if (!slide) return;
-          var target = Math.round(slide.offsetLeft);
+          var target = Math.round(railSlideLeft(rail, slide));
           if (Math.abs(rail.scrollLeft - target) <= 2) {
             rail.dataset.snapLock = "";
             syncRailNav(rail, document.getElementById("go-rail-nav"));
@@ -18384,7 +18577,7 @@
                   key: "stempelkarte",
                   type: "stempelkarte",
                   title: "Stempelkarte",
-                  description: "Trainierst Du mit einem Freund bei seinem oder Deinem Workout-Event zusammen, scannt Ihr die Karten und bekommt so einen digitalen Stempel. Wenn Du alle 12 Punkte voll hast, erhältst Du ein robustes gogogo-T-Shirt in Bio-Baumwollqualität.\nZum Punktesammeln tippe auf das Event unter Aktuell. Die Stempelkarte öffnet sich und Dein Freund hält seine/ihre Kamera auf den QR-Code. Dann tippt er/sie, ob Du pünktlich warst. Du musst dann auch bestätigen, ob er/sie pünktlich war. Wer pünktlich war, erhält zwei Stempel."
+                  description: "Trainierst Du mit einem Freund bei seinem oder Deinem Workout-Event zusammen, scannt Ihr die Karten und bekommt so einen digitalen Stempel. Was es für eine volle Karte gibt, macht Ihr in der Challenge Eurer Gruppe aus. Zum Punktesammeln tippe auf das Event unter Aktuell. Die Stempelkarte öffnet sich und Dein Freund hält seine/ihre Kamera auf den QR-Code. Dann tippt er/sie, ob Du pünktlich warst. Du musst dann auch bestätigen, ob er/sie pünktlich war. Wer pünktlich war, erhält zwei Stempel."
                 },
                 {
                   key: "web_call",
@@ -18407,8 +18600,8 @@
                 {
                   key: "coach_offer",
                   type: "coach_offer",
-                  title: "Selbst Coaching anbieten",
-                  description: "Mit Trainer-A- oder PT-Lizenz Zugang zum Admin-Bereich. CV an gogogo senden — Coaching-Playbook lesen."
+                  title: "Ich als Coach",
+                  description: "Melde Dich als Coach an, um die Leitung einer Gruppe zu haben. Wenn Du Freunde als Coachees betreuen und Trainingspläne erstellen willst, benötigst Du ein gogogo-Zertifikat. Mit der Trainer-A-Lizenz und/oder einer PT-Lizenz und mit Erfahrung in der Fitnesswelt kannst Du hier einen Zugang zum Admin-Bereich erhalten. Freunde finden Dich dann in der Coach-Liste mit einem blauen c. Für das Zertifikat sendest Du an uns Dein CV."
                 }
               ];
         /* Plus-Punkte wählen: Friday Fitness Circle immer, die anderen nach Auswahl (gebuchte bleiben sichtbar) */
@@ -18451,12 +18644,12 @@
                 if (isZ && ffcLoggedNow) ownedNow = true;
                 var coachSelf = of.key === "coach_offer" && !!(sessionIsTrainer || (sessionAccount && sessionAccount.is_trainer));
                 if (coachSelf) ownedNow = true;
-                var btn = existing[ei].querySelector(".go-slide__cta");
+                var btn = existing[ei].querySelector(".go-slide__cta:not(.go-slide__cta--signup)");
                 if (!btn) continue;
                 if (ownedNow) {
-                  btn.textContent = coachSelf ? "Du bist Coach" : "Gebucht";
+                  btn.textContent = coachSelf ? "Registriert" : "Gebucht";
                 } else {
-                  btn.textContent = "Buchen";
+                  btn.textContent = of.key === "coach_offer" ? "Registrierung" : "Buchen";
                 }
                 btn.disabled = !!ownedNow;
                 btn.classList.toggle("is-owned", !!ownedNow);
@@ -18566,8 +18759,17 @@
             owned = true;
             cta.className = "go-slide__cta is-owned";
           }
-          if (owned) cta.textContent = isCoachSelf ? "Du bist Coach" : "Gebucht";
-          else cta.textContent = "Buchen";
+          if (owned) cta.textContent = isCoachSelf ? "Registriert" : "Gebucht";
+          else cta.textContent = offer.key === "coach_offer" ? "Registrierung" : "Buchen";
+          /* Ich als Coach: über „Registrierung“ der Knopf „Anmelden“ (Selbst-Anmeldung, unverifiziert) */
+          if (offer.key === "coach_offer") {
+            var signup = document.createElement("button");
+            signup.type = "button";
+            signup.className = "go-slide__cta go-slide__cta--signup";
+            paintCoachSignupBtn(signup);
+            signup.addEventListener("click", function () { openCoachSelfSignup(signup); });
+            card.appendChild(signup);
+          }
           if (owned && offer.key === "stempelkarte") {
             /* Stempelkarte: nach Buchung öffnet der CTA die Karte */
             cta.textContent = "Karte zeigen";
@@ -18669,6 +18871,11 @@
           var copy = document.createElement("p");
           copy.className = "go-slide__copy";
           copy.textContent = offer.description || "";
+          /* Ich als Coach: Text nur, solange man noch nicht angemeldet/registriert ist */
+          if (offer.key === "coach_offer") {
+            copy.classList.add("go-slide__copy--coach");
+            if (isCoachAny()) copy.hidden = true;
+          }
           card.appendChild(copy);
           /* Friday Fitness Circle: eine Zeile, mit „mehr“ aufklappbar */
           if (offer.key === "zirkel" && copy.textContent) {
@@ -18785,12 +18992,12 @@
               }
             });
           }
-          if (target) rail.scrollLeft = Math.round(target.offsetLeft);
+          if (target) rail.scrollLeft = Math.round(railSlideLeft(rail, target));
           else rail.scrollLeft = keepLeft;
           requestAnimationFrame(function () {
             sizeGoRailSlides(rail);
             if (target) {
-              rail.scrollLeft = Math.round(list[targetIdx].offsetLeft);
+              rail.scrollLeft = Math.round(railSlideLeft(rail, list[targetIdx]));
               if (keepSlideTop > 0) {
                 var restoreBody = list[targetIdx].querySelector(":scope > .go-slide__body");
                 (restoreBody || list[targetIdx]).scrollTop = keepSlideTop;
@@ -18871,6 +19078,79 @@
           });
           pack.appendChild(buy);
           body.appendChild(pack);
+        } else if (kind === "groupsearch") {
+          /* Gruppe suchen: Name → Suchen → „Gefunden! Beitreten.“ → Anfrage an den Ersteller (Herz) */
+          var sForm = document.createElement("div");
+          sForm.className = "go-group-form";
+          var sName = document.createElement("input");
+          sName.type = "text";
+          sName.placeholder = "Name der Gruppe";
+          sName.maxLength = 40;
+          sForm.appendChild(sName);
+          var sHint = document.createElement("p");
+          sHint.className = "go-group-search__hint";
+          sHint.hidden = true;
+          sForm.appendChild(sHint);
+          var sGo = document.createElement("button");
+          sGo.type = "button";
+          sGo.className = "go-slide__cta";
+          sGo.textContent = "Suchen";
+          var found = null;
+          sName.addEventListener("input", function () { found = null; sGo.textContent = "Suchen"; sHint.hidden = true; });
+          sGo.addEventListener("click", function () {
+            if (found) {
+              sGo.disabled = true;
+              rest("rpc/go_request_group_join", { method: "POST", body: { p_group: found.group_id } })
+                .then(function (r) {
+                  var who = String(found.owner_name || "").split(" ")[0] || "die Gruppe";
+                  gogogoToast(
+                    r === "full" ? "Die Gruppe ist voll (10 Mitglieder)."
+                    : r === "accepted" ? "Du bist schon in " + found.name + "."
+                    : r === "owner" ? "Das ist Deine eigene Gruppe."
+                    : "Anfrage an " + who + " gesendet. Sobald bestätigt, siehst Du " + found.name + " hier."
+                  );
+                  closeGoSub();
+                })
+                .catch(function () {
+                  sGo.disabled = false;
+                  gogogoToast("Beitreten ging nicht (go-group-search.sql ausgeführt?)");
+                });
+              return;
+            }
+            var q = String(sName.value || "").trim();
+            if (q.length < 2) { sName.focus(); return; }
+            sGo.disabled = true;
+            rest("rpc/go_find_group", { method: "POST", body: { p_name: q } })
+              .then(function (rows) {
+                sGo.disabled = false;
+                var hit = (rows || [])[0];
+                if (!hit) {
+                  sHint.hidden = false;
+                  sHint.textContent = "Keine Gruppe mit diesem Namen.";
+                  return;
+                }
+                found = hit;
+                sName.value = hit.name || q;
+                sHint.hidden = false;
+                sHint.textContent = (hit.name || "") + (hit.owner_name ? " · " + String(hit.owner_name).split(" ")[0] : "") +
+                  " · " + (hit.members || 0) + (Number(hit.members) === 1 ? " Mitglied" : " Mitglieder");
+                sGo.textContent = hit.my_status === "requested" ? "Angefragt" : "Gefunden! Beitreten.";
+                if (hit.my_status === "requested") sGo.disabled = true;
+              })
+              .catch(function () {
+                sGo.disabled = false;
+                gogogoToast("Suchen ging nicht (go-group-search.sql ausgeführt?)");
+              });
+          });
+          sForm.appendChild(sGo);
+          var sCancel = document.createElement("button");
+          sCancel.type = "button";
+          sCancel.className = "go-slide__cta go-slide__cta--quiet";
+          sCancel.textContent = "Abbrechen";
+          sCancel.addEventListener("click", function () { closeGoSub(); });
+          sForm.appendChild(sCancel);
+          body.appendChild(sForm);
+          setTimeout(function () { try { sName.focus(); } catch (eF) {} }, 80);
         } else if (kind === "group") {
           var form = document.createElement("div");
           form.className = "go-group-form";
@@ -23677,6 +23957,33 @@
         list.className = "team-gevents";
         list.hidden = true;
         slide.appendChild(list);
+        /* Aus dem Zwischenspeicher sofort zeichnen (sonst ist die Slide nach dem Neuzeichnen kurz kürzer und springt) */
+        function paintRows(rows) {
+          list.textContent = "";
+          rows.forEach(function (ev) {
+            var li = document.createElement("li");
+            li.className = "team-gevents__row";
+            var img = document.createElement("span");
+            img.className = "team-gevents__img";
+            var src = ev.photo_url || (window.GoCovers && GoCovers.url ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id) : "");
+            if (src) img.style.backgroundImage = 'url("' + String(src).replace(/"/g, "%22") + '")';
+            var day = document.createElement("span");
+            day.className = "team-gevents__day";
+            day.textContent = new Date(ev.starts_at).toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }).replace(".", "");
+            var name = document.createElement("span");
+            name.className = "team-gevents__name";
+            name.textContent = String(ev.title || (ev.courses && ev.courses.title) || "Event");
+            li.appendChild(img);
+            li.appendChild(day);
+            li.appendChild(name);
+            list.appendChild(li);
+          });
+          list.hidden = !rows.length;
+        }
+        var gKey = String(group.id);
+        var cached = groupEventsCache[gKey];
+        if (cached) paintRows(cached.rows);
+        if (cached && Date.now() - cached.at < 60000) return;
         var from = new Date(Log.berlinToday() + "T00:00:00").toISOString();
         rest(
           "events?group_id=eq." + encodeURIComponent(group.id) +
@@ -23686,29 +23993,14 @@
         )
           .then(function (rows) {
             rows = Array.isArray(rows) ? rows : [];
-            list.textContent = "";
-            rows.forEach(function (ev) {
-              var li = document.createElement("li");
-              li.className = "team-gevents__row";
-              var img = document.createElement("span");
-              img.className = "team-gevents__img";
-              var src = ev.photo_url || (window.GoCovers && GoCovers.url ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id) : "");
-              if (src) img.style.backgroundImage = 'url("' + String(src).replace(/"/g, "%22") + '")';
-              var day = document.createElement("span");
-              day.className = "team-gevents__day";
-              day.textContent = new Date(ev.starts_at).toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }).replace(".", "");
-              var name = document.createElement("span");
-              name.className = "team-gevents__name";
-              name.textContent = String(ev.title || (ev.courses && ev.courses.title) || "Event");
-              li.appendChild(img);
-              li.appendChild(day);
-              li.appendChild(name);
-              list.appendChild(li);
-            });
-            list.hidden = !rows.length;
+            var sig = JSON.stringify(rows.map(function (r) { return [r.id, r.title, r.starts_at, r.photo_url]; }));
+            var same = cached && cached.sig === sig;
+            groupEventsCache[gKey] = { rows: rows, sig: sig, at: Date.now() };
+            if (!same) paintRows(rows);
           })
           .catch(function () {});
       }
+      var groupEventsCache = {};
 
       function openGruppen() {
         showPlan("team");
@@ -23808,10 +24100,12 @@
             reloadInvites: function () { return loadInvites(); },
             /* weitere Meldungen fürs Herz: Gruppenanfragen */
             heartNotices: function () {
-              return Promise.all([loadGroupInvites(), loadStampLinkRequests()]).then(function (r) {
+              return Promise.all([loadGroupInvites(), loadGroupJoinRequests(), loadStampLinkRequests()]).then(function (r) {
                 return (r[0] || []).map(function (gi) {
                   return { kind: "group", created_at: gi.created_at, open: function () { openGroupInvite(gi); } };
-                }).concat((r[1] || []).map(function (lr) {
+                }).concat((r[1] || []).map(function (gr) {
+                  return { kind: "groupjoin", created_at: gr.created_at, open: function () { openGroupJoinRequest(gr); } };
+                })).concat((r[2] || []).map(function (lr) {
                   return { kind: "stamplink", created_at: lr.created_at, open: function () { openStampLinkRequest(lr); } };
                 }));
               });
@@ -23856,6 +24150,7 @@
           setTimeout(promptJoinRequests, 2500);
           setTimeout(promptCoachRequests, 4000);
           setTimeout(syncSessionAccount, 600);
+          setTimeout(loadCoachStatus, 900);
           /* Mitteilungen (go-messages.js): einmal mittig in Aktuell */
           if (window.GoMessages) {
             GoMessages.init({
@@ -24100,6 +24395,7 @@
             button.type = "button";
             var label = document.createElement("span");
             label.textContent = group.name;
+            addVc(label, group.ids.filter(function (gid) { return verifiedCoaches[gid]; })[0] || group.id);
             var tick = document.createElement("span");
             tick.className = "tick";
             tick.innerHTML = '<svg viewBox="0 0 14 14" width="12" height="12" aria-hidden="true"><path d="M2 7.2 5.2 10.5 12 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -24308,7 +24604,10 @@
       function fillProfile(account, plan, photos, mine) {
         var idName = document.getElementById("profile-identity-name");
         var idNick = document.getElementById("profile-identity-nick");
-        if (idName) idName.textContent = (account && account.name) || (profilePerson && profilePerson.name) || "Profil";
+        if (idName) {
+          idName.textContent = (account && account.name) || (profilePerson && profilePerson.name) || "Profil";
+          addVc(idName, (account && account.id) || (profilePerson && profilePerson.id) || (mine && sessionAccount && sessionAccount.id));
+        }
         var nickRaw = (account && account.nickname) || (profilePerson && profilePerson.nickname) || (mine && sessionAccount && sessionAccount.nickname) || "";
         if (idNick) idNick.textContent = nickRaw ? ("@" + String(nickRaw).replace(/^@/, "")) : "";
         document.getElementById("profile-goal").textContent = (account && account.training_goal) || (mine ? "Ziel wählen" : "");
@@ -24516,7 +24815,10 @@
         profilePerson = person;
         document.getElementById("profile-name").textContent = mine ? personName() : (person.name || "Team");
         var idName = document.getElementById("profile-identity-name");
-        if (idName) idName.textContent = mine ? personName() : (person.name || "Team");
+        if (idName) {
+          idName.textContent = mine ? personName() : (person.name || "Team");
+          addVc(idName, mine && sessionAccount ? sessionAccount.id : person.id);
+        }
         paintProfileFace(person);
         var sheet = document.getElementById("profile-sheet");
         sheet.hidden = false;

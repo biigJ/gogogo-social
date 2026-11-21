@@ -30,6 +30,7 @@
     ".gcr-coach__copy{flex:1;min-width:0}" +
     ".gcr-coach__name{font-weight:700;font-size:16px}" +
     ".gcr-mini{font-size:13px;color:rgba(42,33,24,.7)}" +
+    ".gcr-vc{display:inline-grid;place-items:center;width:14px;height:14px;margin-left:3px;vertical-align:super;border-radius:50%;background:#1D9BF0;color:#fff;font:700 9px/1 Inter,system-ui,sans-serif}" +
     ".gcr-coach .gcr-mini{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
     ".gcr-coach__acts{display:flex;gap:8px;margin-top:8px}" +
     ".gcr-mini b{color:#2A2118}" +
@@ -282,6 +283,35 @@
     });
   }
 
+  /* Coach ohne Zertifikat: seiner Gruppe beitreten (Anfrage, der Coach bestätigt unter dem Herz). Der eigene Coach bleibt. */
+  function joinCoachGroup(c, btn) {
+    var first = String(c.name || c.nickname || "Der Coach").split(" ")[0];
+    host.rest("rpc/go_coach_group", { method: "POST", body: { p_coach: c.id } })
+      .then(function (rows) {
+        var g0 = (rows || [])[0];
+        var g = g0 ? { id: g0.group_id, name: g0.name } : null;
+        if (!g) { if (host.toast) host.toast(first + " hat noch keine Gruppe."); return; }
+        var ask = global.GoDialog
+          ? GoDialog.confirm("Der Gruppe " + (g.name || "") + " beitreten?", {
+              body: first + " ist Coach ohne Zertifikat. Du trainierst in der Gruppe mit, Dein eigener Coach bleibt. " + first + " bestätigt Deine Anfrage.",
+              ok: "Anfragen", cancel: "Abbrechen", row: true
+            })
+          : Promise.resolve(true);
+        return ask.then(function (yes) {
+          if (!yes) return;
+          if (btn) btn.disabled = true;
+          return host.rest("rpc/go_request_group_join", { method: "POST", body: { p_group: g.id } }).then(function (r) {
+            if (btn) btn.textContent = r === "accepted" ? "Dabei" : r === "full" ? "Voll" : "Angefragt";
+            if (host.toast) host.toast(r === "full" ? "Die Gruppe ist voll (10 Mitglieder)." : r === "accepted" ? "Du bist schon in der Gruppe." : "Anfrage an " + first + " gesendet.");
+          });
+        });
+      })
+      .catch(function () {
+        if (btn) btn.disabled = false;
+        if (host.toast) host.toast("Beitreten ging nicht (go-group-search.sql ausgeführt?)");
+      });
+  }
+
   /* ---------- Coach-Liste mit Sterne-Schnitt ---------- */
   function openCoachList(opts) {
     opts = opts || {};
@@ -290,21 +320,31 @@
       (opts.onSearch ? '<button type="button" class="gcr-link" data-gcr-search>Per ID oder Nickname suchen</button>' : "") +
       '<button type="button" class="gcr-btn gcr-btn--ghost" data-gcr-close>Schließen</button>');
     var coaches = [];
-    host.rest("go_accounts?is_trainer=eq.true&select=id,name,nickname,photo_url,about_me&order=name.asc")
+    /* Auch Coaches ohne Zertifikat (selbst angemeldet, go-coach-self.sql): nicht als Trainer wählbar,
+       aber man kann ihrer Gruppe beitreten. Man hat immer höchstens einen Coach (trainer_id). */
+    host.rest("go_accounts?or=(is_trainer.eq.true,coach_self_at.not.is.null)&select=id,name,nickname,photo_url,about_me,is_trainer,coach_verified_at&order=name.asc")
+      .catch(function () { return host.rest("go_accounts?is_trainer=eq.true&select=id,name,nickname,photo_url,about_me,is_trainer&order=name.asc"); })
       .then(function (rows) {
         coaches = (rows || []).filter(function (c) { return String(c.id) !== String(host.me()); });
         return summaries(coaches.map(function (c) { return c.id; }));
       })
       .then(function (sum) {
-        coaches.sort(function (a, b) { return ((sum[b.id] || {}).avg || 0) - ((sum[a.id] || {}).avg || 0); });
+        coaches.sort(function (a, b) {
+          if (!!a.is_trainer !== !!b.is_trainer) return a.is_trainer ? -1 : 1;
+          return ((sum[b.id] || {}).avg || 0) - ((sum[a.id] || {}).avg || 0);
+        });
         sh.el.querySelector("[data-gcr-list]").innerHTML = coaches.length
           ? coaches.map(function (c) {
               var cur = String(c.id) === String(opts.currentId || "");
               /* Name, darunter Bewertung in einer Zeile, darunter Über + Wählen/Entfernen */
+              var groupOnly = !c.is_trainer;
               return '<div class="gcr-coach">' + face(c) + '<div class="gcr-coach__copy"><div class="gcr-coach__name">' + esc(c.name || c.nickname || "Coach") +
-                '</div><div class="gcr-mini">' + summaryLine(sum[c.id]) + "</div>" +
+                (c.coach_verified_at ? '<span class="gcr-vc" aria-label="Verifizierter Coach">c</span>' : "") +
+                '</div><div class="gcr-mini">' + (groupOnly ? "Coach ohne Zertifikat · Training in seiner Gruppe" : summaryLine(sum[c.id])) + "</div>" +
                 '<div class="gcr-coach__acts"><button type="button" class="gcr-pill" data-gcr-about="' + esc(c.id) + '">Über</button>' +
-                (cur
+                (groupOnly
+                  ? '<button type="button" class="gcr-pill is-solid" data-gcr-group="' + esc(c.id) + '">Gruppe beitreten</button>'
+                  : cur
                   ? (opts.onRemove ? '<button type="button" class="gcr-pill" data-gcr-remove="1">Als Coach entfernen</button>' : "")
                   : '<button type="button" class="gcr-pill is-solid" data-gcr-pick="' + esc(c.id) + '">Wählen</button>') +
                 "</div></div></div>";
@@ -319,6 +359,12 @@
       if (a) {
         var ca = coaches.filter(function (c) { return String(c.id) === a.getAttribute("data-gcr-about"); })[0];
         if (ca) openAbout(ca);
+        return;
+      }
+      var jg = e.target.closest("[data-gcr-group]");
+      if (jg) {
+        var cg = coaches.filter(function (c) { return String(c.id) === jg.getAttribute("data-gcr-group"); })[0];
+        if (cg) joinCoachGroup(cg, jg);
         return;
       }
       var p = e.target.closest("[data-gcr-pick]");
