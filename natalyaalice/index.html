@@ -6187,6 +6187,7 @@
     .go-group-form input[type="checkbox"]:checked {
       background: #2A2118 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23F6F1E8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 18px no-repeat;
     }
+    .team-slide__about--hint { margin-top: 14px !important; text-align: center; }
     .go-group-friends__face { width: 36px !important; height: 36px !important; flex: none; font-size: 15px; }
     body.is-session #plan-training .go-section__head { display: none !important; }
 
@@ -16835,7 +16836,28 @@
         box.appendChild(meSlide);
       }
 
+      /* Neuaufbau ohne Blitzen: schon geladene Bilder (gleiche Quelle) weiterverwenden statt neu zu dekodieren */
       function renderTeam() {
+        var box = document.getElementById("plan-team");
+        if (!box) return;
+        var pool = {};
+        Array.prototype.forEach.call(box.querySelectorAll("img"), function (img) {
+          var src = img.getAttribute("src") || "";
+          if (src && img.complete && img.naturalWidth) (pool[src] = pool[src] || []).push(img);
+        });
+        renderTeamNow();
+        Array.prototype.forEach.call(box.querySelectorAll("img"), function (img) {
+          var list = pool[img.getAttribute("src") || ""];
+          var old = list && list.shift();
+          if (!old || !img.parentNode) return;
+          old.className = img.className;
+          old.alt = img.alt;
+          if (img.style.cssText) old.style.cssText = img.style.cssText;
+          img.parentNode.replaceChild(old, img);
+        });
+      }
+
+      function renderTeamNow() {
         var box = document.getElementById("plan-team");
         if (!box) return;
         if (walletState.touching) { walletState.pending = true; return; }
