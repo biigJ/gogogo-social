@@ -2459,7 +2459,7 @@
       return;
     }
     Promise.resolve(FFC.groups()).then(function (groups) {
-      if (!(groups || []).length) { GoDialog.alert("Du bist noch in keinem Circle. Unter Plus → FFC → Deine Circle verwalten."); return; }
+      if (!(groups || []).length) { GoDialog.alert("Du bist noch in keinem Circle. Unter Plus → FFC → Deinen Circle verwalten."); return; }
       return GoDialog.choose("Circle hinzufügen", groups.map(function (g) { return { label: g.name, value: String(g.group_id) }; }))
         .then(function (gid) {
           if (!gid) return;

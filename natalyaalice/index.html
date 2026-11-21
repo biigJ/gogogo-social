@@ -6068,6 +6068,7 @@
     .go-slide__ffc:has(.go-zlb) { margin-top: 24px; }
     .go-zlb-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 18px; }
     #go-rail .go-zlb-btns .go-slide__cta.go-zlb-btn { margin: 0 !important; width: 100%; display: flex; align-items: center; justify-content: center; }
+    body.is-session #go-rail .go-circle-name, .go-circle-name { margin: 14px 0 4px !important; text-align: center; }
     body.is-session #go-rail .go-zlb-title, .go-zlb-title { margin: 0 0 6px; font-family: "Playfair Display", Georgia, serif !important; font-size: 18px !important; font-weight: 600 !important; }
     .go-rec-detail__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .go-rec-detail__pen { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: #2A2118; cursor: pointer; }
@@ -15731,7 +15732,9 @@
               list.textContent = "Du bist noch in keinem Circle. Tritt einem Circle bei, dann siehst Du hier Deine Rangliste.";
               return;
             }
-            title.textContent = ci.circle.name || "Circle";
+            /* Name steht über dem Circle-Knopf, hier nicht doppelt */
+            title.textContent = "";
+            title.hidden = true;
             var meId = sessionAccount ? String(sessionAccount.id) : "";
             var inCircle = {};
             ci.ids.forEach(function (id) { inCircle[id] = true; });
@@ -19090,7 +19093,25 @@
             circleBtn.className = "go-slide__cta go-slide__cta--editor";
             /* Circles gründen und verwalten nur Coaches; alle anderen treten bei */
             var circleCoach = typeof isCoachAny === "function" ? isCoachAny() : true;
-            circleBtn.textContent = circleCoach ? "Deine Circle verwalten" : "Circle beitreten";
+            circleBtn.textContent = circleCoach ? "Deinen Circle verwalten" : "Circle beitreten";
+            /* Name des Circles zwischen „Ich bin dabei“ und dem Circle-Knopf */
+            var circleName = document.createElement("p");
+            circleName.className = "go-zlb-title go-circle-name";
+            circleName.textContent = window.__goCircleName || "";
+            circleName.hidden = !window.__goCircleName;
+            card.appendChild(circleName);
+            if (window.FFC && FFC.groups) {
+              Promise.resolve(FFC.groups()).then(function (groups) {
+                groups = groups || [];
+                var scope = null;
+                try { scope = FFC.leaderboardScope ? FFC.leaderboardScope() : null; } catch (eS) {}
+                var g = groups.filter(function (x) { return String(x.group_id) === String(scope); })[0] || groups[0];
+                var nm = g ? String(g.name || "").trim() : "";
+                window.__goCircleName = nm;
+                circleName.textContent = nm;
+                circleName.hidden = !nm;
+              }).catch(function () {});
+            }
             circleBtn.addEventListener("click", function () { openCircleJoin({ coach: circleCoach }); });
             card.appendChild(circleBtn);
           }
