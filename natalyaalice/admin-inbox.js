@@ -26,6 +26,7 @@
   };
 
   var CSS =
+    ".ga-h3{margin:18px 0 4px;font:700 13px/1.3 Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:rgba(42,33,24,.6)}" +
     ".ga-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(42,33,24,.1)}" +
     ".ga-face{width:42px;height:42px;flex:none;border-radius:50%;object-fit:cover;background:#E6DED0;display:grid;place-items:center;font-weight:700}" +
     ".ga-copy{flex:1;min-width:0}" +
@@ -395,7 +396,53 @@
       .then(function (res) { if (st) { st.ex = res; paint(); } })
       .catch(function () { if (st) { st.ex = "error"; paint(); } });
   }
+  /* Fotos und Video-Links von Nutzern zu Übungen (go-exercise-media-review.sql): freigeben oder ablehnen */
+  function loadMedia() {
+    st.media = "loading";
+    return host.rest("go_exercise_links_ranked?approved_at=is.null&select=id,name,url,added_by_name,created_at&order=created_at.desc&limit=100")
+      .then(function (rows) { if (st) { st.media = rows || []; paint(); } })
+      .catch(function () { if (st) { st.media = "error"; paint(); } });
+  }
+  function paintMedia() {
+    if (st.media === "error") return '<p class="cp-hint">Fotos und Videos: go-exercise-media-review.sql fehlt noch.</p>';
+    if (!st.media) { loadMedia(); return ""; }
+    if (st.media === "loading") return "";
+    if (!st.media.length) return '<h3 class="ga-h3">Fotos und Videos von Nutzern</h3><p class="cp-hint">Nichts offen.</p>';
+    return '<h3 class="ga-h3">Fotos und Videos von Nutzern</h3>' + st.media.map(function (r) {
+      var info = global.GoExMedia ? GoExMedia.parse(r.url) : null;
+      var thumb = info && (info.kind === "img" ? info.url : info.thumb);
+      return '<div class="ga-item" data-ga-media="' + esc(r.id) + '" style="cursor:pointer">' +
+        (thumb ? '<img class="ga-face" style="border-radius:10px" src="' + esc(thumb) + '" alt="" />' : '<span class="ga-face">▶</span>') +
+        '<div class="ga-copy"><p><b>' + esc(r.name) + '</b><span class="ga-new">' + (info && info.kind === "img" ? "Foto" : "Video") + "</span></p>" +
+        '<span class="ga-msg">' + esc(r.added_by_name || "?") + "</span>" +
+        '<span class="ga-when">' + esc(when(r.created_at)) + "</span></div></div>";
+    }).join("");
+  }
+  function decideMedia(id) {
+    var row = (Array.isArray(st.media) ? st.media : []).filter(function (r) { return String(r.id) === String(id); })[0];
+    if (!row || !global.GoDialog) return;
+    GoDialog.choose(row.name, [
+      { label: "Ansehen", value: "view" },
+      { label: "Freigeben", value: "ok" },
+      { label: "Ablehnen", value: "drop" }
+    ]).then(function (v) {
+      if (v === "view") { if (global.GoExMedia) GoExMedia.open(row.name, row.url); return; }
+      if (!v) return;
+      var req = v === "ok"
+        ? host.rest("go_exercise_links?id=eq." + encodeURIComponent(row.id), { method: "PATCH", prefer: "return=minimal", body: { approved_at: new Date().toISOString(), approved_by: me() } })
+        : host.rest("go_exercise_links?id=eq." + encodeURIComponent(row.id), { method: "DELETE", prefer: "return=minimal" });
+      req.then(function () {
+        st.media = st.media.filter(function (r) { return String(r.id) !== String(row.id); });
+        paint();
+        if (host.toast) host.toast(v === "ok" ? "Freigegeben" : "Abgelehnt");
+        if (global.GoExMedia && GoExMedia.reload) GoExMedia.reload();
+      }).catch(function () { if (host.toast) host.toast("Ging gerade nicht"); });
+    });
+  }
   function paintEx() {
+    return paintMedia() + '<h3 class="ga-h3">Neue Übungen</h3>' + paintExSubs();
+  }
+  function paintExSubs() {
     if (st.ex === "error") return '<p class="cp-hint">Liste nicht geladen. Ist go-uebung-einreichen.sql in Supabase ausgeführt?</p>';
     if (!st.ex) { loadEx(); return '<p class="cp-hint">Lade…</p>'; }
     if (!st.ex.rows.length) return '<p class="cp-hint">Keine offenen Einreichungen. Nutzer reichen unter Plus → Videos Übungen ein.</p>';
@@ -664,7 +711,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -674,6 +721,7 @@
     if (t.hasAttribute("data-ga-info")) { openInfo(t.getAttribute("data-ga-info")); return; }
     if (t.hasAttribute("data-ga-req")) { requestCoach(t.getAttribute("data-ga-req")); return; }
     if (t.hasAttribute("data-ga-sub")) { decideSub(t.getAttribute("data-ga-sub")); return; }
+    if (t.hasAttribute("data-ga-media")) { decideMedia(t.getAttribute("data-ga-media")); return; }
     if (t.hasAttribute("data-ga-wa")) { markWa(t.getAttribute("data-ga-wa")); return; }
     if (t.hasAttribute("data-ga-close")) return close();
     if (t.hasAttribute("data-ga-tab")) {

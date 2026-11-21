@@ -283,9 +283,8 @@
         0
       );
     } catch (eG) {}
-    if (now < gate.getTime()) {
-      return '<p class="wr-zirkel-cd">ab 7:00</p>';
-    }
+    /* vor 7:00 am Eventtag kein Countdown („ab 7:00“ las sich wie die Startzeit) */
+    if (now < gate.getTime()) return "";
     var sec = Math.max(0, Math.floor((start - now) / 1000));
     var h = Math.floor(sec / 3600);
     var m = Math.floor((sec % 3600) / 60);
@@ -1137,10 +1136,15 @@
         list.push({ kind: "event", starts_at: ev.starts_at, ev: ev });
       }
     });
+    /* FFC-Circle-Event, das aus meinem eigenen Zirkel entstanden ist (Mit Circle teilen): nicht doppelt zeigen */
+    var ownZ = list.filter(function (it) {
+      return it.ev && String(it.ev.user_id) === me() && (it.ev.category === "zirkel" || /zirkel/i.test(String(it.ev.title || "")));
+    });
     state.ffcEvents.forEach(function (ev) {
-      if (dayKey(ev.starts_at) === iso) {
-        list.push({ kind: "ffc", starts_at: ev.starts_at, ev: ev });
-      }
+      if (dayKey(ev.starts_at) !== iso) return;
+      var t = new Date(ev.starts_at).getTime();
+      var dup = ownZ.some(function (it) { return Math.abs(new Date(it.ev.starts_at).getTime() - t) <= 30 * 60000; });
+      if (!dup) list.push({ kind: "ffc", starts_at: ev.starts_at, ev: ev });
     });
     (state.joined || []).forEach(function (ev) {
       if (dayKey(ev.starts_at) === iso) list.push({ kind: "joined", starts_at: ev.starts_at, ev: ev });
@@ -2809,21 +2813,22 @@
       var label = DAYS_DE[d.getDay()] + " " + d.getDate() + ".";
       var ev = de.slots[i];
       if (!ev) {
-        return '<div class="wr-dayrow is-empty" data-wr-dayslot="' + i + '"><b>' + label + '</b><span class="wr-dayrow__free">frei</span><span></span></div>';
+        return '<div class="wr-dayrow is-empty" data-wr-dayslot="' + i + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + '</b> <span class="wr-dayrow__free">frei</span></span></div><span></span></div>';
       }
       var opts = timeOptsFor(de.times[ev.id]);
       var ti = Math.max(0, opts.indexOf(de.times[ev.id]));
       var vis = de.vis[ev.id];
-      return '<div class="wr-dayrow" data-wr-dayslot="' + i + '"><b>' + label + "</b>" +
-        '<div class="wr-dayrow__mid"><span class="wr-dayrow__title">' + esc(ev.title || "Training") + "</span>" +
+      /* Zeile 1: Wochentag + Name. Zeile 2: Uhrzeit, zeigen/privat (feste Breite), Bubble, Media. Griff über die volle Höhe */
+      return '<div class="wr-dayrow" data-wr-dayslot="' + i + '">' +
+        '<div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " + esc(ev.title || "Training") + "</span>" +
         '<div class="wr-dayrow__ctl"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
         opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
         '<button type="button" class="wr-dayrow__vis' + (vis === "privat" ? "" : " is-on") + '" data-wr-dayvis="' + esc(ev.id) + '">' + (vis === "privat" ? "privat" : "zeigen") + "</button>" +
-        '<button type="button" class="wr-dayrow__vis" data-wr-daymedia="' + esc(ev.id) + '">Media</button>' +
         (host.bubbleId && host.bubbleId()
           ? '<button type="button" class="wr-dayrow__vis wr-dayrow__bub' + (state.daysEdit.bub[ev.id] ? " is-on" : "") + '" data-wr-daybub="' + esc(ev.id) + '" aria-pressed="' + (state.daysEdit.bub[ev.id] ? "true" : "false") + '">' +
             (global.GoBubbles ? GoBubbles.SOAP_SVG : "") + "Bubble</button>"
           : "") +
+        '<button type="button" class="wr-dayrow__vis" data-wr-daymedia="' + esc(ev.id) + '">Media</button>' +
         "</div></div>" +
         '<span class="wr-dayrow__grip" data-wr-grip="' + i + '" aria-label="Ziehen"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span></div>';
     }).join("");
@@ -2996,15 +3001,15 @@
           "</div>";
       }).join("");
     }
-    var d = new Date(ev.starts_at);
+    /* Name als Überschrift; Eventbild gilt nur für mich (alle gleichen Events), Übungen global (mit Freigabe) */
+    var cover = !photo && global.GoCovers ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id) : "";
     openSheet(
-      '<p class="wr-sheet-title">Media</p>' +
-      '<p class="wr-sheet-hint">' + esc((ev.title || "Training") + " · " + DAYS_DE[d.getDay()] + " " + d.getDate() + ".") + "</p>" +
-      '<div class="wr-share-block"><h4>Eventbild</h4>' +
-      '<div class="wr-media-prev">' + (photo ? '<img src="' + esc(photo) + '" alt="" />' : "<span>Kein eigenes Bild</span>") + "</div>" +
+      '<p class="wr-sheet-title">' + esc(ev.title || "Training") + "</p>" +
+      '<div class="wr-share-block">' +
+      '<div class="wr-media-prev">' + (photo || cover ? '<img src="' + esc(photo || cover) + '" alt="" />' : "<span>Standard-Foto</span>") + "</div>" +
       '<div class="wr-media-acts">' +
-      '<label class="wr-dayrow__vis">' + (photo ? "Foto ändern" : "Foto wählen") + '<input type="file" accept="image/*" data-wr-media-file="event" hidden /></label>' +
-      (photo ? '<button type="button" class="wr-dayrow__vis" data-wr-media-del="event">Entfernen</button>' : "") +
+      '<label class="wr-dayrow__vis' + (photo ? " is-on" : "") + '">Eigenes Foto<input type="file" accept="image/*" data-wr-media-file="event" hidden /></label>' +
+      '<button type="button" class="wr-dayrow__vis' + (photo ? "" : " is-on") + '" data-wr-media-del="event">Standard-Foto</button>' +
       "</div></div>" +
       '<div class="wr-share-block"><h4>Übungen</h4>' +
       exHtml + "</div>" +
@@ -3080,7 +3085,9 @@
       state.media.edit = null;
       paintMediaSheet();
       var msg = done.length === 2 ? "Foto und Video-Link gespeichert" : done.length ? done[0] + " gespeichert" : "Gespeichert";
-      if (global.GoDialog) GoDialog.alert(msg); else if (host.toast) host.toast(msg);
+      /* go-exercise-media-review.sql: für mich sofort, für alle nach Freigabe im Admin */
+      if (global.GoDialog) GoDialog.alert(msg, done.length ? { body: "Du siehst es ab jetzt bei der Übung. Für alle anderen erscheint es nach der Freigabe." } : {});
+      else if (host.toast) host.toast(msg);
     }).catch(function (err) {
       if (btn) btn.disabled = false;
       var m = String((err && err.message) || "");
@@ -3088,16 +3095,27 @@
     });
   }
 
+  /* Eigenes Foto gilt für alle gleichen eigenen Events (gleicher Titel), die noch geplant sind; erledigte behalten ihr Foto */
   function saveEventPhoto(url) {
     var ev = mediaEvent();
     if (!ev) return Promise.resolve();
-    return rest("events?id=eq." + encodeURIComponent(ev.id) + "&user_id=eq." + encodeURIComponent(me()), {
-      method: "PATCH", prefer: "return=minimal", body: { photo_url: url || null }
-    }).then(function () {
+    if (!url && !ev.photo_url) { paintMediaSheet(); return Promise.resolve(); }
+    var body = { photo_url: url || null };
+    var series = rest("events?user_id=eq." + encodeURIComponent(me()) + "&title=eq." + encodeURIComponent(ev.title || "") +
+      "&status=eq.geplant&starts_at=gte." + encodeURIComponent(berlinToday() + "T00:00:00+01:00"), {
+      method: "PATCH", prefer: "return=minimal", body: body
+    });
+    var one = rest("events?id=eq." + encodeURIComponent(ev.id) + "&user_id=eq." + encodeURIComponent(me()), {
+      method: "PATCH", prefer: "return=minimal", body: body
+    });
+    return Promise.all([series, one]).then(function () {
+      (state.events || []).forEach(function (e) {
+        if (String(e.user_id) === me() && e.title === ev.title && (e.status === "geplant" || e.id === ev.id)) e.photo_url = url || null;
+      });
       ev.photo_url = url || null;
       state.mediaDirty = true;
       paintMediaSheet();
-      if (host.toast) host.toast(url ? "Eventbild gespeichert" : "Eventbild entfernt");
+      if (host.toast) host.toast(url ? "Eigenes Foto für alle „" + (ev.title || "Training") + "“" : "Standard-Foto für alle „" + (ev.title || "Training") + "“");
       notifyAktuell();
     }).catch(function () { if (host.toast) host.toast("Speichern ging gerade nicht"); });
   }
