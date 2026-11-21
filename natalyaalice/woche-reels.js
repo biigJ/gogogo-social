@@ -2648,6 +2648,11 @@
         var t = new Date(ev.starts_at).getTime();
         var day = dayKey(ev.starts_at);
         if (!(day >= from && day < to)) return;
+        /* Circle-Kopie meines eigenen Zirkels (Mit Circle teilen): nicht doppelt, hängt an der eigenen Zeile */
+        if (ev.is_mine) {
+          var twin = rows.filter(function (x) { return x.kind === "own" && Math.abs(new Date(x.at).getTime() - t) <= 30 * 60000; })[0];
+          if (twin) { twin.circleCopy = ev; return; }
+        }
         if (ev.is_mine) {
           /* Circle-Termin (Zirkel-App) immer als eigene Zeile, damit er einzeln gelöscht werden kann */
           rows.push({ key: "ffc:" + ev.id, kind: "ffcOwn", ev: ev, at: ev.starts_at, title: ev.title || "Zirkeltraining" });
@@ -2656,7 +2661,21 @@
         }
       });
       rows.sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
-      state.zEdit = { rows: rows, times: {}, vis: {}, orig: {}, ownFfc: ffcEvs.filter(function (e) { return e.is_mine; }) };
+      state.zEdit = { rows: rows, times: {}, vis: {}, orig: {}, invited: {}, ownFfc: ffcEvs.filter(function (e) { return e.is_mine; }) };
+      /* eingeladene Freunde je eigenem Zirkel (wiederkehrend eingeladen) */
+      var ownIds = rows.filter(function (x) { return x.kind === "own"; }).map(function (x) { return x.ev.id; });
+      if (ownIds.length) {
+        rest("go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&event_id=in.(" + ownIds.join(",") + ")&status=in.(pending,accepted)&select=event_id,to_id,status")
+          .then(function (inv) {
+            (inv || []).forEach(function (r) {
+              var k = String(r.event_id);
+              (state.zEdit.invited[k] = state.zEdit.invited[k] || []).push({ id: String(r.to_id), status: r.status });
+            });
+            return ensurePeople((inv || []).map(function (r) { return String(r.to_id); }));
+          })
+          .then(function () { if (state.zEdit && !state.zEdit.fmt && document.querySelector("[data-wr-zpen]")) paintZirkelEditor(); })
+          .catch(function () {});
+      }
       rows.forEach(function (x) {
         if (x.kind !== "own") return;
         var tm = displayTime(x.at) ? formatTime(x.at) : NO_TIME;
@@ -2671,10 +2690,26 @@
   function paintZirkelEditor() {
     var ze = state.zEdit;
     if (!ze) return;
+    var groups = host && host.myGroups ? host.myGroups() || [] : [];
     var rows = ze.rows.map(function (x, i) {
       var d = new Date(dayKey(x.at) + "T12:00:00");
       var label = DAYS_DE[d.getDay()] + " " + d.getDate() + ".";
-      var title = esc(x.title) + (x.who ? ' <span class="wr-dayrow__who">· ' + esc(String(x.who).split(" ")[0]) + "</span>" : "");
+      var title = "<b>" + label + "</b> " + esc(String(x.title).replace(/\s*·.*$/, "")) + (x.who ? ' <span class="wr-dayrow__who">· ' + esc(String(x.who).split(" ")[0]) + "</span>" : "");
+      /* Zeile 3: wer ist dabei – Circle, Gruppe (alle Mitglieder eingeladen) oder einzelne Freunde */
+      var with_ = [];
+      if (x.circleCopy) with_.push('<span class="wr-dayrow__tag">Circle ' + esc(String(x.circleCopy.title || "").split("·").slice(1).join("·").trim() || "") + "</span>");
+      var inv = x.kind === "own" ? (ze.invited[String(x.ev.id)] || []) : [];
+      if (inv.length) {
+        var ids = inv.map(function (v) { return v.id; });
+        var g = groups.filter(function (gg) { var m = (gg.members || []).map(String); return m.length && m.every(function (id) { return ids.indexOf(id) >= 0; }); })[0];
+        if (g) with_.push('<span class="wr-dayrow__tag">Gruppe ' + esc(g.name) + "</span>");
+        inv.forEach(function (v) {
+          if (g && (g.members || []).map(String).indexOf(v.id) >= 0) return;
+          var p = personOf(v.id);
+          with_.push('<span class="wr-zface' + (v.status === "pending" ? " is-pending" : "") + '" title="' + esc(p.name || "") + '">' +
+            (p.photo ? '<img src="' + esc(p.photo) + '" alt="" />' : esc(String(p.name || "?").slice(0, 1))) + "</span>");
+        });
+      }
       var ctl;
       if (x.kind === "own") {
         var opts = timeOptsFor(ze.times[x.ev.id]);
@@ -2687,16 +2722,17 @@
         ctl = '<span class="wr-dayrow__time">' + esc(displayTime(x.at) ? formatTime(x.at) : "–:–") + "</span>" +
           '<span class="wr-dayrow__tag">' + (x.kind === "ffcOwn" ? "Circle" : "dabei") + "</span>";
       }
-      return '<div class="wr-dayrow"><b>' + label + "</b>" +
+      return '<div class="wr-dayrow wr-dayrow--z">' +
         '<div class="wr-dayrow__mid"><span class="wr-dayrow__title">' + title + "</span>" +
-        '<div class="wr-dayrow__ctl">' + ctl + "</div></div>" +
+        '<div class="wr-dayrow__ctl">' + ctl + "</div>" +
+        (with_.length ? '<div class="wr-dayrow__with">' + with_.join("") + "</div>" : "") + "</div>" +
         '<button type="button" class="wr-dayrow__pen" data-wr-zpen="' + i + '" aria-label="Bearbeiten">' + PEN_SVG + "</button></div>";
     }).join("");
     openSheet(
       '<p class="wr-sheet-title">Zirkeltrainings bearbeiten</p>' +
       (rows ? '<div class="wr-days wr-days--all">' + rows + "</div>" :
         '<p class="wr-sheet-hint">Diese Woche ist kein Zirkeltraining geplant.</p>') +
-      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">' + (rows ? "Abbrechen" : "Schließen") + "</button>" +
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">' + (rows ? "Verlassen" : "Schließen") + "</button>" +
       (ze.rows.some(function (x) { return x.kind === "own"; }) ? '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zedit-save="1">Speichern</button>' : "") + "</div>"
     );
     var card = $("wr-sheet-card");
@@ -2827,6 +2863,21 @@
     }).catch(function () { if (host.toast) host.toast("Hat nicht geklappt"); });
   }
 
+  /* Zirkel-App kennt kein Verschieben: Circle-Kopie löschen und zur neuen Zeit neu anlegen (gleiche Einladungen an den Circle) */
+  function moveCircleCopy(copy, newAt) {
+    if (!ffcOk() || !FFC.deleteEvent || !FFC.createEvent) return Promise.resolve();
+    var cname = String(copy.title || "").split("·").slice(1).join("·").trim();
+    return Promise.resolve(FFC.groups ? FFC.groups() : []).then(function (groups) {
+      var g = (groups || []).filter(function (x) { return String(x.name || "").trim() === cname; })[0];
+      return Promise.resolve(g && FFC.weeklyPoints ? FFC.weeklyPoints(g.group_id) : []).then(function (pts) {
+        var ids = (pts || []).filter(function (p) { return !p.is_me; }).map(function (p) { return p.user_id; });
+        return Promise.resolve(FFC.deleteEvent(copy.id)).then(function () {
+          return FFC.createEvent({ title: copy.title, startsAt: newAt, inviteeIds: ids });
+        });
+      });
+    }).catch(function () {});
+  }
+
   function saveZirkelEditor() {
     var ze = state.zEdit;
     if (!ze) return;
@@ -2847,6 +2898,7 @@
       }).then(function () {
         if (body.starts_at) { x.at = body.starts_at; x.ev.starts_at = body.starts_at; ze.orig[id] = pick; }
         if (body.visibility) x.ev.visibility = body.visibility;
+        if (body.starts_at && x.circleCopy) return moveCircleCopy(x.circleCopy, body.starts_at);
       }));
     });
     Promise.all(jobs).then(function () {
@@ -2911,7 +2963,7 @@
       '<p class="wr-sheet-title">Tage bearbeiten</p>' +
       '<p class="wr-sheet-hint">Du kannst Einheiten in den Tagen verschieben, Uhrzeit anpassen, privat/zeigen wählen, um zu entscheiden, ob Freunde es sehen dürfen.</p>' +
       '<div class="wr-days wr-days--all">' + rows + "</div>" +
-      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>' +
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Verlassen</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-days-save="1">Speichern</button></div>'
     );
     var cardAll = $("wr-sheet-card");
@@ -4491,6 +4543,23 @@
   }
 
   function shareExternal(iso, eventId) {
+    /* Bild im Layout der Aktuell-Karte + Text (share-card.js) */
+    var evC = findOwnEvent(eventId) || (state.events || []).filter(function (e) { return String(e.id) === String(eventId); })[0];
+    if (evC && global.GoShareCard) {
+      var owner = personOf(String(evC.user_id || me()));
+      GoShareCard.share({
+        title: String(evC.title || "Training").replace(/^[^A-Za-zÄÖÜäöü0-9]+\s*/, ""),
+        emoji: emojiFor(evC.category, evC.title),
+        startsAt: evC.starts_at,
+        hasTime: !!displayTime(evC.starts_at),
+        location: evC.location || "",
+        photo: evC.photo_url || "",
+        cover: global.GoCovers ? GoCovers.url(evC.course_id, evC.category || "kraft", evC.enrollment_id) : "",
+        who: String(owner.name || "").split(" ")[0],
+        whoPhoto: owner.photo || ""
+      });
+      return;
+    }
     var text = shareTextFor(iso, eventId);
     var url = "https://gogogo-social.vercel.app/workout/";
     if (navigator.share) {
