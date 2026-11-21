@@ -4363,6 +4363,8 @@
     }
     .crew-story__ring .team-avatar img { width: 100%; height: 100%; object-fit: cover; }
     .crew-story--bub .crew-story__ring { padding: 0; border: 5px solid var(--gbub, #E9E1D2); background: transparent; }
+    .crew-story--bub.is-seen .crew-story__ring { border-width: 3px; opacity: .85; }
+    .go-boot__txt--top { margin: 0 24px 18px; text-align: center; font-family: "Playfair Display", Georgia, serif; font-size: 24px; font-weight: 600; line-height: 1.2; letter-spacing: 0; }
     .crew-bub__face { display: grid; place-items: center; background: var(--gbub, #E9E1D2) center / cover no-repeat; color: #1D1630; }
     .crew-bub__face svg { width: 26px; height: 26px; }
     .crew-story__name {
@@ -6668,20 +6670,30 @@
     })();
     /* Gleiches Rad für spätere Ladezeiten (z. B. Wechsel auf Woche): GoLoader.show() → { hide() } */
     window.GoLoader = {
-      show: function () {
+      /* text: Spruch über dem Rad, dann sofort sichtbar und mindestens 1,4 s stehen (zum Lesen) */
+      show: function (text) {
         var src = document.querySelector(".go-boot__wheel");
-        var box = null, done = false;
-        /* erst nach 120 ms zeigen: wenn es schneller geht, kein Aufblitzen */
+        var box = null, done = false, t0 = Date.now();
+        var minMs = text ? 1400 : 0;
+        /* ohne Text erst nach 120 ms zeigen: wenn es schneller geht, kein Aufblitzen */
         var t = setTimeout(function () {
           if (done) return;
           box = document.createElement("div");
           box.className = "go-boot go-boot--again";
           box.setAttribute("role", "status");
-          box.innerHTML = (window.__goWheel || "") + '<p class="go-boot__txt">Lädt</p>';
+          var esc = function (x) { var d = document.createElement("span"); d.textContent = x; return d.innerHTML; };
+          box.innerHTML = text
+            ? '<p class="go-boot__txt go-boot__txt--top">' + esc(text) + "</p>" + (window.__goWheel || "")
+            : (window.__goWheel || "") + '<p class="go-boot__txt">Lädt</p>';
           document.body.appendChild(box);
-        }, 120);
-        var safety = setTimeout(hide, 4000);
+        }, text ? 0 : 120);
+        var safety = setTimeout(hideNow, 6000);
         function hide() {
+          var wait = minMs - (Date.now() - t0);
+          if (wait > 0) { setTimeout(hideNow, wait); return; }
+          hideNow();
+        }
+        function hideNow() {
           if (done) return;
           done = true;
           clearTimeout(t); clearTimeout(safety);
@@ -7142,8 +7154,8 @@
       <label class="heute-filter-pick">
         <select id="heute-filter-select" aria-label="Heute filtern">
           <option value="ich">Ich</option>
+          <option value="circle">Circle</option>
           <option value="team">Team</option>
-          <option value="tagebuch">Tagebuch</option>
           <option value="alles">Alles</option>
         </select>
       </label>
@@ -8412,7 +8424,7 @@
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-5"></script>
   <script src="/natalyaalice/go-story.js?v=gst-1"></script>
-  <script src="/natalyaalice/bubbles.js?v=bub-8"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-9"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-6"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-8"></script>
@@ -8427,7 +8439,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-96"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-97"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-72"></script>
   <script src="/natalyaalice/support.js?v=support-23"></script>
@@ -16715,19 +16727,15 @@
         if (!heute) return;
         var cur = heute.value === "crew" ? "team" : heute.value;
         if (String(cur).indexOf("group:") === 0) cur = "gruppe";
-        var html =
-          '<option value="ich">Ich</option>' +
-          '<option value="team">Team</option>';
-        if (myGroups().length) html += '<option value="gruppe">Gruppe</option>';
-        html +=
-          '<option value="tagebuch">Tagebuch</option>' +
-          '<option value="alles">Alles</option>';
+        /* Reihenfolge: Ich, Gruppe, Circle, Team, Bubble, Alles (kein Tagebuch mehr) */
         var bub = window.GoBubbles ? GoBubbles.mine() : null;
-        if (bub) {
-          var bo = document.createElement("option");
-          bo.textContent = "Bubble " + bub.name;
-          html += '<option value="bubble">' + bo.innerHTML + "</option>";
-        }
+        var html = '<option value="ich">Ich</option>';
+        if (myGroups().length) html += '<option value="gruppe">Gruppe</option>';
+        html += '<option value="circle">Circle</option>' +
+          '<option value="team">Team</option>';
+        if (bub) html += '<option value="bubble">Bubble</option>';
+        html += '<option value="alles">Alles</option>';
+        if (cur === "tagebuch") cur = "alles";
         heute.innerHTML = html;
         if (cur === "bubble" && !bub) cur = "alles";
         if (cur === "gruppe" && !myGroups().length) cur = "team";
@@ -21830,7 +21838,8 @@
         if (value === "all") value = "alles";
         if (value === "mine") value = "ich";
         if (String(value).indexOf("group:") === 0) value = "gruppe";
-        var allowed = value === "team" || value === "gruppe" || value === "tagebuch" || value === "alles" ? value : "ich";
+        if (value === "tagebuch") value = "alles";
+        var allowed = value === "team" || value === "gruppe" || value === "circle" || value === "bubble" || value === "alles" ? value : "ich";
         if (window.HeuteAccountability) {
           HeuteAccountability.setFilter(allowed);
           heuteFilter = allowed;
@@ -23054,6 +23063,11 @@
       /* Bubble-Mitglieder als Kreise unter „Alle“: Profile + letzte Aktivität (Event/Nachricht), höchstens alle 5 min */
       var bubblePeople = {}, bubbleAct = {}, bubbleCrewAt = 0, bubbleCrewBid = "", bubbleCrewLoading = false;
       var bubbleMsgAt = "", bubbleUpcoming = [];
+      /* Gelesen: Bubble-Kreis „Alles“ bis zur letzten Nachricht, Ort-Kreise je Event */
+      function bubbleSeen() {
+        try { return JSON.parse(localStorage.getItem("gogogo_bub_seen") || "{}") || {}; } catch (e) { return {}; }
+      }
+      function bubbleSeenSave(o) { try { localStorage.setItem("gogogo_bub_seen", JSON.stringify(o)); } catch (e) {} }
       function bubbleNorm(x) {
         return window.GoPlacePicker && GoPlacePicker.norm ? GoPlacePicker.norm(x) : String(x || "").trim().toLowerCase();
       }
@@ -23091,16 +23105,27 @@
         item.addEventListener("click", onOpen);
         return item;
       }
-      /* Aktuell → Alles: rechts neben „Du“ die Bubble (wenn dort geschrieben wurde) und Orte mit kommenden Bubble-Events.
+      /* Aktuell → Alles: rechts neben „Du“ die Bubble (wenn dort in den letzten 24 h geschrieben wurde) und Orte mit kommenden Bubble-Events.
          Ort nur, wenn er in meinem Profil steht. Kreis bleibt bis zum Start des Events, höchstens 7 Tage voraus. */
+      /* Ungelesene Kreise direkt neben „Du“, gelesene gibt die Funktion zurück (kommen hinter die aktiven Profile) */
       function appendBubbleCircles(box) {
         var b = window.GoBubbles && GoBubbles.mine ? GoBubbles.mine() : null;
-        if (!b) return;
+        var later = [];
+        if (!b) return later;
         var color = b.color || "#E9E1D2";
-        if (bubbleMsgAt && Date.now() - Date.parse(bubbleMsgAt) < 7 * 864e5) {
-          box.appendChild(bubbleCircle("Alles", b.photo_url || "", color, function () {
-            if (window.HeuteAccountability) HeuteAccountability.setFilter("bubble");
-          }));
+        var seen = bubbleSeen();
+        if (bubbleMsgAt && Date.now() - Date.parse(bubbleMsgAt) < 864e5) {
+          var msgEl = bubbleCircle("Alles", b.photo_url || "", color, function () {
+            var sv = bubbleSeen();
+            sv.msg = bubbleMsgAt;
+            bubbleSeenSave(sv);
+            var ld = window.GoLoader ? GoLoader.show("Es gibt Neues in Deiner Bubble") : null;
+            var done = function () { if (ld) ld.hide(); };
+            if (window.HeuteAccountability) Promise.resolve(HeuteAccountability.setFilter("bubble")).then(done, done);
+            else done();
+          });
+          if (seen.msg && String(seen.msg) >= String(bubbleMsgAt)) { msgEl.classList.add("is-seen"); later.push(msgEl); }
+          else box.appendChild(msgEl);
         }
         var mine = {};
         placeNames(sessionAccount && sessionAccount.workout_places).forEach(function (n) { mine[bubbleNorm(n)] = true; });
@@ -23114,12 +23139,23 @@
           if (!hit) byPlace.push(hit = { key: key, name: String(ev.location).trim(), evs: [] });
           hit.evs.push(ev);
         });
+        var placeSeen = seen.places || {};
         byPlace.forEach(function (pl) {
           var cover = GoBubbles.eventCover ? GoBubbles.eventCover(pl.evs[0]) : (pl.evs[0].photo_url || "");
-          box.appendChild(bubbleCircle(pl.name, cover, color, function () {
+          var ids = pl.evs.map(function (ev) { return String(ev.id); });
+          var el = bubbleCircle(pl.name, cover, color, function () {
+            var sv = bubbleSeen();
+            sv.places = sv.places || {};
+            sv.places[pl.key] = ids;
+            bubbleSeenSave(sv);
             GoBubbles.openStory(pl.evs, pl.name, bubblePersonOf, color, bubbleFocusEvent);
-          }));
+            setTimeout(paintHeuteCrew, 50);
+          });
+          var old = placeSeen[pl.key] || [];
+          if (ids.every(function (id) { return old.indexOf(id) >= 0; })) { el.classList.add("is-seen"); later.push(el); }
+          else box.appendChild(el);
         });
+        return later;
       }
       /* Heutige Events einer Person als Story (Freunde-Posts, eigener Post, heutiges Event) */
       function openPersonStory(person) {
@@ -23239,7 +23275,7 @@
         applyTrainingRing(meItem, meActEarly[String(sessionAccount.id)] || null, presenceFor(sessionAccount.id));
         if (window.GoTama) GoTama.decorate(meItem, sessionAccount.id);
         box.appendChild(meItem);
-        if (heuteView() === "alles") appendBubbleCircles(box);
+        var seenBub = heuteView() === "alles" ? appendBubbleCircles(box) : [];
         var seenIds = {};
         var friends = teamPeople.filter(function (person) {
           if (!person || !person.id || person.isSelf || String(person.id) === String(sessionAccount.id)) return false;
@@ -23326,7 +23362,14 @@
           return String((a.person && a.person.name) || "").localeCompare(String((b.person && b.person.name) || ""), "de");
         });
         crewActive = friends.length;
+        /* Gelesene Bubble-Kreise: hinter die aktiven Profile (trainiert gerade, heute dran, heute fertig) */
+        function flushSeenBub() {
+          (seenBub || []).forEach(function (el) { box.appendChild(el); });
+          seenBub = [];
+        }
         friends.forEach(function (entry) {
+          var pr = entry.presence;
+          if (seenBub.length && !(entry.today || (pr && (pr.status === "active" || pr.status === "done")))) flushSeenBub();
           var photoId = entry.today && entry.today.photoEventId;
           /* Tipp: pulsierend → heutige Einheit quadratisch, dicker Rand → erledigte Einheit (openFor) */
           var opener = openFor(entry.person, entry.story);
@@ -23336,6 +23379,7 @@
           if (window.GoTama) GoTama.decorate(el, entry.person.id);
           box.appendChild(el);
         });
+        flushSeenBub();
         /* Alle: dazu die Mitglieder meiner Bubble (gleiche Kreise), zuletzt aktiv zuerst */
         if (crewView === "alles" && window.GoBubbles && GoBubbles.mine && GoBubbles.mine()) {
           var bubIds = (GoBubbles.memberIds ? GoBubbles.memberIds(GoBubbles.mine().id) : []).filter(function (id) {
@@ -23563,7 +23607,7 @@
               if (v === "crew") v = "team";
               if (String(v).indexOf("group:") === 0) v = "gruppe";
               heuteFilter =
-                v === "team" || v === "gruppe" || v === "tagebuch" || v === "alles" ? v : "ich";
+                v === "team" || v === "gruppe" || v === "circle" || v === "bubble" || v === "alles" ? v : v === "tagebuch" ? "alles" : "ich";
               document.body.dataset.heute = heuteFilter;
               try { localStorage.setItem(HOME_HEUTE, heuteFilter); } catch (eHF2) {}
               paintHeuteJoins(heuteFlags());
@@ -25405,7 +25449,8 @@
         else if (storedHeute === "mine" || storedHeute === "ich") heuteFilter = "ich";
         else if (storedHeute === "crew" || storedHeute === "team") heuteFilter = "team";
         else if (storedHeute === "gruppe" || String(storedHeute).indexOf("group:") === 0) heuteFilter = "gruppe";
-        else if (storedHeute === "tagebuch") heuteFilter = "tagebuch";
+        else if (storedHeute === "tagebuch") heuteFilter = "alles";
+        else if (storedHeute === "circle" || storedHeute === "bubble") heuteFilter = storedHeute;
       } catch (eSH) {}
       paintVisibility();
       paintHeuteFilter();
