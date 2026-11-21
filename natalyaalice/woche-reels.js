@@ -4468,6 +4468,23 @@
   }
 
   function shareExternal(iso, eventId) {
+    /* Bild im Layout der Aktuell-Karte + Text (share-card.js) */
+    var evC = findOwnEvent(eventId) || (state.events || []).filter(function (e) { return String(e.id) === String(eventId); })[0];
+    if (evC && global.GoShareCard) {
+      var owner = personOf(String(evC.user_id || me()));
+      GoShareCard.share({
+        title: String(evC.title || "Training").replace(/^[^A-Za-zÄÖÜäöü0-9]+\s*/, ""),
+        emoji: emojiFor(evC.category, evC.title),
+        startsAt: evC.starts_at,
+        hasTime: !!displayTime(evC.starts_at),
+        location: evC.location || "",
+        photo: evC.photo_url || "",
+        cover: global.GoCovers ? GoCovers.url(evC.course_id, evC.category || "kraft", evC.enrollment_id) : "",
+        who: String(owner.name || "").split(" ")[0],
+        whoPhoto: owner.photo || ""
+      });
+      return;
+    }
     var text = shareTextFor(iso, eventId);
     var url = "https://gogogo-social.vercel.app/workout/";
     if (navigator.share) {
