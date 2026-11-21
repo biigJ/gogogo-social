@@ -1450,8 +1450,8 @@
     body.is-session[data-shell="heute"] .heute-filter-pick { display: flex; margin: 0; width: auto; }
     .heute-refresh { display: none; }
     body.is-session[data-shell="heute"] .heute-refresh {
-      display: grid; place-items: center; position: absolute; right: 12px;
-      /* mittig zur Dropdown-Zeile (vorher 8px tiefer) */
+      display: grid; place-items: center; position: absolute; right: -7px;
+      /* rechter Rand des Symbols = rechter Kartenrand; mittig zur Dropdown-Zeile */
       top: calc(max(6px, env(safe-area-inset-top, 0px)) + var(--heute-filter-line) - 4.5px);
       width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%;
       background: transparent; color: #2A2118; cursor: pointer;
@@ -1460,7 +1460,7 @@
     /* Herz links neben Refresh: Antworten auf meine Kommentare, roter Punkt = neu */
     .heute-replies { display: none; }
     body.is-session[data-shell="heute"] .heute-replies {
-      display: grid; place-items: center; position: absolute; right: 50px;
+      display: grid; place-items: center; position: absolute; right: 31px;
       top: calc(max(6px, env(safe-area-inset-top, 0px)) + var(--heute-filter-line) - 4.5px);
       width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%;
       background: transparent; color: #2A2118; cursor: pointer;
@@ -1543,9 +1543,11 @@
       content: ""; position: absolute; top: 0; bottom: 0; left: -50vw; right: -50vw; z-index: -1;
       background: inherit; pointer-events: none;
     }
+    /* Profilkreise randlos bis zum Screenrand (welcome 20px + Filterzeile 12px), erster Kreis bleibt an seiner Stelle */
     body.is-session[data-shell="heute"] .heute-filter-row .heute-stories:not([hidden]) {
-      display: block; flex: 0 0 calc(100% + 24px); width: calc(100% + 24px); margin: 6px -12px 0;
+      display: block; flex: 0 0 calc(100% + 64px); width: calc(100% + 64px); margin: 6px -32px 0;
     }
+    body.is-session[data-shell="heute"] .heute-filter-row .heute-stories__row { padding-left: 40px; padding-right: 40px; }
     body.is-session[data-shell="heute"] .dock { display: none !important; }
     body.is-session[data-shell="heute"] #heute-acc { order: 1; margin-top: 8px; width: 100%; }
     /* Kein opacity-Hide mehr — das verursachte das Aktuell-Flackern bei jedem Refresh */
@@ -4374,8 +4376,9 @@
     .acc-card__visdots { position: absolute; right: 8px; bottom: 8px; z-index: 4; display: flex; gap: 4px; align-items: center; justify-content: center; width: 44px; height: 32px; padding: 0; border: 0; background: transparent; cursor: pointer; }
     .acc-card__visdots i { width: 5px; height: 5px; border-radius: 50%; background: #fff; box-shadow: 0 0 3px rgba(0,0,0,.55); }
     .acc-card.is-wallet:not(.is-open) .acc-card__visdots { display: none; }
-    .crew-story--bub .crew-story__ring { padding: 0; border: 5px solid var(--gbub, #E9E1D2); background: transparent; }
-    .crew-story--bub.is-seen .crew-story__ring { border-width: 3px; opacity: .85; }
+    /* Bubble-Kreise so groß wie die der Freunde: Farbring liegt als Schatten innen, das Bild bleibt gleich groß */
+    .crew-story--bub .crew-story__ring { padding: 1px; border: 0; background: var(--gbub, #E9E1D2); }
+    .crew-story--bub.is-seen .crew-story__ring { opacity: .85; }
     .go-boot__txt--top { margin: 0 24px 18px; text-align: center; font-family: "Playfair Display", Georgia, serif; font-size: 24px; font-weight: 600; line-height: 1.2; letter-spacing: 0; }
     .crew-bub__face { display: grid; place-items: center; background: var(--gbub, #E9E1D2) center / cover no-repeat; color: #1D1630; }
     .crew-bub__face svg { width: 26px; height: 26px; }
@@ -8487,7 +8490,7 @@
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-5"></script>
   <script src="/natalyaalice/go-story.js?v=gst-1"></script>
-  <script src="/natalyaalice/bubbles.js?v=bub-9"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-10"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-5"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-6"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-8"></script>
@@ -20288,6 +20291,10 @@
         var s = d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" }).replace(/,/, "");
         return withTime ? s + ", " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }) : s;
       }
+      function circleMode(ev) {
+        var z = window.GoZirkelSetup && GoZirkelSetup.parse ? GoZirkelSetup.parse(ev && ev.note) : null;
+        return z ? (z.mode === "double" ? "Double" : "Single") : "";
+      }
       function circleRounds(ev) {
         var z = window.GoZirkelSetup && GoZirkelSetup.parse ? GoZirkelSetup.parse(ev && ev.note) : null;
         return z && z.rounds ? z.rounds : 0;
@@ -20328,7 +20335,7 @@
             l.textContent = circleDayLabel(ev.starts_at, false);
             var r = document.createElement("span");
             var n = circleRounds(ev);
-            r.textContent = n ? n + " Runden" : "";
+            r.textContent = [circleMode(ev), n ? n + " Runden" : ""].filter(Boolean).join(" · ");
             row.appendChild(l);
             row.appendChild(r);
             ui.evList.appendChild(row);
@@ -20514,7 +20521,7 @@
             var links = pack[0];
             var evLines = (pack[1] || []).map(function (ev) {
               var n = circleRounds(ev);
-              return circleDayLabel(ev.starts_at, false) + (n ? " · " + n + " Runden" : "");
+              return [circleDayLabel(ev.starts_at, false), circleMode(ev), n ? n + " Runden" : ""].filter(Boolean).join(" · ");
             });
             var link = (links || [])[0] || null;
             var here = !!(link && cur && String(link.ref) === String(cur.group_id));
@@ -24262,7 +24269,7 @@
         var color = b.color || "#E9E1D2";
         var seen = bubbleSeen();
         if (bubbleMsgAt && Date.now() - Date.parse(bubbleMsgAt) < 864e5) {
-          var msgEl = bubbleCircle("Alles", b.photo_url || "", color, function () {
+          var msgEl = bubbleCircle("Bubble", b.photo_url || "", color, function () {
             var sv = bubbleSeen();
             sv.msg = bubbleMsgAt;
             bubbleSeenSave(sv);
