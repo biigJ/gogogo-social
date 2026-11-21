@@ -48,6 +48,7 @@
     ".god__area{min-height:88px;padding:10px 12px;resize:none;font-family:inherit}" +
     ".god__file{display:flex;align-items:center;justify-content:center;cursor:pointer}" +
     ".god__row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}" +
+    ".god__check{margin:12px 0 16px;line-height:1.3;padding:10px 12px}" +
     ".god__row2 .god__btn{margin:0}";
 
   function ensureCss() {
@@ -365,6 +366,52 @@
     });
   }
 
+  /* Kleines Formular: Überschrift, Textfeld, optional ein Haken, Buttons nebeneinander → { text, checked } | null
+     opts: { placeholder, value, check: "Text am Haken", checked, ok, cancel } */
+  function formDlg(msg, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      var tEl = card.querySelector(".god__text");
+      if (tEl) tEl.classList.add("is-center");
+      var input = document.createElement("input");
+      input.className = "god__input";
+      input.type = "text";
+      input.maxLength = opts.maxLength || 60;
+      input.placeholder = opts.placeholder || "";
+      input.value = opts.value || "";
+      card.appendChild(input);
+      var cb = null;
+      if (opts.check) {
+        var lab = document.createElement("label");
+        lab.className = "god__pick god__check";
+        cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = !!opts.checked;
+        lab.appendChild(cb);
+        lab.appendChild(document.createTextNode(opts.check));
+        card.appendChild(lab);
+      }
+      var row = document.createElement("div");
+      row.className = "god__row2";
+      var ok = document.createElement("button");
+      ok.type = "button";
+      ok.className = "god__btn";
+      ok.textContent = opts.ok || "Speichern";
+      ok.addEventListener("click", function () { close({ text: String(input.value || "").trim(), checked: !!(cb && cb.checked) }); });
+      var no = document.createElement("button");
+      no.type = "button";
+      no.className = "god__btn god__btn--quiet";
+      no.textContent = opts.cancel || "Abbrechen";
+      no.addEventListener("click", function () { close(null); });
+      row.appendChild(ok);
+      row.appendChild(no);
+      card.appendChild(row);
+      setTimeout(function () { try { input.focus(); } catch (e) {} }, 60);
+      return null;
+    });
+  }
+
   /* Sonstiges erledigt: Überschrift, „Wie war es? (optional)“, Foto auswählen, Speichern | Abbrechen → { text, file } | null */
   function doneDlg(msg, opts) {
     opts = opts || {};
@@ -410,5 +457,5 @@
     });
   }
 
-  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg, plan: planDlg, done: doneDlg };
+  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg, plan: planDlg, done: doneDlg, form: formDlg };
 })(window);
