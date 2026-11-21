@@ -121,3 +121,18 @@ begin
   return 'declined';
 end $$;
 grant execute on function go_answer_group_request(uuid, uuid, boolean) to anon, authenticated;
+
+-- Gruppe eines Coaches (Coach-Liste → „Gruppe beitreten“ bei Coaches ohne Zertifikat)
+create or replace function go_coach_group(p_coach uuid)
+returns table (group_id uuid, name text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select g.id, g.name from groups g
+  where g.created_by = p_coach
+  order by g.created_at asc
+  limit 1;
+$$;
+grant execute on function go_coach_group(uuid) to anon, authenticated;
