@@ -56,6 +56,13 @@
     }
     .icon-btn { width: 44px; height: 44px; padding: 0; border: 0; background: transparent; color: var(--ink); display: grid; place-items: center; border-radius: 50%; }
     .icon-btn svg { width: 24px; height: 24px; }
+    /* Admin-Burger wie in der App: rechts oben, Menü rechtsbündig */
+    .bar { position: sticky; }
+    .burger span { display: block; width: 30px; height: 2.5px; background: currentColor; border-radius: 2px; box-shadow: 0 -11px 0 currentColor, 0 11px 0 currentColor; }
+    .admin-menu { position: absolute; left: 0; right: 0; top: 100%; z-index: 20; background: #F3EEE4; padding: 0 20px 10px; box-shadow: 0 14px 24px rgba(42,33,24,.12); }
+    .admin-menu[hidden] { display: none; }
+    .admin-menu a { display: block; padding: 14px 2px; border-bottom: 1px solid rgba(42,33,24,.2); color: var(--ink); text-decoration: none; font: 500 16px/1.35 var(--sans); text-align: right; }
+    .admin-menu a.is-on { font-weight: 700; }
     .bar__title { text-align: center; min-width: 0; }
     .bar__title h1 { font-size: 26px; line-height: 1.15; overflow-wrap: anywhere; hyphens: auto; }
     .headline-select {
@@ -200,7 +207,16 @@
         </select>
         <h1 id="detail-title" class="hidden"></h1>
       </div>
-      <span></span>
+      <button type="button" class="icon-btn burger" id="burger" aria-label="Admin-Menü"><span></span></button>
+      <nav class="admin-menu" id="admin-menu" hidden aria-label="Admin">
+        <a href="/workout/?admin=news">Nachrichten</a>
+        <a href="/workout/?admin=wa">Erinnerungen</a>
+        <a href="/workout/?admin=coaches">Nutzer</a>
+        <a href="#plans" class="is-on">Editor</a>
+        <a href="/workout/?admin=ex">Social Media Links</a>
+        <a href="/workout/?admin=circles">Circles</a>
+        <a href="/workout/?admin=groups">Gruppen</a>
+      </nav>
     </header>
 
     <div id="gate" class="gate hidden">
@@ -269,6 +285,7 @@
       $("view-sel").classList.add("hidden");
       $("detail-title").classList.remove("hidden");
       $("detail-title").textContent = "Kurs-Editor";
+      $("burger").classList.add("hidden");
       $("back").addEventListener("click", function () { location.href = backUrl(); });
       return;
     }
@@ -355,6 +372,9 @@
       showList();
     }
     window.addEventListener("hashchange", route);
+    /* Burger: zurück in die anderen Admin-Bereiche */
+    $("burger").addEventListener("click", function (e) { e.stopPropagation(); $("admin-menu").hidden = !$("admin-menu").hidden; });
+    document.addEventListener("click", function (e) { if (!e.target.closest("#admin-menu")) $("admin-menu").hidden = true; });
     $("view-sel").addEventListener("change", function () { location.hash = this.value; });
     $("back").addEventListener("click", function () {
       if (!$("detail-view").classList.contains("hidden")) location.hash = state.view;
