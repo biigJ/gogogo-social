@@ -14594,6 +14594,7 @@
                     var memQ = "group_members?group_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=group_id,account_id,role";
                     return rest(memQ + ",status").catch(function () { return rest(memQ); }).catch(function () { return memberships || []; }).then(function (memberRows) {
                       var byGroup = {};
+                      var pendingBy = {};
                       (memberRows || []).forEach(function (m) {
                         if (!m || !m.group_id || !m.account_id) return;
                         /* Beitrittsanfragen sind noch keine Mitglieder (go-group-search.sql) */
@@ -14601,6 +14602,8 @@
                         var gid = String(m.group_id);
                         if (!byGroup[gid]) byGroup[gid] = [];
                         byGroup[gid].push(String(m.account_id));
+                        /* Eingeladen, aber noch nicht bestätigt: steht in der Gruppe, zählt in Aktuell → Gruppe noch nicht */
+                        if (m.status === "pending") (pendingBy[gid] = pendingBy[gid] || {})[String(m.account_id)] = true;
                       });
                       myGroupsCache = groupRows.map(function (g) {
                         if (!g || !g.id) return null;
@@ -14619,6 +14622,7 @@
                           description: g.description || "",
                           photo_url: g.photo_url || "",
                           members: memberIds,
+                          pending: pendingBy[gid] || {},
                           owner: owner,
                           legacy_key: g.legacy_key || null
                         };
@@ -16996,14 +17000,15 @@
         syncHeuteFilterOptions();
       }
 
+      /* Aktuell → Gruppe: nur Mitglieder meiner eigenen Gruppe (ohne FFC-Spiegelung, ohne offene Einladungen) */
       function groupMemberIds() {
         var ids = [];
         var seen = {};
-        myGroups().forEach(function (g) {
+        ownGroups().forEach(function (g) {
           /* Gründer gehört auch zur Gruppe */
           ((g && g.members) || []).concat(g && g.owner ? [g.owner] : []).forEach(function (id) {
             id = id ? String(id) : "";
-            if (!id || seen[id]) return;
+            if (!id || seen[id] || (g.pending && g.pending[id])) return;
             seen[id] = true;
             ids.push(id);
           });
@@ -23579,6 +23584,34 @@
         }).catch(function () { bubbleCrewLoading = false; return false; });
       }
 
+      /* Mitglieder meiner Circles (FFC-Gruppen) für Aktuell → Circle, höchstens alle 5 min neu */
+      var circleCrew = { members: {}, at: 0, loading: false, sig: "" };
+      function loadCircleCrew() {
+        if (circleCrew.loading || Date.now() - circleCrew.at < 300000) return Promise.resolve(false);
+        if (!window.FFC || !FFC.user || !FFC.user() || !FFC.groups || !FFC.weeklyPoints) return Promise.resolve(false);
+        circleCrew.loading = true;
+        return Promise.resolve(FFC.groups())
+          .then(function (groups) {
+            return Promise.all((groups || []).map(function (g) {
+              return Promise.resolve(FFC.weeklyPoints(g.group_id)).catch(function () { return []; });
+            }));
+          })
+          .then(function (lists) {
+            var next = {};
+            (lists || []).forEach(function (rows) {
+              (rows || []).forEach(function (r) {
+                var n = String((r && r.nickname) || "").replace(/^@/, "").toLowerCase();
+                if (n) next[n] = r;
+              });
+            });
+            var sig = Object.keys(next).sort().join(",");
+            var changed = sig !== circleCrew.sig;
+            circleCrew = { members: next, at: Date.now(), loading: false, sig: sig };
+            return changed;
+          })
+          .catch(function () { circleCrew.loading = false; circleCrew.at = Date.now(); return false; });
+      }
+
       function paintHeuteCrew() {
         var box = document.getElementById("heute-stories-team");
         if (!box) return;
@@ -23708,6 +23741,21 @@
             var pid = String(entry.person.id);
             return teamPeople.some(function (tp) { return tp && String(tp.id) === pid; });
           });
+        } else if (crewView === "circle") {
+          /* Circle: nur Mitglieder meiner Circles (FFC), Abgleich über den Nickname; fehlende kommen dazu */
+          var cm = circleCrew.members;
+          var nickOf = function (p) { return String((p && p.nickname) || "").replace(/^@/, "").toLowerCase(); };
+          friends = friends.filter(function (entry) { var n = nickOf(entry.person); return !!(n && cm[n]); });
+          var shown = {};
+          friends.forEach(function (entry) { shown[nickOf(entry.person)] = true; });
+          var myNick = nickOf(sessionAccount);
+          Object.keys(cm).forEach(function (n) {
+            if (shown[n] || n === myNick || cm[n].is_me) return;
+            var m = cm[n];
+            var pid = "ffc-" + m.user_id;
+            friends.push({ person: { id: pid, name: m.nickname, nickname: m.nickname, photo_url: m.avatar_url || "" }, story: null, presence: presenceFor(pid), today: null });
+          });
+          loadCircleCrew().then(function (changed) { if (changed && heuteView() === "circle") paintHeuteCrew(); });
         }
         friends.sort(function (a, b) {
           function rank(entry) {
