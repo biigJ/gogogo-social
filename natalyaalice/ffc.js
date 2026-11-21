@@ -1639,7 +1639,7 @@
   }
 
   function refreshSetup(){
-    document.getElementById('sumRounds').textContent = rounds;
+    document.getElementById('sumRounds').textContent = shownRounds(rounds, roundExercises);
     document.getElementById('sumWork').textContent = fmtMin(workSec);
     document.getElementById('sumRest').textContent = restSec+'s';
     const total = rounds > 0 ? rounds*workSec + (rounds-1)*restSec : 0;
@@ -1799,6 +1799,12 @@
   function shortUnit(exId){ const u = unitFor(exId); return u === 'Wiederholungen' ? 'Wdh.' : u === 'Kalorien' ? 'kcal' : 'm'; }
 
   const RUN_ID = 'run';
+  /* Runde = Laufen + Workout (wie in gogogo und im Zirkel-Setup). Mit Laufen im Ablauf zählt ein Paar als eine Runde. */
+  function shownRounds(n, list){
+    n = Number(n) || 0;
+    const ids = (list || []).map(x => x && typeof x === 'object' ? x.exercise : x);
+    return ids.some(id => id === RUN_ID) ? Math.ceil(n/2) : n;
+  }
 
   // Gewicht für Übungen mit Ball/Gewicht (aktuell nur Wall Balls). Tippen auf "6 kg" wechselt 4 → 6 → 9 kg.
   // Gewichte wie bei HYROX-Wettkämpfen (Sled-Gewichte inkl. Schlitten). Sled Hybrid: wie Sled Pull.
@@ -2590,7 +2596,7 @@
         '<div class="session-top">' +
           '<div class="session-head">' +
             '<span class="session-date">'+dateStr+(sessPts>0?' · <span class="sess-pts">'+sessPts+' Punkte</span>':'')+'</span>' +
-            '<span class="session-meta">'+session.rounds+' Runden · '+fmtMin(session.workSec)+' Arbeit · '+session.restSec+'s Pause · Gesamt '+fmt(session.totalSec)+'</span>' +
+            '<span class="session-meta">'+shownRounds(session.rounds, session.log)+' Runden · '+fmtMin(session.workSec)+' Arbeit · '+session.restSec+'s Pause · Gesamt '+fmt(session.totalSec)+'</span>' +
           '</div>' +
           '<button class="session-delete" data-id="'+session.id+'" title="Dieses Training löschen">'+trashIconSvg+'</button>' +
         '</div>' + rows +
@@ -2710,7 +2716,7 @@
     lastSavedSessionId = null;
     setFinishEditStatus('');
     document.getElementById('finishSummary').textContent =
-      rounds+' Runden · '+fmtMin(workSec)+' Arbeit · '+restSec+'s Pause · Gesamt '+fmt(elapsedTotal);
+      shownRounds(rounds, log)+' Runden · '+fmtMin(workSec)+' Arbeit · '+restSec+'s Pause · Gesamt '+fmt(elapsedTotal);
     buildFinishLog();
 
     const statusEl = document.getElementById('finishSaveStatus');
@@ -2884,7 +2890,7 @@
     ctx.fillStyle = 'rgba(243,238,228,0.3)'; ctx.fillRect(pad, y, POST_W - pad*2, 2);
     y -= 40;
     ctx.font = '500 32px Inter, sans-serif'; ctx.fillStyle = 'rgba(243,238,228,0.88)';
-    ctx.fillText(W.rounds+' Runden  ·  '+fmtMin(W.workSec)+' Arbeit  ·  Gesamt '+fmt(W.elapsed), pad, y);
+    ctx.fillText(shownRounds(W.rounds, W.log)+' Runden  ·  '+fmtMin(W.workSec)+' Arbeit  ·  Gesamt '+fmt(W.elapsed), pad, y);
     y -= 78;   // Playfair-Ziffern haben Unterlängen
     ctx.font = '600 176px "Playfair Display", Georgia, serif'; ctx.fillStyle = SAND;
     const pts = String(W.points);
@@ -2959,7 +2965,7 @@
 
     // Runden · Zeit
     ctx.font = '600 34px Inter, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.fillText(W.rounds+' Runden  ·  '+fmtMin(W.workSec)+' Arbeit  ·  Gesamt '+fmt(W.elapsed), pad, y);
+    ctx.fillText(shownRounds(W.rounds, W.log)+' Runden  ·  '+fmtMin(W.workSec)+' Arbeit  ·  Gesamt '+fmt(W.elapsed), pad, y);
     y -= 30;
 
     // Punkte groß
@@ -3880,11 +3886,13 @@
           date: session.date,
           dateLabel,
           rounds: session.rounds,
+          roundsShown: shownRounds(session.rounds, session.log),
+          hasRun: (session.log || []).some(e => e && e.exercise === RUN_ID),
           workSec: session.workSec,
           restSec: session.restSec,
           totalSec: session.totalSec,
           points: pts,
-          meta: (session.rounds||0)+' Runden · '+fmtMin(session.workSec||0)+' Arbeit · '+(session.restSec||0)+'s Pause',
+          meta: shownRounds(session.rounds, session.log)+' Runden · '+fmtMin(session.workSec||0)+' Arbeit · '+(session.restSec||0)+'s Pause',
           canStory: !isNaN(d.getTime()) && Date.now() - d.getTime() < 24*3600000,
           lines
         };
