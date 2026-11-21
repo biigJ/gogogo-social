@@ -137,10 +137,12 @@
     host = h || host;
     if (!host) return Promise.resolve(0);
     var since = lastSeen();
-    return load().then(function (data) {
+    /* offene Meldungen zählen immer mit, bis sie erledigt sind */
+    var rep = host.rest("rpc/go_admin_reports", { method: "POST", body: {} }).then(function (r) { return (r || []).length; }).catch(function () { return 0; });
+    return Promise.all([load().then(function (data) {
       if (!since) return 0; /* erstes Öffnen: alles gilt als gelesen, sonst 100+ Altlasten */
       return items(data).filter(function (it) { return String(it.at) > since; }).length;
-    }).catch(function () { return 0; });
+    }).catch(function () { return 0; }), rep]).then(function (n) { return n[0] + n[1]; });
   }
 
   function when(at) {
@@ -173,10 +175,48 @@
     return '<button type="button" class="ga-act" data-ga-req="' + esc(id) + '">Anfrage Coach</button>';
   }
 
+  /* Gemeldete Bubble-Nachrichten (go-bubble-chat.sql): Nachricht, Person, Sperren */
+  function loadReports() {
+    st.reports = "loading";
+    return host.rest("rpc/go_admin_reports", { method: "POST", body: {} })
+      .then(function (rows) { if (st) { st.reports = rows || []; paint(); } })
+      .catch(function () { if (st) { st.reports = []; paint(); } });
+  }
+  function paintReports() {
+    if (!st.reports) { loadReports(); return ""; }
+    if (st.reports === "loading" || !st.reports.length) return "";
+    return '<h3 class="ga-h3">Gemeldet</h3>' + st.reports.map(function (r) {
+      var a = { name: r.author_name, photo_url: r.author_photo };
+      var media = r.media_url
+        ? (/\.(mp4|mov|webm)(\?|$)/i.test(r.media_url)
+            ? '<video src="' + esc(r.media_url) + '" controls playsinline preload="metadata" style="display:block;width:100%;max-height:220px;margin-top:6px;border-radius:10px"></video>'
+            : '<img src="' + esc(r.media_url) + '" alt="" style="display:block;max-width:100%;max-height:220px;margin-top:6px;border-radius:10px" />')
+        : "";
+      return '<div class="ga-item" style="align-items:flex-start">' + face(a) +
+        '<div class="ga-copy"><p><b>' + esc(r.author_name || "?") + "</b>" + (r.author_blocked_at ? ' <span class="ga-new">gesperrt</span>' : "") + "</p>" +
+        (r.body ? '<span class="ga-msg" style="white-space:pre-wrap">„' + esc(r.body) + '“</span>' : "") + media +
+        '<span class="ga-when">Gemeldet von ' + esc(r.reporter_name || "?") + " · " + esc(when(r.created_at)) +
+        " · dabei seit " + esc(when(r.author_since)) + " · " + esc(String(r.author_messages || 0)) + " Nachrichten · " +
+        esc(String(r.author_reports || 0)) + " Meldungen</span></div>" +
+        '<div class="ga-acts">' +
+        (r.author_blocked_at ? "" : '<button type="button" class="ga-act ga-del" data-ga-block="' + esc(r.author_id) + '" data-ga-name="' + esc(r.author_name || "") + '">Sperren</button>') +
+        '<button type="button" class="ga-act" data-ga-rdone="' + esc(r.id) + '">Erledigt</button></div></div>';
+    }).join("");
+  }
+  function blockUser(id, name) {
+    if (!global.GoDialog) return;
+    GoDialog.confirm((name || "Diese Person") + " sperren? Alle Bubble-Nachrichten werden ausgeblendet, schreiben geht nicht mehr.", { ok: "Sperren", cancel: "Abbrechen" })
+      .then(function (yes) {
+        if (!yes) return;
+        host.rest("rpc/go_admin_block_user", { method: "POST", body: { p_id: id, p_block: true } })
+          .then(function () { if (host.toast) host.toast("Gesperrt"); return loadReports(); })
+          .catch(function () { if (host.toast) host.toast("Sperren ging nicht"); });
+      });
+  }
   function paintNews() {
     var since = st.seenBefore;
     var list = items(st.data);
-    var compose = '<button type="button" class="cp-btn cp-btn--ghost" data-ga-broadcast="1" style="margin:0 0 10px">Mitteilung an alle Nutzer</button>' +
+    var compose = paintReports() + '<button type="button" class="cp-btn cp-btn--ghost" data-ga-broadcast="1" style="margin:0 0 10px">Mitteilung an alle Nutzer</button>' +
       '<p class="cp-hint">Erscheint bei allen einmal mittig in Aktuell. Tippen schließt. Neue öffentliche Wochenpläne melden sich von selbst.</p>';
     if (!list.length) return compose + '<p class="cp-hint">Noch keine Nachrichten.</p>';
     return compose + list.map(function (it) {
@@ -711,7 +751,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -721,6 +761,12 @@
     if (t.hasAttribute("data-ga-info")) { openInfo(t.getAttribute("data-ga-info")); return; }
     if (t.hasAttribute("data-ga-req")) { requestCoach(t.getAttribute("data-ga-req")); return; }
     if (t.hasAttribute("data-ga-sub")) { decideSub(t.getAttribute("data-ga-sub")); return; }
+    if (t.hasAttribute("data-ga-block")) { blockUser(t.getAttribute("data-ga-block"), t.getAttribute("data-ga-name")); return; }
+    if (t.hasAttribute("data-ga-rdone")) {
+      host.rest("rpc/go_admin_report_done", { method: "POST", body: { p_id: t.getAttribute("data-ga-rdone") } })
+        .then(loadReports).catch(function () { if (host.toast) host.toast("Ging nicht"); });
+      return;
+    }
     if (t.hasAttribute("data-ga-media")) { decideMedia(t.getAttribute("data-ga-media")); return; }
     if (t.hasAttribute("data-ga-wa")) { markWa(t.getAttribute("data-ga-wa")); return; }
     if (t.hasAttribute("data-ga-close")) return close();

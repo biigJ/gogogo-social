@@ -102,21 +102,140 @@
     return global.GoPlacePicker && GoPlacePicker.norm ? GoPlacePicker.norm(s) : String(s || "").toLowerCase().trim();
   }
 
-  /* ---------- Chat: freie Texte ---------- */
+  /* ---------- Chat: Texte, Fotos/Videos, Antworten (go-bubble-chat.sql) ---------- */
   function messages() {
     var b = mine();
     if (!b || !host) return Promise.resolve([]);
-    return host.rest("go_bubble_messages?bubble_id=eq." + encodeURIComponent(b.id) +
-      "&select=id,author_id,body,created_at&order=created_at.desc&limit=200").catch(function () { return []; });
+    var q = "go_bubble_messages?bubble_id=eq." + encodeURIComponent(b.id) + "&order=created_at.desc&limit=200&select=";
+    return host.rest(q + "id,author_id,body,created_at,media_url,media_kind,reply_to")
+      .catch(function () { return host.rest(q + "id,author_id,body,created_at"); })
+      .catch(function () { return []; });
   }
-  function post(text) {
+  function post(text, extra) {
     var b = mine();
+    extra = extra || {};
     var body = String(text || "").trim();
-    if (!b || !body) return Promise.resolve(false);
-    return host.rest("go_bubble_messages", {
-      method: "POST", prefer: "return=minimal",
-      body: { bubble_id: b.id, author_id: me(), body: body.slice(0, 2000) }
-    }).then(function () { return true; });
+    if (!b || (!body && !extra.media_url)) return Promise.resolve(false);
+    var row = { bubble_id: b.id, author_id: me(), body: body.slice(0, 2000) };
+    if (extra.media_url) { row.media_url = extra.media_url; row.media_kind = extra.media_kind || "img"; }
+    if (extra.reply_to) row.reply_to = extra.reply_to;
+    return host.rest("go_bubble_messages", { method: "POST", prefer: "return=minimal", body: row })
+      .then(function () { return true; });
+  }
+
+  /* Foto verkleinern: längste Seite 1280 px, JPEG */
+  function shrinkImage(file) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      var src = URL.createObjectURL(file);
+      img.onload = function () {
+        var k = Math.min(1, 1280 / Math.max(img.width, img.height));
+        var cv = document.createElement("canvas");
+        cv.width = Math.round(img.width * k);
+        cv.height = Math.round(img.height * k);
+        cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(src);
+        cv.toBlob(function (bl) { if (bl) resolve(bl); else reject(new Error("Foto nicht lesbar")); }, "image/jpeg", 0.8);
+      };
+      img.onerror = function () { URL.revokeObjectURL(src); reject(new Error("Foto nicht lesbar")); };
+      img.src = src;
+    });
+  }
+  /* Video verkleinern (höchstens 720 px), wo der Browser es kann (captureStream + MediaRecorder, z. B. Android/Chrome).
+     Safari auf dem iPhone kann das nicht: dann Original bis 50 MB. */
+  var VIDEO_MAX = 50 * 1024 * 1024;
+  function shrinkVideo(file) {
+    return new Promise(function (resolve, reject) {
+      var v = document.createElement("video");
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "auto";
+      var src = URL.createObjectURL(file);
+      v.src = src;
+      v.onerror = function () { URL.revokeObjectURL(src); reject(new Error("Video nicht lesbar")); };
+      v.onloadedmetadata = function () {
+        if (v.duration > 180) { URL.revokeObjectURL(src); reject(new Error("Video höchstens 3 Minuten")); return; }
+        var k = Math.min(1, 720 / Math.max(v.videoWidth || 720, v.videoHeight || 720));
+        var canRecode = typeof v.captureStream === "function" && global.MediaRecorder;
+        if (!canRecode || (k >= 1 && file.size < 8 * 1024 * 1024)) {
+          URL.revokeObjectURL(src);
+          if (file.size > VIDEO_MAX) reject(new Error("Video zu groß (max. 50 MB). Kürzer aufnehmen."));
+          else resolve(file);
+          return;
+        }
+        var cv = document.createElement("canvas");
+        cv.width = Math.round(v.videoWidth * k / 2) * 2;
+        cv.height = Math.round(v.videoHeight * k / 2) * 2;
+        var ctx = cv.getContext("2d");
+        var out = cv.captureStream(30);
+        try { v.captureStream().getAudioTracks().forEach(function (t) { out.addTrack(t); }); } catch (eA) {}
+        var type = MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported("video/mp4") ? "video/mp4" : "video/webm";
+        var rec = new MediaRecorder(out, { mimeType: type, videoBitsPerSecond: 1500000 });
+        var parts = [];
+        rec.ondataavailable = function (e) { if (e.data && e.data.size) parts.push(e.data); };
+        rec.onstop = function () {
+          URL.revokeObjectURL(src);
+          var blob = new Blob(parts, { type: type });
+          resolve(blob.size && blob.size < file.size ? blob : (file.size > VIDEO_MAX ? null : file));
+        };
+        var raf = 0;
+        function draw() { ctx.drawImage(v, 0, 0, cv.width, cv.height); if (!v.ended) raf = requestAnimationFrame(draw); }
+        v.onended = function () { cancelAnimationFrame(raf); try { rec.stop(); } catch (eS) {} };
+        v.muted = false;
+        v.volume = 0;
+        rec.start(1000);
+        v.play().then(draw).catch(function () { try { rec.stop(); } catch (eS2) {} });
+      };
+    }).then(function (b) {
+      if (!b) throw new Error("Video zu groß (max. 50 MB). Kürzer aufnehmen.");
+      return b;
+    });
+  }
+  function uploadChat(blob, ext) {
+    var st = host && host.storage;
+    if (!st) return Promise.reject(new Error("Upload nicht verfügbar"));
+    var path = (me() || "x") + "/" + Date.now() + "." + ext;
+    return fetch(st.url + "/storage/v1/object/go-chat/" + path, {
+      method: "POST",
+      headers: { apikey: st.key, Authorization: "Bearer " + st.key, "Content-Type": blob.type || (ext === "jpg" ? "image/jpeg" : "video/mp4"), "x-upsert": "true" },
+      body: blob
+    }).then(function (r) {
+      if (!r.ok) return r.text().then(function (t) { throw new Error(/Bucket not found/i.test(t) ? "Speicher fehlt: go-bubble-chat.sql ausführen" : /size|too large|exceeded/i.test(t) ? "Datei zu groß" : "Upload fehlgeschlagen"); });
+      return st.url + "/storage/v1/object/public/go-chat/" + path;
+    });
+  }
+
+  var draft = { media: null, reply: null };
+  function setReply(msg) {
+    draft.reply = msg || null;
+    paintDraft();
+    var f = document.getElementById("gbub-compose");
+    var inp = f && f.querySelector("input[type=text]");
+    if (inp && msg) inp.focus();
+  }
+  function paintDraft() {
+    var f = document.getElementById("gbub-compose");
+    if (!f) return;
+    var q = f.querySelector(".gbub-compose__reply");
+    if (draft.reply) {
+      q.hidden = false;
+      q.querySelector("span").textContent = (draft.reply.who ? draft.reply.who + ": " : "") + (draft.reply.body || (draft.reply.media_url ? (draft.reply.media_kind === "video" ? "Video" : "Foto") : ""));
+    } else q.hidden = true;
+    var pv = f.querySelector(".gbub-compose__prev");
+    pv.textContent = "";
+    if (draft.media) {
+      pv.hidden = false;
+      var el = document.createElement(draft.media.kind === "video" ? "video" : "img");
+      el.src = draft.media.preview;
+      if (draft.media.kind === "video") { el.muted = true; el.playsInline = true; }
+      pv.appendChild(el);
+      var x = document.createElement("button");
+      x.type = "button";
+      x.setAttribute("aria-label", "Entfernen");
+      x.textContent = "×";
+      x.addEventListener("click", function () { draft.media = null; paintDraft(); });
+      pv.appendChild(x);
+    } else pv.hidden = true;
   }
   function mountComposer() {
     ensureCss();
@@ -124,23 +243,64 @@
     var f = document.createElement("form");
     f.id = "gbub-compose";
     f.className = "gbub-compose";
-    f.innerHTML = '<input type="text" maxlength="2000" placeholder="Nachricht an die Bubble" enterkeyhint="send" />' +
-      '<button type="submit" aria-label="Senden"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-2.5-6.5L4 12z"/></svg></button>';
+    f.innerHTML =
+      '<div class="gbub-compose__reply" hidden><span></span><button type="button" data-gbub-noreply aria-label="Antwort abbrechen">×</button></div>' +
+      '<div class="gbub-compose__row">' +
+      '<span class="gbub-compose__prev" hidden></span>' +
+      '<input type="text" maxlength="2000" placeholder="Nachricht an die Bubble" enterkeyhint="send" />' +
+      '<label class="gbub-compose__att" aria-label="Foto oder Video anhängen"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg>' +
+      '<input type="file" accept="image/*,video/*" hidden /></label>' +
+      '<button type="submit" aria-label="Senden"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-2.5-6.5L4 12z"/></svg></button>' +
+      "</div>";
+    var inp = f.querySelector("input[type=text]");
+    /* beim Schreiben die Pill unten ausblenden */
+    inp.addEventListener("focus", function () { document.body.classList.add("gbub-typing"); });
+    inp.addEventListener("blur", function () { setTimeout(function () { if (document.activeElement !== inp) document.body.classList.remove("gbub-typing"); }, 150); });
+    f.querySelector("[data-gbub-noreply]").addEventListener("click", function () { setReply(null); });
+    f.querySelector("input[type=file]").addEventListener("change", function (e) {
+      var file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      var kind = /^video\//.test(file.type) ? "video" : "img";
+      draft.media = { kind: kind, file: file, preview: URL.createObjectURL(file) };
+      paintDraft();
+      inp.focus();
+    });
     f.addEventListener("submit", function (e) {
       e.preventDefault();
-      var inp = f.querySelector("input");
       var t = String(inp.value || "").trim();
-      if (!t) return;
-      var btn = f.querySelector("button");
+      if (!t && !draft.media) return;
+      var btn = f.querySelector("button[type=submit]");
       btn.disabled = true;
-      post(t).then(function () {
+      f.classList.add("is-busy");
+      var media = draft.media;
+      var up = media
+        ? (media.kind === "video"
+            ? shrinkVideo(media.file).then(function (bl) { return uploadChat(bl, /webm/.test(bl.type) ? "webm" : /quicktime/.test(bl.type) ? "mov" : "mp4"); })
+            : shrinkImage(media.file).then(function (bl) { return uploadChat(bl, "jpg"); }))
+        : Promise.resolve("");
+      up.then(function (url) {
+        return post(t, { media_url: url || "", media_kind: media ? media.kind : "", reply_to: draft.reply ? draft.reply.id : "" });
+      }).then(function () {
         inp.value = "";
+        draft.media = null;
+        draft.reply = null;
+        paintDraft();
         if (host.onMessage) host.onMessage();
-      }).catch(function () {
-        toast(missing ? "Bubbles fehlen noch: go-bubbles.sql ausführen" : "Senden ging gerade nicht");
-      }).then(function () { btn.disabled = false; });
+      }).catch(function (err) {
+        var m = String((err && err.message) || "");
+        toast(missing ? "Bubbles fehlen noch: go-bubbles.sql ausführen" : m && !/HTTP|fetch/i.test(m) ? m : "Senden ging gerade nicht");
+      }).then(function () { btn.disabled = false; f.classList.remove("is-busy"); });
     });
     document.body.appendChild(f);
+  }
+
+  /* Melden: landet im Admin unter Nachrichten (go_reports) */
+  function report(msg) {
+    return host.rest("go_reports", {
+      method: "POST", prefer: "return=minimal",
+      body: { kind: "bubble_message", target_id: msg.id, author_id: msg.author_id, reporter_id: me(), body: msg.body || "", media_url: msg.media_url || null }
+    });
   }
 
   /* ---------- Wiki ---------- */
@@ -577,8 +737,21 @@
       ".gbub-compose{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 104px);z-index:60;display:none;gap:8px;align-items:center;padding:6px 6px 6px 16px;border-radius:999px;background:#fff;box-shadow:0 6px 24px rgba(29,22,48,.14)}" +
       "body[data-shell=heute][data-heute=bubble] .gbub-compose{display:flex}" +
       "body.wr-sheet-open .gbub-compose,body.ffc-open .gbub-compose{display:none !important}" +
-      ".gbub-compose input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:500 16px Inter,sans-serif;color:#1D1630}" +
-      ".gbub-compose button{flex:none;width:42px;height:42px;border-radius:50%;border:0;background:#1D1630;color:#fff;display:flex;align-items:center;justify-content:center}" +
+      ".gbub-compose{flex-direction:column;align-items:stretch;border-radius:24px}" +
+      ".gbub-compose__row{display:flex;align-items:center;gap:6px;min-width:0}" +
+      ".gbub-compose input[type=text]{flex:1;min-width:0;border:0;outline:0;background:transparent;font:500 16px Inter,sans-serif;color:#1D1630}" +
+      ".gbub-compose button[type=submit]{flex:none;width:42px;height:42px;border-radius:50%;border:0;background:#1D1630;color:#fff;display:flex;align-items:center;justify-content:center}" +
+      ".gbub-compose.is-busy button[type=submit]{opacity:.5}" +
+      ".gbub-compose__att{flex:none;width:38px;height:42px;display:grid;place-items:center;color:#1D1630;cursor:pointer}" +
+      ".gbub-compose__prev{flex:none;position:relative;width:40px;height:40px;border-radius:10px;overflow:hidden;background:#E9E1D2}" +
+      ".gbub-compose__prev[hidden],.gbub-compose__reply[hidden]{display:none}" +
+      ".gbub-compose__prev img,.gbub-compose__prev video{width:100%;height:100%;object-fit:cover;display:block}" +
+      ".gbub-compose__prev button{position:absolute;top:0;right:0;width:18px;height:18px;padding:0;border:0;border-radius:0 0 0 8px;background:rgba(29,22,48,.75);color:#fff;font:700 13px/18px Inter,sans-serif}" +
+      ".gbub-compose__reply{display:flex;align-items:center;gap:8px;margin:2px 4px 6px 0;padding:6px 10px;border-left:3px solid #1D1630;border-radius:8px;background:#F3EEE4;font:500 13px/1.3 Inter,sans-serif;color:#1D1630}" +
+      ".gbub-compose__reply span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+      ".gbub-compose__reply button{flex:none;border:0;background:none;font:700 16px Inter,sans-serif;color:#1D1630}" +
+      "body.gbub-typing .app-pill{display:none !important}" +
+      "body.gbub-typing .gbub-compose{bottom:calc(env(safe-area-inset-bottom,0px) + 12px)}" +
       /* Kante des ersten Kreises auf das W von Wiki */
       ".gbub-strip{display:none;gap:14px;overflow-x:auto;padding:4px 20px 10px 9px;scrollbar-width:none}" +
       "body[data-heute=bubble] .gbub-strip{display:flex}" +
@@ -621,6 +794,8 @@
     openStory: openStory,
     openWiki: openWiki,
     mountComposer: mountComposer,
+    setReply: setReply,
+    report: report,
     wallet: wallet,
     SOAP_SVG: SOAP_SVG
   };
