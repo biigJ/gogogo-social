@@ -2924,6 +2924,194 @@
     });
   }
 
+  /* ---------- Gruppen-Events (Mitglied): 7 Tage, Gruppen-Events ersetzen dort den Wochenplan ----------
+     „−“ nimmt ein Event wieder heraus (mit Bestätigung), Weiter sagt beim Coach zu. Lässt sich jederzeit wiederholen. */
+  function groupOfMine() { return host && host.myGroups ? (host.myGroups() || [])[0] || null : null; }
+  function myPlanOnDay(iso) {
+    return (state.events || []).filter(function (e) {
+      return e && String(e.user_id) === me() && e.item_type !== "support_session" && e.item_type !== "alternative" &&
+        !e.travel_auto && e.item_type !== "hotel_workout" && dayKey(e.starts_at) === iso && e.status !== "erledigt" &&
+        (e.status !== "ausgefallen" || !!(e.enrollment_id || e.course_id)) && !(e.group_id && e.visibility === "gruppe" && String(e.user_id) !== me());
+    })[0] || null;
+  }
+  function openGroupEventsPick() {
+    var g = groupOfMine();
+    if (!g) return;
+    var days = [];
+    for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
+    openSheet('<p class="wr-sheet-title">Gruppen-Events</p><p class="wr-sheet-hint">Lädt …</p>');
+    var from = days[0] + "T00:00:00" + berlinOffsetSuffix(days[0]);
+    var to = addDays(days[6], 1) + "T00:00:00" + berlinOffsetSuffix(days[6]);
+    rest("events?group_id=eq." + encodeURIComponent(g.id) + "&user_id=neq." + encodeURIComponent(me()) +
+      "&status=eq.geplant&starts_at=gte." + encodeURIComponent(from) + "&starts_at=lt." + encodeURIComponent(to) +
+      "&select=id,user_id,title,category,starts_at,course_id,enrollment_id&order=starts_at.asc&limit=50")
+      .then(function (evs) {
+        evs = evs || [];
+        if (!evs.length) return [evs, []];
+        return rest("event_rsvps?user_id=eq." + encodeURIComponent(me()) + "&event_id=in.(" + evs.map(function (e) { return e.id; }).join(",") + ")&select=event_id,status")
+          .catch(function () { return []; }).then(function (rs) { return [evs, rs || []]; });
+      })
+      .then(function (r) {
+        var going = {};
+        r[1].forEach(function (x) { if (x && x.status === "zugesagt") going[String(x.event_id)] = true; });
+        /* Auswahl: bisher zugesagte bleiben, neue sind vorgeschlagen */
+        state.gev = { group: g, days: days, evs: r[0], going: going, keep: {} };
+        r[0].forEach(function (e) { state.gev.keep[String(e.id)] = true; });
+        paintGroupEventsPick();
+      })
+      .catch(function () {
+        openSheet('<p class="wr-sheet-title">Gruppen-Events</p><p class="wr-sheet-hint">Laden ging gerade nicht.</p>' +
+          '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button></div>');
+      });
+  }
+  function paintGroupEventsPick() {
+    var st = state.gev;
+    if (!st) return;
+    var rows = st.days.map(function (iso) {
+      var d = new Date(iso + "T12:00:00");
+      var label = DAYS_DE[d.getDay()] + " " + d.getDate() + ".";
+      var plan = myPlanOnDay(iso);
+      var gevs = st.evs.filter(function (e) { return dayKey(e.starts_at) === iso && st.keep[String(e.id)]; });
+      if (!gevs.length) {
+        return '<div class="wr-dayrow wr-zrec-row' + (plan ? "" : " is-empty") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " +
+          (plan ? esc(plan.title || "Training") : '<span class="wr-dayrow__free">frei</span>') + "</span></div><span></span></div>";
+      }
+      return gevs.map(function (e, k) {
+        var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
+        return '<div class="wr-dayrow wr-zrec-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k ? "" : label) + "</b> " +
+          "👥 " + esc(e.title || "Training") + esc(tm) + (plan && !k ? ' <s class="wr-dayrow__free">' + esc(plan.title || "") + "</s>" : "") +
+          '</span></div><button type="button" class="wr-dayrow__minus" data-wr-gev-rm="' + esc(e.id) + '" aria-label="Entfernen">−</button></div>';
+      }).join("");
+    }).join("");
+    var any = st.evs.length;
+    openSheet(
+      '<p class="wr-sheet-title">Gruppen-Events</p>' +
+      '<p class="wr-sheet-hint">' + (any ? "Die Events Deiner Gruppe " + esc(st.group.name || "") + " ersetzen an diesen Tagen Deinen Wochenplan. Mit − nimmst Du eins heraus." : "Diese Woche gibt es keine Gruppen-Events.") + "</p>" +
+      '<div class="wr-days wr-days--all">' + rows + "</div>" +
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Verlassen</button>' +
+      (any ? '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-gev-save="1">Weiter</button>' : "") + "</div>"
+    );
+    bindGroupSheet();
+  }
+  function saveGroupEventsPick(btn) {
+    var st = state.gev;
+    if (!st) return;
+    if (btn) btn.disabled = true;
+    var jobs = [];
+    st.evs.forEach(function (e) {
+      var id = String(e.id);
+      var iso = dayKey(e.starts_at);
+      var plan = myPlanOnDay(iso);
+      if (st.keep[id] && !st.going[id]) {
+        jobs.push(rest("event_rsvps?on_conflict=event_id,user_id", {
+          method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+          body: { event_id: id, user_id: me(), status: "zugesagt" }
+        }).then(function () {
+          /* Ersatz für den Wochenplan an diesem Tag */
+          if (plan && plan.status === "geplant" && /^[0-9a-f-]{36}$/i.test(String(plan.id))) {
+            return rest("events?id=eq." + encodeURIComponent(plan.id) + "&user_id=eq." + encodeURIComponent(me()), {
+              method: "PATCH", prefer: "return=minimal", body: { status: "ausgefallen" }
+            });
+          }
+        }));
+      } else if (!st.keep[id] && st.going[id]) {
+        jobs.push(rest("event_rsvps?event_id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(me()), {
+          method: "DELETE", prefer: "return=minimal"
+        }).then(function () {
+          /* herausgenommen: Plan-Einheit dieses Tages wieder geplant, wenn kein anderes Gruppen-Event bleibt */
+          var other = st.evs.some(function (o) { return String(o.id) !== id && dayKey(o.starts_at) === iso && st.keep[String(o.id)]; });
+          if (!other && plan && plan.status === "ausgefallen" && (plan.enrollment_id || plan.course_id)) {
+            return rest("events?id=eq." + encodeURIComponent(plan.id) + "&user_id=eq." + encodeURIComponent(me()), {
+              method: "PATCH", prefer: "return=minimal", body: { status: "geplant" }
+            });
+          }
+        }));
+      }
+    });
+    Promise.all(jobs).then(function () {
+      closeSheet();
+      if (host.toast) host.toast(jobs.length ? "Beim Coach zugesagt" : "Nichts geändert");
+      return refresh().then(notifyAktuell);
+    }).catch(function () {
+      if (btn) btn.disabled = false;
+      if (host.toast) host.toast("Speichern ging gerade nicht");
+    });
+  }
+
+  /* ---------- zusätzliche Gruppen-Events (Coach): eigene Trainings der 7 Tage, geteilte markiert,
+     an Tagen ohne Gruppen-Event ein freies Feld → Kraft oder Ausdauer wählen. Nichts verschiebbar. ---------- */
+  function openGroupExtras() {
+    var g = groupOfMine();
+    if (!g) return;
+    var days = [];
+    for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
+    state.gextra = { group: g, days: days };
+    var rows = days.map(function (iso) {
+      var d = new Date(iso + "T12:00:00");
+      var label = DAYS_DE[d.getDay()] + " " + d.getDate() + ".";
+      var mine = (state.events || []).filter(function (e) {
+        return e && String(e.user_id) === me() && dayKey(e.starts_at) === iso && e.status !== "ausgefallen" &&
+          e.item_type !== "support_session";
+      }).sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
+      var shared = mine.filter(function (e) { return e.visibility === "gruppe" && String(e.group_id || "") === String(g.id); });
+      var html = mine.map(function (e, k) {
+        var isSh = shared.indexOf(e) >= 0;
+        var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
+        return '<div class="wr-dayrow wr-zrec-row' + (isSh ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k ? "" : label) + "</b> " +
+          (isSh ? "👥 " : "") + esc(e.title || "Training") + esc(tm) + "</span>" +
+          (isSh ? '<span class="wr-dayrow__tag">in der Gruppe</span>' : "") + "</div><span></span></div>";
+      }).join("");
+      if (!shared.length) {
+        html += '<button type="button" class="wr-dayrow wr-zrec-row wr-dayrow--add" data-wr-gextra-add="' + iso + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' +
+          (mine.length ? "" : label) + '</b> <span class="wr-dayrow__free">+ Gruppen-Event</span></span></div><span></span></button>';
+      }
+      return html;
+    }).join("");
+    openSheet(
+      '<p class="wr-sheet-title">Zusätzliche Gruppen-Events</p>' +
+      '<p class="wr-sheet-hint">Markiert: schon mit ' + esc(g.name || "Deiner Gruppe") + " geteilt. Im freien Feld legst Du ein zusätzliches Event an, Deine Gruppe kann es unter Gruppen-Events wählen.</p>" +
+      '<div class="wr-days wr-days--all">' + rows + "</div>" +
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Fertig</button></div>'
+    );
+    bindGroupSheet();
+  }
+  function groupExtraAdd(iso) {
+    var g = state.gextra && state.gextra.group;
+    if (!g || !global.GoDialog) return;
+    GoDialog.choose("Gruppen-Event am " + DAYS_DE[new Date(iso + "T12:00:00").getDay()], [
+      { label: "Kraft", value: "kraft" },
+      { label: "Ausdauer", value: "ausdauer" }
+    ], { center: true }).then(function (kind) {
+      if (!kind) return;
+      setTimeout(function () {
+        openKindSheet(kind, iso);
+        /* Auswahl läuft über die normale Liste; beim Speichern wird es ein Gruppen-Event (ohne den Wochenplan zu ändern) */
+        state.groupExtraNext = g.id;
+      }, 0);
+    });
+  }
+  function bindGroupSheet() {
+    var card = $("wr-sheet-card");
+    if (card) card.classList.add("wr-sheet__card--days");
+    if (!card || card._wrGevBound) return;
+    card._wrGevBound = true;
+    card.addEventListener("click", function (e) {
+      var rm = e.target.closest("[data-wr-gev-rm]");
+      if (rm && state.gev) {
+        e.stopPropagation();
+        var id = rm.getAttribute("data-wr-gev-rm");
+        var ev = state.gev.evs.filter(function (x) { return String(x.id) === id; })[0] || {};
+        GoDialog.confirm("„" + (ev.title || "Gruppen-Event") + "“ herausnehmen?", { body: "Du sagst für dieses Event nicht zu. Dein Wochenplan gilt an dem Tag wieder.", ok: "Entfernen", cancel: "Abbrechen", row: true })
+          .then(function (yes) { if (yes) { state.gev.keep[id] = false; paintGroupEventsPick(); } });
+        return;
+      }
+      var sv = e.target.closest("[data-wr-gev-save]");
+      if (sv) { e.stopPropagation(); saveGroupEventsPick(sv); return; }
+      var add = e.target.closest("[data-wr-gextra-add]");
+      if (add) { e.stopPropagation(); groupExtraAdd(add.getAttribute("data-wr-gextra-add")); return; }
+    });
+  }
+
   function openDaysEditor() {
     var days = [];
     for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
@@ -3767,6 +3955,8 @@
 
   function closeSheet() {
     var sheet = $("wr-sheet");
+    /* abgebrochenes „+ Gruppen-Event“: nächstes normales Anlegen ist wieder privat/Team */
+    state.groupExtraNext = null;
     if (sheet) sheet.hidden = true;
     document.body.classList.remove("wr-sheet-open");
   }
@@ -3912,8 +4102,9 @@
     }
 
     function syncPlanAfterSave(body) {
-      /* Reise-Alternativen dürfen den Wochenplan nicht überschreiben */
+      /* Reise-Alternativen und zusätzliche Gruppen-Events dürfen den Wochenplan nicht überschreiben */
       if (body && body.travel_auto) return Promise.resolve();
+      if (p.groupExtra) return Promise.resolve();
       if (!host || !host.syncPlanDay || !p.iso) return Promise.resolve();
       return Promise.resolve(
         host.syncPlanDay(p.iso, {
@@ -3925,6 +4116,8 @@
     }
 
     function saveOrReplace(body) {
+      /* Coach: zusätzliches Gruppen-Event (für die Gruppe sichtbar, Mitglieder wählen es unter Gruppen-Events) */
+      if (p.groupExtra && body) { body.visibility = "gruppe"; body.group_id = p.groupExtra; replaceId = null; }
       function after() {
         return syncPlanAfterSave(body).then(finish);
       }
@@ -4317,8 +4510,10 @@
       iso: iso,
       slug: slug,
       title: title,
-      replaceId: replaceId
+      replaceId: replaceId,
+      groupExtra: state.groupExtraNext || null
     };
+    state.groupExtraNext = null;
     openCreateTimeSheet();
   }
 
@@ -4905,6 +5100,7 @@
       travel_auto: !!payload.travel_auto
     };
     if (payload.note) body.note = payload.note;
+    if (payload.group_id) body.group_id = payload.group_id;
     return rest("events", {
       method: "POST",
       prefer: "return=representation",
@@ -5479,6 +5675,10 @@
         items.push({ info: "Zirkeltraining am: " + (zDays.length ? zDays.join(", ") : "–") });
         items.push({ label: "Zirkeltrainings eintragen", value: "zrec" });
         items.push({ label: "Zirkeltrainings bearbeiten", value: "zedit" });
+        /* Gruppe: Mitglieder übernehmen Gruppen-Events, der Ersteller (Coach) trägt zusätzliche ein */
+        var myGrp = host && host.myGroups ? (host.myGroups() || [])[0] : null;
+        if (myGrp && String(myGrp.owner || "") !== me()) items.push({ label: "Gruppen-Events", value: "gev" });
+        if (myGrp && String(myGrp.owner || "") === me()) items.push({ label: "zusätzliche Gruppen-Events", value: "gextra" });
         GoDialog.choose("Deine Woche", items, {
           center: true,
           sub: planNames.length ? planNames.join(" · ") : "Kein Wochenplan"
@@ -5489,6 +5689,8 @@
             if (v === "days") openDaysEditor();
             if (v === "zrec") openZirkelRecurring();
             if (v === "zedit") openZirkelEditor();
+            if (v === "gev") openGroupEventsPick();
+            if (v === "gextra") openGroupExtras();
           }, 0);
         });
         return;
