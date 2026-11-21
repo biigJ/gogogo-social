@@ -407,7 +407,13 @@
     st.orgs = st.orgs || {};
     st.orgs[kind] = "loading";
     return host.rest("rpc/" + ORG[kind].list, { method: "POST", body: {} })
-      .then(function (rows) { if (st) { st.orgs[kind] = rows || []; paint(); } })
+      .then(function (rows) {
+        if (!st) return;
+        /* Altlast ohne Ersteller und ohne Mitglieder (z. B. „Joschas Kreis“, an der alten Tabelle users) ausblenden */
+        if (kind === "group") rows = (rows || []).filter(function (g) { return (g.owner && g.owner.id) || (g.members || []).length; });
+        st.orgs[kind] = rows || [];
+        paint();
+      })
       .catch(function () { if (st) { st.orgs[kind] = "error"; paint(); } });
   }
   function orgById(kind, gid) {
