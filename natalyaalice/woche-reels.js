@@ -3078,7 +3078,9 @@
       state.media.edit = null;
       paintMediaSheet();
       var msg = done.length === 2 ? "Foto und Video-Link gespeichert" : done.length ? done[0] + " gespeichert" : "Gespeichert";
-      if (global.GoDialog) GoDialog.alert(msg); else if (host.toast) host.toast(msg);
+      /* go-exercise-media-review.sql: für mich sofort, für alle nach Freigabe im Admin */
+      if (global.GoDialog) GoDialog.alert(msg, done.length ? { body: "Du siehst es ab jetzt bei der Übung. Für alle anderen erscheint es nach der Freigabe." } : {});
+      else if (host.toast) host.toast(msg);
     }).catch(function (err) {
       if (btn) btn.disabled = false;
       var m = String((err && err.message) || "");
