@@ -15,6 +15,8 @@
  *   Stufen: 0 normal · 1 Gelb · 2 Gelb-Orange · 3 Rot
  *   Ziffer (nur am eigenen Kreis): Tage am Stück, an denen abgehakt wurde. Tage ohne Event zählen nicht und
  *   brechen nicht ab; ein Tag mit offenem oder ausgefallenem Event bricht ab. Heute zählt erst, wenn abgehakt.
+ *   Verschoben (auch einmal): ab 0:00 steht die Ziffer auf 0, außer an dem Tag wurde etwas abgehakt
+ *   oder ein Event von Freunden mitgemacht, das abgeschlossen ist (event_rsvps zugesagt + erledigt).
  *   Verschieben merkt sich die Datenbank in events.moved_days (go-tamagotchi.sql).
  */
 (function (global) {
@@ -50,8 +52,10 @@
   }
 
   function compute(rows, todayIso) {
-    var done = {}, missed = {}, cancelled = {}, moved = {}, other = {};
+    var done = {}, missed = {}, cancelled = {}, moved = {}, other = {}, movedAny = {};
     (rows || []).forEach(function (r) {
+      /* jedes Verschieben (auch das erste) bricht die Serie um 0:00 – außer am Tag wurde etwas abgeschlossen */
+      (r.moved_days || []).forEach(function (m) { movedAny[String(m).slice(0, 10)] = true; });
       /* erstes Verschieben je Event ist frei; ab dem zweiten zählt es (Tag liegt evtl. in der Zukunft → heute) */
       (r.moved_days || []).forEach(function (m, i) {
         if (i < 1) return;
@@ -80,7 +84,7 @@
     for (var k = todayIso; k >= start; k = addDays(k, -1)) {
       if (done[k]) { days += 1; continue; }
       if (k === todayIso) continue;
-      if (missed[k] || (cancelled[k] && !other[k])) break;
+      if (missed[k] || (cancelled[k] && !other[k]) || movedAny[k]) break;
     }
     return { level: level, weeks: days };
   }
@@ -104,10 +108,18 @@
       noMovedCol = true;
       return host.rest(base);
     });
-    q.then(function (rows) {
+    /* mitgemachte Events von Freunden, die abgeschlossen sind, zählen wie eigene erledigte */
+    var joined = host.rest("event_rsvps?user_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&status=eq.zugesagt" +
+      "&select=user_id,events(starts_at,status)&limit=2000").catch(function () { return []; });
+    Promise.all([q, joined]).then(function (res) {
+      var rows = res[0];
       var by = {};
       ids.forEach(function (id) { by[id] = []; });
       (rows || []).forEach(function (r) { if (by[r.user_id]) by[r.user_id].push(r); });
+      (res[1] || []).forEach(function (j) {
+        var e = j && j.events;
+        if (e && e.status === "erledigt" && by[j.user_id] && String(e.starts_at) >= from) by[j.user_id].push({ starts_at: e.starts_at, status: "erledigt" });
+      });
       ids.forEach(function (id) { cache[id] = compute(by[id], t); });
       if (host.onChange) host.onChange();
     }).catch(function () {
