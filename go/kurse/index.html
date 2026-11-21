@@ -145,6 +145,10 @@
     .erow__t { font-size: 15px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
     .epill { flex: none; align-self: center; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--ink); color: var(--ink); white-space: nowrap; }
     .epill.is-fill { background: var(--ink); color: #F6F1E8; }
+    .erow__acts { flex: none; align-self: center; display: flex; gap: 2px; }
+    .ico { width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink); display: grid; place-items: center; }
+    .ico:hover { background: rgba(42,33,28,.08); }
+    .ico--del { color: var(--accent); }
     .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }
     .chip { padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--ink); background: transparent; color: var(--ink); font-size: 13px; font-weight: 600; }
     .chip.is-on { background: var(--ink); color: #F6F1E8; }
@@ -485,6 +489,12 @@
       var lv = ["l1", "l2", "l3"].filter(function (k) { return on[k]; });
       return !lv.length || lv.indexOf("l" + c.level) >= 0;
     }
+    var ICON_COPY = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>';
+    var ICON_DEL = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
+    function actsHtml(kind, id) {
+      return '<span class="erow__acts"><button type="button" class="ico" data-rcopy="' + kind + "|" + esc(id) + '" aria-label="Kopieren" title="Kopieren">' + ICON_COPY + "</button>" +
+        '<button type="button" class="ico ico--del" data-rdel="' + kind + "|" + esc(id) + '" aria-label="Löschen" title="Löschen">' + ICON_DEL + "</button></span>";
+    }
     function rectHtml(url, ph) {
       return '<span class="erect">' + (url ? '<img src="' + esc(url) + '" alt="" loading="lazy" />' : esc(ph || "")) + "</span>";
     }
@@ -501,7 +511,6 @@
       if (state.pick && state.view === "units") return renderPicker(box);
       var v = state.view, on = chipsOn(v), html = "";
       var tools = '<div class="list-tools"><span class="grow"></span>' +
-        (v === "units" ? '<button type="button" class="ghost" id="list-copy"' + (currentUnitId() ? "" : " disabled") + ">Kopieren</button>" : "") +
         '<button type="button" id="list-new">Neu</button></div>' + chipsHtml(v);
       if (v === "plans") {
         html = plans().filter(function (c) {
@@ -516,7 +525,7 @@
             "<span>" + esc(mixText(mixOf(c))) + "</span>" +
             "<span>" + (c.level ? "Level " + c.level : "ohne Level") + (c.is_public ? " · Nutzer" : "") + "</span>" +
             (goals.length ? "<span>" + esc(goals.join(" · ")) + "</span>" : "") + "</div>" +
-            '<span class="epill' + (c.is_active ? " is-fill" : "") + '">' + (c.is_active ? "Katalog" : "Entwurf") + "</span></div>";
+            '<span class="epill' + (c.is_active ? " is-fill" : "") + '">' + (c.is_active ? "Katalog" : "Entwurf") + "</span>" + actsHtml("plan", c.id) + "</div>";
         }).join("");
       } else if (v === "units") {
         var cats = ["kraft", "ausdauer"].filter(function (k) { return on[k]; });
@@ -534,7 +543,7 @@
             '<div class="erow__c"><span class="erow__t">' + esc(c.title) + "</span>" +
             "<span>" + esc(catLabel(c.category_default)) + (c.level ? " · Level " + c.level : "") + "</span>" +
             "<span>" + (n ? n + (n === 1 ? " Übung" : " Übungen") : "noch keine Übungen") + "</span></div>" +
-            '<span class="epill' + (c.is_active ? " is-fill" : "") + '">' + (c.is_active ? "Katalog" : "Entwurf") + "</span></div>";
+            '<span class="epill' + (c.is_active ? " is-fill" : "") + '">' + (c.is_active ? "Katalog" : "Entwurf") + "</span>" + actsHtml("unit", c.id) + "</div>";
         }).join("");
       } else if (v === "exercises") {
         html = exerciseRows(on, false);
@@ -565,7 +574,7 @@
           "<span>" + (e.units.length ? "in " + e.units.length + (e.units.length === 1 ? " Event" : " Events") : "in keinem Event") + "</span>" +
           "<span>" + (url ? "Video ✓" : "ohne Video") + "</span>" +
           (picked ? "<span>Jetzt „+ Übung“ im gewünschten Block tippen: sie kommt oben in den Block.</span>" + (e.cue ? "<span>" + esc(e.cue) + "</span>" : "") : "") +
-          "</div></div>";
+          "</div>" + (pickMode ? "" : actsHtml("ex", e.key)) + "</div>";
       }).join("");
     }
     /* Übungsauswahl links (statt Eventliste), solange im Event „+ Übung“ aktiv ist */
@@ -599,6 +608,14 @@
         return;
       }
       if (e.target.closest("#pick-close")) { closePicker(); return; }
+      var rc = e.target.closest("[data-rcopy]"), rd = e.target.closest("[data-rdel]");
+      if (rc || rd) {
+        var parts = (rc || rd).getAttribute(rc ? "data-rcopy" : "data-rdel").split("|");
+        var kind = parts[0], rid = parts.slice(1).join("|");
+        if (rc) { if (kind === "unit") copyUnit(rid); else if (kind === "plan") copyPlan(rid); else copyExercise(rid); }
+        else { if (kind === "ex") deleteExercise(rid); else { var cc = byId(rid); if (cc) deleteCourse(cc, kind === "unit"); } }
+        return;
+      }
       var vid = e.target.closest("[data-exvid]");
       if (vid) { GoExMedia.open(vid.getAttribute("data-exvid")); return; }
       var pe = e.target.closest("[data-pickex]");
@@ -645,6 +662,55 @@
     }
     makeSplit($("split"), $("panes"), "--lw", "kurse_lw", 280, 0.7);
 
+    /* Wochenplan kopieren: „(Kopie) Titel“, gleiche Tage, noch nicht im Katalog */
+    function copyPlan(id) {
+      var c = byId(id);
+      if (!c) return;
+      var f = { title: "(Kopie) " + c.title, category_default: c.category_default || "kraft", level: c.level || null, description: c.description || null,
+        image_url: c.image_url || null, sessions_per_week: c.sessions_per_week || 7, is_active: false };
+      if (state.newCols) { f.goals = c.goals || []; f.is_public = false; }
+      insertCourse(f).then(function (nc) {
+        var rows = (c.course_sessions || []).map(function (s) {
+          return { course_id: nc.id, block_no: s.block_no, session_no: s.session_no, is_travel: !!s.is_travel, title: s.title, category: s.category,
+            unit_course_id: s.unit_course_id || null, blocks: s.blocks || [] };
+        });
+        return (rows.length ? rest("course_sessions", { method: "POST", prefer: "return=minimal", body: rows }) : Promise.resolve()).then(function () { return nc; });
+      })
+        .then(function (nc) { return loadAll().then(function () { location.hash = "plan/" + nc.id; toast("Kopie angelegt, noch nicht im Katalog"); }); })
+        .catch(function (err) { toast(err.message); });
+    }
+    /* Übung kopieren: „(Kopie) Name“ mit Block, Hinweis und Video */
+    function copyExercise(key) {
+      var e = state.exIndex[key];
+      if (!e) return;
+      var name = "(Kopie) " + e.name;
+      var url = GoExMedia.urlFor(e.name);
+      rest("go_exercise_catalog?on_conflict=name_key", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+        body: { name_key: exKey(name), name: name, block_type: e.block || null, cue: e.cue || null, created_by: me.id } })
+        .then(function () { return url ? saveVideo(name, url) : null; })
+        .then(loadAll)
+        .then(function () { location.hash = "ex/" + encodeURIComponent(exKey(name)); toast("Kopie angelegt"); })
+        .catch(function (err) { toast(err.message); });
+    }
+    /* Übung löschen: nur, wenn sie in keinem Event steckt (sonst Namen der Events nennen) */
+    function deleteExercise(key) {
+      var e = state.exIndex[key];
+      if (!e) return;
+      if (e.units.length) {
+        var names = e.units.map(function (id) { var u = byId(id); return u ? "„" + u.title + "“" : ""; }).filter(Boolean);
+        GoDialog.alert("„" + e.name + "“ lässt sich nicht löschen. Steckt in " + names.length + (names.length === 1 ? " Event: " : " Events: ") + names.join(", ") + ". Erst dort entfernen.");
+        return;
+      }
+      GoDialog.confirm("Übung „" + e.name + "“ endgültig löschen? Das Video dazu fällt mit weg.", { ok: "Löschen" }).then(function (ok) {
+        if (!ok) return;
+        Promise.all([
+          rest("go_exercise_catalog?name_key=eq." + encodeURIComponent(key), { method: "DELETE", prefer: "return=minimal" }),
+          rest("go_exercise_media?name_key=eq." + encodeURIComponent(GoExMedia.key(e.name)), { method: "DELETE", prefer: "return=minimal" }).catch(function () {})
+        ]).then(function () { GoExMedia.set(e.name, ""); return loadAll(); })
+          .then(function () { if (/^ex\//.test(decodeURIComponent(location.hash.slice(1)))) location.hash = "exercises"; else renderListOnly(); toast("Gelöscht"); })
+          .catch(function (err) { toast(err.message); });
+      });
+    }
     /* Event kopieren: „(Kopie) Titel“, gleiche Übungen, noch nicht im Katalog */
     function copyUnit(id) {
       var c = byId(id);
@@ -801,13 +867,20 @@
       var check = isUnit
         ? rest("course_sessions?unit_course_id=eq." + c.id + "&select=course_id").then(function (rows) {
             var n = {}; (rows || []).forEach(function (r) { if (r.course_id !== c.id) n[r.course_id] = 1; });
-            return Object.keys(n).length ? "Steckt in " + Object.keys(n).length + " Wochenplan/-plänen. Erst dort austauschen." : "";
+            var names = Object.keys(n).map(function (id) { var p = byId(id); return p ? "„" + p.title + "“" : "ein gelöschter Plan"; });
+            return names.length ? "Steckt in " + names.length + (names.length === 1 ? " Wochenplan: " : " Wochenplänen: ") + names.join(", ") + ". Erst dort austauschen." : "";
           })
-        : rest("enrollments?course_id=eq." + c.id + "&status=eq.aktiv&select=id").then(function (rows) {
-            return (rows || []).length ? (rows.length + " Person(en) nutzen den Plan gerade. Erst beenden oder „im Katalog sichtbar“ ausschalten.") : "";
+        : rest("enrollments?course_id=eq." + c.id + "&status=eq.aktiv&select=user_id").then(function (rows) {
+            if (!(rows || []).length) return "";
+            var ids = rows.map(function (r) { return r.user_id; });
+            return rest("go_accounts?id=in.(" + ids.join(",") + ")&select=name").catch(function () { return []; }).then(function (acc) {
+              var names = (acc || []).map(function (a) { return String(a.name || "").split(" ")[0]; }).filter(Boolean);
+              return rows.length + (rows.length === 1 ? " Person nutzt" : " Personen nutzen") + " den Plan gerade" + (names.length ? " (" + names.join(", ") + ")" : "") +
+                ". Erst beenden oder „im Katalog sichtbar“ ausschalten.";
+            });
           });
       check.then(function (blocked) {
-        if (blocked) { toast(blocked); return; }
+        if (blocked) { GoDialog.alert("„" + c.title + "“ lässt sich nicht löschen. " + blocked); return; }
         return GoDialog.confirm("„" + c.title + "“ endgültig löschen?", { ok: "Löschen" }).then(function (ok) {
           if (!ok) return;
           /* Hartes Löschen scheitert, sobald es erledigte Trainings mit diesem Plan gibt
