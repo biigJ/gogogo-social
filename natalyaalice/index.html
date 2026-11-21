@@ -8529,7 +8529,7 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-23"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-24"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-3"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-16"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
@@ -15769,6 +15769,41 @@
           row.appendChild(avg);
           return row;
         }
+        /* HYROX Doubles des Circles (go-hyrox-doubles.sql): fließen ins Double-Leaderboard und in die Aufzeichnungen */
+        var hxdCache = { gid: null, rows: null };
+        function hxdRows() {
+          var ready = window.__goCircleReady ? Promise.resolve(window.__goCircleReady()).catch(function () {}) : Promise.resolve();
+          return ready.then(hxdRowsNow);
+        }
+        function hxdRowsNow() {
+          var gid = window.__goCircleGid ? window.__goCircleGid() : null;
+          if (!gid) return Promise.resolve([]);
+          if (hxdCache.gid === gid && hxdCache.rows) return Promise.resolve(hxdCache.rows);
+          return rest("rpc/go_circle_hyrox_doubles", { method: "POST", body: { p_group: gid } })
+            .catch(function () { return []; })
+            .then(function (rows) { hxdCache = { gid: gid, rows: rows || [] }; return hxdCache.rows; });
+        }
+        function hxdNames(row) { return String(row.team || "").split(/\s*&\s*/); }
+        function hxdScore(row) { return window.GoHyroxDoubles ? GoHyroxDoubles.score(row) : { total: 0, n: 0, stations: [] }; }
+        /* Aufzeichnung wie aus FFC: Datum, Punkte, Runden = Stationen */
+        function hxdSessions(rows) {
+          var me = sessionAccount ? String(sessionAccount.id) : "";
+          return (rows || []).filter(function (r) { return (r.account_ids || []).map(String).indexOf(me) >= 0; }).map(function (r) {
+            var sc = hxdScore(r);
+            var names = hxdNames(r);
+            var i = (r.account_ids || []).map(String).indexOf(me);
+            var partner = names[i === 0 ? 1 : 0] || "";
+            var d = new Date(r.day + "T12:00:00");
+            return {
+              id: "hxd-" + r.id, hxd: true, date: r.day + "T12:00:00Z",
+              dateLabel: d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) + " · " + (r.title || "HYROX Double") + (partner ? " mit " + partner : ""),
+              points: sc.total, workSec: Number(r.work_sec) || 360, restSec: Number(r.rest_sec) || 60, rounds: sc.stations.length,
+              lines: sc.stations.map(function (st, k) {
+                return { label: "R" + (k + 1) + " · " + st.label, value: Number(st.value).toLocaleString("de-DE") + " " + st.unit + (st.points != null ? " · " + st.points + " P" : "") };
+              })
+            };
+          });
+        }
         function lbRow(rank, name, right, me) {
           var row = document.createElement("div");
           row.className = "go-slide__ffc-row" + (me ? " is-me" : "");
@@ -15810,10 +15845,26 @@
             var inCircle = {};
             ci.ids.forEach(function (id) { inCircle[id] = true; });
             if (lbMode === "double") {
-              return loadDoublePairs(lbAvg).then(function (res) {
+              return Promise.all([loadDoublePairs(lbAvg), hxdRows()]).then(function (pack) {
+                var res = pack[0] || {};
                 list.textContent = "";
-                if (res.missing) { list.textContent = "Punkte für Double brauchen go-ffc-punkte.sql in Supabase."; return; }
-                var inC = (res.pairs || []).filter(function (pr) { return pr.ids.every(function (id) { return inCircle[id]; }); });
+                var inC = (res.missing ? [] : (res.pairs || [])).filter(function (pr) { return pr.ids.every(function (id) { return inCircle[id]; }); });
+                /* HYROX Doubles: je Team und Termin die Summe der Stationspunkte (100 = Elite-Double in 6 Min) */
+                var hxdFrom = lbAvg === "last" ? "" : from;
+                var byKey = {};
+                (pack[1] || []).forEach(function (r) {
+                  if (r.category === "nicht gewertet") return;
+                  if (hxdFrom && String(r.day) < hxdFrom) return;
+                  var sc = hxdScore(r);
+                  if (!sc.n) return;
+                  var ids = (r.account_ids || []).map(String);
+                  var key = ids.slice().sort().join("|") + "|" + r.category;
+                  var pr = byKey[key] || (byKey[key] = { ids: ids, names: hxdNames(r), days: {}, dayPoints: {}, count: 0, points: 0, cat: r.category, me: ids.indexOf(meId) >= 0 });
+                  if (!pr.days[r.day]) { pr.days[r.day] = true; pr.count += 1; }
+                  pr.dayPoints[r.day] = (pr.dayPoints[r.day] || 0) + sc.total;
+                  pr.points += sc.total;
+                });
+                Object.keys(byKey).forEach(function (k) { inC.push(byKey[k]); });
                 if (circleFrom) {
                   /* nur Double-Tage ab Gründung des Circles */
                   inC = inC.map(function (pr) {
@@ -15840,12 +15891,28 @@
                   })
                   .sort(function (x, y) { return (y.avg || 0) - (x.avg || 0); });
                 if (!pairs.length) { list.textContent = "Noch kein Double im Circle in diesem Zeitraum."; return; }
-                pairs.forEach(function (pr, i) {
-                  var val = pr.avg != null ? pr.avg.toLocaleString("de-DE") + " P" : "–";
-                  list.appendChild(lbRow(i + 1, pr.names.join(" + "),
-                    lbAvg === "month" ? (pr.avg != null ? "ø " : "") + val + " · " + pr.count + "×"
-                    : lbAvg === "week" ? (pr.avg != null ? "Σ " : "") + val + " · " + pr.count + "×"
-                    : val, pr.me));
+                /* je Kategorie (HYROX: Männer, Mix, Frauen; Zirkel-Doubles ohne Kategorie), Namen einzeln, „Du“ an Deiner Stelle */
+                var groups = ["Männer", "Mix", "Frauen", ""];
+                var multi = pairs.some(function (pr) { return pr.cat; });
+                groups.forEach(function (cat) {
+                  var gl = pairs.filter(function (pr) { return (pr.cat || "") === cat; });
+                  if (!gl.length) return;
+                  if (multi) {
+                    var hcat = document.createElement("p");
+                    hcat.className = "hxd-cat";
+                    hcat.textContent = cat || "Zirkel";
+                    list.appendChild(hcat);
+                  }
+                  gl.forEach(function (pr, i) {
+                    var val = pr.avg != null ? Math.round(pr.avg).toLocaleString("de-DE") + " P" : "–";
+                    var nm = pr.ids.map(function (id, k) { return String(id) === meId ? "Du" : (pr.names[k] || "Partner"); }).join(" + ");
+                    var rowEl = lbRow(i + 1, nm,
+                      lbAvg === "month" ? (pr.avg != null ? "ø " : "") + val + " · " + pr.count + "×"
+                      : lbAvg === "week" ? (pr.avg != null ? "Σ " : "") + val + " · " + pr.count + "×"
+                      : val, false);
+                    if (pr.me) rowEl.classList.add("is-me");
+                    list.appendChild(rowEl);
+                  });
                 });
               });
             }
@@ -16075,6 +16142,7 @@
         }
         function reloadLb() {
           circleInfo = null;
+          hxdCache = { gid: null, rows: null };
           paintLb();
         }
         function reloadLbOld() {
@@ -16166,7 +16234,7 @@
             var hd = document.createElement("span");
             hd.textContent = s.dateLabel || "Training";
             head.appendChild(hd);
-            if (FFC.editHistoryAmount && (s.lines || []).length) {
+            if (FFC.editHistoryAmount && (s.lines || []).length && !s.hxd) {
               var pen = document.createElement("button");
               pen.type = "button";
               pen.className = "go-rec-detail__pen" + (editing ? " is-on" : "");
@@ -16314,10 +16382,12 @@
           });
         var recPromise =
           FFC.historyRecords
-            ? Promise.all([Promise.resolve(FFC.historyRecords()), loadDoubleDays()])
+            ? Promise.all([Promise.resolve(FFC.historyRecords()), loadDoubleDays(), hxdRows()])
                 .then(function (r) {
-                  allRecSessions = r[0] || [];
+                  var hx = hxdSessions(r[2]);
+                  allRecSessions = (r[0] || []).concat(hx).sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
                   doubleDays = r[1] || {};
+                  hx.forEach(function (x) { doubleDays[recDay(x.date)] = true; });
                   paintRecFiltered();
                 })
                 .catch(function () {
@@ -19320,19 +19390,8 @@
               ? ""
               : "Nach dem Buchen erscheinen hier Deine Aufzeichnungen.";
             recSec.appendChild(recBox);
-            /* HYROX Doubles des Circles (go-hyrox-doubles.sql), nur sichtbar, wenn es Termine gibt */
-            var hxdSec = document.createElement("section");
-            hxdSec.hidden = true;
-            hxdSec.innerHTML = "<h3>HYROX Doubles</h3>";
-            var hxdBox = document.createElement("div");
-            hxdBox.className = "go-slide__ffc-plain hxd";
-            hxdSec.appendChild(hxdBox);
             ffcWrap.appendChild(lbSec);
-            ffcWrap.appendChild(hxdSec);
             ffcWrap.appendChild(recSec);
-            if (window.GoHyroxDoubles) {
-              GoHyroxDoubles.mount(hxdBox, { rest: rest, group: function () { var g = circleCurrent(); return g ? g.group_id : null; } });
-            }
             card.appendChild(ffcWrap);
             if (ffcLogged) {
               /* Sofort füllen — kein „Lade…“-Zwischenzustand der flackert */
@@ -20185,7 +20244,7 @@
               applyCircleCover();
               return setJob;
             })
-            .then(function () { ensureCircleRow(); paintCircleEvents(); if (window.GoHyroxDoubles) GoHyroxDoubles.refresh(); });
+            .then(function () { ensureCircleRow(); paintCircleEvents(); });
         }).catch(function () {});
       }
       /* Einmal je Sitzung: eigene FFC-Circles an gogogo melden (Admin → Circles); vom Admin hinzugefügte Circles:
@@ -20217,7 +20276,6 @@
           applyCircleCover();
           ensureCircleRow();
           paintCircleEvents();
-          if (window.GoHyroxDoubles) GoHyroxDoubles.refresh();
           if (window.__goZirkelLbReload) window.__goZirkelLbReload();
         });
       }
@@ -20283,6 +20341,8 @@
         var adminIds = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
         return !!(sessionAccount.is_admin || adminIds.indexOf(String(sessionAccount.id)) !== -1);
       }
+      window.__goCircleGid = function () { var g = circleCurrent(); return g ? String(g.group_id) : null; };
+      window.__goCircleReady = function () { return cst().loaded ? Promise.resolve() : loadCircleState(); };
       function circleSettings(g) {
         return g ? cst().settings[String(g.group_id)] || null : null;
       }
