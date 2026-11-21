@@ -142,6 +142,15 @@
         card.appendChild(face);
       }
       text(card, msg);
+      /* opts.body: Erklärtext unter der Überschrift (Überschrift dann mittig) */
+      if (opts.body) {
+        var tB = card.querySelector(".god__text");
+        if (tB) tB.classList.add("is-center");
+        var bd = document.createElement("p");
+        bd.className = "god__body";
+        bd.textContent = opts.body;
+        card.appendChild(bd);
+      }
       var okB = button(card, opts.ok || "Ja", "", function () { close(true); });
       var noB = button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(false); });
       /* opts.row: beide Buttons nebeneinander (OK links, Abbrechen rechts) */

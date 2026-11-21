@@ -36,6 +36,8 @@
     ".ga-item.is-new .ga-copy p::before{content:'';display:inline-block;width:8px;height:8px;margin:0 6px 1px 0;border-radius:50%;background:#111}" +
     ".ga-act{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer}" +
     ".ga-act.is-on{background:#111;color:#fff}" +
+    ".ga-nick{font-weight:500;color:rgba(42,33,24,.6)}" +
+    ".ga-vc{display:inline-grid;place-items:center;width:14px;height:14px;margin-left:3px;vertical-align:super;border-radius:50%;background:#1D9BF0;color:#fff;font:700 9px/1 Inter,system-ui,sans-serif}" +
     ".ga-del{margin-left:6px;color:#C7413B;border-color:#C7413B}" +
     ".ga-wa{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:#128C7E;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-grid;place-items:center}" +
     ".ga-item.is-sent{opacity:.5}" +
@@ -168,9 +170,27 @@
       return b && b.type === "coach_offer" && String(b.account_id) === String(id);
     });
   }
+  /* Coach-Stufen (go-coach-self.sql): selbst angemeldet → Admin gibt blaues c (verifiziert, Coachees möglich) */
+  function coachInfo(id) { return (st.coachInfo && st.coachInfo[String(id)]) || {}; }
+  function loadCoachInfo() {
+    st.coachInfo = {};
+    var ids = (st.accounts || []).map(function (a) { return a.account_id; }).filter(Boolean);
+    if (!ids.length) return;
+    var base = "go_accounts?id=in.(" + ids.join(",") + ")&select=";
+    host.rest(base + "id,nickname,coach_self_at,coach_verified_at")
+      .catch(function () { return host.rest(base + "id,nickname"); })
+      .then(function (rows) {
+        if (!st) return;
+        (rows || []).forEach(function (r) { st.coachInfo[String(r.id)] = r; });
+        if (st.tab === "coaches" || st.tab === "news") paint();
+      })
+      .catch(function () {});
+  }
   function coachBtn(id) {
     var on = trainerOf(id);
-    if (on) return '<button type="button" class="ga-act is-on" data-ga-coach="' + esc(id) + '" data-on="1">Coach ✓</button>';
+    var ci = coachInfo(id);
+    if (ci.coach_verified_at) return '<button type="button" class="ga-act is-on" data-ga-vc="' + esc(id) + '" data-on="1">Coach <span class="ga-vc">c</span></button>';
+    if (on || ci.coach_self_at) return '<button type="button" class="ga-act' + (on ? " is-on" : "") + '" data-ga-vc="' + esc(id) + '">Coach' + (on ? " ✓" : "") + "</button>";
     if (!coachRequested(id)) return "";
     return '<button type="button" class="ga-act" data-ga-req="' + esc(id) + '">Anfrage Coach</button>';
   }
@@ -237,8 +257,10 @@
   }
 
   function paintCoaches() {
+    if (!st.coachInfo) loadCoachInfo();
+    var isC = function (a) { var ci = coachInfo(a.account_id); return !!(a.is_trainer || ci.coach_self_at || ci.coach_verified_at); };
     var accs = (st.accounts || []).slice().sort(function (x, y) {
-      if (!!y.is_trainer !== !!x.is_trainer) return y.is_trainer ? 1 : -1;
+      if (isC(y) !== isC(x)) return isC(y) ? 1 : -1;
       return String(x.name || "").localeCompare(String(y.name || ""), "de");
     });
     if (!st.goals) loadGoals();
@@ -250,7 +272,9 @@
           '<button type="button" class="ga-act ga-del" data-ga-del="' + esc(id) + '" aria-label="Löschen">Löschen</button>';
         var coach = coachBtn(id);
         return '<div class="ga-item"><button type="button" class="ga-facebtn" data-ga-info="' + esc(id) + '" aria-label="Infos zu ' + esc(a.name || "") + '">' + face(a) + "</button>" +
-          '<div class="ga-copy"><p><b>' + esc(a.name || "?") + "</b></p>" +
+          '<div class="ga-copy"><p><b>' + esc(a.name || "?") + "</b>" +
+          (coachInfo(id).coach_verified_at ? '<span class="ga-vc">c</span>' : "") +
+          (coachInfo(id).nickname ? ' <span class="ga-nick">@' + esc(String(coachInfo(id).nickname).replace(/^@/, "")) + "</span>" : "") + "</p>" +
           '<span class="ga-when">seit ' + esc(when(a.at).split(" · ")[0]) + "</span>" +
           '<button type="button" class="ga-goal" data-ga-goal="' + esc(id) + '">' + esc(goal || "Ziel hinzufügen") + "</button></div>" +
           (coach || del ? '<div class="ga-acts">' + coach + del + "</div>" : "") +
@@ -751,7 +775,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -778,6 +802,33 @@
       return;
     }
     if (t.hasAttribute("data-ga-coach")) setCoach(t);
+    if (t.hasAttribute("data-ga-vc")) verifyCoach(t);
+  }
+
+  /* Blaues c geben (Bestätigen links, Abbrechen rechts) oder wieder entziehen */
+  function verifyCoach(btn) {
+    var id = btn.getAttribute("data-ga-vc");
+    var off = btn.getAttribute("data-on") === "1";
+    if (!global.GoDialog) return;
+    GoDialog.confirm(off ? "Blaues c und Coach-Rolle entziehen?" : "Willst Du dem Coach einen blauen Haken geben?",
+      { ok: off ? "Entziehen" : "Bestätigen", cancel: "Abbrechen", row: true }).then(function (yes) {
+      if (!yes) return;
+      btn.disabled = true;
+      host.rest("rpc/go_admin_verify_coach", { method: "POST", body: { p_account: id, p_on: !off } })
+        .then(function () {
+          var ci = st.coachInfo[String(id)] || (st.coachInfo[String(id)] = {});
+          ci.coach_verified_at = off ? null : new Date().toISOString();
+          if (!off) ci.coach_self_at = ci.coach_self_at || ci.coach_verified_at;
+          var person = (st.accounts || []).filter(function (a) { return String(a.account_id) === String(id); })[0];
+          if (person) person.is_trainer = !off;
+          paint();
+          if (host.toast) host.toast(off ? "Blaues c entzogen" : "Blaues c vergeben");
+        })
+        .catch(function () {
+          btn.disabled = false;
+          if (host.toast) host.toast("Hat nicht geklappt (go-coach-self.sql ausgeführt?)");
+        });
+    });
   }
 
   /* Mitteilung an alle (go-messages.sql) */
