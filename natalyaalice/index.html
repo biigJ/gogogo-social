@@ -8497,7 +8497,7 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-20"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-22"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-3"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-16"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
@@ -17173,42 +17173,10 @@
                 var nicks = (rows || []).filter(function (r) { return r && r.nickname && !r.is_me; })
                   .map(function (r) { return String(r.nickname).replace(/[(),*]/g, ""); });
                 nicks.forEach(function (n) { ffcCircleByNick[n.toLowerCase()] = name; });
-                if (!nicks.length) return [];
-                return rest("go_accounts?or=(" + nicks.map(function (n) {
-                  return "nickname.ilike." + encodeURIComponent(n);
-                }).join(",") + ")&select=id").catch(function () { return []; });
               })
-              .then(function (accs) {
-                var ids = (accs || []).map(function (a) { return String(a.id); })
-                  .filter(function (aid) { return aid && aid !== me; });
-                var mine = myGroups().filter(function (x) {
-                  return String(x.name || "").trim().toLowerCase() === name.toLowerCase();
-                })[0];
-                if (mine) {
-                  var have = (mine.members || []).map(String);
-                  var missing = ids.filter(function (aid) { return have.indexOf(aid) < 0; });
-                  if (!missing.length) return;
-                  return rest("group_members", {
-                    method: "POST",
-                    prefer: "resolution=merge-duplicates,return=minimal",
-                    body: missing.map(function (aid) { return { group_id: mine.id, account_id: aid, role: "member" }; })
-                  }).catch(function () {}).then(loadMyGroups);
-                }
-                /* Gibt es die Gruppe schon (gleicher Name, älteste zuerst)? Dann beitreten statt doppelt anlegen */
-                return rest("groups?name=ilike." + encodeURIComponent(name) + "&select=id&order=created_at.asc&limit=1")
-                  .catch(function () { return []; })
-                  .then(function (found) {
-                    var gid = found && found[0] && found[0].id;
-                    if (gid) {
-                      return rest("group_members", {
-                        method: "POST",
-                        prefer: "resolution=merge-duplicates,return=minimal",
-                        body: [{ group_id: gid, account_id: me, role: "member" }]
-                      }).catch(function () {}).then(loadMyGroups);
-                    }
-                    return saveMyGroups(myGroups().concat([{ name: name, members: ids }]));
-                  });
-              });
+              /* Keine Gruppe mehr automatisch aus dem Circle anlegen oder befüllen: Circles und Gruppen sind getrennt,
+                 Gruppen gründen nur Coaches (vorher entstand so z. B. „FF Schönhauser HYROX“ bei Mimi) */
+              .then(function () { return null; });
           })
           .then(function () {
             done();
