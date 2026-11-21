@@ -20130,7 +20130,7 @@
           var ids = cst().groups.map(function (g) { return encodeURIComponent(String(g.group_id)); });
           if (!ids.length) { paintCircleHead(); applyCircleCover(); paintCircleEvents(); return; }
           var setQ = "go_circles?group_id=in.(" + ids.join(",") + ")&select=group_id,name,owner_id,locations,online";
-          var setJob = rest(setQ + ",created_at")
+          var setJob = rest(setQ + ",created_at,started_in_app")
             .catch(function () { return rest(setQ); })
             .catch(function () { return []; })
             .then(function (rows) { (rows || []).forEach(function (r) { if (r) cst().settings[String(r.group_id)] = r; }); });
@@ -20181,7 +20181,9 @@
       function circleStartDay(gid) {
         var g = (cst().groups || []).filter(function (x) { return String(x.group_id) === String(gid); })[0];
         var st0 = cst().settings[String(gid)];
-        var at = (g && g.created_at) || (st0 && st0.created_at) || "";
+        /* go_circles.created_at nur, wenn der Circle in der App gegründet wurde (go-circle-start-fix.sql);
+           sonst ist es nur der Tag, an dem er zum ersten Mal in gogogo auftauchte */
+        var at = (g && g.created_at) || (st0 && st0.started_in_app && st0.created_at) || "";
         if (!at) return "";
         try { return new Date(at).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }); } catch (e) { return ""; }
       }
@@ -20584,7 +20586,10 @@
               }
               return Promise.resolve(FFC.createGroup(name, ids)).then(function (res) {
                 if (res && res.error) { GoDialog.alert("Ging nicht: " + (res.error.message || "Fehler")); return; }
-                afterCircleChange();
+                /* Gründungstag merken: Leaderboard zählt ab heute */
+                var newId = res && res.data != null ? String(res.data) : "";
+                var mark = newId ? rest("rpc/go_circle_started", { method: "POST", body: { p_group: newId, p_name: name } }).catch(function () {}) : Promise.resolve();
+                Promise.resolve(mark).then(afterCircleChange);
                 GoDialog.alert("Circle „" + name + "“ steht.");
               });
             });
