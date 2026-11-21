@@ -15752,6 +15752,7 @@
           list.textContent = "Lädt …";
           lbBox.appendChild(list);
           var from = lbAvg === "month" ? monthStartIso() : lbAvg === "week" ? mondayIso() : lbLastFrom();
+          var circleFrom = "";
           var ready = circleInfo ? Promise.resolve(circleInfo) : loadCircleMembers().then(function (ci) { circleInfo = ci; return ci; });
           ready.then(function (ci) {
             if (!ci.circle) {
@@ -15762,6 +15763,9 @@
             /* Name steht über dem Circle-Knopf, hier nicht doppelt */
             title.textContent = "";
             title.hidden = true;
+            /* neuer Circle: nur Workouts ab Gründung */
+            circleFrom = window.__goCircleStart ? window.__goCircleStart(ci.circle.group_id) : "";
+            if (circleFrom && circleFrom > from) from = circleFrom;
             var meId = sessionAccount ? String(sessionAccount.id) : "";
             var inCircle = {};
             ci.ids.forEach(function (id) { inCircle[id] = true; });
@@ -15770,6 +15774,18 @@
                 list.textContent = "";
                 if (res.missing) { list.textContent = "Punkte für Double brauchen go-ffc-punkte.sql in Supabase."; return; }
                 var inC = (res.pairs || []).filter(function (pr) { return pr.ids.every(function (id) { return inCircle[id]; }); });
+                if (circleFrom) {
+                  /* nur Double-Tage ab Gründung des Circles */
+                  inC = inC.map(function (pr) {
+                    var days = {}, pts = 0, any = false, cnt = 0;
+                    Object.keys(pr.days).forEach(function (d) {
+                      if (d < circleFrom) return;
+                      days[d] = true; cnt += 1;
+                      if (pr.dayPoints && pr.dayPoints[d] != null) { pts += pr.dayPoints[d]; any = true; }
+                    });
+                    return Object.assign({}, pr, { days: days, count: cnt, points: any ? pts : null });
+                  }).filter(function (pr) { return pr.count > 0; });
+                }
                 var lastD = "";
                 if (lbAvg === "last") {
                   inC.forEach(function (pr) { Object.keys(pr.days).forEach(function (d) { if (d > lastD) lastD = d; }); });
@@ -15795,6 +15811,7 @@
             }
             return GoFfcPoints.sync(lbHost()).then(function () { return GoFfcPoints.load(lbHost(), ci.ids, from); }).then(function (rows) {
               list.textContent = "";
+              if (circleFrom) rows = (rows || []).filter(function (r) { return String(r.day) >= circleFrom; });
               if (GoFfcPoints.missing()) { list.textContent = "Punkte brauchen go-ffc-punkte.sql in Supabase."; return; }
               var agg = {};
               (rows || []).forEach(function (r) {
@@ -20128,7 +20145,9 @@
           syncMyCircles();
           var ids = cst().groups.map(function (g) { return encodeURIComponent(String(g.group_id)); });
           if (!ids.length) { paintCircleHead(); applyCircleCover(); paintCircleEvents(); return; }
-          var setJob = rest("go_circles?group_id=in.(" + ids.join(",") + ")&select=group_id,name,owner_id,locations,online")
+          var setQ = "go_circles?group_id=in.(" + ids.join(",") + ")&select=group_id,name,owner_id,locations,online";
+          var setJob = rest(setQ + ",created_at")
+            .catch(function () { return rest(setQ); })
             .catch(function () { return []; })
             .then(function (rows) { (rows || []).forEach(function (r) { if (r) cst().settings[String(r.group_id)] = r; }); });
           return rest("go_circle_photos?group_id=in.(" + ids.join(",") + ")&select=group_id,photo_url")
@@ -20174,7 +20193,17 @@
           if (window.__goZirkelLbReload) window.__goZirkelLbReload();
         });
       }
+      /* Startdatum eines Circles (FFC created_at, sonst go_circles.created_at, go-circle-start.sql): Leaderboard zählt erst ab dann */
+      function circleStartDay(gid) {
+        var g = (cst().groups || []).filter(function (x) { return String(x.group_id) === String(gid); })[0];
+        var st0 = cst().settings[String(gid)];
+        var at = (g && g.created_at) || (st0 && st0.created_at) || "";
+        if (!at) return "";
+        try { return new Date(at).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }); } catch (e) { return ""; }
+      }
+      window.__goCircleStart = circleStartDay;
       function afterCircleChange() {
+        cst().synced = false;
         if (typeof syncFfcGroupIntoTeam === "function") { try { syncFfcGroupIntoTeam(); } catch (eS) {} }
         if (typeof renderTeam === "function") renderTeam();
         return loadCircleState().then(function () {
@@ -26789,6 +26818,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-14"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-17"></script>
 </body>
 </html>

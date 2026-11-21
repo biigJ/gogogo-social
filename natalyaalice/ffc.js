@@ -3787,7 +3787,8 @@
         group_id: g.group_id,
         name: g.name,
         is_owner: !!g.is_owner,
-        member_count: g.member_count
+        member_count: g.member_count,
+        created_at: g.created_at || null   /* falls my_groups es liefert: Leaderboard ab Gründung */
       }));
     },
     leaderboardScope(){ return lbScope; },
