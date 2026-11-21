@@ -412,13 +412,15 @@
   function andList(arr) {
     return arr.length < 2 ? arr.join("") : arr.slice(0, -1).join(", ") + " und " + arr[arr.length - 1];
   }
-  function openText(open) {
+  /* kurz = true, wenn viel zusammenkommt (mehrere offene Punkte, dazu Erledigtes oder Serie): etwas knapper formulieren */
+  function openText(open, kurz) {
     var steps = open.filter(isSteps), other = open.filter(function (e) { return !isSteps(e); });
     var out = [];
     if (other.length) {
-      out.push(andList(other.map(waTitle)) + (other.length > 1 ? " stehen" : " steht") + " heute noch an. Schon gemacht? Dann hak " + (other.length > 1 ? "sie" : "es") + " ab. Sonst: Du schaffst das noch!");
+      out.push(andList(other.map(waTitle)) + (other.length > 1 ? " stehen" : " steht") + " heute noch an. " +
+        (kurz ? "Schon gemacht? Dann abhaken!" : "Schon gemacht? Dann hak " + (other.length > 1 ? "sie" : "es") + " ab. Sonst: Du schaffst das noch!"));
     }
-    steps.forEach(function (e) { out.push("Hast Du schon " + waTitle(e) + " gemacht? Setz den Haken :)"); });
+    steps.forEach(function (e) { out.push((kurz ? waTitle(e) + " geschafft?" : "Hast Du schon " + waTitle(e) + " gemacht?") + " Setz den Haken :)"); });
     return out.join(" ");
   }
   function waText(r) {
@@ -432,6 +434,7 @@
     var morgen = next ? waTitle(next) + (hhmm(next.at) ? " um " + hhmm(next.at) : "") : "";
     var doneTxt = andList(done.map(waTitle));
     var parts = [];
+    var kurz = open.length + (done.length ? 1 : 0) + (big ? 1 : 0) >= 3;
     if (done.length && !open.length) {
       if (big && next) parts.push(streak + " Tage in Folge, das ist richtig stark! " + doneTxt + " heute erledigt und morgen schon " + morgen + " am Start. Genau so baust Du Dir Deine Routine.");
       else if (big) parts.push(streak + " Tage in Folge, das ist richtig stark! " + doneTxt + " heute erledigt. Damit die Serie hält: Plan Dir gleich was für morgen ein.");
@@ -439,12 +442,12 @@
       else parts.push("Stark, " + doneTxt + " heute erledigt! Für morgen ist noch nichts geplant. Trag Dir gleich was ein, dann bleibst Du dran.");
     } else if (done.length && open.length) {
       parts.push((big ? streak + " Tage in Folge, stark! " : "Stark, ") + doneTxt + " hast Du heute schon erledigt.");
-      parts.push(openText(open));
-      parts.push(next ? "Morgen geht es mit " + morgen + " weiter." : "Für morgen ist noch nichts geplant. Trag Dir gleich was ein.");
+      parts.push(openText(open, kurz));
+      parts.push(next ? (kurz ? "Morgen: " + morgen + "." : "Morgen geht es mit " + morgen + " weiter.") : (kurz ? "Morgen ist noch frei, plan Dir was ein." : "Für morgen ist noch nichts geplant. Trag Dir gleich was ein."));
     } else if (open.length) {
-      parts.push(openText(open));
-      parts.push(next ? "Morgen geht es mit " + morgen + " weiter." : "Für morgen ist noch nichts geplant. Trag Dir gleich was ein.");
-      if (big) parts.push("Deine Serie steht bei " + streak + " Tagen, die willst Du halten.");
+      parts.push(openText(open, kurz));
+      parts.push(next ? (kurz ? "Morgen: " + morgen + "." : "Morgen geht es mit " + morgen + " weiter.") : (kurz ? "Morgen ist noch frei, plan Dir was ein." : "Für morgen ist noch nichts geplant. Trag Dir gleich was ein."));
+      if (big) parts.push(kurz ? "Halt Deine Serie von " + streak + " Tagen!" : "Deine Serie steht bei " + streak + " Tagen, die willst Du halten.");
     } else if (next) {
       parts.push("Heute schon was gemacht? Dann trag es in gogogo ein und setz den Haken. Morgen hast Du " + morgen + " geplant, viel Spaß dabei!");
     } else {
