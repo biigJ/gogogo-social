@@ -5170,6 +5170,19 @@
     #go-rail .go-slide__cta--signup + .go-slide__cta { margin-top: 12px !important; }
     /* Blaues c (verifizierter Coach): wie der Haken bei Instagram, oben rechts am Namen */
     .go-vc { display: inline-grid; place-items: center; width: .62em; height: .62em; min-width: 13px; min-height: 13px; margin-left: 3px; vertical-align: super; border-radius: 50%; background: #1D9BF0; color: #fff; font: 700 9px/1 Inter, system-ui, sans-serif !important; letter-spacing: 0; text-transform: none; }
+    .team-slide__cta--challenge { margin-top: 12px !important; }
+    .team-challenge { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 14px 0 0; padding: 12px 14px; border: 1.5px solid #2A2118; border-radius: 14px; text-align: left; }
+    .team-challenge__label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .65; width: 100%; }
+    .team-challenge[hidden], .team-slide__cta[hidden] { display: none !important; }
+    body.is-session #plan-team .team-challenge .team-challenge__name, .team-challenge__name { font-family: "Playfair Display", Georgia, serif !important; font-size: 22px !important; font-weight: 600 !important; }
+    .team-challenge__goal { width: 100%; margin: 2px 0 0; font-size: 15px; line-height: 1.4; }
+    .team-challenge__stamps { font-size: 13px; opacity: .7; }
+    .team-challenge__end { margin-left: auto; border: 0; background: transparent; color: #C7413B; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+    /* Stempelkarten-Stapel: Karten dahinter angedeutet, Punkte zeigen, welche oben liegt */
+    .stamp-pass.has-stack { box-shadow: 0 -9px 0 -4px rgba(246,241,232,.55), 0 -18px 0 -8px rgba(246,241,232,.3); cursor: pointer; }
+    .stamp-pass__stackdots { display: flex; justify-content: center; gap: 6px; margin: 6px 0 0; }
+    .stamp-pass__stackdots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(246,241,232,.4); }
+    .stamp-pass__stackdots i.is-on { background: #F6F1E8; }
     .team-slide__coach-name {
       display: flex;
       align-items: center;
@@ -7593,6 +7606,7 @@
         <strong id="stamp-card-count" hidden>0</strong>
       </div>
       <div class="stamp-pass__grid" id="stamp-card-grid" aria-hidden="true"></div>
+      <div class="stamp-pass__stackdots" id="stamp-card-stackdots" hidden></div>
       <div class="stamp-pass__meta">
         <div><span>NICKNAME</span><strong id="stamp-card-nick">—</strong></div>
         <div><span>MITGLIED</span><strong id="stamp-card-member">—</strong></div>
@@ -8445,13 +8459,13 @@
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-13"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-3"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-14"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-15"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-101"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-102"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-73"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -15155,10 +15169,70 @@
         modal.hidden = false;
         modal.removeAttribute("hidden");
         modal.style.display = "grid";
+        loadStampStack(stamps);
         /* „Später“ gilt bis zum nächsten Öffnen der Karte */
         Object.keys(stampAsked).forEach(function (k) { delete stampAsked[k]; });
         pollStampChecks();
         startStampPoll();
+      }
+
+      /* Verknüpfte Stempelkarten (Gruppe, Circle) als Stapel: Tipp auf die Karte wechselt, Überschrift = Name */
+      var STAMP_COLORS = { main: "#C7413B", group: "#2A2118", circle: "#E0642C" };
+      function paintStampFace(card) {
+        var pass = document.querySelector("#stamp-card-modal .stamp-pass");
+        var brand = document.getElementById("stamp-card-brand");
+        var count = document.getElementById("stamp-card-count");
+        var grid = document.getElementById("stamp-card-grid");
+        var n = Math.max(0, Math.min(12, Number(card.stamps) || 0));
+        if (brand) brand.textContent = card.name || "gogogo";
+        if (count) count.textContent = String(n);
+        if (grid) {
+          grid.textContent = "";
+          for (var i = 0; i < 12; i++) {
+            var slot = document.createElement("span");
+            slot.className = "stamp-pass__slot" + (i < n ? " is-filled" : "");
+            grid.appendChild(slot);
+          }
+        }
+        if (pass) pass.style.background = STAMP_COLORS[card.kind] || STAMP_COLORS.main;
+      }
+      function loadStampStack(mainStamps) {
+        var modal = document.getElementById("stamp-card-modal");
+        var pass = modal && modal.querySelector(".stamp-pass");
+        if (!pass) return;
+        var dots = document.getElementById("stamp-card-stackdots");
+        modal._stack = [{ kind: "main", name: "gogogo", stamps: mainStamps }];
+        modal._stackAt = 0;
+        pass.classList.remove("has-stack");
+        pass.style.background = "";
+        if (dots) dots.hidden = true;
+        if (!sessionAccount) return;
+        rest("go_stamp_links?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&status=eq.linked&select=id,kind,name,stamps&order=created_at.asc")
+          .then(function (rows) {
+            if (!rows || !rows.length || modal.hidden) return;
+            modal._stack = modal._stack.concat(rows.map(function (r) { return { kind: r.kind, name: r.name, stamps: r.stamps }; }));
+            pass.classList.add("has-stack");
+            paintStackDots();
+          })
+          .catch(function () {});
+        if (!pass._stackBound) {
+          pass._stackBound = true;
+          pass.addEventListener("click", function (e) {
+            var st = modal._stack || [];
+            if (st.length < 2) return;
+            if (e.target.closest("#stamp-card-wallet, .stamp-pass__qr")) return;
+            modal._stackAt = (modal._stackAt + 1) % st.length;
+            paintStampFace(st[modal._stackAt]);
+            paintStackDots();
+          });
+        }
+        function paintStackDots() {
+          var d = document.getElementById("stamp-card-stackdots");
+          if (!d) return;
+          var st = modal._stack || [];
+          d.hidden = st.length < 2;
+          d.innerHTML = st.map(function (_, i) { return '<i class="' + (i === modal._stackAt ? "is-on" : "") + '"></i>'; }).join("");
+        }
       }
 
       function paypalDonateUrl() {
@@ -19685,8 +19759,16 @@
             /* Tipp auf einen Circle: Leaderboard zeigen oder austreten */
             return GoDialog.choose(g.name || "Circle", [
               { label: "Leaderboard zeigen", value: "show" },
+              { label: "Stempelkarte verknüpfen", value: "stamp" },
               { label: "Circle verlassen", value: "leave" }
             ]).then(function (act) {
+              if (act === "stamp") {
+                /* eigene Circle-Stempelkarte (go-challenges.sql): Stempel, wenn der Trainingspartner denselben Circle verknüpft hat */
+                rest("rpc/go_link_circle_card", { method: "POST", body: { p_circle: String(gid), p_name: g.name || "Circle" } })
+                  .then(function () { gogogoToast("Stempelkarte mit " + (g.name || "dem Circle") + " verknüpft. Du findest sie unter Plus → Stempelkarte."); })
+                  .catch(function () { gogogoToast("Verknüpfen ging nicht (go-challenges.sql ausgeführt?)"); });
+                return;
+              }
               if (act === "show") {
                 if (FFC.setLeaderboardScope) FFC.setLeaderboardScope(gid);
                 gogogoToast("Leaderboard zeigt jetzt diesen Circle.");
@@ -23725,6 +23807,138 @@
       }
 
       /* Meine Gruppe: „Events hinzufügen“ → Woche mit Hinweis aufs Postausgang-Icon; darunter die geteilten Events */
+      /* Challenge (go-challenges.sql): Ersteller legt eine an (eine zur Zeit), sie steht unter dem Button.
+         „Stempelkarten verknüpfen“: alle Mitglieder bestätigen unter dem Herz, dann gibt es eine Gruppen-Stempelkarte. */
+      var groupChallengeCache = {};
+      function appendGroupChallenge(slide, group) {
+        var meId = String((sessionAccount && sessionAccount.id) || "");
+        var owner = String(group.owner || "") === meId;
+        var btn = null;
+        if (owner) {
+          btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "team-slide__cta team-slide__cta--gevents team-slide__cta--challenge";
+          btn.textContent = "Challenge hinzufügen";
+          btn.addEventListener("click", function () { openChallengeCreate(group); });
+          slide.appendChild(btn);
+        }
+        var line = document.createElement("div");
+        line.className = "team-challenge";
+        line.hidden = true;
+        slide.appendChild(line);
+        function paint(ch) {
+          line.textContent = "";
+          line.hidden = !ch;
+          if (btn) btn.hidden = !!ch;
+          if (!ch) return;
+          var lab = document.createElement("span");
+          lab.className = "team-challenge__label";
+          lab.textContent = "Challenge";
+          var nm = document.createElement("strong");
+          nm.className = "team-challenge__name";
+          nm.textContent = ch.name || "";
+          line.appendChild(lab);
+          line.appendChild(nm);
+          if (ch.goal) {
+            var gl = document.createElement("p");
+            gl.className = "team-challenge__goal";
+            gl.textContent = ch.goal;
+            line.appendChild(gl);
+          }
+          if (ch.link_stamps) {
+            var st = document.createElement("span");
+            st.className = "team-challenge__stamps";
+            st.textContent = "Stempelkarten verknüpft";
+            line.appendChild(st);
+          }
+          if (owner) {
+            var end = document.createElement("button");
+            end.type = "button";
+            end.className = "team-challenge__end";
+            end.textContent = "Beenden";
+            end.addEventListener("click", function () {
+              GoDialog.confirm("Challenge „" + (ch.name || "") + "“ beenden?", { ok: "Beenden", cancel: "Abbrechen", row: true }).then(function (yes) {
+                if (!yes) return;
+                rest("rpc/go_end_challenge", { method: "POST", body: { p_challenge: ch.id } })
+                  .then(function () { delete groupChallengeCache[String(group.id)]; paint(null); })
+                  .catch(function () { gogogoToast("Beenden ging nicht"); });
+              });
+            });
+            line.appendChild(end);
+          }
+        }
+        var gKey = String(group.id);
+        var cached = groupChallengeCache[gKey];
+        if (cached) paint(cached.ch);
+        if (cached && Date.now() - cached.at < 60000) return;
+        rest("go_challenges?group_id=eq." + encodeURIComponent(group.id) + "&ended_at=is.null&select=id,name,goal,link_stamps&limit=1")
+          .then(function (rows) {
+            var ch = (rows || [])[0] || null;
+            groupChallengeCache[gKey] = { ch: ch, at: Date.now() };
+            paint(ch);
+          })
+          .catch(function () {});
+      }
+      function openChallengeCreate(group) {
+        if (!window.GoDialog || !GoDialog.form) return;
+        /* Challenges organisieren Coaches (Plus → Ich als Coach → Anmelden) */
+        if (typeof isCoachAny === "function" && !isCoachAny()) {
+          GoDialog.confirm("Challenges organisieren Coaches", {
+            body: "Melde Dich unter Plus → Ich als Coach an, dann legst Du hier Challenges für Deine Gruppe an.",
+            ok: "Ich als Coach", cancel: "Abbrechen", row: true
+          }).then(function (yes) {
+            if (!yes) return;
+            showPlan("training");
+            requestAnimationFrame(function () { jumpToGoOffer("coach_offer"); });
+          });
+          return;
+        }
+        GoDialog.form("Challenge", {
+          placeholder: "Name der Challenge",
+          area: { placeholder: "Ziel, z. B. Wer als Letzter die Stempelkarte voll hat, gibt allen einen Kaffee aus.", maxLength: 200 },
+          check: "Stempelkarten der Gruppenmitglieder verknüpfen",
+          ok: "Erstellen", cancel: "Abbrechen"
+        }).then(function (r) {
+          if (!r) return;
+          var name = String(r.text || "").trim();
+          var goal = String(r.text2 || "").trim().slice(0, 200);
+          if (!name) { gogogoToast("Bitte einen Namen für die Challenge"); return; }
+          if (!goal) { gogogoToast("Bitte das Ziel eintragen: Was gilt am Ende?"); return; }
+          rest("rpc/go_create_challenge", { method: "POST", body: { p_group: group.id, p_name: name.slice(0, 60), p_link: !!r.checked, p_goal: goal } })
+            .then(function (res) {
+              if (res && res.ok) {
+                groupChallengeCache[String(group.id)] = { ch: { id: res.id, name: name, goal: goal, link_stamps: !!r.checked }, at: Date.now() };
+                gogogoToast(r.checked ? "Challenge steht. Deine Gruppe bestätigt die Stempelkarte unter dem Herz." : "Challenge steht.");
+                renderTeam();
+                return;
+              }
+              gogogoToast(res && res.reason === "exists" ? "Es läuft schon eine Challenge. Eine zur Zeit." : "Nur der Ersteller der Gruppe legt Challenges an.");
+            })
+            .catch(function () { gogogoToast("Anlegen ging nicht (go-challenges.sql ausgeführt?)"); });
+        });
+      }
+      /* Verknüpfungsanfragen an mich (Herz) */
+      function loadStampLinkRequests() {
+        if (!sessionAccount) return Promise.resolve([]);
+        return rest("rpc/go_my_stamp_link_requests", { method: "POST", body: {} }).catch(function () { return []; });
+      }
+      function openStampLinkRequest(lr) {
+        if (!window.GoDialog) return;
+        var who = String(lr.from_name || "Dein Coach").split(" ")[0];
+        GoDialog.choose(who + " verknüpft die Stempelkarten der Gruppe " + (lr.group_name || ""), [
+          { label: "Bestätigen", value: "yes" },
+          { label: "Ablehnen", value: "no" }
+        ], { center: true, sub: lr.challenge_name ? "Challenge: " + lr.challenge_name + (lr.challenge_goal ? ". Ziel: " + lr.challenge_goal : "") + ". Du bekommst eine eigene Stempelkarte für die Gruppe." : "", cancel: "Später" }).then(function (v) {
+          if (v !== "yes" && v !== "no") return;
+          rest("rpc/go_answer_stamp_link", { method: "POST", body: { p_link: lr.link_id, p_accept: v === "yes" } })
+            .then(function () {
+              gogogoToast(v === "yes" ? "Verknüpft. Du findest die Karte unter Plus → Stempelkarte." : "Abgelehnt");
+              if (window.HeuteAccountability && HeuteAccountability.refreshHeart) HeuteAccountability.refreshHeart();
+            })
+            .catch(function () { gogogoToast("Ging gerade nicht"); });
+        });
+      }
+
       function appendGroupEvents(slide, group) {
         var add = document.createElement("button");
         add.type = "button";
@@ -23738,6 +23952,7 @@
           ask.then(function (ok) { if (!ok) openGruppen(); });
         });
         slide.appendChild(add);
+        appendGroupChallenge(slide, group);
         var list = document.createElement("ul");
         list.className = "team-gevents";
         list.hidden = true;
@@ -23885,11 +24100,13 @@
             reloadInvites: function () { return loadInvites(); },
             /* weitere Meldungen fürs Herz: Gruppenanfragen */
             heartNotices: function () {
-              return Promise.all([loadGroupInvites(), loadGroupJoinRequests()]).then(function (r) {
+              return Promise.all([loadGroupInvites(), loadGroupJoinRequests(), loadStampLinkRequests()]).then(function (r) {
                 return (r[0] || []).map(function (gi) {
                   return { kind: "group", created_at: gi.created_at, open: function () { openGroupInvite(gi); } };
                 }).concat((r[1] || []).map(function (gr) {
                   return { kind: "groupjoin", created_at: gr.created_at, open: function () { openGroupJoinRequest(gr); } };
+                })).concat((r[2] || []).map(function (lr) {
+                  return { kind: "stamplink", created_at: lr.created_at, open: function () { openStampLinkRequest(lr); } };
                 }));
               });
             },
