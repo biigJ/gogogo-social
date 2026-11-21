@@ -2009,6 +2009,9 @@
       width: 30px; height: 30px; display: grid; place-items: center; line-height: 1;
     }
     .wr-act__icon .wr-ico { width: 30px; height: 30px; display: block; }
+    .wr-act--ics .wr-act__icon { font: 700 13px/1 Inter, system-ui, sans-serif; letter-spacing: .02em; text-transform: lowercase; }
+    .wr-friend-row--group { cursor: pointer; font-weight: 600; }
+    .wr-friend-row__ph { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #2A2118; color: #F6F1E8; font: 700 15px/1 Inter, sans-serif; }
     .wr-act__n { font-size: 11px; font-weight: 700; min-height: 12px; }
     .wr-dots {
       position: absolute; top: calc(var(--wr-top-h) + 8px); left: 0; right: 0; z-index: 4;
@@ -2445,7 +2448,10 @@
     button.acc-tool-badge { border: 0; background: transparent; color: inherit; padding: 0; cursor: pointer; font: inherit; }
     .acc-face--outbox,
     .acc-card__faces--inline .acc-face--add.acc-face--outbox { width: 30px !important; height: 30px !important; background: transparent !important; color: #2A2118 !important; border: 0 !important; box-shadow: none !important; display: inline-grid; place-items: center; padding: 0; }
-    .acc-face--outbox svg { width: 24px !important; height: 24px !important; }
+    /* Postausgang wie in Woche, 1,2-fach */
+    .acc-face--outbox, .acc-card__faces--inline .acc-face--add.acc-face--outbox { width: 36px !important; height: 36px !important; }
+    .acc-face--outbox svg { width: 29px !important; height: 29px !important; }
+    .acc-face-slot[data-withdraw-to] { cursor: pointer; }
     .acc-tool--wave.is-on { opacity: 0.45; }
     .acc-tool--heart { color: #C7413B; }
     .acc-heart-me { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; background: #E6DED0; font-size: 12px; font-weight: 700; color: #2A2118; flex: none; }
@@ -8383,9 +8389,9 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-87"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-88"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-65"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-66"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
   <script>
     (function () {
@@ -13581,6 +13587,8 @@
               });
             }).catch(function () { return []; });
           },
+          /* eigene Gruppen (ohne FFC-Circle) für den Einladen-Dialog */
+          myGroups: function () { try { return ownGroups(); } catch (eG) { return []; } },
           bubbleId: function () { var b = window.GoBubbles ? GoBubbles.mine() : null; return b ? String(b.id) : ""; },
           planItemForDay: function (iso) {
             if (!sessionMode || !sessionAccount || !iso) return null;
@@ -19797,6 +19805,7 @@
                 });
               });
               grow.appendChild(gcheck);
+              grow.addEventListener("click", function (eG) { if (eG.target.closest && eG.target.closest(".invite-check")) return; gcheck.click(); });
               gwrap.appendChild(grow);
             });
             box.appendChild(gwrap);
@@ -19883,6 +19892,8 @@
             });
             row.appendChild(name);
             row.appendChild(check);
+            /* ganze Zeile antippbar */
+            row.addEventListener("click", function (eRow) { if (eRow.target.closest && eRow.target.closest(".invite-check")) return; check.click(); });
             box.appendChild(row);
           });
         }
@@ -23086,6 +23097,7 @@
             /* vorher GoHost/GoFFC (gibt es nicht) → „Start“ brach ab */
             openZirkel: function (preset) { openZirkelFlow(preset); },
             inviteFacesForIso: inviteFacesForIso,
+            reloadInvites: function () { return loadInvites(); },
             clearInvitesForDay: clearInvitesForDay,
             groupMemberIds: groupMemberIds,
             syncHeuteFilterOptions: syncHeuteFilterOptions,
