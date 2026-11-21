@@ -381,6 +381,17 @@
       input.placeholder = opts.placeholder || "";
       input.value = opts.value || "";
       card.appendChild(input);
+      /* opts.area: zweites, mehrzeiliges Feld (z. B. Ziel der Challenge) */
+      var area = null;
+      if (opts.area) {
+        area = document.createElement("textarea");
+        area.className = "god__input god__area";
+        area.rows = 3;
+        area.maxLength = opts.area.maxLength || 200;
+        area.placeholder = opts.area.placeholder || "";
+        area.value = opts.area.value || "";
+        card.appendChild(area);
+      }
       var cb = null;
       if (opts.check) {
         var lab = document.createElement("label");
@@ -398,7 +409,7 @@
       ok.type = "button";
       ok.className = "god__btn";
       ok.textContent = opts.ok || "Speichern";
-      ok.addEventListener("click", function () { close({ text: String(input.value || "").trim(), checked: !!(cb && cb.checked) }); });
+      ok.addEventListener("click", function () { close({ text: String(input.value || "").trim(), text2: area ? String(area.value || "").trim() : "", checked: !!(cb && cb.checked) }); });
       var no = document.createElement("button");
       no.type = "button";
       no.className = "god__btn god__btn--quiet";

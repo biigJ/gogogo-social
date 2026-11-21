@@ -2,7 +2,8 @@
 -- Idempotent. Im Supabase SQL-Editor (gogogo, agpyse…) ausführen.
 -- Voraussetzung: go-visibility-team.sql, go-group-requests.sql, go-stamp-punctual.sql.
 --
--- go_challenges     eine laufende Challenge je Gruppe (Name, Ersteller, Stempelkarten verknüpft ja/nein)
+-- go_challenges     eine laufende Challenge je Gruppe (Name, Ziel, Ersteller, Stempelkarten verknüpft ja/nein)
+--                   Ziel = was die Gruppe ausmacht, z. B. „Wer als Letzter die Stempelkarte voll hat, gibt allen einen Kaffee aus.“
 -- go_stamp_links    zusätzliche Stempelkarte je Person für eine Gruppe oder einen Circle (eigener Zähler, Überschrift = Name)
 --                   status 'pending' (Mitglied muss bestätigen, Herz in Aktuell) oder 'linked'
 -- Stempel: Sobald eine Pünktlichkeits-Prüfung fertig ist (go_stamp_checks.done_at), bekommt jede verknüpfte Karte
@@ -17,6 +18,7 @@ create table if not exists go_challenges (
   created_at timestamptz not null default now(),
   ended_at timestamptz
 );
+alter table go_challenges add column if not exists goal text check (char_length(goal) <= 200);
 create unique index if not exists go_challenges_one_active on go_challenges (group_id) where ended_at is null;
 
 alter table go_challenges enable row level security;
@@ -48,7 +50,8 @@ create policy "go_stamp_links_select" on go_stamp_links for select to anon, auth
 -- Schreiben nur über die Funktionen
 
 -- Challenge anlegen (nur Ersteller der Gruppe). Mit Verknüpfung: Ersteller sofort verknüpft, Mitglieder bestätigen.
-create or replace function go_create_challenge(p_group uuid, p_name text, p_link boolean default false)
+drop function if exists go_create_challenge(uuid, text, boolean);
+create or replace function go_create_challenge(p_group uuid, p_name text, p_link boolean default false, p_goal text default null)
 returns jsonb
 language plpgsql
 security definer
@@ -66,8 +69,8 @@ begin
   if exists (select 1 from go_challenges where group_id = p_group and ended_at is null) then
     return jsonb_build_object('ok', false, 'reason', 'exists');
   end if;
-  insert into go_challenges (group_id, name, link_stamps, created_by)
-  values (p_group, trim(p_name), coalesce(p_link, false), me)
+  insert into go_challenges (group_id, name, goal, link_stamps, created_by)
+  values (p_group, trim(p_name), nullif(trim(coalesce(p_goal, '')), ''), coalesce(p_link, false), me)
   returning id into ch;
   if p_link then
     insert into go_stamp_links (account_id, kind, ref, name, challenge_id, invited_by, status)
@@ -81,7 +84,7 @@ begin
   end if;
   return jsonb_build_object('ok', true, 'id', ch);
 end $$;
-grant execute on function go_create_challenge(uuid, text, boolean) to anon, authenticated;
+grant execute on function go_create_challenge(uuid, text, boolean, text) to anon, authenticated;
 
 -- Challenge beenden (Ersteller). Verknüpfte Karten bleiben mit ihren Stempeln.
 create or replace function go_end_challenge(p_challenge uuid)
@@ -98,14 +101,15 @@ $$;
 grant execute on function go_end_challenge(uuid) to anon, authenticated;
 
 -- Offene Verknüpfungen an mich (Herz): Gruppe, Challenge, wer fragt
+drop function if exists go_my_stamp_link_requests();
 create or replace function go_my_stamp_link_requests()
-returns table (link_id uuid, group_name text, challenge_name text, from_name text, created_at timestamptz)
+returns table (link_id uuid, group_name text, challenge_name text, challenge_goal text, from_name text, created_at timestamptz)
 language sql
 stable
 security definer
 set search_path = public
 as $$
-  select l.id, l.name, c.name, a.name, l.created_at
+  select l.id, l.name, c.name, c.goal, a.name, l.created_at
   from go_stamp_links l
   left join go_challenges c on c.id = l.challenge_id
   left join go_accounts a on a.id = l.invited_by

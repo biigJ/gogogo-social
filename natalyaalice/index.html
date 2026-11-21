@@ -5163,7 +5163,8 @@
     .team-challenge { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 14px 0 0; padding: 12px 14px; border: 1.5px solid #2A2118; border-radius: 14px; text-align: left; }
     .team-challenge__label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .65; width: 100%; }
     .team-challenge[hidden], .team-slide__cta[hidden] { display: none !important; }
-    .team-challenge__name { font-family: "Playfair Display", Georgia, serif !important; font-size: 22px !important; font-weight: 600 !important; }
+    body.is-session #plan-team .team-challenge .team-challenge__name, .team-challenge__name { font-family: "Playfair Display", Georgia, serif !important; font-size: 22px !important; font-weight: 600 !important; }
+    .team-challenge__goal { width: 100%; margin: 2px 0 0; font-size: 15px; line-height: 1.4; }
     .team-challenge__stamps { font-size: 13px; opacity: .7; }
     .team-challenge__end { margin-left: auto; border: 0; background: transparent; color: #C7413B; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
     /* Stempelkarten-Stapel: Karten dahinter angedeutet, Punkte zeigen, welche oben liegt */
@@ -23558,6 +23559,12 @@
           nm.textContent = ch.name || "";
           line.appendChild(lab);
           line.appendChild(nm);
+          if (ch.goal) {
+            var gl = document.createElement("p");
+            gl.className = "team-challenge__goal";
+            gl.textContent = ch.goal;
+            line.appendChild(gl);
+          }
           if (ch.link_stamps) {
             var st = document.createElement("span");
             st.className = "team-challenge__stamps";
@@ -23584,7 +23591,7 @@
         var cached = groupChallengeCache[gKey];
         if (cached) paint(cached.ch);
         if (cached && Date.now() - cached.at < 60000) return;
-        rest("go_challenges?group_id=eq." + encodeURIComponent(group.id) + "&ended_at=is.null&select=id,name,link_stamps&limit=1")
+        rest("go_challenges?group_id=eq." + encodeURIComponent(group.id) + "&ended_at=is.null&select=id,name,goal,link_stamps&limit=1")
           .then(function (rows) {
             var ch = (rows || [])[0] || null;
             groupChallengeCache[gKey] = { ch: ch, at: Date.now() };
@@ -23608,16 +23615,19 @@
         }
         GoDialog.form("Challenge", {
           placeholder: "Name der Challenge",
+          area: { placeholder: "Ziel, z. B. Wer als Letzter die Stempelkarte voll hat, gibt allen einen Kaffee aus.", maxLength: 200 },
           check: "Stempelkarten der Gruppenmitglieder verknüpfen",
           ok: "Erstellen", cancel: "Abbrechen"
         }).then(function (r) {
           if (!r) return;
           var name = String(r.text || "").trim();
+          var goal = String(r.text2 || "").trim().slice(0, 200);
           if (!name) { gogogoToast("Bitte einen Namen für die Challenge"); return; }
-          rest("rpc/go_create_challenge", { method: "POST", body: { p_group: group.id, p_name: name.slice(0, 60), p_link: !!r.checked } })
+          if (!goal) { gogogoToast("Bitte das Ziel eintragen: Was gilt am Ende?"); return; }
+          rest("rpc/go_create_challenge", { method: "POST", body: { p_group: group.id, p_name: name.slice(0, 60), p_link: !!r.checked, p_goal: goal } })
             .then(function (res) {
               if (res && res.ok) {
-                groupChallengeCache[String(group.id)] = { ch: { id: res.id, name: name, link_stamps: !!r.checked }, at: Date.now() };
+                groupChallengeCache[String(group.id)] = { ch: { id: res.id, name: name, goal: goal, link_stamps: !!r.checked }, at: Date.now() };
                 gogogoToast(r.checked ? "Challenge steht. Deine Gruppe bestätigt die Stempelkarte unter dem Herz." : "Challenge steht.");
                 renderTeam();
                 return;
@@ -23638,7 +23648,7 @@
         GoDialog.choose(who + " verknüpft die Stempelkarten der Gruppe " + (lr.group_name || ""), [
           { label: "Bestätigen", value: "yes" },
           { label: "Ablehnen", value: "no" }
-        ], { center: true, sub: lr.challenge_name ? "Challenge: " + lr.challenge_name + ". Du bekommst eine eigene Stempelkarte für die Gruppe." : "", cancel: "Später" }).then(function (v) {
+        ], { center: true, sub: lr.challenge_name ? "Challenge: " + lr.challenge_name + (lr.challenge_goal ? ". Ziel: " + lr.challenge_goal : "") + ". Du bekommst eine eigene Stempelkarte für die Gruppe." : "", cancel: "Später" }).then(function (v) {
           if (v !== "yes" && v !== "no") return;
           rest("rpc/go_answer_stamp_link", { method: "POST", body: { p_link: lr.link_id, p_accept: v === "yes" } })
             .then(function () {
