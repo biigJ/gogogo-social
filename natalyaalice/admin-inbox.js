@@ -1,7 +1,7 @@
 /* admin-inbox.js — Admin in der App (nur Joscha / Ben)
  *
  *   GoAdmin.open(host, tab)   → Vollbild mit Burger-Menü: Nachrichten, Erinnerungen, Nutzer (Infobox per Profilbild,
- *                               Ziele ergänzen, „Anfrage Coach“ bestätigen/ablehnen, Löschen), Videos, Editor (/workout/kurse/)
+ *                               Ziele, Rolle, Pausieren, Löschen), Editor (/workout/kurse/), Social Media Links, Circles
  *   GoAdmin.unread(host)      → Promise<Anzahl neuer Nachrichten seit dem letzten Öffnen>
  *
  * host: rest(path, opts), sessionAccount, toast(msg)
@@ -37,7 +37,22 @@
     ".ga-act{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer}" +
     ".ga-act.is-on{background:#111;color:#fff}" +
     ".ga-nick{font-weight:500;color:rgba(42,33,24,.6)}" +
-    ".ga-vc{display:inline-grid;place-items:center;width:14px;height:14px;margin-left:3px;vertical-align:super;border-radius:50%;background:#1D9BF0;color:#fff;font:700 9px/1 Inter,system-ui,sans-serif}" +
+    ".ga-vc{display:inline-grid;place-items:center;width:14px;height:14px;margin-left:3px;vertical-align:super;border-radius:50%;background:#1D9BF0;line-height:0;font-size:0}" +
+    ".ga-vc svg{display:block;width:100%;height:100%}" +
+    /* Nutzer- und Circle-Zeilen */
+    ".ga-rows{display:flex;flex-direction:column;gap:2px;font-size:13px;line-height:1.35;color:rgba(42,33,24,.75)}" +
+    ".ga-rows .ga-r1{font-size:15px;color:#2A2118}" +
+    ".ga-rows span.ga-sep::before{content:' · '}" +
+    ".ga-link{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer;text-align:left}" +
+    ".ga-pill{flex:none;align-self:center;min-height:34px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}" +
+    ".ga-pill.is-fill{background:#111;color:#fff}" +
+    ".ga-pill.is-blue{background:#1D9BF0;border-color:#1D9BF0;color:#fff}" +
+    ".ga-cimg{width:76px;height:76px;flex:none;align-self:flex-start;border-radius:12px;object-fit:cover;background:#E6DED0}" +
+    ".ga-item.is-top{align-items:flex-start}" +
+    "@media (max-width:600px){.ga-item.ga-circ{flex-wrap:wrap}.ga-circ .ga-pill{margin-left:88px}}" +
+    ".ga-filters{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}" +
+    ".ga-filters select{min-height:34px;padding:0 10px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:13px;font-weight:600;color:#111}" +
+    ".ga-paused{opacity:.55}" +
     ".ga-del{margin-left:6px;color:#C7413B;border-color:#C7413B}" +
     ".ga-wa{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:#128C7E;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-grid;place-items:center}" +
     ".ga-item.is-sent{opacity:.5}" +
@@ -177,7 +192,9 @@
     var ids = (st.accounts || []).map(function (a) { return a.account_id; }).filter(Boolean);
     if (!ids.length) return;
     var base = "go_accounts?id=in.(" + ids.join(",") + ")&select=";
-    host.rest(base + "id,nickname,coach_self_at,coach_verified_at")
+    var more = ",serial_number,invite_code,phone,whatsapp_phone,about_me,training_goal,trainer_id,workout_places";
+    host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at" + more)
+      .catch(function () { return host.rest(base + "id,nickname,coach_self_at,coach_verified_at" + more); })
       .catch(function () { return host.rest(base + "id,nickname"); })
       .then(function (rows) {
         if (!st) return;
@@ -189,7 +206,7 @@
   function coachBtn(id) {
     var on = trainerOf(id);
     var ci = coachInfo(id);
-    if (ci.coach_verified_at) return '<button type="button" class="ga-act is-on" data-ga-vc="' + esc(id) + '" data-on="1">Coach <span class="ga-vc">c</span></button>';
+    if (ci.coach_verified_at) return '<button type="button" class="ga-act is-on" data-ga-vc="' + esc(id) + '" data-on="1">Coach <span class="ga-vc"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.1 6.6A4.6 4.6 0 1 0 13.1 13.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></span></button>';
     if (on || ci.coach_self_at) return '<button type="button" class="ga-act' + (on ? " is-on" : "") + '" data-ga-vc="' + esc(id) + '">Coach' + (on ? " ✓" : "") + "</button>";
     if (!coachRequested(id)) return "";
     return '<button type="button" class="ga-act" data-ga-req="' + esc(id) + '">Anfrage Coach</button>';
@@ -256,38 +273,241 @@
     }).join("");
   }
 
+  /* Gruppe und Circle je Nutzer (go-admin-circles.sql) */
+  function loadLinks() {
+    st.links = {};
+    host.rest("rpc/go_admin_user_links", { method: "POST", body: {} })
+      .then(function (r) { if (st) { st.links = r || {}; if (st.tab === "coaches") paint(); } })
+      .catch(function () {});
+  }
+  function isCoachAcc(a) {
+    var ci = coachInfo(a.account_id);
+    return !!(a.is_trainer || ci.coach_self_at || ci.coach_verified_at);
+  }
+  function aboutOf(ci) {
+    var v = ci.about_me;
+    if (typeof v === "string") { try { v = JSON.parse(v); } catch (e) { v = {}; } }
+    return v && typeof v === "object" ? v : {};
+  }
+  /* Pille rechts: Nutzer (leer) · Coach (gefüllt) · Coach mit blauem c (blau) · Anfrage Coach */
+  function rolePill(a) {
+    var id = String(a.account_id);
+    var ci = coachInfo(id);
+    if (ci.coach_verified_at) return '<button type="button" class="ga-pill is-blue" data-ga-role="' + esc(id) + '">Coach</button>';
+    if (isCoachAcc(a)) return '<button type="button" class="ga-pill is-fill" data-ga-role="' + esc(id) + '">Coach</button>';
+    if (coachRequested(id)) return '<button type="button" class="ga-pill" data-ga-req="' + esc(id) + '">Anfrage Coach</button>';
+    return '<button type="button" class="ga-pill" data-ga-user="' + esc(id) + '">' + (ci.paused_at ? "Pausiert" : "Nutzer") + "</button>";
+  }
   function paintCoaches() {
     if (!st.coachInfo) loadCoachInfo();
-    var isC = function (a) { var ci = coachInfo(a.account_id); return !!(a.is_trainer || ci.coach_self_at || ci.coach_verified_at); };
+    if (!st.links) loadLinks();
+    if (!st.goals) loadGoals();
     var accs = (st.accounts || []).slice().sort(function (x, y) {
-      if (isC(y) !== isC(x)) return isC(y) ? 1 : -1;
+      if (isCoachAcc(y) !== isCoachAcc(x)) return isCoachAcc(y) ? 1 : -1;
       return String(x.name || "").localeCompare(String(y.name || ""), "de");
     });
-    if (!st.goals) loadGoals();
-    return '<p class="cp-hint">Profilbild: alles zur Person. Ziel: ergänzen, das Ziel der Person bleibt.</p>' +
+    var nameOf = function (aid) {
+      var hit = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(aid); })[0];
+      return hit ? String(hit.name || "").split(" ")[0] : "";
+    };
+    function parts(list) {
+      return list.filter(Boolean).map(function (h, i) { return i ? '<span class="ga-sep"></span>' + h : h; }).join("");
+    }
+    return '<p class="cp-hint">Profilbild: alles zur Person. Pille rechts: Rolle ändern, pausieren oder löschen.</p>' +
       accs.map(function (a) {
         var id = String(a.account_id);
+        var ci = coachInfo(id);
+        var ab = aboutOf(ci);
+        var ln = (st.links && st.links[id]) || {};
+        var nick = ci.nickname ? '<span class="ga-nick">@' + esc(String(ci.nickname).replace(/^@/, "")) + "</span>" : "";
+        var first = esc(String(a.name || "?").split(" ")[0]);
+        var r1 = parts(["<b>" + first + "</b>" + (ci.coach_verified_at ? '<span class="ga-vc"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.1 6.6A4.6 4.6 0 1 0 13.1 13.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></span>' : ""), nick, ci.serial_number ? "ID " + esc(ci.serial_number) : "", ci.paused_at ? "pausiert" : ""]);
+        var phone = ci.whatsapp_phone || (/\d{5,}/.test(String(ci.phone || "")) ? ci.phone : "");
+        var r2 = parts([ci.invite_code ? "Code " + esc(ci.invite_code) : "", esc(ab.email || ""), esc(phone || "")]);
         var goal = goalText(id);
-        var del = id === String(me()) || ADMIN_IDS.indexOf(id) !== -1 ? "" :
-          '<button type="button" class="ga-act ga-del" data-ga-del="' + esc(id) + '" aria-label="Löschen">Löschen</button>';
-        var coach = coachBtn(id);
-        return '<div class="ga-item"><button type="button" class="ga-facebtn" data-ga-info="' + esc(id) + '" aria-label="Infos zu ' + esc(a.name || "") + '">' + face(a) + "</button>" +
-          '<div class="ga-copy"><p><b>' + esc(a.name || "?") + "</b>" +
-          (coachInfo(id).coach_verified_at ? '<span class="ga-vc">c</span>' : "") +
-          (coachInfo(id).nickname ? ' <span class="ga-nick">@' + esc(String(coachInfo(id).nickname).replace(/^@/, "")) + "</span>" : "") + "</p>" +
-          '<span class="ga-when">seit ' + esc(when(a.at).split(" · ")[0]) + "</span>" +
-          '<button type="button" class="ga-goal" data-ga-goal="' + esc(id) + '">' + esc(goal || "Ziel hinzufügen") + "</button></div>" +
-          (coach || del ? '<div class="ga-acts">' + coach + del + "</div>" : "") +
-          "</div>";
+        var r3 = parts([
+          '<button type="button" class="ga-link" data-ga-goal="' + esc(id) + '">' + esc(goal || "Ziel hinzufügen") + "</button>",
+          ci.trainer_id ? "Coach: " + esc(nameOf(ci.trainer_id) || "ja") : "",
+          (ln.groups || []).length ? "Gruppe: " + esc(ln.groups.join(", ")) : "",
+          (ln.circles || []).length ? "Circle: " + esc(ln.circles.join(", ")) : ""
+        ]);
+        var r4 = esc(placeList(ci.workout_places).join(" · "));
+        return '<div class="ga-item is-top' + (ci.paused_at ? " ga-paused" : "") + '"><button type="button" class="ga-facebtn" data-ga-info="' + esc(id) + '" aria-label="Infos zu ' + esc(a.name || "") + '">' + face(a) + "</button>" +
+          '<div class="ga-copy ga-rows"><div class="ga-r1">' + r1 + "</div>" +
+          (r2 ? "<div>" + r2 + "</div>" : "") + "<div>" + r3 + "</div>" + (r4 ? "<div>" + r4 + "</div>" : "") + "</div>" +
+          rolePill(a) + "</div>";
       }).join("");
+  }
+  /* Nutzer-Pille: Löschen / Pausieren */
+  function userMenu(id) {
+    var a = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0] || {};
+    var ci = coachInfo(id);
+    var name = a.name || "Diese Person";
+    var items = [];
+    if (id !== String(me()) && ADMIN_IDS.indexOf(id) === -1) items.push({ label: "Löschen", value: "del" });
+    items.push({ label: ci.paused_at ? "Fortsetzen" : "Pausieren", value: "pause" });
+    GoDialog.choose(name, items, { center: true, sub: ci.paused_at ? "Pausiert: keine WhatsApp-Erinnerung." : "", cancel: "Abbrechen" }).then(function (v) {
+      if (v === "del") {
+        var fake = document.createElement("button");
+        fake.setAttribute("data-ga-del", id);
+        deleteAccount(fake);
+        return;
+      }
+      if (v !== "pause") return;
+      var on = !ci.paused_at;
+      host.rest("rpc/go_admin_pause_account", { method: "POST", body: { p_account: id, p_on: on } })
+        .then(function () {
+          (st.coachInfo[String(id)] || (st.coachInfo[String(id)] = {})).paused_at = on ? new Date().toISOString() : null;
+          paint();
+          if (host.toast) host.toast(on ? name + " pausiert" : name + " ist wieder aktiv");
+        })
+        .catch(function () { GoDialog.alert("Pausieren braucht go-admin-circles.sql in Supabase."); });
+    });
+  }
+  /* Coach-Pille: Entziehen / Verifiziert (blaues c an oder aus) */
+  function roleMenu(id) {
+    var a = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0] || {};
+    var ci = coachInfo(id);
+    var name = a.name || "Coach";
+    GoDialog.choose(name, [
+      { label: "Coach-Rolle entziehen", value: "revoke" },
+      { label: ci.coach_verified_at ? "Verifiziert ✓ (blaues c entfernen)" : "Verifizieren (blaues c)", value: ci.coach_verified_at ? "unverify" : "verify" }
+    ], { center: true, cancel: "Abbrechen" }).then(function (mode) {
+      if (!mode) return;
+      host.rest("rpc/go_admin_coach_role", { method: "POST", body: { p_account: id, p_mode: mode } })
+        .then(function () {
+          var c = st.coachInfo[String(id)] || (st.coachInfo[String(id)] = {});
+          if (mode === "verify") { c.coach_verified_at = new Date().toISOString(); c.coach_self_at = c.coach_self_at || c.coach_verified_at; a.is_trainer = true; }
+          if (mode === "unverify") c.coach_verified_at = null;
+          if (mode === "revoke") { c.coach_verified_at = null; c.coach_self_at = null; a.is_trainer = false; }
+          paint();
+          if (host.toast) host.toast(mode === "verify" ? "Blaues c vergeben" : mode === "unverify" ? "Blaues c entfernt" : "Coach-Rolle entzogen");
+        })
+        .catch(function () { GoDialog.alert("Das braucht go-admin-circles.sql in Supabase."); });
+    });
+  }
+
+  /* ---------- Circles (go-admin-circles.sql) ---------- */
+  function loadCircles() {
+    st.circles = "loading";
+    return host.rest("rpc/go_admin_circles", { method: "POST", body: {} })
+      .then(function (rows) { if (st) { st.circles = rows || []; paint(); } })
+      .catch(function () { if (st) { st.circles = "error"; paint(); } });
+  }
+  function circleById(gid) {
+    return (Array.isArray(st.circles) ? st.circles : []).filter(function (c) { return String(c.group_id) === String(gid); })[0];
+  }
+  function shortDay(at) {
+    var d = new Date(at);
+    return isNaN(d.getTime()) ? "" : d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" }).replace(/,/, "");
+  }
+  function paintCircles() {
+    if (st.circles === "error") return '<p class="cp-hint">Liste nicht geladen. Ist go-admin-circles.sql in Supabase ausgeführt?</p>';
+    if (!st.circles) { loadCircles(); return '<p class="cp-hint">Lade…</p>'; }
+    if (st.circles === "loading") return '<p class="cp-hint">Lade…</p>';
+    var cf = st.cf || (st.cf = { loc: "", coach: "" });
+    var locs = {}, coaches = {};
+    st.circles.forEach(function (c) {
+      (c.locations || []).forEach(function (l) { locs[l] = 1; });
+      if (c.owner && c.owner.id) coaches[c.owner.id] = c.owner.name || "Coach";
+    });
+    var list = st.circles.filter(function (c) {
+      if (cf.loc && (c.locations || []).indexOf(cf.loc) < 0) return false;
+      if (cf.coach && !(c.owner && String(c.owner.id) === cf.coach)) return false;
+      return true;
+    });
+    var filters = '<div class="ga-filters">' +
+      '<select data-ga-cf="loc" aria-label="Ort"><option value="">Alle Orte</option>' + Object.keys(locs).sort().map(function (l) {
+        return '<option value="' + esc(l) + '"' + (cf.loc === l ? " selected" : "") + ">" + esc(l) + "</option>";
+      }).join("") + "</select>" +
+      '<select data-ga-cf="coach" aria-label="Coach"><option value="">Alle Coaches</option>' + Object.keys(coaches).map(function (id) {
+        return '<option value="' + esc(id) + '"' + (cf.coach === id ? " selected" : "") + ">" + esc(coaches[id]) + "</option>";
+      }).join("") + "</select></div>";
+    if (!st.circles.length) return '<p class="cp-hint">Noch keine Circles. Sie erscheinen, sobald Mitglieder die App mit ihrem Circle öffnen.</p>';
+    return filters + list.map(function (c) {
+      var gid = esc(c.group_id);
+      var img = c.photo_url || "/assets/gogogo/gogogo-Zirkeltraining.jpg";
+      var coach = c.owner && c.owner.id
+        ? 'Coach: <button type="button" class="ga-link" data-gc-coach="' + gid + '">' + esc(String(c.owner.name || "Coach").split(" ")[0]) + "</button>"
+        : '<button type="button" class="ga-link" data-gc-coach="' + gid + '">Coach hinzufügen</button>';
+      var mem = (c.members || []).map(function (m) {
+        return '<button type="button" class="ga-link" data-gc-member="' + esc(m.id) + '">' + esc(String(m.name || "?").split(" ")[0]) + "</button>" + (m.source === "admin" ? "*" : "");
+      }).join(", ");
+      var places = '<button type="button" class="ga-link" data-gc-places="' + gid + '">' +
+        esc((c.locations || []).length ? c.locations.join(", ") : "Ort hinzufügen") + "</button>" + (c.online ? " · online möglich" : "");
+      var last = (c.last || []).map(function (x) { return esc(shortDay(x.at)) + " · " + esc(String(x.n)) + " dabei"; }).join(", ");
+      return '<div class="ga-item is-top ga-circ"><img class="ga-cimg" src="' + esc(img) + '" alt="" />' +
+        '<div class="ga-copy ga-rows"><div class="ga-r1"><b>' + esc(c.name || "Circle") + "</b></div>" +
+        "<div>" + coach + "</div>" +
+        "<div>Mitglieder: " + (mem || "–") + "</div>" +
+        "<div>Orte: " + places + "</div>" +
+        "<div>Zuletzt: " + (last || "–") + "</div></div>" +
+        '<button type="button" class="ga-pill" data-gc-add="' + gid + '">Teilnehmer hinzufügen</button></div>';
+    }).join("") + '<p class="cp-hint">* vom Admin hinzugefügt. Im FFC-Leaderboard erscheinen sie, sobald sie dem Circle in FFC beigetreten sind (die App versucht das beim nächsten Öffnen).</p>';
+  }
+  function circleCoach(gid) {
+    var c = circleById(gid);
+    if (!c) return;
+    var coaches = (st.accounts || []).filter(isCoachAcc).sort(function (x, y) { return String(x.name || "").localeCompare(String(y.name || ""), "de"); });
+    var items = coaches.map(function (a) { return { label: String(a.name || "Coach") + (c.owner && String(c.owner.id) === String(a.account_id) ? " ✓" : ""), value: String(a.account_id) }; });
+    if (c.owner && c.owner.id) items.unshift({ label: "Coach entfernen", value: "none" });
+    GoDialog.choose("Coach von " + (c.name || "Circle"), items, { center: true, cancel: "Abbrechen" }).then(function (v) {
+      if (!v) return;
+      host.rest("rpc/go_admin_set_circle_coach", { method: "POST", body: { p_group: String(gid), p_account: v === "none" ? null : v } })
+        .then(function () { if (host.toast) host.toast(v === "none" ? "Coach entfernt" : "Coach gesetzt"); return loadCircles(); })
+        .catch(function () { GoDialog.alert("Das braucht go-admin-circles.sql in Supabase."); });
+    });
+  }
+  function circlePlaces(gid) {
+    var c = circleById(gid);
+    if (!c) return;
+    var locs = (c.locations || []).slice();
+    var items = locs.map(function (l) { return { label: "✕ " + l, value: "rm:" + l }; });
+    if (locs.length < 6) items.push({ label: "Ort hinzufügen", value: "add" });
+    items.push({ label: c.online ? "Online möglich: ja" : "Online möglich: nein", value: "online" });
+    function save(next, online) {
+      return host.rest("rpc/go_admin_save_circle_places", { method: "POST", body: { p_group: String(gid), p_locations: next, p_online: !!online } })
+        .then(function () { c.locations = next; c.online = !!online; paint(); setTimeout(function () { circlePlaces(gid); }, 0); })
+        .catch(function () { GoDialog.alert("Das braucht go-admin-circles.sql in Supabase."); });
+    }
+    GoDialog.choose("Orte von " + (c.name || "Circle"), items, { center: true, sub: locs.length ? "Tippen auf einen Ort entfernt ihn." : "Noch kein Ort.", cancel: "Fertig" }).then(function (v) {
+      if (!v) return;
+      if (v === "online") return save(locs, !c.online);
+      if (v.indexOf("rm:") === 0) return save(locs.filter(function (l) { return l !== v.slice(3); }), c.online);
+      if (v === "add" && global.goPickPlace) {
+        return global.goPickPlace("Ort für " + (c.name || "den Circle")).then(function (name) {
+          if (!name || locs.some(function (l) { return l.toLowerCase() === name.toLowerCase(); })) { circlePlaces(gid); return; }
+          return save(locs.concat([name]), c.online);
+        });
+      }
+    });
+  }
+  function circleAdd(gid) {
+    var c = circleById(gid);
+    if (!c) return;
+    var have = {};
+    (c.members || []).forEach(function (m) { have[String(m.id)] = 1; });
+    host.rest("go_accounts?select=id,name&order=name.asc&limit=1000").catch(function () { return st.accounts.map(function (a) { return { id: a.account_id, name: a.name }; }); })
+      .then(function (rows) {
+        var items = (rows || []).filter(function (r) { return r && r.id && !have[String(r.id)]; })
+          .map(function (r) { return { label: r.name || "?", value: String(r.id) }; });
+        return GoDialog.pick("Teilnehmer hinzufügen zu " + (c.name || "Circle"), items, { ok: "Hinzufügen", cancel: "Abbrechen", empty: "Alle Nutzer sind schon dabei." });
+      })
+      .then(function (ids) {
+        if (!ids || !ids.length) return;
+        return host.rest("rpc/go_admin_add_circle_members", { method: "POST", body: { p_group: String(gid), p_ids: ids } })
+          .then(function () { if (host.toast) host.toast(ids.length + (ids.length === 1 ? " Teilnehmer" : " Teilnehmer") + " hinzugefügt"); return loadCircles(); })
+          .catch(function () { GoDialog.alert("Das braucht go-admin-circles.sql in Supabase."); });
+      });
   }
 
   var TABS = [
     { id: "news", label: "Nachrichten" },
     { id: "wa", label: "Erinnerungen" },
     { id: "coaches", label: "Nutzer" },
-    { id: "ex", label: "Videos" },
-    { id: "editor", label: "Editor" }
+    { id: "editor", label: "Editor" },
+    { id: "ex", label: "Social Media Links" },
+    { id: "circles", label: "Circles" }
   ];
   function tabLabel(id) {
     var t = TABS.filter(function (x) { return x.id === id; })[0];
@@ -307,7 +527,7 @@
       st.body.innerHTML = '<p class="cp-hint">' + esc(st.error) + "</p>";
       return;
     }
-    st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : paintCoaches();
+    st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : st.tab === "circles" ? paintCircles() : paintCoaches();
   }
 
   /* ---------- Ziele der Nutzer (go_accounts.training_goal, mehrere mit Komma) ---------- */
@@ -751,7 +971,13 @@
         row("Orte", esc(placeList(a.workout_places).join(" · ")) + (a.places_findable ? " (auffindbar)" : ""));
         row("Mantra", esc(a.mantra || ""));
         row("Telefon", esc(a.whatsapp_phone || (/\d{5,}/.test(String(a.phone || "")) ? a.phone : "")));
-        row("Code", esc([a.serial_number, a.invite_code].filter(Boolean).join(" · ")));
+        row("E-Mail", esc(about.email || ""));
+        var lnk = (st.links && st.links[String(id)]) || {};
+        row("Gruppe", esc((lnk.groups || []).join(", ")));
+        row("Circle", esc((lnk.circles || []).join(", ")));
+        row("Status", a.paused_at ? "pausiert seit " + esc(dateDe(a.paused_at)) : "");
+        row("ID", esc(a.serial_number || ""));
+        row("Login-Code", esc(a.invite_code || ""));
         row("Dabei seit", esc(dateDe(a.created_at || person.at)));
         row("Datenschutz", a.privacy_ack_at ? "zugestimmt " + esc(dateDe(a.privacy_ack_at)) : "noch nicht zugestimmt");
         row("Erinnerung", a.wa_reminder ? "WhatsApp 19 Uhr an" : "");
@@ -775,12 +1001,25 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gc-coach],[data-gc-member],[data-gc-places],[data-gc-add]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
     if (t.hasAttribute("data-ga-broadcast")) { broadcast(); return; }
     if (t.hasAttribute("data-ga-del")) { deleteAccount(t); return; }
+    if (t.hasAttribute("data-ga-role")) { roleMenu(t.getAttribute("data-ga-role")); return; }
+    if (t.hasAttribute("data-ga-user")) { userMenu(t.getAttribute("data-ga-user")); return; }
+    if (t.hasAttribute("data-gc-coach")) { circleCoach(t.getAttribute("data-gc-coach")); return; }
+    if (t.hasAttribute("data-gc-places")) { circlePlaces(t.getAttribute("data-gc-places")); return; }
+    if (t.hasAttribute("data-gc-add")) { circleAdd(t.getAttribute("data-gc-add")); return; }
+    if (t.hasAttribute("data-gc-member")) {
+      /* Mitglied: zu Nutzer wechseln und die Infobox öffnen */
+      var mid = t.getAttribute("data-gc-member");
+      st.tab = "coaches";
+      paint();
+      openInfo(mid);
+      return;
+    }
     if (t.hasAttribute("data-ga-goal")) { editGoal(t.getAttribute("data-ga-goal")); return; }
     if (t.hasAttribute("data-ga-info")) { openInfo(t.getAttribute("data-ga-info")); return; }
     if (t.hasAttribute("data-ga-req")) { requestCoach(t.getAttribute("data-ga-req")); return; }
@@ -850,6 +1089,13 @@
     });
   }
 
+  function onChange(e) {
+    var sel = e.target && e.target.closest ? e.target.closest("[data-ga-cf]") : null;
+    if (!sel || !st) return;
+    (st.cf || (st.cf = {}))[sel.getAttribute("data-ga-cf")] = sel.value;
+    paint();
+  }
+
   function close() {
     if (st && st.root) st.root.remove();
     document.body.classList.remove("cp-open");
@@ -875,6 +1121,7 @@
     st = { root: root, body: root.querySelector(".cp-body"), title: root.querySelector(".ga-bar h2"), menu: root.querySelector(".ga-menu"),
       tab: tab || "news", seenBefore: lastSeen(), data: null, accounts: [] };
     root.addEventListener("click", onClick);
+    root.addEventListener("change", onChange);
     load().then(function (data) {
       if (!st) return;
       st.data = data || {};

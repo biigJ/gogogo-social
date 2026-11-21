@@ -8492,7 +8492,7 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-13"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-17"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-3"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-16"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
@@ -20125,6 +20125,7 @@
         return Promise.resolve(groups || FFC.groups()).then(function (gs) {
           cst().groups = gs || [];
           cst().loaded = true;
+          syncMyCircles();
           var ids = cst().groups.map(function (g) { return encodeURIComponent(String(g.group_id)); });
           if (!ids.length) { paintCircleHead(); applyCircleCover(); paintCircleEvents(); return; }
           var setJob = rest("go_circles?group_id=in.(" + ids.join(",") + ")&select=group_id,name,owner_id,locations,online")
@@ -20140,6 +20141,29 @@
             })
             .then(function () { ensureCircleRow(); paintCircleEvents(); });
         }).catch(function () {});
+      }
+      /* Einmal je Sitzung: eigene FFC-Circles an gogogo melden (Admin → Circles); vom Admin hinzugefügte Circles:
+         in FFC beitreten, wenn FFC das erlaubt, sonst nur für Circle-Events und Herz merken (go-admin-circles.sql) */
+      function syncMyCircles() {
+        if (cst().synced || !sessionAccount) return;
+        cst().synced = true;
+        var list = (cst().groups || []).map(function (g) { return { id: String(g.group_id), name: g.name || "", owner: !!g.is_owner }; });
+        rest("rpc/go_sync_my_circles", { method: "POST", body: { p_groups: list } })
+          .then(function (rows) {
+            var have = {};
+            list.forEach(function (g) { have[g.id] = 1; });
+            var todo = (rows || []).filter(function (r) { return r && r.group_id && !have[String(r.group_id)]; });
+            cst().extraIds = todo.map(function (r) { return String(r.group_id); });
+            if (!todo.length || !FFC.joinGroup) return;
+            return Promise.all(todo.map(function (r) {
+              return Promise.resolve(FFC.joinGroup(r.group_id)).then(function (res) { return !(res && res.error); }).catch(function () { return false; });
+            })).then(function (ok) {
+              if (!ok.some(Boolean)) return;
+              cst().synced = false;
+              return afterCircleChange();
+            });
+          })
+          .catch(function () {});
       }
       function selectCircle(gid) {
         return Promise.resolve(FFC.setLeaderboardScope ? FFC.setLeaderboardScope(gid) : null).then(function () {
@@ -20356,7 +20380,7 @@
         if (!sessionAccount || !window.FFC || !FFC.user || !FFC.user()) return Promise.resolve([]);
         var ready = cst().loaded ? Promise.resolve() : loadCircleState();
         return ready.then(function () {
-          var ids = (cst().groups || []).map(function (g) { return String(g.group_id); });
+          var ids = (cst().groups || []).map(function (g) { return String(g.group_id); }).concat(cst().extraIds || []);
           if (!ids.length) return [];
           return rest("rpc/go_circle_news", { method: "POST", body: { p_groups: ids } }).catch(function () { return []; });
         });
