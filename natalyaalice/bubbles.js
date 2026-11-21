@@ -613,6 +613,10 @@
     init: function (h) { host = h; return load(); },
     load: load,
     mine: mine,
+    /* Mitglieder (Konto-IDs) einer Bubble */
+    memberIds: function (bid) {
+      return members.filter(function (m) { return String(m.bubble_id) === String(bid); }).map(function (m) { return String(m.account_id); });
+    },
     renderInto: renderInto,
     openCreate: openCreate,
     messages: messages,

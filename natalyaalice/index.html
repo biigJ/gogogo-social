@@ -8385,7 +8385,7 @@
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-5"></script>
-  <script src="/natalyaalice/bubbles.js?v=bub-6"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-7"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-5"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-8"></script>
@@ -22885,6 +22885,34 @@
         return true;
       }
 
+      /* Bubble-Mitglieder als Kreise unter „Alle“: Profile + letzte Aktivität (Event/Nachricht), höchstens alle 5 min */
+      var bubblePeople = {}, bubbleAct = {}, bubbleCrewAt = 0, bubbleCrewBid = "", bubbleCrewLoading = false;
+      function loadBubbleCrew() {
+        var b = window.GoBubbles && GoBubbles.mine ? GoBubbles.mine() : null;
+        if (!b || !GoBubbles.memberIds || bubbleCrewLoading) return Promise.resolve(false);
+        if (bubbleCrewBid === String(b.id) && Date.now() - bubbleCrewAt < 300000) return Promise.resolve(false);
+        bubbleCrewLoading = true;
+        var meId = String(sessionAccount.id);
+        var ids = GoBubbles.memberIds(b.id).filter(function (id) { return id !== meId; });
+        var need = ids.filter(function (id) { return !bubblePeople[id]; });
+        var bid = encodeURIComponent(b.id);
+        return Promise.all([
+          need.length ? rest("go_accounts?id=in.(" + need.map(encodeURIComponent).join(",") + ")&select=id,name,nickname,photo_url").catch(function () { return []; }) : [],
+          rest("go_bubble_messages?bubble_id=eq." + bid + "&select=author_id,created_at&order=created_at.desc&limit=200").catch(function () { return []; }),
+          rest("events?bubble_id=eq." + bid + "&starts_at=lte." + encodeURIComponent(new Date().toISOString()) + "&select=user_id,starts_at&order=starts_at.desc&limit=200").catch(function () { return []; })
+        ]).then(function (r) {
+          (r[0] || []).forEach(function (a) { if (a && a.id) bubblePeople[String(a.id)] = a; });
+          bubbleAct = {};
+          function bump(id, t) { id = String(id || ""); if (id && (!bubbleAct[id] || String(t) > bubbleAct[id])) bubbleAct[id] = String(t); }
+          (r[1] || []).forEach(function (m) { bump(m.author_id, m.created_at); });
+          (r[2] || []).forEach(function (e) { bump(e.user_id, new Date(e.starts_at).toISOString()); });
+          bubbleCrewBid = String(b.id);
+          bubbleCrewAt = Date.now();
+          bubbleCrewLoading = false;
+          return true;
+        }).catch(function () { bubbleCrewLoading = false; return false; });
+      }
+
       function paintHeuteCrew() {
         var box = document.getElementById("heute-stories-team");
         if (!box) return;
@@ -23038,6 +23066,26 @@
           if (window.GoTama) GoTama.decorate(el, entry.person.id);
           box.appendChild(el);
         });
+        /* Alle: dazu die Mitglieder meiner Bubble (gleiche Kreise), zuletzt aktiv zuerst */
+        if (crewView === "alles" && window.GoBubbles && GoBubbles.mine && GoBubbles.mine()) {
+          var bubIds = (GoBubbles.memberIds ? GoBubbles.memberIds(GoBubbles.mine().id) : []).filter(function (id) {
+            return id !== String(sessionAccount.id) && !friends.some(function (en) { return String(en.person.id) === id; });
+          });
+          bubIds.sort(function (x, y) {
+            var ax = bubbleAct[x] || "", ay = bubbleAct[y] || "";
+            if (ax !== ay) return ay.localeCompare(ax);
+            return String((bubblePeople[x] || {}).name || "").localeCompare(String((bubblePeople[y] || {}).name || ""), "de");
+          });
+          bubIds.forEach(function (id) {
+            var bp = bubblePeople[id] || groupPeople[id];
+            if (!bp) return;
+            var person = { id: id, name: bp.name || bp.nickname || "?", nickname: bp.nickname || "", photo_url: bp.photo_url || "" };
+            var el = storyItem(person, null, openFor(person, null));
+            el.classList.add("is-bubble");
+            box.appendChild(el);
+          });
+          loadBubbleCrew().then(function (changed) { if (changed && heuteView() === "alles") paintHeuteCrew(); });
+        }
         var add = document.createElement("button");
         add.type = "button";
         add.className = "crew-story crew-story--add";
