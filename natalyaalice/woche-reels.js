@@ -6160,6 +6160,7 @@
 
   global.WocheReels = {
     refreshKeepDay: refreshKeepDay,
+    shareToCircle: function (id, gid) { return shareToCircle(id, gid); },
     openZirkelRecurring: function () { openZirkelRecurring(); },
     openPlanPicker: function () { openPlanPicker(); },
     install: install,
