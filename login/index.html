@@ -78,7 +78,7 @@
     .input:focus { border-color: var(--ink); outline: none; }
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .code {
-      font: 700 34px/1 var(--mono); letter-spacing: 0.6em; text-align: center; padding-left: 0.6em;
+      font: 700 34px/1 var(--mono); letter-spacing: 0.35em; text-align: center; padding-left: 0.6em;
       min-height: 64px;
     }
     .code::placeholder { color: rgba(42, 33, 24, 0.25); }
@@ -136,28 +136,33 @@
       <button class="btn" id="login-submit" type="submit" disabled>Anmelden</button>
       <p class="msg" id="login-msg" role="status" aria-live="polite"></p>
       <button type="button" class="quiet" id="forgot">Code vergessen?</button>
+      <button type="button" class="quiet" id="mail-login">Mit E-Mail anmelden</button>
       <p class="help" id="forgot-help" hidden>Schreib Joscha kurz über <a href="/kontakt/">Kontakt</a> oder WhatsApp. Du bekommst Deinen Code direkt zurück. In der App findest Du ihn später unter Profil → Einstellungen → Login-Code.</p>
     </form>
 
     <form id="new-form" novalidate hidden>
-      <div class="row2">
-        <label class="field"><span>Vorname</span>
-          <input class="input" id="new-first" type="text" autocomplete="given-name" autocapitalize="words" required />
-        </label>
-        <label class="field"><span>Nachname</span>
-          <input class="input" id="new-last" type="text" autocomplete="family-name" autocapitalize="words" />
-        </label>
-      </div>
-      <label class="field"><span>Handynummer (für WhatsApp)</span>
-        <input class="input" id="new-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0176 …" required />
+      <label class="field"><span>Vorname</span>
+        <input class="input" id="new-first" type="text" autocomplete="given-name" autocapitalize="words" enterkeyhint="next" required />
       </label>
-      <label class="check"><input type="checkbox" id="new-privacy" required />
+      <label class="field"><span>E-Mail</span>
+        <input class="input" id="new-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" enterkeyhint="send" placeholder="name@beispiel.de" required />
+      </label>
+      <label class="check" id="new-privacy-row"><input type="checkbox" id="new-privacy" required />
         <span>Ich habe die <a href="/datenschutz/" target="_blank" rel="noopener">Datenschutzerklärung</a> gelesen und bin einverstanden, dass meine Angaben für die App gespeichert werden.</span>
       </label>
-      <button class="btn" id="new-submit" type="submit" disabled>Konto anlegen</button>
+      <button class="btn" id="new-submit" type="submit" disabled>Code per E-Mail senden</button>
       <p class="msg" id="new-msg" role="status" aria-live="polite"></p>
     </form>
-
+    <form id="otp-form" novalidate hidden>
+      <p class="lead" id="otp-lead" style="text-align:center"></p>
+      <label class="field"><span>Code aus der E-Mail</span>
+        <input class="input code" id="otp-code" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="8" autocomplete="one-time-code" enterkeyhint="go" placeholder="000000" required />
+      </label>
+      <button class="btn" id="otp-submit" type="submit" disabled>Anmelden</button>
+      <p class="msg" id="otp-msg" role="status" aria-live="polite"></p>
+      <button type="button" class="quiet" id="otp-resend">Code nochmal senden</button>
+      <button type="button" class="quiet" id="otp-back">Andere E-Mail</button>
+    </form>
     <section class="done" id="done" hidden aria-live="polite">
       <p>Dein Code</p>
       <div class="codebig" id="done-code">0000</div>
@@ -237,9 +242,12 @@
         $("tab-new").setAttribute("aria-selected", isNew ? "true" : "false");
         $("login-form").hidden = isNew;
         $("new-form").hidden = !isNew;
+        $("otp-form").hidden = true;
         $("done").hidden = true;
+        mailOnly = false;
+        $("new-privacy-row").hidden = false;
         $("title").textContent = isNew ? "Neu bei gogogo" : "Willkommen zurück";
-        $("lead").textContent = isNew ? "Drei Angaben, dann bekommst Du Deinen Code." : "Vorname und Dein 4-stelliger Code.";
+        $("lead").textContent = isNew ? "Vorname und E-Mail. Du bekommst einen Code per E-Mail." : "Vorname und Dein 4-stelliger Code.";
         try { history.replaceState(null, "", isNew ? "#neu" : location.pathname + location.search); } catch (e) {}
       }
       $("tab-login").addEventListener("click", function () { show("login"); });
@@ -288,67 +296,163 @@
         location.href = nextUrl();
       });
 
-      /* ---------- Neu hier: Konto anlegen ---------- */
-      var fIn = $("new-first"), lIn = $("new-last"), pIn = $("new-phone"), okIn = $("new-privacy"), newBtn = $("new-submit"), newMsg = $("new-msg");
-      function phoneOk(v) { return String(v || "").replace(/[^0-9]/g, "").length >= 8; }
-      function updNew() { newBtn.disabled = !(fIn.value.trim() && phoneOk(pIn.value) && okIn.checked); }
-      [fIn, lIn, pIn, okIn].forEach(function (el) { el.addEventListener("input", updNew); el.addEventListener("change", updNew); });
+      /* ---------- Neu hier / Mit E-Mail: Code per E-Mail (Supabase Auth, go-email-login.sql) ---------- */
+      var mailOnly = false; /* Anmelden per E-Mail: ohne Datenschutz-Haken (Konto gibt es schon) */
+      var fIn = $("new-first"), eIn = $("new-email"), okIn = $("new-privacy"), newBtn = $("new-submit"), newMsg = $("new-msg");
+      var otpIn = $("otp-code"), otpBtn = $("otp-submit"), otpMsg = $("otp-msg");
+      var PENDING = "gogogo_mail_pending";
+      function mailOk(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(v || "").trim()); }
+      function updNew() { newBtn.disabled = !(fIn.value.trim() && mailOk(eIn.value) && (mailOnly || okIn.checked)); }
+      [fIn, eIn, okIn].forEach(function (el) { el.addEventListener("input", updNew); el.addEventListener("change", updNew); });
       updNew();
-
-      function randomCode() { return String(1000 + Math.floor(Math.random() * 9000)); }
-
-      var created = null;
+      $("mail-login").addEventListener("click", function () {
+        show("new");
+        mailOnly = true;
+        $("new-privacy-row").hidden = true;
+        $("title").textContent = "Mit E-Mail anmelden";
+        $("lead").textContent = "Vorname und E-Mail. Du bekommst einen Code per E-Mail.";
+        if (nameIn.value && !fIn.value) fIn.value = nameIn.value;
+        updNew();
+        eIn.focus();
+      });
+      async function auth(path, body, token) {
+        var headers = { apikey: SUPABASE_KEY, "Content-Type": "application/json" };
+        headers.Authorization = "Bearer " + (token || SUPABASE_KEY);
+        var res = await fetch(SUPABASE_URL + "/auth/v1/" + path, { method: body ? "POST" : "GET", headers: headers, body: body ? JSON.stringify(body) : undefined });
+        var t = await res.text();
+        var j = null;
+        try { j = t ? JSON.parse(t) : null; } catch (e) {}
+        if (!res.ok) { var err = new Error((j && (j.msg || j.error_description || j.message)) || ("HTTP " + res.status)); err.status = res.status; err.code = j && (j.error_code || j.code); throw err; }
+        return j;
+      }
+      async function sendCode(first, email) {
+        var redirect = location.origin + "/login/?mail=1" + (nextUrl() !== "/workout/" ? "&next=" + encodeURIComponent(nextUrl()) : "");
+        await auth("otp?redirect_to=" + encodeURIComponent(redirect), { email: email, create_user: true, data: { first_name: first } });
+        try { localStorage.setItem(PENDING, JSON.stringify({ first: first, email: email, at: Date.now() })); } catch (e) {}
+      }
+      function mailError(err) {
+        var m = String((err && err.message) || "");
+        if (err && err.status === 429 || /rate|seconds/i.test(m)) return "Zu viele Versuche. Warte kurz und versuch es nochmal.";
+        if (/not authorized|authorized/i.test(m)) return "E-Mail-Versand ist noch nicht eingerichtet (Supabase SMTP).";
+        if (/invalid|valid email/i.test(m)) return "Diese E-Mail-Adresse klappt nicht.";
+        return "Senden hat nicht geklappt. Versuch es gleich nochmal.";
+      }
       $("new-form").addEventListener("submit", async function (e) {
         e.preventDefault();
         if (newBtn.disabled) return;
         newBtn.disabled = true;
         newMsg.className = "msg";
-        newMsg.textContent = "Konto wird angelegt …";
+        newMsg.textContent = "Code wird gesendet …";
         var first = fIn.value.trim().replace(/\s+/g, " ");
-        var name = (first + " " + lIn.value.trim()).trim();
-        var phone = pIn.value.trim();
+        var email = eIn.value.trim().toLowerCase();
         try {
-          /* Gibt es die Nummer schon? Dann nicht doppelt anlegen */
-          var digits = phone.replace(/[^0-9]/g, "").slice(-8);
-          var existing = await rest("go_accounts?phone=like.*" + encodeURIComponent(digits) + "&select=id&limit=1").catch(function () { return []; });
-          if (existing && existing.length) {
-            newMsg.className = "msg is-error";
-            newMsg.textContent = "Zu dieser Nummer gibt es schon ein Konto. Melde Dich an oder nutz „Code vergessen?“.";
-            newBtn.disabled = false;
-            return;
-          }
-          /* Code wählen, der mit diesem Vornamen noch frei ist */
-          var code = randomCode();
-          for (var i = 0; i < 6; i++) {
-            var taken = await rest("go_accounts?invite_code=eq." + code + "&select=name&limit=50").catch(function () { return []; });
-            if (!(taken || []).some(function (r) { return same(firstName(r.name), first); })) break;
-            code = randomCode();
-          }
-          var rows = await rest("go_accounts", {
-            method: "POST",
-            prefer: "return=representation",
-            body: { name: name, phone: phone, invite_code: code }
-          });
-          created = rows && rows[0];
-          if (!created) throw new Error("leer");
-          /* Einwilligung festhalten (go-datenschutz-1.sql), still bei fehlender Spalte */
-          rest("go_accounts?id=eq." + encodeURIComponent(created.id), {
-            method: "PATCH", prefer: "return=minimal", body: { privacy_ack_at: new Date().toISOString() }
-          }).catch(function () {});
+          await sendCode(first, email);
         } catch (err) {
           newMsg.className = "msg is-error";
-          newMsg.textContent = "Anlegen hat nicht geklappt. Versuch es gleich nochmal.";
+          newMsg.textContent = mailError(err);
           newBtn.disabled = false;
           return;
         }
-        saveSession(created);
-        $("new-form").hidden = true;
-        $("done-code").textContent = created.invite_code;
-        $("title").textContent = "Willkommen, " + firstName(created.name);
-        $("lead").textContent = "Dein Konto ist da.";
-        document.querySelector(".seg").hidden = true;
-        $("done").hidden = false;
+        newMsg.textContent = "";
+        newBtn.disabled = false;
+        showOtp(email);
       });
+      function showOtp(email) {
+        $("new-form").hidden = true;
+        $("login-form").hidden = true;
+        document.querySelector(".seg").hidden = true;
+        $("otp-form").hidden = false;
+        $("title").textContent = "Schau in Deine E-Mails";
+        $("lead").textContent = "";
+        $("otp-lead").textContent = "Wir haben Dir einen Code an " + email + " geschickt. Gib ihn hier ein oder tipp auf den Link in der E-Mail.";
+        otpIn.value = "";
+        otpMsg.textContent = "";
+        updOtp();
+        otpIn.focus();
+      }
+      function updOtp() { otpBtn.disabled = !/^\d{6,8}$/.test(otpIn.value); }
+      otpIn.addEventListener("input", function () {
+        otpIn.value = otpIn.value.replace(/\D/g, "").slice(0, 8);
+        updOtp();
+        if (otpIn.value.length === 6) $("otp-form").requestSubmit();
+      });
+      function pending() { try { return JSON.parse(localStorage.getItem(PENDING) || "{}"); } catch (e) { return {}; } }
+      /* Token aus Code oder Link → Konto holen/anlegen → App */
+      async function finishWithToken(token, first) {
+        var res = await fetch(SUPABASE_URL + "/rest/v1/rpc/go_email_login", {
+          method: "POST",
+          headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify({ p_name: first || null })
+        });
+        if (!res.ok) {
+          var t = await res.text();
+          throw new Error(/go_email_login|function/.test(t) ? "go-email-login.sql fehlt noch in Supabase." : "Konto konnte nicht geladen werden.");
+        }
+        var rows = await res.json();
+        var account = rows && rows[0];
+        if (!account) throw new Error("Konto konnte nicht geladen werden.");
+        try { localStorage.removeItem(PENDING); } catch (e) {}
+        saveSession(account);
+        location.replace(nextUrl());
+      }
+      $("otp-form").addEventListener("submit", async function (e) {
+        e.preventDefault();
+        if (otpBtn.disabled) return;
+        otpBtn.disabled = true;
+        otpMsg.className = "msg";
+        otpMsg.textContent = "Einen Moment …";
+        var p = pending();
+        try {
+          var s = await auth("verify", { type: "email", email: p.email, token: otpIn.value });
+          await finishWithToken(s.access_token, p.first);
+        } catch (err) {
+          otpMsg.className = "msg is-error";
+          otpMsg.textContent = /fehlt|Konto/.test(err.message) ? err.message : "Der Code passt nicht oder ist abgelaufen.";
+          otpBtn.disabled = false;
+          otpIn.select();
+        }
+      });
+      $("otp-resend").addEventListener("click", async function () {
+        var p = pending();
+        if (!p.email) return;
+        otpMsg.className = "msg";
+        otpMsg.textContent = "Code wird gesendet …";
+        try { await sendCode(p.first, p.email); otpMsg.textContent = "Neuer Code ist unterwegs."; }
+        catch (err) { otpMsg.className = "msg is-error"; otpMsg.textContent = mailError(err); }
+      });
+      $("otp-back").addEventListener("click", function () {
+        document.querySelector(".seg").hidden = false;
+        show("new");
+        var p = pending();
+        if (p.first) fIn.value = p.first;
+        if (p.email) eIn.value = p.email;
+        updNew();
+      });
+      /* Link aus der E-Mail: #access_token=… (auch auf einem anderen Gerät) */
+      (async function fromMailLink() {
+        var h = new URLSearchParams(String(location.hash || "").replace(/^#/, ""));
+        var token = h.get("access_token");
+        var errText = h.get("error_description");
+        if (!token && !errText) return;
+        try { history.replaceState(null, "", location.pathname + (nextUrl() !== "/workout/" ? "?next=" + encodeURIComponent(nextUrl()) : "")); } catch (e) {}
+        $("login-form").hidden = true;
+        document.querySelector(".seg").hidden = true;
+        $("title").textContent = "Einen Moment …";
+        $("lead").textContent = "";
+        if (errText) {
+          show("new");
+          newMsg.className = "msg is-error";
+          newMsg.textContent = "Der Link ist abgelaufen. Lass Dir einen neuen Code schicken.";
+          return;
+        }
+        try {
+          await finishWithToken(token, pending().first);
+        } catch (err) {
+          show("new");
+          newMsg.className = "msg is-error";
+          newMsg.textContent = err.message;
+        }
+      })();
       $("done-go").addEventListener("click", function () { location.href = nextUrl(); });
     })();
   </script>
