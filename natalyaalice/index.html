@@ -5159,6 +5159,10 @@
       color: rgba(42, 33, 24, 0.28);
       cursor: default;
     }
+    .team-slide__cta.team-slide__cta--search { margin-top: 12px; background: transparent; color: #2A2118; border: 1.5px solid #2A2118; }
+    .go-group-search__hint { margin: 4px 0 0; font-size: 15px; color: rgba(42,33,24,.75); }
+    .go-slide__cta.go-slide__cta--quiet { background: transparent !important; color: #2A2118 !important; border: 1.5px solid #2A2118; margin-top: 10px; }
+    .group-edit-photo { display: flex; align-items: center; justify-content: center; min-height: 44px; margin: 6px 0 10px; border: 1.5px solid #2A2118; font-weight: 600; cursor: pointer; }
     .team-slide__coach-name {
       display: flex;
       align-items: center;
@@ -7672,6 +7676,7 @@
       <label class="wr-field" style="display:block;margin:10px 0;">Beschreibung
         <input id="group-edit-desc" type="text" maxlength="160" style="width:100%;min-height:44px;margin-top:6px;padding:0 12px;border:1px solid #2A2118;background:transparent;color:#2A2118;" />
       </label>
+      <label class="group-edit-photo" id="group-edit-photo">Gruppenfoto speichern<input id="group-edit-photo-file" type="file" accept="image/*" hidden /></label>
       <button type="button" id="group-edit-save">Speichern</button>
       <button type="button" class="sand-quiet" id="group-edit-delete" style="color:#C7413B;">Gruppe löschen</button>
       <button type="button" class="sand-quiet" id="group-edit-cancel">Abbrechen</button>
@@ -8439,7 +8444,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-97"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-99"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-72"></script>
   <script src="/natalyaalice/support.js?v=support-23"></script>
@@ -14544,7 +14549,7 @@
             var idMap = {};
             (memberships || []).forEach(function (row) {
               /* offene Gruppenanfrage: erst nach Bestätigen (Herz) dabei */
-              if (row && row.group_id && row.status !== "pending") idMap[String(row.group_id)] = true;
+              if (row && row.group_id && row.status !== "pending" && row.status !== "requested") idMap[String(row.group_id)] = true;
             });
             return rest("groups?created_by=eq." + encodeURIComponent(me) + "&select=" + selectFull)
               .catch(function () {
@@ -14565,12 +14570,13 @@
                   .catch(function () { return fetchGroupsByIds(ids, selectBasic).catch(function () { return created || []; }); })
                   .then(function (rows) {
                     var groupRows = rows || [];
-                    return rest(
-                      "group_members?group_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=group_id,account_id,role"
-                    ).catch(function () { return memberships || []; }).then(function (memberRows) {
+                    var memQ = "group_members?group_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=group_id,account_id,role";
+                    return rest(memQ + ",status").catch(function () { return rest(memQ); }).catch(function () { return memberships || []; }).then(function (memberRows) {
                       var byGroup = {};
                       (memberRows || []).forEach(function (m) {
                         if (!m || !m.group_id || !m.account_id) return;
+                        /* Beitrittsanfragen sind noch keine Mitglieder (go-group-search.sql) */
+                        if (m.status === "requested") return;
                         var gid = String(m.group_id);
                         if (!byGroup[gid]) byGroup[gid] = [];
                         byGroup[gid].push(String(m.account_id));
@@ -14729,6 +14735,33 @@
         modal.dataset.groupId = String(group.id || "");
         nameIn.value = String(group.name || "");
         descIn.value = String(group.description || "");
+        /* Gruppenfoto: Geräte-Auswahl öffnet sich, Foto wird gleich gespeichert */
+        var pf = document.getElementById("group-edit-photo-file");
+        if (pf && !pf._bound) {
+          pf._bound = true;
+          pf.addEventListener("change", function (event) {
+            var f = event.target.files && event.target.files[0];
+            event.target.value = "";
+            var gid = String((document.getElementById("group-edit-modal") || {}).dataset.groupId || "");
+            if (!f || !gid) return;
+            var lab = document.getElementById("group-edit-photo");
+            if (lab) lab.firstChild.textContent = "Speichert …";
+            compressPhoto(f, function (url) {
+              if (!url) { if (lab) lab.firstChild.textContent = "Gruppenfoto speichern"; return; }
+              var list = myGroups().slice();
+              list.forEach(function (g) { if (g && String(g.id) === gid) g.photo_url = url; });
+              saveMyGroups(list).then(function () {
+                if (lab) lab.firstChild.textContent = "Gruppenfoto gespeichert ✓";
+                renderTeam();
+              }).catch(function () {
+                if (lab) lab.firstChild.textContent = "Gruppenfoto speichern";
+                gogogoToast("Foto speichern ging nicht");
+              });
+            });
+          });
+        }
+        var labR = document.getElementById("group-edit-photo");
+        if (labR) labR.firstChild.textContent = "Gruppenfoto speichern";
         modal.hidden = false;
       }
 
@@ -14750,6 +14783,10 @@
         if (idx == null) return;
         var person = list[idx];
         if (!person || !person.id) return;
+        if ((group.members || []).length >= 10) {
+          GoDialog.alert("Deine Gruppe ist voll", { body: "In eine Gruppe passen höchstens 10 Mitglieder." });
+          return;
+        }
         var groups = myGroups().slice();
         groups.forEach(function (g) {
           if (!g || String(g.id) !== String(group.id)) return;
@@ -16208,6 +16245,33 @@
           .then(function () { try { renderTeam(); } catch (eR) {} })
           .catch(function () { gogogoToast("Ging gerade nicht"); });
       }
+      /* Beitrittsanfragen an meine Gruppe (go-group-search.sql): Herz in Aktuell → Bestätigen / Ablehnen */
+      function loadGroupJoinRequests() {
+        if (!sessionAccount) return Promise.resolve([]);
+        return rest("rpc/go_my_group_requests", { method: "POST", body: {} }).catch(function () { return []; });
+      }
+      function openGroupJoinRequest(gr) {
+        if (!window.GoDialog) return;
+        var who = String(gr.name || gr.nickname || "Jemand").split(" ")[0];
+        GoDialog.choose(who + " möchte Deiner Gruppe " + (gr.group_name || "") + " beitreten", [
+          { label: "Bestätigen", value: "yes" },
+          { label: "Ablehnen", value: "no" }
+        ], { center: true, cancel: "Später" }).then(function (v) {
+          if (v !== "yes" && v !== "no") return;
+          rest("rpc/go_answer_group_request", { method: "POST", body: { p_group: gr.group_id, p_account: gr.account_id, p_accept: v === "yes" } })
+            .then(function () {
+              gogogoToast(v === "yes" ? who + " ist jetzt in " + (gr.group_name || "Deiner Gruppe") : "Abgelehnt");
+              return loadMyGroups();
+            })
+            .then(function () {
+              try { renderTeam(); } catch (eR) {}
+              if (window.HeuteAccountability && HeuteAccountability.refreshHeart) HeuteAccountability.refreshHeart();
+            })
+            .catch(function (err) {
+              gogogoToast(/group_full/.test(String((err && err.message) || "")) ? "Deine Gruppe ist voll (10 Mitglieder)." : "Ging gerade nicht");
+            });
+        });
+      }
       function openGroupInvite(gi) {
         if (!window.GoDialog) return;
         var who = String(gi.owner_name || "Jemand").split(" ")[0];
@@ -17008,7 +17072,18 @@
           var src = img.getAttribute("src") || "";
           if (src && img.complete && img.naturalWidth) (pool[src] = pool[src] || []).push(img);
         });
+        /* Neu zeichnen (Nachladen alle paar Sekunden) ohne Sprung nach oben: Scrollstand je Slide merken */
+        var keepTop = {};
+        Array.prototype.forEach.call(box.querySelectorAll(".team-slide"), function (sl) {
+          if (sl.dataset.title && sl.scrollTop) keepTop[sl.dataset.title] = sl.scrollTop;
+        });
+        var keepLeft = box.scrollLeft;
         renderTeamNow();
+        Array.prototype.forEach.call(box.querySelectorAll(".team-slide"), function (sl) {
+          var top = keepTop[sl.dataset.title];
+          if (top) sl.scrollTop = top;
+        });
+        if (keepLeft && Math.abs(box.scrollLeft - keepLeft) > 1) box.scrollLeft = keepLeft;
         Array.prototype.forEach.call(box.querySelectorAll("img"), function (img) {
           var list = pool[img.getAttribute("src") || ""];
           var old = list && list.shift();
@@ -17464,9 +17539,27 @@
           createBtn.className = "team-slide__cta is-solid";
           createBtn.textContent = "Gruppe erstellen";
           createBtn.addEventListener("click", function () {
+            /* Gruppen leiten Coaches (Plus → Ich als Coach → Anmelden) */
+            if (typeof isCoachAny === "function" && !isCoachAny()) {
+              GoDialog.confirm("Gruppen leiten Coaches", {
+                body: "Melde Dich unter Plus → Ich als Coach an. Danach erstellst Du hier Deine Gruppe. Einer Gruppe beitreten kannst Du über „Gruppe suchen“.",
+                ok: "Ich als Coach", cancel: "Abbrechen", row: true
+              }).then(function (yes) {
+                if (!yes) return;
+                showPlan("training");
+                requestAnimationFrame(function () { jumpToGoOffer("coach_offer"); });
+              });
+              return;
+            }
             openGoSub("group", "Gruppe erstellen");
           });
           emptyGroup.appendChild(createBtn);
+          var searchBtn = document.createElement("button");
+          searchBtn.type = "button";
+          searchBtn.className = "team-slide__cta team-slide__cta--search";
+          searchBtn.textContent = "Gruppe suchen";
+          searchBtn.addEventListener("click", function () { openGoSub("groupsearch", "Gruppe suchen"); });
+          emptyGroup.appendChild(searchBtn);
           var emptyHint = document.createElement("p");
           emptyHint.className = "team-slide__about team-slide__about--hint";
           emptyHint.textContent = "Deine Gruppe zum schnellen Organisieren von Events und zum aktuellen Austausch.";
@@ -18797,6 +18890,79 @@
           });
           pack.appendChild(buy);
           body.appendChild(pack);
+        } else if (kind === "groupsearch") {
+          /* Gruppe suchen: Name → Suchen → „Gefunden! Beitreten.“ → Anfrage an den Ersteller (Herz) */
+          var sForm = document.createElement("div");
+          sForm.className = "go-group-form";
+          var sName = document.createElement("input");
+          sName.type = "text";
+          sName.placeholder = "Name der Gruppe";
+          sName.maxLength = 40;
+          sForm.appendChild(sName);
+          var sHint = document.createElement("p");
+          sHint.className = "go-group-search__hint";
+          sHint.hidden = true;
+          sForm.appendChild(sHint);
+          var sGo = document.createElement("button");
+          sGo.type = "button";
+          sGo.className = "go-slide__cta";
+          sGo.textContent = "Suchen";
+          var found = null;
+          sName.addEventListener("input", function () { found = null; sGo.textContent = "Suchen"; sHint.hidden = true; });
+          sGo.addEventListener("click", function () {
+            if (found) {
+              sGo.disabled = true;
+              rest("rpc/go_request_group_join", { method: "POST", body: { p_group: found.group_id } })
+                .then(function (r) {
+                  var who = String(found.owner_name || "").split(" ")[0] || "die Gruppe";
+                  gogogoToast(
+                    r === "full" ? "Die Gruppe ist voll (10 Mitglieder)."
+                    : r === "accepted" ? "Du bist schon in " + found.name + "."
+                    : r === "owner" ? "Das ist Deine eigene Gruppe."
+                    : "Anfrage an " + who + " gesendet. Sobald bestätigt, siehst Du " + found.name + " hier."
+                  );
+                  closeGoSub();
+                })
+                .catch(function () {
+                  sGo.disabled = false;
+                  gogogoToast("Beitreten ging nicht (go-group-search.sql ausgeführt?)");
+                });
+              return;
+            }
+            var q = String(sName.value || "").trim();
+            if (q.length < 2) { sName.focus(); return; }
+            sGo.disabled = true;
+            rest("rpc/go_find_group", { method: "POST", body: { p_name: q } })
+              .then(function (rows) {
+                sGo.disabled = false;
+                var hit = (rows || [])[0];
+                if (!hit) {
+                  sHint.hidden = false;
+                  sHint.textContent = "Keine Gruppe mit diesem Namen.";
+                  return;
+                }
+                found = hit;
+                sName.value = hit.name || q;
+                sHint.hidden = false;
+                sHint.textContent = (hit.name || "") + (hit.owner_name ? " · " + String(hit.owner_name).split(" ")[0] : "") +
+                  " · " + (hit.members || 0) + (Number(hit.members) === 1 ? " Mitglied" : " Mitglieder");
+                sGo.textContent = hit.my_status === "requested" ? "Angefragt" : "Gefunden! Beitreten.";
+                if (hit.my_status === "requested") sGo.disabled = true;
+              })
+              .catch(function () {
+                sGo.disabled = false;
+                gogogoToast("Suchen ging nicht (go-group-search.sql ausgeführt?)");
+              });
+          });
+          sForm.appendChild(sGo);
+          var sCancel = document.createElement("button");
+          sCancel.type = "button";
+          sCancel.className = "go-slide__cta go-slide__cta--quiet";
+          sCancel.textContent = "Abbrechen";
+          sCancel.addEventListener("click", function () { closeGoSub(); });
+          sForm.appendChild(sCancel);
+          body.appendChild(sForm);
+          setTimeout(function () { try { sName.focus(); } catch (eF) {} }, 80);
         } else if (kind === "group") {
           var form = document.createElement("div");
           form.className = "go-group-form";
@@ -23462,6 +23628,33 @@
         list.className = "team-gevents";
         list.hidden = true;
         slide.appendChild(list);
+        /* Aus dem Zwischenspeicher sofort zeichnen (sonst ist die Slide nach dem Neuzeichnen kurz kürzer und springt) */
+        function paintRows(rows) {
+          list.textContent = "";
+          rows.forEach(function (ev) {
+            var li = document.createElement("li");
+            li.className = "team-gevents__row";
+            var img = document.createElement("span");
+            img.className = "team-gevents__img";
+            var src = ev.photo_url || (window.GoCovers && GoCovers.url ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id) : "");
+            if (src) img.style.backgroundImage = 'url("' + String(src).replace(/"/g, "%22") + '")';
+            var day = document.createElement("span");
+            day.className = "team-gevents__day";
+            day.textContent = new Date(ev.starts_at).toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }).replace(".", "");
+            var name = document.createElement("span");
+            name.className = "team-gevents__name";
+            name.textContent = String(ev.title || (ev.courses && ev.courses.title) || "Event");
+            li.appendChild(img);
+            li.appendChild(day);
+            li.appendChild(name);
+            list.appendChild(li);
+          });
+          list.hidden = !rows.length;
+        }
+        var gKey = String(group.id);
+        var cached = groupEventsCache[gKey];
+        if (cached) paintRows(cached.rows);
+        if (cached && Date.now() - cached.at < 60000) return;
         var from = new Date(Log.berlinToday() + "T00:00:00").toISOString();
         rest(
           "events?group_id=eq." + encodeURIComponent(group.id) +
@@ -23471,29 +23664,14 @@
         )
           .then(function (rows) {
             rows = Array.isArray(rows) ? rows : [];
-            list.textContent = "";
-            rows.forEach(function (ev) {
-              var li = document.createElement("li");
-              li.className = "team-gevents__row";
-              var img = document.createElement("span");
-              img.className = "team-gevents__img";
-              var src = ev.photo_url || (window.GoCovers && GoCovers.url ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id) : "");
-              if (src) img.style.backgroundImage = 'url("' + String(src).replace(/"/g, "%22") + '")';
-              var day = document.createElement("span");
-              day.className = "team-gevents__day";
-              day.textContent = new Date(ev.starts_at).toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }).replace(".", "");
-              var name = document.createElement("span");
-              name.className = "team-gevents__name";
-              name.textContent = String(ev.title || (ev.courses && ev.courses.title) || "Event");
-              li.appendChild(img);
-              li.appendChild(day);
-              li.appendChild(name);
-              list.appendChild(li);
-            });
-            list.hidden = !rows.length;
+            var sig = JSON.stringify(rows.map(function (r) { return [r.id, r.title, r.starts_at, r.photo_url]; }));
+            var same = cached && cached.sig === sig;
+            groupEventsCache[gKey] = { rows: rows, sig: sig, at: Date.now() };
+            if (!same) paintRows(rows);
           })
           .catch(function () {});
       }
+      var groupEventsCache = {};
 
       function openGruppen() {
         showPlan("team");
@@ -23593,10 +23771,12 @@
             reloadInvites: function () { return loadInvites(); },
             /* weitere Meldungen fürs Herz: Gruppenanfragen */
             heartNotices: function () {
-              return loadGroupInvites().then(function (rows) {
-                return (rows || []).map(function (gi) {
+              return Promise.all([loadGroupInvites(), loadGroupJoinRequests()]).then(function (r) {
+                return (r[0] || []).map(function (gi) {
                   return { kind: "group", created_at: gi.created_at, open: function () { openGroupInvite(gi); } };
-                });
+                }).concat((r[1] || []).map(function (gr) {
+                  return { kind: "groupjoin", created_at: gr.created_at, open: function () { openGroupJoinRequest(gr); } };
+                }));
               });
             },
             clearInvitesForDay: clearInvitesForDay,

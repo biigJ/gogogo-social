@@ -5216,7 +5216,9 @@
     todayActivity: todayActivity,
     focusEvent: focusEvent,
     todayCardFor: todayCardFor,
-    todayEventsFor: todayEventsFor
+    todayEventsFor: todayEventsFor,
+    /* Herz neu prüfen (z. B. nach Bestätigen einer Anfrage) */
+    refreshHeart: function () { state.repliesAt = 0; return checkReplies(); }
   };
   /* Wallet: Tipp auf eine zusammengeschobene Karte schiebt sie frei (andere bleiben zu);
      Tipp aufs Bild einer offenen Karte schiebt sie zurück. Werkzeuge unter der offenen Karte bleiben bedienbar. */
