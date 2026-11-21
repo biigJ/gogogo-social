@@ -5,7 +5,8 @@
  *   GoCovers.url(courseId, cat, enrollmentId)
  *                                → Bild der Einzeleinheit, sonst Bild des Wochenplans
  *                                  (nur wenn das Event aus dieser Wochenplan-Einschreibung stammt),
- *                                  sonst Bild der Kategorie
+ *                                  sonst Bild der Kategorie (Zirkel: Foto des eigenen Circles, falls gesetzt)
+ *   GoCovers.setZirkel(url)      → Circle-Foto für Zirkel-Events (leer = globales Zirkel-Bild)
  *
  * Ein eigenes Foto am Event (events.photo_url) hat immer Vorrang; das entscheidet der Aufrufer.
  */
@@ -22,6 +23,7 @@
   };
 
   var byCourse = {};
+  var zirkelCover = ""; // Foto des eigenen Circles (go_circle_photos), ersetzt das globale Zirkel-Bild
   var planOfEnroll = {}; // Einschreibung → Wochenplan
   var loading = null;
 
@@ -47,6 +49,8 @@
   }
 
   function url(courseId, cat, enrollmentId) {
+    /* Zirkel-Events zeigen das Foto des eigenen Circles vor dem Kursbild */
+    if (String(cat || "") === "zirkel" && zirkelCover) return zirkelCover;
     if (courseId && byCourse[String(courseId)]) return byCourse[String(courseId)];
     return planImage(courseId, enrollmentId) || CAT[String(cat || "")] || CAT.kraft;
   }
@@ -56,6 +60,7 @@
     ready: function () { return loading || Promise.resolve(); },
     onReady: function (fn) { (loading || Promise.resolve()).then(fn); },
     url: url,
+    setZirkel: function (u) { zirkelCover = String(u || ""); },
     count: function () { return Object.keys(byCourse).length; },
     hasCourseImage: function (courseId) { return !!(courseId && byCourse[String(courseId)]); }
   };

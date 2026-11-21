@@ -6069,6 +6069,10 @@
     .go-zlb-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 18px; }
     #go-rail .go-zlb-btns .go-slide__cta.go-zlb-btn { margin: 0 !important; width: 100%; display: flex; align-items: center; justify-content: center; }
     body.is-session #go-rail .go-circle-name, .go-circle-name { margin: 14px 0 4px !important; text-align: center; }
+    .go-circle-name .go-zlb-title { margin: 0 !important; }
+    .go-circle-pick { position: relative; display: inline-block; max-width: 100%; }
+    .go-circle-pick select { -webkit-appearance: none; appearance: none; border: 0; background: transparent; color: inherit; text-align: center; text-align-last: center; padding: 2px 22px 2px 4px; max-width: 100%; cursor: pointer; }
+    .go-circle-pick::after { content: ""; position: absolute; right: 4px; top: 50%; width: 7px; height: 7px; margin-top: -6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); pointer-events: none; }
     body.is-session #go-rail .go-zlb-title, .go-zlb-title { margin: 0 0 6px; font-family: "Playfair Display", Georgia, serif !important; font-size: 18px !important; font-weight: 600 !important; }
     .go-rec-detail__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .go-rec-detail__pen { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: #2A2118; cursor: pointer; }
@@ -8480,7 +8484,7 @@
   <script src="/natalyaalice/exercise-media.js?v=gxm-5"></script>
   <script src="/natalyaalice/go-story.js?v=gst-1"></script>
   <script src="/natalyaalice/bubbles.js?v=bub-9"></script>
-  <script src="/natalyaalice/go-covers.js?v=cov-4"></script>
+  <script src="/natalyaalice/go-covers.js?v=cov-5"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-6"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-8"></script>
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
@@ -16746,6 +16750,7 @@
         });
         ffcGroupNames = next;
         try { localStorage.setItem("gogogo_ffc_group_names", JSON.stringify(next)); } catch (eFs) {}
+        if (!cst().loaded) loadCircleState(groups);
       }
       function isFfcGroup(g) {
         return !!(g && ffcGroupNames[String(g.name || "").trim().toLowerCase()]);
@@ -19086,24 +19091,21 @@
             /* Circles gründen und verwalten nur Coaches; alle anderen treten bei */
             var circleCoach = typeof isCoachAny === "function" ? isCoachAny() : true;
             circleBtn.textContent = circleCoach ? "Deinen Circle verwalten" : "Circle beitreten";
-            /* Name des Circles zwischen „Ich bin dabei“ und dem Circle-Knopf */
-            var circleName = document.createElement("p");
-            circleName.className = "go-zlb-title go-circle-name";
-            circleName.textContent = window.__goCircleName || "";
-            circleName.hidden = !window.__goCircleName;
-            card.appendChild(circleName);
-            if (window.FFC && FFC.groups) {
-              Promise.resolve(FFC.groups()).then(function (groups) {
-                groups = groups || [];
-                var scope = null;
-                try { scope = FFC.leaderboardScope ? FFC.leaderboardScope() : null; } catch (eS) {}
-                var g = groups.filter(function (x) { return String(x.group_id) === String(scope); })[0] || groups[0];
-                var nm = g ? String(g.name || "").trim() : "";
-                window.__goCircleName = nm;
-                circleName.textContent = nm;
-                circleName.hidden = !nm;
-              }).catch(function () {});
+            /* Name des Circles zwischen „Ich bin dabei“ und dem Circle-Knopf; Coaches mit blauem c wählen hier per Dreh-Auswahl */
+            var circleHead = document.createElement("div");
+            circleHead.className = "go-circle-name";
+            circleHead.hidden = !window.__goCircleName;
+            if (window.__goCircleName) {
+              var cnP = document.createElement("p");
+              cnP.className = "go-zlb-title";
+              cnP.textContent = window.__goCircleName;
+              circleHead.appendChild(cnP);
             }
+            card.appendChild(circleHead);
+            var circleImg = art.querySelector("img");
+            cst().ui = { head: circleHead, img: circleImg, imgDefault: circleImg ? circleImg.getAttribute("src") : "" };
+            paintCircleHead();
+            loadCircleState();
             circleBtn.addEventListener("click", function () { openCircleJoin({ coach: circleCoach }); });
             card.appendChild(circleBtn);
           }
@@ -19990,53 +19992,175 @@
 
       /* Plus → FFC → Circle beitreten: eigene FFC-Gruppen zeigen oder neue gründen.
          Hendriks Backend kennt kein „selbst beitreten“: in einen bestehenden Circle holt Dich der Gründer. */
+      /* Circle (FFC-Gruppe) im Plus-Slide: Name, Bild, Auswahl.
+         Normal: ein Circle je Person (auch Coaches ohne blaues c). Coaches mit blauem c: mehrere, Auswahl per Dreh-Auswahl.
+         Bild je Circle in gogogo (go-circle.sql, go_circle_photos); ohne eigenes Bild das globale Zirkel-Bild. */
+      /* Zustand global (Funktion statt var, weil der Plus-Slide schon vor dieser Zeile zeichnen kann) */
+      function cst() { return window.__goCircleState || (window.__goCircleState = { groups: [], photos: {}, ui: null, loaded: false }); }
+      function circleVerified() {
+        return !!(sessionAccount && sessionAccount.coach_verified_at);
+      }
+      function circleCurrent() {
+        var gs = cst().groups || [];
+        var scope = null;
+        try { scope = window.FFC && FFC.leaderboardScope ? FFC.leaderboardScope() : null; } catch (eS) {}
+        return gs.filter(function (g) { return String(g.group_id) === String(scope); })[0] || gs[0] || null;
+      }
+      function circlePhoto(g) {
+        return g ? cst().photos[String(g.group_id)] || "" : "";
+      }
+      function applyCircleCover() {
+        if (window.GoCovers && GoCovers.setZirkel) GoCovers.setZirkel(circlePhoto(circleCurrent()));
+      }
+      function paintCircleHead() {
+        var ui = cst().ui;
+        var cur = circleCurrent();
+        window.__goCircleName = cur ? String(cur.name || "").trim() : (cst().loaded ? "" : window.__goCircleName || "");
+        if (!ui || !ui.head || !ui.head.isConnected) return;
+        if (!cst().loaded) return;
+        var gs = cst().groups || [];
+        ui.head.textContent = "";
+        ui.head.hidden = !cur;
+        if (cur && circleVerified() && gs.length > 1) {
+          var wrap = document.createElement("label");
+          wrap.className = "go-circle-pick";
+          var sel = document.createElement("select");
+          sel.className = "go-zlb-title";
+          sel.setAttribute("aria-label", "Circle wählen");
+          gs.forEach(function (g) {
+            var o = document.createElement("option");
+            o.value = String(g.group_id);
+            o.textContent = String(g.name || "Circle");
+            sel.appendChild(o);
+          });
+          sel.value = String(cur.group_id);
+          sel.addEventListener("change", function () { selectCircle(sel.value); });
+          wrap.appendChild(sel);
+          ui.head.appendChild(wrap);
+        } else if (cur) {
+          var p = document.createElement("p");
+          p.className = "go-zlb-title";
+          p.textContent = String(cur.name || "Circle");
+          ui.head.appendChild(p);
+        }
+        if (ui.img) {
+          var src = circlePhoto(cur) || ui.imgDefault;
+          if (src && ui.img.getAttribute("src") !== src) ui.img.src = src;
+        }
+      }
+      function loadCircleState(groups) {
+        if (!window.FFC || !FFC.user || !FFC.user() || !FFC.groups) return Promise.resolve();
+        return Promise.resolve(groups || FFC.groups()).then(function (gs) {
+          cst().groups = gs || [];
+          cst().loaded = true;
+          var ids = cst().groups.map(function (g) { return encodeURIComponent(String(g.group_id)); });
+          if (!ids.length) { paintCircleHead(); applyCircleCover(); return; }
+          return rest("go_circle_photos?group_id=in.(" + ids.join(",") + ")&select=group_id,photo_url")
+            .catch(function () { return []; })
+            .then(function (rows) {
+              (rows || []).forEach(function (r) { if (r && r.photo_url) cst().photos[String(r.group_id)] = r.photo_url; });
+              paintCircleHead();
+              applyCircleCover();
+            });
+        }).catch(function () {});
+      }
+      function selectCircle(gid) {
+        return Promise.resolve(FFC.setLeaderboardScope ? FFC.setLeaderboardScope(gid) : null).then(function () {
+          paintCircleHead();
+          applyCircleCover();
+          if (window.__goZirkelLbReload) window.__goZirkelLbReload();
+        });
+      }
+      function afterCircleChange() {
+        if (typeof syncFfcGroupIntoTeam === "function") { try { syncFfcGroupIntoTeam(); } catch (eS) {} }
+        if (typeof renderTeam === "function") renderTeam();
+        return loadCircleState().then(function () {
+          if (window.__goZirkelLbReload) window.__goZirkelLbReload();
+        });
+      }
+      function pickCirclePhoto(g) {
+        var inp = document.createElement("input");
+        inp.type = "file";
+        inp.accept = "image/*";
+        inp.hidden = true;
+        document.body.appendChild(inp);
+        inp.addEventListener("change", function () {
+          var f = inp.files && inp.files[0];
+          inp.remove();
+          if (!f) return;
+          gogogoToast("Foto wird gespeichert …");
+          compressPhoto(f, function (url) {
+            if (!url) { gogogoToast("Foto ging nicht"); return; }
+            rest("rpc/go_set_circle_photo", { method: "POST", body: { p_group: String(g.group_id), p_url: url } })
+              .then(function () {
+                cst().photos[String(g.group_id)] = url;
+                paintCircleHead();
+                applyCircleCover();
+                gogogoToast("Foto für „" + (g.name || "Circle") + "“ gespeichert.");
+              })
+              .catch(function (err) {
+                var m = String((err && err.message) || "");
+                if (/not_owner/.test(m)) GoDialog.alert("Das Foto dieses Circles hat jemand anderes gesetzt. Ändern kann es nur diese Person.");
+                else GoDialog.alert("Foto speichern braucht go-circle.sql in Supabase.");
+              });
+          });
+        });
+        inp.click();
+      }
+      /* Deinen Circle verwalten: Stempelkarte zuordnen, Foto (Gründer), löschen (Gründer) bzw. verlassen.
+         Beitreten und gründen: ohne Circle, oder als Coach mit blauem c (mehrere Circles). */
       function openCircleJoin(opts) {
         opts = opts || {};
         if (!window.FFC || !FFC.user || !FFC.user()) { openZirkelRegister(); return; }
-        Promise.resolve(FFC.groups ? FFC.groups() : []).then(function (groups) {
-          var choices = (groups || []).map(function (g) {
-            return { label: g.name + " · " + g.member_count, value: "g:" + g.group_id };
-          });
-          choices.push({ label: "Circle beitreten", value: "join" });
-          if (opts.coach !== false) choices.push({ label: "Neuen Circle gründen", value: "new" });
-          /* Kein Coach und noch in keinem Circle: direkt zur Suche */
-          if (opts.coach === false && !(groups || []).length) { joinCircleSearch(); return; }
-          var msg = (groups || []).length ? "Deine Circles" : "Noch in keinem Circle. In einen bestehenden holt Dich der Gründer. Oder gründe selbst einen.";
-          return GoDialog.choose(msg, choices).then(function (v) {
-            if (!v) return;
-            if (v === "new") { createCircle(); return; }
-            if (v === "join") { setTimeout(joinCircleSearch, 0); return; }
-            var gid = Number(String(v).slice(2));
-            var g = (groups || []).filter(function (x) { return Number(x.group_id) === gid; })[0] || {};
-            /* Tipp auf einen Circle: Leaderboard zeigen oder austreten */
-            return GoDialog.choose(g.name || "Circle", [
-              { label: "Leaderboard zeigen", value: "show" },
-              { label: "Stempelkarte verknüpfen", value: "stamp" },
-              { label: "Circle verlassen", value: "leave" }
-            ]).then(function (act) {
+        loadCircleState().then(function () {
+          var gs = cst().groups || [];
+          var cur = circleCurrent();
+          var verified = circleVerified();
+          var coach = opts.coach !== false && (verified || (typeof isCoachAny === "function" && isCoachAny()));
+          var canMore = verified || !gs.length;
+          if (!cur && !coach) { joinCircleSearch(); return; }
+          return rest("go_stamp_links?kind=eq.circle&status=eq.linked&select=ref,name").catch(function () { return []; }).then(function (links) {
+            var link = (links || [])[0] || null;
+            var here = !!(link && cur && String(link.ref) === String(cur.group_id));
+            var choices = [];
+            if (cur) {
+              if (!here) choices.push({ label: "Stempelkarte diesem Circle zuordnen", value: "stamp" });
+              if (cur.is_owner) choices.push({ label: circlePhoto(cur) ? "Foto ändern" : "Foto hinzufügen", value: "photo" });
+              choices.push({ label: cur.is_owner ? "Circle löschen" : "Circle verlassen", value: "leave" });
+            }
+            if (canMore) {
+              choices.push({ label: "Circle beitreten", value: "join" });
+              if (coach) choices.push({ label: "Neuen Circle gründen", value: "new" });
+            }
+            var msg = cur ? String(cur.name || "Circle") : "Noch in keinem Circle. In einen bestehenden holt Dich der Gründer. Oder gründe selbst einen.";
+            var sub = !cur ? "" : here ? "Deine Stempelkarte gehört zu diesem Circle."
+              : link ? "Deine Stempelkarte gehört zu „" + (link.name || "einem anderen Circle") + "“."
+              : "Deine Stempelkarte ist noch keinem Circle zugeordnet.";
+            return GoDialog.choose(msg, choices, sub ? { center: true, sub: sub } : {}).then(function (act) {
+              if (!act) return;
+              if (act === "new") { createCircle(); return; }
+              if (act === "join") { setTimeout(joinCircleSearch, 0); return; }
+              if (act === "photo") { pickCirclePhoto(cur); return; }
               if (act === "stamp") {
-                /* eigene Circle-Stempelkarte (go-challenges.sql): Stempel, wenn der Trainingspartner denselben Circle verknüpft hat */
-                rest("rpc/go_link_circle_card", { method: "POST", body: { p_circle: String(gid), p_name: g.name || "Circle" } })
-                  .then(function () { gogogoToast("Stempelkarte mit " + (g.name || "dem Circle") + " verknüpft. Du findest sie unter Plus → Stempelkarte."); })
-                  .catch(function () { gogogoToast("Verknüpfen ging nicht (go-challenges.sql ausgeführt?)"); });
-                return;
-              }
-              if (act === "show") {
-                Promise.resolve(FFC.setLeaderboardScope ? FFC.setLeaderboardScope(gid) : null).then(function () {
-                  if (window.__goZirkelLbReload) window.__goZirkelLbReload();
-                });
-                gogogoToast("Leaderboard zeigt jetzt diesen Circle.");
+                /* eine persönliche Circle-Stempelkarte: zieht mit Stempeln in diesen Circle um (go-circle.sql) */
+                rest("rpc/go_move_circle_card", { method: "POST", body: { p_circle: String(cur.group_id), p_name: cur.name || "Circle" } })
+                  .then(function () { gogogoToast("Stempelkarte gehört jetzt zu „" + (cur.name || "Circle") + "“."); })
+                  .catch(function () { gogogoToast("Zuordnen braucht go-circle.sql in Supabase."); });
                 return;
               }
               if (act !== "leave") return;
-              return GoDialog.confirm("„" + (g.name || "Circle") + "“ wirklich verlassen? Circle und Leaderboard sind danach für Dich weg.", { ok: "Verlassen" })
+              var del = !!cur.is_owner;
+              return GoDialog.confirm(del
+                ? "„" + (cur.name || "Circle") + "“ wirklich löschen? Der Circle und sein Leaderboard sind dann für alle Mitglieder weg."
+                : "„" + (cur.name || "Circle") + "“ wirklich verlassen? Circle und Leaderboard sind danach für Dich weg.", { ok: del ? "Löschen" : "Verlassen" })
                 .then(function (ok) {
                   if (!ok) return;
-                  return Promise.resolve(FFC.leaveGroup(gid)).then(function (res) {
+                  /* FFC: leave_group löscht den Circle, wenn der Gründer ihn verlässt (wie in der FFC-App „Gruppe löschen“) */
+                  return Promise.resolve(FFC.leaveGroup(cur.group_id)).then(function (res) {
                     if (res && res.error) { GoDialog.alert("Ging nicht: " + (res.error.message || "Fehler")); return; }
-                    if (typeof syncFfcGroupIntoTeam === "function") { try { syncFfcGroupIntoTeam(); } catch (eS) {} }
-                    if (typeof renderTeam === "function") renderTeam();
-                    GoDialog.alert("Du hast „" + (g.name || "Circle") + "“ verlassen.");
+                    return afterCircleChange().then(function () {
+                      GoDialog.alert(del ? "„" + (cur.name || "Circle") + "“ ist gelöscht." : "Du hast „" + (cur.name || "Circle") + "“ verlassen.");
+                    });
                   });
                 });
             });
@@ -20061,8 +20185,7 @@
               if (!gid) return;
               return FFC.joinGroup(gid).then(function (r2) {
                 if (r2 && r2.error) { GoDialog.alert("Beitreten ging nicht: " + (r2.error.message || "Fehler")); return; }
-                if (typeof syncFfcGroupIntoTeam === "function") { try { syncFfcGroupIntoTeam(); } catch (eS) {} }
-                if (typeof renderTeam === "function") renderTeam();
+                afterCircleChange();
                 GoDialog.alert("Du bist jetzt im Circle.");
               });
             });
@@ -20081,6 +20204,7 @@
             if (!ids.length) { GoDialog.alert("Wähle mindestens eine Person."); return; }
             return Promise.resolve(FFC.createGroup(name, ids)).then(function (res) {
               if (res && res.error) { GoDialog.alert("Ging nicht: " + (res.error.message || "Fehler")); return; }
+              afterCircleChange();
               GoDialog.alert("Circle „" + name + "“ steht.");
             });
           });
