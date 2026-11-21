@@ -6076,6 +6076,15 @@
     .go-circle-name .go-zlb-title { margin: 0 !important; }
     .go-circle-evs { margin: 4px 0 8px; }
     .go-circle-evs:empty { display: none; }
+    .hxd-days { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+    body.is-session #go-rail .hxd-day, .hxd-day { flex: 0 0 auto !important; width: auto !important; min-height: 36px !important; padding: 0 14px !important; background: transparent !important; color: #2A2118 !important; border: 1.5px solid #2A2118 !important; }
+    body.is-session #go-rail .hxd-day.is-on, .hxd-day.is-on { background: #2A2118 !important; color: #F3EEE4 !important; }
+    .hxd-cat { margin: 12px 0 2px; font: 700 12px/1.3 Inter, system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; color: rgba(42, 33, 24, 0.6); }
+    .hxd-row { cursor: pointer; }
+    .hxd-detail { margin: 0 0 8px 14px; font-size: 13px; color: rgba(42, 33, 24, 0.75); }
+    .hxd-detail > div { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+    .hxd-board { border-top: 1px solid rgba(42, 33, 24, 0.12); margin-top: 4px; }
+    .hxd-hint { margin: 10px 0 0; font-size: 12px; color: rgba(42, 33, 24, 0.6); }
     .go-circle-where { margin: 6px 0 2px; font-size: 14px; color: rgba(42, 33, 24, 0.75); text-align: center; }
     .go-circle-pick { position: relative; display: inline-block; max-width: 100%; }
     .go-circle-pick select { -webkit-appearance: none; appearance: none; border: 0; background: transparent; color: inherit; text-align: center; text-align-last: center; padding: 2px 22px 2px 4px; max-width: 100%; cursor: pointer; }
@@ -19311,8 +19320,19 @@
               ? ""
               : "Nach dem Buchen erscheinen hier Deine Aufzeichnungen.";
             recSec.appendChild(recBox);
+            /* HYROX Doubles des Circles (go-hyrox-doubles.sql), nur sichtbar, wenn es Termine gibt */
+            var hxdSec = document.createElement("section");
+            hxdSec.hidden = true;
+            hxdSec.innerHTML = "<h3>HYROX Doubles</h3>";
+            var hxdBox = document.createElement("div");
+            hxdBox.className = "go-slide__ffc-plain hxd";
+            hxdSec.appendChild(hxdBox);
             ffcWrap.appendChild(lbSec);
+            ffcWrap.appendChild(hxdSec);
             ffcWrap.appendChild(recSec);
+            if (window.GoHyroxDoubles) {
+              GoHyroxDoubles.mount(hxdBox, { rest: rest, group: function () { var g = circleCurrent(); return g ? g.group_id : null; } });
+            }
             card.appendChild(ffcWrap);
             if (ffcLogged) {
               /* Sofort füllen — kein „Lade…“-Zwischenzustand der flackert */
@@ -20165,7 +20185,7 @@
               applyCircleCover();
               return setJob;
             })
-            .then(function () { ensureCircleRow(); paintCircleEvents(); });
+            .then(function () { ensureCircleRow(); paintCircleEvents(); if (window.GoHyroxDoubles) GoHyroxDoubles.refresh(); });
         }).catch(function () {});
       }
       /* Einmal je Sitzung: eigene FFC-Circles an gogogo melden (Admin → Circles); vom Admin hinzugefügte Circles:
@@ -20197,6 +20217,7 @@
           applyCircleCover();
           ensureCircleRow();
           paintCircleEvents();
+          if (window.GoHyroxDoubles) GoHyroxDoubles.refresh();
           if (window.__goZirkelLbReload) window.__goZirkelLbReload();
         });
       }
@@ -26861,6 +26882,7 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/natalyaalice/hyrox-doubles.js?v=hxd-1"></script>
   <script src="/natalyaalice/ffc.js?v=ffc-dlg-17"></script>
 </body>
 </html>
