@@ -8399,7 +8399,7 @@
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-88"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-89"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-66"></script>
   <script src="/natalyaalice/support.js?v=support-22"></script>
@@ -16275,8 +16275,11 @@
       }
       /* Wallet-Stand überlebt Neuaufbau von Team (Daten-Refresh, Zurück aus dem Profil) */
       var walletState = { id: "", touching: false, pending: false };
+      var bubbleWalletState = { id: "" };
       /* opts (Bubbles): { fill(card, item), open(item) } statt Freundeskarte und Profil */
       function paintFriendWallet(wallet, people, inGroup, opts) {
+        /* eigene Merkstelle je Wallet: Bubbles sprangen sonst auf die erste Karte (gemerkt war ein Freund) */
+        var ws = opts ? bubbleWalletState : walletState;
         wallet.textContent = "";
         var cards = [];
         var stage = document.createElement("div");
@@ -16299,7 +16302,7 @@
             if (e.target.closest("a")) return;
             /* Karte im Stapel oben oder unten: erst nach vorn holen */
             if (Math.abs(idx - walletPos()) > 0.3) { wallet.scrollTo({ top: idx * walletStep(), behavior: "smooth" }); return; }
-            walletState.id = String(p.id);
+            ws.id = String(p.id);
             if (opts && opts.open) { opts.open(p); return; }
             openProfile(p);
           });
@@ -16337,7 +16340,7 @@
           }
           /* zuletzt angesehenen Freund wieder vorn zeigen */
           var want = 0;
-          cards.forEach(function (c, i) { if (String(c.p.id) === walletState.id) want = i; });
+          cards.forEach(function (c, i) { if (String(c.p.id) === ws.id) want = i; });
           wallet.scrollTop = want * walletStep();
           paintWalletPos();
           if (!wallet.classList.contains("is-ready")) requestAnimationFrame(function () { wallet.classList.add("is-ready"); });
@@ -16348,7 +16351,7 @@
           if (pos < 0) pos = pos * 0.12;
           var yFront = Math.min(pos, TOPN) * TP;
           var front = Math.round(pos);
-          if (cards[front]) walletState.id = String(cards[front].p.id);
+          if (cards[front]) ws.id = String(cards[front].p.id);
           cards.forEach(function (c, i) {
             var d = i - pos;
             var y, sc = 1, op = 1, z;
@@ -20888,10 +20891,9 @@
             if (window.HeuteAccountability && HeuteAccountability.setFilter) HeuteAccountability.setFilter("bubble");
             var pillBtn = document.querySelector('.app-pill [data-shell="heute"]');
             if (pillBtn) pillBtn.click();
-            var bName = (b && b.name) || ((GoBubbles.mine() || {}).name) || "";
             if (window.GoDialog && GoDialog.alert) {
               setTimeout(function () {
-                GoDialog.alert("Wechsle über das Dropdown-Menü die Ansicht.", { plain: true, body: "Jetzt, bring Leben in die Bubble" + (bName ? " " + bName : "") + ".", ok: "Alles klar" });
+                GoDialog.alert("Oben im Dropdown auf andere Ansicht wechseln. In dieser kannst Du Nachrichten schreiben und Events der Bubble zuordnen.", { plain: true, ok: "Alles klar" });
               }, 350);
             }
           },
