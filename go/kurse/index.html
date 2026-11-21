@@ -31,7 +31,8 @@
     .muted { color: var(--dim); font-size: 13px; }
     .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
     .grow { flex: 1 1 160px; min-width: 0; }
-    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 10px 0; }
+    /* flach wie Admin → Circles/Nutzer: keine Kästen, nur Trennlinien */
+    .card { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 4px 0 16px; margin: 10px 0; }
     label { display: block; font-size: 12px; color: var(--dim); margin: 0 0 4px; }
     input, select, textarea {
       width: 100%; font: inherit; color: var(--ink); background: #fff;
@@ -125,6 +126,52 @@
     .goal-chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .goal-chips label.check { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; background: #fff; font-size: 13px; }
     .pill.on { border-color: var(--ink); color: var(--ink); }
+    /* Listen wie Admin → Circles/Nutzer: Bild 4:5 links, Text in Reihen, Pille rechts */
+    .elist { display: block; }
+    .erow { display: flex; gap: 12px; align-items: flex-start; padding: 12px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+    .erow:hover { background: rgba(42,33,28,.04); }
+    .erow.is-current { background: rgba(42,33,28,.08); }
+    .erow.is-off .erow__t { color: var(--dim); }
+    .erect { width: 61px; height: 76px; flex: none; border-radius: 10px; object-fit: cover; background: #E6DED0; display: grid; place-items: center; color: var(--dim); font-size: 11px; overflow: hidden; }
+    .erect img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .erow__c { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--dim); }
+    .erow__t { font-size: 15px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+    .epill { flex: none; align-self: center; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--ink); color: var(--ink); white-space: nowrap; }
+    .epill.is-fill { background: var(--ink); color: #F6F1E8; }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }
+    .chip { padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--ink); background: transparent; color: var(--ink); font-size: 13px; font-weight: 600; }
+    .chip.is-on { background: var(--ink); color: #F6F1E8; }
+    /* Übungsauswahl links: angetippte Übung wird 6 Reihen hoch, Mini-Vorschau des Videos */
+    .erow.is-pick { background: rgba(199,65,59,.08); }
+    .erow__vid { display: none; width: 86px; height: 108px; flex: none; border-radius: 10px; background: #111 center / cover no-repeat; border: 0; padding: 0; position: relative; }
+    .erow__vid span { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; }
+    .erow__vid span svg { width: 30px; height: 30px; }
+    .erow.is-pick .erow__vid { display: block; }
+    .erow.is-pick .erow__c { min-height: 108px; }
+    /* Schieber zwischen den Spalten */
+    #split, .pd-split { display: none; cursor: col-resize; align-self: stretch; position: relative; touch-action: none; }
+    .pd-split { display: block; }
+    #split::after, .pd-split::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--line); border-radius: 2px; }
+    #split:hover::after, .pd-split:hover::after, #split.is-drag::after, .pd-split.is-drag::after { background: var(--ink); }
+    #split { min-height: calc(100vh - 100px); position: sticky; top: 84px; }
+    /* Event: quadratisches Bild, Katalog-Haken in der Zeile von Kategorie und Level */
+    .ev-head { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 14px; align-items: start; }
+    .ev-img { width: 132px; height: 132px; border-radius: 12px; overflow: hidden; background: #E6DED0; border: 0; padding: 0; display: grid; place-items: center; color: var(--dim); font-size: 12px; cursor: zoom-in; }
+    .ev-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .ev-imgbtns { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .ev-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+    .ev-row select { width: auto; }
+    .imgview { position: fixed; inset: 0; z-index: 60; background: rgba(20,16,12,.6); display: grid; place-items: center; padding: 16px; }
+    .imgview img { width: min(390px, 100%); max-height: 92vh; object-fit: contain; border-radius: 14px; background: #000; }
+    /* Übungen im Event: Griff zum Schieben */
+    .drag { cursor: grab; color: var(--dim); display: inline-grid; place-items: center; width: 22px; user-select: none; }
+    .item.is-dragging, .block.is-dragging { opacity: .4; }
+    .item.is-drop { box-shadow: 0 -2px 0 var(--accent); }
+    .block > .row .drag { margin-right: 4px; }
+    /* Übung: immer ein Video-Rahmen, mehrere zum Wischen */
+    .vstrip__empty { width: 100%; aspect-ratio: 9 / 16; max-height: 520px; border-radius: 12px; background: #E6DED0; display: grid; place-items: center; color: var(--dim); font-size: 14px; text-align: center; padding: 20px; }
+    /* Wochenplan rechts: Ziele als Auswahl, Beschreibung volle Breite */
+    .pd-goals { text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); padding: 8px 10px; font-weight: 500; }
     .del-row { margin-top: 18px; display: flex; justify-content: flex-end; }
     /* Haken im gogogo-Stil */
     input[type="checkbox"] { -webkit-appearance: none; appearance: none; width: 18px !important; height: 18px; flex: none; margin: 0; padding: 0;
@@ -146,20 +193,21 @@
     .list-tools { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
     .list-tools input[type="search"] { flex: 1; }
     .item .vlink { grid-column: 1 / -1; font-size: 13px; padding: 6px 8px; }
-    .item.item--simple, .item.item--simple { grid-template-columns: minmax(0, 1fr) auto !important; }
-    .item.item--simple .vlink { grid-column: 1 / -1; }
-    .item.item--simple .n { grid-column: 1 / 2 !important; }
-    .item.item--simple [data-act="del-item"] { grid-column: 2 / 3; width: 36px; }
+    .item.item--simple, .item.item--simple { grid-template-columns: 22px minmax(0, 1fr) auto !important; }
+    .item.item--simple .vlink { grid-column: 2 / -1; }
+    .item.item--simple .n { grid-column: 2 / 3 !important; }
+    .item.item--simple [data-act="del-item"] { grid-column: 3 / 4; width: 36px; }
     .item.ihead .vlink { display: none; }
     /* Desktop-Wochenplan: Einheiten links (2/3), Plan rechts (1/3), beide so hoch wie der Bildschirm */
     .panes.is-desk { display: block; }
-    .pd { display: grid; grid-template-columns: minmax(0, 2fr) minmax(340px, 1fr); gap: 24px; height: calc(100vh - 92px); }
-    .pd-units, .pd-plan { min-height: 0; overflow-y: auto; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+    .pd { display: grid; grid-template-columns: minmax(0, var(--pl, 2fr)) 14px minmax(340px, 1fr); gap: 10px; height: calc(100vh - 92px); }
+    .pd-units, .pd-plan { min-height: 0; overflow-y: auto; background: transparent; border: 0; padding: 4px 6px; }
     .pd-plan { display: flex; flex-direction: column; gap: 8px; }
     .pd-lab { margin-top: 6px; }
     .pd-media { display: grid; grid-template-columns: 96px auto minmax(0, 1fr); gap: 10px; align-items: start; margin-top: 4px; }
     .pd-media__btns { display: flex; flex-direction: column; gap: 6px; }
     .pd-media textarea { min-height: 120px; height: 120px; }
+    #p-desc { min-height: 90px; }
     .pd-aud { gap: 18px; margin-top: 4px; }
     .pd-week .day-row { margin: 2px 0; border-radius: 10px; padding: 1px 4px; }
     .pd-week select { padding: 5px 8px; }
@@ -168,7 +216,7 @@
     .pd-drop.is-over { background: rgba(199,65,59,.12); outline: 1.5px dashed var(--accent); }
     .pd-mix { margin: 2px 0 0; font-weight: 600; }
     .pd-level { gap: 10px; }
-    .pd-foot { margin-top: auto; padding: 10px 0 2px; border-top: 1px solid var(--line); position: sticky; bottom: -14px; background: var(--card); }
+    .pd-foot { margin-top: auto; padding: 10px 0 2px; border-top: 1px solid var(--line); position: sticky; bottom: -4px; background: var(--bg); }
     .pd-ulist { display: grid; gap: 6px; }
     .pd-unit { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto 80px; gap: 10px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: grab; }
     .pd-unit:hover { border-color: var(--ink); }
@@ -178,9 +226,10 @@
     /* Desktop: Liste links, Detail rechts */
     @media (min-width: 1100px) {
       .wrap { max-width: 1320px; padding-left: 28px; padding-right: 28px; }
-      .panes.is-split { display: grid; grid-template-columns: minmax(380px, 460px) minmax(0, 1fr); gap: 28px; align-items: start; }
+      /* Liste links, Detail rechts, Breite per Schieber (--lw) */
+      .panes.is-split { display: grid; grid-template-columns: var(--lw, 440px) 14px minmax(0, 1fr); gap: 14px; align-items: start; }
       .panes.is-split #list-view { position: sticky; top: 84px; max-height: calc(100vh - 100px); overflow-y: auto; }
-      .panes.is-split #list-view tr.is-current td { background: rgba(42,33,28,.07); }
+      .panes.is-split #split { display: block; }
       .item { grid-template-columns: 2.6fr 0.6fr 0.8fr 0.8fr 0.8fr 1fr 1.6fr auto; }
     }
   </style>
@@ -215,6 +264,7 @@
     </nav>
     <div class="panes" id="panes">
       <main id="list-view" class="hidden"></main>
+      <div id="split" role="separator" aria-orientation="vertical" aria-label="Breite der Liste"></div>
       <main id="detail-view" class="hidden"></main>
     </div>
   </div>
@@ -384,6 +434,8 @@
 
     // ---------- Listen ----------
     function showList() {
+      state.pick = false;
+      state.pickName = "";
       $("panes").classList.remove("is-desk");
       setHeader("");
       $("detail-view").classList.add("hidden");
@@ -392,83 +444,201 @@
       renderListOnly();
     }
     function markCurrent(open) {
-      [].forEach.call($("list-view").querySelectorAll("tr[data-open]"), function (tr) {
-        tr.classList.toggle("is-current", tr.getAttribute("data-open") === open);
+      [].forEach.call($("list-view").querySelectorAll("[data-open]"), function (el) {
+        el.classList.toggle("is-current", el.getAttribute("data-open") === open);
       });
     }
+    /* Filter als Auswahl statt Texteingabe */
+    var CHIPS = {
+      plans: [["l1", "Level 1"], ["l2", "Level 2"], ["l3", "Level 3"], ["cat", "Im Katalog"], ["off", "Entwurf"]],
+      units: [["kraft", "Kraft"], ["ausdauer", "Ausdauer"], ["l1", "Level 1"], ["l2", "Level 2"], ["l3", "Level 3"], ["count", "Anzahl Übungen"]],
+      exercises: BLOCK_TYPES.concat([["video", "mit Video"], ["novideo", "ohne Video"]])
+    };
+    function chipsOn(v) { state.chips = state.chips || {}; return state.chips[v] || (state.chips[v] = {}); }
+    function chipsHtml(v) {
+      var on = chipsOn(v);
+      return '<div class="chips" data-chips="' + v + '">' + CHIPS[v].map(function (c) {
+        return '<button type="button" class="chip' + (on[c[0]] ? " is-on" : "") + '" data-chip="' + c[0] + '">' + esc(c[1]) + "</button>";
+      }).join("") + "</div>";
+    }
+    function levelOk(c, on) {
+      var lv = ["l1", "l2", "l3"].filter(function (k) { return on[k]; });
+      return !lv.length || lv.indexOf("l" + c.level) >= 0;
+    }
+    function rectHtml(url, ph) {
+      return '<span class="erect">' + (url ? '<img src="' + esc(url) + '" alt="" loading="lazy" />' : esc(ph || "")) + "</span>";
+    }
+    function currentUnitId() {
+      var m = decodeURIComponent(location.hash.slice(1)).match(/^unit\/(.+)$/);
+      return m ? m[1] : "";
+    }
+    /* Events ohne Zirkeltraining: das kommt aus FFC, die Einheit braucht es nur als Kurs für Zirkel-Termine */
+    function listUnits() { return units().filter(function (u) { return (u.category_default || "kraft") !== "zirkel"; }); }
     function renderListOnly() {
       var box = $("list-view");
       box.classList.remove("hidden");
       if (state.view === "videos") return renderVideos(box);
-      var v = state.view, html = "";
-      var filt = v === "plans" || v === "units" || v === "exercises"
-        ? '<div class="list-tools"><input type="search" class="list-filter" id="list-filter" placeholder="Filtern" value="' + esc((state.listFilters || {})[v] || "") + '" />' +
-          '<button type="button" id="list-new">Neu</button></div>'
-        : "";
+      if (state.pick && state.view === "units") return renderPicker(box);
+      var v = state.view, on = chipsOn(v), html = "";
+      var tools = '<div class="list-tools"><span class="grow"></span>' +
+        (v === "units" ? '<button type="button" class="ghost" id="list-copy"' + (currentUnitId() ? "" : " disabled") + ">Kopieren</button>" : "") +
+        '<button type="button" id="list-new">Neu</button></div>' + chipsHtml(v);
       if (v === "plans") {
-        html = '<table class="tbl"><colgroup><col class="col-name"><col><col class="col-xs"></colgroup>' +
-          '<thead><tr><th>Name</th><th>Verteilung</th><th class="num">Level</th></tr></thead><tbody>' +
-          '<tr class="new-row" data-open="new-plan"><td>Neu</td><td></td><td></td></tr>' +
-          plans().map(function (c) {
-            return '<tr data-open="plan/' + c.id + '" class="' + (c.is_active ? "" : "is-off") + '"><td class="name">' + esc(c.title) +
-              (c.is_active ? "" : ' <span class="pill">nicht im Katalog</span>') + (c.is_public ? ' <span class="pill on">öffentlich</span>' : "") + "</td><td>" + esc(mixText(mixOf(c))) +
-              '</td><td class="num">' + (c.level ? "L" + c.level : "–") + "</td></tr>";
-          }).join("") + "</tbody></table>";
+        html = plans().filter(function (c) {
+          if (!levelOk(c, on)) return false;
+          if (on.cat && !c.is_active) return false;
+          if (on.off && c.is_active) return false;
+          return true;
+        }).map(function (c) {
+          var goals = (c.goals || []).map(function (g) { var x = GOALS.find(function (y) { return y[0] === g; }); return x ? x[1] : g; });
+          return '<div class="erow' + (c.is_active ? "" : " is-off") + '" data-open="plan/' + c.id + '">' + rectHtml(c.image_url, "Plan") +
+            '<div class="erow__c"><span class="erow__t">' + esc(c.title) + "</span>" +
+            "<span>" + esc(mixText(mixOf(c))) + "</span>" +
+            "<span>" + (c.level ? "Level " + c.level : "ohne Level") + (c.is_public ? " · Nutzer" : "") + "</span>" +
+            (goals.length ? "<span>" + esc(goals.join(" · ")) + "</span>" : "") + "</div>" +
+            '<span class="epill' + (c.is_active ? " is-fill" : "") + '">' + (c.is_active ? "Katalog" : "Entwurf") + "</span></div>";
+        }).join("");
       } else if (v === "units") {
-        var list = units().slice().sort(function (a, b) {
+        var cats = ["kraft", "ausdauer"].filter(function (k) { return on[k]; });
+        var list = listUnits().filter(function (c) {
+          if (cats.length && cats.indexOf(c.category_default || "kraft") < 0) return false;
+          return levelOk(c, on);
+        }).sort(function (a, b) {
+          if (on.count) return exCount(b) - exCount(a) || a.title.localeCompare(b.title, "de");
           var ca = CATS.findIndex(function (k) { return k[0] === a.category_default; }), cb = CATS.findIndex(function (k) { return k[0] === b.category_default; });
           return ca !== cb ? ca - cb : a.title.localeCompare(b.title, "de");
         });
-        html = '<table class="tbl"><colgroup><col class="col-name"><col class="col-s"><col class="col-s"><col class="col-xs"></colgroup>' +
-          '<thead><tr><th>Name</th><th>Kategorie</th><th class="num">Übungen</th><th class="num">Level</th></tr></thead><tbody>' +
-          '<tr class="new-row" data-open="new-unit"><td>Neu</td><td></td><td></td><td></td></tr>' +
-          list.map(function (c) {
-            return '<tr data-open="unit/' + c.id + '" class="' + (c.is_active ? "" : "is-off") + '"><td class="name">' + esc(c.title) +
-              (c.is_active ? "" : ' <span class="pill">nicht im Katalog</span>') + "</td><td>" + esc(catLabel(c.category_default)) +
-              '</td><td class="num">' + (exCount(c) || "–") + '</td><td class="num">' + (c.level ? "L" + c.level : "–") + "</td></tr>";
-          }).join("") + "</tbody></table>";
+        html = list.map(function (c) {
+          var n = exCount(c);
+          return '<div class="erow' + (c.is_active ? "" : " is-off") + '" data-open="unit/' + c.id + '">' + rectHtml(c.image_url, catLabel(c.category_default)) +
+            '<div class="erow__c"><span class="erow__t">' + esc(c.title) + "</span>" +
+            "<span>" + esc(catLabel(c.category_default)) + (c.level ? " · Level " + c.level : "") + "</span>" +
+            "<span>" + (n ? n + (n === 1 ? " Übung" : " Übungen") : "noch keine Übungen") + "</span></div>" +
+            '<span class="epill' + (c.is_active ? " is-fill" : "") + '">' + (c.is_active ? "Katalog" : "Entwurf") + "</span></div>";
+        }).join("");
       } else if (v === "exercises") {
-        var ex = Object.keys(state.exIndex).map(function (k) { return state.exIndex[k]; })
-          .sort(function (a, b) { return a.name.localeCompare(b.name, "de"); });
-        html = '<table class="tbl"><colgroup><col class="col-name"><col class="col-s"><col class="col-xs"><col></colgroup>' +
-          '<thead><tr><th>Name</th><th>Block</th><th class="num">Einheiten</th><th>Video-Link</th></tr></thead><tbody>' +
-          '<tr class="new-row" data-open="new-ex"><td>Neu</td><td></td><td></td><td></td></tr>' +
-          ex.map(function (e) {
-            return '<tr data-open="ex/' + encodeURIComponent(e.key) + '"><td class="name">' + esc(e.name) + "</td><td>" + esc(blockLabel(e.block)) +
-              '</td><td class="num">' + (e.units.length || "–") + '</td><td><input type="url" class="vlink-inline" data-vlink data-vname="' + esc(e.name) + '" placeholder="https://…" value="' + esc(GoExMedia.urlFor(e.name) || "") + '" /></td></tr>';
-          }).join("") + "</tbody></table>";
+        html = exerciseRows(on, false);
       }
-      box.innerHTML = filt + html;
-      applyListFilter();
+      box.innerHTML = tools + '<div class="elist">' + (html || '<p class="muted">Nichts gefunden.</p>') + "</div>";
+      var cur = decodeURIComponent(location.hash.slice(1));
+      if (cur) markCurrent(cur);
     }
-    function applyListFilter() {
-      var q = String((state.listFilters || {})[state.view] || "").trim().toLowerCase();
-      [].forEach.call($("list-view").querySelectorAll("tr[data-open]"), function (tr) {
-        if (/^new-/.test(tr.getAttribute("data-open"))) { tr.classList.toggle("hidden", !!filtToolsOn()); return; }
-        tr.classList.toggle("hidden", !!q && tr.textContent.toLowerCase().indexOf(q) < 0);
-      });
+    function exerciseRows(on, pickMode) {
+      var types = BLOCK_TYPES.map(function (t) { return t[0]; }).filter(function (k) { return on[k]; });
+      var ex = Object.keys(state.exIndex).map(function (k) { return state.exIndex[k]; }).filter(function (e) {
+        if (types.length && types.indexOf(e.block || "") < 0) return false;
+        var has = !!GoExMedia.urlFor(e.name);
+        if (on.video && !has) return false;
+        if (on.novideo && has) return false;
+        return true;
+      }).sort(function (a, b) { return a.name.localeCompare(b.name, "de"); });
+      return ex.map(function (e) {
+        var url = GoExMedia.urlFor(e.name);
+        var info = url ? GoExMedia.parse(url) : null;
+        var thumb = info && info.thumb ? info.thumb : "";
+        var picked = pickMode && state.pickName === e.name;
+        return '<div class="erow' + (picked ? " is-pick" : "") + '" ' + (pickMode ? 'data-pickex="' + esc(e.name) + '"' : 'data-open="ex/' + encodeURIComponent(e.key) + '"') + ">" +
+          (picked ? '<button type="button" class="erow__vid" data-exvid="' + esc(e.name) + '" style="' + (thumb ? "background-image:url(" + esc(thumb) + ")" : "") + '"><span>' + GoExMedia.playIcon + "</span></button>"
+            : rectHtml(thumb, url ? "Video" : "")) +
+          '<div class="erow__c"><span class="erow__t">' + esc(e.name) + "</span>" +
+          "<span>" + esc(blockLabel(e.block)) + "</span>" +
+          "<span>" + (e.units.length ? "in " + e.units.length + (e.units.length === 1 ? " Event" : " Events") : "in keinem Event") + "</span>" +
+          "<span>" + (url ? "Video ✓" : "ohne Video") + "</span>" +
+          (picked ? "<span>Jetzt „+ Übung“ im gewünschten Block tippen: sie kommt oben in den Block.</span>" + (e.cue ? "<span>" + esc(e.cue) + "</span>" : "") : "") +
+          "</div></div>";
+      }).join("");
     }
-    function filtToolsOn() { return !!$("list-filter"); }
-    $("list-view").addEventListener("input", function (e) {
-      if (e.target.id !== "list-filter") return;
-      (state.listFilters = state.listFilters || {})[state.view] = e.target.value;
-      applyListFilter();
-    });
+    /* Übungsauswahl links (statt Eventliste), solange im Event „+ Übung“ aktiv ist */
+    function renderPicker(box) {
+      var on = chipsOn("exercises");
+      box.innerHTML = '<div class="list-tools"><button type="button" class="ghost small" id="pick-close">← Events</button><span class="grow"></span></div>' +
+        '<p class="muted" style="margin:0 0 8px">Übung antippen, dann rechts „+ Übung“ im Block.</p>' + chipsHtml("exercises") +
+        '<div class="elist">' + (exerciseRows(on, true) || '<p class="muted">Nichts gefunden.</p>') + "</div>";
+    }
+    function openPicker() {
+      if (!$("panes").classList.contains("is-split")) return false;
+      state.pick = true;
+      renderListOnly();
+      return true;
+    }
+    function closePicker() {
+      state.pick = false;
+      state.pickName = "";
+      renderListOnly();
+    }
 
     $("list-view").addEventListener("click", function (e) {
       if (e.target.closest("[data-vname]")) return;
+      var chip = e.target.closest("[data-chip]");
+      if (chip) {
+        var v = chip.closest("[data-chips]").getAttribute("data-chips"), k = chip.getAttribute("data-chip"), on = chipsOn(v);
+        on[k] = !on[k];
+        if (k === "video" && on.video) on.novideo = false;
+        if (k === "novideo" && on.novideo) on.video = false;
+        renderListOnly();
+        return;
+      }
+      if (e.target.closest("#pick-close")) { closePicker(); return; }
+      var vid = e.target.closest("[data-exvid]");
+      if (vid) { GoExMedia.open(vid.getAttribute("data-exvid")); return; }
+      var pe = e.target.closest("[data-pickex]");
+      if (pe) {
+        var nm = pe.getAttribute("data-pickex");
+        state.pickName = state.pickName === nm ? "" : nm;
+        var keep = $("list-view").scrollTop;
+        renderListOnly();
+        $("list-view").scrollTop = keep;
+        return;
+      }
       if (e.target.closest("#list-new")) {
         if (state.view === "exercises") return createExercise();
         return state.view === "units" ? createUnit() : createPlan();
       }
-      var tr = e.target.closest("tr[data-open]");
-      if (!tr) return;
-      var to = tr.getAttribute("data-open");
-      if (to === "new-plan") return createPlan();
-      if (to === "new-unit") return createUnit();
-      if (to === "new-ex") return createExercise();
-      location.hash = to;
+      if (e.target.closest("#list-copy")) { copyUnit(currentUnitId()); return; }
+      var row = e.target.closest("[data-open]");
+      if (!row) return;
+      location.hash = row.getAttribute("data-open");
     });
+
+    /* Schieber: Breite links ziehen, wird gemerkt */
+    function makeSplit(handle, host, varName, key, minPx, maxFrac) {
+      if (!handle || !host) return;
+      try { var saved = localStorage.getItem(key); if (saved) host.style.setProperty(varName, saved); } catch (eS) {}
+      handle.addEventListener("pointerdown", function (e) {
+        e.preventDefault();
+        try { handle.setPointerCapture(e.pointerId); } catch (eP) {}
+        handle.classList.add("is-drag");
+        var left = host.getBoundingClientRect().left;
+        function move(ev) {
+          var w = Math.max(minPx, Math.min(host.clientWidth * maxFrac, ev.clientX - left));
+          host.style.setProperty(varName, Math.round(w) + "px");
+        }
+        function up() {
+          handle.classList.remove("is-drag");
+          handle.removeEventListener("pointermove", move);
+          handle.removeEventListener("pointerup", up);
+          try { localStorage.setItem(key, host.style.getPropertyValue(varName)); } catch (eS) {}
+        }
+        handle.addEventListener("pointermove", move);
+        handle.addEventListener("pointerup", up);
+      });
+    }
+    makeSplit($("split"), $("panes"), "--lw", "kurse_lw", 280, 0.7);
+
+    /* Event kopieren: „(Kopie) Titel“, gleiche Übungen, noch nicht im Katalog */
+    function copyUnit(id) {
+      var c = byId(id);
+      if (!c) { toast("Erst ein Event öffnen"); return; }
+      insertCourse({ title: "(Kopie) " + c.title, category_default: c.category_default || "kraft", level: c.level || null, description: c.description || null,
+        image_url: c.image_url || null, sessions_per_week: 1, duration_weeks: 1, is_active: false })
+        .then(function (nc) {
+          return rest("course_sessions", { method: "POST", prefer: "return=minimal",
+            body: { course_id: nc.id, block_no: 1, session_no: 1, is_travel: false, title: nc.title, category: nc.category_default || "kraft", blocks: unitBlocks(c) } })
+            .then(function () { return nc; });
+        })
+        .then(function (nc) { return loadAll().then(function () { location.hash = "unit/" + nc.id; toast("Kopie angelegt, noch nicht im Katalog"); }); })
+        .catch(function (err) { toast(err.message); });
+    }
 
     // ---------- Neu ----------
     function slugify(t) {
@@ -525,7 +695,11 @@
       $("panes").classList.toggle("is-desk", deskPlan);
       if (split) {
         var v = kind === "plan" ? "plans" : kind === "unit" ? "units" : "exercises";
-        if (state.view !== v || $("list-view").classList.contains("hidden") || !$("list-view").firstChild) { state.view = v; renderListOnly(); }
+        if (state.view !== v) { state.pick = false; state.pickName = ""; }
+        state.view = v;
+        var keepTop = $("list-view").scrollTop;
+        renderListOnly();
+        $("list-view").scrollTop = keepTop;
         markCurrent(kind + "/" + id);
       } else $("list-view").classList.add("hidden");
       if (deskPlan) {
@@ -546,6 +720,34 @@
       if (kind === "plan") planDetail(box, c); else unitDetail(box, c);
     }
 
+    function unitFormHtml(c) {
+      return '<div class="card"><div class="ev-head"><div>' +
+        '<button type="button" class="ev-img" id="f-cover-prev" data-zoom aria-label="Bild groß ansehen"></button>' +
+        '<div class="ev-imgbtns"><label class="file-btn"><input id="f-cover" type="file" accept="image/*" hidden />Bild wählen</label>' +
+        '<button class="ghost small" id="f-cover-del" type="button">Entfernen</button></div></div>' +
+        '<div><label>Titel</label><input id="f-title" value="' + esc(c.title) + '" />' +
+        '<div class="ev-row"><select id="f-cat" aria-label="Kategorie">' +
+        CATS.map(function (k) { return '<option value="' + k[0] + '"' + (c.category_default === k[0] ? " selected" : "") + ">" + k[1] + "</option>"; }).join("") +
+        '</select><select id="f-level" aria-label="Level"><option value="">Level –</option>' +
+        [1, 2, 3].map(function (l) { return '<option value="' + l + '"' + (c.level === l ? " selected" : "") + ">Level " + l + "</option>"; }).join("") + "</select>" +
+        '<label class="check"><input id="f-active" type="checkbox"' + (c.is_active ? " checked" : "") + " /> Im Katalog sichtbar</label></div>" +
+        '<div style="margin-top:8px"><label>Beschreibung</label><textarea id="f-desc">' + esc(c.description || "") + "</textarea></div></div></div>" +
+        '<div class="row" style="margin-top:12px; justify-content: space-between"><button id="f-save">Speichern</button>' +
+        '<button type="button" class="danger" id="f-del">Löschen</button></div></div>';
+    }
+    /* Bild groß in Breite eines Handys */
+    document.addEventListener("click", function (e) {
+      var z = e.target.closest ? e.target.closest("[data-zoom]") : null;
+      if (z) {
+        var im = z.querySelector("img");
+        if (!im) return;
+        var v = document.createElement("div");
+        v.className = "imgview";
+        v.innerHTML = '<img src="' + esc(im.getAttribute("src")) + '" alt="" />';
+        v.addEventListener("click", function () { v.remove(); });
+        document.body.appendChild(v);
+      }
+    });
     function baseFormHtml(c, isUnit) {
       return '<div class="card">' +
         '<label>Titel</label><input id="f-title" value="' + esc(c.title) + '" />' +
@@ -708,26 +910,39 @@
       box.innerHTML =
         '<div class="pd">' +
         '<section class="pd-units" id="pd-units"></section>' +
+        '<div class="pd-split" id="pd-split" role="separator" aria-orientation="vertical" aria-label="Breite"></div>' +
         '<aside class="pd-plan">' +
         '<label>Titel</label><input id="p-title" value="' + esc(c.title) + '" />' +
-        (state.newCols ? '<label class="pd-lab">Ziele</label><div class="goal-chips">' +
-          GOALS.map(function (g) {
-            return '<label class="check"><input type="checkbox" data-pgoal="' + g[0] + '"' + ((c.goals || []).indexOf(g[0]) !== -1 ? " checked" : "") + " /> " + g[1] + "</label>";
-          }).join("") + "</div>" : "") +
+        /* Freitext unter dem Titel in voller Breite */
+        '<textarea id="p-desc" placeholder="Beschreibung">' + esc(c.description || "") + "</textarea>" +
+        /* Ziele: antippen öffnet die Liste mit Haken */
+        (state.newCols ? '<button type="button" class="pd-goals ghost" id="p-goals"></button>' : "") +
         '<div class="pd-media"><div class="cover-prev" id="p-cover-prev"></div>' +
         '<div class="pd-media__btns"><label class="file-btn"><input id="p-cover" type="file" accept="image/*" hidden />Bild wählen</label>' +
-        '<button class="ghost small" id="p-cover-del" type="button">Entfernen</button></div>' +
-        '<textarea id="p-desc" placeholder="Beschreibung">' + esc(c.description || "") + "</textarea></div>" +
+        '<button class="ghost small" id="p-cover-del" type="button">Entfernen</button></div><span></span></div>' +
         '<div class="row pd-aud"><label class="check"><input id="p-coaches" type="checkbox"' + (c.is_active ? " checked" : "") + " /> Coaches</label>" +
-        (state.newCols ? '<label class="check"><input id="p-users" type="checkbox"' + (c.is_public ? " checked" : "") + " /> Nutzer</label>" : "") + "</div>" +
+        (state.newCols ? '<label class="check"><input id="p-users" type="checkbox"' + (c.is_public ? " checked" : "") + " /> Nutzer</label>" : "") +
+        '<select id="p-level" style="width:auto" aria-label="Level"><option value="">Level –</option>' +
+        [1, 2, 3].map(function (l) { return '<option value="' + l + '"' + (c.level === l ? " selected" : "") + ">Level " + l + "</option>"; }).join("") + "</select></div>" +
         '<label class="pd-lab">Woche</label><div class="pd-week">' + days + "</div>" +
         '<p class="pd-mix" id="mix">' + esc(mixText(mixOf(c))) + "</p>" +
-        '<div class="row pd-level"><label class="pd-lab" style="margin:0">Level</label><select id="p-level" style="width:auto"><option value="">–</option>' +
-        [1, 2, 3].map(function (l) { return "<option" + (c.level === l ? " selected" : "") + ">" + l + "</option>"; }).join("") + "</select></div>" +
         '<div class="row pd-foot"><button id="p-save">Speichern</button><span class="grow"></span><button type="button" class="danger" id="p-del">Löschen</button></div>' +
         "</aside></div>";
       paintCover(c.image_url, "p");
       paintUnitList();
+      makeSplit($("pd-split"), box.querySelector(".pd"), "--pl", "kurse_pl", 300, 0.8);
+      var pgoals = (c.goals || []).slice();
+      function paintGoals() {
+        var b = $("p-goals");
+        if (!b) return;
+        var names = GOALS.filter(function (g) { return pgoals.indexOf(g[0]) >= 0; }).map(function (g) { return g[1]; });
+        b.textContent = "Ziele: " + (names.length ? names.join(", ") : "keine");
+      }
+      paintGoals();
+      if ($("p-goals")) $("p-goals").addEventListener("click", function () {
+        GoDialog.pick("Ziele", GOALS.map(function (g) { return { label: g[1], value: g[0], checked: pgoals.indexOf(g[0]) >= 0 }; }), { ok: "Übernehmen", cancel: "Abbrechen" })
+          .then(function (vals) { if (!vals) return; pgoals = vals; paintGoals(); toast("Ziele übernommen, Speichern nicht vergessen"); });
+      });
       $("p-cover").addEventListener("change", function () { uploadCover(c, this, "p"); });
       $("p-cover-del").addEventListener("click", function () {
         saveCoverUrl(c, null, "p").then(function () { toast("Bild entfernt"); }).catch(function (err) { toast(err.message); });
@@ -742,7 +957,7 @@
         };
         if (state.newCols) {
           f.is_public = $("p-users").checked;
-          f.goals = [].map.call(document.querySelectorAll("[data-pgoal]:checked"), function (x) { return x.getAttribute("data-pgoal"); });
+          f.goals = pgoals.slice();
         }
         if (!f.title) { toast("Titel fehlt"); return; }
         /* Nutzer sehen nur, was auch im Katalog ist */
@@ -773,36 +988,31 @@
     function paintUnitList() {
       var host = $("pd-units");
       if (!host) return;
-      var q = String(state.unitFilter || "").trim().toLowerCase();
-      var cat = state.unitCat || "";
+      var on = chipsOn("units");
+      var cats = ["kraft", "ausdauer"].filter(function (k) { return on[k]; });
       var list = units().filter(function (u) {
-        if (cat && (u.category_default || "kraft") !== cat) return false;
-        return !q || u.title.toLowerCase().indexOf(q) >= 0;
+        if (cats.length && cats.indexOf(u.category_default || "kraft") < 0) return false;
+        return levelOk(u, on);
       }).sort(function (a, b) {
+        if (on.count) return exCount(b) - exCount(a) || a.title.localeCompare(b.title, "de");
         var ca = CATS.findIndex(function (k) { return k[0] === a.category_default; }), cb = CATS.findIndex(function (k) { return k[0] === b.category_default; });
         return ca !== cb ? ca - cb : a.title.localeCompare(b.title, "de");
       });
       host.innerHTML =
-        '<div class="list-tools"><input type="search" id="pd-ufilter" placeholder="Einheiten filtern" value="' + esc(state.unitFilter || "") + '" />' +
-        '<select id="pd-ucat" style="width:auto"><option value="">Alle</option>' +
-        CATS.map(function (k) { return '<option value="' + k[0] + '"' + (cat === k[0] ? " selected" : "") + ">" + k[1] + "</option>"; }).join("") + "</select>" +
-        '<button type="button" id="pd-unew">Neu</button></div>' +
-        '<p class="muted" style="margin:0 0 8px">Auf einen Wochentag rechts ziehen. Klick öffnet die Einheit.</p>' +
-        '<div class="pd-ulist">' + list.map(function (u) {
-          return '<div class="pd-unit" draggable="true" data-unit="' + u.id + '">' +
-            (u.image_url ? '<img src="' + esc(u.image_url) + '" alt="" />' : '<span class="pd-unit__ph"></span>') +
-            '<span class="pd-unit__name">' + esc(u.title) + (u.is_active ? "" : ' <span class="pill">nicht im Katalog</span>') + "</span>" +
-            '<span class="pill">' + esc(catLabel(u.category_default)) + "</span>" +
-            '<span class="muted">' + (exCount(u) ? exCount(u) + " Übungen" : "") + "</span></div>";
+        '<div class="list-tools"><span class="muted grow">Auf einen Wochentag rechts ziehen. Klick öffnet das Event.</span><button type="button" id="pd-unew">Neu</button></div>' +
+        chipsHtml("units") +
+        '<div class="elist">' + list.map(function (u) {
+          var n = exCount(u);
+          return '<div class="erow' + (u.is_active ? "" : " is-off") + '" draggable="true" data-unit="' + u.id + '">' + rectHtml(u.image_url, catLabel(u.category_default)) +
+            '<div class="erow__c"><span class="erow__t">' + esc(u.title) + "</span>" +
+            "<span>" + esc(catLabel(u.category_default)) + (u.level ? " · Level " + u.level : "") + "</span>" +
+            "<span>" + (n ? n + (n === 1 ? " Übung" : " Übungen") : "noch keine Übungen") + "</span></div>" +
+            '<span class="epill' + (u.is_active ? " is-fill" : "") + '">' + (u.is_active ? "Katalog" : "Entwurf") + "</span></div>";
         }).join("") + "</div>";
-      $("pd-ufilter").addEventListener("input", function () {
-        state.unitFilter = this.value;
-        var pos = this.selectionStart;
-        paintUnitList();
-        var f = $("pd-ufilter"); f.focus(); try { f.setSelectionRange(pos, pos); } catch (e) {}
-      });
-      $("pd-ucat").addEventListener("change", function () { state.unitCat = this.value; paintUnitList(); });
       $("pd-unew").addEventListener("click", function () { createUnit(true); });
+      host.querySelectorAll("[data-chip]").forEach(function (chip) {
+        chip.addEventListener("click", function () { var k = chip.getAttribute("data-chip"); on[k] = !on[k]; paintUnitList(); });
+      });
       host.querySelectorAll("[data-unit]").forEach(function (el) {
         el.addEventListener("dragstart", function (e) { e.dataTransfer.setData("text/plain", el.getAttribute("data-unit")); e.dataTransfer.effectAllowed = "copy"; });
         el.addEventListener("click", function () { openUnitInDesk(el.getAttribute("data-unit")); });
@@ -849,7 +1059,7 @@
       var s = mainSessions(c)[0] || { title: c.title, blocks: [], category: c.category_default || "kraft" };
       var cat = c.category_default || s.category || "kraft";
       var usedIn = plans().filter(function (p) { return mainSessions(p).some(function (x) { return x.unit_course_id === c.id; }); });
-      box.innerHTML = baseFormHtml(c, true) +
+      box.innerHTML = unitFormHtml(c) +
         "<h2>Übungen</h2>" +
         '<div class="card" id="u-session">' +
         (cat === "zirkel"
@@ -872,10 +1082,22 @@
         var act = btn.getAttribute("data-act");
         if (act === "add-block") sesBox.querySelector("[data-blocks]").insertAdjacentHTML("beforeend", blockHtml({ type: "grund", items: [{}] }));
         else if (act === "del-block") btn.closest(".block").remove();
-        else if (act === "add-item") btn.closest(".block").querySelector("[data-items]").insertAdjacentHTML("beforeend", itemHtml({}));
+        else if (act === "add-item") {
+          var itemsEl = btn.closest(".block").querySelector("[data-items]");
+          if (state.pickName) {
+            /* gewählte Übung von links oben in diesen Block */
+            itemsEl.insertAdjacentHTML("afterbegin", itemHtml({ name: state.pickName }));
+            state.pickName = "";
+            renderListOnly();
+            saveBlocks(c, readBlocks(sesBox));
+          } else if (!uopts.inDesk && openPicker()) {
+            toast("Links eine Übung antippen, dann hier nochmal „+ Übung“");
+          } else itemsEl.insertAdjacentHTML("beforeend", itemHtml({}));
+        }
         else if (act === "del-item") btn.closest(".item").remove();
         else if (act === "save-blocks") saveBlocks(c, readBlocks(sesBox)).then(function () { if (uopts.inDesk) paintVideoMarks(sesBox); });
       });
+      bindBlockDrag(sesBox, function () { saveBlocks(c, readBlocks(sesBox)); });
       $("ai-copy").addEventListener("click", function () {
         var text = "Das ist eine gogogo-Einzeleinheit (" + c.title + ", " + catLabel(cat) + ") als JSON. Blöcke vom Typ mobility, skill, grund, hybrid, hypertrophie, finisher, ausdauer; " +
           "jede Übung hat name und optional sets, reps, time_s, dist_m, load, note.\nMeine Änderung: [HIER BESCHREIBEN]\n" +
@@ -894,9 +1116,56 @@
       });
     }
 
+    /* Übungen und Blöcke am Griff ziehen; nach dem Loslassen wird gespeichert */
+    function bindBlockDrag(box, onSave) {
+      var dragEl = null;
+      box.addEventListener("mousedown", function (e) {
+        var h = e.target.closest(".drag");
+        if (!h) return;
+        var el = h.hasAttribute("data-dragblock") ? h.closest(".block") : h.closest(".item");
+        if (el) el.draggable = true;
+      });
+      box.addEventListener("dragstart", function (e) {
+        var el = e.target.closest && (e.target.closest(".item") || e.target.closest(".block"));
+        if (!el || !el.draggable) return;
+        dragEl = el;
+        el.classList.add("is-dragging");
+        try { e.dataTransfer.setData("text/plain", "x"); e.dataTransfer.effectAllowed = "move"; } catch (eD) {}
+      });
+      function clear() { [].forEach.call(box.querySelectorAll(".is-drop"), function (x) { x.classList.remove("is-drop"); }); }
+      box.addEventListener("dragover", function (e) {
+        if (!dragEl) return;
+        e.preventDefault();
+        clear();
+        var isBlock = dragEl.classList.contains("block");
+        var t = isBlock ? e.target.closest(".block") : e.target.closest(".item:not(.ihead)");
+        if (t && t !== dragEl) t.classList.add("is-drop");
+      });
+      box.addEventListener("drop", function (e) {
+        if (!dragEl) return;
+        e.preventDefault();
+        var isBlock = dragEl.classList.contains("block");
+        var t = isBlock ? e.target.closest(".block") : e.target.closest(".item:not(.ihead)");
+        if (t && t !== dragEl) t.parentNode.insertBefore(dragEl, t);
+        else if (!isBlock) {
+          var items = e.target.closest(".block") && e.target.closest(".block").querySelector("[data-items]");
+          if (items && items !== dragEl.parentNode) items.appendChild(dragEl);
+        }
+        clear();
+        dragEl.classList.remove("is-dragging");
+        dragEl.draggable = false;
+        dragEl = null;
+        onSave();
+      });
+      box.addEventListener("dragend", function () {
+        clear();
+        if (dragEl) { dragEl.classList.remove("is-dragging"); dragEl.draggable = false; dragEl = null; }
+      });
+    }
+    var GRIP = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
     function blockHtml(bl) {
       var items = (bl.items || []).map(function (it) { return itemHtml(it); }).join("");
-      return '<div class="block"><div class="row">' +
+      return '<div class="block"><div class="row"><span class="drag" data-dragblock title="Block ziehen">' + GRIP + "</span>" +
         '<select data-bf="type" style="width:auto">' +
         BLOCK_TYPES.map(function (t) { return '<option value="' + t[0] + '"' + (bl.type === t[0] ? " selected" : "") + ">" + t[1] + "</option>"; }).join("") +
         '</select><span class="grow"></span><button class="small ghost" data-act="add-item">+ Übung</button> <button class="small danger" data-act="del-block">Block entfernen</button>' +
@@ -909,7 +1178,7 @@
       var vid = it.name && window.GoExMedia ? GoExMedia.urlFor(it.name) : "";
       /* Sätze, Wdh. usw. plant der Nutzer selbst: Felder ausgeblendet, vorhandene Werte bleiben erhalten */
       function hid(k) { return '<input type="hidden" data-if="' + k + '" value="' + esc(it[k]) + '" />'; }
-      return '<div class="item item--simple">' + f("name", "Übung", "n", "", "ex-names") +
+      return '<div class="item item--simple"><span class="drag" title="Übung ziehen">' + GRIP + "</span>" + f("name", "Übung", "n", "", "ex-names") +
         hid("sets") + hid("reps") + hid("time_s") + hid("dist_m") + hid("load") + hid("note") +
         '<button class="small danger" data-act="del-item" aria-label="Übung entfernen">×</button>' +
         '<input class="vlink" data-vlink type="url" placeholder="Video-Link (YouTube/Instagram)" value="' + esc(vid) + '" /></div>';
@@ -995,7 +1264,7 @@
       var host = $("x-vids");
       if (!host) return;
       function draw(list) {
-        if (!list.length) { host.innerHTML = '<p class="muted">Noch kein Video. Link unten einfügen.</p>'; return; }
+        if (!list.length) { host.innerHTML = '<figure class="vstrip__item"><div class="vstrip__empty">Noch kein Video.<br />Link unten einfügen.</div></figure>'; return; }
         host.innerHTML = list.map(function (v, i) {
           var src = embedSrc(v.url);
           return '<figure class="vstrip__item">' +
@@ -1013,11 +1282,12 @@
       }
       var list = mainUrl ? [{ url: mainUrl, main: true }] : [];
       draw(list);
-      rest("go_exercise_submissions?select=note,name&name=ilike." + encodeURIComponent(e.name) + "&order=created_at.desc&limit=12")
+      /* freigegebene Links von Nutzern (go-exercise-media-review.sql): je Link ein Rahmen zum Wischen */
+      rest("go_exercise_links?name_key=eq." + encodeURIComponent(e.key) + "&approved_at=not.is.null&select=url&order=created_at.desc&limit=12")
         .then(function (rows) {
           var seen = {}; if (mainUrl) seen[mainUrl] = true;
           (rows || []).forEach(function (r) {
-            var u = String(r.note || "").trim();
+            var u = String(r.url || "").trim();
             if (/^https?:\/\//.test(u) && !seen[u]) { seen[u] = true; list.push({ url: u, main: false }); }
           });
           draw(list);
