@@ -1078,16 +1078,26 @@
       if (e.target.closest("[data-gi-goal]")) { editGoal(id, function () { close(); openInfo(id); }); return; }
       if (e.target.closest("[data-gi-req]")) { close(); requestCoach(id); return; }
       if (e.target.closest("[data-gi-pen]")) {
-        pickPhoto(function (url) {
-          host.rest("rpc/go_admin_update_account", { method: "POST", body: { p_account: id, p_photo: url } })
+        /* Stift: Löschen / Hochladen / Abbrechen */
+        var savePhoto = function (url) {
+          return host.rest("rpc/go_admin_update_account", { method: "POST", body: { p_account: id, p_photo: url } })
             .then(function () {
-              (st.coachInfo[String(id)] || (st.coachInfo[String(id)] = {})).photo_url = url;
-              var im = card.querySelector(".ga-photo img");
-              if (im) im.src = url; else { close(); openInfo(id); }
+              (st.coachInfo[String(id)] || (st.coachInfo[String(id)] = {})).photo_url = url || null;
+              var acc = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0];
+              if (acc) acc.photo_url = url || null;
+              close();
+              openInfo(id);
               paint();
-              if (host.toast) host.toast("Foto gespeichert");
+              if (host.toast) host.toast(url ? "Foto gespeichert" : "Foto gelöscht");
             })
             .catch(function () { GoDialog.alert("Das braucht go-admin-groups.sql in Supabase."); });
+        };
+        GoDialog.choose("Foto", [
+          { label: "Löschen", value: "del" },
+          { label: "Hochladen", value: "up" }
+        ], { center: true, cancel: "Abbrechen" }).then(function (v) {
+          if (v === "up") pickPhoto(savePhoto);
+          else if (v === "del") savePhoto("");
         });
       }
     });
