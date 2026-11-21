@@ -142,8 +142,16 @@
         card.appendChild(face);
       }
       text(card, msg);
-      button(card, opts.ok || "Ja", "", function () { close(true); });
-      button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(false); });
+      var okB = button(card, opts.ok || "Ja", "", function () { close(true); });
+      var noB = button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(false); });
+      /* opts.row: beide Buttons nebeneinander (OK links, Abbrechen rechts) */
+      if (opts.row) {
+        var row = document.createElement("div");
+        row.className = "god__row2";
+        row.appendChild(okB);
+        row.appendChild(noB);
+        card.appendChild(row);
+      }
       return false;
     });
   }
