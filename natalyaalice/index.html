@@ -6171,8 +6171,17 @@
       background: transparent;
       color: #2A2118;
     }
-    .go-group-friends { display: grid; gap: 8px; max-height: 240px; overflow: auto; }
-    .go-group-friends label { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+    .go-group-friends { display: grid; gap: 8px; max-height: 300px; overflow: auto; padding: 2px 0; }
+    .go-group-friends label { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+    /* quadratische Checkbox (vorher wie ein Eingabefeld: hoch und oben abgeschnitten) */
+    .go-group-form input[type="checkbox"] {
+      -webkit-appearance: none; appearance: none; flex: none; width: 24px; height: 24px; min-height: 0; margin: 0; padding: 0;
+      border: 1.5px solid #2A2118; border-radius: 6px; background: transparent; display: inline-grid; place-items: center; cursor: pointer;
+    }
+    .go-group-form input[type="checkbox"]:checked {
+      background: #2A2118 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5' fill='none' stroke='%23F6F1E8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 18px no-repeat;
+    }
+    .go-group-friends__face { width: 36px !important; height: 36px !important; flex: none; font-size: 15px; }
     body.is-session #plan-training .go-section__head { display: none !important; }
 
     /* Profile 1:1 portrait */
@@ -14480,12 +14489,13 @@
           if (!ids.length) return Promise.resolve([]);
           return rest("groups?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=" + select);
         }
-        return rest("group_members?account_id=eq." + encodeURIComponent(me) + "&select=group_id,role")
-          .catch(function () { return []; })
+        return rest("group_members?account_id=eq." + encodeURIComponent(me) + "&select=group_id,role,status")
+          .catch(function () { return rest("group_members?account_id=eq." + encodeURIComponent(me) + "&select=group_id,role").catch(function () { return []; }); })
           .then(function (memberships) {
             var idMap = {};
             (memberships || []).forEach(function (row) {
-              if (row && row.group_id) idMap[String(row.group_id)] = true;
+              /* offene Gruppenanfrage: erst nach Bestätigen (Herz) dabei */
+              if (row && row.group_id && row.status !== "pending") idMap[String(row.group_id)] = true;
             });
             return rest("groups?created_by=eq." + encodeURIComponent(me) + "&select=" + selectFull)
               .catch(function () {
@@ -16009,6 +16019,52 @@
       window.openNutritionLogModal = openNutritionLogModal;
       window.openStampCardModal = openStampCardModal;
 
+      /* Ich als Besitzer (angenommen), Mitglieder als Anfrage: neue Zeilen bekommen status 'pending' (Default aus go-group-requests.sql),
+         bestehende behalten ihren Status (merge ohne status-Spalte). Ohne SQL: wie bisher. */
+      /* Gruppenanfragen an mich (go-group-requests.sql): kommen über das Herz in Aktuell */
+      function loadGroupInvites() {
+        if (!sessionAccount) return Promise.resolve([]);
+        return rest("rpc/go_my_group_invites", { method: "POST", body: {} }).catch(function () { return []; });
+      }
+      function answerGroupInvite(gi, accept) {
+        return rest("rpc/go_answer_group_invite", { method: "POST", body: { p_group: gi.group_id, p_accept: !!accept } })
+          .then(function () {
+            gogogoToast(accept ? "Du bist jetzt in " + (gi.name || "der Gruppe") : "Abgelehnt");
+            return loadMyGroups();
+          })
+          .then(function () { try { renderTeam(); } catch (eR) {} })
+          .catch(function () { gogogoToast("Ging gerade nicht"); });
+      }
+      function openGroupInvite(gi) {
+        if (!window.GoDialog) return;
+        var who = String(gi.owner_name || "Jemand").split(" ")[0];
+        var opts = [];
+        if (gi.description) opts.push({ label: "Kurzbeschreibung", value: "desc" });
+        opts.push({ label: "Bestätigen", value: "yes" }, { label: "Ablehnen", value: "no" });
+        GoDialog.choose(who + " möchte Dich der Gruppe " + (gi.name || "") + " hinzufügen", opts, { center: true, cancel: "Später" }).then(function (v) {
+          if (v === "desc") {
+            /* Kurzbeschreibung lesen, danach zurück zur Anfrage */
+            GoDialog.alert(gi.name || "Gruppe", { body: gi.description, ok: "Schließen" }).then(function () { openGroupInvite(gi); });
+            return;
+          }
+          if (v === "yes" || v === "no") answerGroupInvite(gi, v === "yes");
+        });
+      }
+
+      function saveGroupMembers(groupId, memberIds) {
+        var me = String(sessionAccount.id);
+        var post = function (rows) {
+          return rest("group_members", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal", body: rows });
+        };
+        return post([{ group_id: groupId, account_id: me, role: "owner", status: "accepted" }])
+          .catch(function () { return post([{ group_id: groupId, account_id: me, role: "owner" }]); })
+          .catch(function () {})
+          .then(function () {
+            if (!memberIds.length) return null;
+            return post(memberIds.map(function (aid) { return { group_id: groupId, account_id: aid, role: "member" }; })).catch(function () {});
+          });
+      }
+
       function saveMyGroups(groups) {
         if (!sessionAccount || !sessionAccount.id) return Promise.resolve();
         var me = String(sessionAccount.id);
@@ -16046,15 +16102,7 @@
               var row = Array.isArray(rows) ? rows[0] : rows;
               if (!row || !row.id) return;
               g.id = row.id;
-              var memberRows = [{ group_id: row.id, account_id: me, role: "owner" }];
-              memberIds.forEach(function (aid) {
-                memberRows.push({ group_id: row.id, account_id: aid, role: "member" });
-              });
-              return rest("group_members", {
-                method: "POST",
-                prefer: "resolution=merge-duplicates,return=minimal",
-                body: memberRows
-              }).catch(function () {});
+              return saveGroupMembers(row.id, memberIds);
             });
           }
           return rest("groups?id=eq." + encodeURIComponent(g.id), {
@@ -16072,15 +16120,7 @@
               body: { name: name }
             }).catch(function () {});
           }).then(function () {
-            var memberRows = [{ group_id: g.id, account_id: me, role: "owner" }];
-            memberIds.forEach(function (aid) {
-              memberRows.push({ group_id: g.id, account_id: aid, role: "member" });
-            });
-            return rest("group_members", {
-              method: "POST",
-              prefer: "resolution=merge-duplicates,return=minimal",
-              body: memberRows
-            }).catch(function () {});
+            return saveGroupMembers(g.id, memberIds);
           });
         });
         return Promise.all(tasks).then(function () {
@@ -17233,6 +17273,10 @@
             openGoSub("group", "Gruppe erstellen");
           });
           emptyGroup.appendChild(createBtn);
+          var emptyHint = document.createElement("p");
+          emptyHint.className = "team-slide__about team-slide__about--hint";
+          emptyHint.textContent = "Deine Gruppe zum schnellen Organisieren von Events und zum aktuellen Austausch.";
+          emptyGroup.appendChild(emptyHint);
           box.appendChild(emptyGroup);
           groupHost = emptyGroup;
         } else {
@@ -18582,7 +18626,7 @@
           ffcCb.id = "go-group-ffc-also";
           ffcAlso.appendChild(ffcCb);
           ffcAlso.appendChild(
-            document.createTextNode(" Auch als Circle")
+            document.createTextNode(" Auch als Circle beim Zirkeltraining")
           );
           form.appendChild(ffcAlso);
           (teamPeople || []).forEach(function (person) {
@@ -18598,6 +18642,10 @@
               else delete selected[cb.value];
             });
             lab.appendChild(cb);
+            /* Profilbild rechts neben der Checkbox */
+            var fFace = personFace({ name: person.name, photo_url: person.photo_url || "" });
+            fFace.classList.add("go-group-friends__face");
+            lab.appendChild(fFace);
             var onFfc = false;
             try {
               onFfc = !!((window.FFC && FFC.friends && FFC.friends()) || []).some(function (f) {
@@ -23086,6 +23134,14 @@
             /* vorher GoHost/GoFFC (gibt es nicht) → „Start“ brach ab */
             openZirkel: function (preset) { openZirkelFlow(preset); },
             inviteFacesForIso: inviteFacesForIso,
+            /* weitere Meldungen fürs Herz: Gruppenanfragen */
+            heartNotices: function () {
+              return loadGroupInvites().then(function (rows) {
+                return (rows || []).map(function (gi) {
+                  return { kind: "group", created_at: gi.created_at, open: function () { openGroupInvite(gi); } };
+                });
+              });
+            },
             clearInvitesForDay: clearInvitesForDay,
             groupMemberIds: groupMemberIds,
             syncHeuteFilterOptions: syncHeuteFilterOptions,
