@@ -6057,6 +6057,23 @@
       max-height: none;
       overflow: visible;
     }
+    /* Circle-Leaderboard und Aufzeichnungen ohne Kasten */
+    .go-slide__ffc-plain { color: #2A2118; font-size: 15px; }
+    /* Datumsrad ohne helle Verlaufsbänder: ausblenden per Maske statt Farbe (Hintergrund bleibt der Slide) */
+    .go-slide__ffc-plain .go-rec-wheel::before, .go-slide__ffc-plain .go-rec-wheel::after { display: none; }
+    .go-slide__ffc-plain .go-rec-wheel__col { -webkit-mask-image: linear-gradient(transparent, #000 32%, #000 68%, transparent); mask-image: linear-gradient(transparent, #000 32%, #000 68%, transparent); }
+    .go-slide__ffc:has(.go-zlb) { margin-top: 24px; }
+    .go-zlb-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 18px; }
+    #go-rail .go-zlb-btns .go-slide__cta.go-zlb-btn { margin: 0 !important; width: 100%; display: flex; align-items: center; justify-content: center; }
+    body.is-session #go-rail .go-zlb-title, .go-zlb-title { margin: 0 0 6px; font-family: "Playfair Display", Georgia, serif !important; font-size: 18px !important; font-weight: 600 !important; }
+    .go-rec-detail__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .go-rec-detail__pen { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: #2A2118; cursor: pointer; }
+    .go-rec-detail__pen.is-on { background: #2A2118; color: #F6F1E8; }
+    body.is-session #go-rail .go-rec-detail__pts, .go-rec-detail__pts { text-align: center; font-family: "Playfair Display", Georgia, serif !important; font-size: 28px !important; font-weight: 600 !important; margin-top: 4px; }
+    .go-slide__ffc-plain .go-rec-detail__meta { text-align: center; font-size: 14px !important; margin-bottom: 6px; }
+    .go-rec-round { padding: 8px 0; border-top: 1px solid rgba(42,33,24,.12); display: grid; gap: 4px; }
+    .go-rec-round__head { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .6; }
+    .go-slide__ffc-plain .go-rec-detail__row { font-size: 15px !important; }
     .go-slide__ffc-row {
       display: flex; align-items: center; justify-content: space-between;
       gap: 8px; padding: 8px 0; border-bottom: 1px solid rgba(42,33,24,.12);
@@ -15608,124 +15625,135 @@
           });
           return row;
         }
-        function paintLbShell(pack) {
-          if (!lbBox) return;
-          pack = pack || {};
-          lastPack = pack;
-          var stdRows = pack.standard || [];
-          var teamRows = pack.team || [];
-          lbBox.textContent = "";
-          var msg = document.createElement("p");
-          msg.className = "go-ffc-msg";
-          lbBox.appendChild(lbChips([["single", "Single"], ["double", "Double"]], lbMode, function (m) {
-            lbMode = m;
-            paintLbShell(lastPack);
-          }));
-          lbBox.appendChild(lbChips([["week", "Diese Woche"], ["all", "Gesamt"]], lbPeriod, function (m) {
-            lbPeriod = m;
-            paintLbShell(lastPack);
-          }));
-          if (lbMode === "double") {
-            var dSec = document.createElement("section");
-            dSec.className = "go-ffc-sec";
-            var pChips = document.createElement("div");
-            dSec.appendChild(pChips);
-            var mine = document.createElement("p");
-            mine.className = "go-ffc-msg";
-            dSec.appendChild(mine);
-            var dList = document.createElement("div");
-            dList.className = "go-ffc-lb-list";
-            dList.textContent = "Lädt …";
-            dSec.appendChild(dList);
-            var dHint = document.createElement("p");
-            dHint.className = "go-ffc-msg";
-            dHint.textContent = "Paare aus Zirkeltrainings im Modus Double. Punkte wie bei Single: jede Runde nach derselben Formel, beide Partner zusammen.";
-            dSec.appendChild(dHint);
-            lbBox.appendChild(dSec);
-            loadDoublePairs(lbPeriod).then(function (res) {
-              var pairs = res.pairs;
-              dList.textContent = "";
-              /* Partner wählen: meine Partner als Chips */
-              var partners = res.myPartners;
-              pChips.textContent = "";
-              if (partners.length) {
-                if (lbPartner && !partners.some(function (x) { return x[0] === lbPartner; })) lbPartner = "";
-                pChips.appendChild(lbChips([["", "Alle Paare"]].concat(partners), lbPartner, function (k) {
-                  lbPartner = k;
-                  paintLbShell(lastPack);
-                }));
-              }
-              var shown = lbPartner ? pairs.filter(function (pr) { return pr.ids.indexOf(lbPartner) !== -1 && pr.me; }) : pairs;
-              if (lbPartner && shown[0]) {
-                var rank = pairs.indexOf(shown[0]) + 1;
-                mine.textContent = "Ihr: Platz " + rank + " von " + pairs.length + " · " + shown[0].count + "× zusammen · " +
-                  (shown[0].points != null ? shown[0].points.toLocaleString("de-DE") + " P" : "Punkte fehlen");
-              } else mine.textContent = "";
-              if (res.missing) {
-                dList.textContent = "Punkte für Double brauchen go-ffc-punkte.sql in Supabase.";
-                return;
-              }
-              if (!shown.length) {
-                dList.textContent = lbPeriod === "week"
-                  ? "Diese Woche noch kein Double. Leg ein Zirkeltraining als Double mit Partner an."
-                  : "Noch kein Double. Leg ein Zirkeltraining als Double mit Partner an.";
-                return;
-              }
-              shown.forEach(function (pr) {
-                var row = document.createElement("div");
-                row.className = "go-slide__ffc-row" + (pr.me ? " is-me" : "");
-                var left = document.createElement("span");
-                left.textContent = String(pairs.indexOf(pr) + 1) + ". " + pr.names.join(" + ") + " · " + pr.count + "×";
-                var right = document.createElement("span");
-                right.textContent = pr.points != null ? pr.points.toLocaleString("de-DE") + " P" : "–";
-                row.appendChild(left);
-                row.appendChild(right);
-                dList.appendChild(row);
+        /* Leaderboard nur mit den Mitgliedern meines Circles (FFC-Gruppe, Abgleich über den Nickname).
+           Zwei Knöpfe als Filter: Single/Double und ø Monat/ø Woche (Durchschnitt je Zirkel im Zeitraum). */
+        var lbAvg = "month";
+        function monthStartIso() {
+          var d = new Date();
+          return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-01";
+        }
+        function monthLabel() {
+          return new Date().toLocaleDateString("de-DE", { month: "long", timeZone: "Europe/Berlin" });
+        }
+        var circleInfo = null;
+        function loadCircleMembers() {
+          return Promise.resolve(FFC.groups ? FFC.groups() : []).then(function (groups) {
+            lbGroups = groups || [];
+            if (!lbGroups.length) return { circle: null, ids: [], people: {} };
+            var scope = null;
+            try { scope = FFC.leaderboardScope ? FFC.leaderboardScope() : null; } catch (eS) {}
+            var g = lbGroups.filter(function (x) { return String(x.group_id) === String(scope); })[0] || lbGroups[0];
+            return Promise.resolve(FFC.weeklyPoints ? FFC.weeklyPoints(g.group_id) : []).then(function (rows) {
+              var nicks = (rows || []).map(function (r) { return String((r && r.nickname) || "").replace(/^@/, ""); }).filter(Boolean);
+              var people = {};
+              if (sessionAccount) people[String(sessionAccount.id)] = sessionAccount;
+              if (!nicks.length) return { circle: g, ids: Object.keys(people), people: people };
+              var orq = nicks.map(function (n) { return "nickname.ilike." + encodeURIComponent('"' + n.replace(/"/g, "") + '"'); }).join(",");
+              return rest("go_accounts?or=(" + orq + ")&select=id,name,nickname&limit=200").catch(function () { return []; }).then(function (accs) {
+                (accs || []).forEach(function (acc) { if (acc && acc.id) people[String(acc.id)] = acc; });
+                return { circle: g, ids: Object.keys(people), people: people };
               });
             });
-            return;
-          }
-          var groupName = (ffcContextGroup() && ffcContextGroup().name) || (lbGroups[0] && lbGroups[0].name) || "Gruppe";
-          lbBox.appendChild(lbChips([["friends", "Freunde"], ["group", groupName]], lbFilter, function (f) {
-            lbFilter = f;
-            paintLbShell(lastPack);
-          }));
-          if (lbPeriod === "all") {
-            var allSec = document.createElement("section");
-            allSec.className = "go-ffc-sec";
-            var allList = document.createElement("div");
-            allList.className = "go-ffc-lb-list";
-            allSec.appendChild(allList);
-            var ids = [];
-            if (lbFilter === "group") {
-              var gg = ffcContextGroup() || (typeof myGroups === "function" && myGroups()[0]) || null;
-              ids = ((gg && gg.members) || []).map(String);
-            } else {
-              ids = (teamPeople || []).map(function (p) { return p && p.id ? String(p.id) : ""; }).filter(Boolean);
-            }
-            if (sessionAccount && ids.indexOf(String(sessionAccount.id)) === -1) ids.push(String(sessionAccount.id));
-            paintAllTime(allList, ids, "Noch keine Punkte. Sie erscheinen, sobald Ihr die App nach einem Zirkel einmal öffnet.");
-            var allHint = document.createElement("p");
-            allHint.className = "go-ffc-msg";
-            allHint.textContent = "Alle Zirkel seit Beginn. Mitglieder zählen, sobald sie gogogo einmal mit FFC-Login geöffnet haben.";
-            allSec.appendChild(allHint);
-            lbBox.appendChild(allSec);
-            return;
-          }
-          if (lbFilter === "friends") {
-            var stdSec = document.createElement("section");
-            stdSec.className = "go-ffc-sec";
-            var stdList = document.createElement("div");
-            stdList.className = "go-ffc-lb-list";
-            paintRows(stdList, stdRows, "Noch keine Punkte unter Freunden. Freunde fügst Du unter Team → Meine Freunde hinzu.");
-            stdSec.appendChild(stdList);
-            lbBox.appendChild(stdSec);
-            return;
-          }
-          var grp = buildGroupSection(teamRows, msg);
-          if (grp) lbBox.appendChild(grp);
-          lbBox.appendChild(msg);
+          });
         }
+        function lbToggleRow() {
+          var row = document.createElement("div");
+          row.className = "go-zlb-btns";
+          var mode = document.createElement("button");
+          mode.type = "button";
+          mode.className = "go-slide__cta go-zlb-btn";
+          mode.textContent = lbMode === "double" ? "Double" : "Single";
+          mode.addEventListener("click", function () {
+            lbMode = lbMode === "double" ? "single" : "double";
+            paintLb();
+            paintRecFiltered();
+          });
+          var avg = document.createElement("button");
+          avg.type = "button";
+          avg.className = "go-slide__cta go-zlb-btn";
+          avg.textContent = lbAvg === "month" ? "ø " + monthLabel() : "ø Woche";
+          avg.addEventListener("click", function () {
+            lbAvg = lbAvg === "month" ? "week" : "month";
+            paintLb();
+          });
+          row.appendChild(mode);
+          row.appendChild(avg);
+          return row;
+        }
+        function lbRow(rank, name, right, me) {
+          var row = document.createElement("div");
+          row.className = "go-slide__ffc-row" + (me ? " is-me" : "");
+          var left = document.createElement("span");
+          left.textContent = (rank ? rank + ". " : "") + name + (me ? " · Du" : "");
+          var r = document.createElement("span");
+          r.textContent = right;
+          row.appendChild(left);
+          row.appendChild(r);
+          return row;
+        }
+        function paintLb() {
+          if (!lbBox) return;
+          lbBox.textContent = "";
+          lbBox.appendChild(lbToggleRow());
+          var title = document.createElement("p");
+          title.className = "go-zlb-title";
+          lbBox.appendChild(title);
+          var list = document.createElement("div");
+          list.className = "go-ffc-lb-list";
+          list.textContent = "Lädt …";
+          lbBox.appendChild(list);
+          var from = lbAvg === "month" ? monthStartIso() : mondayIso();
+          var ready = circleInfo ? Promise.resolve(circleInfo) : loadCircleMembers().then(function (ci) { circleInfo = ci; return ci; });
+          ready.then(function (ci) {
+            if (!ci.circle) {
+              title.textContent = "";
+              list.textContent = "Du bist noch in keinem Circle. Tritt einem Circle bei, dann siehst Du hier Deine Rangliste.";
+              return;
+            }
+            title.textContent = ci.circle.name || "Circle";
+            var meId = sessionAccount ? String(sessionAccount.id) : "";
+            var inCircle = {};
+            ci.ids.forEach(function (id) { inCircle[id] = true; });
+            if (lbMode === "double") {
+              return loadDoublePairs(lbAvg).then(function (res) {
+                list.textContent = "";
+                if (res.missing) { list.textContent = "Punkte für Double brauchen go-ffc-punkte.sql in Supabase."; return; }
+                var pairs = (res.pairs || []).filter(function (pr) { return pr.ids.every(function (id) { return inCircle[id]; }); })
+                  .map(function (pr) { return Object.assign({}, pr, { avg: pr.points != null && pr.count ? Math.round(pr.points / pr.count) : null }); })
+                  .sort(function (x, y) { return (y.avg || 0) - (x.avg || 0); });
+                if (!pairs.length) { list.textContent = "Noch kein Double im Circle in diesem Zeitraum."; return; }
+                pairs.forEach(function (pr, i) {
+                  list.appendChild(lbRow(i + 1, pr.names.join(" + "), (pr.avg != null ? "ø " + pr.avg.toLocaleString("de-DE") + " P" : "–") + " · " + pr.count + "×", pr.me));
+                });
+              });
+            }
+            return GoFfcPoints.sync(lbHost()).then(function () { return GoFfcPoints.load(lbHost(), ci.ids, from); }).then(function (rows) {
+              list.textContent = "";
+              if (GoFfcPoints.missing()) { list.textContent = "Punkte brauchen go-ffc-punkte.sql in Supabase."; return; }
+              var agg = {};
+              (rows || []).forEach(function (r) {
+                var k = String(r.account_id);
+                var a0 = agg[k] || (agg[k] = { sum: 0, n: 0 });
+                a0.sum += Number(r.points) || 0;
+                a0.n += 1;
+              });
+              var lines = ci.ids.map(function (id) {
+                var p = ci.people[id] || {};
+                var a1 = agg[id];
+                return { id: id, name: String(p.name || p.nickname || "Athlet").split(" ")[0], avg: a1 && a1.n ? Math.round(a1.sum / a1.n) : null, n: a1 ? a1.n : 0 };
+              }).sort(function (x, y) {
+                if ((x.avg == null) !== (y.avg == null)) return x.avg == null ? 1 : -1;
+                return (y.avg || 0) - (x.avg || 0) || x.name.localeCompare(y.name, "de");
+              });
+              var rank = 0;
+              lines.forEach(function (l) {
+                if (l.avg != null) rank += 1;
+                list.appendChild(lbRow(l.avg != null ? rank : 0, l.name, l.avg != null ? "ø " + l.avg.toLocaleString("de-DE") + " P · " + l.n + "×" : "–", l.id === meId));
+              });
+            });
+          }).catch(function () { list.textContent = "Leaderboard konnte nicht geladen werden."; });
+        }
+        function paintLbShell() { paintLb(); }
         var lastPack = {};
         function buildGroupSection(teamRows, msg) {
           /* —— Leaderboard Team —— */
@@ -15815,7 +15843,7 @@
         function loadDoublePairs(period) {
           var people = lbPeopleIndex();
           var meId = sessionAccount ? String(sessionAccount.id) : "";
-          var from = period === "week" ? mondayIso() : null;
+          var from = period === "week" ? mondayIso() : period === "month" ? monthStartIso() : null;
           function nameOf(id, fallback) {
             var p = people[String(id)];
             return String((p && (p.name || p.nickname)) || fallback || "Partner").split(" ")[0];
@@ -15893,6 +15921,10 @@
           })[0] || null;
         }
         function reloadLb() {
+          circleInfo = null;
+          paintLb();
+        }
+        function reloadLbOld() {
           Promise.all([
             FFC.groups ? FFC.groups() : Promise.resolve([]),
             FFC.weeklyPoints ? FFC.weeklyPoints(null) : Promise.resolve([]),
@@ -15908,11 +15940,39 @@
               paintLbShell({ standard: [], team: [] });
             });
         }
-        function paintRecSessions(sessions, keepIdx) {
+        /* Aufzeichnungen folgen dem Single/Double-Knopf: Double = Tage mit Zirkel im Modus Double (eigen oder zugesagt mit Partner) */
+        var allRecSessions = [];
+        var doubleDays = {};
+        function recDay(ts) {
+          try { return new Date(ts).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }); } catch (e) { return String(ts || "").slice(0, 10); }
+        }
+        function loadDoubleDays() {
+          if (!sessionAccount) return Promise.resolve({});
+          var me = encodeURIComponent(sessionAccount.id);
+          return Promise.all([
+            rest("events?user_id=eq." + me + "&category=eq.zirkel&note=like.zirkel:double*&select=starts_at&limit=500").catch(function () { return []; }),
+            rest("event_rsvps?user_id=eq." + me + "&partner_id=not.is.null&select=events(starts_at,category)&limit=500").catch(function () { return []; })
+          ]).then(function (r) {
+            var days = {};
+            (r[0] || []).forEach(function (e) { if (e && e.starts_at) days[recDay(e.starts_at)] = true; });
+            (r[1] || []).forEach(function (x) { var e = x && x.events; if (e && e.starts_at && e.category === "zirkel") days[recDay(e.starts_at)] = true; });
+            return days;
+          });
+        }
+        function paintRecFiltered(keepId) {
+          var list = (allRecSessions || []).filter(function (s0) {
+            var dbl = !!doubleDays[recDay(s0.date)];
+            return lbMode === "double" ? dbl : !dbl;
+          });
+          var keep = 0;
+          if (keepId != null) list.forEach(function (s1, i) { if (String(s1.id) === String(keepId)) keep = i; });
+          paintRecSessions(list, keep, lbMode === "double" ? "Noch keine Aufzeichnungen im Modus Double." : null);
+        }
+        function paintRecSessions(sessions, keepIdx, emptyText) {
           if (!recBox) return;
           recBox.textContent = "";
           if (!sessions || !sessions.length) {
-            recBox.textContent = "Noch keine Aufzeichnungen.";
+            recBox.textContent = emptyText || "Noch keine Aufzeichnungen.";
             return;
           }
           var wheel = document.createElement("div");
@@ -15933,59 +15993,95 @@
           wheel.appendChild(col);
           var detail = document.createElement("div");
           detail.className = "go-rec-detail";
+          /* Aufzeichnung: Datum mit Stift (Werte erst nach Tipp auf den Stift änderbar), mittig Punkte,
+             darunter Runden / Arbeit / Pause, dann Doppelrunden Laufen + Station wie in der Workout-Ansicht */
+          var editIdx = -1;
+          function fmtWork(sec) {
+            sec = Number(sec) || 0;
+            return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+          }
           function show(idx) {
             var s = sessions[idx];
             if (!s) return;
             Array.prototype.forEach.call(col.querySelectorAll(".go-rec-wheel__item"), function (el, i) {
               el.classList.toggle("is-on", i === idx);
             });
+            var editing = editIdx === idx;
             detail.textContent = "";
             var head = document.createElement("div");
             head.className = "go-rec-detail__head";
-            head.textContent =
-              (s.dateLabel || "Training") +
-              (s.points > 0 ? " · " + s.points + " Punkte" : "");
+            var hd = document.createElement("span");
+            hd.textContent = s.dateLabel || "Training";
+            head.appendChild(hd);
+            if (FFC.editHistoryAmount && (s.lines || []).length) {
+              var pen = document.createElement("button");
+              pen.type = "button";
+              pen.className = "go-rec-detail__pen" + (editing ? " is-on" : "");
+              pen.setAttribute("aria-label", editing ? "Bearbeiten beenden" : "Werte bearbeiten");
+              pen.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg>';
+              pen.addEventListener("click", function () { editIdx = editing ? -1 : idx; show(idx); });
+              head.appendChild(pen);
+            }
+            detail.appendChild(head);
+            var pts = document.createElement("div");
+            pts.className = "go-rec-detail__pts";
+            pts.textContent = (Number(s.points) || 0).toLocaleString("de-DE") + " Punkte";
+            detail.appendChild(pts);
             var meta = document.createElement("div");
             meta.className = "go-rec-detail__meta";
-            meta.textContent = s.meta || "";
-            detail.appendChild(head);
-            if (meta.textContent) detail.appendChild(meta);
-            (s.lines || []).forEach(function (line) {
-              var row = document.createElement("div");
-              row.className = "go-rec-detail__row";
-              var left = document.createElement("span");
-              left.textContent = line.label || "";
-              /* Wert antippen → nachtragen/korrigieren (FFC training_sessions) */
-              var right = document.createElement(FFC.editHistoryAmount && line.idx != null ? "button" : "span");
-              right.textContent = line.value || "";
-              if (right.tagName === "BUTTON") {
-                right.type = "button";
-                right.className = "go-rec-detail__edit" + (line.empty ? " is-empty" : "");
-                right.addEventListener("click", function () {
-                  Promise.resolve(FFC.editHistoryAmount(s.id, line.idx)).then(function (ok) {
-                    if (!ok) return;
-                    return Promise.resolve(FFC.historyRecords()).then(function (fresh) {
-                      paintRecSessions(fresh || [], idx);
-                    });
-                  }).catch(function () {});
-                });
-              }
-              row.appendChild(left);
-              row.appendChild(right);
-              detail.appendChild(row);
+            meta.textContent = (s.rounds || 0) + " Runden / " + fmtWork(s.workSec) + " Arbeit / " + (s.restSec || 0) + "s Pause";
+            detail.appendChild(meta);
+            /* Doppelrunden: Laufen + Station zusammen (Reihenfolge wie protokolliert) */
+            var lines = s.lines || [];
+            var blocks = [];
+            for (var li = 0; li < lines.length; li++) {
+              var cur = lines[li], nxt = lines[li + 1];
+              var isRun = function (l) { return l && /·\s*Laufen/.test(l.label || ""); };
+              if (nxt && (isRun(cur) || isRun(nxt)) && !(isRun(cur) && isRun(nxt))) { blocks.push([cur, nxt]); li++; }
+              else blocks.push([cur]);
+            }
+            blocks.forEach(function (blk, bi) {
+              var box = document.createElement("div");
+              box.className = "go-rec-round";
+              var rh = document.createElement("div");
+              rh.className = "go-rec-round__head";
+              rh.textContent = "Runde " + (bi + 1);
+              box.appendChild(rh);
+              blk.forEach(function (line) {
+                var row = document.createElement("div");
+                row.className = "go-rec-detail__row";
+                var left = document.createElement("span");
+                left.textContent = String(line.label || "").replace(/^R\d+\s*·\s*/, "");
+                var right = document.createElement(editing && line.idx != null ? "button" : "span");
+                right.textContent = line.value || "";
+                if (right.tagName === "BUTTON") {
+                  right.type = "button";
+                  right.className = "go-rec-detail__edit" + (line.empty ? " is-empty" : "");
+                  right.addEventListener("click", function () {
+                    Promise.resolve(FFC.editHistoryAmount(s.id, line.idx)).then(function (ok) {
+                      if (!ok) return;
+                      return Promise.resolve(FFC.historyRecords()).then(function (fresh) {
+                        allRecSessions = fresh || [];
+                        paintRecFiltered(s.id);
+                      });
+                    }).catch(function () {});
+                  });
+                }
+                row.appendChild(left);
+                row.appendChild(right);
+                box.appendChild(row);
+              });
+              detail.appendChild(box);
             });
             if (s.canStory && FFC.storyFromHistory) {
               var story = document.createElement("button");
               story.type = "button";
               story.className = "go-rec-detail__story";
               story.textContent = "Story posten";
-              story.addEventListener("click", function () {
-                /* Overlay erst, wenn ein Foto gewählt ist (onStoryOpen) – Abbrechen lässt Plus stehen */
-                FFC.storyFromHistory(s.id);
-              });
+              story.addEventListener("click", function () { FFC.storyFromHistory(s.id); });
               detail.appendChild(story);
             }
-            if (!(s.lines || []).length) {
+            if (!lines.length) {
               var empty = document.createElement("div");
               empty.className = "go-rec-detail__meta";
               empty.textContent = "Keine Übungen protokolliert.";
@@ -16042,6 +16138,7 @@
             centerWheelItem(first, false);
           });
         }
+        window.__goZirkelLbReload = reloadLb;
         try {
           lbScopeId = FFC.leaderboardScope ? FFC.leaderboardScope() : null;
         } catch (eSc) {
@@ -16056,9 +16153,11 @@
           });
         var recPromise =
           FFC.historyRecords
-            ? Promise.resolve(FFC.historyRecords())
-                .then(function (sessions) {
-                  paintRecSessions(sessions || []);
+            ? Promise.all([Promise.resolve(FFC.historyRecords()), loadDoubleDays()])
+                .then(function (r) {
+                  allRecSessions = r[0] || [];
+                  doubleDays = r[1] || {};
+                  paintRecFiltered();
                 })
                 .catch(function () {
                   if (recBox) recBox.textContent = "Aufzeichnungen konnten nicht geladen werden.";
@@ -18755,9 +18854,9 @@
                 var btn = existing[ei].querySelector(".go-slide__cta:not(.go-slide__cta--signup)");
                 if (!btn) continue;
                 if (ownedNow) {
-                  btn.textContent = coachSelf ? "Registriert" : "Gebucht";
+                  btn.textContent = coachSelf ? "Registriert" : isZ ? "Ich bin dabei" : "Gebucht";
                 } else {
-                  btn.textContent = of.key === "coach_offer" ? "Registrierung" : "Buchen";
+                  btn.textContent = of.key === "coach_offer" ? "Registrierung" : isZ ? "Beitreten" : "Buchen";
                 }
                 btn.disabled = !!ownedNow;
                 btn.classList.toggle("is-owned", !!ownedNow);
@@ -18867,8 +18966,8 @@
             owned = true;
             cta.className = "go-slide__cta is-owned";
           }
-          if (owned) cta.textContent = isCoachSelf ? "Registriert" : "Gebucht";
-          else cta.textContent = offer.key === "coach_offer" ? "Registrierung" : "Buchen";
+          if (owned) cta.textContent = isCoachSelf ? "Registriert" : isZirkel ? "Ich bin dabei" : "Gebucht";
+          else cta.textContent = offer.key === "coach_offer" ? "Registrierung" : isZirkel ? "Beitreten" : "Buchen";
           /* Ich als Coach: über „Registrierung“ der Knopf „Anmelden“ (Selbst-Anmeldung, unverifiziert) */
           if (offer.key === "coach_offer") {
             var signup = document.createElement("button");
@@ -18950,8 +19049,10 @@
             var circleBtn = document.createElement("button");
             circleBtn.type = "button";
             circleBtn.className = "go-slide__cta go-slide__cta--editor";
-            circleBtn.textContent = "Deine Circle verwalten";
-            circleBtn.addEventListener("click", function () { openCircleJoin(); });
+            /* Circles gründen und verwalten nur Coaches; alle anderen treten bei */
+            var circleCoach = typeof isCoachAny === "function" ? isCoachAny() : true;
+            circleBtn.textContent = circleCoach ? "Deine Circle verwalten" : "Circle beitreten";
+            circleBtn.addEventListener("click", function () { openCircleJoin({ coach: circleCoach }); });
             card.appendChild(circleBtn);
           }
           if (offer.key === "coach_offer") {
@@ -18985,19 +19086,8 @@
             if (isCoachAny()) copy.hidden = true;
           }
           card.appendChild(copy);
-          /* Friday Fitness Circle: eine Zeile, mit „mehr“ aufklappbar */
-          if (offer.key === "zirkel" && copy.textContent) {
-            copy.classList.add("is-clamped");
-            var moreTxt = document.createElement("button");
-            moreTxt.type = "button";
-            moreTxt.className = "go-slide__more";
-            moreTxt.textContent = "mehr";
-            moreTxt.addEventListener("click", function () {
-              var open = copy.classList.toggle("is-clamped");
-              moreTxt.textContent = open ? "mehr" : "weniger";
-            });
-            card.appendChild(moreTxt);
-          }
+          /* Friday Fitness Circle: Text voll sichtbar, nach dem Beitreten ausgeblendet */
+          if (offer.key === "zirkel" && owned) copy.hidden = true;
           if (offer.key === "coach_offer") {
             var more = document.createElement("button");
             more.type = "button";
@@ -19055,9 +19145,8 @@
             var ffcWrap = document.createElement("div");
             ffcWrap.className = "go-slide__ffc";
             var lbSec = document.createElement("section");
-            lbSec.innerHTML = "<h3>Leaderboard</h3>";
             var lbBox = document.createElement("div");
-            lbBox.className = "go-slide__ffc-box";
+            lbBox.className = "go-slide__ffc-plain go-zlb";
             lbBox.id = "go-zirkel-board";
             lbBox.textContent = ffcLogged
               ? ""
@@ -19066,7 +19155,7 @@
             var recSec = document.createElement("section");
             recSec.innerHTML = "<h3>Aufzeichnungen</h3>";
             var recBox = document.createElement("div");
-            recBox.className = "go-slide__ffc-box";
+            recBox.className = "go-slide__ffc-plain";
             recBox.id = "go-zirkel-records";
             recBox.textContent = ffcLogged
               ? ""
@@ -19849,14 +19938,17 @@
 
       /* Plus → FFC → Circle beitreten: eigene FFC-Gruppen zeigen oder neue gründen.
          Hendriks Backend kennt kein „selbst beitreten“: in einen bestehenden Circle holt Dich der Gründer. */
-      function openCircleJoin() {
+      function openCircleJoin(opts) {
+        opts = opts || {};
         if (!window.FFC || !FFC.user || !FFC.user()) { openZirkelRegister(); return; }
         Promise.resolve(FFC.groups ? FFC.groups() : []).then(function (groups) {
           var choices = (groups || []).map(function (g) {
             return { label: g.name + " · " + g.member_count, value: "g:" + g.group_id };
           });
           choices.push({ label: "Circle beitreten", value: "join" });
-          choices.push({ label: "Neuen Circle gründen", value: "new" });
+          if (opts.coach !== false) choices.push({ label: "Neuen Circle gründen", value: "new" });
+          /* Kein Coach und noch in keinem Circle: direkt zur Suche */
+          if (opts.coach === false && !(groups || []).length) { joinCircleSearch(); return; }
           var msg = (groups || []).length ? "Deine Circles" : "Noch in keinem Circle. In einen bestehenden holt Dich der Gründer. Oder gründe selbst einen.";
           return GoDialog.choose(msg, choices).then(function (v) {
             if (!v) return;
@@ -19878,7 +19970,9 @@
                 return;
               }
               if (act === "show") {
-                if (FFC.setLeaderboardScope) FFC.setLeaderboardScope(gid);
+                Promise.resolve(FFC.setLeaderboardScope ? FFC.setLeaderboardScope(gid) : null).then(function () {
+                  if (window.__goZirkelLbReload) window.__goZirkelLbReload();
+                });
                 gogogoToast("Leaderboard zeigt jetzt diesen Circle.");
                 return;
               }
