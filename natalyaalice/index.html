@@ -5159,6 +5159,9 @@
       color: rgba(42, 33, 24, 0.28);
       cursor: default;
     }
+    #go-rail .go-slide__cta--signup + .go-slide__cta { margin-top: 12px !important; }
+    /* Blaues c (verifizierter Coach): wie der Haken bei Instagram, oben rechts am Namen */
+    .go-vc { display: inline-grid; place-items: center; width: .62em; height: .62em; min-width: 13px; min-height: 13px; margin-left: 3px; vertical-align: super; border-radius: 50%; background: #1D9BF0; color: #fff; font: 700 9px/1 Inter, system-ui, sans-serif !important; letter-spacing: 0; text-transform: none; }
     .team-slide__coach-name {
       display: flex;
       align-items: center;
@@ -8431,9 +8434,9 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-12"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-13"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-2"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-11"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-12"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
@@ -15188,18 +15191,100 @@
         );
       }
 
+      /* ---------- Ich als Coach: Selbst-Anmeldung + blaues c (go-coach-self.sql) ---------- */
+      var COACH_SELF_TEXT = "Ich melde mich als Coach für gogogo an. Ich handle im Sinne der Community und bin einverstanden, dass mein Name, mein Über-mich-Text, meine Orte und Profilbild für alle Nutzer sichtbar sind. Um mit Nutzern befreundet zu sein, müssen diese mein Nickname kennen oder meinen QR-Code scannen. Sie können meine Coachees werden, wenn ich mich als Coach mit gogogo-Zertifikat registriert habe. Als Coach ohne Zertifikat kann ich Challenges und Orte in meiner Gruppe organisieren. Wenn mich Nutzer als Coach gewählt haben, kann ich sie in meiner Gruppe aufnehmen. Ich kann nicht mehr als 10 Nutzer in meine Gruppe aufnehmen.";
+      var verifiedCoaches = {};
+      function isCoachAny() {
+        var a = sessionAccount || {};
+        return !!(sessionIsTrainer || a.is_trainer || a.coach_self_at || a.coach_verified_at);
+      }
+      function paintCoachSignupBtn(btn) {
+        if (!btn) return;
+        var a = sessionAccount || {};
+        var on = !!(a.coach_self_at || a.is_trainer || sessionIsTrainer || a.coach_verified_at);
+        btn.textContent = on ? "Angemeldet" : "Anmelden";
+        btn.disabled = on;
+        btn.classList.toggle("is-owned", on);
+      }
+      /* Slide in place anpassen (kein Rail-Rebuild) */
+      function syncCoachSlide() {
+        var rail = document.getElementById("go-rail");
+        if (!rail) return;
+        var slide = rail.querySelector('.go-slide[data-offer="coach_offer"]');
+        if (!slide) return;
+        paintCoachSignupBtn(slide.querySelector(".go-slide__cta--signup"));
+        var copy = slide.querySelector(".go-slide__copy--coach");
+        if (copy) copy.hidden = isCoachAny();
+      }
+      function openCoachSelfSignup(btn) {
+        if (!window.GoDialog) return;
+        GoDialog.confirm("Als Coach anmelden", { body: COACH_SELF_TEXT, ok: "Anmelden", cancel: "Abbrechen", row: true }).then(function (yes) {
+          if (!yes) return;
+          if (btn) btn.disabled = true;
+          rest("rpc/go_coach_self_signup", { method: "POST", body: {} })
+            .then(function (at) {
+              sessionAccount.coach_self_at = at || new Date().toISOString();
+              if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+              syncCoachSlide();
+              gogogoToast("Du bist als Coach angemeldet. Gruppe leiten: Team → Meine Gruppe.");
+            })
+            .catch(function () {
+              if (btn) btn.disabled = false;
+              gogogoToast("Anmelden ging nicht (go-coach-self.sql ausgeführt?)");
+            });
+        });
+      }
+      /* Blaues c: oben rechts am Namen. el bekommt data-vc-id, das c kommt, sobald die Liste geladen ist */
+      function addVc(el, id) {
+        if (!el) return;
+        id = String(id || "");
+        el.setAttribute("data-vc-id", id);
+        var old = el.querySelector(":scope > .go-vc");
+        if (old) old.remove();
+        if (!id || !verifiedCoaches[id]) return;
+        var b = document.createElement("span");
+        b.className = "go-vc";
+        b.setAttribute("aria-label", "Verifizierter Coach");
+        b.title = "Verifizierter Coach";
+        b.textContent = "c";
+        el.appendChild(b);
+      }
+      function applyVcAll() {
+        document.querySelectorAll("[data-vc-id]").forEach(function (el) { addVc(el, el.getAttribute("data-vc-id")); });
+      }
+      function loadCoachStatus() {
+        if (!sessionMode || !sessionAccount || !sessionAccount.id) return;
+        rest("go_accounts?coach_verified_at=not.is.null&select=id&limit=500")
+          .then(function (rows) {
+            verifiedCoaches = {};
+            (rows || []).forEach(function (r) { if (r && r.id) verifiedCoaches[String(r.id)] = true; });
+            applyVcAll();
+          })
+          .catch(function () {});
+        rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id) + "&select=coach_self_at,coach_verified_at")
+          .then(function (rows) {
+            var r = rows && rows[0];
+            if (!r) return;
+            sessionAccount.coach_self_at = r.coach_self_at || null;
+            sessionAccount.coach_verified_at = r.coach_verified_at || null;
+            syncCoachSlide();
+          })
+          .catch(function () {});
+      }
+      window.GoCoachBadge = { add: function (el, id) { addVc(el, id); }, isVerified: function (id) { return !!verifiedCoaches[String(id || "")]; } };
+
       /* Coach-Status kommt nach dem ersten Rail-Paint: CTA in place umstellen, kein Rail-Rebuild */
       function markCoachOfferOwned() {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
         Array.prototype.forEach.call(rail.querySelectorAll(".go-slide"), function (slide) {
           var h = slide.querySelector(".go-slide__title");
-          if (!h || h.textContent !== "Selbst Coaching anbieten") return;
-          var cta = slide.querySelector(".go-slide__cta");
-          if (!cta || cta.textContent === "Du bist Coach") return;
+          if (!h || h.textContent !== "Ich als Coach") return;
+          var cta = slide.querySelector(".go-slide__cta:not(.go-slide__cta--signup)");
+          if (!cta || cta.textContent === "Registriert") return;
           var fresh = cta.cloneNode(false);
           fresh.className = "go-slide__cta is-owned";
-          fresh.textContent = "Du bist Coach";
+          fresh.textContent = "Registriert";
           fresh.disabled = true;
           fresh.setAttribute("aria-disabled", "true");
           cta.parentNode.replaceChild(fresh, cta);
@@ -16343,6 +16428,7 @@
         var h = document.createElement("h3");
         h.className = "fw-card__name";
         h.textContent = String(p.name || p.nickname || "Freund").split(" ")[0];
+        addVc(h, p.id);
         if (p.nickname) {
           var nk = document.createElement("span");
           nk.className = "fw-card__nick";
@@ -17537,6 +17623,7 @@
         var nameEl = document.createElement("h3");
         nameEl.className = "team-slide__coach-name-text";
         nameEl.textContent = trainer ? (trainer.name || "Coach") : "Noch kein Coach";
+        if (trainer) addVc(nameEl, trainer.id);
         nameRow.appendChild(nameEl);
         var pick = document.createElement("button");
         pick.type = "button";
@@ -18342,8 +18429,8 @@
                 {
                   key: "coach_offer",
                   type: "coach_offer",
-                  title: "Selbst Coaching anbieten",
-                  description: "Mit Trainer-A- oder PT-Lizenz Zugang zum Admin-Bereich. CV an gogogo senden — Coaching-Playbook lesen."
+                  title: "Ich als Coach",
+                  description: "Melde Dich als Coach an, um die Leitung einer Gruppe zu haben. Wenn Du Freunde als Coachees betreuen und Trainingspläne erstellen willst, benötigst Du ein gogogo-Zertifikat. Mit der Trainer-A-Lizenz und/oder einer PT-Lizenz und mit Erfahrung in der Fitnesswelt kannst Du hier einen Zugang zum Admin-Bereich erhalten. Freunde finden Dich dann in der Coach-Liste mit einem blauen c. Für das Zertifikat sendest Du an uns Dein CV."
                 }
               ];
         /* Plus-Punkte wählen: Friday Fitness Circle immer, die anderen nach Auswahl (gebuchte bleiben sichtbar) */
@@ -18386,12 +18473,12 @@
                 if (isZ && ffcLoggedNow) ownedNow = true;
                 var coachSelf = of.key === "coach_offer" && !!(sessionIsTrainer || (sessionAccount && sessionAccount.is_trainer));
                 if (coachSelf) ownedNow = true;
-                var btn = existing[ei].querySelector(".go-slide__cta");
+                var btn = existing[ei].querySelector(".go-slide__cta:not(.go-slide__cta--signup)");
                 if (!btn) continue;
                 if (ownedNow) {
-                  btn.textContent = coachSelf ? "Du bist Coach" : "Gebucht";
+                  btn.textContent = coachSelf ? "Registriert" : "Gebucht";
                 } else {
-                  btn.textContent = "Buchen";
+                  btn.textContent = of.key === "coach_offer" ? "Registrierung" : "Buchen";
                 }
                 btn.disabled = !!ownedNow;
                 btn.classList.toggle("is-owned", !!ownedNow);
@@ -18501,8 +18588,17 @@
             owned = true;
             cta.className = "go-slide__cta is-owned";
           }
-          if (owned) cta.textContent = isCoachSelf ? "Du bist Coach" : "Gebucht";
-          else cta.textContent = "Buchen";
+          if (owned) cta.textContent = isCoachSelf ? "Registriert" : "Gebucht";
+          else cta.textContent = offer.key === "coach_offer" ? "Registrierung" : "Buchen";
+          /* Ich als Coach: über „Registrierung“ der Knopf „Anmelden“ (Selbst-Anmeldung, unverifiziert) */
+          if (offer.key === "coach_offer") {
+            var signup = document.createElement("button");
+            signup.type = "button";
+            signup.className = "go-slide__cta go-slide__cta--signup";
+            paintCoachSignupBtn(signup);
+            signup.addEventListener("click", function () { openCoachSelfSignup(signup); });
+            card.appendChild(signup);
+          }
           if (owned && offer.key === "stempelkarte") {
             /* Stempelkarte: nach Buchung öffnet der CTA die Karte */
             cta.textContent = "Karte zeigen";
@@ -18604,6 +18700,11 @@
           var copy = document.createElement("p");
           copy.className = "go-slide__copy";
           copy.textContent = offer.description || "";
+          /* Ich als Coach: Text nur, solange man noch nicht angemeldet/registriert ist */
+          if (offer.key === "coach_offer") {
+            copy.classList.add("go-slide__copy--coach");
+            if (isCoachAny()) copy.hidden = true;
+          }
           card.appendChild(copy);
           /* Friday Fitness Circle: eine Zeile, mit „mehr“ aufklappbar */
           if (offer.key === "zirkel" && copy.textContent) {
@@ -23648,6 +23749,7 @@
           setTimeout(promptJoinRequests, 2500);
           setTimeout(promptCoachRequests, 4000);
           setTimeout(syncSessionAccount, 600);
+          setTimeout(loadCoachStatus, 900);
           /* Mitteilungen (go-messages.js): einmal mittig in Aktuell */
           if (window.GoMessages) {
             GoMessages.init({
@@ -23892,6 +23994,7 @@
             button.type = "button";
             var label = document.createElement("span");
             label.textContent = group.name;
+            addVc(label, group.ids.filter(function (gid) { return verifiedCoaches[gid]; })[0] || group.id);
             var tick = document.createElement("span");
             tick.className = "tick";
             tick.innerHTML = '<svg viewBox="0 0 14 14" width="12" height="12" aria-hidden="true"><path d="M2 7.2 5.2 10.5 12 3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -24100,7 +24203,10 @@
       function fillProfile(account, plan, photos, mine) {
         var idName = document.getElementById("profile-identity-name");
         var idNick = document.getElementById("profile-identity-nick");
-        if (idName) idName.textContent = (account && account.name) || (profilePerson && profilePerson.name) || "Profil";
+        if (idName) {
+          idName.textContent = (account && account.name) || (profilePerson && profilePerson.name) || "Profil";
+          addVc(idName, (account && account.id) || (profilePerson && profilePerson.id) || (mine && sessionAccount && sessionAccount.id));
+        }
         var nickRaw = (account && account.nickname) || (profilePerson && profilePerson.nickname) || (mine && sessionAccount && sessionAccount.nickname) || "";
         if (idNick) idNick.textContent = nickRaw ? ("@" + String(nickRaw).replace(/^@/, "")) : "";
         document.getElementById("profile-goal").textContent = (account && account.training_goal) || (mine ? "Ziel wählen" : "");
@@ -24308,7 +24414,10 @@
         profilePerson = person;
         document.getElementById("profile-name").textContent = mine ? personName() : (person.name || "Team");
         var idName = document.getElementById("profile-identity-name");
-        if (idName) idName.textContent = mine ? personName() : (person.name || "Team");
+        if (idName) {
+          idName.textContent = mine ? personName() : (person.name || "Team");
+          addVc(idName, mine && sessionAccount ? sessionAccount.id : person.id);
+        }
         paintProfileFace(person);
         var sheet = document.getElementById("profile-sheet");
         sheet.hidden = false;
