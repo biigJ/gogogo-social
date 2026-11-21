@@ -6073,6 +6073,7 @@
     .go-circle-name .go-zlb-title { margin: 0 !important; }
     .go-circle-evs { margin: 4px 0 8px; }
     .go-circle-evs:empty { display: none; }
+    .go-circle-where { margin: 6px 0 2px; font-size: 14px; color: rgba(42, 33, 24, 0.75); text-align: center; }
     .go-circle-pick { position: relative; display: inline-block; max-width: 100%; }
     .go-circle-pick select { -webkit-appearance: none; appearance: none; border: 0; background: transparent; color: inherit; text-align: center; text-align-last: center; padding: 2px 22px 2px 4px; max-width: 100%; cursor: pointer; }
     .go-circle-pick::after { content: ""; position: absolute; right: 4px; top: 50%; width: 7px; height: 7px; margin-top: -6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); pointer-events: none; }
@@ -20310,6 +20311,14 @@
         loadCircleEvents(g).then(function (evs) {
           if (circleCurrent() !== g) return;
           ui.evList.textContent = "";
+          /* Ort und online für alle Mitglieder */
+          var w = circleWhere(g);
+          if (w.locs.length || w.online) {
+            var wh = document.createElement("p");
+            wh.className = "go-circle-where";
+            wh.textContent = (w.locs.length ? "Ort: " + w.locs.join(", ") : "") + (w.online ? (w.locs.length ? " · " : "") + "online möglich" : "");
+            ui.evList.appendChild(wh);
+          }
           (evs || []).forEach(function (ev) {
             var row = document.createElement("div");
             row.className = "go-slide__ffc-row go-circle-ev";
@@ -20495,7 +20504,16 @@
           var coach = opts.coach !== false && (verified || (typeof isCoachAny === "function" && isCoachAny()));
           var canMore = verified || !gs.length;
           if (!cur && !coach) { joinCircleSearch(); return; }
-          return rest("go_stamp_links?kind=eq.circle&status=eq.linked&select=ref,name").catch(function () { return []; }).then(function (links) {
+          /* Ort, online und Termine der nächsten 2 Wochen für alle Mitglieder, nicht nur den Coach */
+          return Promise.all([
+            rest("go_stamp_links?kind=eq.circle&status=eq.linked&select=ref,name").catch(function () { return []; }),
+            cur ? loadCircleEvents(cur) : Promise.resolve([])
+          ]).then(function (pack) {
+            var links = pack[0];
+            var evLines = (pack[1] || []).map(function (ev) {
+              var n = circleRounds(ev);
+              return circleDayLabel(ev.starts_at, false) + (n ? " · " + n + " Runden" : "");
+            });
             var link = (links || [])[0] || null;
             var here = !!(link && cur && String(link.ref) === String(cur.group_id));
             var choices = [];
@@ -20512,7 +20530,8 @@
             var msg = cur ? String(cur.name || "Circle") : "Noch in keinem Circle. In einen bestehenden holt Dich der Gründer. Oder gründe selbst einen.";
             var wq = cur ? circleWhere(cur) : { locs: [] };
             var whereLine = cur ? (wq.locs.length ? "Ort: " + wq.locs.join(", ") : "Noch kein Ort") + (wq.online ? " · online möglich" : "") + "\n" : "";
-            var sub = !cur ? "" : whereLine + (here ? "Deine Stempelkarte gehört zu diesem Circle."
+            var evBlock = cur ? (evLines.length ? "Nächste 2 Wochen:\n" + evLines.join("\n") : "Keine Termine in den nächsten 2 Wochen") + "\n\n" : "";
+            var sub = !cur ? "" : whereLine + evBlock + (here ? "Deine Stempelkarte gehört zu diesem Circle."
               : link ? "Deine Stempelkarte gehört zu „" + (link.name || "einem anderen Circle") + "“."
               : "Deine Stempelkarte ist noch keinem Circle zugeordnet.");
             return GoDialog.choose(msg, choices, sub ? { center: true, sub: sub } : {}).then(function (act) {
