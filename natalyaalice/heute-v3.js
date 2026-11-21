@@ -26,7 +26,7 @@
 
   var FILTER_KEY = "gogogo_heute_filter_v3";
   /* Ich ⊂ Team ⊂ Gruppe ⊂ Tagebuch ⊂ Alles — Gruppe nur wenn vorhanden */
-  var VIEW_LEVEL = { ich: 0, team: 1, gruppe: 1, tagebuch: 2, alles: 3, bubble: 3 };
+  var VIEW_LEVEL = { ich: 0, team: 1, gruppe: 1, tagebuch: 2, alles: 3, bubble: 3, circle: 3 };
 
   function viewFlags(view) {
     view = normalizeFilter(view) || "ich";
@@ -39,6 +39,8 @@
       teamOnly: view === "team",
       diaryOnly: view === "tagebuch",
       bubbleOnly: view === "bubble",
+      /* Circle = Zirkeltrainings: FFC-Events und -Posts, Zirkel-Events und mit dem Circle geteilte Events */
+      circleOnly: view === "circle",
       showIncomingInvites: level >= 1,
       showOwnFfc: true,
       showAcceptedFfc: true,
@@ -98,7 +100,9 @@
     if (v === "all") return "alles";
     if (v === "mine") return "ich";
     if (String(v || "").indexOf("group:") === 0) return "gruppe";
-    if (["ich", "team", "gruppe", "tagebuch", "alles", "bubble"].indexOf(v) >= 0) return v;
+    /* Tagebuch gibt es im Dropdown nicht mehr → Alles */
+    if (v === "tagebuch") return "alles";
+    if (["ich", "team", "gruppe", "alles", "bubble", "circle"].indexOf(v) >= 0) return v;
     return "";
   }
 
@@ -2629,6 +2633,16 @@
         return dayKey(it.starts_at) <= today;
       });
     }
+    if (flags.circleOnly) {
+      var isCircle = function (it) {
+        if (it.kind === "ffc" || it.kind === "ffc_post") return true;
+        var ev = it.ev || it.item;
+        return !!(ev && (ev.category === "zirkel" || ev.visibility === "circle"));
+      };
+      myToday = myToday.filter(isCircle);
+      upcoming = upcoming.filter(isCircle);
+      history = history.filter(isCircle);
+    }
     if (flags.teamOnly) {
       history = history.filter(function (it) {
         return it._mine || inTeamFilter((it.ev && it.ev.user_id) || (it.item && it.item.user_id) || "", flags);
@@ -5050,8 +5064,8 @@
       else {
         sel.innerHTML =
           '<option value="ich">Ich</option>' +
+          '<option value="circle">Circle</option>' +
           '<option value="team">Team</option>' +
-          '<option value="tagebuch">Tagebuch</option>' +
           '<option value="alles">Alles</option>';
       }
       if (!normalizeFilter(sel.value)) sel.value = state.filter || "ich";
@@ -5195,7 +5209,7 @@
     resetAktuellPaint: resetAktuellPaint,
     setFilter: function (v) {
       saveFilter(v);
-      refresh();
+      return refresh();
     },
     afterKindChosen: afterKindChosen,
     createUnplanned: createUnplannedEvent,

@@ -44,7 +44,7 @@
   }
   function writeCache(b) {
     try {
-      if (b) localStorage.setItem(CACHE, JSON.stringify({ id: b.id, name: b.name, color: b.color || "" }));
+      if (b) localStorage.setItem(CACHE, JSON.stringify({ id: b.id, name: b.name, color: b.color || "", photo_url: b.photo_url || "" }));
       else localStorage.removeItem(CACHE);
     } catch (e) {}
   }
@@ -60,6 +60,7 @@
     return bubbles.filter(function (b) { return String(b.id) === String(r.bubble_id); })[0] || null;
   }
 
+  var imgKeep = {};
   function load() {
     if (!host || !host.rest) return Promise.resolve();
     if (loading) return loading;
@@ -69,6 +70,13 @@
     ]).then(function (r) {
       bubbles = r[0] || [];
       members = r[1] || [];
+      /* Fotos einmal dekodiert im Speicher halten: beim Neuzeichnen kein Aufblitzen */
+      bubbles.forEach(function (b) {
+        if (!b || !b.photo_url || imgKeep[b.photo_url]) return;
+        var im = new Image();
+        im.src = b.photo_url;
+        imgKeep[b.photo_url] = im;
+      });
       loaded = true;
       missing = false;
       writeCache(mine());
@@ -634,7 +642,7 @@
   /* Kreis-Ansicht: Kreis (Foto oder Farbe mit Seifenblase) links, Name rechts; eigene Bubble mit Pillen */
   function cardHtml(b, isMine) {
     return '<div class="gbub-row' + (isMine ? " is-mine" : "") + '" data-gbub="' + esc(b.id) + '" role="button" tabindex="0">' +
-      '<span class="gbub-row__img" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' + (b.photo_url ? '<img src="' + esc(b.photo_url) + '" alt="" loading="lazy" />' : SOAP_SVG) + "</span>" +
+      '<span class="gbub-row__img" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' + (b.photo_url ? '<img src="' + esc(b.photo_url) + '" alt="" decoding="sync" />' : SOAP_SVG) + "</span>" +
       '<span class="gbub-row__txt">' +
       (isMine ? '<span class="gbub-row__pills"><span class="gbub-card__me">Meine Bubble</span><button type="button" class="gbub-card__me is-leave" data-gbub-leave="' + esc(b.id) + '">Verlassen</button></span>' : "") +
       '<span class="gbub-row__name">' + esc(b.name) + "</span></span></div>";
@@ -651,6 +659,9 @@
     var list = bubbles.slice();
     if (cur) list.sort(function (a, b) { return (String(b.id) === String(cur.id)) - (String(a.id) === String(cur.id)); });
     html += list.map(function (b) { return cardHtml(b, cur && String(cur.id) === String(b.id)); }).join("");
+    /* gleicher Inhalt (z. B. Verlassen abgebrochen, Nachladen): nicht neu zeichnen, sonst blitzen die Fotos */
+    if (el._gbubHtml === html) return;
+    el._gbubHtml = html;
     el.innerHTML = html;
   }
 
