@@ -20376,26 +20376,38 @@
           else if (v === "no") seen();
         });
       }
+      /* Orte und online (Gründer): Orte über den Ortswähler mit Karte, jede Änderung wird gleich gespeichert */
+      function saveCirclePlaces(g, locs, online) {
+        return rest("rpc/go_save_circle", { method: "POST", body: { p_group: String(g.group_id), p_name: g.name || "", p_locations: locs, p_online: !!online } })
+          .then(function () {
+            cst().settings[String(g.group_id)] = Object.assign({}, circleSettings(g) || {}, { group_id: String(g.group_id), locations: locs, online: !!online });
+          });
+      }
       function editCirclePlaces(g) {
         var w = circleWhere(g);
-        GoDialog.form("Wo trainiert " + (g.name || "der Circle") + "?", {
-          placeholder: "Orte, mit Komma getrennt",
-          value: w.locs.join(", "),
-          maxLength: 200,
-          check: "Online möglich",
-          checked: w.online,
-          ok: "Speichern"
-        }).then(function (res) {
-          if (!res) return;
-          var locs = String(res.text || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 6);
-          return rest("rpc/go_save_circle", { method: "POST", body: { p_group: String(g.group_id), p_name: g.name || "", p_locations: locs, p_online: !!res.checked } })
-            .then(function () {
-              cst().settings[String(g.group_id)] = Object.assign({}, circleSettings(g) || {}, { group_id: String(g.group_id), locations: locs, online: !!res.checked });
-              gogogoToast("Gespeichert: " + (locs.join(", ") || "kein Ort") + (res.checked ? " · online möglich" : ""));
-            })
-            .catch(function (err) {
-              GoDialog.alert(/not_owner/.test(String((err && err.message) || "")) ? "Orte legt der Gründer des Circles fest." : "Orte speichern braucht go-circle-events.sql in Supabase.");
+        var items = w.locs.map(function (l) { return { label: "✕ " + l, value: "rm:" + l }; });
+        if (w.locs.length < 6) items.push({ label: "Ort hinzufügen", value: "add" });
+        items.push({ label: w.online ? "Online möglich: ja" : "Online möglich: nein", value: "online" });
+        GoDialog.choose("Orte von " + (g.name || "Deinem Circle"), items, {
+          center: true, sub: w.locs.length ? "Tippen auf einen Ort entfernt ihn." : "Noch kein Ort festgelegt.", cancel: "Fertig"
+        }).then(function (v) {
+          if (!v) return;
+          var job;
+          if (v === "add") {
+            job = pickPlace("Ort für " + (g.name || "den Circle")).then(function (name) {
+              if (!name) return null;
+              if (w.locs.some(function (l) { return l.toLowerCase() === name.toLowerCase(); })) return null;
+              return saveCirclePlaces(g, w.locs.concat([name]), w.online);
             });
+          } else if (v === "online") {
+            job = saveCirclePlaces(g, w.locs, !w.online);
+          } else if (v.indexOf("rm:") === 0) {
+            var nm = v.slice(3);
+            job = saveCirclePlaces(g, w.locs.filter(function (l) { return l !== nm; }), w.online);
+          }
+          return Promise.resolve(job).then(function () { setTimeout(function () { editCirclePlaces(g); }, 0); }).catch(function (err) {
+            GoDialog.alert(/not_owner/.test(String((err && err.message) || "")) ? "Orte legt der Gründer des Circles fest." : "Orte speichern braucht go-circle-events.sql in Supabase.");
+          });
         });
       }
       window.GoCircle = { askBeforeOwn: function (fn) { askBeforeOwnZirkel(fn); } };
@@ -20493,17 +20505,23 @@
           name = String(name || "").trim();
           if (!name) return;
           var friends = ((FFC.friends && FFC.friends()) || []).filter(function (f) { return f && f.status === "accepted" && f.friend_id; });
-          return GoDialog.pick("Wer ist dabei?", friends.map(function (f) {
-            return { label: f.nickname || "Freund", value: f.friend_id };
-          }), { ok: "Circle gründen", empty: "Noch keine Freunde im Zirkel. Freunde fügst Du unter Team → Meine Freunde hinzu." }).then(function (ids) {
-            if (!ids) return;
-            if (!ids.length) { GoDialog.alert("Wähle mindestens eine Person."); return; }
-            return Promise.resolve(FFC.createGroup(name, ids)).then(function (res) {
-              if (res && res.error) { GoDialog.alert("Ging nicht: " + (res.error.message || "Fehler")); return; }
-              afterCircleChange();
-              GoDialog.alert("Circle „" + name + "“ steht.");
+          /* ohne gewählte Person: Hinweis und zurück zur Auswahl (nicht abbrechen) */
+          function pickPeople(chosen) {
+            return GoDialog.pick("Wer ist dabei?", friends.map(function (f) {
+              return { label: f.nickname || "Freund", value: f.friend_id, checked: (chosen || []).indexOf(f.friend_id) >= 0 };
+            }), { ok: "Circle gründen", empty: "Noch keine Freunde im Zirkel. Freunde fügst Du unter Team → Meine Freunde hinzu." }).then(function (ids) {
+              if (!ids) return;
+              if (!ids.length) {
+                return GoDialog.alert("Wähle mindestens eine Person.", { ok: "Zurück zur Auswahl" }).then(function () { return pickPeople([]); });
+              }
+              return Promise.resolve(FFC.createGroup(name, ids)).then(function (res) {
+                if (res && res.error) { GoDialog.alert("Ging nicht: " + (res.error.message || "Fehler")); return; }
+                afterCircleChange();
+                GoDialog.alert("Circle „" + name + "“ steht.");
+              });
             });
-          });
+          }
+          return pickPeople([]);
         });
       }
 
@@ -25482,6 +25500,35 @@
           GoDialog.alert(/places_findable/.test(m) ? "Ging nicht: go-orte-suche.sql fehlt in Supabase." : "Ging gerade nicht. Bitte nochmal versuchen.");
         });
       }
+      /* Ort über den Ortswähler mit Karte wählen → Promise<Name|null> (auch für Circle-Orte und Admin) */
+      function pickPlace(title) {
+        return new Promise(function (resolve) {
+          if (!window.GoPlacePicker) { resolve(null); return; }
+          var box = document.createElement("div");
+          box.className = "orte-pick";
+          box.innerHTML = '<div class="orte-pick__card" role="dialog" aria-modal="true" aria-label="Ort wählen">' +
+            "<h2></h2><div class=\"orte-pick__host\"></div>" +
+            '<button type="button" class="orte-pick__btn" data-orte-ok disabled>Hinzufügen</button>' +
+            '<button type="button" class="orte-pick__btn orte-pick__btn--quiet" data-orte-cancel>Abbrechen</button></div>';
+          box.querySelector("h2").textContent = title || "Ort hinzufügen";
+          document.body.appendChild(box);
+          var okBtn = box.querySelector("[data-orte-ok]");
+          var picker = GoPlacePicker.mount(box.querySelector(".orte-pick__host"), {
+            rest: rest, accountId: "", value: "", noFav: true,
+            onChange: function (p) { okBtn.disabled = !p; }
+          });
+          function close(v) { if (box.parentNode) box.parentNode.removeChild(box); resolve(v); }
+          box.addEventListener("click", function (e) {
+            if (e.target === box || e.target.closest("[data-orte-cancel]")) { close(null); return; }
+            if (!e.target.closest("[data-orte-ok]")) return;
+            var p = picker.value();
+            if (!p || !p.name) return;
+            picker.remember();
+            close(p.name);
+          });
+        });
+      }
+      window.goPickPlace = pickPlace;
       function openOrtePicker() {
         if (!window.GoPlacePicker) return;
         var box = document.createElement("div");
