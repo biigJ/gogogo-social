@@ -1908,6 +1908,8 @@
       '">' +
       mediaInnerHtml(opts) +
       overlayHtml(opts) +
+      /* eigene Events: drei weiße Punkte unten rechts → Sichtbarkeit (nur an aufgeklappten Karten sichtbar) */
+      (opts.visDots ? '<button type="button" class="acc-card__visdots" data-vis-ev="' + esc(opts.visDots) + '" aria-label="Sichtbarkeit ändern"><i></i><i></i><i></i></button>' : "") +
       "</div>"
     );
   }
@@ -2118,6 +2120,7 @@
         onlineCtaHtml(ev),
       postId: String(ev.id),
       eventId: String(ev.id),
+      visDots: mine && /^[0-9a-f-]{36}$/i.test(String(ev.id)) ? String(ev.id) : "",
       inviteIso: day,
       ownerId: String(ev.user_id || ""),
       canInvite: !mine
@@ -4322,6 +4325,33 @@
     out.push({ value: "team", label: "Team" });
     return out;
   }
+  /* Sichtbarkeit eines eigenen Events ändern (Pille schaltet durch). Bubble setzt bubble_id, damit es überall gilt
+     (Bubble-Feed, Woche → Tage bearbeiten). Gruppe setzt group_id, Circle teilt wie in der Woche. */
+  function changeEventVisibility(id) {
+    var ev = (state.events || []).filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!ev || !global.GoDialog || !GoDialog.vis) return;
+    var list = altVisList();
+    var cur = normalizeVisibility(ev.visibility || "team");
+    GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list }).then(function (v) {
+      if (!v || v === normalizeVisibility(ev.visibility || "team")) return;
+      var pick = list.filter(function (x) { return x.value === v; })[0] || {};
+      var body = { visibility: v };
+      if (v === "gruppe" && pick.group_id) body.group_id = pick.group_id;
+      if (v === "bubble" && pick.bubble_id) body.bubble_id = pick.bubble_id;
+      rest("events?id=eq." + encodeURIComponent(id), { method: "PATCH", prefer: "return=minimal", body: body })
+        .then(function () {
+          Object.keys(body).forEach(function (k) { ev[k] = body[k]; });
+          if (host.toast) host.toast("Sichtbar: " + (pick.label || v));
+          if (v === "circle" && global.WocheReels && WocheReels.shareToCircle) WocheReels.shareToCircle(id);
+          if (global.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
+          render();
+        })
+        .catch(function () {
+          if (host.toast) host.toast(v === "circle" || v === "bubble" ? "Ging nicht (go-visibility-fein.sql?)" : "Ändern ging gerade nicht");
+        });
+    });
+  }
+
   function altTimes() {
     var now = new Date();
     var p = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Berlin" }).split(":");
@@ -4658,6 +4688,12 @@
     }
     /* Kraft-/Ausdauer-Event antippen: vergangen → gespeicherte Übungen, heute/später → Workout tracken.
        Eingeladene/Teilnehmer tracken die Einheit des Erstellers unter ihrem eigenen Profil. */
+    var visDots = t.closest("[data-vis-ev]");
+    if (visDots) {
+      e.preventDefault();
+      changeEventVisibility(visDots.getAttribute("data-vis-ev"));
+      return;
+    }
     var mediaHit = t.closest(".acc-card__media");
     if (mediaHit && !t.closest("button, a, input")) {
       var cardW = mediaHit.closest(".acc-card[data-event-id]");

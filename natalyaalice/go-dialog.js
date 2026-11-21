@@ -365,6 +365,45 @@
     });
   }
 
+  /* Sichtbarkeit wählen: Überschrift, Pille (Tippen schaltet durch), Speichern | Abbrechen → value | null */
+  function visDlg(msg, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      var tEl = card.querySelector(".god__text");
+      if (tEl) tEl.classList.add("is-center");
+      var list = opts.visList || [{ value: "team", label: "Team" }];
+      var vi = Math.max(0, list.map(function (x) { return x.value; }).indexOf(opts.vis || "team"));
+      var pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "god__vis";
+      function paintPill() { pill.textContent = list[vi].label; pill.classList.toggle("is-on", list[vi].value !== "privat"); }
+      paintPill();
+      pill.addEventListener("click", function () { vi = (vi + 1) % list.length; paintPill(); });
+      var pw = document.createElement("div");
+      pw.className = "god__center";
+      pw.style.marginBottom = "16px";
+      pw.appendChild(pill);
+      card.appendChild(pw);
+      var row = document.createElement("div");
+      row.className = "god__row2";
+      var ok = document.createElement("button");
+      ok.type = "button";
+      ok.className = "god__btn";
+      ok.textContent = opts.ok || "Speichern";
+      ok.addEventListener("click", function () { close(list[vi].value); });
+      var no = document.createElement("button");
+      no.type = "button";
+      no.className = "god__btn god__btn--quiet";
+      no.textContent = opts.cancel || "Abbrechen";
+      no.addEventListener("click", function () { close(null); });
+      row.appendChild(ok);
+      row.appendChild(no);
+      card.appendChild(row);
+      return null;
+    });
+  }
+
   /* Sonstiges erledigt: Überschrift, „Wie war es? (optional)“, Foto auswählen, Speichern | Abbrechen → { text, file } | null */
   function doneDlg(msg, opts) {
     opts = opts || {};
@@ -410,5 +449,5 @@
     });
   }
 
-  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg, plan: planDlg, done: doneDlg };
+  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg, plan: planDlg, done: doneDlg, vis: visDlg };
 })(window);
