@@ -280,6 +280,41 @@
   }
 
   /* Gruppe und Circle je Nutzer (go-admin-circles.sql) */
+  /* Wochenplan, Stempelkarten, Gruppen, Circles, Doubles je Nutzer (go-admin-user-extras.sql) */
+  function loadExtras() {
+    st.extras = {};
+    host.rest("rpc/go_admin_user_extras", { method: "POST", body: {} })
+      .then(function (r) { if (st) { st.extras = r || {}; st.extrasOk = true; if (st.tab === "coaches") paint(); } })
+      .catch(function () {});
+  }
+  function extrasOf(id) { return (st.extras && st.extras[String(id)]) || null; }
+  function stampTxt(n) { return (Number(n) || 0) + "/12"; }
+  /* Stempelkarte aktiv mit Stempeln, sonst inaktiv; dazu je Gruppe und Circle die verknüpfte Karte (inaktiv, angefragt oder Stempel) */
+  function stampLine(x) {
+    var out = [x.stamp ? "Stempelkarte " + stampTxt(x.stamp.stamps) : "Stempelkarte inaktiv"];
+    var links = x.links || [];
+    function linkFor(kind, ref) { return links.filter(function (l) { return l.kind === kind && String(l.ref) === String(ref); })[0]; }
+    function one(kind, label, g) {
+      var l = linkFor(kind, g.id);
+      out.push(label + " " + (g.name || "") + ": " + (!l ? "inaktiv" : l.status === "pending" ? "angefragt" : stampTxt(l.stamps)));
+    }
+    (x.groups || []).forEach(function (g) { one("group", "Gruppe", g); });
+    (x.circles || []).forEach(function (g) { one("circle", "Circle", g); });
+    /* verknüpfte Karten von Circles/Gruppen, in denen die Person nicht (mehr) ist */
+    links.forEach(function (l) {
+      var known = (l.kind === "group" ? x.groups : x.circles || []).some(function (g) { return String(g.id) === String(l.ref); });
+      if (!known) out.push((l.kind === "group" ? "Gruppe " : "Circle ") + (l.name || "") + ": " + (l.status === "pending" ? "angefragt" : stampTxt(l.stamps)));
+    });
+    return out;
+  }
+  function doubleLine(x, nameOf) {
+    var d = (x.doubles || []).map(function (e) {
+      var who = e.partner_id ? nameOf(e.partner_id) : "";
+      if (!who && e.partner_name) { try { who = decodeURIComponent(e.partner_name); } catch (err) { who = e.partner_name; } }
+      return (who || "Partner") + " " + shortDay(e.at);
+    });
+    return "Double: " + (d.length ? d.join(", ") : "–");
+  }
   function loadLinks() {
     st.links = {};
     host.rest("rpc/go_admin_user_links", { method: "POST", body: {} })
@@ -307,6 +342,7 @@
   function paintCoaches() {
     if (!st.coachInfo) loadCoachInfo();
     if (!st.links) loadLinks();
+    if (!st.extras) loadExtras();
     if (!st.goals) loadGoals();
     var accs = (st.accounts || []).slice().sort(function (x, y) {
       if (isCoachAcc(y) !== isCoachAcc(x)) return isCoachAcc(y) ? 1 : -1;
@@ -331,21 +367,63 @@
         var phone = ci.whatsapp_phone || (/\d{5,}/.test(String(ci.phone || "")) ? ci.phone : "");
         var r2 = parts([ci.invite_code ? "Code " + esc(ci.invite_code) : "", esc(ab.email || ""), esc(phone || "")]);
         var goal = goalText(id);
+        var x = extrasOf(id);
+        var plan = x ? (x.plan && x.plan.title ? x.plan.title : "wählen") : "";
         var r3 = parts([
           '<button type="button" class="ga-link" data-ga-goal="' + esc(id) + '">' + esc(goal || "Ziel hinzufügen") + "</button>",
           ci.trainer_id ? "Coach: " + esc(nameOf(ci.trainer_id) || "ja") : "",
-          (ln.groups || []).length ? "Gruppe: " + esc(ln.groups.join(", ")) : "",
-          (ln.circles || []).length ? "Circle: " + esc(ln.circles.join(", ")) : ""
+          x ? 'Wochenplan: <button type="button" class="ga-link" data-ga-plan="' + esc(id) + '">' + esc(plan) + "</button>" : "",
+          (ln.groups || []).length ? "Gruppe: " + esc(ln.groups.join(", ")) : "Gruppe: –",
+          "Circle: " + ((ln.circles || []).length ? esc(ln.circles.join(", ")) : "–")
         ]);
+        var r5 = x ? parts(stampLine(x).map(esc).concat([esc(doubleLine(x, function (aid) {
+          var hit = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(aid); })[0];
+          return hit ? String(hit.name || "").split(" ")[0] : "";
+        }))])) : "";
         var pl = placeList(ci.workout_places);
         var r4 = '<button type="button" class="ga-link" data-ga-places="' + esc(id) + '">' + esc(pl.length ? pl.join(" · ") : "Ort hinzufügen") + "</button>";
         var photo = ci.photo_url || a.photo_url;
         var rect = photo ? '<img class="ga-rect" src="' + esc(photo) + '" alt="" />' : '<span class="ga-rect">' + esc(String(a.name || "?").slice(0, 1)) + "</span>";
         return '<div class="ga-item is-top' + (ci.paused_at ? " ga-paused" : "") + '"><button type="button" class="ga-rectbtn" data-ga-info="' + esc(id) + '" aria-label="Infos zu ' + esc(a.name || "") + '">' + rect + "</button>" +
           '<div class="ga-copy ga-rows"><div class="ga-r1">' + r1 + "</div>" +
-          (r2 ? "<div>" + r2 + "</div>" : "") + "<div>" + r3 + "</div><div>" + r4 + "</div></div>" +
+          (r2 ? "<div>" + r2 + "</div>" : "") + "<div>" + r3 + "</div><div>" + r4 + "</div>" + (r5 ? "<div>" + r5 + "</div>" : "") + "</div>" +
           rolePill(a) + "</div>";
       }).join("");
+  }
+  /* Wochenplan setzen oder entfernen (z. B. wenn der Coach jemanden aus seinen Coachees genommen hat) */
+  var WD = [[1, "Mo"], [2, "Di"], [3, "Mi"], [4, "Do"], [5, "Fr"], [6, "Sa"], [0, "So"]];
+  function userPlan(id) {
+    var x = extrasOf(id) || {};
+    var cur = x.plan || null;
+    var a = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(id); })[0] || {};
+    var first = String(a.name || "Nutzer").split(" ")[0];
+    host.rest("courses?is_active=eq.true&or=(private_for.is.null,private_for.eq." + encodeURIComponent(id) + ")&select=id,title&order=title.asc&limit=200")
+      .catch(function () { return host.rest("courses?is_active=eq.true&select=id,title&order=title.asc&limit=200"); })
+      .then(function (rows) {
+        var items = (rows || []).filter(function (c) { return c && c.id && !/^zirkeltraining$/i.test(String(c.title || "")); })
+          .map(function (c) { return { label: String(c.title || "Plan") + (cur && String(cur.course_id) === String(c.id) ? " ✓" : ""), value: String(c.id) }; });
+        if (cur) items.unshift({ label: "Wochenplan entfernen", value: "none" });
+        return GoDialog.choose("Wochenplan für " + first, items, { center: true, sub: cur ? "Aktuell: " + cur.title : "Noch kein Wochenplan", cancel: "Abbrechen" });
+      })
+      .then(function (v) {
+        if (!v) return;
+        if (v === "none") {
+          return GoDialog.confirm("Wochenplan „" + cur.title + "“ bei " + first + " entfernen? Künftige Plan-Termine fallen weg.", { ok: "Entfernen", cancel: "Abbrechen", row: true })
+            .then(function (ok) { if (ok) return savePlan(id, null, null); });
+        }
+        var days = (cur && cur.weekdays) || [];
+        return GoDialog.pick("An welchen Tagen?", WD.map(function (d) { return { label: d[1], value: String(d[0]), checked: days.indexOf(d[0]) >= 0 }; }), { ok: "Speichern", cancel: "Abbrechen" })
+          .then(function (picked) {
+            if (!picked) return;
+            if (!picked.length) { GoDialog.alert("Wähle mindestens einen Tag."); return; }
+            return savePlan(id, v, picked.map(Number));
+          });
+      });
+  }
+  function savePlan(id, course, days) {
+    return host.rest("rpc/go_admin_set_plan", { method: "POST", body: { p_account: id, p_course: course, p_weekdays: days } })
+      .then(function () { if (host.toast) host.toast(course ? "Wochenplan gesetzt" : "Wochenplan entfernt"); loadExtras(); })
+      .catch(function () { GoDialog.alert("Das braucht go-admin-user-extras.sql in Supabase."); });
   }
   /* Nutzer-Pille: Löschen / Pausieren */
   function userMenu(id) {
@@ -1183,7 +1261,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -1192,6 +1270,7 @@
     if (t.hasAttribute("data-ga-role")) { roleMenu(t.getAttribute("data-ga-role")); return; }
     if (t.hasAttribute("data-ga-user")) { userMenu(t.getAttribute("data-ga-user")); return; }
     if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
+    if (t.hasAttribute("data-ga-plan")) { userPlan(t.getAttribute("data-ga-plan")); return; }
     if (t.hasAttribute("data-gx")) {
       var gx = t.getAttribute("data-gx"), gk = t.getAttribute("data-gk"), gid = t.getAttribute("data-gid");
       if (gx === "coach") orgCoach(gk, gid);
