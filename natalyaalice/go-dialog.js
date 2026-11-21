@@ -30,7 +30,7 @@
     ".god__face{width:96px;height:96px;margin:2px auto 14px;border-radius:50%;background:#E6DED0 center/cover no-repeat;display:grid;place-items:center;font:700 34px/1 Inter,system-ui,sans-serif;color:#2A2118}" +
     ".god__face + .god__text{text-align:center}" +
     ".god__card .god__text.is-center{text-align:center;margin-bottom:4px !important}" +
-    ".god__sub{margin:0 0 16px;font-size:15px;font-weight:600;text-align:center;color:rgba(42,33,24,.75)}" +
+    ".god__sub{margin:0 0 16px;white-space:pre-line;font-size:15px;font-weight:600;text-align:center;color:rgba(42,33,24,.75)}" +
     ".god__info{margin:-2px 0 12px;font-size:14px;text-align:center;color:rgba(42,33,24,.7)}" +
     ".god__body{margin:8px 0 18px;font-size:16px;line-height:1.5;text-align:left}" +
     ".god__body.is-plain{margin:4px 0 20px;font-size:17px;text-align:center;white-space:pre-wrap}" +

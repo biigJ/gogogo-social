@@ -6070,6 +6070,8 @@
     #go-rail .go-zlb-btns .go-slide__cta.go-zlb-btn { margin: 0 !important; width: 100%; display: flex; align-items: center; justify-content: center; }
     body.is-session #go-rail .go-circle-name, .go-circle-name { margin: 14px 0 4px !important; text-align: center; }
     .go-circle-name .go-zlb-title { margin: 0 !important; }
+    .go-circle-evs { margin: 4px 0 8px; }
+    .go-circle-evs:empty { display: none; }
     .go-circle-pick { position: relative; display: inline-block; max-width: 100%; }
     .go-circle-pick select { -webkit-appearance: none; appearance: none; border: 0; background: transparent; color: inherit; text-align: center; text-align-last: center; padding: 2px 22px 2px 4px; max-width: 100%; cursor: pointer; }
     .go-circle-pick::after { content: ""; position: absolute; right: 4px; top: 50%; width: 7px; height: 7px; margin-top: -6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); pointer-events: none; }
@@ -8492,7 +8494,7 @@
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-13"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-3"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-15"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-16"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-1"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
@@ -8500,7 +8502,7 @@
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-102"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-76"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-77"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
   <script>
     (function () {
@@ -19164,6 +19166,20 @@
             loadCircleState();
             circleBtn.addEventListener("click", function () { openCircleJoin({ coach: circleCoach }); });
             card.appendChild(circleBtn);
+            /* darunter: individuelles Event + Circle-Events der nächsten 2 Wochen (Datum + Runden) */
+            var circleEvBtn = document.createElement("button");
+            circleEvBtn.type = "button";
+            circleEvBtn.className = "go-slide__cta go-slide__cta--editor";
+            circleEvBtn.textContent = "Individuelles Event erstellen";
+            circleEvBtn.hidden = !window.__goCircleName;
+            circleEvBtn.addEventListener("click", onCircleEventBtn);
+            card.appendChild(circleEvBtn);
+            var circleEvList = document.createElement("div");
+            circleEvList.className = "go-circle-evs";
+            card.appendChild(circleEvList);
+            cst().ui.evBtn = circleEvBtn;
+            cst().ui.evList = circleEvList;
+            paintCircleEvents();
           }
           if (offer.key === "coach_offer") {
             /* Kurs-Editor direkt unter Buchen, nur für Coaches/Admin; reiner Link, keine Rail-Logik */
@@ -20052,7 +20068,7 @@
          Normal: ein Circle je Person (auch Coaches ohne blaues c). Coaches mit blauem c: mehrere, Auswahl per Dreh-Auswahl.
          Bild je Circle in gogogo (go-circle.sql, go_circle_photos); ohne eigenes Bild das globale Zirkel-Bild. */
       /* Zustand global (Funktion statt var, weil der Plus-Slide schon vor dieser Zeile zeichnen kann) */
-      function cst() { return window.__goCircleState || (window.__goCircleState = { groups: [], photos: {}, ui: null, loaded: false }); }
+      function cst() { return window.__goCircleState || (window.__goCircleState = { groups: [], photos: {}, settings: {}, ui: null, loaded: false }); }
       function circleVerified() {
         return !!(sessionAccount && sessionAccount.coach_verified_at);
       }
@@ -20110,20 +20126,27 @@
           cst().groups = gs || [];
           cst().loaded = true;
           var ids = cst().groups.map(function (g) { return encodeURIComponent(String(g.group_id)); });
-          if (!ids.length) { paintCircleHead(); applyCircleCover(); return; }
+          if (!ids.length) { paintCircleHead(); applyCircleCover(); paintCircleEvents(); return; }
+          var setJob = rest("go_circles?group_id=in.(" + ids.join(",") + ")&select=group_id,name,owner_id,locations,online")
+            .catch(function () { return []; })
+            .then(function (rows) { (rows || []).forEach(function (r) { if (r) cst().settings[String(r.group_id)] = r; }); });
           return rest("go_circle_photos?group_id=in.(" + ids.join(",") + ")&select=group_id,photo_url")
             .catch(function () { return []; })
             .then(function (rows) {
               (rows || []).forEach(function (r) { if (r && r.photo_url) cst().photos[String(r.group_id)] = r.photo_url; });
               paintCircleHead();
               applyCircleCover();
-            });
+              return setJob;
+            })
+            .then(function () { ensureCircleRow(); paintCircleEvents(); });
         }).catch(function () {});
       }
       function selectCircle(gid) {
         return Promise.resolve(FFC.setLeaderboardScope ? FFC.setLeaderboardScope(gid) : null).then(function () {
           paintCircleHead();
           applyCircleCover();
+          ensureCircleRow();
+          paintCircleEvents();
           if (window.__goZirkelLbReload) window.__goZirkelLbReload();
         });
       }
@@ -20163,6 +20186,219 @@
         });
         inp.click();
       }
+      /* ---------- Circle-Events (go-circle-events.sql) ----------
+         Orte + online je Circle (go_circles). Der Gründer (Coach) erstellt Circle-Events (events.circle_id);
+         dazu zählen seine Zirkeltrainings aus dem Wochenplan. Plus-Slide zeigt die nächsten 2 Wochen: Datum + Runden.
+         Mitglieder übernehmen ein Circle-Event in ihre Woche (Zusage); neue Circle-Events meldet das Herz. */
+      var CIRCLE_DAYS = 14;
+      function circleSettings(g) {
+        return g ? cst().settings[String(g.group_id)] || null : null;
+      }
+      function circleWhere(g) {
+        var st = circleSettings(g) || {};
+        var locs = (st.locations || []).filter(Boolean);
+        return { locs: locs, online: !!st.online };
+      }
+      /* Gründer: Zeile in go_circles anlegen, damit Mitglieder seine Zirkeltrainings als Circle-Events sehen */
+      function ensureCircleRow() {
+        var g = circleCurrent();
+        if (!g || !g.is_owner || circleSettings(g) || cst()["ensured" + g.group_id]) return;
+        cst()["ensured" + g.group_id] = true;
+        rest("rpc/go_save_circle", { method: "POST", body: { p_group: String(g.group_id), p_name: g.name || "", p_locations: [], p_online: false } })
+          .then(function () { cst().settings[String(g.group_id)] = { group_id: String(g.group_id), name: g.name, owner_id: sessionAccount && sessionAccount.id, locations: [], online: false }; })
+          .catch(function () {});
+      }
+      function circleDayLabel(iso, withTime) {
+        var d = new Date(iso);
+        var s = d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" }).replace(/,/, "");
+        return withTime ? s + ", " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }) : s;
+      }
+      function circleRounds(ev) {
+        var z = window.GoZirkelSetup && GoZirkelSetup.parse ? GoZirkelSetup.parse(ev && ev.note) : null;
+        return z && z.rounds ? z.rounds : 0;
+      }
+      /* „Fr. 28.11., 12:30, Hasenheide (online möglich)“ */
+      function circleNextText(ev, g) {
+        var z = window.GoZirkelSetup && GoZirkelSetup.parse ? GoZirkelSetup.parse(ev.note) : null;
+        var where = String(ev.location || "").trim() || circleWhere(g).locs.join(" oder ");
+        var online = (z && z.online) || circleWhere(g).online;
+        return circleDayLabel(ev.starts_at, true) + (where ? ", " + where : "") + (online ? " (online möglich)" : "");
+      }
+      function loadCircleEvents(g) {
+        if (!g) return Promise.resolve([]);
+        return rest("rpc/go_circle_events", { method: "POST", body: { p_group: String(g.group_id), p_days: CIRCLE_DAYS } })
+          .catch(function () { return []; });
+      }
+      function paintCircleEvents() {
+        var ui = cst().ui;
+        if (!ui || !ui.evList || !ui.evList.isConnected) return;
+        var g = circleCurrent();
+        if (ui.evBtn) ui.evBtn.hidden = !g;
+        if (!g) { ui.evList.textContent = ""; return; }
+        loadCircleEvents(g).then(function (evs) {
+          if (circleCurrent() !== g) return;
+          ui.evList.textContent = "";
+          (evs || []).forEach(function (ev) {
+            var row = document.createElement("div");
+            row.className = "go-slide__ffc-row go-circle-ev";
+            var l = document.createElement("span");
+            l.textContent = circleDayLabel(ev.starts_at, false);
+            var r = document.createElement("span");
+            var n = circleRounds(ev);
+            r.textContent = n ? n + " Runden" : "";
+            row.appendChild(l);
+            row.appendChild(r);
+            ui.evList.appendChild(row);
+          });
+        });
+      }
+      function circleDates() {
+        var out = [];
+        var d = new Date();
+        for (var i = 0; i < CIRCLE_DAYS; i++) {
+          var x = new Date(d.getTime() + i * 86400000);
+          out.push({ iso: x.toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }), label: x.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" }).replace(/,/, "") });
+        }
+        return out;
+      }
+      function berlinAt(iso, hhmm) {
+        /* Uhrzeit in Berlin → ISO (Sommer-/Winterzeit über die Differenz zu UTC) */
+        var guess = new Date(iso + "T" + hhmm + ":00Z");
+        var b = new Date(guess.toLocaleString("en-US", { timeZone: "Europe/Berlin" }));
+        var u = new Date(guess.toLocaleString("en-US", { timeZone: "UTC" }));
+        return new Date(guess.getTime() - (b - u)).toISOString();
+      }
+      /* Event erstellen: Tag, Uhrzeit, Runden (Drehräder), beim Gründer Ort aus den Circle-Orten */
+      function createCircleEvent(g, asCircle) {
+        var dates = circleDates();
+        var pick = { day: null, time: null, rounds: 6, loc: "" };
+        GoDialog.time(asCircle ? "Circle-Event: Tag" : "Eigenes Zirkeltraining: Tag", { times: dates.map(function (x) { return x.label; }), ok: "Weiter", cancel: "Abbrechen" })
+          .then(function (lab) {
+            if (!lab) return null;
+            pick.day = (dates.filter(function (x) { return x.label === lab; })[0] || {}).iso;
+            return GoDialog.time("Uhrzeit", { ok: "Weiter", cancel: "Abbrechen" });
+          })
+          .then(function (t) {
+            if (!t) return null;
+            pick.time = String(t).padStart(5, "0");
+            var rs = [];
+            for (var n = 3; n <= 12; n++) rs.push(n + " Runden");
+            return GoDialog.time("Runden", { times: rs, ok: "Weiter", cancel: "Abbrechen" });
+          })
+          .then(function (r) {
+            if (!r) return null;
+            pick.rounds = parseInt(r, 10) || 6;
+            var w = circleWhere(g);
+            if (!asCircle || w.locs.length < 2) { pick.loc = asCircle ? w.locs[0] || "" : ""; return true; }
+            return GoDialog.choose("Ort", w.locs.map(function (l) { return { label: l, value: l }; })).then(function (l) {
+              if (!l) return null;
+              pick.loc = l;
+              return true;
+            });
+          })
+          .then(function (ok) {
+            if (!ok) return;
+            var w = circleWhere(g);
+            var note = window.GoZirkelSetup ? GoZirkelSetup.toNote({ mode: "single", rounds: pick.rounds, workSec: 240, restSec: 30, online: asCircle && w.online }) : null;
+            return rest("courses?title=eq.Zirkeltraining&select=id&limit=1").catch(function () { return []; }).then(function (rows) {
+              var body = {
+                user_id: sessionAccount.id, category: "zirkel", course_id: rows && rows[0] ? rows[0].id : null,
+                title: "Zirkeltraining", starts_at: berlinAt(pick.day, pick.time), status: "geplant",
+                visibility: asCircle ? "circle" : "team", is_unplanned: false, note: note, location: pick.loc || null
+              };
+              if (asCircle) body.circle_id = String(g.group_id);
+              return rest("events", { method: "POST", prefer: "return=minimal", body: body });
+            }).then(function () {
+              gogogoToast(asCircle ? "Circle-Event steht. Deine Mitglieder sehen es am Herz." : "Zirkeltraining ist in Deiner Woche.");
+              paintCircleEvents();
+              if (window.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
+            }).catch(function (err) {
+              var m = String((err && err.message) || "");
+              GoDialog.alert(/circle_id|visibility/.test(m) ? "Circle-Events brauchen go-circle-events.sql in Supabase." : "Speichern ging gerade nicht.");
+            });
+          });
+      }
+      function joinCircleEvent(ev, g) {
+        return rest("rpc/go_join_circle_event", { method: "POST", body: { p_event: ev.id } })
+          .then(function () {
+            gogogoToast("Übernommen: " + circleDayLabel(ev.starts_at, true) + " ist in Deiner Woche.");
+            if (window.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
+            if (window.HeuteAccountability && HeuteAccountability.refreshHeart) HeuteAccountability.refreshHeart();
+            paintCircleEvents();
+          })
+          .catch(function () { GoDialog.alert("Übernehmen braucht go-circle-events.sql in Supabase."); });
+      }
+      /* Vor dem eigenen Zirkeltraining: lieber das nächste vom Circle übernehmen? (nicht für den Gründer) */
+      function askBeforeOwnZirkel(proceed) {
+        var g = circleCurrent();
+        if (!g || g.is_owner || !window.GoDialog) { proceed(); return; }
+        loadCircleEvents(g).then(function (evs) {
+          var next = (evs || []).filter(function (e) { return !e.joined && String(e.user_id) !== String(sessionAccount && sessionAccount.id); })[0];
+          if (!next) { proceed(); return; }
+          return GoDialog.choose("Nächstes Zirkeltraining: " + circleNextText(next, g), [
+            { label: "In meine Woche übernehmen", value: "take" },
+            { label: "Trotzdem eigenes erstellen", value: "own" }
+          ], { center: true, sub: "Dein Circle " + (g.name || "") + " trainiert schon. Willst Du wirklich ein eigenes Zirkeltraining erstellen?", cancel: "Abbrechen" })
+            .then(function (v) {
+              if (v === "take") joinCircleEvent(next, g);
+              else if (v === "own") setTimeout(proceed, 0);
+            });
+        }).catch(function () { proceed(); });
+      }
+      function onCircleEventBtn() {
+        var g = circleCurrent();
+        if (!g) return;
+        if (g.is_owner) { createCircleEvent(g, true); return; }
+        askBeforeOwnZirkel(function () { createCircleEvent(g, false); });
+      }
+      /* Herz: neue Circle-Events vom Coach */
+      function loadCircleNews() {
+        if (!sessionAccount || !window.FFC || !FFC.user || !FFC.user()) return Promise.resolve([]);
+        var ready = cst().loaded ? Promise.resolve() : loadCircleState();
+        return ready.then(function () {
+          var ids = (cst().groups || []).map(function (g) { return String(g.group_id); });
+          if (!ids.length) return [];
+          return rest("rpc/go_circle_news", { method: "POST", body: { p_groups: ids } }).catch(function () { return []; });
+        });
+      }
+      function openCircleNews(cn) {
+        var g = (cst().groups || []).filter(function (x) { return String(x.group_id) === String(cn.circle_id); })[0] || { group_id: cn.circle_id, name: cn.circle_name };
+        function seen() {
+          return rest("rpc/go_seen_circle_news", { method: "POST", body: { p_event: cn.id } }).catch(function () {}).then(function () {
+            if (window.HeuteAccountability && HeuteAccountability.refreshHeart) HeuteAccountability.refreshHeart();
+          });
+        }
+        GoDialog.choose("Neues Zirkeltraining im Circle " + (cn.circle_name || g.name || ""), [
+          { label: "In meine Woche übernehmen", value: "take" },
+          { label: "Nicht dabei", value: "no" }
+        ], { center: true, sub: circleNextText(cn, g), cancel: "Später" }).then(function (v) {
+          if (v === "take") joinCircleEvent(cn, g);
+          else if (v === "no") seen();
+        });
+      }
+      function editCirclePlaces(g) {
+        var w = circleWhere(g);
+        GoDialog.form("Wo trainiert " + (g.name || "der Circle") + "?", {
+          placeholder: "Orte, mit Komma getrennt",
+          value: w.locs.join(", "),
+          maxLength: 200,
+          check: "Online möglich",
+          checked: w.online,
+          ok: "Speichern"
+        }).then(function (res) {
+          if (!res) return;
+          var locs = String(res.text || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean).slice(0, 6);
+          return rest("rpc/go_save_circle", { method: "POST", body: { p_group: String(g.group_id), p_name: g.name || "", p_locations: locs, p_online: !!res.checked } })
+            .then(function () {
+              cst().settings[String(g.group_id)] = Object.assign({}, circleSettings(g) || {}, { group_id: String(g.group_id), locations: locs, online: !!res.checked });
+              gogogoToast("Gespeichert: " + (locs.join(", ") || "kein Ort") + (res.checked ? " · online möglich" : ""));
+            })
+            .catch(function (err) {
+              GoDialog.alert(/not_owner/.test(String((err && err.message) || "")) ? "Orte legt der Gründer des Circles fest." : "Orte speichern braucht go-circle-events.sql in Supabase.");
+            });
+        });
+      }
+      window.GoCircle = { askBeforeOwn: function (fn) { askBeforeOwnZirkel(fn); } };
       /* Deinen Circle verwalten: Stempelkarte zuordnen, Foto (Gründer), löschen (Gründer) bzw. verlassen.
          Beitreten und gründen: ohne Circle, oder als Coach mit blauem c (mehrere Circles). */
       function openCircleJoin(opts) {
@@ -20181,6 +20417,7 @@
             var choices = [];
             if (cur) {
               if (!here) choices.push({ label: "Stempelkarte diesem Circle zuordnen", value: "stamp" });
+              if (cur.is_owner) choices.push({ label: "Orte und online", value: "places" });
               if (cur.is_owner) choices.push({ label: circlePhoto(cur) ? "Foto ändern" : "Foto hinzufügen", value: "photo" });
               choices.push({ label: cur.is_owner ? "Circle löschen" : "Circle verlassen", value: "leave" });
             }
@@ -20189,14 +20426,17 @@
               if (coach) choices.push({ label: "Neuen Circle gründen", value: "new" });
             }
             var msg = cur ? String(cur.name || "Circle") : "Noch in keinem Circle. In einen bestehenden holt Dich der Gründer. Oder gründe selbst einen.";
-            var sub = !cur ? "" : here ? "Deine Stempelkarte gehört zu diesem Circle."
+            var wq = cur ? circleWhere(cur) : { locs: [] };
+            var whereLine = cur ? (wq.locs.length ? "Ort: " + wq.locs.join(", ") : "Noch kein Ort") + (wq.online ? " · online möglich" : "") + "\n" : "";
+            var sub = !cur ? "" : whereLine + (here ? "Deine Stempelkarte gehört zu diesem Circle."
               : link ? "Deine Stempelkarte gehört zu „" + (link.name || "einem anderen Circle") + "“."
-              : "Deine Stempelkarte ist noch keinem Circle zugeordnet.";
+              : "Deine Stempelkarte ist noch keinem Circle zugeordnet.");
             return GoDialog.choose(msg, choices, sub ? { center: true, sub: sub } : {}).then(function (act) {
               if (!act) return;
               if (act === "new") { createCircle(); return; }
               if (act === "join") { setTimeout(joinCircleSearch, 0); return; }
               if (act === "photo") { pickCirclePhoto(cur); return; }
+              if (act === "places") { setTimeout(function () { editCirclePlaces(cur); }, 0); return; }
               if (act === "stamp") {
                 /* eine persönliche Circle-Stempelkarte: zieht mit Stempeln in diesen Circle um (go-circle.sql) */
                 rest("rpc/go_move_circle_card", { method: "POST", body: { p_circle: String(cur.group_id), p_name: cur.name || "Circle" } })
@@ -24577,7 +24817,7 @@
             reloadInvites: function () { return loadInvites(); },
             /* weitere Meldungen fürs Herz: Gruppenanfragen */
             heartNotices: function () {
-              return Promise.all([loadGroupInvites(), loadGroupJoinRequests(), loadStampLinkRequests(), loadGroupNews()]).then(function (r) {
+              return Promise.all([loadGroupInvites(), loadGroupJoinRequests(), loadStampLinkRequests(), loadGroupNews(), loadCircleNews().catch(function () { return []; })]).then(function (r) {
                 return (r[0] || []).map(function (gi) {
                   return { kind: "group", created_at: gi.created_at, open: function () { openGroupInvite(gi); } };
                 }).concat((r[1] || []).map(function (gr) {
@@ -24586,6 +24826,8 @@
                   return { kind: "groupnews", created_at: gn.accepted_at, open: function () { openGroupNews(gn); } };
                 })).concat((r[2] || []).map(function (lr) {
                   return { kind: "stamplink", created_at: lr.created_at, open: function () { openStampLinkRequest(lr); } };
+                })).concat((r[4] || []).map(function (cn) {
+                  return { kind: "circlenews", created_at: cn.created_at, open: function () { openCircleNews(cn); } };
                 }));
               });
             },

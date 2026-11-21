@@ -5687,7 +5687,8 @@
           setTimeout(function () {
             if (v === "plan") openPlanPicker();
             if (v === "days") openDaysEditor();
-            if (v === "zrec") openZirkelRecurring();
+            /* Mitglieder: vorher fragen, ob sie lieber das nächste Zirkeltraining ihres Circles übernehmen */
+            if (v === "zrec") { if (global.GoCircle && GoCircle.askBeforeOwn) GoCircle.askBeforeOwn(openZirkelRecurring); else openZirkelRecurring(); }
             if (v === "zedit") openZirkelEditor();
             if (v === "gev") openGroupEventsPick();
             if (v === "gextra") openGroupExtras();
