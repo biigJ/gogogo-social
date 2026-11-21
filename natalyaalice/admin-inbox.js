@@ -396,13 +396,31 @@
     if (d.indexOf("0") === 0) return "49" + d.slice(1);
     return d;
   }
-  /* WhatsApp-Text nach Lage: heute (offen / erledigt / nichts) × morgen (geplant / nichts) × Serie (ab 4 Tagen)
-   *                 | morgen geplant                         | morgen nichts
-   *  heute offen     | erinnern an heute, morgen kurz nennen  | erinnern an heute + morgen planen
-   *  heute erledigt  | loben (Serie wertschätzen)             | loben + morgen planen
-   *  erledigt+offen  | loben, Rest von heute nennen, morgen   | loben, Rest von heute, morgen planen
-   *  heute nichts    | auf morgen freuen                      | morgen planen
+  /* WhatsApp am Abend: erinnert, dass man noch was macht oder das Gemachte abhakt.
+   * Text nach Lage: heute (offen / erledigt / beides / nichts) × morgen (geplant / nichts) × Serie (ab 4 Tagen).
+   *                   | morgen geplant                              | morgen nichts
+   *  heute offen       | offene Events nennen (machen oder abhaken)  | dito + morgen planen
+   *  heute erledigt    | loben (Serie wertschätzen), morgen nennen   | loben + morgen planen
+   *  erledigt + offen  | loben, Offenes nennen, morgen nennen        | loben, Offenes nennen, morgen planen
+   *  heute nichts      | Gemachtes eintragen, morgen nennen          | Gemachtes eintragen + morgen planen
+   * Schritte sind speziell: „Hast Du schon 5.000 Schritte gemacht? Setz den Haken :)“
    */
+  function waTitle(e) {
+    return String((e && e.title) || "Training").replace(/^\s*[>≥]\s*/, "").trim();
+  }
+  function isSteps(e) { return /schritte/i.test(String((e && e.title) || "")); }
+  function andList(arr) {
+    return arr.length < 2 ? arr.join("") : arr.slice(0, -1).join(", ") + " und " + arr[arr.length - 1];
+  }
+  function openText(open) {
+    var steps = open.filter(isSteps), other = open.filter(function (e) { return !isSteps(e); });
+    var out = [];
+    if (other.length) {
+      out.push(andList(other.map(waTitle)) + (other.length > 1 ? " stehen" : " steht") + " heute noch an. Schon gemacht? Dann hak " + (other.length > 1 ? "sie" : "es") + " ab. Sonst: Du schaffst das noch!");
+    }
+    steps.forEach(function (e) { out.push("Hast Du schon " + waTitle(e) + " gemacht? Setz den Haken :)"); });
+    return out.join(" ");
+  }
   function waText(r) {
     var first = String(r.nickname || r.name || "").replace(/^@/, "").split(" ")[0];
     var today = r.today || [];
@@ -411,25 +429,26 @@
     var next = (r.tomorrow || [])[0];
     var streak = Number(r.streak) || 0;
     var big = streak >= 4;
-    function t(e) { return String((e && e.title) || "Training").trim(); }
-    var morgen = next ? t(next) + (hhmm(next.at) ? " um " + hhmm(next.at) : "") : "";
+    var morgen = next ? waTitle(next) + (hhmm(next.at) ? " um " + hhmm(next.at) : "") : "";
+    var doneTxt = andList(done.map(waTitle));
     var parts = [];
     if (done.length && !open.length) {
-      if (big && next) parts.push(streak + " Tage in Folge, das ist richtig stark! " + t(done[0]) + " heute erledigt und morgen schon " + morgen + " am Start. Genau so baust Du Dir Deine Routine.");
-      else if (big) parts.push(streak + " Tage in Folge, das ist richtig stark! " + t(done[0]) + " heute erledigt. Damit die Serie hält: Plan Dir gleich was für morgen ein.");
-      else if (next) parts.push("Stark, " + t(done[0]) + " heute erledigt und morgen schon " + morgen + " am Start. Genau so!");
-      else parts.push("Stark, " + t(done[0]) + " heute erledigt! Für morgen ist noch nichts geplant. Trag Dir gleich was ein, dann bleibst Du dran.");
+      if (big && next) parts.push(streak + " Tage in Folge, das ist richtig stark! " + doneTxt + " heute erledigt und morgen schon " + morgen + " am Start. Genau so baust Du Dir Deine Routine.");
+      else if (big) parts.push(streak + " Tage in Folge, das ist richtig stark! " + doneTxt + " heute erledigt. Damit die Serie hält: Plan Dir gleich was für morgen ein.");
+      else if (next) parts.push("Stark, " + doneTxt + " heute erledigt und morgen schon " + morgen + " am Start. Genau so!");
+      else parts.push("Stark, " + doneTxt + " heute erledigt! Für morgen ist noch nichts geplant. Trag Dir gleich was ein, dann bleibst Du dran.");
     } else if (done.length && open.length) {
-      parts.push((big ? streak + " Tage in Folge, stark! " : "Stark, ") + t(done[0]) + " hast Du heute schon erledigt. " + t(open[0]) + " steht noch an. Schaffst Du das noch?");
-      parts.push(next ? "Morgen geht es mit " + morgen + " weiter." : "Und für morgen ist noch nichts geplant. Trag Dir gleich was ein.");
+      parts.push((big ? streak + " Tage in Folge, stark! " : "Stark, ") + doneTxt + " hast Du heute schon erledigt.");
+      parts.push(openText(open));
+      parts.push(next ? "Morgen geht es mit " + morgen + " weiter." : "Für morgen ist noch nichts geplant. Trag Dir gleich was ein.");
     } else if (open.length) {
-      if (next) parts.push(t(open[0]) + " steht heute noch an. Schaffst Du das noch? Morgen geht es mit " + morgen + " weiter.");
-      else parts.push(t(open[0]) + " steht heute noch an, und für morgen ist noch nichts geplant. Zieh heute durch und trag Dir gleich was für morgen ein.");
+      parts.push(openText(open));
+      parts.push(next ? "Morgen geht es mit " + morgen + " weiter." : "Für morgen ist noch nichts geplant. Trag Dir gleich was ein.");
       if (big) parts.push("Deine Serie steht bei " + streak + " Tagen, die willst Du halten.");
     } else if (next) {
-      parts.push("Morgen hast Du " + morgen + " geplant. Viel Spaß dabei!");
+      parts.push("Heute schon was gemacht? Dann trag es in gogogo ein und setz den Haken. Morgen hast Du " + morgen + " geplant, viel Spaß dabei!");
     } else {
-      parts.push("Heute und morgen steht bei Dir noch nichts an. Plan Dir für morgen was in gogogo ein, auch kurz zählt.");
+      parts.push("Heute schon was gemacht? Dann trag es in gogogo ein und setz den Haken. Für morgen steht noch nichts an, plan Dir gleich was ein, auch kurz zählt.");
     }
     return "Hi " + first + "! " + parts.join(" ") + "\n\nHerzliche Grüße, Joscha. gogogo!";
   }
