@@ -2060,7 +2060,8 @@
           noCheck: ev.status !== "erledigt" && day < todayIso(),
           menu: ev.status !== "erledigt" && day >= todayIso(),
           badge: eventBadgeKind(ev),
-          shareId: String(ev.id),
+          /* Papierflieger nur für heute und kommende Events, nicht für vergangene */
+          shareId: day >= todayIso() ? String(ev.id) : "",
           shareDay: day,
           removeId: "",
           removeMode: "delete"
