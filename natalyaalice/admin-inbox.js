@@ -12,6 +12,7 @@
   "use strict";
 
   var host = null;
+  var PEN = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>';
   var st = null;
 
   var TYPE_TITLE = {
@@ -47,9 +48,14 @@
     ".ga-pill{flex:none;align-self:center;min-height:34px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}" +
     ".ga-pill.is-fill{background:#111;color:#fff}" +
     ".ga-pill.is-blue{background:#1D9BF0;border-color:#1D9BF0;color:#fff}" +
-    ".ga-cimg{width:76px;height:76px;flex:none;align-self:flex-start;border-radius:12px;object-fit:cover;background:#E6DED0}" +
+    /* Bild fest 4 Schriftreihen hoch, Rechteck 4:5 */
+    ".ga-cimg,.ga-rect{width:61px;height:76px;flex:none;align-self:flex-start;border-radius:10px;object-fit:cover;background:#E6DED0;display:grid;place-items:center;font-weight:700}" +
+    ".ga-rectbtn{flex:none;align-self:flex-start;padding:0;border:0;background:none;cursor:pointer;border-radius:10px}" +
+    ".ga-photo{position:relative;width:160px;height:200px;margin:0 auto 12px}" +
+    ".ga-photo img,.ga-photo span{width:100%;height:100%;border-radius:14px;object-fit:cover;background:#E6DED0;display:grid;place-items:center;font:700 48px/1 Inter,system-ui,sans-serif}" +
+    ".ga-pen{position:absolute;right:-8px;bottom:-8px;width:40px;height:40px;border-radius:50%;border:0;background:#111;color:#fff;display:grid;place-items:center;cursor:pointer}" +
     ".ga-item.is-top{align-items:flex-start}" +
-    "@media (max-width:600px){.ga-item.ga-circ{flex-wrap:wrap}.ga-circ .ga-pill{margin-left:88px}}" +
+    "@media (max-width:600px){.ga-item.ga-circ{flex-wrap:wrap}.ga-circ .ga-pill{margin-left:73px}}" +
     ".ga-filters{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}" +
     ".ga-filters select{min-height:34px;padding:0 10px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:13px;font-weight:600;color:#111}" +
     ".ga-paused{opacity:.55}" +
@@ -74,7 +80,7 @@
     ".ga-facebtn{flex:none;padding:0;border:0;background:none;border-radius:50%;cursor:pointer}" +
     ".ga-info{position:fixed;inset:0;z-index:10040;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(20,16,12,.42)}" +
     ".ga-info__card{width:min(100%,420px);max-height:88vh;overflow-y:auto;box-sizing:border-box;background:#F3EEE4;color:#2A2118;border-radius:22px;padding:20px 18px 14px;font-family:Inter,system-ui,sans-serif}" +
-    ".ga-info__top{display:flex;align-items:center;gap:14px;margin-bottom:12px}" +
+    ".ga-info__top{display:flex;flex-direction:column;align-items:center;gap:6px;margin-bottom:12px;text-align:center}" +
     ".ga-info__face{width:72px;height:72px;flex:none;border-radius:50%;object-fit:cover;background:#E6DED0;display:grid;place-items:center;font:700 28px/1 Inter,system-ui,sans-serif}" +
     ".ga-info .ga-info__name{margin:0;font:600 24px/1.15 'Playfair Display',Georgia,serif !important}" +
     ".ga-info .ga-info__nick{display:block;font:500 14px/1.3 Inter,system-ui,sans-serif !important;color:rgba(42,33,24,.65);margin-top:2px}" +
@@ -86,7 +92,7 @@
     ".ga-info__btns button{min-height:46px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:15px;font-weight:700;cursor:pointer}" +
     ".ga-info__btns button.is-dark{background:#111;color:#fff}" +
     ".ga-info__btns button.is-quiet{border:0;color:rgba(42,33,24,.7);font-weight:600}" +
-    "@media (min-width:900px){.cp .cp-body{max-width:760px;margin:0 auto;width:100%;box-sizing:border-box}}";
+    "@media (min-width:900px){.cp .cp-body{max-width:760px;margin:0 auto;width:100%;box-sizing:border-box}.cp.ga-root .cp-body{max-width:1064px}}";
 
   function ensureCss() {
     if (document.getElementById("ga-css")) return;
@@ -192,7 +198,7 @@
     var ids = (st.accounts || []).map(function (a) { return a.account_id; }).filter(Boolean);
     if (!ids.length) return;
     var base = "go_accounts?id=in.(" + ids.join(",") + ")&select=";
-    var more = ",serial_number,invite_code,phone,whatsapp_phone,about_me,training_goal,trainer_id,workout_places";
+    var more = ",serial_number,invite_code,phone,whatsapp_phone,about_me,training_goal,trainer_id,workout_places,photo_url";
     host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at" + more)
       .catch(function () { return host.rest(base + "id,nickname,coach_self_at,coach_verified_at" + more); })
       .catch(function () { return host.rest(base + "id,nickname"); })
@@ -331,10 +337,13 @@
           (ln.groups || []).length ? "Gruppe: " + esc(ln.groups.join(", ")) : "",
           (ln.circles || []).length ? "Circle: " + esc(ln.circles.join(", ")) : ""
         ]);
-        var r4 = esc(placeList(ci.workout_places).join(" · "));
-        return '<div class="ga-item is-top' + (ci.paused_at ? " ga-paused" : "") + '"><button type="button" class="ga-facebtn" data-ga-info="' + esc(id) + '" aria-label="Infos zu ' + esc(a.name || "") + '">' + face(a) + "</button>" +
+        var pl = placeList(ci.workout_places);
+        var r4 = '<button type="button" class="ga-link" data-ga-places="' + esc(id) + '">' + esc(pl.length ? pl.join(" · ") : "Ort hinzufügen") + "</button>";
+        var photo = ci.photo_url || a.photo_url;
+        var rect = photo ? '<img class="ga-rect" src="' + esc(photo) + '" alt="" />' : '<span class="ga-rect">' + esc(String(a.name || "?").slice(0, 1)) + "</span>";
+        return '<div class="ga-item is-top' + (ci.paused_at ? " ga-paused" : "") + '"><button type="button" class="ga-rectbtn" data-ga-info="' + esc(id) + '" aria-label="Infos zu ' + esc(a.name || "") + '">' + rect + "</button>" +
           '<div class="ga-copy ga-rows"><div class="ga-r1">' + r1 + "</div>" +
-          (r2 ? "<div>" + r2 + "</div>" : "") + "<div>" + r3 + "</div>" + (r4 ? "<div>" + r4 + "</div>" : "") + "</div>" +
+          (r2 ? "<div>" + r2 + "</div>" : "") + "<div>" + r3 + "</div><div>" + r4 + "</div></div>" +
           rolePill(a) + "</div>";
       }).join("");
   }
@@ -387,117 +396,203 @@
     });
   }
 
-  /* ---------- Circles (go-admin-circles.sql) ---------- */
-  function loadCircles() {
-    st.circles = "loading";
-    return host.rest("rpc/go_admin_circles", { method: "POST", body: {} })
-      .then(function (rows) { if (st) { st.circles = rows || []; paint(); } })
-      .catch(function () { if (st) { st.circles = "error"; paint(); } });
+  /* ---------- Circles und Gruppen: gleiche Liste ----------
+     Circles: go-admin-circles.sql · Gruppen: go-admin-groups.sql */
+  var ORG = {
+    circle: { list: "go_admin_circles", sql: "go-admin-circles.sql", label: "Circle", fallback: "/assets/gogogo/gogogo-Zirkeltraining.jpg" },
+    group: { list: "go_admin_groups", sql: "go-admin-groups.sql", label: "Gruppe", fallback: "/assets/gogogo/personaltraining-1600.webp" }
+  };
+  function orgState(kind) { st.orgs = st.orgs || {}; return st.orgs[kind]; }
+  function loadOrgs(kind) {
+    st.orgs = st.orgs || {};
+    st.orgs[kind] = "loading";
+    return host.rest("rpc/" + ORG[kind].list, { method: "POST", body: {} })
+      .then(function (rows) { if (st) { st.orgs[kind] = rows || []; paint(); } })
+      .catch(function () { if (st) { st.orgs[kind] = "error"; paint(); } });
   }
-  function circleById(gid) {
-    return (Array.isArray(st.circles) ? st.circles : []).filter(function (c) { return String(c.group_id) === String(gid); })[0];
+  function orgById(kind, gid) {
+    var l = orgState(kind);
+    return (Array.isArray(l) ? l : []).filter(function (c) { return String(c.group_id) === String(gid); })[0];
   }
   function shortDay(at) {
     var d = new Date(at);
     return isNaN(d.getTime()) ? "" : d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" }).replace(/,/, "");
   }
-  function paintCircles() {
-    if (st.circles === "error") return '<p class="cp-hint">Liste nicht geladen. Ist go-admin-circles.sql in Supabase ausgeführt?</p>';
-    if (!st.circles) { loadCircles(); return '<p class="cp-hint">Lade…</p>'; }
-    if (st.circles === "loading") return '<p class="cp-hint">Lade…</p>';
-    var cf = st.cf || (st.cf = { loc: "", coach: "" });
+  function sqlHint(kind) { GoDialog.alert("Das braucht " + ORG[kind].sql + " in Supabase."); }
+  function paintOrgs(kind) {
+    var l = orgState(kind);
+    if (l === "error") return '<p class="cp-hint">Liste nicht geladen. Ist ' + ORG[kind].sql + " in Supabase ausgeführt?</p>";
+    if (!l) { loadOrgs(kind); return '<p class="cp-hint">Lade…</p>'; }
+    if (l === "loading") return '<p class="cp-hint">Lade…</p>';
+    st.cfs = st.cfs || {};
+    var cf = st.cfs[kind] || (st.cfs[kind] = { loc: "", coach: "" });
     var locs = {}, coaches = {};
-    st.circles.forEach(function (c) {
-      (c.locations || []).forEach(function (l) { locs[l] = 1; });
+    l.forEach(function (c) {
+      (c.locations || []).forEach(function (x) { locs[x] = 1; });
       if (c.owner && c.owner.id) coaches[c.owner.id] = c.owner.name || "Coach";
     });
-    var list = st.circles.filter(function (c) {
+    var list = l.filter(function (c) {
       if (cf.loc && (c.locations || []).indexOf(cf.loc) < 0) return false;
       if (cf.coach && !(c.owner && String(c.owner.id) === cf.coach)) return false;
       return true;
     });
     var filters = '<div class="ga-filters">' +
-      '<select data-ga-cf="loc" aria-label="Ort"><option value="">Alle Orte</option>' + Object.keys(locs).sort().map(function (l) {
-        return '<option value="' + esc(l) + '"' + (cf.loc === l ? " selected" : "") + ">" + esc(l) + "</option>";
+      '<select data-ga-cf="loc" data-gk="' + kind + '" aria-label="Ort"><option value="">Alle Orte</option>' + Object.keys(locs).sort().map(function (x) {
+        return '<option value="' + esc(x) + '"' + (cf.loc === x ? " selected" : "") + ">" + esc(x) + "</option>";
       }).join("") + "</select>" +
-      '<select data-ga-cf="coach" aria-label="Coach"><option value="">Alle Coaches</option>' + Object.keys(coaches).map(function (id) {
+      '<select data-ga-cf="coach" data-gk="' + kind + '" aria-label="Coach"><option value="">Alle Coaches</option>' + Object.keys(coaches).map(function (id) {
         return '<option value="' + esc(id) + '"' + (cf.coach === id ? " selected" : "") + ">" + esc(coaches[id]) + "</option>";
       }).join("") + "</select></div>";
-    if (!st.circles.length) return '<p class="cp-hint">Noch keine Circles. Sie erscheinen, sobald Mitglieder die App mit ihrem Circle öffnen.</p>';
+    if (!l.length) return '<p class="cp-hint">' + (kind === "circle" ? "Noch keine Circles. Sie erscheinen, sobald Mitglieder die App mit ihrem Circle öffnen." : "Noch keine Gruppen.") + "</p>";
+    function btn(act, gid, html) { return '<button type="button" class="ga-link" data-gx="' + act + '" data-gk="' + kind + '" data-gid="' + esc(gid) + '">' + html + "</button>"; }
     return filters + list.map(function (c) {
-      var gid = esc(c.group_id);
-      var img = c.photo_url || "/assets/gogogo/gogogo-Zirkeltraining.jpg";
-      var coach = c.owner && c.owner.id
-        ? 'Coach: <button type="button" class="ga-link" data-gc-coach="' + gid + '">' + esc(String(c.owner.name || "Coach").split(" ")[0]) + "</button>"
-        : '<button type="button" class="ga-link" data-gc-coach="' + gid + '">Coach hinzufügen</button>';
+      var gid = c.group_id;
+      var img = c.photo_url || ORG[kind].fallback;
+      var coach = c.owner && c.owner.id ? "Coach: " + btn("coach", gid, esc(String(c.owner.name || "Coach").split(" ")[0])) : btn("coach", gid, "Coach hinzufügen");
       var mem = (c.members || []).map(function (m) {
-        return '<button type="button" class="ga-link" data-gc-member="' + esc(m.id) + '">' + esc(String(m.name || "?").split(" ")[0]) + "</button>" + (m.source === "admin" ? "*" : "");
+        var mark = m.source === "admin" ? "*" : m.status && m.status !== "accepted" ? " (offen)" : "";
+        return '<button type="button" class="ga-link" data-gx="member" data-gk="' + kind + '" data-gid="' + esc(m.id) + '">' + esc(String(m.name || "?").split(" ")[0]) + "</button>" + mark;
       }).join(", ");
-      var places = '<button type="button" class="ga-link" data-gc-places="' + gid + '">' +
-        esc((c.locations || []).length ? c.locations.join(", ") : "Ort hinzufügen") + "</button>" + (c.online ? " · online möglich" : "");
+      var places = btn("places", gid, esc((c.locations || []).length ? c.locations.join(", ") : "Ort hinzufügen")) + (c.online ? " · online möglich" : "");
       var last = (c.last || []).map(function (x) { return esc(shortDay(x.at)) + " · " + esc(String(x.n)) + " dabei"; }).join(", ");
-      return '<div class="ga-item is-top ga-circ"><img class="ga-cimg" src="' + esc(img) + '" alt="" />' +
-        '<div class="ga-copy ga-rows"><div class="ga-r1"><b>' + esc(c.name || "Circle") + "</b></div>" +
+      return '<div class="ga-item is-top ga-circ"><button type="button" class="ga-rectbtn" data-gx="photo" data-gk="' + kind + '" data-gid="' + esc(gid) + '" aria-label="Bild"><img class="ga-cimg" src="' + esc(img) + '" alt="" /></button>' +
+        '<div class="ga-copy ga-rows"><div class="ga-r1"><b>' + esc(c.name || ORG[kind].label) + "</b></div>" +
         "<div>" + coach + "</div>" +
         "<div>Mitglieder: " + (mem || "–") + "</div>" +
         "<div>Orte: " + places + "</div>" +
         "<div>Zuletzt: " + (last || "–") + "</div></div>" +
-        '<button type="button" class="ga-pill" data-gc-add="' + gid + '">Teilnehmer hinzufügen</button></div>';
-    }).join("") + '<p class="cp-hint">* vom Admin hinzugefügt. Im FFC-Leaderboard erscheinen sie, sobald sie dem Circle in FFC beigetreten sind (die App versucht das beim nächsten Öffnen).</p>';
+        '<button type="button" class="ga-pill" data-gx="add" data-gk="' + kind + '" data-gid="' + esc(gid) + '">Teilnehmer hinzufügen</button></div>';
+    }).join("") + (kind === "circle" ? '<p class="cp-hint">* vom Admin hinzugefügt. Im FFC-Leaderboard erscheinen sie, sobald sie dem Circle in FFC beigetreten sind (die App versucht das beim nächsten Öffnen).</p>' : '<p class="cp-hint">Höchstens 10 Mitglieder je Gruppe.</p>');
   }
-  function circleCoach(gid) {
-    var c = circleById(gid);
+  function orgCoach(kind, gid) {
+    var c = orgById(kind, gid);
     if (!c) return;
     var coaches = (st.accounts || []).filter(isCoachAcc).sort(function (x, y) { return String(x.name || "").localeCompare(String(y.name || ""), "de"); });
     var items = coaches.map(function (a) { return { label: String(a.name || "Coach") + (c.owner && String(c.owner.id) === String(a.account_id) ? " ✓" : ""), value: String(a.account_id) }; });
-    if (c.owner && c.owner.id) items.unshift({ label: "Coach entfernen", value: "none" });
-    GoDialog.choose("Coach von " + (c.name || "Circle"), items, { center: true, cancel: "Abbrechen" }).then(function (v) {
+    if (kind === "circle" && c.owner && c.owner.id) items.unshift({ label: "Coach entfernen", value: "none" });
+    GoDialog.choose("Coach von " + (c.name || ORG[kind].label), items, { center: true, cancel: "Abbrechen" }).then(function (v) {
       if (!v) return;
-      host.rest("rpc/go_admin_set_circle_coach", { method: "POST", body: { p_group: String(gid), p_account: v === "none" ? null : v } })
-        .then(function () { if (host.toast) host.toast(v === "none" ? "Coach entfernt" : "Coach gesetzt"); return loadCircles(); })
-        .catch(function () { GoDialog.alert("Das braucht go-admin-circles.sql in Supabase."); });
+      var rpc = kind === "circle" ? "go_admin_set_circle_coach" : "go_admin_set_group_owner";
+      host.rest("rpc/" + rpc, { method: "POST", body: { p_group: String(gid), p_account: v === "none" ? null : v } })
+        .then(function () { if (host.toast) host.toast(v === "none" ? "Coach entfernt" : "Coach gesetzt"); return loadOrgs(kind); })
+        .catch(function () { sqlHint(kind); });
     });
   }
-  function circlePlaces(gid) {
-    var c = circleById(gid);
-    if (!c) return;
-    var locs = (c.locations || []).slice();
-    var items = locs.map(function (l) { return { label: "✕ " + l, value: "rm:" + l }; });
-    if (locs.length < 6) items.push({ label: "Ort hinzufügen", value: "add" });
-    items.push({ label: c.online ? "Online möglich: ja" : "Online möglich: nein", value: "online" });
-    function save(next, online) {
-      return host.rest("rpc/go_admin_save_circle_places", { method: "POST", body: { p_group: String(gid), p_locations: next, p_online: !!online } })
-        .then(function () { c.locations = next; c.online = !!online; paint(); setTimeout(function () { circlePlaces(gid); }, 0); })
-        .catch(function () { GoDialog.alert("Das braucht go-admin-circles.sql in Supabase."); });
-    }
-    GoDialog.choose("Orte von " + (c.name || "Circle"), items, { center: true, sub: locs.length ? "Tippen auf einen Ort entfernt ihn." : "Noch kein Ort.", cancel: "Fertig" }).then(function (v) {
+  /* Orte bearbeiten: Liste (Tippen entfernt), Ort hinzufügen über den Ortswähler mit Karte */
+  function editPlaces(title, locs, opts, save) {
+    var items = locs.map(function (x) { return { label: "✕ " + x, value: "rm:" + x }; });
+    if (locs.length < 12) items.push({ label: "Ort hinzufügen", value: "add" });
+    if (opts.online != null) items.push({ label: opts.online ? "Online möglich: ja" : "Online möglich: nein", value: "online" });
+    GoDialog.choose(title, items, { center: true, sub: locs.length ? "Tippen auf einen Ort entfernt ihn." : "Noch kein Ort.", cancel: "Fertig" }).then(function (v) {
       if (!v) return;
-      if (v === "online") return save(locs, !c.online);
-      if (v.indexOf("rm:") === 0) return save(locs.filter(function (l) { return l !== v.slice(3); }), c.online);
+      if (v === "online") return save(locs, !opts.online);
+      if (v.indexOf("rm:") === 0) return save(locs.filter(function (x) { return x !== v.slice(3); }), opts.online);
       if (v === "add" && global.goPickPlace) {
-        return global.goPickPlace("Ort für " + (c.name || "den Circle")).then(function (name) {
-          if (!name || locs.some(function (l) { return l.toLowerCase() === name.toLowerCase(); })) { circlePlaces(gid); return; }
-          return save(locs.concat([name]), c.online);
+        return global.goPickPlace("Ort hinzufügen").then(function (name) {
+          if (!name || locs.some(function (x) { return x.toLowerCase() === name.toLowerCase(); })) return save(locs, opts.online);
+          return save(locs.concat([name]), opts.online);
         });
       }
     });
   }
-  function circleAdd(gid) {
-    var c = circleById(gid);
+  function orgPlaces(kind, gid) {
+    var c = orgById(kind, gid);
+    if (!c) return;
+    editPlaces("Orte von " + (c.name || ORG[kind].label), (c.locations || []).slice(), { online: kind === "circle" ? !!c.online : null }, function (next, online) {
+      var req = kind === "circle"
+        ? host.rest("rpc/go_admin_save_circle_places", { method: "POST", body: { p_group: String(gid), p_locations: next, p_online: !!online } })
+        : host.rest("rpc/go_admin_save_group_places", { method: "POST", body: { p_group: String(gid), p_locations: next } });
+      return req.then(function () {
+        c.locations = next;
+        if (kind === "circle") c.online = !!online;
+        paint();
+        setTimeout(function () { orgPlaces(kind, gid); }, 0);
+      }).catch(function () { sqlHint(kind); });
+    });
+  }
+  function userPlaces(id) {
+    var ci = coachInfo(id);
+    var a = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0] || {};
+    editPlaces("Orte von " + String(a.name || "Nutzer").split(" ")[0], placeList(ci.workout_places), { online: null }, function (next) {
+      return host.rest("rpc/go_admin_update_account", { method: "POST", body: { p_account: id, p_places: next } })
+        .then(function () {
+          (st.coachInfo[String(id)] || (st.coachInfo[String(id)] = {})).workout_places = next;
+          paint();
+          setTimeout(function () { userPlaces(id); }, 0);
+        })
+        .catch(function () { GoDialog.alert("Das braucht go-admin-groups.sql in Supabase."); });
+    });
+  }
+  /* Foto ändern: Geräte-Auswahl öffnet sich, Bild wird komprimiert gespeichert */
+  function pickPhoto(onUrl) {
+    var inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    inp.hidden = true;
+    document.body.appendChild(inp);
+    inp.addEventListener("change", function () {
+      var f = inp.files && inp.files[0];
+      inp.remove();
+      if (!f) return;
+      if (host.toast) host.toast("Foto wird gespeichert …");
+      if (global.goCompressPhoto) global.goCompressPhoto(f, function (url) { if (url) onUrl(url); });
+      else {
+        var r = new FileReader();
+        r.onload = function () { onUrl(String(r.result || "")); };
+        r.readAsDataURL(f);
+      }
+    });
+    inp.click();
+  }
+  /* Bild groß mit Stift (Circles und Gruppen) */
+  function orgPhoto(kind, gid) {
+    var c = orgById(kind, gid);
+    if (!c) return;
+    var box = document.createElement("div");
+    box.className = "ga-info";
+    box.innerHTML = '<div class="ga-info__card" role="dialog" aria-modal="true"><div class="ga-photo"><img src="' + esc(c.photo_url || ORG[kind].fallback) + '" alt="" />' +
+      '<button type="button" class="ga-pen" data-gp-pen="1" aria-label="Foto ändern">' + PEN + "</button></div>" +
+      '<p class="ga-info__name" style="text-align:center">' + esc(c.name || ORG[kind].label) + "</p>" +
+      '<div class="ga-info__btns"><button type="button" class="is-quiet" data-gi-close="1">Schließen</button></div></div>';
+    document.body.appendChild(box);
+    box.addEventListener("click", function (e) {
+      if (e.target === box || e.target.closest("[data-gi-close]")) { box.remove(); return; }
+      if (!e.target.closest("[data-gp-pen]")) return;
+      pickPhoto(function (url) {
+        var req = kind === "circle"
+          ? host.rest("rpc/go_set_circle_photo", { method: "POST", body: { p_group: String(gid), p_url: url } })
+          : host.rest("rpc/go_admin_set_group_photo", { method: "POST", body: { p_group: String(gid), p_url: url } });
+        req.then(function () {
+          c.photo_url = url;
+          var im = box.querySelector(".ga-photo img");
+          if (im) im.src = url;
+          paint();
+          if (host.toast) host.toast("Foto gespeichert");
+        }).catch(function () { sqlHint(kind); });
+      });
+    });
+  }
+  function orgAdd(kind, gid) {
+    var c = orgById(kind, gid);
     if (!c) return;
     var have = {};
     (c.members || []).forEach(function (m) { have[String(m.id)] = 1; });
+    if (c.owner && c.owner.id) have[String(c.owner.id)] = 1;
     host.rest("go_accounts?select=id,name&order=name.asc&limit=1000").catch(function () { return st.accounts.map(function (a) { return { id: a.account_id, name: a.name }; }); })
       .then(function (rows) {
         var items = (rows || []).filter(function (r) { return r && r.id && !have[String(r.id)]; })
           .map(function (r) { return { label: r.name || "?", value: String(r.id) }; });
-        return GoDialog.pick("Teilnehmer hinzufügen zu " + (c.name || "Circle"), items, { ok: "Hinzufügen", cancel: "Abbrechen", empty: "Alle Nutzer sind schon dabei." });
+        return GoDialog.pick("Teilnehmer hinzufügen zu " + (c.name || ORG[kind].label), items, { ok: "Hinzufügen", cancel: "Abbrechen", empty: "Alle Nutzer sind schon dabei." });
       })
       .then(function (ids) {
         if (!ids || !ids.length) return;
-        return host.rest("rpc/go_admin_add_circle_members", { method: "POST", body: { p_group: String(gid), p_ids: ids } })
-          .then(function () { if (host.toast) host.toast(ids.length + (ids.length === 1 ? " Teilnehmer" : " Teilnehmer") + " hinzugefügt"); return loadCircles(); })
-          .catch(function () { GoDialog.alert("Das braucht go-admin-circles.sql in Supabase."); });
+        var rpc = kind === "circle" ? "go_admin_add_circle_members" : "go_admin_add_group_members";
+        return host.rest("rpc/" + rpc, { method: "POST", body: { p_group: String(gid), p_ids: ids } })
+          .then(function () { if (host.toast) host.toast(ids.length + " Teilnehmer hinzugefügt"); return loadOrgs(kind); })
+          .catch(function (err) {
+            if (/group_full/.test(String((err && err.message) || ""))) GoDialog.alert("Die Gruppe ist voll (höchstens 10 Mitglieder).");
+            else sqlHint(kind);
+          });
       });
   }
 
@@ -507,7 +602,8 @@
     { id: "coaches", label: "Nutzer" },
     { id: "editor", label: "Editor" },
     { id: "ex", label: "Social Media Links" },
-    { id: "circles", label: "Circles" }
+    { id: "circles", label: "Circles" },
+    { id: "groups", label: "Gruppen" }
   ];
   function tabLabel(id) {
     var t = TABS.filter(function (x) { return x.id === id; })[0];
@@ -527,7 +623,7 @@
       st.body.innerHTML = '<p class="cp-hint">' + esc(st.error) + "</p>";
       return;
     }
-    st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : st.tab === "circles" ? paintCircles() : paintCoaches();
+    st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : st.tab === "circles" ? paintOrgs("circle") : st.tab === "groups" ? paintOrgs("group") : paintCoaches();
   }
 
   /* ---------- Ziele der Nutzer (go_accounts.training_goal, mehrere mit Komma) ---------- */
@@ -644,7 +740,7 @@
     return out.join(" ");
   }
   function waText(r) {
-    var first = String(r.nickname || r.name || "").replace(/^@/, "").split(" ")[0];
+    var first = String(r.name || r.nickname || "").replace(/^@/, "").trim().split(" ")[0];
     var today = r.today || [];
     var open = today.filter(function (e) { return e.status === "geplant"; });
     var done = today.filter(function (e) { return e.status === "erledigt"; });
@@ -673,7 +769,7 @@
     } else {
       parts.push("Heute schon was gemacht? Dann trag es in gogogo ein und setz den Haken. Für morgen steht noch nichts an, plan Dir gleich was ein, auch kurz zählt.");
     }
-    return "Hi " + first + "! " + parts.join(" ") + "\n\nHerzliche Grüße, Joscha. gogogo!";
+    return "Hi " + first + "! " + parts.join(" ") + " Herzliche Grüße, Joscha. gogogo!";
   }
   function loadWa() {
     st.wa = null;
@@ -980,7 +1076,20 @@
     box.addEventListener("click", function (e) {
       if (e.target === box || e.target.closest("[data-gi-close]")) { close(); return; }
       if (e.target.closest("[data-gi-goal]")) { editGoal(id, function () { close(); openInfo(id); }); return; }
-      if (e.target.closest("[data-gi-req]")) { close(); requestCoach(id); }
+      if (e.target.closest("[data-gi-req]")) { close(); requestCoach(id); return; }
+      if (e.target.closest("[data-gi-pen]")) {
+        pickPhoto(function (url) {
+          host.rest("rpc/go_admin_update_account", { method: "POST", body: { p_account: id, p_photo: url } })
+            .then(function () {
+              (st.coachInfo[String(id)] || (st.coachInfo[String(id)] = {})).photo_url = url;
+              var im = card.querySelector(".ga-photo img");
+              if (im) im.src = url; else { close(); openInfo(id); }
+              paint();
+              if (host.toast) host.toast("Foto gespeichert");
+            })
+            .catch(function () { GoDialog.alert("Das braucht go-admin-groups.sql in Supabase."); });
+        });
+      }
     });
     var enc = encodeURIComponent(id);
     var nowIso = new Date().toISOString();
@@ -1042,8 +1151,9 @@
           .map(function (b) { return b.type === "coach_offer" ? "möchte Coach werden" : (b.title || TYPE_TITLE[b.type] || b.type); });
         row("Buchungen", esc(books.join(" · ")));
         var photo = a.photo_url || person.photo_url;
-        var faceHtml = photo ? '<img class="ga-info__face" src="' + esc(photo) + '" alt="" />' :
-          '<span class="ga-info__face">' + esc(String(a.name || person.name || "?").slice(0, 1)) + "</span>";
+        var faceHtml = '<div class="ga-photo">' + (photo ? '<img src="' + esc(photo) + '" alt="" />' :
+          "<span>" + esc(String(a.name || person.name || "?").slice(0, 1)) + "</span>") +
+          '<button type="button" class="ga-pen" data-gi-pen="1" aria-label="Foto ändern">' + PEN + "</button></div>";
         var req = !a.is_trainer && coachRequested(id);
         card.innerHTML = '<div class="ga-info__top">' + faceHtml + '<p class="ga-info__name">' + esc(a.name || person.name || "?") +
           (a.nickname ? '<span class="ga-info__nick">@' + esc(a.nickname) + "</span>" : "") + "</p></div>" +
@@ -1057,7 +1167,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gc-coach],[data-gc-member],[data-gc-places],[data-gc-add]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -1065,15 +1175,19 @@
     if (t.hasAttribute("data-ga-del")) { deleteAccount(t); return; }
     if (t.hasAttribute("data-ga-role")) { roleMenu(t.getAttribute("data-ga-role")); return; }
     if (t.hasAttribute("data-ga-user")) { userMenu(t.getAttribute("data-ga-user")); return; }
-    if (t.hasAttribute("data-gc-coach")) { circleCoach(t.getAttribute("data-gc-coach")); return; }
-    if (t.hasAttribute("data-gc-places")) { circlePlaces(t.getAttribute("data-gc-places")); return; }
-    if (t.hasAttribute("data-gc-add")) { circleAdd(t.getAttribute("data-gc-add")); return; }
-    if (t.hasAttribute("data-gc-member")) {
-      /* Mitglied: zu Nutzer wechseln und die Infobox öffnen */
-      var mid = t.getAttribute("data-gc-member");
-      st.tab = "coaches";
-      paint();
-      openInfo(mid);
+    if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
+    if (t.hasAttribute("data-gx")) {
+      var gx = t.getAttribute("data-gx"), gk = t.getAttribute("data-gk"), gid = t.getAttribute("data-gid");
+      if (gx === "coach") orgCoach(gk, gid);
+      else if (gx === "places") orgPlaces(gk, gid);
+      else if (gx === "add") orgAdd(gk, gid);
+      else if (gx === "photo") orgPhoto(gk, gid);
+      else if (gx === "member") {
+        /* Mitglied: zu Nutzer wechseln und die Infobox öffnen */
+        st.tab = "coaches";
+        paint();
+        openInfo(gid);
+      }
       return;
     }
     if (t.hasAttribute("data-ga-goal")) { editGoal(t.getAttribute("data-ga-goal")); return; }
@@ -1148,7 +1262,9 @@
   function onChange(e) {
     var sel = e.target && e.target.closest ? e.target.closest("[data-ga-cf]") : null;
     if (!sel || !st) return;
-    (st.cf || (st.cf = {}))[sel.getAttribute("data-ga-cf")] = sel.value;
+    st.cfs = st.cfs || {};
+    var k = sel.getAttribute("data-gk") || "circle";
+    (st.cfs[k] || (st.cfs[k] = {}))[sel.getAttribute("data-ga-cf")] = sel.value;
     paint();
   }
 
@@ -1164,7 +1280,7 @@
     ensureCss();
     if (st) close();
     var root = document.createElement("div");
-    root.className = "cp";
+    root.className = "cp ga-root";
     root.innerHTML =
       '<div class="ga-bar">' +
       '<button type="button" class="ga-round" data-ga-close aria-label="Zurück">' +
