@@ -56,7 +56,7 @@
     ".ga-del{margin-left:6px;color:#C7413B;border-color:#C7413B}" +
     ".ga-wa{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:#128C7E;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-grid;place-items:center}" +
     ".ga-item.is-sent{opacity:.5}" +
-    ".ga-msg{display:block;font-size:13px;color:rgba(42,33,24,.75);margin-top:2px}" +
+    ".ga-msg{display:block;white-space:pre-wrap;font-size:13px;color:rgba(42,33,24,.75);margin-top:2px}" +
     ".ga-bar{display:grid;grid-template-columns:31px 1fr 31px;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 8px;position:relative}" +
     ".ga-bar h2{margin:0;text-align:center;font:600 22px/1.2 'Playfair Display',Georgia,serif}" +
     ".ga-round{width:31px;height:31px;padding:0;border:1px solid #2A2118;border-radius:50%;display:grid;place-items:center;background:transparent;color:#2A2118;cursor:pointer}" +
@@ -616,23 +616,76 @@
     if (d.indexOf("0") === 0) return "49" + d.slice(1);
     return d;
   }
+  /* WhatsApp am Abend: erinnert, dass man noch was macht oder das Gemachte abhakt.
+   * Text nach Lage: heute (offen / erledigt / beides / nichts) × morgen (geplant / nichts) × Serie (ab 4 Tagen).
+   *                   | morgen geplant                              | morgen nichts
+   *  heute offen       | offene Events nennen (machen oder abhaken)  | dito + morgen planen
+   *  heute erledigt    | loben (Serie wertschätzen), morgen nennen   | loben + morgen planen
+   *  erledigt + offen  | loben, Offenes nennen, morgen nennen        | loben, Offenes nennen, morgen planen
+   *  heute nichts      | Gemachtes eintragen, morgen nennen          | Gemachtes eintragen + morgen planen
+   * Schritte sind speziell: „Hast Du schon 5.000 Schritte gemacht? Setz den Haken :)“
+   */
+  function waTitle(e) {
+    return String((e && e.title) || "Training").replace(/^\s*[>≥]\s*/, "").trim();
+  }
+  function isSteps(e) { return /schritte/i.test(String((e && e.title) || "")); }
+  function andList(arr) {
+    return arr.length < 2 ? arr.join("") : arr.slice(0, -1).join(", ") + " und " + arr[arr.length - 1];
+  }
+  function openText(open) {
+    var steps = open.filter(isSteps), other = open.filter(function (e) { return !isSteps(e); });
+    var out = [];
+    if (other.length) {
+      out.push(andList(other.map(waTitle)) + (other.length > 1 ? " stehen" : " steht") + " heute noch an. Schon gemacht? Dann hak " + (other.length > 1 ? "sie" : "es") + " ab. Sonst: Du schaffst das noch!");
+    }
+    steps.forEach(function (e) { out.push("Hast Du schon " + waTitle(e) + " gemacht? Setz den Haken :)"); });
+    return out.join(" ");
+  }
   function waText(r) {
-    var first = String(r.nickname || r.name || "").split(" ")[0];
-    var open = (r.today || []).filter(function (e) { return e.status === "geplant"; });
-    var done = (r.today || []).some(function (e) { return e.status === "erledigt"; });
+    var first = String(r.nickname || r.name || "").replace(/^@/, "").split(" ")[0];
+    var today = r.today || [];
+    var open = today.filter(function (e) { return e.status === "geplant"; });
+    var done = today.filter(function (e) { return e.status === "erledigt"; });
     var next = (r.tomorrow || [])[0];
-    var parts = ["Hi " + first + "!"];
-    if (open.length) parts.push("Heute noch offen: " + open[0].title + ". Schaffst Du das noch?");
-    else if (done) parts.push("Stark, heute erledigt.");
-    if (next) parts.push("Morgen: " + next.title + (hhmm(next.at) ? " um " + hhmm(next.at) : "") + ".");
-    if (!open.length && !next) parts.push("Morgen steht nichts an. Plan Dir was in gogogo.");
-    parts.push("gogogo");
-    return parts.join(" ");
+    var streak = Number(r.streak) || 0;
+    var big = streak >= 4;
+    var morgen = next ? waTitle(next) + (hhmm(next.at) ? " um " + hhmm(next.at) : "") : "";
+    var doneTxt = andList(done.map(waTitle));
+    var parts = [];
+    if (done.length && !open.length) {
+      if (big && next) parts.push(streak + " Tage in Folge, das ist richtig stark! " + doneTxt + " heute erledigt und morgen schon " + morgen + " am Start. Genau so baust Du Dir Deine Routine.");
+      else if (big) parts.push(streak + " Tage in Folge, das ist richtig stark! " + doneTxt + " heute erledigt. Damit die Serie hält: Plan Dir gleich was für morgen ein.");
+      else if (next) parts.push("Stark, " + doneTxt + " heute erledigt und morgen schon " + morgen + " am Start. Genau so!");
+      else parts.push("Stark, " + doneTxt + " heute erledigt! Für morgen ist noch nichts geplant. Trag Dir gleich was ein, dann bleibst Du dran.");
+    } else if (done.length && open.length) {
+      parts.push((big ? streak + " Tage in Folge, stark! " : "Stark, ") + doneTxt + " hast Du heute schon erledigt.");
+      parts.push(openText(open));
+      parts.push(next ? "Morgen geht es mit " + morgen + " weiter." : "Für morgen ist noch nichts geplant. Trag Dir gleich was ein.");
+    } else if (open.length) {
+      parts.push(openText(open));
+      parts.push(next ? "Morgen geht es mit " + morgen + " weiter." : "Für morgen ist noch nichts geplant. Trag Dir gleich was ein.");
+      if (big) parts.push("Deine Serie steht bei " + streak + " Tagen, die willst Du halten.");
+    } else if (next) {
+      parts.push("Heute schon was gemacht? Dann trag es in gogogo ein und setz den Haken. Morgen hast Du " + morgen + " geplant, viel Spaß dabei!");
+    } else {
+      parts.push("Heute schon was gemacht? Dann trag es in gogogo ein und setz den Haken. Für morgen steht noch nichts an, plan Dir gleich was ein, auch kurz zählt.");
+    }
+    return "Hi " + first + "! " + parts.join(" ") + "\n\nHerzliche Grüße, Joscha. gogogo!";
   }
   function loadWa() {
     st.wa = null;
     return host.rest("rpc/go_admin_wa_list", { method: "POST", body: { p_day: berlinToday() } })
-      .then(function (rows) { if (st) { st.wa = rows || []; paint(); } })
+      .then(function (rows) {
+        if (!st) return;
+        st.wa = rows || [];
+        paint();
+        /* Serie je Person (go_streak_days), danach Texte neu */
+        Promise.all(st.wa.map(function (r) {
+          return host.rest("rpc/go_streak_days", { method: "POST", body: { p_user_id: r.account_id } })
+            .then(function (n) { r.streak = Number(n) || 0; })
+            .catch(function () {});
+        })).then(function () { if (st && st.tab === "wa") paint(); });
+      })
       .catch(function () { if (st) { st.wa = "error"; paint(); } });
   }
   function paintWa() {

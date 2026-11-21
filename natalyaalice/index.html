@@ -5177,7 +5177,8 @@
     .group-edit-photo { display: flex; align-items: center; justify-content: center; min-height: 44px; margin: 6px 0 10px; border: 1.5px solid #2A2118; font-weight: 600; cursor: pointer; }
     #go-rail .go-slide__cta--signup + .go-slide__cta { margin-top: 12px !important; }
     /* Blaues c (verifizierter Coach): wie der Haken bei Instagram, oben rechts am Namen */
-    .go-vc { display: inline-grid; place-items: center; width: .62em; height: .62em; min-width: 13px; min-height: 13px; margin-left: 3px; vertical-align: super; border-radius: 50%; background: #1D9BF0; color: #fff; font: 700 9px/1 Inter, system-ui, sans-serif !important; letter-spacing: 0; text-transform: none; }
+    .go-vc { display: inline-grid; place-items: center; width: .62em; height: .62em; min-width: 13px; min-height: 13px; margin-left: 3px; vertical-align: super; border-radius: 50%; background: #1D9BF0; color: #fff; font-size: 0 !important; line-height: 0; }
+    .go-vc svg { display: block; width: 100%; height: 100%; }
     .team-slide__cta--challenge { margin-top: 12px !important; }
     .team-challenge { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 14px 0 0; padding: 12px 14px; border: 1.5px solid #2A2118; border-radius: 14px; text-align: left; }
     .team-challenge__label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .65; width: 100%; }
@@ -15405,7 +15406,8 @@
         b.className = "go-vc";
         b.setAttribute("aria-label", "Verifizierter Coach");
         b.title = "Verifizierter Coach";
-        b.textContent = "c";
+        /* „c“ als Bogen um den Mittelpunkt des Punkts (Schrift-Glyphe sitzt je nach Font zu tief) */
+        b.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.1 6.6A4.6 4.6 0 1 0 13.1 13.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>';
         el.appendChild(b);
       }
       function applyVcAll() {
@@ -16123,12 +16125,20 @@
             pts.className = "go-rec-detail__pts";
             pts.textContent = (Number(s.points) || 0).toLocaleString("de-DE") + " Punkte";
             detail.appendChild(pts);
+            /* Eine Runde = Laufen + Workout (wie im FFC-Setup). Double mit Partner: nur Workout, ohne Laufen */
+            var isDbl = lbMode === "double";
+            var isRunL = function (l) { return l && /·\s*Laufen/.test(l.label || ""); };
+            var allLines = s.lines || [];
+            var lines = isDbl ? allLines.filter(function (l) { return !isRunL(l); }) : allLines;
+            var nRounds = isDbl ? (lines.length || Math.ceil((s.rounds || 0) / 2))
+              : (s.roundsShown != null ? s.roundsShown : (allLines.some(isRunL) ? Math.ceil((s.rounds || 0) / 2) : (s.rounds || 0)));
             var meta = document.createElement("div");
             meta.className = "go-rec-detail__meta";
-            meta.textContent = (s.rounds || 0) + " Runden / " + fmtWork(s.workSec) + " Arbeit / " + (s.restSec || 0) + "s Pause";
+            meta.textContent = isDbl
+              ? fmtWork(s.workSec) + " Workout ohne Laufen · " + nRounds + " Runden"
+              : nRounds + " Runden / " + fmtWork(s.workSec) + " Arbeit / " + (s.restSec || 0) + "s Pause";
             detail.appendChild(meta);
             /* Doppelrunden: Laufen + Station zusammen (Reihenfolge wie protokolliert) */
-            var lines = s.lines || [];
             var blocks = [];
             for (var li = 0; li < lines.length; li++) {
               var cur = lines[li], nxt = lines[li + 1];
@@ -26789,6 +26799,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-14"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-16"></script>
 </body>
 </html>

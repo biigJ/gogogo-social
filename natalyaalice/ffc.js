@@ -1639,7 +1639,7 @@
   }
 
   function refreshSetup(){
-    document.getElementById('sumRounds').textContent = rounds;
+    document.getElementById('sumRounds').textContent = shownRounds(rounds, roundExercises);
     document.getElementById('sumWork').textContent = fmtMin(workSec);
     document.getElementById('sumRest').textContent = restSec+'s';
     const total = rounds > 0 ? rounds*workSec + (rounds-1)*restSec : 0;
@@ -1799,6 +1799,17 @@
   function shortUnit(exId){ const u = unitFor(exId); return u === 'Wiederholungen' ? 'Wdh.' : u === 'Kalorien' ? 'kcal' : 'm'; }
 
   const RUN_ID = 'run';
+  /* Runde = Laufen + Workout (wie in gogogo und im Zirkel-Setup). Mit Laufen im Ablauf zählt ein Paar als eine Runde. */
+  function shownRounds(n, list){
+    n = Number(n) || 0;
+    const ids = (list || []).map(x => x && typeof x === 'object' ? x.exercise : x);
+    return ids.some(id => id === RUN_ID) ? Math.ceil(n/2) : n;
+  }
+  /* Rundennummer zur Phase i: mit Laufen teilen sich Laufen und Station dieselbe Nummer (R1, R1, R2, R2 …) */
+  function roundNo(i, list){
+    const ids = (list || []).map(x => x && typeof x === 'object' ? x.exercise : x);
+    return ids.some(id => id === RUN_ID) ? Math.floor(i/2)+1 : i+1;
+  }
 
   // Gewicht für Übungen mit Ball/Gewicht (aktuell nur Wall Balls). Tippen auf "6 kg" wechselt 4 → 6 → 9 kg.
   // Gewichte wie bei HYROX-Wettkämpfen (Sled-Gewichte inkl. Schlitten). Sled Hybrid: wie Sled Pull.
@@ -1908,7 +1919,7 @@
 
     const nameOf = id=> (exercises.find(e=>e.id===id)||{}).name || id;
     document.getElementById('exPreview').innerHTML = selectedExercises.length
-      ? roundExercises.map((id,i)=>'<span class="ex-chip'+(id===RUN_ID?' run':'')+'"><b>R'+(i+1)+'</b> '+nameOf(id)+(exWeights[id]?' '+fmtWeight(id, exWeights[id]):'')+'</span>').join('')
+      ? roundExercises.map((id,i)=>'<span class="ex-chip'+(id===RUN_ID?' run':'')+'"><b>R'+roundNo(i, roundExercises)+'</b> '+nameOf(id)+(exWeights[id]?' '+fmtWeight(id, exWeights[id]):'')+'</span>').join('')
       : '';
     refreshSetup();
   }
@@ -2050,7 +2061,7 @@
       } else if(i === currentRound-1){
         seg.classList.remove('done');
         seg.classList.add('current');
-        if(!seg.querySelector('.seg-num')) seg.insertAdjacentHTML('beforeend', '<span class="seg-num">'+(i+1)+'</span>');
+        if(!seg.querySelector('.seg-num')) seg.insertAdjacentHTML('beforeend', '<span class="seg-num">'+roundNo(i, log)+'</span>');
         if(phase==='work'){
           fill.style.width = ((workSec-phaseRemaining)/workSec*100) + '%';
         } else {
@@ -2182,7 +2193,7 @@
     const showLog = (phase==='rest' || phase==='log-final');
     logCardEl.classList.toggle('active', showLog);
     if(showLog){
-      logRoundNumEl.textContent = currentRound;
+      logRoundNumEl.textContent = roundNo(currentRound-1, log);
       const entry = log[currentRound-1] || {exercise:'', amount:''};
       exerciseSelect.value = entry.exercise;
       amountInput.value = entry.amount;
@@ -2267,7 +2278,7 @@
         amtHtml = '<button class="r-amt-btn missing" data-edit="'+i+'">+ nachtragen</button>';
       }
       row.innerHTML =
-        '<span class="r-num">R'+(i+1)+'</span>' +
+        '<span class="r-num">R'+roundNo(i, log)+'</span>' +
         '<span class="r-ex">'+(ex?ex.name:entry.exercise)+weightSuffix(entry)+'</span>' +
         amtHtml +
         '<span class="r-pts">'+pts+' P</span>';
@@ -2412,7 +2423,7 @@
       const ex = exercises.find(e=>e.id===entry.exercise);
       const pts = roundPoints(entry.exercise, entry.amount, WORK_DEFAULT, myGender);
       return '<div class="finish-log-row">' +
-        '<span class="r-num">R'+(i+1)+'</span>' +
+        '<span class="r-num">R'+roundNo(i, bfLogData)+'</span>' +
         '<span class="r-ex">'+(ex?ex.name:entry.exercise)+weightSuffix(entry)+'</span>' +
         '<input type="number" inputmode="decimal" min="0" step="any" placeholder="0" data-i="'+i+'" value="'+esc(entry.amount)+'">' +
         '<span class="bf-unit">'+shortUnit(entry.exercise)+'</span>' +
@@ -2579,7 +2590,7 @@
         if(!entry.exercise) return;
         const ex = exercises.find(e=>e.id===entry.exercise);
         const pts = roundPoints(entry.exercise, entry.amount, session.workSec, myGender);
-        rows += '<div class="session-log-row"><span>R'+(i+1)+' · '+(ex?ex.name:entry.exercise)+weightSuffix(entry)+'</span><span>'+
+        rows += '<div class="session-log-row"><span>R'+roundNo(i, session.log)+' · '+(ex?ex.name:entry.exercise)+weightSuffix(entry)+'</span><span>'+
           '<button type="button" class="sl-amt" data-hedit="'+esc(session.id)+'|'+i+'">'+(entry.amount||'+ nachtragen')+(entry.amount?' '+(ex?ex.unit:''):'')+'</button>'+
           ' <span class="sl-pts">· '+pts+' P</span></span></div>';
       });
@@ -2590,7 +2601,7 @@
         '<div class="session-top">' +
           '<div class="session-head">' +
             '<span class="session-date">'+dateStr+(sessPts>0?' · <span class="sess-pts">'+sessPts+' Punkte</span>':'')+'</span>' +
-            '<span class="session-meta">'+session.rounds+' Runden · '+fmtMin(session.workSec)+' Arbeit · '+session.restSec+'s Pause · Gesamt '+fmt(session.totalSec)+'</span>' +
+            '<span class="session-meta">'+shownRounds(session.rounds, session.log)+' Runden · '+fmtMin(session.workSec)+' Arbeit · '+session.restSec+'s Pause · Gesamt '+fmt(session.totalSec)+'</span>' +
           '</div>' +
           '<button class="session-delete" data-id="'+session.id+'" title="Dieses Training löschen">'+trashIconSvg+'</button>' +
         '</div>' + rows +
@@ -2618,7 +2629,7 @@
     if(!session || !session.log || !session.log[idx] || !currentUser) return false;
     const entry = session.log[idx];
     const ex = exercises.find(e=>e.id===entry.exercise);
-    const v = await GoDialog.prompt('R'+(idx+1)+' · '+(ex?ex.name:entry.exercise)+(ex?' ('+ex.unit+')':''), entry.amount || '', { ok:'Speichern' });
+    const v = await GoDialog.prompt('R'+roundNo(idx, session.log)+' · '+(ex?ex.name:entry.exercise)+(ex?' ('+ex.unit+')':''), entry.amount || '', { ok:'Speichern' });
     if(v === null || v === undefined) return false;
     const raw = String(v).trim().replace(',', '.');
     const n = raw === '' ? 0 : parseFloat(raw);
@@ -2710,7 +2721,7 @@
     lastSavedSessionId = null;
     setFinishEditStatus('');
     document.getElementById('finishSummary').textContent =
-      rounds+' Runden · '+fmtMin(workSec)+' Arbeit · '+restSec+'s Pause · Gesamt '+fmt(elapsedTotal);
+      shownRounds(rounds, log)+' Runden · '+fmtMin(workSec)+' Arbeit · '+restSec+'s Pause · Gesamt '+fmt(elapsedTotal);
     buildFinishLog();
 
     const statusEl = document.getElementById('finishSaveStatus');
@@ -2884,7 +2895,7 @@
     ctx.fillStyle = 'rgba(243,238,228,0.3)'; ctx.fillRect(pad, y, POST_W - pad*2, 2);
     y -= 40;
     ctx.font = '500 32px Inter, sans-serif'; ctx.fillStyle = 'rgba(243,238,228,0.88)';
-    ctx.fillText(W.rounds+' Runden  ·  '+fmtMin(W.workSec)+' Arbeit  ·  Gesamt '+fmt(W.elapsed), pad, y);
+    ctx.fillText(shownRounds(W.rounds, W.log)+' Runden  ·  '+fmtMin(W.workSec)+' Arbeit  ·  Gesamt '+fmt(W.elapsed), pad, y);
     y -= 78;   // Playfair-Ziffern haben Unterlängen
     ctx.font = '600 176px "Playfair Display", Georgia, serif'; ctx.fillStyle = SAND;
     const pts = String(W.points);
@@ -2959,7 +2970,7 @@
 
     // Runden · Zeit
     ctx.font = '600 34px Inter, sans-serif'; ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.fillText(W.rounds+' Runden  ·  '+fmtMin(W.workSec)+' Arbeit  ·  Gesamt '+fmt(W.elapsed), pad, y);
+    ctx.fillText(shownRounds(W.rounds, W.log)+' Runden  ·  '+fmtMin(W.workSec)+' Arbeit  ·  Gesamt '+fmt(W.elapsed), pad, y);
     y -= 30;
 
     // Punkte groß
@@ -3468,7 +3479,7 @@
   function planRowHtml(r){
     const isCur = phase === 'work' && r === currentRound - 1;
     const isNext = r === currentRound;
-    return '<div class="plan-row'+(isCur?' current':'')+(isNext?' next':'')+'"><span class="plan-rnd">R'+(r+1)+'</span><span class="plan-name">'+esc(exName(log[r]))+'</span>' +
+    return '<div class="plan-row'+(isCur?' current':'')+(isNext?' next':'')+'"><span class="plan-rnd">R'+roundNo(r, log)+'</span><span class="plan-name">'+esc(exName(log[r]))+'</span>' +
       (isCur ? '<span class="plan-next-tag">Läuft</span>' : isNext ? '<span class="plan-next-tag">Als Nächstes</span>' : '') + '</div>';
   }
   function renderPlan(){
@@ -3871,7 +3882,7 @@
           return {
             idx: i,
             empty: !(parseFloat(entry.amount) > 0),
-            label: 'R'+(i+1)+' · '+(ex?ex.name:entry.exercise)+weightSuffix(entry),
+            label: 'R'+roundNo(i, session.log)+' · '+(ex?ex.name:entry.exercise)+weightSuffix(entry),
             value: (parseFloat(entry.amount) > 0 ? String(entry.amount)+' '+(ex?ex.unit:'') : '+ nachtragen')+(p?(' · '+p+' P'):'')
           };
         });
@@ -3880,11 +3891,13 @@
           date: session.date,
           dateLabel,
           rounds: session.rounds,
+          roundsShown: shownRounds(session.rounds, session.log),
+          hasRun: (session.log || []).some(e => e && e.exercise === RUN_ID),
           workSec: session.workSec,
           restSec: session.restSec,
           totalSec: session.totalSec,
           points: pts,
-          meta: (session.rounds||0)+' Runden · '+fmtMin(session.workSec||0)+' Arbeit · '+(session.restSec||0)+'s Pause',
+          meta: shownRounds(session.rounds, session.log)+' Runden · '+fmtMin(session.workSec||0)+' Arbeit · '+(session.restSec||0)+'s Pause',
           canStory: !isNaN(d.getTime()) && Date.now() - d.getTime() < 24*3600000,
           lines
         };
