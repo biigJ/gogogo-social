@@ -2277,6 +2277,61 @@
     }).catch(function () { state.bubbleMsgs = []; });
   }
 
+  /* Antwort: zitierte Nachricht über dem Text */
+  function bubbleReplyQuote(m) {
+    if (!m.reply_to) return "";
+    var o = (state.bubbleMsgs || []).filter(function (x) { return String(x.id) === String(m.reply_to); })[0];
+    if (!o) return '<span class="acc-msg__quote">Nachricht nicht mehr da</span>';
+    var who = String(o.author_id) === me() ? "Du" : String(personOf(String(o.author_id)).name || "?").split(" ")[0];
+    var txt = o.body || (o.media_url ? (o.media_kind === "video" ? "Video" : "Foto") : "");
+    return '<span class="acc-msg__quote"><b>' + esc(who) + "</b> " + esc(String(txt).slice(0, 90)) + "</span>";
+  }
+
+  /* Lange drücken auf eine Bubble-Nachricht: Antworten / Melden */
+  (function bindBubbleLongPress() {
+    var tm = 0, sx = 0, sy = 0, fired = false;
+    function msgOf(el) {
+      var id = el && el.getAttribute("data-msg-id");
+      return (state.bubbleMsgs || []).filter(function (x) { return String(x.id) === String(id); })[0] || null;
+    }
+    function open(m) {
+      if (!m || !global.GoDialog) return;
+      var mine = String(m.author_id) === me();
+      var opts = [{ label: "Antworten", value: "reply" }];
+      if (!mine) opts.push({ label: "Melden", value: "report" });
+      GoDialog.choose("Nachricht", opts, { center: true }).then(function (v) {
+        if (v === "reply" && global.GoBubbles && GoBubbles.setReply) {
+          var who = mine ? "Du" : String(personOf(String(m.author_id)).name || "").split(" ")[0];
+          GoBubbles.setReply({ id: m.id, who: who, body: m.body, media_url: m.media_url, media_kind: m.media_kind });
+        } else if (v === "report") {
+          GoDialog.confirm("Nachricht entspricht nicht den Richtlinien?", { ok: "Melden", cancel: "Abbrechen" }).then(function (yes) {
+            if (!yes || !GoBubbles.report) return;
+            GoBubbles.report(m).then(function () { if (host.toast) host.toast("Gemeldet. Danke."); })
+              .catch(function () { if (host.toast) host.toast("Melden ging nicht (go-bubble-chat.sql?)"); });
+          });
+        }
+      });
+    }
+    document.addEventListener("pointerdown", function (e) {
+      var el = e.target && e.target.closest ? e.target.closest(".acc-msg[data-msg-id]") : null;
+      if (!el || e.target.closest("button, video")) return;
+      fired = false;
+      sx = e.clientX; sy = e.clientY;
+      clearTimeout(tm);
+      tm = setTimeout(function () { fired = true; open(msgOf(el)); }, 500);
+    }, { passive: true });
+    document.addEventListener("pointermove", function (e) {
+      if (tm && (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10)) { clearTimeout(tm); tm = 0; }
+    }, { passive: true });
+    ["pointerup", "pointercancel"].forEach(function (t) { document.addEventListener(t, function () { clearTimeout(tm); tm = 0; }, { passive: true }); });
+    document.addEventListener("contextmenu", function (e) {
+      if (e.target && e.target.closest && e.target.closest(".acc-msg[data-msg-id]")) e.preventDefault();
+    });
+    document.addEventListener("click", function (e) {
+      if (fired && e.target && e.target.closest && e.target.closest(".acc-msg[data-msg-id]")) { e.preventDefault(); e.stopPropagation(); fired = false; }
+    }, true);
+  })();
+
   function renderBubbleMsg(m) {
     var mine = String(m.author_id) === me();
     var p = personOf(String(m.author_id));
@@ -2288,7 +2343,13 @@
     return '<article class="acc-msg' + (mine ? " is-mine" : "") + '" data-msg-id="' + esc(m.id) + '">' +
       (mine ? '<button type="button" class="acc-msg__more" data-msg-more="' + esc(m.id) + '" aria-label="Optionen"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>' : "") +
       '<span class="acc-msg__who">' + esc(mine ? "Du" : String(p.name || "?").split(" ")[0]) + " · " + esc(when) + "</span>" +
-      '<p class="acc-msg__txt">' + esc(m.body || "") + "</p></article>";
+      bubbleReplyQuote(m) +
+      (m.media_url
+        ? (m.media_kind === "video"
+            ? '<video class="acc-msg__media" src="' + esc(m.media_url) + '" controls playsinline preload="metadata"></video>'
+            : '<img class="acc-msg__media" src="' + esc(m.media_url) + '" alt="" loading="lazy" />')
+        : "") +
+      (m.body ? '<p class="acc-msg__txt">' + esc(m.body) + "</p>" : "") + "</article>";
   }
 
   /* Bubble-Filter: nur Events, die in meiner Bubble markiert sind (eigene und die der anderen Mitglieder) */
