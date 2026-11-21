@@ -20254,6 +20254,15 @@
          dazu zählen seine Zirkeltrainings aus dem Wochenplan. Plus-Slide zeigt die nächsten 2 Wochen: Datum + Runden.
          Mitglieder übernehmen ein Circle-Event in ihre Woche (Zusage); neue Circle-Events meldet das Herz. */
       var CIRCLE_DAYS = 14;
+      /* Verwalten darf: Gründer in FFC, der in gogogo eingetragene Coach (go_circles.owner_id, z. B. vom Admin gesetzt) oder ein Admin */
+      function circleCanManage(g) {
+        if (!g || !sessionAccount) return false;
+        if (g.is_owner) return true;
+        var st0 = circleSettings(g);
+        if (st0 && st0.owner_id && String(st0.owner_id) === String(sessionAccount.id)) return true;
+        var adminIds = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
+        return !!(sessionAccount.is_admin || adminIds.indexOf(String(sessionAccount.id)) !== -1);
+      }
       function circleSettings(g) {
         return g ? cst().settings[String(g.group_id)] || null : null;
       }
@@ -20394,7 +20403,7 @@
       /* Vor dem eigenen Zirkeltraining: lieber das nächste vom Circle übernehmen? (nicht für den Gründer) */
       function askBeforeOwnZirkel(proceed) {
         var g = circleCurrent();
-        if (!g || g.is_owner || !window.GoDialog) { proceed(); return; }
+        if (!g || circleCanManage(g) || !window.GoDialog) { proceed(); return; }
         loadCircleEvents(g).then(function (evs) {
           var next = (evs || []).filter(function (e) { return !e.joined && String(e.user_id) !== String(sessionAccount && sessionAccount.id); })[0];
           if (!next) { proceed(); return; }
@@ -20411,7 +20420,7 @@
       function onCircleEventBtn() {
         var g = circleCurrent();
         if (!g) return;
-        if (g.is_owner) { createCircleEvent(g, true); return; }
+        if (circleCanManage(g)) { createCircleEvent(g, true); return; }
         askBeforeOwnZirkel(function () { createCircleEvent(g, false); });
       }
       /* Herz: neue Circle-Events vom Coach */
@@ -20492,8 +20501,8 @@
             var choices = [];
             if (cur) {
               if (!here) choices.push({ label: "Stempelkarte diesem Circle zuordnen", value: "stamp" });
-              if (cur.is_owner) choices.push({ label: "Orte und online", value: "places" });
-              if (cur.is_owner) choices.push({ label: circlePhoto(cur) ? "Foto ändern" : "Foto hinzufügen", value: "photo" });
+              if (circleCanManage(cur)) choices.push({ label: "Orte und online", value: "places" });
+              if (circleCanManage(cur)) choices.push({ label: circlePhoto(cur) ? "Foto ändern" : "Foto hinzufügen", value: "photo" });
               choices.push({ label: cur.is_owner ? "Circle löschen" : "Circle verlassen", value: "leave" });
             }
             if (canMore) {
