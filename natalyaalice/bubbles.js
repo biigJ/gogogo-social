@@ -407,8 +407,32 @@
     }
   }
 
-  /* Story: Events nacheinander, 4 s je Event; Tipp rechts = weiter, links = zurück */
-  function openStory(evs, title, personOf, color) {
+  /* Story: Events nacheinander (GoStory: 5 s je Event, Zeitstrahl unten, Halten = anhalten).
+     onItem(ev): Tipp auf den Titel öffnet das Event. Ohne go-story.js: alte Ansicht mit 4 s. */
+  function evWhen(ev) {
+    var d = new Date(ev.starts_at);
+    return d.toLocaleDateString("de-DE", { timeZone: "Europe/Berlin", weekday: "short", day: "numeric", month: "numeric" }) +
+      (/T12:00:00/.test(String(ev.starts_at)) ? "" : " · " + d.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" }));
+  }
+  function evCover(ev) {
+    if (ev.photo_url) return ev.photo_url;
+    try { return global.GoCovers && GoCovers.url ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id) || "" : ""; } catch (e) { return ""; }
+  }
+  function openStory(evs, title, personOf, color, onItem) {
+    if (global.GoStory && GoStory.open) {
+      return GoStory.open((evs || []).map(function (ev) {
+        var p = personOf ? personOf(ev.user_id) : null;
+        return {
+          id: ev.id,
+          ev: ev,
+          bg: evCover(ev),
+          who: (p && p.name) || "",
+          title: String(ev.title || "Training").replace(/^[^A-Za-zÄÖÜäöü0-9]+\s*/, ""),
+          sub: evWhen(ev) + (ev.location ? " · " + ev.location : ""),
+          done: ev.status === "erledigt"
+        };
+      }), { title: title, color: color, onItem: onItem ? function (it) { onItem(it.ev); } : null });
+    }
     ensureCss();
     var i = 0, timer = null;
     var wrap = document.createElement("div");
@@ -499,6 +523,9 @@
       '<label class="gbub-photo"><span>Foto</span><input type="file" accept="image/*" hidden /></label>' +
       '<input name="name" maxlength="40" placeholder="Name" required />' +
       '<textarea name="desc" rows="3" maxlength="400" placeholder="Beschreibung"></textarea>' +
+      '<div class="gbub-colors" role="radiogroup" aria-label="Farbe">' + PALETTE.map(function (c, k) {
+        return '<button type="button" class="gbub-color' + (k === bubbles.length % PALETTE.length ? " is-on" : "") + '" data-gbub-color="' + c + '" style="background:' + c + '" aria-label="Farbe ' + c + '"></button>';
+      }).join("") + "</div>" +
       '<div class="gbub-places"><div class="gbub-places__chips"></div>' +
       '<button type="button" class="gbub-places__add" data-gbub-addplace>+ Ort hinzufügen</button>' +
       '<div class="gbub-places__picker" hidden><div class="gbub-places__pp"></div>' +
@@ -524,8 +551,15 @@
         return '<span class="gbub-chip">' + esc(p.name) + '<button type="button" data-gbub-rmplace="' + k + '" aria-label="Entfernen">×</button></span>';
       }).join("");
     }
+    var color = PALETTE[bubbles.length % PALETTE.length];
     wrap.addEventListener("click", function (e) {
       if (e.target === wrap || (e.target.closest && e.target.closest("[data-gbub-cancel]"))) { close(); return; }
+      var col = e.target.closest && e.target.closest("[data-gbub-color]");
+      if (col) {
+        color = col.getAttribute("data-gbub-color");
+        wrap.querySelectorAll("[data-gbub-color]").forEach(function (x) { x.classList.toggle("is-on", x === col); });
+        return;
+      }
       if (e.target.closest && e.target.closest("[data-gbub-addplace]")) {
         pkBox.hidden = false;
         if (!picker && global.GoPlacePicker) picker = GoPlacePicker.mount(wrap.querySelector(".gbub-places__pp"), { rest: host.rest, accountId: me(), noFav: true });
@@ -566,7 +600,7 @@
           prefer: "return=representation",
           body: {
             name: name, description: desc, photo_url: url, places: places,
-            color: PALETTE[bubbles.length % PALETTE.length], created_by: me(), sort: 100
+            color: color, created_by: me(), sort: 100
           }
         });
       }).then(function (rows) {
@@ -722,6 +756,9 @@
       ".gbub-sheet__card{width:100%;max-width:520px;background:#FBF3E2;color:#1D1630;border-radius:24px 24px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;box-sizing:border-box}" +
       ".gbub-sheet__card h2{margin:0 0 4px;text-align:center;font:700 18px Inter,sans-serif}" +
       ".gbub-sheet__card input,.gbub-sheet__card textarea{width:100%;box-sizing:border-box;border:1px solid rgba(29,22,48,.25);border-radius:12px;padding:12px;font:500 16px Inter,sans-serif;background:#fff;color:#1D1630}" +
+      ".gbub-colors{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}" +
+      ".gbub-color{width:32px;height:32px;border-radius:50%;border:0;cursor:pointer;box-shadow:inset 0 0 0 2px rgba(255,255,255,.7)}" +
+      ".gbub-color.is-on{box-shadow:0 0 0 3px #1D1630,inset 0 0 0 2px rgba(255,255,255,.7)}" +
       ".gbub-photo{align-self:center;width:110px;height:110px;border-radius:20px;border:1.5px dashed rgba(29,22,48,.4);display:flex;align-items:center;justify-content:center;font:600 14px Inter,sans-serif;background-size:cover;background-position:center;cursor:pointer}" +
       ".gbub-photo.has-img span{display:none}" +
       ".gbub-sheet__btns{display:flex;gap:10px;margin-top:6px}" +
@@ -796,6 +833,8 @@
     post: post,
     paintStrip: paintStrip,
     openStory: openStory,
+    eventCover: evCover,
+    normName: normName,
     openWiki: openWiki,
     mountComposer: mountComposer,
     setReply: setReply,

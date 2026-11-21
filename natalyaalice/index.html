@@ -4360,6 +4360,9 @@
       font-size: 20px;
     }
     .crew-story__ring .team-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .crew-story--bub .crew-story__ring { padding: 0; border: 5px solid var(--gbub, #E9E1D2); background: transparent; }
+    .crew-bub__face { display: grid; place-items: center; background: var(--gbub, #E9E1D2) center / cover no-repeat; color: #1D1630; }
+    .crew-bub__face svg { width: 26px; height: 26px; }
     .crew-story__name {
       max-width: var(--story-d, 68px);
       font-size: 11px;
@@ -8400,7 +8403,8 @@
   <script src="/natalyaalice/log.js"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-5"></script>
-  <script src="/natalyaalice/bubbles.js?v=bub-7"></script>
+  <script src="/natalyaalice/go-story.js?v=gst-1"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-8"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-3"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-6"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-8"></script>
@@ -8415,7 +8419,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-95"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-96"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-71"></script>
   <script src="/natalyaalice/support.js?v=support-23"></script>
@@ -23040,6 +23044,102 @@
 
       /* Bubble-Mitglieder als Kreise unter „Alle“: Profile + letzte Aktivität (Event/Nachricht), höchstens alle 5 min */
       var bubblePeople = {}, bubbleAct = {}, bubbleCrewAt = 0, bubbleCrewBid = "", bubbleCrewLoading = false;
+      var bubbleMsgAt = "", bubbleUpcoming = [];
+      function bubbleNorm(x) {
+        return window.GoPlacePicker && GoPlacePicker.norm ? GoPlacePicker.norm(x) : String(x || "").trim().toLowerCase();
+      }
+      function bubblePersonOf(id) {
+        id = String(id || "");
+        if (sessionAccount && id === String(sessionAccount.id)) return { name: "Du" };
+        var p = bubblePeople[id] || groupPeople[id] || (teamPeople || []).filter(function (t) { return t && String(t.id) === id; })[0];
+        return { name: p ? String(p.name || p.nickname || "").split(" ")[0] : "" };
+      }
+      function bubbleFocusEvent(ev) {
+        if (!ev || !window.HeuteAccountability) return;
+        if (HeuteAccountability.focusEvent(ev.id)) return;
+        HeuteAccountability.setFilter("bubble");
+        setTimeout(function () { HeuteAccountability.focusEvent(ev.id); }, 700);
+      }
+      /* Kreis mit Bild (oder Seifenblase) im Rand der Bubble-Farbe */
+      function bubbleCircle(label, img, color, onOpen) {
+        var item = document.createElement("button");
+        item.type = "button";
+        item.className = "crew-story crew-story--bub";
+        item.style.setProperty("--gbub", color || "#E9E1D2");
+        var ring = document.createElement("span");
+        ring.className = "crew-story__ring";
+        var face = document.createElement("span");
+        face.className = "team-avatar crew-bub__face";
+        if (img) face.style.backgroundImage = 'url("' + String(img).replace(/"/g, "%22") + '")';
+        else face.innerHTML = (window.GoBubbles && GoBubbles.SOAP_SVG) || "";
+        ring.appendChild(face);
+        item.appendChild(ring);
+        var name = document.createElement("span");
+        name.className = "crew-story__name";
+        name.textContent = label;
+        item.appendChild(name);
+        item.setAttribute("aria-label", label);
+        item.addEventListener("click", onOpen);
+        return item;
+      }
+      /* Aktuell → Alles: rechts neben „Du“ die Bubble (wenn dort geschrieben wurde) und Orte mit kommenden Bubble-Events.
+         Ort nur, wenn er in meinem Profil steht. Kreis bleibt bis zum Start des Events, höchstens 7 Tage voraus. */
+      function appendBubbleCircles(box) {
+        var b = window.GoBubbles && GoBubbles.mine ? GoBubbles.mine() : null;
+        if (!b) return;
+        var color = b.color || "#E9E1D2";
+        if (bubbleMsgAt && Date.now() - Date.parse(bubbleMsgAt) < 7 * 864e5) {
+          box.appendChild(bubbleCircle("Alles", b.photo_url || "", color, function () {
+            if (window.HeuteAccountability) HeuteAccountability.setFilter("bubble");
+          }));
+        }
+        var mine = {};
+        placeNames(sessionAccount && sessionAccount.workout_places).forEach(function (n) { mine[bubbleNorm(n)] = true; });
+        var now = Date.now();
+        var byPlace = [];
+        bubbleUpcoming.forEach(function (ev) {
+          if (Date.parse(ev.starts_at) <= now) return;
+          var key = bubbleNorm(ev.location);
+          if (!mine[key]) return;
+          var hit = byPlace.filter(function (x) { return x.key === key; })[0];
+          if (!hit) byPlace.push(hit = { key: key, name: String(ev.location).trim(), evs: [] });
+          hit.evs.push(ev);
+        });
+        byPlace.forEach(function (pl) {
+          var cover = GoBubbles.eventCover ? GoBubbles.eventCover(pl.evs[0]) : (pl.evs[0].photo_url || "");
+          box.appendChild(bubbleCircle(pl.name, cover, color, function () {
+            GoBubbles.openStory(pl.evs, pl.name, bubblePersonOf, color, bubbleFocusEvent);
+          }));
+        });
+      }
+      /* Heutige Events einer Person als Story (Freunde-Posts, eigener Post, heutiges Event) */
+      function openPersonStory(person) {
+        if (!window.GoStory || !window.HeuteAccountability || !HeuteAccountability.todayEventsFor) return false;
+        var evs = HeuteAccountability.todayEventsFor(person.id);
+        if (!evs.length) return false;
+        var first = person.isSelf ? "Du" : String(person.nickname || person.name || "").split(" ")[0];
+        return GoStory.open(evs.map(function (ev) {
+          var d = new Date(ev.starts_at);
+          var untimed = /T12:00:00/.test(String(ev.starts_at));
+          var note = ev.status === "erledigt" && ev.note && !/^zirkel:/.test(String(ev.note)) ? String(ev.note) : "";
+          return {
+            id: ev.id,
+            bg: window.GoBubbles && GoBubbles.eventCover ? GoBubbles.eventCover(ev) : (ev.photo_url || ""),
+            title: String(ev.title || (ev.courses && ev.courses.title) || "Training"),
+            sub: (untimed ? "Heute" : "Heute · " + d.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" })) +
+              (ev.location ? " · " + ev.location : ""),
+            note: note,
+            done: ev.status === "erledigt"
+          };
+        }), {
+          title: first,
+          onItem: function (it) {
+            if (HeuteAccountability.focusEvent(it.id)) return;
+            HeuteAccountability.setFilter("alles");
+            setTimeout(function () { HeuteAccountability.focusEvent(it.id); }, 700);
+          }
+        });
+      }
       function loadBubbleCrew() {
         var b = window.GoBubbles && GoBubbles.mine ? GoBubbles.mine() : null;
         if (!b || !GoBubbles.memberIds || bubbleCrewLoading) return Promise.resolve(false);
@@ -23052,8 +23152,14 @@
         return Promise.all([
           need.length ? rest("go_accounts?id=in.(" + need.map(encodeURIComponent).join(",") + ")&select=id,name,nickname,photo_url").catch(function () { return []; }) : [],
           rest("go_bubble_messages?bubble_id=eq." + bid + "&select=author_id,created_at&order=created_at.desc&limit=200").catch(function () { return []; }),
-          rest("events?bubble_id=eq." + bid + "&starts_at=lte." + encodeURIComponent(new Date().toISOString()) + "&select=user_id,starts_at&order=starts_at.desc&limit=200").catch(function () { return []; })
+          rest("events?bubble_id=eq." + bid + "&starts_at=lte." + encodeURIComponent(new Date().toISOString()) + "&select=user_id,starts_at&order=starts_at.desc&limit=200").catch(function () { return []; }),
+          /* kommende Bubble-Events mit Ort (höchstens 7 Tage voraus) für die Ort-Kreise in Aktuell → Alles */
+          rest("events?bubble_id=eq." + bid + "&location=not.is.null&starts_at=gt." + encodeURIComponent(new Date().toISOString()) +
+            "&starts_at=lte." + encodeURIComponent(new Date(Date.now() + 7 * 864e5).toISOString()) +
+            "&select=id,user_id,title,starts_at,location,photo_url,category,course_id,enrollment_id,status,visibility&order=starts_at.asc&limit=100").catch(function () { return []; })
         ]).then(function (r) {
+          bubbleMsgAt = (r[1] && r[1][0] && r[1][0].created_at) || "";
+          bubbleUpcoming = (r[3] || []).filter(function (ev) { return ev && ev.visibility !== "privat" && String(ev.location || "").trim(); });
           (r[0] || []).forEach(function (a) { if (a && a.id) bubblePeople[String(a.id)] = a; });
           bubbleAct = {};
           function bump(id, t) { id = String(id || ""); if (id && (!bubbleAct[id] || String(t) > bubbleAct[id])) bubbleAct[id] = String(t); }
@@ -23091,7 +23197,7 @@
             /* Pulsierender Kreis: heutiges Training als Karte zeigen */
             var item = e && e.currentTarget;
             if (item && item.classList && item.classList.contains("is-training") &&
-                openTrainingPopup(person, item.classList.contains("is-training-done"))) return;
+                (openPersonStory(person) || openTrainingPopup(person, item.classList.contains("is-training-done")))) return;
             if (story && window.FFC && FFC.openStory && FFC.openStory(story.index)) return;
             openProfile(person);
           };
@@ -23124,6 +23230,7 @@
         applyTrainingRing(meItem, meActEarly[String(sessionAccount.id)] || null, presenceFor(sessionAccount.id));
         if (window.GoTama) GoTama.decorate(meItem, sessionAccount.id);
         box.appendChild(meItem);
+        if (heuteView() === "alles") appendBubbleCircles(box);
         var seenIds = {};
         var friends = teamPeople.filter(function (person) {
           if (!person || !person.id || person.isSelf || String(person.id) === String(sessionAccount.id)) return false;
@@ -23170,6 +23277,7 @@
           meItem.onclick = null;
           var meFresh = meItem.cloneNode(true);
           meFresh.addEventListener("click", function () {
+            if (openPersonStory(me)) return;
             if (!(window.HeuteAccountability && HeuteAccountability.focusEvent(meToday.photoEventId))) openProfile(me);
           });
           box.replaceChild(meFresh, meItem);

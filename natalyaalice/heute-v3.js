@@ -5176,6 +5176,17 @@
     try { return { id: ev.id, html: renderEventCard(ev) }; } catch (e) { return null; }
   }
 
+  /* Heutige Events einer Person (sichtbar für mich), für die Story beim Tipp auf den Kreis */
+  function todayEventsFor(personId) {
+    var t = todayIso();
+    var flags = viewFlags("alles");
+    flags.todayAll = true;
+    return (state.events || []).filter(function (e) {
+      return e && String(e.user_id) === String(personId) && e.status !== "ausgefallen" &&
+        evDayIso(e) === t && eventVisibleToMe(e, flags);
+    }).sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
+  }
+
   global.HeuteAccountability = {
     install: install,
     refresh: refresh,
@@ -5190,7 +5201,8 @@
     createUnplanned: createUnplannedEvent,
     todayActivity: todayActivity,
     focusEvent: focusEvent,
-    todayCardFor: todayCardFor
+    todayCardFor: todayCardFor,
+    todayEventsFor: todayEventsFor
   };
   /* Wallet: Tipp auf eine zusammengeschobene Karte schiebt sie frei (andere bleiben zu);
      Tipp aufs Bild einer offenen Karte schiebt sie zurück. Werkzeuge unter der offenen Karte bleiben bedienbar. */
