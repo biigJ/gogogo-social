@@ -5176,6 +5176,7 @@
     .team-challenge[hidden], .team-slide__cta[hidden] { display: none !important; }
     /* Gruppe: eingeladen oder Beitrittsanfrage → Kreis halb transparent, bis zugesagt ist */
     .team-slide__member.is-waiting { opacity: .5; }
+    .team-slide__leave { display: block; margin: 28px auto 8px; border: 0; background: transparent; color: #C7413B; font: inherit; font-weight: 600; cursor: pointer; }
     body.is-session #plan-team .team-challenge .team-challenge__name, .team-challenge__name { font-family: "Playfair Display", Georgia, serif !important; font-size: 22px !important; font-weight: 600 !important; }
     .team-challenge__goal { width: 100%; margin: 2px 0 0; font-size: 15px; line-height: 1.4; }
     .team-challenge__stamps { font-size: 13px; opacity: .7; }
@@ -16419,6 +16420,37 @@
           .then(function () { try { renderTeam(); } catch (eR) {} })
           .catch(function () { gogogoToast("Ging gerade nicht"); });
       }
+      /* Gruppe verlassen bzw. Mitglied entfernen (go-group-leave.sql) */
+      function afterGroupChange() {
+        return loadMyGroups().then(function () {
+          syncGroupOptions();
+          try { renderTeam(); } catch (eR) {}
+          if (typeof paintHeuteCrew === "function") paintHeuteCrew();
+        });
+      }
+      function leaveGroup(group) {
+        GoDialog.confirm("Gruppe " + (group.name || "") + " verlassen?", {
+          body: "Du siehst die Events der Gruppe danach nicht mehr. Zurück kommst Du über „Gruppe suchen“.",
+          ok: "Verlassen", cancel: "Abbrechen", row: true
+        }).then(function (yes) {
+          if (!yes) return;
+          rest("rpc/go_leave_group", { method: "POST", body: { p_group: group.id } })
+            .then(function () { gogogoToast("Du hast " + (group.name || "die Gruppe") + " verlassen."); return afterGroupChange(); })
+            .catch(function () { gogogoToast("Verlassen ging nicht (go-group-leave.sql ausgeführt?)"); });
+        });
+      }
+      function removeFromGroup(group, person) {
+        var first = String(person.name || person.nickname || "Mitglied").split(" ")[0];
+        var pending = person._waiting === "pending";
+        GoDialog.confirm(pending ? "Einladung an " + first + " zurückziehen?" : first + " aus der Gruppe entfernen?", {
+          ok: pending ? "Zurückziehen" : "Entfernen", cancel: "Abbrechen", row: true
+        }).then(function (yes) {
+          if (!yes) return;
+          rest("rpc/go_remove_group_member", { method: "POST", body: { p_group: group.id, p_account: person.id } })
+            .then(function () { gogogoToast(pending ? "Einladung zurückgezogen" : first + " ist nicht mehr in der Gruppe."); return afterGroupChange(); })
+            .catch(function () { gogogoToast("Entfernen ging nicht (go-group-leave.sql ausgeführt?)"); });
+        });
+      }
       /* Bestätigte Mitgliedschaften (go-group-news.sql): Herz meldet „X ist jetzt in Deiner Gruppe“ bzw. „Du bist jetzt in …“ */
       function loadGroupNews() {
         if (!sessionAccount) return Promise.resolve([]);
@@ -17712,6 +17744,18 @@
                 openGroupJoinRequest({ group_id: group.id, group_name: group.name, account_id: person.id, name: person.name, nickname: person.nickname });
                 return;
               }
+              /* Ersteller: Profil ansehen oder aus der Gruppe entfernen (Einladung zurückziehen) */
+              if (isOwnerView && String(person.id) !== String(group.owner || "") && window.GoDialog) {
+                var first = String(person.name || person.nickname || "Mitglied").split(" ")[0];
+                GoDialog.choose(first, [
+                  { label: "Profil ansehen", value: "profile" },
+                  { label: person._waiting === "pending" ? "Einladung zurückziehen" : "Aus der Gruppe entfernen", value: "remove" }
+                ], { center: true }).then(function (v) {
+                  if (v === "profile") { openProfile(person); return; }
+                  if (v === "remove") removeFromGroup(group, person);
+                });
+                return;
+              }
               openProfile(person);
             });
             membersRow.appendChild(btn);
@@ -17730,6 +17774,15 @@
             slide.appendChild(inviteNew);
           }
           if (!detached && group && group.id) appendGroupEvents(slide, group);
+          /* Mitglied (nicht Ersteller): Gruppe verlassen */
+          if (!detached && group && group.id && String(group.owner || "") !== String((sessionAccount && sessionAccount.id) || "")) {
+            var leaveBtn = document.createElement("button");
+            leaveBtn.type = "button";
+            leaveBtn.className = "team-slide__leave";
+            leaveBtn.textContent = "Gruppe verlassen";
+            leaveBtn.addEventListener("click", function () { leaveGroup(group); });
+            slide.appendChild(leaveBtn);
+          }
           if (!detached) box.appendChild(slide);
           return slide;
         }
