@@ -1387,13 +1387,15 @@
   var FACE_HOURGLASS =
     '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3.5h11M6.5 20.5h11M8 3.5v2.2c0 2.2 1.6 3.5 4 5.3 2.4-1.8 4-3.1 4-5.3V3.5M8 20.5v-2.2c0-2.2 1.6-3.5 4-5.3 2.4 1.8 4 3.1 4 5.3v2.2"/></svg>';
 
-  function faceSlotHtml(person, pending) {
+  function faceSlotHtml(person, pending, withdraw) {
     var label = (person && person.name) || "?";
     var cls = "acc-face-slot" + (pending ? " is-pending" : "");
     return (
       '<span class="' +
       cls +
-      '" title="' +
+      '"' +
+      (pending && withdraw ? ' role="button" data-withdraw-to="' + esc(withdraw.to) + '" data-withdraw-ev="' + esc(withdraw.ev || "") + '" data-withdraw-iso="' + esc(withdraw.iso || "") + '"' : "") +
+      ' title="' +
       esc(pending ? label + " · wartet" : label) +
       '">' +
       avatarHtml(person, "acc-face") +
@@ -1496,7 +1498,8 @@
       .map(function (g) {
         return faceSlotHtml(
           { name: g.name, photo: g.photo },
-          String(g.status || "") === "pending"
+          String(g.status || "") === "pending",
+          { to: g.id, ev: /^[0-9a-f-]{36}$/i.test(String(eventId || "")) ? eventId : "", iso: inviteIso }
         );
       })
       .join("");
@@ -1608,9 +1611,12 @@
     '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">' +
     '<path d="M12 20.3s-7.3-4.4-8.6-9A4.6 4.6 0 0 1 12 7.1a4.6 4.6 0 0 1 8.6 4.2c-1.3 4.6-8.6 9-8.6 9z"/></svg>';
   /* Postausgang statt Plus: Einladen */
+  /* gleiches Symbol wie in Woche */
   var OUTBOX_SVG =
-    '<svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
-    '<path d="M4 13.5h4.2l1.3 2.5h5l1.3-2.5H20"/><path d="M5.2 13.5 7 7.5h2.5M18.8 13.5 17 7.5h-2.5"/><path d="M4 13.5V19h16v-5.5"/><path d="M12 11V3.5M9.3 6.2 12 3.5l2.7 2.7"/></svg>';
+    '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="M8 7l4-4 4 4"/><path d="M5 14v4.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V14"/></svg>';
+  /* Papierflieger wie bei Instagram: Teilen */
+  var PLANE_SVG =
+    '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M21.5 3.2 2.8 10.4l7 3 3 7.4z"/><path d="M21.5 3.2 9.8 13.4"/></svg>';
   function placeSpontan(html) {
     return html;
   }
@@ -1777,8 +1783,7 @@
     var share = opts.shareId
       ? '<button type="button" class="acc-tool acc-tool--share" data-acc-share="' + esc(opts.shareId) + '" data-acc-share-day="' + esc(opts.shareDay || "") +
         '" aria-label="Teilen">' +
-        '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
-        '<path d="M12 3.5v11"/><path d="M8 7.3 12 3.5l4 3.8"/><path d="M7 10.5H5.5v9h13v-9H17"/></svg></button>'
+        PLANE_SVG + "</button>"
       : "";
     var badgeKind = opts.badge || "";
     var badge = badgeKind
@@ -4440,6 +4445,42 @@
       removeEvent(heart.getAttribute("data-heart-ev"), "cancel");
       return;
     }
+    /* Zurückziehen: graue Hand (eigene Anfrage) bzw. Freund mit Sanduhr (eigene Einladung) */
+    var wd = t.closest("[data-withdraw-to]");
+    if (wd) {
+      var wTo = wd.getAttribute("data-withdraw-to"), wEv = wd.getAttribute("data-withdraw-ev"), wIso = wd.getAttribute("data-withdraw-iso");
+      var wName = String(personOf(wTo).name || "").split(" ")[0];
+      askWithdraw("Einladung zurückziehen" + (wName ? " an " + wName : "") + "?").then(function (yes) {
+        if (!yes) return;
+        var q = "go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&to_id=eq." + encodeURIComponent(wTo) + "&status=eq.pending" +
+          (wEv ? "&event_id=eq." + encodeURIComponent(wEv) : "&workout_date=eq." + encodeURIComponent(wIso));
+        rest(q, { method: "PATCH", prefer: "return=minimal", body: { status: "cancelled" } })
+          .then(function () {
+            if (host.reloadInvites) return host.reloadInvites();
+          })
+          .then(function () { render(); if (host.toast) host.toast("Einladung zurückgezogen"); })
+          .catch(function () { if (host.toast) host.toast("Zurückziehen ging gerade nicht"); });
+      });
+      return;
+    }
+    var waveOn = t.closest(".acc-tool--wave.is-on[data-wave-ev]");
+    if (waveOn) {
+      var rEv = waveOn.getAttribute("data-wave-ev");
+      askWithdraw("Anfrage zurückziehen?").then(function (yes) {
+        if (!yes) return;
+        rest("go_event_requests?event_id=eq." + encodeURIComponent(rEv) + "&from_id=eq." + encodeURIComponent(me()) + "&status=eq.pending", {
+          method: "DELETE", prefer: "return=representation"
+        }).then(function (gone) {
+          if (!gone || !gone.length) throw new Error("rls");
+          delete state.waved[String(rEv)];
+          render();
+          if (host.toast) host.toast("Anfrage zurückgezogen");
+        }).catch(function () {
+          if (host.toast) host.toast("Zurückziehen ging nicht (go-event-requests-withdraw.sql?)");
+        });
+      });
+      return;
+    }
     var wave = t.closest("[data-wave-ev]");
     if (wave) {
       sendJoinRequest(wave.getAttribute("data-wave-ev"), wave);
@@ -4725,15 +4766,27 @@
     var now = Date.now();
     if (state.repliesAt && now - state.repliesAt < 15000) { paintReplyHeart(); return Promise.resolve(); }
     state.repliesAt = now;
-    return rest(
+    /* Herz meldet: Antworten auf meine Kommentare und offene Einladungen an mich (z. B. über eine Gruppe) */
+    var replies = rest(
       "event_comments?reply_to_account=eq." + encodeURIComponent(me()) +
         "&account_id=neq." + encodeURIComponent(me()) +
         "&select=id,event_id,created_at&order=created_at.desc&limit=1"
-    ).then(function (rows) {
-      state.lastReply = (rows && rows[0]) || null;
+    ).catch(function () { return null; });
+    var invites = rest(
+      "go_workout_invites?to_id=eq." + encodeURIComponent(me()) +
+        "&status=eq.pending&event_id=not.is.null&workout_date=gte." + encodeURIComponent(todayIso()) +
+        "&select=id,event_id,created_at&order=created_at.desc&limit=1"
+    ).catch(function () { return null; });
+    var extra = host && host.heartNotices ? Promise.resolve(host.heartNotices()).catch(function () { return []; }) : Promise.resolve([]);
+    return Promise.all([replies, invites, extra]).then(function (r) {
+      var list = [];
+      if (r[0] && r[0][0]) list.push(Object.assign({ kind: "reply" }, r[0][0]));
+      if (r[1] && r[1][0]) list.push(Object.assign({ kind: "invite" }, r[1][0]));
+      (r[2] || []).forEach(function (x) { if (x && x.created_at) list.push(x); });
+      list.sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); });
+      state.lastReply = list[0] || null;
+      state.heartList = list;
       paintReplyHeart();
-    }).catch(function () {
-      state.repliesMissing = true; /* Spalte fehlt noch */
     });
   }
   function replyThreadText(eventId) {
@@ -4787,11 +4840,13 @@
   function onReplyHeart() {
     function go(r) {
       if (!r) {
-        if (host && host.toast) host.toast("Noch keine Antworten auf Deine Kommentare");
+        if (host && host.toast) host.toast("Noch nichts Neues");
         return;
       }
       try { localStorage.setItem(replySeenKey(), String(r.created_at)); } catch (e) {}
       paintReplyHeart();
+      /* eigene Meldungen des Hosts (z. B. Gruppenanfrage) öffnen ihren Dialog selbst */
+      if (typeof r.open === "function") { r.open(); return; }
       openReplyEvent(r.event_id);
     }
     if (state.lastReply) { go(state.lastReply); return; }
@@ -4801,6 +4856,12 @@
   document.addEventListener("click", function (e) {
     if (e.target && e.target.closest && e.target.closest("#heute-replies")) { e.preventDefault(); onReplyHeart(); }
   });
+
+  function askWithdraw(q) {
+    return global.GoDialog && GoDialog.confirm
+      ? GoDialog.confirm(q, { ok: "Zurückziehen", cancel: "Abbrechen" })
+      : Promise.resolve(global.confirm(q));
+  }
 
   function resetAktuellPaint() {
     state.paintedAktuell = false;
