@@ -9,11 +9,14 @@
  *   Tag mit erledigtem Event              → eine Stufe zurück (bis 0; 3 → 1)
  *   Tag mit geplantem, nicht erledigtem   → eine Stufe hoch (bis Rot)
  *   Event ausdrücklich ausfallen lassen   → eine Stufe hoch, außer am Tag steht ein Ersatz (Alternative)
- *   Event von diesem Tag verschoben       → eine Stufe hoch, höchstens Gelb-Orange (2)
+ *   Event verschoben: das erste Mal je Event bleibt die Farbe, ab dem zweiten Mal eine Stufe hoch
+ *                                           (höchstens Gelb-Orange, 2), gezählt am Tag des Verschiebens
  *   Tag ohne Event                        → bleibt
  *   Stufen: 0 normal · 1 Gelb · 2 Gelb-Orange · 3 Rot
  *   Ziffer (nur am eigenen Kreis): Tage am Stück, an denen abgehakt wurde. Tage ohne Event zählen nicht und
  *   brechen nicht ab; ein Tag mit offenem oder ausgefallenem Event bricht ab. Heute zählt erst, wenn abgehakt.
+ *   Verschoben (auch einmal): ab 0:00 steht die Ziffer auf 0, außer an dem Tag wurde etwas abgehakt
+ *   oder ein Event von Freunden mitgemacht, das abgeschlossen ist (event_rsvps zugesagt + erledigt).
  *   Verschieben merkt sich die Datenbank in events.moved_days (go-tamagotchi.sql).
  */
 (function (global) {
@@ -49,14 +52,20 @@
   }
 
   function compute(rows, todayIso) {
-    var done = {}, missed = {}, cancelled = {}, moved = {}, other = {};
+    var done = {}, missed = {}, cancelled = {}, moved = {}, other = {}, movedAny = {};
     (rows || []).forEach(function (r) {
-      (r.moved_days || []).forEach(function (m) {
+      /* jedes Verschieben (auch das erste) bricht die Serie um 0:00 – außer am Tag wurde etwas abgeschlossen */
+      (r.moved_days || []).forEach(function (m) { movedAny[String(m).slice(0, 10)] = true; });
+      /* erstes Verschieben je Event ist frei; ab dem zweiten zählt es (Tag liegt evtl. in der Zukunft → heute) */
+      (r.moved_days || []).forEach(function (m, i) {
+        if (i < 1) return;
         m = String(m).slice(0, 10);
-        if (m <= todayIso) moved[m] = (moved[m] || 0) + 1;
+        if (m > todayIso) m = todayIso;
+        moved[m] = (moved[m] || 0) + 1;
       });
       var d = berlinDay(r.starts_at);
       if (!d || d > todayIso) return;
+      /* (zukünftige Events zählen nur über moved_days oben) */
       if (r.status === "erledigt") done[d] = true;
       else if (r.status === "ausgefallen") cancelled[d] = true;
       else if (r.status === "geplant" && d < todayIso) missed[d] = true;
@@ -68,14 +77,14 @@
       if (done[d]) level = level >= 3 ? 1 : Math.max(0, level - 1);
       else if (d < todayIso && cancelled[d] && !other[d]) level = Math.min(3, level + 1);
       else if (d < todayIso && missed[d]) level = Math.min(3, level + 1);
-      else if (moved[d]) level = level >= 2 ? level : level + 1;
+      else if (moved[d]) level = level >= 2 ? level : Math.min(2, level + moved[d]);
     }
     /* Tage am Stück abgehakt (rückwärts ab heute) */
     var days = 0;
     for (var k = todayIso; k >= start; k = addDays(k, -1)) {
       if (done[k]) { days += 1; continue; }
       if (k === todayIso) continue;
-      if (missed[k] || (cancelled[k] && !other[k])) break;
+      if (missed[k] || (cancelled[k] && !other[k]) || movedAny[k]) break;
     }
     return { level: level, weeks: days };
   }
@@ -93,14 +102,24 @@
     var from = addDays(mondayOf(t), -7 * 12);
     var base = "events?user_id=in.(" + ids.map(encodeURIComponent).join(",") + ")" +
       "&starts_at=gte." + from + "T00:00:00Z&starts_at=lte." + addDays(t, 1) + "T00:00:00Z&order=starts_at.asc&limit=5000&select=user_id,starts_at,status";
-    var q = noMovedCol ? host.rest(base) : host.rest(base + ",moved_days").catch(function () {
+    /* verschobene Events liegen oft schon in der Zukunft: die mit moved_days zusätzlich laden */
+    var withMoved = base.replace("&starts_at=lte." + addDays(t, 1) + "T00:00:00Z", "&or=(starts_at.lte." + addDays(t, 1) + "T00:00:00Z,moved_days.neq.{})") + ",moved_days";
+    var q = noMovedCol ? host.rest(base) : host.rest(withMoved).catch(function () {
       noMovedCol = true;
       return host.rest(base);
     });
-    q.then(function (rows) {
+    /* mitgemachte Events von Freunden, die abgeschlossen sind, zählen wie eigene erledigte */
+    var joined = host.rest("event_rsvps?user_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&status=eq.zugesagt" +
+      "&select=user_id,events(starts_at,status)&limit=2000").catch(function () { return []; });
+    Promise.all([q, joined]).then(function (res) {
+      var rows = res[0];
       var by = {};
       ids.forEach(function (id) { by[id] = []; });
       (rows || []).forEach(function (r) { if (by[r.user_id]) by[r.user_id].push(r); });
+      (res[1] || []).forEach(function (j) {
+        var e = j && j.events;
+        if (e && e.status === "erledigt" && by[j.user_id] && String(e.starts_at) >= from) by[j.user_id].push({ starts_at: e.starts_at, status: "erledigt" });
+      });
       ids.forEach(function (id) { cache[id] = compute(by[id], t); });
       if (host.onChange) host.onChange();
     }).catch(function () {
