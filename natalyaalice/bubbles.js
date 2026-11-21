@@ -355,7 +355,13 @@
     if (!el || !b) return;
     ensureCss();
     /* Story nur aus Events mit Bubble-Markierung UND Ort; deren Orte tragen sich selbst in die Leiste ein */
-    var list = (events || []).filter(function (ev) { return ev && String(ev.location || "").trim(); })
+    /* nur Events ab heute: Vergangenes (gestern und davor) gehört nicht mehr in die Orte-Stories */
+    var todayKey = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+    var list = (events || []).filter(function (ev) {
+      if (!ev || !String(ev.location || "").trim()) return false;
+      var d = new Date(ev.starts_at);
+      return isNaN(d.getTime()) || d.toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }) >= todayKey;
+    })
       .sort(function (x, y) { return String(x.starts_at).localeCompare(String(y.starts_at)); });
     var places = placesOf(b).slice();
     list.forEach(function (ev) {
@@ -782,7 +788,7 @@
       ".gbub-places__add,.gbub-places__ok{border:1.5px dashed rgba(29,22,48,.45);background:transparent;color:#1D1630;border-radius:12px;min-height:44px;width:100%;font:600 15px Inter,sans-serif;cursor:pointer}" +
       ".gbub-places__ok{border-style:solid;margin-top:8px}" +
       ".gbub-places__pp .gpp__map{height:180px}" +
-      ".gbub-compose{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 104px);z-index:60;display:none;gap:8px;align-items:center;padding:6px 6px 6px 16px;border-radius:999px;background:#fff;box-shadow:0 6px 24px rgba(29,22,48,.14)}" +
+      ".gbub-compose{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 77px);z-index:60;display:none;gap:8px;align-items:center;padding:6px 6px 6px 16px;border-radius:999px;background:#fff;box-shadow:0 6px 24px rgba(29,22,48,.14)}" +
       "body[data-shell=heute][data-heute=bubble] .gbub-compose{display:flex}" +
       "body.wr-sheet-open .gbub-compose,body.ffc-open .gbub-compose{display:none !important}" +
       ".gbub-compose{flex-direction:column;align-items:stretch;border-radius:24px}" +
