@@ -39,7 +39,15 @@
     ".gxm-row{display:flex;gap:8px;margin-top:12px}" +
     ".gxm-row a,.gxm-row button{flex:1;display:flex;align-items:center;justify-content:center;min-height:46px;border-radius:999px;font:inherit;font-weight:700;font-size:15px;text-decoration:none;cursor:pointer}" +
     ".gxm-row a{border:1.5px solid #111;color:#111;background:transparent}" +
-    ".gxm-row button{border:0;background:#111;color:#fff}";
+    ".gxm-row button{border:0;background:#111;color:#fff}" +
+    ".gxm-track{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:0;scrollbar-width:none;touch-action:pan-x pan-y}" +
+    ".gxm-track::-webkit-scrollbar{display:none}" +
+    ".gxm-slide{flex:0 0 100%;scroll-snap-align:center;display:flex;align-items:center;justify-content:center}" +
+    ".gxm-slide>*{width:100%}" +
+    ".gxm-ext{display:flex;align-items:center;justify-content:center;min-height:200px;border-radius:14px;background:#111;color:#fff;font-weight:700;text-decoration:none}" +
+    ".gxm-dots{display:flex;justify-content:center;gap:6px;margin-top:10px}" +
+    ".gxm-dots i{width:7px;height:7px;border-radius:50%;background:rgba(42,33,24,.25)}" +
+    ".gxm-dots i.is-on{background:#2A2118}";
 
   function ensureCss() {
     if (document.getElementById("gxm-css")) return;
@@ -94,7 +102,13 @@
     loading = Promise.all([
       host.rest("go_exercise_media?select=name_key,name,url&limit=2000").catch(function () { return []; }),
       /* Nutzer-Links mit Sternen (go-exercise-links.sql); fehlt die View, bleibt es bei gogogo-Links */
-      host.rest("go_exercise_links_ranked?select=id,name_key,name,url,added_by,added_by_name,stars,created_at&limit=5000").catch(function () { return []; })
+      /* approved_at erst nach go-exercise-media-review.sql; ohne Spalte gilt alles als freigegeben */
+      host.rest("go_exercise_links_ranked?select=id,name_key,name,url,added_by,added_by_name,stars,created_at,approved_at&limit=5000")
+        .catch(function () {
+          return host.rest("go_exercise_links_ranked?select=id,name_key,name,url,added_by,added_by_name,stars,created_at&limit=5000")
+            .then(function (rows) { return (rows || []).map(function (r) { r.approved_at = r.created_at || "x"; return r; }); });
+        })
+        .catch(function () { return []; })
     ]).then(function (res) {
       map = {};
       (res[0] || []).forEach(function (r) { if (r && r.name_key && r.url) map[r.name_key] = r.url; });
@@ -104,12 +118,17 @@
     return loading;
   }
 
+  /* nur freigegebene Nutzer-Einträge zählen für alle; Fotos getrennt von Videos */
+  var userBestImg = {};
   function rankUser() {
     userBest = {};
-    userLinks.slice().sort(function (a, b) {
+    userBestImg = {};
+    userLinks.slice().filter(function (l) { return l.approved_at; }).sort(function (a, b) {
       return (b.stars || 0) - (a.stars || 0) || String(a.created_at).localeCompare(String(b.created_at));
     }).forEach(function (l) {
-      if (!userBest[l.name_key]) userBest[l.name_key] = l.url;
+      var info = parse(l.url);
+      if (info && info.kind === "img") { if (!userBestImg[l.name_key]) userBestImg[l.name_key] = l.url; }
+      else if (!userBest[l.name_key]) userBest[l.name_key] = l.url;
     });
   }
 
@@ -127,7 +146,27 @@
   function urlFor(name) {
     var k = key(name);
     var mine = mineFor(k);
-    return (mine && mine.url) || map[k] || userBest[k] || "";
+    return (mine && mine.url) || map[k] || userBest[k] || userBestImg[k] || "";
+  }
+  /* Foto und Video einer Übung: eigene vor gogogo vor freigegebenen Nutzer-Einträgen */
+  function itemsFor(name) {
+    var k = key(name);
+    var me = meId();
+    var own = function (kind) {
+      return userLinks.filter(function (l) {
+        if (l.name_key !== k || String(l.added_by) !== me) return false;
+        var i = parse(l.url);
+        return kind === "img" ? i && i.kind === "img" : i && i.kind !== "img";
+      }).sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); })[0];
+    };
+    var oi = own("img"), ov = own("video");
+    var img = (oi && oi.url) || userBestImg[k] || "";
+    var vid = (ov && ov.url) || (map[k] && parse(map[k]) && parse(map[k]).kind !== "img" ? map[k] : "") || userBest[k] || "";
+    if (!img && map[k] && parse(map[k]) && parse(map[k]).kind === "img") img = map[k];
+    var out = [];
+    if (vid) out.push(vid);
+    if (img) out.push(img);
+    return out;
   }
 
   function shrink(file, maxSide) {
@@ -176,7 +215,41 @@
     return out;
   }
 
+  /* Mehrere Einträge (Video + Foto): links/rechts wischen */
+  function openCarousel(name, urls) {
+    ensureCss();
+    var wrap = document.createElement("div");
+    wrap.className = "gxm-sheet";
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    var slides = urls.map(function (u) {
+      var info = parse(u);
+      if (!info) return "";
+      if (info.kind === "img") return '<div class="gxm-slide"><img class="gxm-img" src="' + esc(info.url) + '" alt="" /></div>';
+      if (!info.embed) return '<div class="gxm-slide"><a class="gxm-ext" href="' + esc(info.url) + '" target="_blank" rel="noopener">In ' + esc(info.label) + " öffnen</a></div>";
+      var frameCls = info.kind === "ig" ? "gxm-frame--ig" : info.kind === "short" ? "gxm-frame--short" : "gxm-frame--yt";
+      return '<div class="gxm-slide"><div class="gxm-frame ' + frameCls + '"><iframe src="' + esc(info.embed) + '" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="' + esc(name || "Video") + '"></iframe></div></div>';
+    }).filter(Boolean);
+    wrap.innerHTML = '<div class="gxm-card"><h2>' + esc(name || "Übung") + "</h2>" +
+      '<div class="gxm-track">' + slides.join("") + "</div>" +
+      '<div class="gxm-dots">' + slides.map(function (_, i) { return '<i class="' + (i ? "" : "is-on") + '"></i>'; }).join("") + "</div>" +
+      '<div class="gxm-row"><button type="button" data-gxm-close>Schließen</button></div></div>';
+    var track = wrap.querySelector(".gxm-track");
+    track.addEventListener("scroll", function () {
+      var i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+      Array.prototype.forEach.call(wrap.querySelectorAll(".gxm-dots i"), function (d, k) { d.classList.toggle("is-on", k === i); });
+    }, { passive: true });
+    wrap.addEventListener("click", function (e) {
+      if (e.target === wrap || (e.target.closest && e.target.closest("[data-gxm-close]"))) wrap.remove();
+    });
+    document.body.appendChild(wrap);
+  }
+
   function open(name, url) {
+    if (!url) {
+      var many = itemsFor(name);
+      if (many.length > 1) { openCarousel(name, many); return; }
+    }
     var info = parse(url || urlFor(name));
     if (!info) return;
     if (!info.embed && info.kind !== "img") {
@@ -238,6 +311,7 @@
     reload: function () { loading = null; return load(); },
     set: function (name, url) { if (url) map[key(name)] = url; else delete map[key(name)]; },
     urlFor: urlFor,
+    itemsFor: itemsFor,
     mine: function (name) { return mineFor(key(name)); },
     /* eigenes Foto (kind "img") oder eigener Video-Link (kind "video") zu einer Übung, neuester zuerst */
     mineOf: function (name, kind) {
