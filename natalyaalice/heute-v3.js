@@ -4648,6 +4648,13 @@
     if (mediaHit && !t.closest("button, a, input")) {
       var cardW = mediaHit.closest(".acc-card[data-event-id]");
       var evA = cardW ? (state.events || []).filter(function (x) { return String(x.id) === cardW.getAttribute("data-event-id"); })[0] : null;
+      /* Heutiges Event, bei dem ich dabei bin → meine Stempelkarte (Freund scannt, Pünktlichkeit gegenseitig) */
+      if (evA && host.openStampCard &&
+          new Date(evA.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }) === todayIso() &&
+          (String(evA.user_id) === me() || iAmGoing(evA.id) || !!inviteFor(evA.id)) &&
+          host.openStampCard(evA)) {
+        return;
+      }
       if (evA && (evA.category === "kraft" || evA.category === "ausdauer")) {
         var evIso = new Date(evA.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
         var mine = String(evA.user_id) === me();

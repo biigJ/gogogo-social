@@ -5430,6 +5430,7 @@
     .plus-pick__btn { display: block; width: 100%; min-height: 48px; margin: 16px 0 6px; border: 0; border-radius: 999px; background: #111; color: #fff; font: inherit; font-size: 16px; font-weight: 700; cursor: pointer; }
     .plus-info__img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 14px; margin: 0 0 12px; background: #E6DED0; }
     .plus-info__text { margin: 0; font-size: 15px; line-height: 1.45; text-align: left; }
+    .go-slide__copy, .plus-info__text { white-space: pre-line; }
     .go-slide__copy.is-clamped { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
     .go-slide__more { display: inline; margin: 4px 0 0; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 700; color: #2A2118; text-decoration: underline; cursor: pointer; }
     .go-slide__art { margin: 0; }
@@ -8414,10 +8415,10 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-94"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-95"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-71"></script>
-  <script src="/natalyaalice/support.js?v=support-22"></script>
+  <script src="/natalyaalice/support.js?v=support-23"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -14813,15 +14814,132 @@
           });
       }
 
-      /* QR-Scan einer fremden Stempelkarte: ?stamp=<Gastgeber-ID> → Stempel für mich */
+      /* QR-Scan einer fremden Stempelkarte: ?stamp=<Karteninhaber>&ev=<Event>.
+         Scannender sagt, ob der Inhaber pünktlich war, der Inhaber bestätigt umgekehrt.
+         Pünktlich = 2 Stempel, sonst 1 (go-stamp-punctual.sql). */
       function handleStampScan() {
-        var host = "";
-        try { host = new URLSearchParams(location.search).get("stamp") || ""; } catch (eU) {}
+        var host = "", ev = "";
+        try {
+          var qs = new URLSearchParams(location.search);
+          host = qs.get("stamp") || "";
+          ev = qs.get("ev") || "";
+        } catch (eU) {}
         if (!host || !sessionAccount || !sessionAccount.id) return;
         try {
           var clean = location.pathname + location.hash;
           history.replaceState(null, "", clean);
         } catch (eH) {}
+        rest("rpc/go_stamp_check_start", {
+          method: "POST",
+          body: { p_owner: host, p_event: /^[0-9a-f-]{36}$/i.test(ev) ? ev : null }
+        })
+          .then(function (res) {
+            var r = res || {};
+            if (r.ok && r.ask) { askStampVerdict(r.check_id, r.other_name); return; }
+            if (r.ok) { waitStampResult(r.check_id, r.other_name); return; }
+            gogogoToast(
+              r.reason === "already" ? "Für dieses Training habt Ihr schon gestempelt."
+              : r.reason === "no_event" ? "Kein Stempel: Ihr seid heute nicht beim selben Event."
+              : r.reason === "not_joined" ? "Kein Stempel: Melde Dich zuerst für das Event an."
+              : r.reason === "no_card" ? "Kein Stempel: Buche zuerst Deine Stempelkarte unter Plus."
+              : r.reason === "owner_no_card" ? "Kein Stempel: Dein Freund hat noch keine Stempelkarte."
+              : r.reason === "self" ? "Das ist Deine eigene Karte."
+              : "Stempel nicht möglich."
+            );
+          })
+          .catch(function (err) {
+            var m = String((err && err.message) || err || "");
+            if (/PGRST202|go_stamp_check_start|404/.test(m)) legacyStampScan(host);
+            else gogogoToast("Stempel nicht möglich. Bitte nochmal scannen.");
+          });
+      }
+
+      var stampAsked = {};
+      var stampPollTimer = null;
+      function stampFirst(n) { return String(n || "").trim().split(/\s+/)[0] || "Dein Freund"; }
+      function syncStampCount(stamps) {
+        var n = Math.max(0, Math.min(12, Number(stamps) || 0));
+        try {
+          var o = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
+          if (o) o.meta = Object.assign({}, o.meta || {}, { stamps: n });
+        } catch (eO) {}
+        var count = document.getElementById("stamp-card-count");
+        if (count) count.textContent = String(n);
+        var slots = document.querySelectorAll("#stamp-card-grid .stamp-pass__slot");
+        for (var i = 0; i < slots.length; i++) slots[i].classList.toggle("is-filled", i < n);
+      }
+      function stampResultMsg(r) {
+        var add = Number(r && r.added) || 0;
+        syncStampCount(r && r.stamps);
+        if (!add) return "Für dieses Training hast Du schon Stempel.";
+        return (add === 2 ? "Pünktlich: 2 Stempel" : "1 Stempel") + " · " + (Number(r.stamps) || 0) + " von 12";
+      }
+      function askStampVerdict(checkId, name) {
+        if (!checkId || stampAsked[checkId]) return;
+        stampAsked[checkId] = true;
+        var ask = window.GoDialog && GoDialog.choose
+          ? GoDialog.choose("War " + stampFirst(name) + " pünktlich?", [
+              { label: "Ja, pünktlich", value: "yes" },
+              { label: "Nein", value: "no" }
+            ], { center: true, cancel: "Später" })
+          : Promise.resolve(window.confirm("War " + stampFirst(name) + " pünktlich?") ? "yes" : "no");
+        ask.then(function (v) {
+          if (!v) return;
+          return rest("rpc/go_stamp_check_verdict", {
+            method: "POST",
+            body: { p_check: checkId, p_punctual: v === "yes" }
+          }).then(function (r) {
+            r = r || {};
+            if (r.ok && r.done) gogogoToast(stampResultMsg(r));
+            else if (r.ok) waitStampResult(checkId, name);
+            else if (r.reason === "already") gogogoToast("Für dieses Training habt Ihr schon gestempelt.");
+            else gogogoToast("Stempel nicht möglich.");
+          });
+        }).catch(function () {
+          stampAsked[checkId] = false;
+          gogogoToast("Stempel nicht möglich (go-stamp-punctual.sql ausgeführt?)");
+        });
+      }
+      /* Ich habe geantwortet, der andere noch nicht: kurz warten, dann Ergebnis zeigen */
+      function waitStampResult(checkId, name) {
+        gogogoToast("Danke. Jetzt bestätigt " + stampFirst(name) + ", ob Du pünktlich warst.");
+        var tries = 0;
+        var tick = function () {
+          if (++tries > 60) return;
+          rest("rpc/go_stamp_check_status", { method: "POST", body: { p_check: checkId } })
+            .then(function (r) {
+              if (r && r.ok && r.done) gogogoToast(stampResultMsg(r));
+              else setTimeout(tick, 4000);
+            })
+            .catch(function () { setTimeout(tick, 8000); });
+        };
+        setTimeout(tick, 4000);
+      }
+      /* Offene Fragen an mich („War X pünktlich?“): beim Start und solange meine Karte offen ist */
+      function pollStampChecks() {
+        if (!sessionAccount || !sessionAccount.id) return;
+        rest("rpc/go_stamp_checks_open", { method: "POST", body: {} })
+          .then(function (rows) {
+            var row = (Array.isArray(rows) ? rows : []).filter(function (x) { return x && !stampAsked[x.check_id]; })[0];
+            if (row) askStampVerdict(row.check_id, row.other_name);
+          })
+          .catch(function () {});
+      }
+      function startStampPoll() {
+        stopStampPoll();
+        stampPollTimer = setInterval(function () {
+          var m = document.getElementById("stamp-card-modal");
+          if (!m || m.hidden) { stopStampPoll(); return; }
+          pollStampChecks();
+        }, 3000);
+      }
+      function stopStampPoll() {
+        if (stampPollTimer) clearInterval(stampPollTimer);
+        stampPollTimer = null;
+      }
+
+      /* Alter Scan ohne Pünktlichkeit (nur wenn go-stamp-punctual.sql fehlt) */
+      function legacyStampScan(host) {
         rest("rpc/go_stamp_by_scan", {
           method: "POST",
           body: { p_host_id: host, p_scanner_id: sessionAccount.id }
@@ -14915,7 +15033,8 @@
         return id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 16).toLowerCase() || "gogogo";
       }
 
-      function openStampCardModal(order) {
+      function openStampCardModal(order, opts) {
+        opts = opts || {};
         var modal = document.getElementById("stamp-card-modal");
         if (!modal) {
           try { GoDialog.alert("Stempelkarte ist noch nicht geladen. Bitte Seite neu laden."); } catch (eM) {}
@@ -14955,6 +15074,7 @@
         if (qr) {
           /* Scan mit der Kamera öffnet die App; wer bei mir eingeladen ist, bekommt einen Stempel */
           var payload = location.origin + "/workout/?stamp=" + encodeURIComponent(String((sessionAccount && sessionAccount.id) || sid));
+          if (opts.eventId) payload += "&ev=" + encodeURIComponent(String(opts.eventId));
           qr.src =
             "https://api.qrserver.com/v1/create-qr-code/?size=336x336&margin=8&data=" +
             encodeURIComponent(payload);
@@ -14967,6 +15087,10 @@
         modal.hidden = false;
         modal.removeAttribute("hidden");
         modal.style.display = "grid";
+        /* „Später“ gilt bis zum nächsten Öffnen der Karte */
+        Object.keys(stampAsked).forEach(function (k) { delete stampAsked[k]; });
+        pollStampChecks();
+        startStampPoll();
       }
 
       function paypalDonateUrl() {
@@ -15090,6 +15214,7 @@
 
       function closeStampCardModal() {
         var modal = document.getElementById("stamp-card-modal");
+        stopStampPoll();
         if (!modal) return;
         modal.hidden = true;
         modal.setAttribute("hidden", "");
@@ -18164,7 +18289,7 @@
                   key: "stempelkarte",
                   type: "stempelkarte",
                   title: "Stempelkarte",
-                  description: "Trainierst Du mit einem Freund bei seinem oder Deinem Workout-Event zusammen, scannt Ihr die Karten und bekommt so einen digitalen Stempel. Wenn Du alle 12 Punkte voll hast, erhältst Du ein robustes gogogo-T-Shirt in Bio-Baumwollqualität."
+                  description: "Trainierst Du mit einem Freund bei seinem oder Deinem Workout-Event zusammen, scannt Ihr die Karten und bekommt so einen digitalen Stempel. Wenn Du alle 12 Punkte voll hast, erhältst Du ein robustes gogogo-T-Shirt in Bio-Baumwollqualität.\nZum Punktesammeln tippe auf das Event unter Aktuell. Die Stempelkarte öffnet sich und Dein Freund hält seine/ihre Kamera auf den QR-Code. Dann tippt er/sie, ob Du pünktlich warst. Du musst dann auch bestätigen, ob er/sie pünktlich war. Wer pünktlich war, erhält zwei Stempel."
                 },
                 {
                   key: "web_call",
@@ -23177,6 +23302,13 @@
         if (sessionMode && window.HeuteAccountability) {
           var accHost = {
             openEventWorkout: function (ev) { openEventWorkout(ev); },
+            /* Heutiges Event antippen → eigene Stempelkarte mit Event im QR */
+            openStampCard: function (ev) {
+              var ord = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
+              if (!ord || !ev) return false;
+              openStampCardModal(ord, { eventId: ev.id });
+              return true;
+            },
           eventMinutes: function (ev) { return eventMinutes(ev); },
             onTodayActivity: function () {
               var key = "";
@@ -23290,6 +23422,7 @@
           };
           HeuteAccountability.install(accHost);
           handleStampScan();
+          if (!window.__goStampPolled) { window.__goStampPolled = true; setTimeout(pollStampChecks, 1800); }
           handleFriendScan();
           setTimeout(promptJoinRequests, 2500);
           setTimeout(promptCoachRequests, 4000);
