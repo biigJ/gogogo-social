@@ -31,7 +31,8 @@
     var safe = function (p) { return h.rest(p).catch(function () { return []; }); };
     loading = Promise.all([
       safe("courses?image_url=not.is.null&select=id,image_url&limit=500"),
-      safe("enrollments?select=id,course_id&limit=500")
+      /* alle Einschreibungen → Plan (go-plan-covers.sql), damit fremde Events das Plan-Bild des Besitzers zeigen; sonst nur eigene */
+      h.rest("rpc/go_enrollment_plans", { method: "POST", body: {} }).catch(function () { return safe("enrollments?select=id,course_id&limit=500"); })
     ]).then(function (res) {
       (res[0] || []).forEach(function (r) { if (r && r.id && r.image_url) byCourse[String(r.id)] = r.image_url; });
       (res[1] || []).forEach(function (r) { if (r && r.id && r.course_id) planOfEnroll[String(r.id)] = String(r.course_id); });
