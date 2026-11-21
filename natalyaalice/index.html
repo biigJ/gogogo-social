@@ -8493,7 +8493,7 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-17"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-18"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-3"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-16"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
@@ -15754,6 +15754,7 @@
           list.textContent = "Lädt …";
           lbBox.appendChild(list);
           var from = lbAvg === "month" ? monthStartIso() : lbAvg === "week" ? mondayIso() : lbLastFrom();
+          var circleFrom = "";
           var ready = circleInfo ? Promise.resolve(circleInfo) : loadCircleMembers().then(function (ci) { circleInfo = ci; return ci; });
           ready.then(function (ci) {
             if (!ci.circle) {
@@ -15764,6 +15765,9 @@
             /* Name steht über dem Circle-Knopf, hier nicht doppelt */
             title.textContent = "";
             title.hidden = true;
+            /* neuer Circle: nur Workouts ab Gründung */
+            circleFrom = window.__goCircleStart ? window.__goCircleStart(ci.circle.group_id) : "";
+            if (circleFrom && circleFrom > from) from = circleFrom;
             var meId = sessionAccount ? String(sessionAccount.id) : "";
             var inCircle = {};
             ci.ids.forEach(function (id) { inCircle[id] = true; });
@@ -15772,6 +15776,18 @@
                 list.textContent = "";
                 if (res.missing) { list.textContent = "Punkte für Double brauchen go-ffc-punkte.sql in Supabase."; return; }
                 var inC = (res.pairs || []).filter(function (pr) { return pr.ids.every(function (id) { return inCircle[id]; }); });
+                if (circleFrom) {
+                  /* nur Double-Tage ab Gründung des Circles */
+                  inC = inC.map(function (pr) {
+                    var days = {}, pts = 0, any = false, cnt = 0;
+                    Object.keys(pr.days).forEach(function (d) {
+                      if (d < circleFrom) return;
+                      days[d] = true; cnt += 1;
+                      if (pr.dayPoints && pr.dayPoints[d] != null) { pts += pr.dayPoints[d]; any = true; }
+                    });
+                    return Object.assign({}, pr, { days: days, count: cnt, points: any ? pts : null });
+                  }).filter(function (pr) { return pr.count > 0; });
+                }
                 var lastD = "";
                 if (lbAvg === "last") {
                   inC.forEach(function (pr) { Object.keys(pr.days).forEach(function (d) { if (d > lastD) lastD = d; }); });
@@ -15797,6 +15813,7 @@
             }
             return GoFfcPoints.sync(lbHost()).then(function () { return GoFfcPoints.load(lbHost(), ci.ids, from); }).then(function (rows) {
               list.textContent = "";
+              if (circleFrom) rows = (rows || []).filter(function (r) { return String(r.day) >= circleFrom; });
               if (GoFfcPoints.missing()) { list.textContent = "Punkte brauchen go-ffc-punkte.sql in Supabase."; return; }
               var agg = {};
               (rows || []).forEach(function (r) {
@@ -20138,7 +20155,9 @@
           syncMyCircles();
           var ids = cst().groups.map(function (g) { return encodeURIComponent(String(g.group_id)); });
           if (!ids.length) { paintCircleHead(); applyCircleCover(); paintCircleEvents(); return; }
-          var setJob = rest("go_circles?group_id=in.(" + ids.join(",") + ")&select=group_id,name,owner_id,locations,online")
+          var setQ = "go_circles?group_id=in.(" + ids.join(",") + ")&select=group_id,name,owner_id,locations,online";
+          var setJob = rest(setQ + ",created_at")
+            .catch(function () { return rest(setQ); })
             .catch(function () { return []; })
             .then(function (rows) { (rows || []).forEach(function (r) { if (r) cst().settings[String(r.group_id)] = r; }); });
           return rest("go_circle_photos?group_id=in.(" + ids.join(",") + ")&select=group_id,photo_url")
@@ -20184,7 +20203,17 @@
           if (window.__goZirkelLbReload) window.__goZirkelLbReload();
         });
       }
+      /* Startdatum eines Circles (FFC created_at, sonst go_circles.created_at, go-circle-start.sql): Leaderboard zählt erst ab dann */
+      function circleStartDay(gid) {
+        var g = (cst().groups || []).filter(function (x) { return String(x.group_id) === String(gid); })[0];
+        var st0 = cst().settings[String(gid)];
+        var at = (g && g.created_at) || (st0 && st0.created_at) || "";
+        if (!at) return "";
+        try { return new Date(at).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }); } catch (e) { return ""; }
+      }
+      window.__goCircleStart = circleStartDay;
       function afterCircleChange() {
+        cst().synced = false;
         if (typeof syncFfcGroupIntoTeam === "function") { try { syncFfcGroupIntoTeam(); } catch (eS) {} }
         if (typeof renderTeam === "function") renderTeam();
         return loadCircleState().then(function () {
@@ -20225,6 +20254,15 @@
          dazu zählen seine Zirkeltrainings aus dem Wochenplan. Plus-Slide zeigt die nächsten 2 Wochen: Datum + Runden.
          Mitglieder übernehmen ein Circle-Event in ihre Woche (Zusage); neue Circle-Events meldet das Herz. */
       var CIRCLE_DAYS = 14;
+      /* Verwalten darf: Gründer in FFC, der in gogogo eingetragene Coach (go_circles.owner_id, z. B. vom Admin gesetzt) oder ein Admin */
+      function circleCanManage(g) {
+        if (!g || !sessionAccount) return false;
+        if (g.is_owner) return true;
+        var st0 = circleSettings(g);
+        if (st0 && st0.owner_id && String(st0.owner_id) === String(sessionAccount.id)) return true;
+        var adminIds = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
+        return !!(sessionAccount.is_admin || adminIds.indexOf(String(sessionAccount.id)) !== -1);
+      }
       function circleSettings(g) {
         return g ? cst().settings[String(g.group_id)] || null : null;
       }
@@ -20365,7 +20403,7 @@
       /* Vor dem eigenen Zirkeltraining: lieber das nächste vom Circle übernehmen? (nicht für den Gründer) */
       function askBeforeOwnZirkel(proceed) {
         var g = circleCurrent();
-        if (!g || g.is_owner || !window.GoDialog) { proceed(); return; }
+        if (!g || circleCanManage(g) || !window.GoDialog) { proceed(); return; }
         loadCircleEvents(g).then(function (evs) {
           var next = (evs || []).filter(function (e) { return !e.joined && String(e.user_id) !== String(sessionAccount && sessionAccount.id); })[0];
           if (!next) { proceed(); return; }
@@ -20382,7 +20420,7 @@
       function onCircleEventBtn() {
         var g = circleCurrent();
         if (!g) return;
-        if (g.is_owner) { createCircleEvent(g, true); return; }
+        if (circleCanManage(g)) { createCircleEvent(g, true); return; }
         askBeforeOwnZirkel(function () { createCircleEvent(g, false); });
       }
       /* Herz: neue Circle-Events vom Coach */
@@ -20463,8 +20501,8 @@
             var choices = [];
             if (cur) {
               if (!here) choices.push({ label: "Stempelkarte diesem Circle zuordnen", value: "stamp" });
-              if (cur.is_owner) choices.push({ label: "Orte und online", value: "places" });
-              if (cur.is_owner) choices.push({ label: circlePhoto(cur) ? "Foto ändern" : "Foto hinzufügen", value: "photo" });
+              if (circleCanManage(cur)) choices.push({ label: "Orte und online", value: "places" });
+              if (circleCanManage(cur)) choices.push({ label: circlePhoto(cur) ? "Foto ändern" : "Foto hinzufügen", value: "photo" });
               choices.push({ label: cur.is_owner ? "Circle löschen" : "Circle verlassen", value: "leave" });
             }
             if (canMore) {
@@ -26799,6 +26837,6 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-16"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-17"></script>
 </body>
 </html>
