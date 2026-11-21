@@ -6676,16 +6676,34 @@
       try { hint = JSON.parse(localStorage.getItem("go_today_hint") || "null"); } catch (e) {}
       if (!hint || hint.d !== today) hint = null;
       var n = first ? ", " + first : "";
-      var slot = h >= 5 && h < 10 ? "morgen" : h < 12 && h >= 10 ? "vormittag" : h >= 12 && h < 14 ? "mittag" : h >= 14 && h < 18 ? "nachmittag" : h >= 18 && h < 22 ? "abend" : "nacht";
+      /* zehn Tageszeiten, je zehn Begrüßungen */
+      var mins = h * 60 + Number(now.toLocaleString("en-GB", { timeZone: "Europe/Berlin", minute: "2-digit" }));
+      var slot = mins >= 240 && mins < 360 ? "sehrfrueh" : mins < 540 && mins >= 360 ? "morgen" : mins < 690 && mins >= 540 ? "vormittag"
+        : mins < 810 && mins >= 690 ? "mittag" : mins < 900 && mins >= 810 ? "fruehnachmittag" : mins < 1020 && mins >= 900 ? "nachmittag"
+        : mins < 1140 && mins >= 1020 ? "fruehabend" : mins < 1290 && mins >= 1140 ? "abend" : mins < 1410 && mins >= 1290 ? "spaet" : "nacht";
       var HELLO = {
-        morgen: ["Guten Morgen" + n + ".", "Moin" + n + ".", "Morgen" + n + ". Der Tag gehört Dir."],
-        vormittag: ["Schönen Vormittag" + n + ".", "Hallo" + n + ". Gut drauf heute?", "Na" + n + ", wie läuft der Tag?"],
-        mittag: ["Mahlzeit" + n + ".", "Hallo" + n + ". Halbzeit für heute.", "Mittag" + n + ". Kurz durchatmen."],
-        nachmittag: ["Schönen Nachmittag" + n + ".", "Hey" + n + ". Noch Energie übrig?", "Hallo" + n + ". Der Tag ist noch jung genug."],
-        abend: ["Guten Abend" + n + ".", "Abend" + n + ". Wie war Dein Tag?", "Schön, dass Du da bist" + n + "."],
-        nacht: ["Noch wach" + n + "?", "Späte Runde" + n + ".", "Gute Nacht bald" + n + "."]
+        sehrfrueh: ["Früh dran" + n + ".", "Du bist vor der Sonne wach" + n + ".", "Guten Morgen" + n + ". Die Stadt schläft noch.", "Respekt" + n + ", so früh schon auf.", "Die ruhigste Stunde gehört Dir" + n + ".",
+          "Moin" + n + ". Noch ist alles still.", "Früher Vogel" + n + ".", "Kaffee läuft schon" + n + "?", "Starker Start" + n + ".", "Guten Morgen" + n + ". Heute kann was werden."],
+        morgen: ["Guten Morgen" + n + ".", "Moin" + n + ".", "Morgen" + n + ". Der Tag gehört Dir.", "Ausgeschlafen" + n + "?", "Guten Morgen" + n + ". Was steht heute an?",
+          "Moin" + n + ". Frischer Tag, frische Beine.", "Hallo" + n + ". Schön, dass Du reinschaust.", "Guten Start" + n + ".", "Morgen" + n + ". Erst Wasser, dann Kaffee.", "Na" + n + ", bereit für heute?"],
+        vormittag: ["Schönen Vormittag" + n + ".", "Hallo" + n + ". Gut drauf heute?", "Na" + n + ", wie läuft der Tag?", "Hey" + n + ". Läuft's?", "Vormittag" + n + ". Kurz Pause machen.",
+          "Hallo" + n + ". Schon was geschafft heute?", "Servus" + n + ".", "Schön, Dich zu sehen" + n + ".", "Na" + n + ", Zeit für einen Blick in Deine Woche.", "Hey" + n + ". Der Tag ist in Fahrt."],
+        mittag: ["Mahlzeit" + n + ".", "Hallo" + n + ". Halbzeit für heute.", "Mittag" + n + ". Kurz durchatmen.", "Mahlzeit" + n + ". Schon gegessen?", "Hey" + n + ". Mittagspause?",
+          "Halbzeit" + n + ". Wie läuft's bisher?", "Mittag" + n + ". Eiweiß nicht vergessen.", "Hallo" + n + ". Kurz raus an die Luft?", "Na" + n + ", gut versorgt heute?", "Mahlzeit" + n + ". Danach eine Runde gehen?"],
+        fruehnachmittag: ["Hallo" + n + ". Das Mittagstief kommt, Du bleibst.", "Hey" + n + ". Kurz bewegen gegen die Müdigkeit.", "Nachmittag" + n + ". Ein Glas Wasser?", "Na" + n + ", noch wach nach dem Essen?", "Hallo" + n + ". Weiter geht's.",
+          "Schönen Nachmittag" + n + ".", "Hey" + n + ". Zweite Halbzeit.", "Na" + n + ", der Tag ist noch lang genug.", "Hallo" + n + ". Aufstehen, strecken, weiter.", "Kurzer Check" + n + ": Wie geht's Dir?"],
+        nachmittag: ["Schönen Nachmittag" + n + ".", "Hey" + n + ". Noch Energie übrig?", "Hallo" + n + ". Der Tag ist noch jung genug.", "Na" + n + ", schon an Training gedacht?", "Hey" + n + ". Gleich Feierabend?",
+          "Hallo" + n + ". Die beste Trainingszeit kommt.", "Nachmittag" + n + ". Was geht heute noch?", "Na" + n + ", Lust auf Bewegung?", "Hey" + n + ". Endspurt für heute.", "Hallo" + n + ". Schön, dass Du da bist."],
+        fruehabend: ["Feierabend" + n + "?", "Hallo" + n + ". Zeit für Dich.", "Guten Abend" + n + ". Noch eine Runde drin?", "Hey" + n + ". Jetzt wird trainiert.", "Abend" + n + ". Der Kopf darf abschalten.",
+          "Na" + n + ", Sachen gepackt?", "Hallo" + n + ". Jetzt gehört der Tag Dir.", "Guten Abend" + n + ". Wie war's?", "Hey" + n + ". Raus aus dem Büro, rein in die Bewegung.", "Feierabend" + n + ". Gut gemacht heute."],
+        abend: ["Guten Abend" + n + ".", "Abend" + n + ". Wie war Dein Tag?", "Schön, dass Du da bist" + n + ".", "Hallo" + n + ". Zeit runterzufahren.", "Guten Abend" + n + ". Gut gegessen?",
+          "Na" + n + ", zufrieden mit heute?", "Abend" + n + ". Noch kurz dehnen?", "Hey" + n + ". Plan schon morgen?", "Guten Abend" + n + ". Haken gesetzt?", "Abend" + n + ". Gönn Dir Ruhe."],
+        spaet: ["Noch wach" + n + "?", "Späte Runde" + n + ".", "Gute Nacht bald" + n + ".", "Spät geworden" + n + ".", "Hallo" + n + ". Gleich ab ins Bett?",
+          "Na" + n + ", noch kurz reinschauen?", "Spät" + n + ". Morgen ist auch noch ein Tag.", "Hey" + n + ". Handy weg, Licht aus.", "Guten späten Abend" + n + ".", "Fast Schlafenszeit" + n + "."],
+        nacht: ["Noch wach" + n + "?", "Mitten in der Nacht" + n + "?", "Nachtschicht" + n + "?", "Hallo" + n + ". Die Nacht ist zum Schlafen da.", "Schlaf gut gleich" + n + ".",
+          "Na" + n + ", kannst nicht schlafen?", "Hey" + n + ". Morgen wartet.", "Nachts" + n + ". Kurz rein, dann Ruhe.", "Psst" + n + ". Alle schlafen.", "Gute Nacht" + n + "."]
       };
-      var MOVE = {
+      var MOVE0 = {
         morgen: ["Wie willst Du Dich heute bewegen?", "Ein paar Schritte vor dem Frühstück?"],
         vormittag: ["Schon bewegt heute?", "Kurz aufstehen, strecken, weiter."],
         mittag: ["Ein Spaziergang nach dem Essen zählt auch.", "Schon bewegt heute?"],
@@ -6693,10 +6711,15 @@
         abend: ["Hast Du Dich heute bewegt?", "Ein kurzer Abendspaziergang?"],
         nacht: ["Morgen geht's weiter.", "Schlaf ist auch Training."]
       };
+      var MOVE = {
+        sehrfrueh: MOVE0.morgen, morgen: MOVE0.morgen, vormittag: MOVE0.vormittag, mittag: MOVE0.mittag,
+        fruehnachmittag: MOVE0.nachmittag, nachmittag: MOVE0.nachmittag, fruehabend: MOVE0.abend, abend: MOVE0.abend,
+        spaet: MOVE0.nacht, nacht: MOVE0.nacht
+      };
       var DONE = ["Heute schon trainiert. Stark.", "Training erledigt. Gönn Dir die Pause.", "Bewegt hast Du Dich heute schon. Gut so."];
       function pick(arr) { return arr[(now.getDate() + h) % arr.length]; }
       var sub;
-      if (hint && hint.next && slot !== "nacht") {
+      if (hint && hint.next && slot !== "nacht" && slot !== "spaet") {
         var t = hint.next.time;
         sub = pick([
           (t ? "Um " + t + " wartet " : "Heute wartet ") + hint.next.title + " auf Dich.",
@@ -6707,7 +6730,7 @@
       else sub = pick(MOVE[slot]);
       var box = document.createElement("div");
       box.className = "go-boot__hello";
-      var a = document.createElement("p"); a.className = "go-boot__hi"; a.textContent = pick(HELLO[slot]);
+      var hl = HELLO[slot]; var a = document.createElement("p"); a.className = "go-boot__hi"; a.textContent = hl[Math.floor(Math.random() * hl.length)];
       var b = document.createElement("p"); b.className = "go-boot__sub"; b.textContent = sub;
       box.appendChild(a); box.appendChild(b);
       el.insertBefore(box, el.firstChild);
@@ -8497,7 +8520,7 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-22"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-23"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-3"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-16"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>

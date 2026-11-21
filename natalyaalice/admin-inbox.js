@@ -70,7 +70,7 @@
     ".ga-burger span{display:block;width:30px;height:2.5px;background:currentColor;border-radius:2px;box-shadow:0 -11px 0 currentColor,0 11px 0 currentColor}" +
     ".ga-menu{position:absolute;left:0;right:0;top:100%;z-index:3;background:#F3EEE4;padding:0 20px 10px;box-shadow:0 14px 24px rgba(42,33,24,.12)}" +
     ".ga-menu[hidden]{display:none}" +
-    ".ga-menu button{display:block;width:100%;padding:14px 2px;border:0;border-bottom:1px solid rgba(42,33,24,.2);border-radius:0;background:transparent;color:#2A2118;font:500 16px/1.35 Inter,system-ui,sans-serif;text-align:left;cursor:pointer}" +
+    ".ga-menu button{display:block;width:100%;padding:14px 2px;border:0;border-bottom:1px solid rgba(42,33,24,.2);border-radius:0;background:transparent;color:#2A2118;font:500 16px/1.35 Inter,system-ui,sans-serif;text-align:right;cursor:pointer}" +
     ".ga-menu button.is-on{font-weight:700}" +
     ".ga-new{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;background:#C7413B;color:#fff;font-size:11px;font-weight:700;vertical-align:2px}" +
     ".ga-req{display:inline-block;margin-top:3px;padding:2px 8px;border-radius:999px;border:1px solid #2A2118;font-size:12px;font-weight:600}" +
