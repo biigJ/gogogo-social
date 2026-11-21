@@ -82,6 +82,9 @@
   var ICON_SHARE =
     '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v11"/><path d="M8 7l4-4 4 4"/><path d="M5 14v4.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V14"/></svg>';
 
+  var ICON_PLANE =
+    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M21.5 3.2 2.8 10.4l7 3 3 7.4z"/><path d="M21.5 3.2 9.8 13.4"/></svg>';
+
   function $(id) {
     return document.getElementById(id);
   }
@@ -1309,15 +1312,19 @@
     var mine = item.kind !== "ffc" && String(ev.user_id) === me();
     var today = berlinToday() === dayKey(ev.starts_at);
     /* Woche ist Planung: kein Abhaken, kein Kommentieren (beides in Aktuell). Nur Einladen/Teilen. */
+    /* oben ics (Kalender), dann Postausgang (Freunde/Gruppe/Circle einladen), darunter Papierflieger (extern teilen) */
     return (
       '<div class="wr-actions">' +
+      '<button type="button" class="wr-act wr-act--ics" data-wr-ics="1" aria-label="Woche für den Kalender exportieren"><span class="wr-act__icon">ics</span></button>' +
       '<button type="button" class="wr-act" data-wr-share="' +
       esc(dayKey(ev.starts_at)) +
       '" data-wr-event="' +
       esc(id) +
-      '" aria-label="Teilen"><span class="wr-act__icon">' +
+      '" aria-label="Einladen"><span class="wr-act__icon">' +
       ICON_SHARE +
       '</span><span class="wr-act__n"></span></button>' +
+      '<button type="button" class="wr-act" data-wr-plane="' + esc(dayKey(ev.starts_at)) + '" data-wr-event="' + esc(id) + '" aria-label="Extern teilen"><span class="wr-act__icon">' +
+      ICON_PLANE + "</span></button>" +
       "</div>"
     );
   }
@@ -4198,32 +4205,39 @@
           );
         })
         .join("");
-      var evS = findOwnEvent(eventId);
+      var evS = findOwnEvent(eventId) || (state.events || []).filter(function (e) { return String(e.id) === String(eventId); })[0];
       var isZ = !!(evS && evS.category === "zirkel");
+      /* oben: beim Zirkel der Circle, sonst/danach die eigene Gruppe; dann die Freunde */
+      var checkBox = function (on) { return '<input type="checkbox"' + (on ? " checked" : "") + ' tabindex="-1" />'; };
+      var circleRows = isZ ? (state.shareCircles || []).map(function (g) {
+        var gid = String(g.group_id);
+        return '<div class="wr-friend-row wr-friend-row--group" role="button" data-wr-circle-pick="' + esc(gid) + '">' +
+          checkBox(!!state.shareCirclePick[gid]) + '<span class="wr-friend-row__ph">' + esc(String(g.name || "C").slice(0, 1)) + "</span><span>Circle " + esc(g.name || "") + "</span></div>";
+      }).join("") : "";
+      var groups = host && host.myGroups ? host.myGroups() || [] : [];
+      var groupRows = groups.map(function (g) {
+        var mem = (g.members || []).map(String).filter(function (m) { return friends.indexOf(m) >= 0; });
+        var on = mem.length > 0 && mem.every(function (m) { return state.shareInvited[m] || state.sharePick[m]; });
+        return '<div class="wr-friend-row wr-friend-row--group" role="button" data-wr-group-pick="' + esc(g.id) + '">' +
+          checkBox(on) + '<span class="wr-friend-row__ph">' + esc(String(g.name || "G").slice(0, 1)) + "</span><span>Gruppe " + esc(g.name || "") + "</span></div>";
+      }).join("");
       openSheet(
-        "<h3>Teilen</h3>" +
-          '<div class="wr-share-block">' +
-          "<h4>Freunde einladen</h4>" +
-          '<p class="wr-sheet-hint">Sie können dann Dein wiederkehrendes Event auch in ihrer Woche haben.</p>' +
-          (list
-            ? '<div class="wr-friend-list">' + list + "</div>"
-            : "<p>Noch keine Freunde.</p>") +
+        '<p class="wr-sheet-title wr-sheet-title--center">' + esc((evS && evS.title) || "Training") + "</p>" +
+          (list || circleRows || groupRows
+            ? '<div class="wr-friend-list">' + circleRows + groupRows + list + "</div>"
+            : '<p class="wr-sheet-hint">Noch keine Freunde.</p>') +
+          '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>' +
           '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-invite-friends="1"' +
-          (friends.length ? "" : " disabled") +
-          ">Einladen</button>" +
-          "</div>" +
-          (isZ ? '<div class="wr-share-block"><h4>Mit Circle teilen</h4>' +
-            '<button type="button" class="wr-pill-btn" data-wr-share-circle="1">Circle wählen</button></div>' : "") +
-          '<div class="wr-share-block">' +
-          "<h4>Extern teilen</h4>" +
-          '<button type="button" class="wr-pill-btn" data-wr-share-ext="1">Teilen…</button>' +
-          "</div>" +
-          '<div class="wr-share-block">' +
-          "<h4>Woche exportieren</h4>" +
-          '<button type="button" class="wr-pill-btn" data-wr-csv="1">Woche als CSV</button>' +
-          "</div>" +
-          '<button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Abbrechen</button>'
+          (friends.length || circleRows ? "" : " disabled") +
+          ">Einladen</button></div>"
       );
+    }
+    state.sharePaint = paint;
+    state.shareCirclePick = {};
+    state.shareCircles = [];
+    var evZ = findOwnEvent(eventId);
+    if (evZ && evZ.category === "zirkel" && ffcOk() && FFC.groups) {
+      Promise.resolve(FFC.groups()).then(function (gs) { state.shareCircles = gs || []; if (state.shareEventId === eventId) paint(); }).catch(function () {});
     }
     /* Schon eingeladene Freunde: Haken gesetzt, keine zweite Einladung */
     loadFriends().then(function () {
@@ -4261,7 +4275,7 @@
   }
 
   /* Zirkel mit dem Circle teilen: je Termin der Serie ein Circle-Event mit Einladung an alle im Circle (FFC) */
-  function shareToCircle(eventId) {
+  function shareToCircle(eventId, presetGid) {
     var ev = findOwnEvent(eventId);
     if (!ev) return;
     if (!ffcOk() || !FFC.groups || !FFC.createEvent) {
@@ -4274,7 +4288,7 @@
     }
     Promise.resolve(FFC.groups()).then(function (groups) {
       if (!(groups || []).length) { GoDialog.alert("Du bist noch in keinem Circle."); return; }
-      return GoDialog.choose("Mit Circle teilen", groups.map(function (g) { return { label: g.name, value: String(g.group_id) }; }))
+      return (presetGid ? Promise.resolve(String(presetGid)) : GoDialog.choose("Mit Circle teilen", groups.map(function (g) { return { label: g.name, value: String(g.group_id) }; })))
         .then(function (gid) {
           if (!gid) return;
           var g = groups.filter(function (x) { return String(x.group_id) === gid; })[0] || { name: "Circle" };
@@ -4331,6 +4345,55 @@
     var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     try {
       var file = new File([blob], name, { type: "text/csv" });
+      if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+        navigator.share({ files: [file], title: name }).catch(function () {});
+        return;
+      }
+    } catch (eF) {}
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1500);
+  }
+
+  /* Woche als .ics: Kalender-Apps (iPhone, Google, Outlook) importieren das, CSV nicht */
+  function exportWeekIcs() {
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+    function utc(d) {
+      return d.getUTCFullYear() + pad(d.getUTCMonth() + 1) + pad(d.getUTCDate()) + "T" + pad(d.getUTCHours()) + pad(d.getUTCMinutes()) + "00Z";
+    }
+    function txt(v) { return String(v || "").replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/([,;])/g, "\\$1"); }
+    var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//gogogo.social//Woche//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+    var stamp = utc(new Date());
+    weekDays().forEach(function (iso) {
+      itemsForDay(iso).forEach(function (it) {
+        var ev = it.ev || it.item || {};
+        if (!ev.starts_at || ev.status === "ausgefallen") return;
+        var uid = String(ev.id || (iso + "-" + (ev.title || "x"))).replace(/[^A-Za-z0-9-]/g, "") + "@gogogo.social";
+        lines.push("BEGIN:VEVENT", "UID:" + uid, "DTSTAMP:" + stamp);
+        if (displayTime(ev.starts_at)) {
+          var st = new Date(ev.starts_at);
+          var z = ev.category === "zirkel" && global.GoZirkelSetup ? GoZirkelSetup.parse(ev.note) : null;
+          var mins = z && GoZirkelSetup.totalSec ? Math.ceil(GoZirkelSetup.totalSec(z) / 60) || 60 : 60;
+          lines.push("DTSTART:" + utc(st), "DTEND:" + utc(new Date(st.getTime() + mins * 60000)));
+        } else {
+          var nx = addDays(iso, 1);
+          lines.push("DTSTART;VALUE=DATE:" + iso.replace(/-/g, ""), "DTEND;VALUE=DATE:" + nx.replace(/-/g, ""));
+        }
+        lines.push("SUMMARY:" + txt(ev.title || "Training"));
+        if (ev.location) lines.push("LOCATION:" + txt(ev.location));
+        lines.push("URL:https://www.gogogo.social/workout/", "END:VEVENT");
+      });
+    });
+    lines.push("END:VCALENDAR");
+    var ics = lines.join("\r\n");
+    var name = "gogogo-woche.ics";
+    var blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    try {
+      var file = new File([blob], name, { type: "text/calendar" });
       if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
         navigator.share({ files: [file], title: name }).catch(function () {});
         return;
@@ -5020,7 +5083,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-inv-yes],[data-wr-inv-no],[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-pick-plan],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-share-circle],[data-wr-csv],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-inv-yes],[data-wr-inv-no],[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-pick-plan],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-group-pick],[data-wr-circle-pick],[data-wr-plane],[data-wr-ics],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-share-circle],[data-wr-csv],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -5435,8 +5498,38 @@
       state.sharePick[fidPick] = boxPick ? !!boxPick.checked : !state.sharePick[fidPick];
       return;
     }
+    if (t.hasAttribute("data-wr-group-pick")) {
+      var gp = ((host && host.myGroups ? host.myGroups() : []) || []).filter(function (g) { return String(g.id) === t.getAttribute("data-wr-group-pick"); })[0];
+      if (gp) {
+        var mem = (gp.members || []).map(String).filter(function (m) { return (state.friends || []).indexOf(m) >= 0 && !state.shareInvited[m]; });
+        var allOn = mem.length > 0 && mem.every(function (m) { return state.sharePick[m]; });
+        mem.forEach(function (m) { state.sharePick[m] = !allOn; });
+        if (state.sharePaint) state.sharePaint();
+      }
+      return;
+    }
+    if (t.hasAttribute("data-wr-circle-pick")) {
+      var cg = t.getAttribute("data-wr-circle-pick");
+      state.shareCirclePick[cg] = !state.shareCirclePick[cg];
+      if (state.sharePaint) state.sharePaint();
+      return;
+    }
     if (t.getAttribute("data-wr-invite-friends")) {
-      inviteFriendsSelected();
+      var circlesPicked = Object.keys(state.shareCirclePick || {}).filter(function (k) { return state.shareCirclePick[k]; });
+      circlesPicked.forEach(function (gid) { shareToCircle(state.shareEventId, gid); });
+      if (Object.keys(state.sharePick || {}).some(function (k) { return state.sharePick[k]; })) inviteFriendsSelected();
+      else if (circlesPicked.length) closeSheet();
+      return;
+    }
+    if (t.hasAttribute("data-wr-plane")) {
+      var pIso = t.getAttribute("data-wr-plane"), pEv = t.getAttribute("data-wr-event");
+      var askP = global.GoDialog ? GoDialog.confirm("Extern Event teilen", { ok: "Teilen", cancel: "Abbrechen" }) : Promise.resolve(true);
+      askP.then(function (yes) { if (yes) shareExternal(pIso, pEv); });
+      return;
+    }
+    if (t.hasAttribute("data-wr-ics")) {
+      var askI = global.GoDialog ? GoDialog.confirm("Deine gogogo-woche.ics für den Kalender exportieren", { ok: "Export", cancel: "Abbrechen" }) : Promise.resolve(true);
+      askI.then(function (yes) { if (yes) exportWeekIcs(); });
       return;
     }
     if (t.getAttribute("data-wr-share-ext")) {
