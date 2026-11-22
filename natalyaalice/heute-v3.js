@@ -644,8 +644,9 @@
     var toIso = to.toISOString();
     var fullSel = "id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note,assigned_by,course_session_id";
     var range = "&starts_at=gte." + encodeURIComponent(fromIso) + "&starts_at=lte." + encodeURIComponent(toIso) + "&order=starts_at.desc&limit=500";
-    /* bubble_id erst nach go-bubbles.sql vorhanden */
-    return rest("events?select=" + fullSel + ",bubble_id" + range)
+    /* bubble_id erst nach go-bubbles.sql vorhanden; group_id für Gruppen-Events (Gruppenname statt Vorname) */
+    return rest("events?select=" + fullSel + ",bubble_id,group_id" + range)
+      .catch(function () { return rest("events?select=" + fullSel + ",bubble_id" + range); })
       .catch(function () {
         return rest("events?select=" + fullSel + range);
       })
@@ -1928,13 +1929,21 @@
     );
   }
 
+  /* Gruppen-Event einer Gruppe, in der ich bin: Gruppenname (und Gruppenbild) statt Vorname */
+  function groupAuthor(ev) {
+    if (!ev || !ev.group_id || !host || !host.myGroups) return null;
+    var g = (host.myGroups() || []).filter(function (x) { return x && String(x.id) === String(ev.group_id); })[0];
+    if (!g || !g.name) return null;
+    return { id: "group-" + g.id, name: g.name, photo_url: g.photo_url || "", isGroup: true };
+  }
+
   function authorHtml(person, show) {
     if (!show || !person) return "";
     return (
       '<div class="acc-card__author">' +
       avatarHtml(person, "acc-face") +
       "<span>" +
-      esc(String(person.name || "?").split(" ")[0]) +
+      esc(person.isGroup ? String(person.name) : String(person.name || "?").split(" ")[0]) +
       "</span></div>"
     );
   }
@@ -2108,7 +2117,7 @@
       enrollmentId: ev.enrollment_id || "",
       emoji: emoji,
       actions: (tools || "") + (actions || ""),
-      author: authorHtml(p, true),
+      author: authorHtml(groupAuthor(ev) || p, true),
       when: zirkelPillsHtml(ev) ? "Heute · " + timeLabel(ev.starts_at) : whenLine(ev.starts_at),
       whenTs: zirkelPillsHtml(ev) ? "" : ev.starts_at,
       zpills: zirkelPillsHtml(ev),

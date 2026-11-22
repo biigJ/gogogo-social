@@ -5100,13 +5100,14 @@
     body.is-session[data-shell="team"] #team-rail-nav,
     body.is-session[data-shell="plan"][data-plan="team"] #team-rail-nav { display: block !important; }
     #team-rail-nav[hidden] { display: none !important; }
-    #team-rail-nav .rail-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; width: 100%; max-width: 100%; padding: 2px 8px 0; box-sizing: border-box; }
+    #team-rail-nav .rail-tabs { display: flex; flex-wrap: nowrap; justify-content: safe center; gap: 4px; width: 100%; max-width: 100%; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding: 2px 4px 0; box-sizing: border-box; }
     body.is-session #team-rail-nav .rail-tab {
-      flex: 0 1 auto; min-width: 0; min-height: 36px; padding: 0 10px; border-radius: 999px;
+      flex: 0 0 auto; min-height: 34px; padding: 0 8px; border-radius: 999px;
       border: 1.5px solid #2A2118; background: transparent; color: #2A2118; cursor: pointer;
-      font-family: Inter, system-ui, sans-serif !important; font-size: var(--t-s) !important; font-weight: 600 !important;
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      font-family: Inter, system-ui, sans-serif !important; font-size: clamp(11px, 3.1vw, 13px) !important; font-weight: 600 !important;
+      white-space: nowrap;
     }
+    #team-rail-nav .rail-tabs::-webkit-scrollbar { display: none; }
     body.is-session #team-rail-nav .rail-tab.is-on { background: #2A2118; color: #F6F1E8; }
     /* Team/Plus/Woche: rail-nav ist Sibling der Pane — gleiche Höhe */
     body.is-session[data-shell="team"] #team-rail-nav,
@@ -8557,7 +8558,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-106"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-107"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-78"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -18428,8 +18429,13 @@
           }).join("");
         }
         Array.prototype.forEach.call(box.children, function (b, i) {
+          var was = b.classList.contains("is-on");
           b.classList.toggle("is-on", i === cur);
           b.setAttribute("aria-selected", i === cur ? "true" : "false");
+          /* schmale Screens: Reihe scrollt, aktiver Reiter bleibt sichtbar (nur die Reiterzeile, nicht die Seite) */
+          if (i === cur && !was && box.scrollWidth > box.clientWidth) {
+            box.scrollLeft = Math.max(0, b.offsetLeft - (box.clientWidth - b.offsetWidth) / 2);
+          }
         });
       }
 
