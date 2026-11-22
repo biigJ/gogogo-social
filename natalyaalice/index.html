@@ -20039,7 +20039,9 @@
               gogogoToast("Ihr seid jetzt verbunden: " + label);
               if (p.nickname && ffcMine() && FFC.friendRequest) FFC.friendRequest(p.nickname).then(onFfcFriendsChanged).catch(function () {});
             }
-            return loadFriendRequests().then(function () { return loadTeam(); });
+            return loadFriendRequests().then(function () { return loadTeam(); }).then(function () {
+              if (accept) setTimeout(maybeAskHistoryShare, 1200);
+            });
           })
           .catch(function (err) {
             gogogoToast(/friend_limit/.test(String((err && err.message) || "")) ? "Maximal 12 Freunde. Coachees zählen nicht mit." : "Ging gerade nicht.");
@@ -23256,6 +23258,13 @@
           });
       }
 
+      function hasSharePeople() {
+        var me = String(sessionAccount.id);
+        var friend = (teamPeople || []).some(function (p) { return p && p.id && !p.isSelf && String(p.id) !== me; });
+        var group = false;
+        try { group = groupMemberIds().some(function (id) { return String(id) !== me; }); } catch (eG) {}
+        return friend || group;
+      }
       function maybeAskHistoryShare() {
         if (!sessionMode || !sessionAccount) return;
         if (document.body.dataset.shell !== "heute") return;
@@ -23265,6 +23274,8 @@
           return;
         }
         if (historyShareAsked()) return;
+        /* erst fragen, wenn es jemanden gibt, mit dem man teilt: erster Freund oder erste Gruppe */
+        if (!hasSharePeople()) return;
         var modal = document.getElementById("history-share-ask");
         if (!modal || !modal.hidden) return;
         modal.hidden = false;
@@ -24563,6 +24574,8 @@
       }
 
       function paintHeuteCrew() {
+        /* Kreise gemalt: jetzt ist bekannt, ob es Freunde gibt (Frage „Historie teilen?“) */
+        setTimeout(maybeAskHistoryShare, 800);
         var box = document.getElementById("heute-stories-team");
         if (!box) return;
         if (!sessionMode || !sessionAccount) return;
