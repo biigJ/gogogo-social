@@ -1529,6 +1529,11 @@
     }
     .heute-refresh.is-busy svg { animation: heute-spin .8s linear infinite; }
     @keyframes heute-spin { to { transform: rotate(360deg); } }
+    /* Dropdown oben in Aktuell: fett, 1,3 × M (gegen die globale Typo-Regel mit !important) */
+    body.is-session[data-shell="heute"] .heute-filter-pick select#heute-filter-select {
+      font-size: calc(var(--t-m) * 1.3) !important;
+      font-weight: 700 !important;
+    }
     body.is-session[data-shell="heute"] .heute-filter-pick select {
       max-width: calc(100vw - 190px); /* Platz für Info links, Herz + Refresh rechts */
       font-size: calc(22px * 1.3);
@@ -5090,6 +5095,19 @@
       padding: 0;
       box-sizing: border-box;
     }
+    /* Community: Reiter im gogogo-Stil statt Pfeile und Überschrift; brechen um, nie breiter als der Screen */
+    #team-rail-nav .rail-nav__btn, #team-rail-nav .rail-nav__title { display: none !important; }
+    body.is-session[data-shell="team"] #team-rail-nav,
+    body.is-session[data-shell="plan"][data-plan="team"] #team-rail-nav { display: block !important; }
+    #team-rail-nav[hidden] { display: none !important; }
+    #team-rail-nav .rail-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; width: 100%; max-width: 100%; padding: 2px 8px 0; box-sizing: border-box; }
+    body.is-session #team-rail-nav .rail-tab {
+      flex: 0 1 auto; min-width: 0; min-height: 36px; padding: 0 10px; border-radius: 999px;
+      border: 1.5px solid #2A2118; background: transparent; color: #2A2118; cursor: pointer;
+      font-family: Inter, system-ui, sans-serif !important; font-size: var(--t-s) !important; font-weight: 600 !important;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    body.is-session #team-rail-nav .rail-tab.is-on { background: #2A2118; color: #F6F1E8; }
     /* Team/Plus/Woche: rail-nav ist Sibling der Pane — gleiche Höhe */
     body.is-session[data-shell="team"] #team-rail-nav,
     body.is-session[data-shell="plan"][data-plan="team"] #team-rail-nav,
@@ -7910,12 +7928,12 @@
         </span>
         <small>Woche</small>
       </button>
-      <button type="button" data-shell="team" aria-label="Team">
+      <button type="button" data-shell="team" aria-label="Community">
         <span class="pill-ico">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="8" r="2.2"/><path d="M1 18.5c.35-2.4 1.9-3.8 3.5-3.8S7.7 16.1 8 18.5"/><circle cx="19.5" cy="8" r="2.2"/><path d="M16 18.5c.35-2.4 1.9-3.8 3.5-3.8s3.15 1.4 3.5 3.8"/><circle cx="12" cy="7" r="2.5"/><path d="M7.6 18.8c.45-3 2.5-4.8 4.4-4.8s3.95 1.8 4.4 4.8"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
-        <small>Team</small>
+        <small>Community</small>
       </button>
       <button type="button" data-shell="kurse" aria-label="Plus">
         <span class="pill-ico">
@@ -18382,8 +18400,42 @@
         return best;
       }
 
+      /* Community: Reiter statt Pfeile + Überschrift. Tippen springt zum Bereich. */
+      function paintRailTabs(rail, nav) {
+        var list = railSlides(rail);
+        var box = nav.querySelector(".rail-tabs");
+        if (!box) {
+          box = document.createElement("div");
+          box.className = "rail-tabs";
+          box.setAttribute("role", "tablist");
+          nav.appendChild(box);
+          box.addEventListener("click", function (e) {
+            var b = e.target.closest("[data-rail-tab]");
+            if (!b) return;
+            var slide = railSlides(rail)[+b.getAttribute("data-rail-tab")];
+            if (!slide) return;
+            rail.scrollTo({ left: railSlideLeft(rail, slide), behavior: "smooth" });
+            window.setTimeout(function () { syncRailNav(rail, nav); }, 300);
+          });
+        }
+        var cur = railCurrentIndex(rail);
+        var labels = list.map(function (el) { return String(el.dataset.title || "").trim().replace(/^Meine?\s+/, ""); });
+        var key = labels.join("|");
+        if (box.dataset.key !== key) {
+          box.dataset.key = key;
+          box.innerHTML = labels.map(function (l, i) {
+            return '<button type="button" class="rail-tab" role="tab" data-rail-tab="' + i + '">' + escapeHtml(l) + "</button>";
+          }).join("");
+        }
+        Array.prototype.forEach.call(box.children, function (b, i) {
+          b.classList.toggle("is-on", i === cur);
+          b.setAttribute("aria-selected", i === cur ? "true" : "false");
+        });
+      }
+
       function syncRailNav(rail, nav) {
         if (!rail || !nav) return;
+        if (nav.id === "team-rail-nav") paintRailTabs(rail, nav);
         var titleEl = nav.querySelector(".rail-nav__title");
         var prev = nav.querySelector(".rail-nav__prev");
         var next = nav.querySelector(".rail-nav__next");
@@ -18946,7 +18998,7 @@
       var INTRO_TEXT = {
         heute: { title: "Aktuell", text: "Hier siehst Du Deine Events von heute, darüber im Stapel die nächsten Tage und darunter, was Du schon erledigt hast. Tipp auf ein Event, um es abzuhaken, ein Foto zu posten oder eine Alternative einzutragen. Oben stellst Du ein, ob Du nur Dich, Dein Team oder alles siehst." },
         woche: { title: "Woche", text: "Hier liegt Dein Wochenplan Tag für Tag, zur Seite wischen blättert durch die Tage. Über den Stift oben rechts wählst oder änderst Du den Plan, verschiebst Tage, setzt Uhrzeiten und legst Zirkeltrainings an. Mit privat oder zeigen entscheidest Du, ob Deine Freunde ein Event sehen." },
-        team: { title: "Team", text: "Hier findest Du Deine Freunde, Deinen Circle und Deinen Coach. Mit dem Haken wählst Du bis zu 5 Freunde, mit denen Du Deine täglichen Events teilst. Neue Freunde findest Du über Nickname, ID, Ort oder QR-Code." }
+        team: { title: "Community", text: "Hier findest Du Deine Freunde, Deinen Circle und Deinen Coach. Mit dem Haken wählst Du bis zu 5 Freunde, mit denen Du Deine täglichen Events teilst. Neue Freunde findest Du über Nickname, ID, Ort oder QR-Code." }
       };
       var introTimer = null;
       function maybeShowIntro() {
