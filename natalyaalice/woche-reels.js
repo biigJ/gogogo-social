@@ -83,7 +83,7 @@
     '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="11.2" r="3"/><path d="M6.4 21c.55-3.6 3-5.7 5.6-5.7s5.05 2.1 5.6 5.7"/><path d="M12 1.8v4.4M9.8 4h4.4"/></svg>';
 
   var ICON_PLANE =
-    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M20.2 3.6 3.9 9.9c-.9.35-.9 1.6 0 1.95l6.1 2.3 2.3 6.1c.35.9 1.6.9 1.95 0l6.3-16.3c.3-.8-.45-1.6-1.25-1.3z"/><path d="M20.1 3.9 10.2 13.8"/></svg>';
+    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M20 3.7 4 9.9c-.8.3-.8 1.4 0 1.7l5.8 2.4 2.5 5.9c.3.8 1.4.8 1.7 0l6.2-16c.3-.8-.4-1.5-1.2-1.2z"/><path d="M20.4 3.6 9.8 14"/></svg>';
 
   function $(id) {
     return document.getElementById(id);
