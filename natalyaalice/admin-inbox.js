@@ -365,7 +365,22 @@
     return '<button type="button" class="ga-pill" data-ga-user="' + esc(id) + '">' + (ci.paused_at ? "Pausiert" : "Nutzer") + "</button>";
   }
   /* Nutzer-Filter: je Merkmal ein Dropdown (alle, Werte, ohne) */
-  var UF = [["goal", "Ziel"], ["coach", "Coach"], ["place", "Ort"], ["plan", "Wochenplan"], ["circle", "Circle"], ["group", "Gruppe"], ["day", "Workout"]];
+  var UF = [["role", "Rolle"], ["member", "Aktiv"], ["goal", "Ziel"], ["coach", "Coach"], ["place", "Ort"], ["plan", "Wochenplan"], ["circle", "Circle"], ["group", "Gruppe"], ["day", "Workout"]];
+  /* feste Werte statt aus den Daten gesammelt; „Aktiv“: gogogo = Stempelkarte aktiv, Circle = aktive Circle-Karte */
+  var UF_FIXED = {
+    role: ["Nutzer", "Coach", "Zertifiziert"],
+    member: ["gogogo, ohne Circle", "kein gogogo, nur Circle", "beides aktiv", "keins aktiv"]
+  };
+  function roleOf(a) {
+    var ci = coachInfo(String(a.account_id));
+    if (ci.coach_verified_at) return "Zertifiziert";
+    return isCoachAcc(a) ? "Coach" : "Nutzer";
+  }
+  function memberOf(x) {
+    var go = !!(x && x.stamp);
+    var circ = ((x && x.links) || []).some(function (l) { return l.kind === "circle" && l.status !== "pending"; });
+    return go && circ ? "beides aktiv" : go ? "gogogo, ohne Circle" : circ ? "kein gogogo, nur Circle" : "keins aktiv";
+  }
   var NONE = "\u2205";
   function berlinDay(at) {
     try { return new Date(at).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }); } catch (e) { return String(at || "").slice(0, 10); }
@@ -384,6 +399,8 @@
     hxdOf(id).forEach(function (r) { days[r.day] = 1; });
     (x.doubles || []).forEach(function (d) { if (d.at) days[berlinDay(d.at)] = 1; });
     return {
+      role: [roleOf(a)],
+      member: [memberOf(x)],
       goal: goalText(id) ? goalText(id).split(" · ") : [],
       coach: ci.trainer_id ? [hit ? String(hit.name || "Coach").split(" ")[0] : "Coach"] : [],
       place: placeList(ci.workout_places),
@@ -394,6 +411,7 @@
     };
   }
   function ufValues(key) {
+    if (UF_FIXED[key]) return [""].concat(UF_FIXED[key]);
     var seen = {};
     (st.accounts || []).forEach(function (a) { facets(a)[key].forEach(function (v) { seen[v] = 1; }); });
     var vals = Object.keys(seen);
