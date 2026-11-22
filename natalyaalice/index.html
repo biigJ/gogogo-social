@@ -8530,7 +8530,7 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-29"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-30"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-3"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-16"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
@@ -20275,6 +20275,8 @@
       function syncMyCircles() {
         if (cst().synced || !sessionAccount) return;
         cst().synced = true;
+        /* FFC-Login steht: für Admin → Nutzer merken (go-login-stand.sql) */
+        rest("rpc/go_mark_seen", { method: "POST", body: { p_ffc: true } }).catch(function () {});
         var list = (cst().groups || []).map(function (g) { return { id: String(g.group_id), name: g.name || "", owner: !!g.is_owner }; });
         rest("rpc/go_sync_my_circles", { method: "POST", body: { p_groups: list } })
           .then(function (rows) {
@@ -25122,6 +25124,8 @@
             try { obForce = new URLSearchParams(location.search).get("onboarding") === "1"; } catch (eOb) {}
             setTimeout(function () { if (obForce) GoOnboarding.start(obHost); else GoOnboarding.maybeStart(obHost); }, 1500);
           }
+          /* Admin → Nutzer: selbst eingeloggt (go-login-stand.sql), einmal je Start */
+          if (sessionAccount) rest("rpc/go_mark_seen", { method: "POST", body: { p_ffc: false } }).catch(function () {});
           /* FFC-Punkte spiegeln (Gesamt- und Double-Leaderboard), sobald der FFC-Login steht */
           setTimeout(function () {
             if (window.GoFfcPoints && sessionAccount) GoFfcPoints.sync({ rest: rest, accountId: String(sessionAccount.id) });
