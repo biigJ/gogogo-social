@@ -272,6 +272,17 @@
         if (codeIn.value.length === 4 && nameIn.value.trim()) $("login-form").requestSubmit();
       });
       updLogin();
+      /* Login-Karte aus dem Admin (QR-Code): ?n=Vorname&c=Code füllt beides aus und meldet an */
+      (function fromCard() {
+        var q = new URLSearchParams(location.search);
+        var n = q.get("n"), c = String(q.get("c") || "").replace(/\D/g, "").slice(0, 4);
+        if (!n || c.length !== 4) return;
+        try { q.delete("n"); q.delete("c"); history.replaceState(null, "", location.pathname + (q.toString() ? "?" + q.toString() : "")); } catch (e) {}
+        nameIn.value = n;
+        codeIn.value = c;
+        updLogin();
+        setTimeout(function () { $("login-form").requestSubmit(); }, 50);
+      })();
 
       $("login-form").addEventListener("submit", async function (e) {
         e.preventDefault();
