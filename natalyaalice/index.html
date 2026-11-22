@@ -18221,8 +18221,15 @@
         ptCta.type = "button";
         ptCta.className = "team-slide__cta is-solid is-pt";
         /* ohne Coach: direkt auswählen */
-        ptCta.textContent = trainer ? "Personal Training" : "Coach auswählen";
+        var pendingCoach = !trainer && coachReqs.outgoing;
+        ptCta.textContent = trainer ? "Personal Training" : pendingCoach
+          ? "Anfrage an " + String((pendingCoach.person && pendingCoach.person.name) || "Coach").split(" ")[0] + " offen"
+          : "Coach auswählen";
         ptCta.addEventListener("click", function () {
+          if (!trainer && coachReqs.outgoing) {
+            withdrawCoachRequest(coachReqs.outgoing);
+            return;
+          }
           if (!trainer) {
             openTeamSearch("trainer");
             return;
@@ -19836,17 +19843,98 @@
         });
       }
 
+      /* Coach wählen = Anfrage stellen; Coach wird es erst, wenn er annimmt (go-coachee-requests.sql) */
       function pickTrainer(coach) {
-        return rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
-          method: "PATCH",
-          prefer: "return=minimal",
-          body: { trainer_id: coach.id }
-        }).then(function () {
-          sessionAccount.trainer_id = coach.id;
-          if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
-          loadTeam();
-        }).catch(function () { gogogoToast("Speichern fehlgeschlagen."); });
+        if (!coach || !coach.id) return Promise.resolve();
+        var label = String(coach.name || "Coach").split(" ")[0];
+        return rest("rpc/go_request_coachee", { method: "POST", body: { p_coach: coach.id } })
+          .then(function (res) {
+            gogogoToast(res === "already" ? label + " ist schon Dein Coach." : "Anfrage an " + label + " gesendet. Sobald " + label + " annimmt, ist " + label + " Dein Coach.");
+            return loadCoachRequests();
+          })
+          .then(function () { loadTeam(); })
+          .catch(function (err) {
+            GoDialog.alert(/go_request_coachee|schema cache|PGRST20/i.test(String((err && err.message) || ""))
+              ? "Coach-Anfragen brauchen go-coachee-requests.sql in Supabase."
+              : "Anfrage ging gerade nicht.");
+          });
       }
+
+      /* Coach-Anfragen: an mich als Coach (incoming) und meine offene (outgoing) */
+      var coachReqs = { incoming: [], outgoing: null };
+      function loadCoachRequests() {
+        if (!sessionMode || !sessionAccount) return Promise.resolve();
+        var meId = encodeURIComponent(sessionAccount.id);
+        var sel = "&status=eq.pending&select=id,user_id,coach_id,created_at&order=created_at.desc";
+        return Promise.all([
+          rest("go_coachee_requests?coach_id=eq." + meId + sel),
+          rest("go_coachee_requests?user_id=eq." + meId + sel + "&limit=1")
+        ]).then(function (r) {
+          var ids = [];
+          (r[0] || []).forEach(function (x) { ids.push(x.user_id); });
+          (r[1] || []).forEach(function (x) { ids.push(x.coach_id); });
+          var people = ids.length
+            ? rest("go_accounts?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=id,name,nickname,photo_url").catch(function () { return []; })
+            : Promise.resolve([]);
+          return people.then(function (acc) {
+            var by = {};
+            (acc || []).forEach(function (a) { by[String(a.id)] = a; });
+            coachReqs = {
+              incoming: (r[0] || []).map(function (x) { return { id: x.id, created_at: x.created_at, person: by[String(x.user_id)] || { id: x.user_id } }; }),
+              outgoing: (r[1] || [])[0] ? { id: r[1][0].id, person: by[String(r[1][0].coach_id)] || { id: r[1][0].coach_id } } : null
+            };
+          });
+        }).catch(function () { coachReqs = { incoming: [], outgoing: null }; });
+      }
+      function askCoachRequest(req) {
+        var p = req.person || {};
+        var name = String(p.name || p.nickname || "Jemand").split(" ")[0];
+        return GoDialog.choose(name + " möchte Dich als Coach.", [
+          { label: "Annehmen", value: "yes" },
+          { label: "Ablehnen", value: "no" }
+        ], { cancel: "Später", photo: p.photo_url || "" }).then(function (v) {
+          if (v !== "yes" && v !== "no") return;
+          return rest("rpc/go_answer_coachee_request", { method: "POST", body: { p_id: req.id, p_accept: v === "yes" } })
+            .then(function () {
+              gogogoToast(v === "yes" ? name + " ist jetzt Dein Coachee." : "Anfrage abgelehnt.");
+              return loadCoachRequests().then(function () { return loadTeam(); });
+            })
+            .catch(function () { gogogoToast("Ging gerade nicht."); });
+        }).then(function () {
+          if (window.HeuteAccountability && HeuteAccountability.refreshHeart) HeuteAccountability.refreshHeart();
+        });
+      }
+      function withdrawCoachRequest(req) {
+        var label = String((req.person && req.person.name) || "Coach").split(" ")[0];
+        return GoDialog.choose("Anfrage an " + label + " läuft noch.", [
+          { label: "Anderen Coach wählen", value: "other" },
+          { label: "Anfrage zurückziehen", value: "withdraw" }
+        ], { cancel: "Warten" }).then(function (v) {
+          if (v === "other") { setTimeout(function () { openTeamSearch("trainer"); }, 0); return; }
+          if (v !== "withdraw") return;
+          return rest("go_coachee_requests?id=eq." + encodeURIComponent(req.id), {
+            method: "PATCH", prefer: "return=minimal", body: { status: "withdrawn", decided_at: new Date().toISOString() }
+          }).then(function () { return loadCoachRequests(); }).then(function () { loadTeam(); }).catch(function () {});
+        });
+      }
+      /* Beim Öffnen von Aktuell: offene Anfragen an mich als Coach (einmal je Sitzung), sonst am Herz */
+      var coachReqAsked = {};
+      var coachReqWait = 0;
+      function promptCoachRequests() {
+        if (!window.GoDialog) return;
+        if (document.querySelector(".god, .gob, #go-boot") || document.querySelector(".sand-modal:not([hidden])")) {
+          if (coachReqWait++ < 120) setTimeout(promptCoachRequests, 2500);
+          return;
+        }
+        coachReqWait = 0;
+        var next = (coachReqs.incoming || []).filter(function (r) { return !coachReqAsked[r.id]; })[0];
+        if (!next) return;
+        coachReqAsked[next.id] = true;
+        askCoachRequest(next).then(function () { setTimeout(promptCoachRequests, 400); });
+      }
+      document.addEventListener("go:aktuell-ready", function () {
+        loadCoachRequests().then(function () { setTimeout(promptCoachRequests, 2600); });
+      });
 
       /* Coach entfernen, ohne einen neuen zu wählen */
       function removeTrainer() {
@@ -19926,7 +20014,7 @@
         var id = String(sessionAccount.id);
         var personSelect = "id,name,nickname,photo_url,serial_number,is_trainer,about_me,diary_visibility,trainer_id";
         return migrateAboutGroupsOnce()
-          .then(function () { return Promise.all([loadMyGroups(), loadFriendRequests()]); })
+          .then(function () { return Promise.all([loadMyGroups(), loadFriendRequests(), loadCoachRequests()]); })
           .then(function () {
         return rest("go_accounts?id=eq." + encodeURIComponent(id) + "&select=id,name,trainer_id,photo_url,is_trainer")
           .catch(function () { return []; })
@@ -21113,16 +21201,8 @@
               return;
             }
             if (teamSearchMode === "trainer") {
-              rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
-                method: "PATCH",
-                prefer: "return=minimal",
-                body: { trainer_id: found.id }
-              }).then(function () {
-                sessionAccount.trainer_id = found.id;
-                if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
-                document.getElementById("team-modal").hidden = true;
-                loadTeam();
-              }).catch(function () { msg.textContent = "Speichern fehlgeschlagen."; });
+              document.getElementById("team-modal").hidden = true;
+              pickTrainer(found);
               return;
             }
             var exists = teamPeople.some(function (person) { return String(person.id) === String(found.id); });
@@ -25174,7 +25254,8 @@
             /* weitere Meldungen fürs Herz: Gruppenanfragen */
             heartNotices: function () {
               return Promise.all([loadGroupInvites(), loadGroupJoinRequests(), loadStampLinkRequests(), loadGroupNews(), loadCircleNews().catch(function () { return []; }),
-                loadFriendRequests().then(function () { return friendReqs.incoming || []; }).catch(function () { return []; })]).then(function (r) {
+                loadFriendRequests().then(function () { return friendReqs.incoming || []; }).catch(function () { return []; }),
+                loadCoachRequests().then(function () { return coachReqs.incoming || []; }).catch(function () { return []; })]).then(function (r) {
                 return (r[0] || []).map(function (gi) {
                   return { kind: "group", created_at: gi.created_at, open: function () { openGroupInvite(gi); } };
                 }).concat((r[1] || []).map(function (gr) {
@@ -25187,6 +25268,8 @@
                   return { kind: "circlenews", created_at: cn.created_at, open: function () { openCircleNews(cn); } };
                 })).concat((r[5] || []).map(function (fr) {
                   return { kind: "friend", created_at: fr.created_at, open: function () { askFriendRequest(fr); } };
+                })).concat((r[6] || []).map(function (cr) {
+                  return { kind: "coachee", created_at: cr.created_at, open: function () { askCoachRequest(cr); } };
                 }));
               });
             },
@@ -26433,11 +26516,8 @@
       });
       document.getElementById("trainer-save").addEventListener("click", function () {
         if (!trainerPick || !sessionAccount || !profilePerson || !profilePerson.isSelf) return;
-        sessionAccount.trainer_id = trainerPick;
-        saveProfileFields({ trainer_id: trainerPick });
-        paintTrainerBlock(sessionAccount, profileTrainerChoices);
-        paintCoachLine(sessionAccount, true);
-        loadTeam();
+        var tp = (profileTrainerChoices || []).filter(function (c) { return c && String(c.id) === String(trainerPick); })[0] || { id: trainerPick };
+        pickTrainer(tp);
         document.getElementById("trainer-modal").hidden = true;
       });
       document.getElementById("trainer-modal").addEventListener("click", function (event) {
