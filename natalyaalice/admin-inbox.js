@@ -49,6 +49,7 @@
     ".ga-pill.is-fill{background:#111;color:#fff}" +
     ".ga-pill.is-blue{background:#1D9BF0;border-color:#1D9BF0;color:#fff}" +
     ".ga-pill.is-admin{background:#C7413B;border-color:#C7413B;color:#fff}" +
+    ".ga-pill.is-owner{background:#E4469A;border-color:#E4469A;color:#fff}" +
     "@media (max-width:600px){.ga-item:has(.ga-wa){flex-wrap:wrap}.ga-item:has(.ga-wa) .ga-copy{flex:1 1 calc(100% - 54px)}.ga-item .ga-wa{margin-left:54px}}" +
     ".ga-nf{display:block;margin:0 0 12px}" +
     ".ga-nf span{display:block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:rgba(42,33,24,.6);margin-bottom:6px}" +
@@ -579,6 +580,7 @@
   function rolePill(a) {
     var id = String(a.account_id);
     var ci = coachInfo(id);
+    if (id === OWNER_ID) return '<button type="button" class="ga-pill is-owner" data-ga-admin="' + esc(id) + '">Inhaber</button>';
     if (ci.is_admin) return '<button type="button" class="ga-pill is-admin" data-ga-admin="' + esc(id) + '">Admin</button>';
     if (ci.coach_verified_at) return '<button type="button" class="ga-pill is-blue" data-ga-role="' + esc(id) + '">Coach</button>';
     if (isCoachAcc(a)) return '<button type="button" class="ga-pill is-fill" data-ga-role="' + esc(id) + '">Coach</button>';
@@ -589,13 +591,14 @@
   var UF = [["role", "Rolle"], ["login", "Login"], ["member", "Stempelkarte"], ["goal", "Ziel"], ["coach", "Coach"], ["place", "Ort"], ["plan", "Wochenplan"], ["circle", "Circle"], ["group", "Gruppe"], ["day", "Workout"]];
   /* feste Werte statt aus den Daten gesammelt; „Aktiv“: gogogo = Stempelkarte aktiv, Circle = aktive Circle-Karte */
   var UF_FIXED = {
-    role: ["Admin", "Zertifiziert", "Coach", "Nutzer"],
+    role: ["Inhaber", "Admin", "Zertifiziert", "Coach", "Nutzer"],
     /* gogogo = selbst mit Vorname und Login-Code angemeldet, Circle = in der App mit FFC (E-Mail und Passwort) eingeloggt (go-login-stand.sql) */
     login: ["gogogo, ohne Circle", "kein gogogo, nur Circle", "beides", "keins"],
     member: ["gogogo, ohne Circle", "kein gogogo, nur Circle", "beides aktiv", "keins aktiv"]
   };
   function roleOf(a) {
     var ci = coachInfo(String(a.account_id));
+    if (String(a.account_id) === OWNER_ID) return "Inhaber";
     if (ci.is_admin) return "Admin";
     if (ci.coach_verified_at) return "Zertifiziert";
     return isCoachAcc(a) ? "Coach" : "Nutzer";
@@ -905,7 +908,7 @@
           if (host.toast) host.toast(on ? name + " ist jetzt Admin" : name + " ist kein Admin mehr");
         }).catch(function (e) {
           var m = String((e && e.message) || "");
-          GoDialog.alert(/owner/.test(m) && !/only_owner/.test(m) ? "Inhaber: Die Admin-Rechte bleiben immer." : /only_owner/.test(m) ? "Admin-Rechte entziehen kann nur Joscha." : /last_admin/.test(m) ? "Es muss mindestens ein Admin bleiben." : /self/.test(m) ? "Dir selbst kannst Du die Rechte nicht entziehen." : "Das braucht go-admin-tickets.sql in Supabase.");
+          GoDialog.alert(/owner/.test(m) && !/only_owner/.test(m) ? "Inhaber: Die Admin-Rechte bleiben immer." : /only_owner/.test(m) ? "Admin-Rechte vergeben und entziehen kann nur Joscha." : /last_admin/.test(m) ? "Es muss mindestens ein Admin bleiben." : /self/.test(m) ? "Dir selbst kannst Du die Rechte nicht entziehen." : "Das braucht go-admin-tickets.sql in Supabase.");
         });
       });
   }
@@ -914,7 +917,7 @@
   function adminMenu(id) {
     var a = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0] || {};
     if (String(id) === OWNER_ID) { GoDialog.alert("Inhaber: Die Admin-Rechte bleiben immer."); return; }
-    if (String(me()) !== OWNER_ID) { GoDialog.alert("Admin-Rechte entziehen kann nur Joscha."); return; }
+    if (String(me()) !== OWNER_ID) { GoDialog.alert("Admin-Rechte vergeben und entziehen kann nur Joscha."); return; }
     GoDialog.choose(a.name || "Admin", [{ label: "Admin-Rechte entziehen", value: "off" }], { center: true, cancel: "Abbrechen" })
       .then(function (v) { if (v === "off") setAdmin(id, false); });
   }
@@ -925,7 +928,7 @@
     var items = [];
     if (id !== String(me()) && ADMIN_IDS.indexOf(id) === -1) items.push({ label: "Löschen", value: "del" });
     items.push({ label: ci.paused_at ? "Fortsetzen" : "Pausieren", value: "pause" });
-    items.push({ label: "Zum Admin machen", value: "admin" });
+    if (String(me()) === OWNER_ID) items.push({ label: "Zum Admin machen", value: "admin" });
     GoDialog.choose(name, items, { center: true, sub: ci.paused_at ? "Pausiert: keine WhatsApp-Erinnerung." : "", cancel: "Abbrechen" }).then(function (v) {
       if (v === "del") {
         var fake = document.createElement("button");
@@ -952,9 +955,8 @@
     var name = a.name || "Coach";
     GoDialog.choose(name, [
       { label: "Coach-Rolle entziehen", value: "revoke" },
-      { label: ci.coach_verified_at ? "Verifiziert ✓ (blaues c entfernen)" : "Verifizieren (blaues c)", value: ci.coach_verified_at ? "unverify" : "verify" },
-      { label: "Zum Admin machen", value: "admin" }
-    ], { center: true, cancel: "Abbrechen" }).then(function (mode) {
+      { label: ci.coach_verified_at ? "Verifiziert ✓ (blaues c entfernen)" : "Verifizieren (blaues c)", value: ci.coach_verified_at ? "unverify" : "verify" }
+    ].concat(String(me()) === OWNER_ID ? [{ label: "Zum Admin machen", value: "admin" }] : []), { center: true, cancel: "Abbrechen" }).then(function (mode) {
       if (!mode) return;
       if (mode === "admin") { setAdmin(id, true); return; }
       host.rest("rpc/go_admin_coach_role", { method: "POST", body: { p_account: id, p_mode: mode } })

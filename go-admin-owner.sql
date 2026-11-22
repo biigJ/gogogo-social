@@ -1,5 +1,5 @@
 -- go-admin-owner.sql — Inhaber-Schutz: Joschas Admin-Rechte kann niemand entziehen, auch er selbst nicht.
--- Anderen Admins entziehen darf nur der Inhaber; Admin-Rechte geben dürfen alle Admins.
+-- Admin-Rechte geben und anderen entziehen darf nur der Inhaber.
 -- Idempotent. Im Supabase SQL-Editor (gogogo, agpyse…) ausführen. Voraussetzung: go-admin-tickets.sql.
 
 create or replace function go_owner_id()
@@ -16,10 +16,8 @@ set search_path = public
 as $$
 begin
   if not go_is_admin() then raise exception 'not_allowed'; end if;
-  if not coalesce(p_on, false) then
-    if p_account = go_owner_id() then raise exception 'owner'; end if;
-    if go_current_account_id() is distinct from go_owner_id() then raise exception 'only_owner'; end if;
-  end if;
+  if not coalesce(p_on, false) and p_account = go_owner_id() then raise exception 'owner'; end if;
+  if go_current_account_id() is distinct from go_owner_id() then raise exception 'only_owner'; end if;
   update go_accounts set is_admin = coalesce(p_on, false) where id = p_account;
 end $$;
 grant execute on function go_admin_set_admin(uuid, boolean) to anon, authenticated;
