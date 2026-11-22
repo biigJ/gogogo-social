@@ -210,7 +210,8 @@
     if (!ids.length) return;
     var base = "go_accounts?id=in.(" + ids.join(",") + ")&select=";
     var more = ",serial_number,invite_code,phone,whatsapp_phone,about_me,training_goal,trainer_id,workout_places,photo_url";
-    host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at" + more)
+    host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at,seen_at,ffc_seen_at" + more)
+      .catch(function () { return host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at" + more); })
       .catch(function () { return host.rest(base + "id,nickname,coach_self_at,coach_verified_at" + more); })
       .catch(function () { return host.rest(base + "id,nickname"); })
       .then(function (rows) {
@@ -365,16 +366,23 @@
     return '<button type="button" class="ga-pill" data-ga-user="' + esc(id) + '">' + (ci.paused_at ? "Pausiert" : "Nutzer") + "</button>";
   }
   /* Nutzer-Filter: je Merkmal ein Dropdown (alle, Werte, ohne) */
-  var UF = [["role", "Rolle"], ["member", "Aktiv"], ["goal", "Ziel"], ["coach", "Coach"], ["place", "Ort"], ["plan", "Wochenplan"], ["circle", "Circle"], ["group", "Gruppe"], ["day", "Workout"]];
+  var UF = [["role", "Rolle"], ["login", "Login"], ["member", "Stempelkarte"], ["goal", "Ziel"], ["coach", "Coach"], ["place", "Ort"], ["plan", "Wochenplan"], ["circle", "Circle"], ["group", "Gruppe"], ["day", "Workout"]];
   /* feste Werte statt aus den Daten gesammelt; „Aktiv“: gogogo = Stempelkarte aktiv, Circle = aktive Circle-Karte */
   var UF_FIXED = {
     role: ["Nutzer", "Coach", "Zertifiziert"],
+    /* gogogo = selbst mit Vorname und Login-Code angemeldet, Circle = in der App mit FFC (E-Mail und Passwort) eingeloggt (go-login-stand.sql) */
+    login: ["gogogo, ohne Circle", "kein gogogo, nur Circle", "beides", "keins"],
     member: ["gogogo, ohne Circle", "kein gogogo, nur Circle", "beides aktiv", "keins aktiv"]
   };
   function roleOf(a) {
     var ci = coachInfo(String(a.account_id));
     if (ci.coach_verified_at) return "Zertifiziert";
     return isCoachAcc(a) ? "Coach" : "Nutzer";
+  }
+  function loginOf(a) {
+    var ci = coachInfo(String(a.account_id));
+    var go = !!ci.seen_at, circ = !!ci.ffc_seen_at;
+    return go && circ ? "beides" : go ? "gogogo, ohne Circle" : circ ? "kein gogogo, nur Circle" : "keins";
   }
   function memberOf(x) {
     var go = !!(x && x.stamp);
@@ -400,6 +408,7 @@
     (x.doubles || []).forEach(function (d) { if (d.at) days[berlinDay(d.at)] = 1; });
     return {
       role: [roleOf(a)],
+      login: [loginOf(a)],
       member: [memberOf(x)],
       goal: goalText(id) ? goalText(id).split(" · ") : [],
       coach: ci.trainer_id ? [hit ? String(hit.name || "Coach").split(" ")[0] : "Coach"] : [],
@@ -485,7 +494,9 @@
           "Circle: " + ((ln.circles || []).length ? esc(ln.circles.join(", ")) : "–")
         ]);
         var nRec = hxdOf(id).length;
-        var r5 = x ? parts(stampLine(x).map(esc).concat([esc(doubleLine(x, function (aid) {
+        var lg = coachInfo(id);
+        var loginTxt = "Login gogogo " + (lg.seen_at ? dayDe(berlinDay(lg.seen_at)) : "–") + " · Circle " + (lg.ffc_seen_at ? dayDe(berlinDay(lg.ffc_seen_at)) : "–");
+        var r5 = x ? parts([esc(loginTxt)].concat(stampLine(x).map(esc)).concat([esc(doubleLine(x, function (aid) {
           var hit = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(aid); })[0];
           return hit ? String(hit.name || "").split(" ")[0] : "";
         }))])) : "";
