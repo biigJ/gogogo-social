@@ -206,6 +206,7 @@
     .vlink-inline { width: 100%; padding: 6px 8px; font-size: 13px; }
     .list-tools { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
     .list-tools input[type="search"] { flex: 1; }
+    .plan-filter { width: auto; flex: 0 1 auto; min-height: 34px; max-width: 70%; padding: 0 10px; border-radius: 999px; border: 1.5px solid #111; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: #111; }
     .item .vlink { grid-column: 1 / -1; font-size: 13px; padding: 6px 8px; }
     .item.item--simple, .item.item--simple { grid-template-columns: 22px minmax(0, 1fr) auto !important; }
     .item.item--simple .vlink { grid-column: 2 / -1; }
@@ -513,7 +514,12 @@
       if (state.view === "videos") return renderVideos(box);
       if (state.pick && state.view === "units") return renderPicker(box);
       var v = state.view, on = chipsOn(v), html = "";
-      var tools = '<div class="list-tools"><span class="grow"></span>' +
+      /* Events: Dropdown Wochenplan, zeigt nur die Events dieses Plans in Tagesreihenfolge */
+      var planSel = v === "units" ? '<select id="plan-filter" class="plan-filter" aria-label="Wochenplan"><option value="">Alle Wochenpläne</option>' +
+        plans().slice().sort(function (a, b) { return a.title.localeCompare(b.title, "de"); }).map(function (p) {
+          return '<option value="' + esc(p.id) + '"' + (state.planFilter === p.id ? " selected" : "") + ">" + esc(p.title) + (p.private_for ? " (persönlich)" : "") + "</option>";
+        }).join("") + "</select>" : "";
+      var tools = '<div class="list-tools">' + planSel + '<span class="grow"></span>' +
         '<button type="button" id="list-new">Neu</button></div>' + chipsHtml(v);
       if (v === "plans") {
         html = plans().filter(function (c) {
@@ -532,10 +538,15 @@
         }).join("");
       } else if (v === "units") {
         var cats = ["kraft", "ausdauer"].filter(function (k) { return on[k]; });
-        var list = listUnits().filter(function (c) {
+        var fp = state.planFilter ? byId(state.planFilter) : null;
+        var dayOf = {};
+        if (fp) mainSessions(fp).forEach(function (s) { if (s.unit_course_id && dayOf[s.unit_course_id] == null) dayOf[s.unit_course_id] = s.session_no; });
+        var list = (fp ? units() : listUnits()).filter(function (c) {
+          if (fp && dayOf[c.id] == null) return false;
           if (cats.length && cats.indexOf(c.category_default || "kraft") < 0) return false;
           return levelOk(c, on);
         }).sort(function (a, b) {
+          if (fp && !on.count) return dayOf[a.id] - dayOf[b.id];
           if (on.count) return exCount(b) - exCount(a) || a.title.localeCompare(b.title, "de");
           var ca = CATS.findIndex(function (k) { return k[0] === a.category_default; }), cb = CATS.findIndex(function (k) { return k[0] === b.category_default; });
           return ca !== cb ? ca - cb : a.title.localeCompare(b.title, "de");
@@ -544,7 +555,7 @@
           var n = exCount(c);
           return '<div class="erow' + (c.is_active ? "" : " is-off") + '" data-open="unit/' + c.id + '">' + rectHtml(c.image_url, catLabel(c.category_default)) +
             '<div class="erow__c"><span class="erow__t">' + esc(c.title) + "</span>" +
-            "<span>" + esc(catLabel(c.category_default)) + (c.level ? " · Level " + c.level : "") + "</span>" +
+            "<span>" + (fp ? esc(DAYS[dayOf[c.id] - 1] || "") + " · " : "") + esc(catLabel(c.category_default)) + (c.level ? " · Level " + c.level : "") + "</span>" +
             "<span>" + (n ? n + (n === 1 ? " Übung" : " Übungen") : "noch keine Übungen") + "</span></div>" +
             '<span class="epill' + (c.is_active ? " is-fill" : "") + '">' + (c.is_active ? "Katalog" : "Entwurf") + "</span>" + actsHtml("unit", c.id) + "</div>";
         }).join("");
@@ -1492,6 +1503,11 @@
         card.outerHTML = videoCard(name);
         toast(url ? "Video gespeichert" : "Video entfernt");
       }).catch(function (err) { toast(err.message); });
+    });
+    $("list-view").addEventListener("change", function (e) {
+      if (!e.target || e.target.id !== "plan-filter") return;
+      state.planFilter = e.target.value;
+      renderListOnly();
     });
     $("list-view").addEventListener("click", function (e) {
       var b = e.target.closest ? e.target.closest("[data-vplay]") : null;
