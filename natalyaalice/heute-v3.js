@@ -3747,18 +3747,35 @@
     });
   }
 
-  /* Einzeleinheiten = aktive Kurse mit genau einer Einheit (wie im Kurs-Editor) */
+  /* Einheiten nur aus den eigenen aktiven Wochenplänen: Nutzer wählen Pläne, keine einzelnen Workouts.
+     Ohne Plan: leere Liste mit units.noPlan = true. */
   function loadSingleUnits(kind) {
+    var plans = (state.enrollments || []).filter(function (en) {
+      var c = en.courses || en.course || {};
+      return en.course_id && !c.is_system;
+    }).map(function (en) { return String(en.course_id); });
+    if (!plans.length) { var none = []; none.noPlan = true; return Promise.resolve(none); }
     return rest(
-      "courses?is_active=eq.true&private_for=is.null&category_default=eq." + encodeURIComponent(kind) +
-        "&select=id,title,slug,sessions_per_week,course_sessions!course_sessions_course_id_fkey(id)&order=title.asc"
+      "course_sessions?course_id=in.(" + plans.map(encodeURIComponent).join(",") + ")&category=eq." + encodeURIComponent(kind) +
+        "&unit_course_id=not.is.null&select=unit_course_id,title&order=session_no.asc"
     ).then(function (rows) {
-      return (rows || []).filter(function (c) {
-        var n = (c.course_sessions || []).length;
-        return n === 1 && (c.sessions_per_week || 1) <= 1 &&
-          ["eigenes-training", "12-wochen-routine"].indexOf(String(c.slug || "")) === -1;
+      var seen = {}, out = [];
+      (rows || []).forEach(function (r) {
+        var id = String(r.unit_course_id);
+        if (seen[id]) return;
+        seen[id] = 1;
+        out.push({ id: r.unit_course_id, title: r.title });
       });
+      return out;
     }).catch(function () { return []; });
+  }
+  function askForPlan() {
+    if (!global.GoDialog) return;
+    GoDialog.choose("Erst einen Wochenplan wählen", [{ label: "Wochenplan wählen", value: "plan" }], {
+      center: true, sub: "Bei gogogo trainierst Du nach Wochenplan. Die Einheiten daraus kannst Du dann auch spontan machen.", cancel: "Später"
+    }).then(function (v) {
+      if (v === "plan") setTimeout(function () { if (global.WocheReels && WocheReels.openPlanPicker) WocheReels.openPlanPicker(); }, 0);
+    });
   }
 
   function createUnplannedEvent(payload) {
@@ -4052,8 +4069,14 @@
       loadSingleUnits(kind).then(function (units) {
         var loading = pick.querySelector(".acc-spontan-loading");
         if (loading) loading.remove();
+        if (units.noPlan) {
+          modal.hidden = true;
+          if (host.closeGoPick) host.closeGoPick();
+          askForPlan();
+          return;
+        }
         if (!units.length) {
-          pick.insertAdjacentHTML("beforeend", "<p>Noch keine Einzeleinheiten für diese Kategorie.</p>");
+          pick.insertAdjacentHTML("beforeend", "<p>Dein Wochenplan hat keine Einheit in dieser Kategorie.</p>");
           return;
         }
         units.forEach(function (u) {
@@ -4299,7 +4322,8 @@
         });
       }
       return loadSingleUnits(kind).then(function (units) {
-        if (!units.length) { GoDialog.alert("Noch keine Einheiten in dieser Kategorie."); return; }
+        if (units.noPlan) { askForPlan(); return; }
+        if (!units.length) { GoDialog.alert("Dein Wochenplan hat keine Einheit in dieser Kategorie."); return; }
         return GoDialog.choose("Welche Einheit?", units.map(function (u) {
           return { label: (emojiFor(kind, u.title) + " " + u.title).trim(), value: String(u.id) };
         })).then(function (uid) {
