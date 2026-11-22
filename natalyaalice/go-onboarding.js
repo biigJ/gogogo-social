@@ -123,7 +123,7 @@
     if (installed || !global.GoDialog) return;
     global.GoDialog.alert("Hinweis", {
       center: true,
-      body: "Füge für bessere Handhabung die Web-App zum Home-Bildschirm auf Deinem Smartphone hinzu.\n\niPhone: in Safari auf das Burgermenü im Browser > Teilen > Mehr anzeigen > + Zum Home-Bildschirm."
+      body: "Füge für bessere Handhabung die Web-App zum Home-Bildschirm auf Deinem Smartphone hinzu.\n\niPhone: in Safari auf das Burgermenü im Browser > Teilen > Mehr anzeigen > + Zum Home-Bildschirm.\n\nAndroid: in Chrome auf ⋮ > Zum Startbildschirm hinzufügen."
     });
   }
 
