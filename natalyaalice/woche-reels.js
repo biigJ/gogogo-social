@@ -1223,8 +1223,13 @@
   /* Zusagen nur auf Heute — Owner zählt hier nicht als Teilnehmer */
   function goingIds(ev) {
     var owner = String((ev && ev.user_id) || "");
+    var seen = {};
+    /* jede Person nur einmal (Zusage kann aus Einladung und RSVP doppelt geladen sein) */
     return (state.rsvps[String(ev && ev.id)] || []).filter(function (id) {
-      return id && id !== owner;
+      id = String(id || "");
+      if (!id || id === owner || seen[id]) return false;
+      seen[id] = true;
+      return true;
     });
   }
 
@@ -1504,10 +1509,22 @@
       );
     });
     if (doneOwn) return "";
+    /* Zugesagte stehen schon unter „dabei“ (RSVP): hier nicht noch einmal. Jede Person nur einmal. */
+    var goingToday = {};
+    (state.events || []).forEach(function (ev) {
+      if (!ev || String(ev.user_id) !== me() || dayKey(ev.starts_at) !== String(iso)) return;
+      goingIds(ev).forEach(function (id) { goingToday[id] = true; });
+    });
+    var seenInv = {};
     var list = (state.invites || []).filter(function (inv) {
       if (!inv || String(inv.workout_date) !== String(iso)) return false;
       var st = String(inv.status || "pending");
-      return st === "pending" || st === "accepted";
+      var to = String(inv.to_id || "");
+      if (!(st === "pending" || st === "accepted")) return false;
+      if (st === "accepted" && goingToday[to]) return false;
+      if (seenInv[to]) return false;
+      seenInv[to] = true;
+      return true;
     });
     if (!list.length) return "";
     return (
