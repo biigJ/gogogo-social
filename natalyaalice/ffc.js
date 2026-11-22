@@ -3691,11 +3691,16 @@
       stopSync();
       const evKey = preset && (preset.eventId || (preset.sync && preset.sync.eventId));
       selKey = evKey ? 'ffc_sel_' + evKey : null;
+      let hadSaved = false;
       if(selKey){
         try{
           const saved = JSON.parse(localStorage.getItem(selKey) || 'null');
-          if(Array.isArray(saved)) selectedExercises = saved.filter(id=> exercises.some(ex=> ex.id === id && ex.id !== RUN_ID));
+          if(Array.isArray(saved)){ selectedExercises = saved.filter(id=> exercises.some(ex=> ex.id === id && ex.id !== RUN_ID)); hadSaved = true; }
         }catch(e){}
+      }
+      /* gogogo: Stationen des Coaches (Circle-Event) als Vorauswahl in Tafel-Reihenfolge; ändern und umsortieren geht wie immer */
+      if(!hadSaved && preset && Array.isArray(preset.stations) && preset.stations.length){
+        selectedExercises = preset.stations.filter(id=> exercises.some(ex=> ex.id === id && ex.id !== RUN_ID));
       }
       if(preset && preset.sync && preset.sync.startAt){
         sync = Object.assign({}, preset.sync);

@@ -13502,6 +13502,12 @@
           return rest(
             "events?id=eq." + encodeURIComponent(eventId) + "&select=id,user_id,starts_at,note,status"
           ).then(function (rows) {
+            /* Stationen des Coaches (note st=, circle-sheet.js) als Vorauswahl; im Workout frei änderbar */
+            if (rows && rows[0] && window.GoCircleSheet) {
+              var FFC_ID = { bike_m: "assaultbike" };
+              var ids = GoCircleSheet.noteStations(rows[0].note).map(function (k) { return FFC_ID[k] || k; });
+              if (ids.length) base.stations = ids;
+            }
             return rows && rows[0] ? GoZirkelSetup.startInfo(rows[0]) : null;
           });
         }
@@ -27019,6 +27025,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/natalyaalice/hyrox-doubles.js?v=hxd-3"></script>
   <script src="/natalyaalice/circle-sheet.js?v=cs-2"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-17"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-18"></script>
 </body>
 </html>
