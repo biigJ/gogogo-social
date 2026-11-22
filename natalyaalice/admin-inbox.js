@@ -62,6 +62,8 @@
     "body .ga-qrcard .ga-qrcard__name{margin-top:auto;font-family:'Playfair Display',Georgia,serif !important;font-weight:600 !important;font-size:22px !important;line-height:1.2;text-align:center}" +
     ".ga-qrcard__nick{font-size:15px;font-weight:600;opacity:.9;margin-top:4px;text-align:center}" +
     ".ga-qrcard__hint{text-align:center;font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.8;margin-top:12px}" +
+    ".ga-rec__next{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(42,33,24,.12);font-size:15px}" +
+    ".ga-rec__next span:last-child{color:rgba(42,33,24,.65);text-align:right}" +
     ".ga-search{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}" +
     ".ga-search input{min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid rgba(42,33,24,.3);background:transparent;font:inherit;font-size:15px;color:#111;min-width:0}" +
     ".ga-search input:focus{outline:none;border-color:#111}" +
@@ -406,6 +408,92 @@
       .then(function (rows) { if (st) { st.hxd = rows || []; if (st.tab === "coaches") paint(); } })
       .catch(function () {});
   }
+  /* Alle Zirkeltraining-Workouts je Person, vergangen und geplant (go-admin-circle-workouts.sql) */
+  function loadCw() {
+    st.cw = [];
+    st.cwLoaded = false;
+    return host.rest("rpc/go_admin_circle_workouts", { method: "POST", body: {} })
+      .then(function (rows) {
+        if (!st) return;
+        st.cw = rows || [];
+        st.cwLoaded = true;
+        st.cwLabels = {};
+        st.cw.forEach(function (r) { st.cwLabels[r.day + "|" + (r.circle_id || "")] = dayDe(r.day) + " · " + (r.circle_name || "Circle"); });
+        if (st.tab === "coaches") paint();
+      })
+      .catch(function () { if (st) st.cwLoaded = "missing"; });
+  }
+  function todayBerlin() { return berlinDay(new Date().toISOString()); }
+  function cwOf(id) {
+    var seen = {};
+    return (st.cw || []).filter(function (r) {
+      if (String(r.account_id) !== String(id)) return false;
+      var k = r.day + "|" + (r.circle_id || "");
+      if (seen[k]) return false;
+      seen[k] = 1;
+      return true;
+    });
+  }
+  function cwFuture(id) {
+    var t = todayBerlin();
+    return cwOf(id).filter(function (r) { return r.day >= t; }).sort(function (x, y) { return String(x.starts_at).localeCompare(String(y.starts_at)); });
+  }
+  function noteVal(note, key) {
+    var m = String(note || "").match(new RegExp("(?:^|\\|)" + key + "=([^|]*)"));
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+  /* Anstehendes Workout eines Termins (Schlüssel Tag|Circle): Stationen aus dem HYROX-Termin, sonst Runden aus dem Event */
+  function nextInfo(key) {
+    var parts = key.split("|"), day = parts[0], cid = parts[1] || "";
+    var ev = (st.cw || []).filter(function (r) { return r.day === day && String(r.circle_id || "") === cid; })
+      .sort(function (x, y) { return (x.note ? 0 : 1) - (y.note ? 0 : 1); })[0] || {};
+    var H = global.GoHyroxDoubles;
+    var stations = H ? H.plan({ day: day, circle_id: cid, results: {} }).map(function (x) { return x.label; }) : [];
+    var work = Number(noteVal(ev.note, "work")) || 0, pause = Number(noteVal(ev.note, "pause")) || 0;
+    var rounds = Number(noteVal(ev.note, "rounds")) || stations.length || 8;
+    var when = ev.starts_at ? shortDay(ev.starts_at) + ", " + new Date(ev.starts_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }) : dayDe(day);
+    var mm = function (sec) { return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); };
+    return {
+      day: day, circle: cid, stations: stations.length ? stations : null, rounds: rounds,
+      title: "Anstehendes Workout",
+      sub: [when, ev.circle_name || "", ev.mode === "double" ? "Double" : ev.mode ? "Single" : "", work ? mm(work) + " Arbeit" + (pause ? " / " + mm(pause) + " Pause" : "") : ""].filter(Boolean).join(" · ")
+    };
+  }
+  /* Letztes Workout vor dem Termin: HYROX Double mit Werten (gleicher Circle zuerst) */
+  function lastInfo(id, beforeDay, cid) {
+    var H = global.GoHyroxDoubles;
+    var rows = hxdOf(id).filter(function (r) { return r.day < beforeDay; })
+      .sort(function (x, y) { return (String(y.circle_id) === cid) - (String(x.circle_id) === cid) || String(y.day).localeCompare(String(x.day)); });
+    var r = rows[0];
+    if (!r || !H) return null;
+    var names = String(r.team || "").split(/\s*&\s*/);
+    var mi = (r.account_ids || []).map(String).indexOf(String(id));
+    var partner = names[mi === 0 ? 1 : 0] || "";
+    var cname = ((st.cw || []).filter(function (x) { return String(x.circle_id) === String(r.circle_id); })[0] || {}).circle_name || "";
+    return {
+      sub: [dayDe(r.day), cname, (r.title || "HYROX Double") + (partner ? " mit " + partner : ""), r.category].filter(Boolean).join(" · "),
+      total: H.score(r).total,
+      rows: H.plan(r).map(function (x) { return { label: x.label, value: x.value == null ? "–" : H.valueText(x), points: x.points }; })
+    };
+  }
+  /* PDF: je Person eine A4-Seite quer (links letztes, rechts anstehendes Workout); Start einmal wählen oder offen lassen */
+  function exportSheets(ids, key) {
+    if (!global.GoCircleSheet) { GoDialog.alert("PDF-Modul fehlt (circle-sheet.js)."); return; }
+    var nx = nextInfo(key);
+    var startJob = nx.stations
+      ? GoDialog.choose("Wo ist Start?", nx.stations.map(function (x, i) { return { label: x, value: String(i) }; }).concat([{ label: "Offen lassen (zum Eintragen)", value: "open" }]), { cancel: "Abbrechen" })
+      : Promise.resolve("open");
+    startJob.then(function (v) {
+      if (!v) return;
+      var start = v === "open" ? null : Number(v);
+      var pages = ids.map(function (id) {
+        var a = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(id); })[0] || {};
+        return { name: a.name || "", partner: "", last: lastInfo(id, nx.day, nx.circle), next: Object.assign({}, nx, { start: start }) };
+      });
+      var file = "gogogo-" + nx.day + "-" + String(((st.cw || []).filter(function (r) { return String(r.circle_id || "") === nx.circle; })[0] || {}).circle_name || "circle").replace(/[^A-Za-z0-9]+/g, "-") + (ids.length === 1 ? "-" + String(pages[0].name).split(" ")[0] : "") + ".pdf";
+      return GoCircleSheet.pdf(pages, { format: "a4", file: file });
+    }).catch(function (e) { GoDialog.alert("PDF ging nicht: " + String((e && e.message) || e)); });
+  }
   function hxdOf(id) {
     return (st.hxd || []).filter(function (r) { return (r.account_ids || []).map(String).indexOf(String(id)) >= 0; });
   }
@@ -501,8 +589,13 @@
     var ln = (st.links && st.links[id]) || {};
     var hit = ci.trainer_id ? (st.accounts || []).filter(function (q) { return String(q.account_id) === String(ci.trainer_id); })[0] : null;
     var days = {};
-    hxdOf(id).forEach(function (r) { days[r.day] = 1; });
-    (x.doubles || []).forEach(function (d) { if (d.at) days[berlinDay(d.at)] = 1; });
+    hxdOf(id).forEach(function (r) { days[r.day + "|" + (r.circle_id || "")] = 1; });
+    cwOf(id).forEach(function (r) { days[r.day + "|" + (r.circle_id || "")] = 1; });
+    (x.doubles || []).forEach(function (d) {
+      if (!d.at) return;
+      var dd = berlinDay(d.at);
+      if (!Object.keys(days).some(function (k) { return k.indexOf(dd + "|") === 0; })) days[dd + "|"] = 1;
+    });
     return {
       role: [roleOf(a)],
       login: [loginOf(a)],
@@ -527,7 +620,13 @@
   function ufLabel(key, label, v) {
     if (!v) return label + ": alle";
     if (v === NONE) return label + ": ohne";
-    return key === "day" ? dayDe(v) : v;
+    if (key === "day") {
+      var cidv = v.split("|")[1];
+      var cname = cidv ? (((st.cw || []).filter(function (r) { return String(r.circle_id) === cidv; })[0] || {}).circle_name || "Circle") : "Double";
+      var lab = (st.cwLabels && st.cwLabels[v]) || dayDe(v.split("|")[0]) + " · " + cname;
+      return lab + (v.split("|")[0] >= todayBerlin() ? " · geplant" : "");
+    }
+    return v;
   }
   function ufMatch(a) {
     var f = st.uf || {};
@@ -548,13 +647,15 @@
         return '<option value="' + esc(v) + '"' + ((f[u[0]] || "") === v ? " selected" : "") + ">" + esc(ufLabel(u[0], u[1], v)) + "</option>";
       }).join("") + "</select>";
     }).join("") + "</div>" +
-      '<p class="ga-ucount">' + n + " von " + total + " Nutzern" + (on ? ' · <button type="button" class="ga-link" data-ga-uf="reset">Filter zurücksetzen</button>' : "") + "</p>";
+      '<p class="ga-ucount">' + n + " von " + total + " Nutzern" + (on ? ' · <button type="button" class="ga-link" data-ga-uf="reset">Filter zurücksetzen</button>' : "") +
+      (f.day && f.day !== NONE && f.day.split("|")[0] >= todayBerlin() && n ? ' · <button type="button" class="ga-link" data-ga-pdfall="1">PDF für alle (' + n + ")</button>" : "") + "</p>";
   }
   function paintCoaches() {
     if (!st.coachInfo) loadCoachInfo();
     if (!st.links) loadLinks();
     if (!st.extras) loadExtras();
     if (!st.hxd) loadHxd();
+    if (!st.cw) loadCw();
     if (!st.goals) loadGoals();
     var accs = (st.accounts || []).slice().sort(function (x, y) {
       if (isCoachAcc(y) !== isCoachAcc(x)) return isCoachAcc(y) ? 1 : -1;
@@ -591,7 +692,7 @@
           (ln.groups || []).length ? "Gruppe: " + esc(ln.groups.join(", ")) : "Gruppe: –",
           "Circle: " + ((ln.circles || []).length ? esc(ln.circles.join(", ")) : "–")
         ]);
-        var nRec = hxdOf(id).length;
+        var nRec = hxdOf(id).length + cwOf(id).length;
         var lg = coachInfo(id);
         var loginTxt = "Login gogogo " + (lg.seen_at ? dayDe(berlinDay(lg.seen_at)) : "–") + " · Circle " + (lg.ffc_seen_at ? dayDe(berlinDay(lg.ffc_seen_at)) : "–");
         var r5 = x ? parts([esc(loginTxt)].concat(stampLine(x).map(esc)).concat([esc(doubleLine(x, function (aid) {
@@ -610,8 +711,9 @@
   }
   /* Circle-Aufzeichnungen eines Nutzers im Design der App (Datumsrad, Punkte, Runden); Stift = Werte nachpflegen */
   function openRec(id, pick, editing) {
-    var rows = hxdOf(id);
-    if (!rows.length || !global.GoHyroxDoubles) return;
+    var rows = global.GoHyroxDoubles ? hxdOf(id) : [];
+    var fut = cwFuture(id);
+    if (!rows.length && !fut.length) return;
     var H = global.GoHyroxDoubles;
     var a = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(id); })[0] || {};
     var idx = 0;
@@ -625,10 +727,14 @@
     var box = document.createElement("div");
     box.className = "ga-info ga-rec";
     box.innerHTML = '<div class="ga-info__card go-slide__ffc-plain" role="dialog" aria-modal="true"><p class="ga-info__name" style="text-align:center">' + esc(String(a.name || "").split(" ")[0]) + "</p>" +
-      '<div class="go-rec-wheel"><div class="go-rec-wheel__mark"></div><div class="go-rec-wheel__col">' + rows.map(function (r, i) {
+      (rows.length ? '<div class="go-rec-wheel"><div class="go-rec-wheel__mark"></div><div class="go-rec-wheel__col">' + rows.map(function (r, i) {
         return '<button type="button" class="go-rec-wheel__item' + (i === idx ? " is-on" : "") + '" data-idx="' + i + '">' + esc(labelOf(r)) + "</button>";
-      }).join("") + '</div></div><div class="go-rec-detail"></div>' +
-      '<div class="ga-info__btns"><button type="button" class="is-quiet" data-gi-close="1">Schließen</button></div></div>';
+      }).join("") + '</div></div><div class="go-rec-detail"></div>' : '<p class="cp-hint" style="text-align:center">Noch keine Aufzeichnung.</p>') +
+      (fut.length ? '<p class="ga-h3">Anstehend</p>' + fut.map(function (r) {
+        return '<div class="ga-rec__next"><span>' + esc(shortDay(r.starts_at)) + ", " + esc(new Date(r.starts_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" })) + "</span><span>" + esc(r.circle_name || "") + " · " + (r.mode === "double" ? "Double" : "Single") + "</span></div>";
+      }).join("") : "") +
+      '<div class="ga-info__btns">' + (fut.length ? '<button type="button" class="is-dark" data-rec-pdf="1">PDF exportieren</button>' : "") +
+      '<button type="button" class="is-quiet" data-gi-close="1">Schließen</button></div></div>';
     document.body.appendChild(box);
     var col = box.querySelector(".go-rec-wheel__col");
     var detail = box.querySelector(".go-rec-detail");
@@ -656,9 +762,11 @@
       var top = Math.max(0, el.offsetTop - (col.clientHeight - el.offsetHeight) / 2);
       if (smooth && col.scrollTo) col.scrollTo({ top: top, behavior: "smooth" }); else col.scrollTop = top;
     }
-    show(idx);
-    requestAnimationFrame(function () { center(false); });
-    col.addEventListener("scroll", function () {
+    if (rows.length) {
+      show(idx);
+      requestAnimationFrame(function () { center(false); });
+    }
+    if (col) col.addEventListener("scroll", function () {
       var mid = col.scrollTop + col.clientHeight / 2, best = idx, dist = Infinity;
       Array.prototype.forEach.call(col.children, function (el, k) {
         var d = Math.abs(el.offsetTop + el.offsetHeight / 2 - mid);
@@ -692,6 +800,12 @@
     }
     box.addEventListener("click", function (e) {
       if (e.target === box || e.target.closest("[data-gi-close]")) { close(); return; }
+      if (e.target.closest("[data-rec-pdf]")) {
+        var pickEv = fut.length === 1 ? Promise.resolve(fut[0].day + "|" + (fut[0].circle_id || "")) :
+          GoDialog.choose("Welches Workout?", fut.map(function (r) { return { label: shortDay(r.starts_at) + " · " + (r.circle_name || ""), value: r.day + "|" + (r.circle_id || "") }; }), { cancel: "Abbrechen" });
+        pickEv.then(function (k) { if (k) exportSheets([id], k); });
+        return;
+      }
       var it = e.target.closest(".go-rec-wheel__item");
       if (it) { show(Number(it.getAttribute("data-idx")) || 0); center(true); return; }
       if (e.target.closest("[data-rec-pen]")) { editing = !editing; show(idx); return; }
@@ -1874,7 +1988,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -1884,6 +1998,11 @@
     if (t.hasAttribute("data-ga-admin")) { adminMenu(t.getAttribute("data-ga-admin")); return; }
     if (t.hasAttribute("data-gt")) { ticketAction(t); return; }
     if (t.hasAttribute("data-ga-new")) { openNew(); return; }
+    if (t.hasAttribute("data-ga-pdfall")) {
+      var ids = (st.accounts || []).filter(function (a) { return qMatch("coaches", a.account_id, a.name) && ufMatch(a); }).map(function (a) { return String(a.account_id); });
+      exportSheets(ids, st.uf.day);
+      return;
+    }
     if (t.hasAttribute("data-ga-qr")) { openQr(t.getAttribute("data-ga-qr")); return; }
     if (t.hasAttribute("data-ga-user")) { userMenu(t.getAttribute("data-ga-user")); return; }
     if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
