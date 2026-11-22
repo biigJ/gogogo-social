@@ -4372,29 +4372,38 @@
     out.push({ value: "team", label: "Team" });
     return out;
   }
-  /* Sichtbarkeit eines eigenen Events ändern (Pille schaltet durch). Bubble setzt bubble_id, damit es überall gilt
-     (Bubble-Feed, Woche → Tage bearbeiten). Gruppe setzt group_id, Circle teilt wie in der Woche. */
+  /* Sichtbarkeit eines eigenen Events über die drei Punkte am Bild */
   function changeEventVisibility(id) {
     var ev = (state.events || []).filter(function (x) { return String(x.id) === String(id); })[0];
     if (!ev || !global.GoDialog || !GoDialog.vis) return;
-    var list = altVisList();
-    var cur = normalizeVisibility(ev.visibility || "team");
+    /* wie das Dropdown in Aktuell: Ich · Community · Meine Bubble · Alles
+       Alles = Community + Bubble (visibility team mit bubble_id) */
+    var bid = host.bubbleId ? String(host.bubbleId() || "") : "";
+    var list = [{ value: "privat", label: "Ich" }, { value: "team", label: "Community" }];
+    if (bid) list.push({ value: "bubble", label: "Meine Bubble" }, { value: "alles", label: "Alles" });
+    var vis = normalizeVisibility(ev.visibility || "team");
+    var cur = vis === "privat" ? "privat" : vis === "bubble" ? "bubble" : (bid && String(ev.bubble_id || "") === bid ? "alles" : "team");
     GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list }).then(function (v) {
-      if (!v || v === normalizeVisibility(ev.visibility || "team")) return;
+      if (!v || v === cur) return;
       var pick = list.filter(function (x) { return x.value === v; })[0] || {};
-      var body = { visibility: v };
-      if (v === "gruppe" && pick.group_id) body.group_id = pick.group_id;
-      if (v === "bubble" && pick.bubble_id) body.bubble_id = pick.bubble_id;
-      rest("events?id=eq." + encodeURIComponent(id), { method: "PATCH", prefer: "return=minimal", body: body })
+      var body = v === "alles" ? { visibility: "team", bubble_id: bid }
+        : v === "bubble" ? { visibility: "bubble", bubble_id: bid }
+        : { visibility: v, bubble_id: null };
+      function save(b) { return rest("events?id=eq." + encodeURIComponent(id), { method: "PATCH", prefer: "return=minimal", body: b }); }
+      save(body)
+        .catch(function (err) {
+          /* ohne go-bubbles.sql gibt es bubble_id nicht: nur Sichtbarkeit setzen */
+          if (v === "privat" || v === "team") { var b2 = { visibility: v }; body = b2; return save(b2); }
+          throw err;
+        })
         .then(function () {
           Object.keys(body).forEach(function (k) { ev[k] = body[k]; });
           if (host.toast) host.toast("Sichtbar: " + (pick.label || v));
-          if (v === "circle" && global.WocheReels && WocheReels.shareToCircle) WocheReels.shareToCircle(id);
           if (global.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
           render();
         })
         .catch(function () {
-          if (host.toast) host.toast(v === "circle" || v === "bubble" ? "Ging nicht (go-visibility-fein.sql?)" : "Ändern ging gerade nicht");
+          if (host.toast) host.toast(v === "bubble" || v === "alles" ? "Ging nicht (go-bubbles.sql?)" : "Ändern ging gerade nicht");
         });
     });
   }
