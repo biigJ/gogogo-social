@@ -208,7 +208,8 @@
     .list-tools input[type="search"] { flex: 1; }
     .item .vlink { grid-column: 1 / -1; font-size: 13px; padding: 6px 8px; }
     .item.item--simple, .item.item--simple { grid-template-columns: 22px minmax(0, 1fr) auto !important; }
-    .item.item--simple .vlink { grid-column: 2 / -1; }
+    .item.item--simple .vlink, .item.item--simple .nt { grid-column: 2 / -1; }
+    .item .nt { font-size: 13px; padding: 6px 8px; }
     .item.item--simple .n { grid-column: 2 / 3 !important; }
     .item.item--simple [data-act="del-item"] { grid-column: 3 / 4; width: 36px; }
     .item.ihead .vlink { display: none; }
@@ -1194,6 +1195,10 @@
         else if (act === "save-blocks") saveBlocks(c, readBlocks(sesBox)).then(function () { if (uopts.inDesk) paintVideoMarks(sesBox); });
       });
       bindBlockDrag(sesBox, function () { saveBlocks(c, readBlocks(sesBox)); });
+      /* Hinweis speichert beim Verlassen des Felds */
+      sesBox.addEventListener("change", function (e) {
+        if (e.target && e.target.getAttribute && e.target.getAttribute("data-if") === "note") saveBlocks(c, readBlocks(sesBox));
+      });
       $("ai-copy").addEventListener("click", function () {
         var text = "Das ist eine gogogo-Einzeleinheit (" + c.title + ", " + catLabel(cat) + ") als JSON. Blöcke vom Typ mobility, skill, grund, hybrid, hypertrophie, finisher, ausdauer; " +
           "jede Übung hat name und optional sets, reps, time_s, dist_m, load, note.\nMeine Änderung: [HIER BESCHREIBEN]\n" +
@@ -1275,8 +1280,10 @@
       /* Sätze, Wdh. usw. plant der Nutzer selbst: Felder ausgeblendet, vorhandene Werte bleiben erhalten */
       function hid(k) { return '<input type="hidden" data-if="' + k + '" value="' + esc(it[k]) + '" />'; }
       return '<div class="item item--simple"><span class="drag" title="Übung ziehen">' + GRIP + "</span>" + f("name", "Übung", "n", "", "ex-names") +
-        hid("sets") + hid("reps") + hid("time_s") + hid("dist_m") + hid("load") + hid("note") +
+        hid("sets") + hid("reps") + hid("time_s") + hid("dist_m") + hid("load") +
         '<button class="small danger" data-act="del-item" aria-label="Übung entfernen">×</button>' +
+        /* Hinweis: erscheint in der App als graue Zeile unter der Übung (z. B. „Maschine“, „15 min · Zone 2“) */
+        f("note", "Hinweis (optional), z. B. Maschine oder Zone 2", "nt") +
         '<input class="vlink" data-vlink type="url" placeholder="Video-Link (YouTube/Instagram)" value="' + esc(vid) + '" /></div>';
     }
     function paintVideoMarks(box) {
