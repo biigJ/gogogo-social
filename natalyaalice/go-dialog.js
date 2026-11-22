@@ -21,6 +21,7 @@
     ".god__btn{display:block;width:100%;min-height:48px;margin:0 0 8px;border:0;border-radius:999px;background:#111;color:#fff;font:inherit;font-weight:700;font-size:16px;cursor:pointer}" +
     ".god__btn--quiet{background:transparent;color:rgba(42,33,24,.7);font-weight:600}" +
     ".god__btn--choice{background:transparent;color:#2A2118;border:1.5px solid #2A2118}" +
+    ".god__btn--danger{color:#C7413B;margin-top:4px}" +
     ".god__list{max-height:46vh;overflow-y:auto;margin:0 0 14px;display:grid;gap:6px}" +
     ".god__pick{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:12px;background:#fff;font-size:16px;cursor:pointer}" +
     ".god__pick input{width:20px;height:20px;accent-color:#2A2118;margin:0}" +
@@ -416,6 +417,15 @@
       row.appendChild(ok);
       row.appendChild(no);
       card.appendChild(row);
+      /* optional darunter eine Aktion (z. B. Löschen) → Ergebnis "__extra" */
+      if (opts.extra) {
+        var ex = document.createElement("button");
+        ex.type = "button";
+        ex.className = "god__btn god__btn--quiet god__btn--danger";
+        ex.textContent = opts.extra;
+        ex.addEventListener("click", function () { close("__extra"); });
+        card.appendChild(ex);
+      }
       return null;
     });
   }

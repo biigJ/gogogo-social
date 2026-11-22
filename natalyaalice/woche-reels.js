@@ -80,10 +80,10 @@
   var ICON_COMMENT =
     '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3v-3H7.5A2.5 2.5 0 0 1 5 13.5v-7z"/></svg>';
   var ICON_SHARE =
-    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 13.5h4.3l1.6 2.6h5.2l1.6-2.6h4.3"/><path d="M3.5 13.5V18a2.5 2.5 0 0 0 2.5 2.5h12a2.5 2.5 0 0 0 2.5-2.5v-4.5"/><path d="M3.5 13.5 6 8h2.2"/><path d="M20.5 13.5 18 8h-2.2"/><path d="M12 2.8v9.4"/><path d="M8.8 6 12 2.8 15.2 6"/></svg>';
+    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="11.2" r="3"/><path d="M6.4 21c.55-3.6 3-5.7 5.6-5.7s5.05 2.1 5.6 5.7"/><path d="M12 1.8v4.4M9.8 4h4.4"/></svg>';
 
   var ICON_PLANE =
-    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M21.5 3.2 2.8 10.4l7 3 3 7.4z"/><path d="M21.5 3.2 9.8 13.4"/></svg>';
+    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M20 3.7 4 9.9c-.8.3-.8 1.4 0 1.7l5.8 2.4 2.5 5.9c.3.8 1.4.8 1.7 0l6.2-16c.3-.8-.4-1.5-1.2-1.2z"/><path d="M20.4 3.6 9.8 14"/></svg>';
 
   function $(id) {
     return document.getElementById(id);

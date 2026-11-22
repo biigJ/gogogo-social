@@ -808,10 +808,15 @@
       });
   }
 
+  /* Zusagen laden. Zwei gleichzeitige Aufrufe (Refresh kurz hintereinander) haben früher beide in dieselbe,
+     vorher geleerte Liste geschrieben → jede Person doppelt unter dem Event. Jetzt: eigene Liste je Aufruf,
+     nur der letzte Aufruf schreibt, jede Person nur einmal. */
+  var rsvpSeq = 0;
   function loadRsvps(eventIds) {
-    state.rsvps = {};
-    state.rsvpPartner = {};
-    if (!eventIds.length) return Promise.resolve();
+    var seq = ++rsvpSeq;
+    if (!eventIds.length) { state.rsvps = {}; state.rsvpPartner = {}; return Promise.resolve(); }
+    var nextRsvps = {};
+    var nextPartner = {};
     var base =
       "event_rsvps?event_id=in.(" +
       eventIds.map(encodeURIComponent).join(",") +
@@ -821,20 +826,23 @@
         return rest(base);
       })
       .then(function (rows) {
+        if (seq !== rsvpSeq) return;
         var partnerIds = [];
         (rows || []).forEach(function (r) {
           var eid = String(r.event_id);
-          if (!state.rsvps[eid]) state.rsvps[eid] = [];
-          state.rsvps[eid].push(String(r.user_id));
+          if (!nextRsvps[eid]) nextRsvps[eid] = [];
+          if (nextRsvps[eid].indexOf(String(r.user_id)) < 0) nextRsvps[eid].push(String(r.user_id));
           if (r.partner_id || r.partner_name) {
-            if (!state.rsvpPartner[eid]) state.rsvpPartner[eid] = {};
-            state.rsvpPartner[eid][String(r.user_id)] = {
+            if (!nextPartner[eid]) nextPartner[eid] = {};
+            nextPartner[eid][String(r.user_id)] = {
               id: r.partner_id ? String(r.partner_id) : "",
               name: r.partner_name || ""
             };
             if (r.partner_id) partnerIds.push(String(r.partner_id));
           }
         });
+        state.rsvps = nextRsvps;
+        state.rsvpPartner = nextPartner;
         if (partnerIds.length) ensurePeople(partnerIds);
         var pids = [];
         Object.keys(state.rsvps).forEach(function (k) {
@@ -1621,10 +1629,10 @@
   /* Postausgang statt Plus: Einladen */
   /* gleiches Symbol wie in Woche */
   var OUTBOX_SVG =
-    '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 13.5h4.3l1.6 2.6h5.2l1.6-2.6h4.3"/><path d="M3.5 13.5V18a2.5 2.5 0 0 0 2.5 2.5h12a2.5 2.5 0 0 0 2.5-2.5v-4.5"/><path d="M3.5 13.5 6 8h2.2"/><path d="M20.5 13.5 18 8h-2.2"/><path d="M12 2.8v9.4"/><path d="M8.8 6 12 2.8 15.2 6"/></svg>';
+    '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="11.2" r="3"/><path d="M6.4 21c.55-3.6 3-5.7 5.6-5.7s5.05 2.1 5.6 5.7"/><path d="M12 1.8v4.4M9.8 4h4.4"/></svg>';
   /* Papierflieger wie bei Instagram: Teilen */
   var PLANE_SVG =
-    '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M21.5 3.2 2.8 10.4l7 3 3 7.4z"/><path d="M21.5 3.2 9.8 13.4"/></svg>';
+    '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M20 3.7 4 9.9c-.8.3-.8 1.4 0 1.7l5.8 2.4 2.5 5.9c.3.8 1.4.8 1.7 0l6.2-16c.3-.8-.4-1.5-1.2-1.2z"/><path d="M20.4 3.6 9.8 14"/></svg>';
   function placeSpontan(html) {
     return html;
   }
@@ -3317,14 +3325,17 @@
     return Promise.all(tasks);
   }
 
-  function submitDone() {
+  function submitDone(noPost) {
     var modal = $("acc-done-modal");
     if (!modal) return;
     var eventId = modal.dataset.eventId;
     if (!eventId) return;
+    noPost = noPost === true;
     var vis = normalizeVisibility(modal.dataset.vis || "team");
     if (vis === "gruppe") vis = "team";
     if (modal.dataset.origVis && modal.dataset.vis === modal.dataset.initVis && modal.dataset.origVis !== "privat") vis = modal.dataset.origVis;
+    /* „Speichern ohne Posting“: erledigt, aber nur für mich, ohne Foto */
+    if (noPost) vis = "privat";
     var note = (($("acc-done-note") && $("acc-done-note").value) || "").trim().slice(0, 500);
     var draft = eventId === "draft" ? state.doneDraft : null;
     if (eventId === "draft" && !draft) return;
@@ -3338,7 +3349,7 @@
         })
       : Promise.resolve();
     ready
-      .then(readDonePhoto)
+      .then(function () { return noPost ? "" : readDonePhoto(); })
       .then(function (photo) {
         var body = {
           status: "erledigt",
@@ -4382,11 +4393,12 @@
     /* wie das Dropdown in Aktuell: Ich · Community · Meine Bubble · Alles
        Alles = Community + Bubble (visibility team mit bubble_id) */
     var bid = host.bubbleId ? String(host.bubbleId() || "") : "";
-    var list = [{ value: "privat", label: "Ich" }, { value: "team", label: "Community" }];
-    if (bid) list.push({ value: "bubble", label: "Meine Bubble" }, { value: "alles", label: "Alles" });
+    var list = [{ value: "privat", label: "nur ich" }, { value: "team", label: "Community" }];
+    if (bid) list.push({ value: "bubble", label: "Bubble" }, { value: "alles", label: "alle" });
     var vis = normalizeVisibility(ev.visibility || "team");
     var cur = vis === "privat" ? "privat" : vis === "bubble" ? "bubble" : (bid && String(ev.bubble_id || "") === bid ? "alles" : "team");
-    GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list }).then(function (v) {
+    GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, extra: "Löschen" }).then(function (v) {
+      if (v === "__extra") { removeEvent(id, "delete"); return; }
       if (!v || v === cur) return;
       var pick = list.filter(function (x) { return x.value === v; })[0] || {};
       var body = v === "alles" ? { visibility: "team", bubble_id: bid }
@@ -5205,7 +5217,9 @@
       });
     }
     var doneOk = $("acc-done-ok");
-    if (doneOk) doneOk.addEventListener("click", submitDone);
+    if (doneOk) doneOk.addEventListener("click", function () { submitDone(false); });
+    var doneNoPost = $("acc-done-nopost");
+    if (doneNoPost) doneNoPost.addEventListener("click", function () { submitDone(true); });
     var doneCancel = $("acc-done-cancel");
     if (doneCancel) doneCancel.addEventListener("click", closeDoneModal);
     var doneModal = $("acc-done-modal");
