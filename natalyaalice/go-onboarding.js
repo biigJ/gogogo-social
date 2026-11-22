@@ -3,8 +3,9 @@
  *   GoOnboarding.maybeStart(host)   zeigt den Ablauf, wenn das Konto neu ist (≤ 14 Tage, noch nicht durchlaufen)
  *   GoOnboarding.start(host)        immer zeigen (Test: /workout/?onboarding=1)
  *
- * host: rest, account() → sessionAccount, savePhoto(file, cb), openPlan(), openCircle(), toast(msg)
- * Schritte: 1 Zustimmen (danach Hinweis Home-Bildschirm) · 2 Darstellung · 3 Foto · 4 Erster Wochenplan · 5 Circle. „Später einrichten“ beendet.
+ * host: rest, account() → sessionAccount, openPlan()
+ * Schritte: 1 Zustimmen (danach Hinweis Home-Bildschirm) · 2 Wochenplan wählen oder „Erst mal umsehen“.
+ * Darstellung, Foto und Circle kommen später über Einstellungen und Plus, damit man die App erst ansehen kann.
  * Durchlaufen merkt sich das Gerät (localStorage) und das Konto (go_accounts.onboarded_at, go-onboarding.sql).
  */
 (function (global) {
@@ -34,10 +35,6 @@
     ".gob__lead{margin:0 0 20px;font-size:15px;line-height:1.45;text-align:center;color:rgba(42,33,24,.75)}" +
     ".gob__check{display:grid;grid-template-columns:22px 1fr;gap:12px;align-items:start;margin:0 0 14px;font-size:15px;line-height:1.4;cursor:pointer}" +
     ".gob__check input{margin-top:1px}" +
-    ".gob__opt{display:block;width:100%;min-height:50px;margin:0 0 8px;border-radius:14px;border:1.5px solid rgba(42,33,24,.25);background:#F6F1E8;color:#2A2118;font:inherit;font-size:16px;font-weight:600;cursor:pointer}" +
-    ".gob__opt.is-on{border-color:#2A2118;background:#2A2118;color:#F6F1E8}" +
-    ".gob__face{width:140px;height:140px;margin:0 auto 18px;border-radius:50%;background:#E6DED0 center/cover no-repeat;display:grid;place-items:center;font-size:40px;font-weight:700;cursor:pointer;border:1.5px dashed rgba(42,33,24,.35)}" +
-    ".gob__face input{display:none}" +
     ".gob__foot{padding:10px 22px calc(18px + env(safe-area-inset-bottom));max-width:440px;width:100%;margin:0 auto;box-sizing:border-box}" +
     ".gob__btn{display:block;width:100%;min-height:52px;border:0;border-radius:999px;background:#111;color:#fff;font:inherit;font-size:16px;font-weight:700;cursor:pointer}" +
     ".gob__btn:disabled{opacity:.4}" +
@@ -53,7 +50,7 @@
     document.head.appendChild(st);
   }
 
-  var STEPS = 5;
+  var STEPS = 2;
 
   function shell(title, lead, inner, main, opts) {
     opts = opts || {};
@@ -63,14 +60,13 @@
       '<div class="gob__top">' + dots + "</div>" +
       '<div class="gob__body"><h2>' + esc(title) + "</h2>" + (lead ? '<p class="gob__lead">' + lead + "</p>" : "") + inner + "</div>" +
       '<div class="gob__foot"><button type="button" class="gob__btn" data-gob-next' + (opts.disabled ? " disabled" : "") + ">" + esc(main) + "</button>" +
-      (opts.noLater ? "" : '<button type="button" class="gob__later" data-gob-later>Später einrichten</button>') + "</div>";
+      (opts.noLater ? "" : '<button type="button" class="gob__later" data-gob-later>' + esc(opts.later || "Später einrichten") + "</button>") + "</div>";
   }
 
   function paint() {
     if (!root) return;
-    var acc = host.account() || {};
     if (step === 0) {
-      shell("Willkommen bei gogogo", "Kurz zustimmen, dann richten wir Deine App ein.",
+      shell("Willkommen bei gogogo", "Kurz zustimmen, dann kannst Du Dich umsehen.",
         '<label class="gob__check"><input type="checkbox" data-gob-c="privacy"' + (consent.privacy ? " checked" : "") + " />" +
         '<span>Ich habe die <a href="/datenschutz/?from=app" target="_blank" rel="noopener">Datenschutzerklärung</a> gelesen. Meine Angaben und Trainings werden für die App gespeichert, Freunde und mein Coach sehen meine geplanten und erledigten Trainings.</span></label>' +
         '<label class="gob__check"><input type="checkbox" data-gob-c="wa"' + (consent.wa ? " checked" : "") + " />" +
@@ -78,30 +74,8 @@
         "Zustimmen und weiter", { disabled: !consent.privacy, noLater: true });
       return;
     }
-    if (step === 1) {
-      var cur = global.GoThemes ? GoThemes.current() : "original";
-      var list = global.GoThemes ? GoThemes.list() : [{ id: "original", label: "Original" }];
-      shell("Darstellung", "Wie soll gogogo für Dich aussehen? Ändern geht später unter Einstellungen.",
-        list.map(function (t) {
-          return '<button type="button" class="gob__opt' + (t.id === cur ? " is-on" : "") + '" data-gob-theme="' + esc(t.id) + '">' + esc(t.label) + "</button>";
-        }).join(""), "Weiter");
-      return;
-    }
-    if (step === 2) {
-      var photo = acc.photo_url || "";
-      shell("Dein Foto", "Damit Deine Freunde Dich erkennen.",
-        '<label class="gob__face" style="' + (photo ? "background-image:url('" + esc(photo) + "');border-style:solid" : "") + '">' +
-        (photo ? "" : "+") + '<input type="file" accept="image/*" data-gob-photo /></label>',
-        photo ? "Weiter" : "Foto wählen");
-      return;
-    }
-    if (step === 3) {
-      shell("Dein erster Wochenplan", "Wähl einen Plan, der zu Deinem Ziel passt. Deine Woche füllt sich dann von selbst.",
-        "", "Wochenplan wählen");
-      return;
-    }
-    shell("Zirkeltraining im Circle", "Gründe einen Circle mit Freunden oder tritt einem bei. Dann trainiert Ihr Zirkel zusammen und seht Euch im Leaderboard.",
-      "", "Circle gründen oder beitreten");
+    shell("Dein erster Wochenplan", "Wähl einen Plan, der zu Deinem Ziel passt. Deine Woche füllt sich dann von selbst.",
+      "", "Wochenplan wählen", { later: "Erst mal umsehen" });
   }
 
   function saveConsent() {
@@ -147,32 +121,13 @@
   }
 
   function onClick(e) {
-    var t = e.target.closest("[data-gob-next],[data-gob-later],[data-gob-theme]");
+    var t = e.target.closest("[data-gob-next],[data-gob-later]");
     if (!t) return;
     if (t.hasAttribute("data-gob-later")) { finish(); return; }
-    if (t.hasAttribute("data-gob-theme")) {
-      if (global.GoThemes) GoThemes.apply(t.getAttribute("data-gob-theme"));
-      paint();
-      return;
-    }
     if (step === 0) { saveConsent(); next(); homeHint(); return; }
-    if (step === 2) {
-      var acc = host.account() || {};
-      if (acc.photo_url) { next(); return; }
-      var inp = root.querySelector("[data-gob-photo]");
-      if (inp) inp.click();
-      return;
-    }
-    if (step === 3) {
-      /* Plan-Auswahl liegt über dem Onboarding; danach geht es hier weiter */
-      step = 4;
-      paint();
-      setTimeout(function () { if (host.openPlan) host.openPlan(); }, 0);
-      return;
-    }
-    if (step === 4) {
+    if (step === 1) {
       finish();
-      setTimeout(function () { if (host.openCircle) host.openCircle(); }, 0);
+      setTimeout(function () { if (host.openPlan) host.openPlan(); }, 0);
       return;
     }
     next();
@@ -185,11 +140,6 @@
       var btn = root.querySelector("[data-gob-next]");
       if (btn) btn.disabled = !consent.privacy;
       return;
-    }
-    if (e.target.hasAttribute && e.target.hasAttribute("data-gob-photo")) {
-      var file = e.target.files && e.target.files[0];
-      if (!file || !host.savePhoto) return;
-      host.savePhoto(file, function () { paint(); });
     }
   }
 
