@@ -17,13 +17,42 @@
 (function (global) {
   "use strict";
 
+  /* Ziele wie im Editor (go/kurse/index.html GOALS), Schlüssel = courses.goals */
   var GOALS = [
-    { key: "laufen", label: "Gesund laufen", sub: "ohne Knie- und Rückenschmerzen" },
-    { key: "ruecken", label: "Rücken stärken", sub: "weniger Rückenschmerzen" },
-    { key: "gesund", label: "Gesund bleiben", sub: "fit für den Alltag" },
     { key: "abnehmen", label: "Abnehmen", sub: "durch mehr Bewegung" },
+    { key: "muskelaufbau", label: "Muskelaufbau", sub: "sichtbar stärker werden" },
+    { key: "laufen", label: "Gesund laufen", sub: "ohne Knie- und Rückenschmerzen" },
+    { key: "schmerzfrei", label: "Schmerzfreiheit im Alltag", sub: "" },
+    { key: "hybrid", label: "Hybrid-Athletik", sub: "Kraft und Ausdauer" },
+    { key: "hyrox", label: "Für HYROX trainieren", sub: "" },
+    { key: "halbmarathon", label: "Für einen Halbmarathon trainieren", sub: "" },
+    { key: "klimmzug", label: "Erste Klimmzüge schaffen", sub: "" },
+    { key: "beweglich", label: "Beweglichkeit verbessern", sub: "" },
+    { key: "haltung", label: "Körperhaltung optimieren", sub: "" },
+    { key: "ruecken", label: "Rücken stärken", sub: "weniger Rückenschmerzen" },
+    { key: "longevity", label: "Langlebigkeit (Longevity)", sub: "" },
+    { key: "herz", label: "Herz-Kreislauf stärken", sub: "" },
+    { key: "energie", label: "Mehr Energie im Alltag", sub: "" },
+    { key: "schlaf", label: "Besser schlafen", sub: "" },
+    { key: "stress", label: "Stressabbau", sub: "" },
+    { key: "kopf", label: "Den Kopf freibekommen", sub: "" },
+    { key: "routine", label: "Eine feste Routine aufbauen", sub: "" },
+    { key: "gesund", label: "Gesund bleiben", sub: "fit für den Alltag" },
     { key: "muskeln", label: "Muskeln erhalten", sub: "stark bleiben mit den Jahren" },
-    { key: "gelenke", label: "Gelenke schonen", sub: "Knie, Hüfte, Schulter" }
+    { key: "gelenke", label: "Gelenke schonen", sub: "Knie, Hüfte, Schulter" },
+    { key: "praevention", label: "Verletzungsprävention", sub: "" },
+    { key: "comeback", label: "Comeback nach einer Verletzung", sub: "" },
+    { key: "knochen", label: "Knochen stärken", sub: "" },
+    { key: "sturz", label: "Sturzprävention im Alter", sub: "" },
+    { key: "schwangerschaft", label: "Fit nach der Schwangerschaft", sub: "" },
+    { key: "balance", label: "Koordination und Balance", sub: "" },
+    { key: "selbstbewusst", label: "Selbstbewusstsein stärken", sub: "" },
+    { key: "leute", label: "Neue Leute kennenlernen", sub: "" },
+    { key: "natur", label: "Zeit in der Natur verbringen", sub: "" },
+    { key: "spielerisch", label: "Spielerisch bewegen", sub: "ohne Leistungsdruck" },
+    { key: "tanzen", label: "Besser tanzen", sub: "" },
+    { key: "bouldern", label: "Bouldern lernen", sub: "" },
+    { key: "schwimmen", label: "Schwimmen lernen", sub: "" }
   ];
   var DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
   var CAT = { kraft: "Kraft", ausdauer: "Ausdauer", zirkel: "Zirkel", alternative: "Bewegung", spontan: "Spontan" };
@@ -37,6 +66,8 @@
     ".gpl__back{width:44px;height:44px;border:0;background:transparent;color:inherit;display:grid;place-items:center;padding:0;cursor:pointer}" +
     ".gpl__body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:6px 16px calc(28px + env(safe-area-inset-bottom))}" +
     ".gpl__lead{margin:4px 0 14px;font-size:15px;line-height:1.4}" +
+    ".gpl__goals{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 12px}" +
+    ".gpl__goals .gpl__goal{margin:0;padding:10px 12px}.gpl__goals .gpl__goal b{font-size:14px;line-height:1.25}" +
     ".gpl__goal{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:0 0 8px;padding:12px 14px;border-radius:14px;border:1.5px solid rgba(42,33,24,.2);background:#F6F1E8;color:inherit;font:inherit;cursor:pointer}" +
     ".gpl__goal b{display:block;font-size:16px}.gpl__goal small{display:block;font-size:13px;color:rgba(42,33,24,.65)}" +
     ".gpl__goal.is-on{border-color:#2A2118;background:#2A2118;color:#F6F1E8}.gpl__goal.is-on small{color:rgba(246,241,232,.75)}" +
@@ -166,12 +197,12 @@
     st.step = "goals";
     st.title.textContent = "Dein Ziel";
     st.body.innerHTML =
-      '<p class="gpl__lead">Was ist wichtig? Mehrauswahl möglich.</p>' +
+      '<p class="gpl__lead">Was ist wichtig? Mehrauswahl möglich.</p><div class="gpl__goals">' +
       GOALS.map(function (g) {
         var on = st.goals.indexOf(g.key) !== -1;
         return '<button type="button" class="gpl__goal' + (on ? " is-on" : "") + '" data-gpp-goal="' + g.key + '">' +
-          '<span class="gpl__tick">' + (on ? "✓" : "") + "</span><span><b>" + esc(g.label) + "</b><small>" + esc(g.sub) + "</small></span></button>";
-      }).join("") +
+          '<span class="gpl__tick">' + (on ? "✓" : "") + "</span><span><b>" + esc(g.label) + "</b>" + (g.sub ? "<small>" + esc(g.sub) + "</small>" : "") + "</span></button>";
+      }).join("") + "</div>" +
       '<input type="text" class="gpl__own" id="gpl-own-goal" maxlength="60" placeholder="Oder eigenes Ziel eingeben" value="' + esc(st.ownGoal || "") + '" />' +
       '<button type="button" class="gpl__btn" data-gpp-next>' + (st.goals.length ? "Passende Pläne zeigen" : "Alle Pläne zeigen") + "</button>" +
       (st.mode === "self" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-indiv>Individuell</button>' : "");
