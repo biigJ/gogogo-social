@@ -49,6 +49,7 @@
     ".ga-pill{flex:none;align-self:center;min-height:34px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}" +
     ".ga-pill.is-fill{background:#111;color:#fff}" +
     ".ga-pill.is-blue{background:#1D9BF0;border-color:#1D9BF0;color:#fff}" +
+    ".ga-rolestack{display:inline-flex;flex-direction:column;gap:4px;align-items:stretch}" +
     ".ga-pill.is-admin{background:#C7413B;border-color:#C7413B;color:#fff}" +
     ".ga-pill.is-owner{background:#E4469A;border-color:#E4469A;color:#fff}" +
     "@media (max-width:600px){.ga-item:has(.ga-wa){flex-wrap:wrap}.ga-item:has(.ga-wa) .ga-copy{flex:1 1 calc(100% - 54px)}.ga-item .ga-wa{margin-left:54px}}" +
@@ -584,12 +585,15 @@
   function rolePill(a) {
     var id = String(a.account_id);
     var ci = coachInfo(id);
-    if (id === OWNER_ID) return '<button type="button" class="ga-pill is-owner" data-ga-admin="' + esc(id) + '">Inhaber</button>';
-    if (ci.is_admin) return '<button type="button" class="ga-pill is-admin" data-ga-admin="' + esc(id) + '">Admin</button>';
-    if (ci.coach_verified_at) return '<button type="button" class="ga-pill is-blue" data-ga-role="' + esc(id) + '">Coach</button>';
-    if (isCoachAcc(a)) return '<button type="button" class="ga-pill is-fill" data-ga-role="' + esc(id) + '">Coach</button>';
-    if (coachRequested(id)) return '<button type="button" class="ga-pill" data-ga-req="' + esc(id) + '">Anfrage Coach</button>';
-    return '<button type="button" class="ga-pill" data-ga-user="' + esc(id) + '">' + (ci.paused_at ? "Pausiert" : "Nutzer") + "</button>";
+    /* Rolle (Coach/Nutzer) oben, darunter Inhaber bzw. Admin als eigene Pille: Admin geht auch ohne Coach */
+    var base;
+    if (ci.coach_verified_at) base = '<button type="button" class="ga-pill is-blue" data-ga-role="' + esc(id) + '">Coach</button>';
+    else if (isCoachAcc(a)) base = '<button type="button" class="ga-pill is-fill" data-ga-role="' + esc(id) + '">Coach</button>';
+    else if (coachRequested(id)) base = '<button type="button" class="ga-pill" data-ga-req="' + esc(id) + '">Anfrage Coach</button>';
+    else base = '<button type="button" class="ga-pill" data-ga-user="' + esc(id) + '">' + (ci.paused_at ? "Pausiert" : "Nutzer") + "</button>";
+    var adm = id === OWNER_ID ? '<button type="button" class="ga-pill is-owner" data-ga-admin="' + esc(id) + '">Inhaber</button>'
+      : ci.is_admin ? '<button type="button" class="ga-pill is-admin" data-ga-admin="' + esc(id) + '">Admin</button>' : "";
+    return adm ? '<span class="ga-rolestack">' + base + adm + "</span>" : base;
   }
   /* Nutzer-Filter: je Merkmal ein Dropdown (alle, Werte, ohne) */
   var UF = [["role", "Rolle"], ["login", "Login"], ["member", "Stempelkarte"], ["goal", "Ziel"], ["coach", "Coach"], ["place", "Ort"], ["plan", "Wochenplan"], ["circle", "Circle"], ["group", "Gruppe"], ["day", "Workout"]];

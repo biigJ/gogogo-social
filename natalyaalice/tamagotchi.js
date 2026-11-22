@@ -13,7 +13,7 @@
  *                                           (höchstens Gelb-Orange, 2), gezählt am Tag des Verschiebens
  *   Tag ohne Event                        → bleibt
  *   Stufen: 0 normal · 1 Gelb · 2 Gelb-Orange · 3 Rot
- *   Ziffer (nur am eigenen Kreis): Tage am Stück, an denen abgehakt wurde. Tage ohne Event zählen nicht und
+ *   Ziffer (nur am eigenen Kreis): Tage am Stück, an denen abgehakt wurde (Events + activity_log checkin, damit gelöschte Posts zählen). Tage ohne Event zählen nicht und
  *   brechen nicht ab; ein Tag mit offenem oder ausgefallenem Event bricht ab. Heute zählt erst, wenn abgehakt.
  *   Verschoben (auch einmal): ab 0:00 steht die Ziffer auf 0, außer an dem Tag wurde etwas abgehakt
  *   oder ein Event von Freunden mitgemacht, das abgeschlossen ist (event_rsvps zugesagt + erledigt).
@@ -111,7 +111,10 @@
     /* mitgemachte Events von Freunden, die abgeschlossen sind, zählen wie eigene erledigte */
     var joined = host.rest("event_rsvps?user_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&status=eq.zugesagt" +
       "&select=user_id,events(starts_at,status)&limit=2000").catch(function () { return []; });
-    Promise.all([q, joined]).then(function (res) {
+    /* Abgehakt im Aktivitätslog (checkin): zählt auch, wenn der Post später gelöscht wurde. RLS: meist nur das eigene Log */
+    var log = host.rest("activity_log?user_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&type=eq.checkin" +
+      "&created_at=gte." + from + "T00:00:00Z&select=user_id,created_at&limit=2000").catch(function () { return []; });
+    Promise.all([q, joined, log]).then(function (res) {
       var rows = res[0];
       var by = {};
       ids.forEach(function (id) { by[id] = []; });
@@ -119,6 +122,9 @@
       (res[1] || []).forEach(function (j) {
         var e = j && j.events;
         if (e && e.status === "erledigt" && by[j.user_id] && String(e.starts_at) >= from) by[j.user_id].push({ starts_at: e.starts_at, status: "erledigt" });
+      });
+      (res[2] || []).forEach(function (l) {
+        if (l && by[l.user_id]) by[l.user_id].push({ starts_at: l.created_at, status: "erledigt" });
       });
       ids.forEach(function (id) { cache[id] = compute(by[id], t); });
       if (host.onChange) host.onChange();
