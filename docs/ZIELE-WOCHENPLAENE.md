@@ -35,6 +35,17 @@ Jeder Plan hat 7 Tage. Freie Tage sind Bewegung (Schritte, Mobility).
 | Muskeln erhalten | ✓ Hybrid Kraft 2× | ✓ Hybrid Kraft 3× | ○ Kraft & Kondition |
 | Gelenke schonen | ✓ Bulletproof Knees | ○ Bulletproof Knees | ○ Bulletproof Knees |
 
+## gogogo-Hybrid-Prinzip (gilt für jedes Event)
+
+Einfache Herangehensweise: Grundübungen in jeder Variante.
+
+- Jede Einheit enthält Hüftöffnung, Hängen und Hocksitz und/oder Kniebeuge. Ausnahme: Fuß verletzt oder ähnlich.
+- Reihenfolge der Blöcke: Mobilität (mit Gewicht, sobald kräftig genug) → Explosivkraft (Sprünge, Würfe) → Grundübung → komplexe Übung → Geräte (Hypertrophie) → Finisher.
+- Hypertrophie hängt nicht an 10 bis 12 Wiederholungen. Entscheidend ist, dass die letzten Wiederholungen schwer werden.
+- Keine Sätze, Wiederholungen oder Pausen als Felder. Varianten stehen im Übungsnamen, der Hinweis höchstens „Ungefähr: Sätze × Wdh × Gewicht“.
+- Keine doppelten Übungen unter verschiedenen Namen. Vor dem Anlegen im Katalog nach vorhandenem Namen suchen.
+- In der App erscheint der Kurztext dazu nach dem Anwenden eines Wochenplans (`PRINZIP` in `natalyaalice/plan-picker.js`).
+
 ## Abweichungen der bestehenden Pläne vom Level-Schema
 
 - Keiner hat einen Zirkel-Tag. Laut Schema gehört in jedes Level einer (Freitag).

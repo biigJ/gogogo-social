@@ -147,6 +147,12 @@ Neue Module: IIFE, `host`-Inject, kein Bundler. Globale Namen nicht kollidieren 
 
 ---
 
+## Trainingsinhalte
+
+Events und Wochenpläne folgen dem gogogo-Hybrid-Prinzip in [`docs/ZIELE-WOCHENPLAENE.md`](docs/ZIELE-WOCHENPLAENE.md). Keine doppelten Übungen unter verschiedenen Namen.
+
+---
+
 ## Kontakt-Kontext Produkt
 
 - Marke: **gogogo** / Friday Fitness Circle (FFC)
