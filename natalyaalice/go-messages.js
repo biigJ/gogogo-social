@@ -6,7 +6,7 @@
  * Quellen:
  *   NEWS (unten)     Änderungen an der App, die Nutzer merken. Bei jeder spürbaren Änderung einen Eintrag ergänzen.
  *                    Neue Konten sehen nur Einträge, die nach ihrer Anmeldung kamen.
- *   go_messages      an alle (Admin, neuer Wochenplan) oder an eine Person (Freund hat Plan geändert), go-messages.sql
+ *   go_messages      an alle (Admin, neuer Wochenplan; ab 3 neuen Plänen eine Sammelmeldung) oder an eine Person (Freund hat Plan geändert), go-messages.sql
  * Gelesen: go_message_reads (pro Konto, geräteübergreifend); ohne die Tabelle nur auf diesem Gerät.
  */
 (function (global) {
@@ -24,6 +24,8 @@
       text: "Freunde einladen geht, sobald Dein Training eine Uhrzeit hat. Die setzt Du unter Woche → Stift → Tage bearbeiten."
     }
   ];
+
+  var PLANS_TEXT = "Es gibt neue Trainingspläne. Du findest sie unter Woche → Stift → Wochenplan ändern.";
 
   var host = null;
   var busy = false;
@@ -65,7 +67,7 @@
       var id = encodeURIComponent(me());
       var msgs = noTables ? Promise.resolve([]) : host.rest(
         "go_messages?or=(to_id.is.null,to_id.eq." + id + ")&created_at=gte." + encodeURIComponent(from) +
-        "&order=created_at.asc&limit=30&select=id,body,created_at"
+        "&order=created_at.asc&limit=60&select=id,kind,body,created_at"
       ).catch(function () { noTables = true; return []; });
       var reads = noTables ? Promise.resolve([]) : host.rest("go_message_reads?account_id=eq." + id + "&select=msg_key&limit=500")
         .catch(function () { return []; });
@@ -76,9 +78,18 @@
         var list = NEWS.filter(function (n) { return n.at >= from; }).map(function (n) {
           return { key: n.key, at: n.at, text: n.text };
         });
-        (r[0] || []).forEach(function (m) { list.push({ key: String(m.id), at: m.created_at, text: m.body }); });
+        (r[0] || []).forEach(function (m) { list.push({ key: String(m.id), at: m.created_at, text: m.body, kind: m.kind }); });
         list.sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
-        return list.filter(function (m) { return !seen[m.key]; });
+        list = list.filter(function (m) { return !seen[m.key]; });
+        /* mehr als 2 neue Wochenpläne: eine Sammelmeldung statt jeden einzeln */
+        var plans = list.filter(function (m) { return m.kind === "new_plan"; });
+        if (plans.length > 2) {
+          var at = plans[0].at;
+          list = list.filter(function (m) { return m.kind !== "new_plan"; });
+          list.push({ keys: plans.map(function (m) { return m.key; }), at: at, text: PLANS_TEXT });
+          list.sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
+        }
+        return list;
       });
     });
   }
@@ -97,7 +108,7 @@
       return;
     }
     var m = list.shift();
-    markRead(m.key);
+    (m.keys || [m.key]).forEach(markRead);
     (GoDialog.note || GoDialog.alert)(m.text).then(function () {
       setTimeout(function () { showQueue(list); }, 350);
     });
