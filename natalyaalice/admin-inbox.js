@@ -448,23 +448,39 @@
     var ev = (st.cw || []).filter(function (r) { return r.day === day && String(r.circle_id || "") === cid; })
       .sort(function (x, y) { return (x.note ? 0 : 1) - (y.note ? 0 : 1); })[0] || {};
     var H = global.GoHyroxDoubles;
-    var stations = H ? H.plan({ day: day, circle_id: cid, results: {} }).map(function (x) { return x.label; }) : [];
+    var CS = global.GoCircleSheet;
+    var keys = CS ? CS.noteStations(ev.note) : [];
+    var stations = keys.length ? CS.labels(keys) : H ? H.plan({ day: day, circle_id: cid, results: {} }).map(function (x) { return x.label; }) : [];
     var work = Number(noteVal(ev.note, "work")) || 0, pause = Number(noteVal(ev.note, "pause")) || 0;
     var rounds = Number(noteVal(ev.note, "rounds")) || stations.length || 8;
     var when = ev.starts_at ? shortDay(ev.starts_at) + ", " + new Date(ev.starts_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }) : dayDe(day);
     var mm = function (sec) { return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); };
     return {
-      day: day, circle: cid, stations: stations.length ? stations : null, rounds: rounds,
+      day: day, circle: cid, stations: stations.length ? stations : null, rounds: rounds, eventId: ev.event_id || null, note: ev.note || "",
       title: "Anstehendes Workout",
       sub: [when, ev.circle_name || "", ev.mode === "double" ? "Double" : ev.mode ? "Single" : "", work ? mm(work) + " Arbeit" + (pause ? " / " + mm(pause) + " Pause" : "") : ""].filter(Boolean).join(" · ")
     };
   }
   /* Letztes Workout vor dem Termin: HYROX Double mit Werten (gleicher Circle zuerst) */
-  function lastInfo(id, beforeDay, cid) {
+  function lastInfo(id, beforeDay, cid, ffc) {
     var H = global.GoHyroxDoubles;
     var rows = hxdOf(id).filter(function (r) { return r.day < beforeDay; })
       .sort(function (x, y) { return (String(y.circle_id) === cid) - (String(x.circle_id) === cid) || String(y.day).localeCompare(String(x.day)); });
     var r = rows[0];
+    /* FFC-Training aus der App (go_ffc_sessions.lines), wenn es jünger ist als das letzte HYROX Double */
+    var f = (ffc || []).filter(function (x) { return String(x.account_id) === String(id) && x.day < beforeDay && (x.lines || []).length; })[0];
+    if (f && (!r || f.day >= r.day)) {
+      var mm = function (sec) { return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); };
+      return {
+        sub: [dayDe(f.day), "Zirkeltraining", (f.rounds ? f.rounds + " Runden" : ""), f.work_sec ? mm(f.work_sec) + " Arbeit" : ""].filter(Boolean).join(" · "),
+        total: f.points,
+        rows: f.lines.map(function (l) {
+          var lab = String(l.label || "").replace(/^R\d+\s*·\s*/, "");
+          var m = String(l.value || "").match(/^(.*?)\s*·\s*(\d+)\s*P$/);
+          return { label: lab, value: m ? m[1] : String(l.value || ""), points: m ? Number(m[2]) : null };
+        })
+      };
+    }
     if (!r || !H) return null;
     var names = String(r.team || "").split(/\s*&\s*/);
     var mi = (r.account_ids || []).map(String).indexOf(String(id));
@@ -480,15 +496,34 @@
   function exportSheets(ids, key) {
     if (!global.GoCircleSheet) { GoDialog.alert("PDF-Modul fehlt (circle-sheet.js)."); return; }
     var nx = nextInfo(key);
-    var startJob = nx.stations
-      ? GoDialog.choose("Wo ist Start?", nx.stations.map(function (x, i) { return { label: x, value: String(i) }; }).concat([{ label: "Offen lassen (zum Eintragen)", value: "open" }]), { cancel: "Abbrechen" })
-      : Promise.resolve("open");
-    startJob.then(function (v) {
+    /* Event ohne Stationen (vor dem Stationen-Schritt angelegt): jetzt wählen und am Event speichern */
+    var stJob = nx.stations ? Promise.resolve(nx.stations) : GoCircleSheet.pickStations("Stationen für dieses Event").then(function (k) {
+      if (!k) return null;
+      if (nx.eventId) {
+        var note = String(nx.note || "zirkel:single").replace(/\|st=[^|]*/, "") + "|st=" + k.join(",");
+        host.rest("events?id=eq." + encodeURIComponent(nx.eventId), { method: "PATCH", prefer: "return=minimal", body: { note: note } }).catch(function () {});
+        (st.cw || []).forEach(function (r) { if (r.event_id === nx.eventId) r.note = note; });
+      }
+      return GoCircleSheet.labels(k);
+    });
+    var ffcJob = host.rest("go_ffc_sessions?account_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&day=lt." + nx.day + "&select=account_id,day,points,rounds,work_sec,lines&order=day.desc&limit=2000")
+      .catch(function () { return host.rest("go_ffc_sessions?account_id=in.(" + ids.map(encodeURIComponent).join(",") + ")&day=lt." + nx.day + "&select=account_id,day,points,rounds,work_sec&order=day.desc&limit=2000"); })
+      .catch(function () { return []; });
+    var ffcRows = [];
+    stJob.then(function (sts) {
+      if (!sts) return null;
+      nx.stations = sts;
+      nx.rounds = sts.length;
+      return ffcJob.then(function (rows) {
+        ffcRows = rows || [];
+        return GoDialog.choose("Wo ist Start?", sts.map(function (x, i) { return { label: x, value: String(i) }; }).concat([{ label: "Offen lassen (zum Eintragen)", value: "open" }]), { cancel: "Abbrechen" });
+      });
+    }).then(function (v) {
       if (!v) return;
       var start = v === "open" ? null : Number(v);
       var pages = ids.map(function (id) {
         var a = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(id); })[0] || {};
-        return { name: a.name || "", partner: "", last: lastInfo(id, nx.day, nx.circle), next: Object.assign({}, nx, { start: start }) };
+        return { name: a.name || "", partner: "", last: lastInfo(id, nx.day, nx.circle, ffcRows), next: Object.assign({}, nx, { start: start }) };
       });
       var file = "gogogo-" + nx.day + "-" + String(((st.cw || []).filter(function (r) { return String(r.circle_id || "") === nx.circle; })[0] || {}).circle_name || "circle").replace(/[^A-Za-z0-9]+/g, "-") + (ids.length === 1 ? "-" + String(pages[0].name).split(" ")[0] : "") + ".pdf";
       return GoCircleSheet.pdf(pages, { format: "a4", file: file });

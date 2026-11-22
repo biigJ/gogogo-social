@@ -175,5 +175,28 @@
     });
   }
 
-  global.GoCircleSheet = { pdf: pdf, plan: plan };
+  /* Stationen (Schlüssel wie hyrox-doubles.js REFS) */
+  function stationList() {
+    var R = (global.GoHyroxDoubles && global.GoHyroxDoubles.REFS) || {};
+    var order = ["row", "skierg", "bike_m", "sledpush", "sledhybrid", "farmers", "wallballs", "lunges", "burpee", "burpeebox"];
+    return order.filter(function (k) { return R[k]; }).map(function (k) { return [k, R[k].label]; });
+  }
+  function labels(keys) {
+    var map = {};
+    stationList().forEach(function (x) { map[x[0]] = x[1]; });
+    return (keys || []).map(function (k) { return map[k] || k; });
+  }
+  /* Coach wählt die Stationen in der Reihenfolge an der Tafel; Antwort = Schlüssel oder null */
+  function pickStations(title, have) {
+    if (!global.GoDialog) return Promise.resolve(null);
+    have = have || [];
+    return global.GoDialog.pick(title || "Stationen", stationList().map(function (x) { return { label: x[1], value: x[0], checked: have.indexOf(x[0]) >= 0 }; }), { ok: "Übernehmen", cancel: "Abbrechen" })
+      .then(function (v) { return v && v.length ? v : null; });
+  }
+  function noteStations(note) {
+    var m = String(note || "").match(/(?:^|\|)st=([^|]*)/);
+    return m && m[1] ? m[1].split(",").filter(Boolean) : [];
+  }
+
+  global.GoCircleSheet = { pdf: pdf, plan: plan, pickStations: pickStations, labels: labels, noteStations: noteStations, stationList: stationList };
 })(window);
