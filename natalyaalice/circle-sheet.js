@@ -179,7 +179,7 @@
   function stationList() {
     var R = (global.GoHyroxDoubles && global.GoHyroxDoubles.REFS) || {};
     var order = ["row", "skierg", "bike_m", "sledpush", "sledhybrid", "farmers", "wallballs", "lunges", "burpee", "burpeebox"];
-    return order.filter(function (k) { return R[k]; }).map(function (k) { return [k, R[k].label]; });
+    return order.filter(function (k) { return R[k]; }).map(function (k) { return [k, R[k].label]; }).concat([["frei", "Frei"]]);
   }
   function labels(keys) {
     var map = {};

@@ -22,7 +22,10 @@
     {id:'assaultbike', name:'Assault Bike',     unit:'Kalorien'},
     {id:'farmers',  name:'Farmers Carry',       unit:'Meter'},
     {id:'lunges',   name:'Sandbag Lunges',      unit:'Meter'},
-    {id:'wallballs',name:'Wall Balls',          unit:'Wiederholungen'}
+    {id:'wallballs',name:'Wall Balls',          unit:'Wiederholungen'},
+    /* gogogo-Ergänzung, Abgleich mit Hendriks punkte.sql folgt */
+    {id:'burpeebox',name:'Burpee Box Jumps',    unit:'Wiederholungen'},
+    {id:'frei',     name:'Frei',                unit:''}
   ];
 
   // ---------- Punktesystem (gleiche Formel wie supabase/punkte.sql!) ----------
@@ -39,7 +42,8 @@
     assaultbike:{dist:50,  m:110, f:140},   // Schätzung: 50 Kalorien in ca. 1:50 / 2:20 (Elite)
     farmers:   {dist:200,  m:97,  f:117},
     lunges:    {dist:100,  m:183, f:215},
-    wallballs: {dist:100,  m:265, f:230}
+    wallballs: {dist:100,  m:265, f:230},
+    burpeebox: {dist:100,  m:400, f:480}    // Schätzung: 15 bzw. 12,5 Wdh/min (Elite), wie hyrox-doubles.js; „Frei“ ohne Punkte
   };
   const POINTS_MAX = 150;      // Deckel gegen Tippfehler
   const POINTS_EXP = 0.943;    // Riegel-Exponent (1/1,06): kürzere Runden = etwas höheres Tempo möglich
@@ -149,7 +153,14 @@
       '<line x1="19" y1="2" x2="19" y2="22"/>' +
       '<circle cx="11" cy="3" r="2.4" fill="currentColor" stroke="none"/>' +
       '<circle cx="9" cy="8" r="2.6" fill="currentColor" stroke="none"/>' +
-      '<path d="M9 10.5 L9 15 M9 15 L6 18 L6 21 M9 15 L12 18 L12 21 M9 11 L11 6 M9 11 L6 10"/>'
+      '<path d="M9 10.5 L9 15 M9 15 L6 18 L6 21 M9 15 L12 18 L12 21 M9 11 L11 6 M9 11 L6 10"/>',
+    burpeebox:
+      '<rect x="13" y="14" width="8" height="7" rx="1"/>' +
+      '<circle cx="8" cy="4" r="2.4" fill="currentColor" stroke="none"/>' +
+      '<path d="M8 6.5 L8 12 M8 12 L5 16 L5 21 M8 12 L11 15 L13 13 M8 8 L4 11 M8 8 L12 6"/>',
+    frei:
+      '<circle cx="12" cy="12" r="9"/>' +
+      '<path d="M12 7.5 V16.5 M7.5 12 H16.5"/>'
   };
   function iconSvg(exId, size){
     const inner = exerciseIcons[exId];
@@ -2629,7 +2640,7 @@
     if(!session || !session.log || !session.log[idx] || !currentUser) return false;
     const entry = session.log[idx];
     const ex = exercises.find(e=>e.id===entry.exercise);
-    const v = await GoDialog.prompt('R'+roundNo(idx, session.log)+' · '+(ex?ex.name:entry.exercise)+(ex?' ('+ex.unit+')':''), entry.amount || '', { ok:'Speichern' });
+    const v = await GoDialog.prompt('R'+roundNo(idx, session.log)+' · '+(ex?ex.name:entry.exercise)+(ex&&ex.unit?' ('+ex.unit+')':''), entry.amount || '', { ok:'Speichern' });
     if(v === null || v === undefined) return false;
     const raw = String(v).trim().replace(',', '.');
     const n = raw === '' ? 0 : parseFloat(raw);
