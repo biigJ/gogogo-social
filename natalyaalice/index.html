@@ -8529,7 +8529,7 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-24"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-25"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-3"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-16"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
@@ -15790,6 +15790,7 @@
           var me = sessionAccount ? String(sessionAccount.id) : "";
           return (rows || []).filter(function (r) { return (r.account_ids || []).map(String).indexOf(me) >= 0; }).map(function (r) {
             var sc = hxdScore(r);
+            var pl = window.GoHyroxDoubles ? GoHyroxDoubles.plan(r) : sc.stations;
             var names = hxdNames(r);
             var i = (r.account_ids || []).map(String).indexOf(me);
             var partner = names[i === 0 ? 1 : 0] || "";
@@ -15797,9 +15798,9 @@
             return {
               id: "hxd-" + r.id, hxd: true, date: r.day + "T12:00:00Z",
               dateLabel: d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) + " · " + (r.title || "HYROX Double") + (partner ? " mit " + partner : ""),
-              points: sc.total, workSec: Number(r.work_sec) || 360, restSec: Number(r.rest_sec) || 60, rounds: sc.stations.length,
-              lines: sc.stations.map(function (st, k) {
-                return { label: "R" + (k + 1) + " · " + st.label, value: Number(st.value).toLocaleString("de-DE") + " " + st.unit + (st.points != null ? " · " + st.points + " P" : "") };
+              points: sc.total, workSec: Number(r.work_sec) || 360, restSec: Number(r.rest_sec) || 60, rounds: pl.length,
+              lines: pl.map(function (st, k) {
+                return { label: "R" + (k + 1) + " · " + st.label, value: GoHyroxDoubles.valueText(st) + (st.points != null ? " · " + st.points + " P" : "") };
               })
             };
           });
@@ -26942,7 +26943,7 @@
     })();
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="/natalyaalice/hyrox-doubles.js?v=hxd-1"></script>
+  <script src="/natalyaalice/hyrox-doubles.js?v=hxd-2"></script>
   <script src="/natalyaalice/ffc.js?v=ffc-dlg-17"></script>
 </body>
 </html>
