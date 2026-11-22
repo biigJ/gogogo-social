@@ -6867,6 +6867,7 @@
       <button type="button" data-menu="apple_health">Apple Health verbinden</button>
       <button type="button" data-menu="garmin">Garmin verbinden</button>
       <button type="button" data-menu="darstellung">Darstellung</button>
+      <button type="button" data-menu="friends_view">Ansicht Freunde und Bubbles</button>
       <button type="button" data-menu="website">Website besuchen</button>
       <button type="button" data-menu="info">Info</button>
       <a href="/impressum/?from=app">Impressum</a>
@@ -10921,6 +10922,23 @@
           openWaReminderSetting();
           return;
         }
+        if (field === "friends_view") {
+          var curView = "list";
+          try { curView = localStorage.getItem("gogogo_friends_view") === "wallet" ? "wallet" : "list"; } catch (eFv) {}
+          GoDialog.choose("Ansicht Freunde und Bubbles", [
+            { label: (curView === "list" ? "✓ " : "") + "Liste (Kreise)", value: "list" },
+            { label: (curView === "wallet" ? "✓ " : "") + "Karten (Quadrate)", value: "wallet" }
+          ], { center: true }).then(function (v) {
+            if (v !== "list" && v !== "wallet") return;
+            try {
+              localStorage.setItem("gogogo_friends_view", v);
+              localStorage.setItem("gogogo_bubbles_view", v);
+            } catch (eFv2) {}
+            try { renderTeam(); } catch (eRt) {}
+            gogogoToast(v === "wallet" ? "Freunde und Bubbles als Karten." : "Freunde und Bubbles als Liste.");
+          });
+          return;
+        }
         if (field === "darstellung") {
           if (window.GoThemes) window.GoThemes.openPicker().then(function () { syncStatusFade(); });
           return;
@@ -14943,8 +14961,8 @@
             var rel = String(x.trainer_id || "") === String(sessionAccount.id) || x.isTrainerPerson;
             return x && x.id && !rel && !feedMuted[String(x.id)] && String(x.id) !== String(sessionAccount.id);
           }).length;
-          if (onCount >= 5) {
-            gogogoToast("Du hast schon 5 gewählt. Nimm erst jemanden raus.");
+          if (onCount >= 10) {
+            gogogoToast("Du hast schon 10 gewählt. Nimm erst jemanden raus.");
             return;
           }
         }
@@ -17747,8 +17765,7 @@
           viewBar.innerHTML =
             '<button type="button" role="radio" data-fview="list" aria-label="Liste"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></button>' +
             '<button type="button" role="radio" data-fview="wallet" aria-label="Wallet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/></svg></button>';
-          list.appendChild(viewBar);
-          list.appendChild(hintTop);
+          /* Ansicht (Kreis/Quadrat) steht jetzt unter Einstellungen, der Satz oben entfällt */
           var wallet = document.createElement("div");
           wallet.className = "friend-wallet";
           wallet.hidden = true;
@@ -17965,7 +17982,6 @@
             try { localStorage.setItem("gogogo_bubbles_view", bubWalletOn ? "wallet" : "list"); } catch (eBv2) {}
             paintBubView();
           });
-          bubOuter.appendChild(bubView);
           bubOuter.appendChild(bubHint);
           bubOuter.appendChild(bubList);
           bubOuter.appendChild(bubWallet);
@@ -24693,7 +24709,8 @@
         applyTrainingRing(meItem, meActEarly[String(sessionAccount.id)] || null, presenceFor(sessionAccount.id));
         if (window.GoTama) GoTama.decorate(meItem, sessionAccount.id);
         box.appendChild(meItem);
-        var seenBub = heuteView() === "alles" ? appendBubbleCircles(box) : [];
+        /* Reihe zeigt nur Freunde und Coachees mit offenem Event heute: keine Bubble-Kreise */
+        var seenBub = [];
         var seenIds = {};
         var friends = teamPeople.filter(function (person) {
           if (!person || !person.id || person.isSelf || String(person.id) === String(sessionAccount.id)) return false;
@@ -24795,12 +24812,16 @@
           return String((a.person && a.person.name) || "").localeCompare(String((b.person && b.person.name) || ""), "de");
         });
         /* Wer heute schon abgehakt hat, fällt aus der Reihe (steht als erledigt im Feed) */
+        /* Nur Freunde und Coachees (Community), die heute noch ein Event vor sich haben oder gerade trainieren */
         var doneIds = {};
         friends = friends.filter(function (entry) {
+          var pid = String(entry.person.id);
           var pr = entry.presence;
           var done = (entry.today && entry.today.done) || (pr && pr.status === "done");
-          if (done) doneIds[String(entry.person.id)] = true;
-          return !done;
+          var open = !done && ((entry.today && entry.today.training) || (pr && pr.status === "active"));
+          var mine = teamPeople.some(function (tp) { return tp && !tp.isSelf && String(tp.id) === pid; });
+          if (!open || !mine) doneIds[pid] = true;
+          return open && mine;
         });
         crewActive = friends.length;
         /* Gelesene Bubble-Kreise: hinter die aktiven Profile (trainiert gerade, heute dran, heute fertig) */
@@ -24822,25 +24843,6 @@
         });
         flushSeenBub();
         /* Alle: dazu die Mitglieder meiner Bubble (gleiche Kreise), zuletzt aktiv zuerst */
-        if (crewView === "alles" && window.GoBubbles && GoBubbles.mine && GoBubbles.mine()) {
-          var bubIds = (GoBubbles.memberIds ? GoBubbles.memberIds(GoBubbles.mine().id) : []).filter(function (id) {
-            return id !== String(sessionAccount.id) && !doneIds[id] && !friends.some(function (en) { return String(en.person.id) === id; });
-          });
-          bubIds.sort(function (x, y) {
-            var ax = bubbleAct[x] || "", ay = bubbleAct[y] || "";
-            if (ax !== ay) return ay.localeCompare(ax);
-            return String((bubblePeople[x] || {}).name || "").localeCompare(String((bubblePeople[y] || {}).name || ""), "de");
-          });
-          bubIds.forEach(function (id) {
-            var bp = bubblePeople[id] || groupPeople[id];
-            if (!bp) return;
-            var person = { id: id, name: bp.name || bp.nickname || "?", nickname: bp.nickname || "", photo_url: bp.photo_url || "" };
-            var el = storyItem(person, null, openFor(person, null));
-            el.classList.add("is-bubble");
-            box.appendChild(el);
-          });
-          loadBubbleCrew().then(function (changed) { if (changed && heuteView() === "alles") paintHeuteCrew(); });
-        }
         /* Kein „Freund hinzufügen“-Kreis mehr in der Reihe: das geht in Community → Freunde */
         paintStoriesVisibility();
         if (!teamPeople.length && !paintHeuteCrew.loading) {
