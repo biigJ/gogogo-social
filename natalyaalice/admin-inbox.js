@@ -37,6 +37,7 @@
     ".ga-item.is-new .ga-copy p::before{content:'';display:inline-block;width:8px;height:8px;margin:0 6px 1px 0;border-radius:50%;background:#111}" +
     ".ga-act{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer}" +
     ".ga-act.is-on{background:#111;color:#fff}" +
+    ".ga-act.is-blue{background:#1D9BF0;border-color:#1D9BF0;color:#fff}" +
     ".ga-nick{font-weight:500;color:rgba(42,33,24,.6)}" +
     ".ga-vc{display:inline-grid;place-items:center;width:14px;height:14px;margin-left:3px;vertical-align:super;border-radius:50%;background:#1D9BF0;line-height:0;font-size:0}" +
     ".ga-vc svg{display:block;width:100%;height:100%}" +
@@ -266,7 +267,8 @@
   function coachBtn(id) {
     var on = trainerOf(id);
     var ci = coachInfo(id);
-    if (ci.coach_verified_at) return '<button type="button" class="ga-act is-on" data-ga-vc="' + esc(id) + '" data-on="1">Coach <span class="ga-vc"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.1 6.6A4.6 4.6 0 1 0 13.1 13.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></span></button>';
+    /* zertifizierter Coach: blaue Pille, ohne „c“ */
+    if (ci.coach_verified_at) return '<button type="button" class="ga-act is-on is-blue" data-ga-vc="' + esc(id) + '" data-on="1">Coach</button>';
     if (on || ci.coach_self_at) return '<button type="button" class="ga-act' + (on ? " is-on" : "") + '" data-ga-vc="' + esc(id) + '">Coach' + (on ? " ✓" : "") + "</button>";
     if (!coachRequested(id)) return "";
     return '<button type="button" class="ga-act" data-ga-req="' + esc(id) + '">Anfrage Coach</button>';
