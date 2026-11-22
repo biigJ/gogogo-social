@@ -1567,8 +1567,14 @@
     }
     .acc-card { margin: 0 0 28px; color: #2A2118; }
     /* Zugesagte Events (Einladung angenommen / Herz): sehr dicker farbiger Rahmen */
-    .acc-card.is-going { position: relative; z-index: 2; }
-    .acc-card.is-going .acc-card__media { box-shadow: 0 0 0 8px #C7413B; }
+    /* Rahmen innen am Bild, damit die nächste Karte im Stapel ihn wie gewohnt verdeckt.
+       Zugesagt (Einladung angenommen / Herz): sehr dick, rot. Eigene kommende Events: mitteldick, grün. */
+    .acc-card.is-going .acc-card__media::after,
+    .acc-card.is-mine-next .acc-card__media::after {
+      content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 3;
+    }
+    .acc-card.is-going .acc-card__media::after { box-shadow: inset 0 0 0 9px #C7413B; }
+    .acc-card.is-mine-next .acc-card__media::after { box-shadow: inset 0 0 0 5px #2E9E5B; }
     /* Wallet (Events ab morgen): Kopf mit Name links, Tag rechts, darunter Eventname linksbündig */
     .acc-card.is-wallet { position: relative; isolation: isolate; border-radius: 16px; transition: margin .28s ease; }
     .acc-card.is-wallet .acc-card__media { border-radius: 16px; transition: height .28s ease; }
@@ -8573,7 +8579,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-109"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-110"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-79"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -24850,7 +24856,7 @@
         var friends = teamPeople.filter(function (person) {
           if (!person || !person.id || person.isSelf || String(person.id) === String(sessionAccount.id)) return false;
           if (seenIds[person.id]) return false;
-          if (feedMuted[String(person.id)]) return false;
+          /* Profilreihe gilt für alle Freunde und Coachees, auch ohne Haken „im Feed“ */
           seenIds[person.id] = true;
           return true;
         }).map(function (person) {
