@@ -905,13 +905,16 @@
           if (host.toast) host.toast(on ? name + " ist jetzt Admin" : name + " ist kein Admin mehr");
         }).catch(function (e) {
           var m = String((e && e.message) || "");
-          GoDialog.alert(/last_admin/.test(m) ? "Es muss mindestens ein Admin bleiben." : /self/.test(m) ? "Dir selbst kannst Du die Rechte nicht entziehen." : "Das braucht go-admin-tickets.sql in Supabase.");
+          GoDialog.alert(/owner/.test(m) && !/only_owner/.test(m) ? "Inhaber: Die Admin-Rechte bleiben immer." : /only_owner/.test(m) ? "Admin-Rechte entziehen kann nur Joscha." : /last_admin/.test(m) ? "Es muss mindestens ein Admin bleiben." : /self/.test(m) ? "Dir selbst kannst Du die Rechte nicht entziehen." : "Das braucht go-admin-tickets.sql in Supabase.");
         });
       });
   }
+  /* Inhaber (go-admin-owner.sql): seine Rechte entzieht niemand; anderen entziehen darf nur er */
+  var OWNER_ID = "2d3ab029-0a5f-4388-8da7-52501a87dc8c";
   function adminMenu(id) {
     var a = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0] || {};
-    if (String(id) === String(me())) { GoDialog.alert("Das bist Du. Admin-Rechte entzieht Dir nur ein anderer Admin."); return; }
+    if (String(id) === OWNER_ID) { GoDialog.alert("Inhaber: Die Admin-Rechte bleiben immer."); return; }
+    if (String(me()) !== OWNER_ID) { GoDialog.alert("Admin-Rechte entziehen kann nur Joscha."); return; }
     GoDialog.choose(a.name || "Admin", [{ label: "Admin-Rechte entziehen", value: "off" }], { center: true, cancel: "Abbrechen" })
       .then(function (v) { if (v === "off") setAdmin(id, false); });
   }
