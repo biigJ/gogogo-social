@@ -2390,7 +2390,7 @@
       if (!mine && normalizeVisibility(ev.visibility) === "privat") return;
       var d = dayKey(ev.starts_at);
       if (ev.status === "geplant" && d < today) return;
-      if (new Date(ev.starts_at).getTime() > now + 14 * 86400000) return;
+      if (d > upcomingLimitIso(today)) return;
       var item = { kind: "event", starts_at: ev.starts_at, _mine: mine, ev: ev };
       if (d === today) out.myToday.push(item);
       else if (d > today) out.upcoming.push(item);
@@ -2406,6 +2406,14 @@
     out.upcoming.sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
     out.history.sort(function (a, b) { return String(b.starts_at).localeCompare(String(a.starts_at)); });
     return out;
+  }
+
+  /* letzter Tag, der in Aktuell noch als „kommend“ erscheint */
+  var UPCOMING_DAYS = 3;
+  function upcomingLimitIso(today) {
+    var p = String(today).split("-");
+    var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2] + UPCOMING_DAYS));
+    return d.toISOString().slice(0, 10);
   }
 
   function buildFeedItems(flags) {
@@ -2630,6 +2638,9 @@
       });
     }
 
+    /* Zukunft höchstens 3 Tage im Voraus (heute + 3) */
+    var lastDay = upcomingLimitIso(today);
+    upcoming = upcoming.filter(function (it) { return dayKey(it.starts_at) <= lastDay; });
     if (flags.diaryOnly) {
       /* Tagebuch: heute ja, Zukunft nein */
       upcoming = upcoming.filter(function (it) {
