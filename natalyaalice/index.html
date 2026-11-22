@@ -4238,6 +4238,10 @@
     .friend-list__feed.is-fixed { background: transparent; color: #2A2118; border-color: #2A2118; cursor: default; }
     /* Meine Freunde: Liste (Kreis) oder Wallet (Quadrat) */
     .friend-view { display: flex; justify-content: center; gap: 3px; margin: -4px 0 10px; }
+    #plan-settings .view-toggle { display: flex !important; align-items: center; gap: 10px; }
+    #plan-settings .view-toggle__label { flex: 0 0 auto; }
+    #plan-settings .view-toggle__ico { display: inline-grid; place-items: center; color: #2A2118; }
+    #plan-settings .view-toggle__swap { font-size: 18px; line-height: 1; }
     .friend-view button { width: 50px; height: 50px; padding: 0; border: 0; background: none; color: rgba(42,33,24,.4); display: grid; place-items: center; cursor: pointer; }
     .friend-view button.is-on { color: #2A2118; }
     .friend-view svg { width: 31px; height: 31px; }
@@ -6870,7 +6874,8 @@
       <button type="button" data-menu="apple_health">Apple Health verbinden</button>
       <button type="button" data-menu="garmin">Garmin verbinden</button>
       <button type="button" data-menu="darstellung">Darstellung</button>
-      <button type="button" data-menu="friends_view">Ansicht Freunde und Bubbles</button>
+      <button type="button" data-menu="friends_view" class="view-toggle">Freunde</button>
+      <button type="button" data-menu="bubbles_view" class="view-toggle">Bubbles</button>
       <button type="button" data-menu="website">Website besuchen</button>
       <button type="button" data-menu="info">Info</button>
       <a href="/impressum/?from=app">Impressum</a>
@@ -10909,6 +10914,24 @@
           .catch(function () {});
       }
 
+      /* Einstellungen: Ansicht Freunde / Bubbles als Kreis (Liste) oder Quadrat (Karten), 🔁 schaltet um */
+      function viewIsWallet(key) {
+        var v = null;
+        try { v = localStorage.getItem(key); } catch (eVw) {}
+        return key === "gogogo_bubbles_view" ? v !== "list" : v === "wallet";
+      }
+      function paintViewToggles() {
+        var CIRCLE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>';
+        var SQUARE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/></svg>';
+        [["friends_view", "gogogo_friends_view", "Freunde"], ["bubbles_view", "gogogo_bubbles_view", "Bubbles"]].forEach(function (x) {
+          var b = document.querySelector('#plan-settings [data-menu="' + x[0] + '"]');
+          if (!b) return;
+          var w = viewIsWallet(x[1]);
+          b.innerHTML = '<span class="view-toggle__label">' + x[2] + '</span><span class="view-toggle__ico">' + (w ? SQUARE : CIRCLE) + '</span><span class="view-toggle__swap" aria-hidden="true">🔁</span>';
+          b.setAttribute("aria-label", x[2] + ": " + (w ? "Karten" : "Liste") + ", tippen zum Umschalten");
+        });
+      }
+      paintViewToggles();
       document.getElementById("plan-settings").addEventListener("click", function (event) {
         var choice = event.target.closest("[data-menu]");
         if (!choice) return;
@@ -10924,21 +10947,12 @@
           openWaReminderSetting();
           return;
         }
-        if (field === "friends_view") {
-          var curView = "list";
-          try { curView = localStorage.getItem("gogogo_friends_view") === "wallet" ? "wallet" : "list"; } catch (eFv) {}
-          GoDialog.choose("Ansicht Freunde und Bubbles", [
-            { label: (curView === "list" ? "✓ " : "") + "Liste (Kreise)", value: "list" },
-            { label: (curView === "wallet" ? "✓ " : "") + "Karten (Quadrate)", value: "wallet" }
-          ], { center: true }).then(function (v) {
-            if (v !== "list" && v !== "wallet") return;
-            try {
-              localStorage.setItem("gogogo_friends_view", v);
-              localStorage.setItem("gogogo_bubbles_view", v);
-            } catch (eFv2) {}
-            try { renderTeam(); } catch (eRt) {}
-            gogogoToast(v === "wallet" ? "Freunde und Bubbles als Karten." : "Freunde und Bubbles als Liste.");
-          });
+        if (field === "friends_view" || field === "bubbles_view") {
+          var vKey = field === "friends_view" ? "gogogo_friends_view" : "gogogo_bubbles_view";
+          var isWallet = viewIsWallet(vKey);
+          try { localStorage.setItem(vKey, isWallet ? "list" : "wallet"); } catch (eFv2) {}
+          paintViewToggles();
+          try { renderTeam(); } catch (eRt) {}
           return;
         }
         if (field === "darstellung") {
@@ -17948,7 +17962,9 @@
           bubHint.textContent = "Tritt einer Bubble bei, teile Events zum Thema, diskutiere und verknüpfe Dich.";
           /* Ansicht wie Meine Freunde: Kreis = Liste, Quadrat = Wallet */
           var bubWalletOn = false;
-          try { bubWalletOn = localStorage.getItem("gogogo_bubbles_view") === "wallet"; } catch (eBv) {}
+          /* Bubbles: Standard Karten (Quadrate), Liste nur wenn gewählt */
+          bubWalletOn = true;
+          try { bubWalletOn = localStorage.getItem("gogogo_bubbles_view") !== "list"; } catch (eBv) {}
           var bubView = document.createElement("div");
           bubView.className = "friend-view";
           bubView.setAttribute("role", "radiogroup");
@@ -18352,7 +18368,8 @@
             }, coacheeList);
           });
         }
-        box.appendChild(coacheeSlide);
+        /* Coachees-Reiter nur für Coaches */
+        if (sessionIsTrainer) box.appendChild(coacheeSlide);
         syncGroupOptions();
         syncHScrollDock();
         syncTeamGoRailNav();
