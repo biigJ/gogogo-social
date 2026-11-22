@@ -585,8 +585,9 @@
     var cur = x.plan || null;
     var a = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(id); })[0] || {};
     var first = String(a.name || "Nutzer").split(" ")[0];
-    host.rest("courses?is_active=eq.true&or=(private_for.is.null,private_for.eq." + encodeURIComponent(id) + ")&select=id,title&order=title.asc&limit=200")
-      .catch(function () { return host.rest("courses?is_active=eq.true&select=id,title&order=title.asc&limit=200"); })
+    /* nur Wochenpläne (mehrere Tage), keine Einzel-Events */
+    host.rest("courses?is_active=eq.true&sessions_per_week=gt.1&deleted_at=is.null&or=(private_for.is.null,private_for.eq." + encodeURIComponent(id) + ")&select=id,title&order=title.asc&limit=200")
+      .catch(function () { return host.rest("courses?is_active=eq.true&sessions_per_week=gt.1&select=id,title&order=title.asc&limit=200"); })
       .then(function (rows) {
         var items = (rows || []).filter(function (c) { return c && c.id && !/^zirkeltraining$/i.test(String(c.title || "")); })
           .map(function (c) { return { label: String(c.title || "Plan") + (cur && String(cur.course_id) === String(c.id) ? " ✓" : ""), value: String(c.id) }; });
