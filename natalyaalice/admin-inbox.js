@@ -66,8 +66,9 @@
     ".ga-rec .go-rec-detail__pts{text-align:center;font:600 28px/1.2 'Playfair Display',Georgia,serif;margin-top:4px}" +
     ".ga-rec .go-rec-detail__meta{text-align:center;font-size:13px;margin-bottom:6px}" +
     /* Dreh-Knöpfe: Tippen schaltet zum nächsten Wert */
-    ".ga-dreh{max-width:240px;overflow:hidden;text-overflow:ellipsis}" +
-    ".ga-dreh.is-on{background:#111;color:#fff}" +
+    ".ga-filters select{max-width:220px}" +
+    "@media (max-width:600px){.ga-filters.is-u{display:grid;grid-template-columns:1fr 1fr}.ga-filters.is-u select{max-width:none;width:100%;min-width:0;font-size:12px;padding:0 6px}}" +
+    ".ga-filters select.is-on{background:#111;color:#fff}" +
     ".ga-ucount{font-size:13px;color:rgba(42,33,24,.65);margin:4px 0 0}" +
     ".ga-del{margin-left:6px;color:#C7413B;border-color:#C7413B}" +
     ".ga-wa{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:#128C7E;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-grid;place-items:center}" +
@@ -363,7 +364,7 @@
     if (coachRequested(id)) return '<button type="button" class="ga-pill" data-ga-req="' + esc(id) + '">Anfrage Coach</button>';
     return '<button type="button" class="ga-pill" data-ga-user="' + esc(id) + '">' + (ci.paused_at ? "Pausiert" : "Nutzer") + "</button>";
   }
-  /* Nutzer-Filter: je Merkmal ein Dreh-Knopf (alle → Werte → ohne → alle) */
+  /* Nutzer-Filter: je Merkmal ein Dropdown (alle, Werte, ohne) */
   var UF = [["goal", "Ziel"], ["coach", "Coach"], ["place", "Ort"], ["plan", "Wochenplan"], ["circle", "Circle"], ["group", "Gruppe"], ["day", "Workout"]];
   var NONE = "\u2205";
   function berlinDay(at) {
@@ -402,7 +403,7 @@
   function ufLabel(key, label, v) {
     if (!v) return label + ": alle";
     if (v === NONE) return label + ": ohne";
-    return label + ": " + (key === "day" ? dayDe(v) : v);
+    return key === "day" ? dayDe(v) : v;
   }
   function ufMatch(a) {
     var f = st.uf || {};
@@ -418,8 +419,10 @@
   function ufBar(n, total) {
     var f = st.uf || {};
     var on = UF.some(function (u) { return f[u[0]]; });
-    return '<div class="ga-filters">' + UF.map(function (u) {
-      return '<button type="button" class="ga-pill ga-dreh' + (f[u[0]] ? " is-on" : "") + '" data-ga-uf="' + u[0] + '">' + esc(ufLabel(u[0], u[1], f[u[0]])) + "</button>";
+    return '<div class="ga-filters is-u">' + UF.map(function (u) {
+      return '<select data-ga-uf="' + u[0] + '" aria-label="' + u[1] + '"' + (f[u[0]] ? ' class="is-on"' : "") + ">" + ufValues(u[0]).map(function (v) {
+        return '<option value="' + esc(v) + '"' + ((f[u[0]] || "") === v ? " selected" : "") + ">" + esc(ufLabel(u[0], u[1], v)) + "</option>";
+      }).join("") + "</select>";
     }).join("") + "</div>" +
       '<p class="ga-ucount">' + n + " von " + total + " Nutzern" + (on ? ' · <button type="button" class="ga-link" data-ga-uf="reset">Filter zurücksetzen</button>' : "") + "</p>";
   }
@@ -1457,18 +1460,7 @@
     if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
     if (t.hasAttribute("data-ga-plan")) { userPlan(t.getAttribute("data-ga-plan")); return; }
     if (t.hasAttribute("data-ga-rec")) { openRec(t.getAttribute("data-ga-rec")); return; }
-    if (t.hasAttribute("data-ga-uf")) {
-      var uk = t.getAttribute("data-ga-uf");
-      st.uf = st.uf || {};
-      if (uk === "reset") st.uf = {};
-      else {
-        var vals = ufValues(uk);
-        var at = vals.indexOf(st.uf[uk] || "");
-        st.uf[uk] = vals[(at + 1) % vals.length];
-      }
-      paint();
-      return;
-    }
+    if (t.getAttribute("data-ga-uf") === "reset") { st.uf = {}; paint(); return; }
     if (t.hasAttribute("data-gx")) {
       var gx = t.getAttribute("data-gx"), gk = t.getAttribute("data-gk"), gid = t.getAttribute("data-gid");
       if (gx === "coach") orgCoach(gk, gid);
@@ -1553,6 +1545,8 @@
   }
 
   function onChange(e) {
+    var uf = e.target && e.target.closest ? e.target.closest("select[data-ga-uf]") : null;
+    if (uf && st) { st.uf = st.uf || {}; st.uf[uf.getAttribute("data-ga-uf")] = uf.value; paint(); return; }
     var sel = e.target && e.target.closest ? e.target.closest("[data-ga-cf]") : null;
     if (!sel || !st) return;
     st.cfs = st.cfs || {};
