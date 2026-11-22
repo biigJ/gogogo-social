@@ -48,13 +48,21 @@
     ".ga-pill{flex:none;align-self:center;min-height:34px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}" +
     ".ga-pill.is-fill{background:#111;color:#fff}" +
     ".ga-pill.is-blue{background:#1D9BF0;border-color:#1D9BF0;color:#fff}" +
-    ".ga-pill.is-admin{background:#111;border-color:#111;color:#fff}" +
-    ".ga-tk__top{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px}" +
-    ".ga-tk__form{border:1px solid rgba(42,33,24,.15);border-radius:16px;padding:14px;margin:0 0 12px;background:rgba(255,255,255,.5)}" +
-    ".ga-tk__row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}" +
-    "@media (max-width:600px){.ga-tk__row{grid-template-columns:1fr}}" +
-    ".ga-tk__l{display:block;font-size:12px;font-weight:700;letter-spacing:.03em;color:rgba(42,33,24,.65);margin:0 0 8px}" +
-    ".ga-tk__l select,.ga-tk__l textarea{display:block;width:100%;box-sizing:border-box;margin-top:4px;min-height:40px;padding:8px 10px;border-radius:10px;border:1px solid rgba(42,33,24,.25);background:#fff;font:inherit;font-size:15px;font-weight:400;color:#111}" +
+    ".ga-pill.is-admin{background:#C7413B;border-color:#C7413B;color:#fff}" +
+    "@media (max-width:600px){.ga-item:has(.ga-wa){flex-wrap:wrap}.ga-item:has(.ga-wa) .ga-copy{flex:1 1 calc(100% - 54px)}.ga-item .ga-wa{margin-left:54px}}" +
+    ".ga-search{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}" +
+    ".ga-search input{min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid rgba(42,33,24,.3);background:transparent;font:inherit;font-size:15px;color:#111;min-width:0}" +
+    ".ga-search input:focus{outline:none;border-color:#111}" +
+    /* Knöpfe 1/5 der vollen Breite (mobil breiter), Formular ohne Rahmen und Flächen */
+    ".ga-btn5{width:max(20%,168px);min-height:44px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:14px;font-weight:700;cursor:pointer}" +
+    ".ga-btn5.is-dark{background:#111;color:#fff}" +
+    ".ga-tk__top{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}" +
+    ".ga-tk__form{margin:4px 0 18px}" +
+    ".ga-tk__row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}" +
+    "@media (max-width:600px){.ga-tk__row{grid-template-columns:1fr;gap:4px}}" +
+    ".ga-tk__l{display:block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:rgba(42,33,24,.6);margin:0 0 14px}" +
+    ".ga-tk__l select,.ga-tk__l textarea{display:block;width:100%;box-sizing:border-box;margin-top:8px;min-height:48px;padding:10px 16px;border-radius:14px;border:1.5px solid rgba(42,33,24,.3);background:transparent;font:inherit;font-size:15px;font-weight:400;letter-spacing:0;text-transform:none;color:#111}" +
+    ".ga-tk__l select{border-radius:999px}" +
     ".ga-tk__btns{display:flex;gap:8px;justify-content:flex-end}" +
     ".ga-tk{border-top:1px solid rgba(42,33,24,.12);padding:12px 0}" +
     ".ga-tk.is-done{opacity:.55}" +
@@ -71,7 +79,7 @@
     ".ga-photo img,.ga-photo span{width:100%;height:100%;border-radius:14px;object-fit:cover;background:#E6DED0;display:grid;place-items:center;font:700 48px/1 Inter,system-ui,sans-serif}" +
     ".ga-pen{position:absolute;right:-8px;bottom:-8px;width:40px;height:40px;border-radius:50%;border:0;background:#111;color:#fff;display:grid;place-items:center;cursor:pointer}" +
     ".ga-item.is-top{align-items:flex-start}" +
-    "@media (max-width:600px){.ga-item.ga-circ{flex-wrap:wrap}.ga-circ .ga-pill{margin-left:73px}}" +
+    "@media (max-width:600px){.ga-item.ga-circ{flex-wrap:wrap}.ga-circ .ga-copy{flex:1 1 calc(100% - 73px)}.ga-circ .ga-pill{margin-left:73px}}" +
     ".ga-filters{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}" +
     ".ga-filters select{min-height:34px;padding:0 10px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:13px;font-weight:600;color:#111}" +
     ".ga-paused{opacity:.55}" +
@@ -233,7 +241,7 @@
       .then(function (rows) {
         if (!st) return;
         (rows || []).forEach(function (r) { st.coachInfo[String(r.id)] = r; });
-        if (st.tab === "coaches" || st.tab === "news") paint();
+        if (st.tab === "coaches" || st.tab === "news" || st.tab === "wa") paint();
       })
       .catch(function () {});
   }
@@ -284,6 +292,20 @@
           .catch(function () { if (host.toast) host.toast("Sperren ging nicht"); });
       });
   }
+  /* Suche nach Nickname und Vorname (Nachrichten, Nutzer, Erinnerungen); Eingabe zeichnet die Liste neu, Fokus bleibt */
+  function qOf(tab) { st.q = st.q || {}; return st.q[tab] || (st.q[tab] = { nick: "", first: "" }); }
+  function searchBar(tab) {
+    var q = qOf(tab);
+    return '<div class="ga-search"><input type="search" data-ga-q="' + tab + '|nick" placeholder="Nickname" value="' + esc(q.nick) + '" autocomplete="off" />' +
+      '<input type="search" data-ga-q="' + tab + '|first" placeholder="Vorname" value="' + esc(q.first) + '" autocomplete="off" /></div>';
+  }
+  function norm(x) { return String(x || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+  function qMatch(tab, id, name) {
+    var q = qOf(tab);
+    if (q.first && norm(String(name || "").split(" ")[0]).indexOf(norm(q.first)) !== 0) return false;
+    if (q.nick && norm(coachInfo(String(id || "")).nickname).indexOf(norm(q.nick).replace(/^@/, "")) < 0) return false;
+    return true;
+  }
   /* Dropdown-Filter für Nachrichten und Tickets: groups = [[key, label, [[value, label], …]], …] */
   function nfOf(scope) { st.nf = st.nf || {}; return st.nf[scope] || (st.nf[scope] = {}); }
   function selBar(scope, groups, n, total, noun) {
@@ -306,7 +328,9 @@
     var f = nfOf("news");
     var now = Date.now(), DAY = 864e5;
     function age(at) { var t = new Date(at).getTime(); return isNaN(t) ? 1e12 : now - t; }
+    if (!st.coachInfo) loadCoachInfo();
     var list = all.filter(function (it) {
+      if (!qMatch("news", it.a.account_id, it.a.name)) return false;
       if (f.kind && it.kind !== f.kind) return false;
       if (f.type && !(it.kind === "booking" && String(it.a.type) === f.type)) return false;
       if (f.who && String(it.a.name || "") !== f.who) return false;
@@ -331,7 +355,7 @@
     if (f.kind === "report") list = [];
     var compose = (showReports ? paintReports() : "") + '<button type="button" class="cp-btn cp-btn--ghost" data-ga-broadcast="1" style="margin:0 0 10px">Mitteilung an alle Nutzer</button>' +
       '<p class="cp-hint">Erscheint bei allen einmal mittig in Aktuell. Tippen schließt. Neue öffentliche Wochenpläne melden sich von selbst.</p>';
-    compose += bar;
+    compose += searchBar("news") + bar;
     if (!list.length) return compose + (f.kind === "report" ? "" : '<p class="cp-hint">' + (all.length ? "Nichts gefunden." : "Noch keine Nachrichten.") + "</p>");
     return compose + list.map(function (it) {
       var a = it.a;
@@ -532,8 +556,8 @@
       return list.filter(Boolean).map(function (h, i) { return i ? '<span class="ga-sep"></span>' + h : h; }).join("");
     }
     var total = accs.length;
-    accs = accs.filter(ufMatch);
-    return '<p class="cp-hint">Profilbild: alles zur Person. Pille rechts: Rolle ändern, pausieren oder löschen. Circle: Aufzeichnungen.</p>' + ufBar(accs.length, total) +
+    accs = accs.filter(function (a) { return qMatch("coaches", a.account_id, a.name) && ufMatch(a); });
+    return '<p class="cp-hint">Profilbild: alles zur Person. Pille rechts: Rolle ändern, pausieren oder löschen. Circle: Aufzeichnungen.</p>' + searchBar("coaches") + ufBar(accs.length, total) +
       accs.map(function (a) {
         var id = String(a.account_id);
         var ci = coachInfo(id);
@@ -1041,7 +1065,7 @@
       tkSelect("gt-sec", d.area === "frontend" ? "Abschnitt" : "Admin-Bereich", secs.map(function (x) { return [x, x]; }), d.section) +
       tkSelect("gt-sub", "Unterkategorie", subs.map(function (x) { return [x, x]; }), d.sub) + "</div>" +
       '<label class="ga-tk__l">Wunsch<textarea id="gt-body" rows="4" placeholder="Was soll sich wo ändern?">' + esc(d.body) + "</textarea></label>" +
-      '<div class="ga-tk__btns"><button type="button" class="cp-btn cp-btn--ghost" data-gt="cancel">Abbrechen</button><button type="button" class="cp-btn" data-gt="save">Ticket speichern</button></div></div>';
+      '<div class="ga-tk__btns"><button type="button" class="ga-btn5" data-gt="cancel">Abbrechen</button><button type="button" class="ga-btn5 is-dark" data-gt="save">Ticket speichern</button></div></div>';
   }
   function paintTickets() {
     if (!st.tickets) { loadTickets(); return '<p class="cp-hint">Lädt …</p>'; }
@@ -1058,8 +1082,8 @@
     });
     var secs = uniq(all.map(function (t) { return t.section; }));
     var open = list.filter(function (t) { return t.status !== "erledigt"; });
-    return (st.tkNew ? tkForm() : '<div class="ga-tk__top"><button type="button" class="cp-btn" data-gt="new">Neues Ticket</button>' +
-        (open.length ? '<button type="button" class="cp-btn cp-btn--ghost" data-gt="copyall">' + open.length + (open.length === 1 ? " offenes Ticket" : " offene Tickets") + " kopieren</button>" : "") + "</div>") +
+    return (st.tkNew ? tkForm() : '<div class="ga-tk__top"><button type="button" class="ga-btn5 is-dark" data-gt="new">Neues Ticket</button>' +
+        (open.length ? '<button type="button" class="ga-btn5" data-gt="copyall">' + open.length + " offen kopieren</button>" : "") + "</div>") +
       selBar("tickets", [
         ["status", "Status", TK_STATUS.map(function (x) { return [x, x]; })],
         ["area", "Bereich", Object.keys(TK_AREAS).map(function (k) { return [k, TK_AREAS[k].label]; })],
@@ -1145,8 +1169,20 @@
       st.body.innerHTML = '<p class="cp-hint">' + esc(st.error) + "</p>";
       return;
     }
+    var fa = document.activeElement, fq = fa && fa.getAttribute ? fa.getAttribute("data-ga-q") : null, fpos = fq ? fa.selectionStart : 0;
     st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : st.tab === "circles" ? paintOrgs("circle") : st.tab === "groups" ? paintOrgs("group") : st.tab === "tickets" ? paintTickets() : paintCoaches();
+    if (fq) {
+      var back = st.body.querySelector('[data-ga-q="' + fq + '"]');
+      if (back) { back.focus(); try { back.setSelectionRange(fpos, fpos); } catch (e) {} }
+    }
   }
+  document.addEventListener("input", function (e) {
+    var k = e.target && e.target.getAttribute ? e.target.getAttribute("data-ga-q") : null;
+    if (!k || !st) return;
+    var parts = k.split("|");
+    qOf(parts[0])[parts[1]] = e.target.value;
+    paint();
+  });
 
   /* ---------- Ziele der Nutzer (go_accounts.training_goal, mehrere mit Komma) ---------- */
   var GOAL_OPTIONS = ["Gesund laufen", "Rücken stärken", "Gesund bleiben", "Abnehmen", "Muskeln erhalten", "Gelenke schonen", "Hybrid Athlet"];
@@ -1315,7 +1351,9 @@
     var done = st.wa.filter(function (r) { return r.sent_at; }).length;
     var head = '<p class="cp-hint">Heute 19 Uhr · ' + done + " von " + st.wa.length + " erinnert. Tipp auf WhatsApp öffnet den Text, danach ist die Person abgehakt.</p>";
     if (!st.wa.length) return head + '<p class="cp-hint">Noch niemand hat die Erinnerung in den Einstellungen eingeschaltet.</p>';
-    return head + st.wa.map(function (r) {
+    if (!st.coachInfo) loadCoachInfo();
+    var rows = st.wa.filter(function (r) { return qMatch("wa", r.account_id, r.name); });
+    return head + searchBar("wa") + (rows.length ? "" : '<p class="cp-hint">Nichts gefunden.</p>') + rows.map(function (r) {
       var text = waText(r);
       var href = "https://wa.me/" + waNumber(r.phone) + "?text=" + encodeURIComponent(text);
       return '<div class="ga-item' + (r.sent_at ? " is-sent" : "") + '">' + face(r) +
