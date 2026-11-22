@@ -33,6 +33,7 @@
     ".god__sub{margin:0 0 16px;white-space:pre-line;font-size:15px;font-weight:600;text-align:center;color:rgba(42,33,24,.75)}" +
     ".god__info{margin:-2px 0 12px;font-size:14px;text-align:center;color:rgba(42,33,24,.7)}" +
     ".god__body{margin:8px 0 18px;font-size:16px;line-height:1.5;text-align:left}" +
+    ".god__body.is-center{text-align:center;white-space:pre-line}" +
     ".god__body.is-plain{margin:4px 0 20px;font-size:17px;text-align:center;white-space:pre-wrap}" +
     ".god__wheel{position:relative;height:176px;margin:0 0 16px;overflow-y:auto;scroll-snap-type:y mandatory;background:#fff;border-radius:14px;padding:66px 0;box-sizing:border-box;scrollbar-width:none}" +
     ".god__wheel::-webkit-scrollbar{display:none}" +
@@ -123,7 +124,7 @@
         var tEl = card.querySelector(".god__text");
         if (tEl) tEl.classList.add("is-center");
         var b = document.createElement("p");
-        b.className = "god__body";
+        b.className = "god__body" + (opts.center ? " is-center" : "");
         b.textContent = opts.body;
         card.appendChild(b);
       }
