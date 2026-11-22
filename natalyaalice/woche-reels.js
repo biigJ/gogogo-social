@@ -80,7 +80,7 @@
   var ICON_COMMENT =
     '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6.5A2.5 2.5 0 0 1 7.5 4h9A2.5 2.5 0 0 1 19 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4 3v-3H7.5A2.5 2.5 0 0 1 5 13.5v-7z"/></svg>';
   var ICON_SHARE =
-    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="11.2" r="3"/><path d="M6.4 21c.55-3.6 3-5.7 5.6-5.7s5.05 2.1 5.6 5.7"/><path d="M12 1.8v4.4M9.8 4h4.4"/></svg>';
+    '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 .9v6.2M8.9 4h6.2"/><circle cx="12" cy="12.4" r="3.4"/><path d="M3.6 22.6c.75-4.7 4.1-7.4 8.4-7.4s7.65 2.7 8.4 7.4"/></svg>';
 
   var ICON_PLANE =
     '<svg class="wr-ico" viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M18.55 3.75 L5.86 7.66 Q2.80 8.60 5.66 10.03 L10.66 12.53 Q11.20 12.80 11.47 13.34 L13.97 18.34 Q15.40 21.20 16.34 18.14 L20.25 5.45 Q21.00 3.00 18.55 3.75Z"/><path d="M19.80 4.00 11.20 12.80"/></svg>';

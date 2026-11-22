@@ -22,6 +22,12 @@
     ".god__btn--quiet{background:transparent;color:rgba(42,33,24,.7);font-weight:600}" +
     ".god__btn--choice{background:transparent;color:#2A2118;border:1.5px solid #2A2118}" +
     ".god__btn--danger{color:#C7413B;margin-top:4px}" +
+    ".god__card--sheet{padding:6px 18px}" +
+    ".god__sheet-row{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:64px;box-sizing:border-box}" +
+    ".god__sheet-row+.god__sheet-row{border-top:1px solid rgba(42,33,24,.12)}" +
+    ".god__sheet-row .god__vis{margin:0}" +
+    ".god__sheet-ok{width:auto;min-height:44px;margin:0;padding:0 22px}" +
+    ".god__sheet-danger{border:0;background:none;color:#C7413B;font:inherit;font-size:16px;font-weight:600;justify-content:flex-start;cursor:pointer;padding:0}" +
     ".god__list{max-height:46vh;overflow-y:auto;margin:0 0 14px;display:grid;gap:6px}" +
     ".god__pick{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:12px;background:#fff;font-size:16px;cursor:pointer}" +
     ".god__pick input{width:20px;height:20px;accent-color:#2A2118;margin:0}" +
@@ -385,6 +391,8 @@
   /* Sichtbarkeit wählen: Überschrift, Pille (Tippen schaltet durch), Speichern | Abbrechen → value | null */
   function visDlg(msg, opts) {
     opts = opts || {};
+    /* Kompakt (wie Instagram): Zeile 1 Pille + Speichern, Zeile 2 Aktion (z. B. Löschen). Antippen außerhalb schließt. */
+    if (opts.extra) return visSheet(opts);
     return open(function (card, close) {
       text(card, msg);
       var tEl = card.querySelector(".god__text");
@@ -426,6 +434,37 @@
         ex.addEventListener("click", function () { close("__extra"); });
         card.appendChild(ex);
       }
+      return null;
+    });
+  }
+
+  function visSheet(opts) {
+    return open(function (card, close) {
+      card.classList.add("god__card--sheet");
+      var list = opts.visList || [{ value: "team", label: "Team" }];
+      var vi = Math.max(0, list.map(function (x) { return x.value; }).indexOf(opts.vis || "team"));
+      var r1 = document.createElement("div");
+      r1.className = "god__sheet-row";
+      var pill = document.createElement("button");
+      pill.type = "button";
+      pill.className = "god__vis";
+      function paintPill() { pill.textContent = list[vi].label; pill.classList.toggle("is-on", list[vi].value !== "privat"); }
+      paintPill();
+      pill.addEventListener("click", function () { vi = (vi + 1) % list.length; paintPill(); });
+      var ok = document.createElement("button");
+      ok.type = "button";
+      ok.className = "god__btn god__sheet-ok";
+      ok.textContent = opts.ok || "Speichern";
+      ok.addEventListener("click", function () { close(list[vi].value); });
+      r1.appendChild(pill);
+      r1.appendChild(ok);
+      card.appendChild(r1);
+      var r2 = document.createElement("button");
+      r2.type = "button";
+      r2.className = "god__sheet-row god__sheet-danger";
+      r2.textContent = opts.extra;
+      r2.addEventListener("click", function () { close("__extra"); });
+      card.appendChild(r2);
       return null;
     });
   }
