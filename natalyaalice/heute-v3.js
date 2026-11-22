@@ -646,7 +646,9 @@
     var fullSel = "id,user_id,course_id,enrollment_id,category,starts_at,location,visibility,is_unplanned,status,title,item_type,photo_url,note,assigned_by,course_session_id";
     var range = "&starts_at=gte." + encodeURIComponent(fromIso) + "&starts_at=lte." + encodeURIComponent(toIso) + "&order=starts_at.desc&limit=500";
     /* bubble_id erst nach go-bubbles.sql vorhanden; group_id für Gruppen-Events (Gruppenname statt Vorname) */
-    return rest("events?select=" + fullSel + ",bubble_id,group_id" + range)
+    /* feed_hidden: „Speichern ohne Posting“ (go-events-feed-hidden.sql) */
+    return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden" + range)
+      .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id" + range); })
       .catch(function () {
         return rest("events?select=" + fullSel + range);
@@ -1204,6 +1206,8 @@
       return inGroupFilter(ev.user_id, flags);
     }
     if (ev.status === "erledigt") {
+      /* ohne Posting gespeichert: auch im eigenen Verlauf nicht zeigen */
+      if (ev.feed_hidden) return false;
       if (mine) return !!flags.showOwnHistory;
       if (!flags.showFriendsHistory || !(vis === "team" || vis === "gruppe")) return false;
       /* Profilreihe (todayAll): heute erledigtes Event ist die Story des Tages, gilt ohne „Historie teilen“ */
@@ -3246,6 +3250,11 @@
           delete next.photo_url;
           stripped = true;
         }
+        /* Spalte fehlt noch (go-events-feed-hidden.sql): ohne speichern, bleibt dann privat */
+        if (/feed_hidden/i.test(msg) && Object.prototype.hasOwnProperty.call(next, "feed_hidden")) {
+          delete next.feed_hidden;
+          stripped = true;
+        }
         if (!stripped) throw err;
         return attempt(next).catch(function (err2) {
           var msg2 = errMsg(err2);
@@ -3357,6 +3366,7 @@
         };
         if (note) body.note = note;
         if (photo) body.photo_url = photo;
+        if (noPost) body.feed_hidden = true;
         /* Heute beendet: Uhrzeit des Beendens wird Zeitstempel des Posts (Reihenfolge in Aktuell) */
         var evNow = state.events.find(function (e) { return String(e.id) === String(eventId); });
         if (evNow && dayKey(evNow.starts_at) === todayIso()) body.starts_at = new Date().toISOString();
