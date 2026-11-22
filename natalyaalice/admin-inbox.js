@@ -59,9 +59,10 @@
     "body .ga-qrcard .ga-qrcard__brand{font-family:'Playfair Display',Georgia,serif !important;font-weight:600 !important;font-size:26px !important;line-height:1.05;letter-spacing:-.02em;margin:2px 0 14px}" +
     ".ga-qrcard__band{width:calc(100% + 28px);margin:0 -14px;padding:18px 0;background:rgba(0,0,0,.22);display:grid;place-items:center}" +
     ".ga-qrcard__code{background:#fff;padding:10px;border-radius:10px;line-height:0}" +
-    "body .ga-qrcard .ga-qrcard__name{margin-top:auto;font-family:'Playfair Display',Georgia,serif !important;font-weight:600 !important;font-size:22px !important;line-height:1.2;text-align:center}" +
+    ".ga-qrcard__foot{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%}" +
+    "body .ga-qrcard .ga-qrcard__name{font-family:'Playfair Display',Georgia,serif !important;font-weight:600 !important;font-size:22px !important;line-height:1.2;text-align:center}" +
     ".ga-qrcard__nick{font-size:15px;font-weight:600;opacity:.9;margin-top:4px;text-align:center}" +
-    ".ga-qrcard__hint{text-align:center;font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.8;margin-top:12px}" +
+    ".ga-qrcard__code-line{margin-top:14px;font-size:15px;font-weight:600;white-space:nowrap;text-align:center}" +
     ".ga-rec__next{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(42,33,24,.12);font-size:15px}" +
     ".ga-rec__next span:last-child{color:rgba(42,33,24,.65);text-align:right}" +
     ".ga-search{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}" +
@@ -1901,9 +1902,9 @@
       box.className = "ga-info ga-qr";
       box.innerHTML = '<div class="ga-qrcard" role="dialog" aria-modal="true"><div class="ga-qrcard__brand">gogogo</div>' +
         '<div class="ga-qrcard__band"><div class="ga-qrcard__code"></div></div>' +
-        '<div class="ga-qrcard__name">' + esc(acc.name || a.name || "") + "</div>" +
-        '<div class="ga-qrcard__nick">' + (acc.nickname ? "@" + esc(acc.nickname) : "&nbsp;") + "</div>" +
-        '<div class="ga-qrcard__hint">Scannen und einloggen · Code ' + esc(acc.invite_code || "–") + "</div></div>";
+        '<div class="ga-qrcard__foot"><div class="ga-qrcard__name">' + esc(acc.name || a.name || "") + "</div>" +
+        (acc.nickname ? '<div class="ga-qrcard__nick">@' + esc(acc.nickname) + "</div>" : "") +
+        '<div class="ga-qrcard__code-line">Login-Code: ' + esc(acc.invite_code || "–") + "</div></div></div>";
       document.body.appendChild(box);
       new global.QRCode(box.querySelector(".ga-qrcard__code"), { text: url, width: 176, height: 176, colorDark: "#2A2118", colorLight: "#ffffff", correctLevel: global.QRCode.CorrectLevel.M });
       box.addEventListener("click", function () { box.remove(); });
