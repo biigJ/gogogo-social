@@ -4,7 +4,7 @@
  *   GoOnboarding.start(host)        immer zeigen (Test: /workout/?onboarding=1)
  *
  * host: rest, account() → sessionAccount, savePhoto(file, cb), openPlan(), openCircle(), toast(msg)
- * Schritte: 1 Zustimmen · 2 Darstellung · 3 Foto · 4 Erster Wochenplan · 5 Circle. „Später einrichten“ beendet.
+ * Schritte: 1 Zustimmen (danach Hinweis Home-Bildschirm) · 2 Darstellung · 3 Foto · 4 Erster Wochenplan · 5 Circle. „Später einrichten“ beendet.
  * Durchlaufen merkt sich das Gerät (localStorage) und das Konto (go_accounts.onboarded_at, go-onboarding.sql).
  */
 (function (global) {
@@ -116,6 +116,17 @@
     }
   }
 
+  /* nach den Zustimmungen: Web-App zum Home-Bildschirm (nicht, wenn sie schon von dort läuft) */
+  function homeHint() {
+    var installed = global.navigator.standalone === true ||
+      (global.matchMedia && global.matchMedia("(display-mode: standalone)").matches);
+    if (installed || !global.GoDialog) return;
+    global.GoDialog.alert("Hinweis", {
+      center: true,
+      body: "Füge für bessere Handhabung die Web-App zum Home-Bildschirm auf Deinem Smartphone hinzu.\n\niPhone: in Safari auf das Burgermenü im Browser > Teilen > Mehr anzeigen > + Zum Home-Bildschirm."
+    });
+  }
+
   function finish() {
     try { localStorage.setItem(key(), "1"); } catch (e) {}
     var a = host.account();
@@ -144,7 +155,7 @@
       paint();
       return;
     }
-    if (step === 0) { saveConsent(); next(); return; }
+    if (step === 0) { saveConsent(); next(); homeHint(); return; }
     if (step === 2) {
       var acc = host.account() || {};
       if (acc.photo_url) { next(); return; }
