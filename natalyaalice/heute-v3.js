@@ -1617,7 +1617,7 @@
   /* Postausgang statt Plus: Einladen */
   /* gleiches Symbol wie in Woche */
   var OUTBOX_SVG =
-    '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="M8 7l4-4 4 4"/><path d="M5 14v4.5A2.5 2.5 0 0 0 7.5 21h9a2.5 2.5 0 0 0 2.5-2.5V14"/></svg>';
+    '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 13.5h4.3l1.6 2.6h5.2l1.6-2.6h4.3"/><path d="M3.5 13.5V18a2.5 2.5 0 0 0 2.5 2.5h12a2.5 2.5 0 0 0 2.5-2.5v-4.5"/><path d="M3.5 13.5 6 8h2.2"/><path d="M20.5 13.5 18 8h-2.2"/><path d="M12 2.8v9.4"/><path d="M8.8 6 12 2.8 15.2 6"/></svg>';
   /* Papierflieger wie bei Instagram: Teilen */
   var PLANE_SVG =
     '<svg class="acc-act-ico wr-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M21.5 3.2 2.8 10.4l7 3 3 7.4z"/><path d="M21.5 3.2 9.8 13.4"/></svg>';
