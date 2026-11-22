@@ -26,7 +26,8 @@
     ".god__pick input{width:20px;height:20px;accent-color:#2A2118;margin:0}" +
     ".god__empty{margin:0 0 14px;color:rgba(42,33,24,.65);font-size:14px}" +
     ".god__card--note{padding:22px 20px;cursor:pointer}" +
-    ".god__note{margin:0;font-size:16px;line-height:1.5;white-space:pre-wrap;text-align:left}" +
+    /* Mitteilungen der App: gogogo-Schrift (Inter 500, M), dunkle Tinte, unabhängig von Seiten-Regeln */
+    ".god .god__note{margin:0;font-family:Inter,system-ui,sans-serif !important;font-size:16px !important;font-weight:500 !important;font-style:normal !important;line-height:1.5;color:#2A2118 !important;-webkit-text-fill-color:#2A2118;white-space:pre-wrap;text-align:left}" +
     ".god__face{width:96px;height:96px;margin:2px auto 14px;border-radius:50%;background:#E6DED0 center/cover no-repeat;display:grid;place-items:center;font:700 34px/1 Inter,system-ui,sans-serif;color:#2A2118}" +
     ".god__face + .god__text{text-align:center}" +
     ".god__card .god__text.is-center{text-align:center;margin-bottom:4px !important}" +
