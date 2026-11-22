@@ -4424,7 +4424,9 @@
   function planAlternative(kind, unit, payload, replace) {
     var list = altVisList();
     return GoDialog.plan((emojiFor(kind, unit.title) + " " + (unit.title || "Training")).trim(), {
-      vis: normalizeVisibility(payload.visibility || "team"), visList: list, times: altTimes()
+      vis: normalizeVisibility(payload.visibility || "team"), visList: list, times: altTimes(),
+      /* Schritte: immer 22:00 voreingestellt */
+      time: /schritte/i.test(unit.title || "") ? "22:00" : ""
     }).then(function (r) {
       if (!r) return;
       var vo = list.filter(function (x) { return x.value === r.vis; })[0] || {};

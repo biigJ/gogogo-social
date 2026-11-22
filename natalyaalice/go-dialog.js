@@ -312,14 +312,16 @@
   }
 
   /* Drehrad (30 Min) als Element, liefert { el, value() } */
-  function wheelEl(times, small) {
+  function wheelEl(times, small, preset) {
     var wheel = document.createElement("div");
     wheel.className = "god__wheel" + (small ? " god__wheel--sm" : "");
+    var pi = preset ? times.indexOf(preset) : -1;
+    if (pi < 0) pi = 0;
     times.forEach(function (t, i) {
       var b = document.createElement("button");
       b.type = "button";
       b.textContent = t;
-      if (i === 0) b.className = "is-on";
+      if (i === pi) b.className = "is-on";
       b.addEventListener("click", function () { b.scrollIntoView({ block: "center", behavior: "smooth" }); });
       wheel.appendChild(b);
     });
@@ -360,7 +362,9 @@
       card.appendChild(pw);
       var row = document.createElement("div");
       row.className = "god__planrow";
-      var wh = wheelEl(opts.times && opts.times.length ? opts.times : ["jetzt"], true);
+      var wh = wheelEl(opts.times && opts.times.length ? opts.times : ["jetzt"], true, opts.time);
+      /* Voreinstellung (z. B. Schritte 22:00) in die Mitte scrollen */
+      if (opts.time) setTimeout(function () { var on = wh.el.querySelector(".is-on"); if (on) wh.el.scrollTop = on.offsetTop - wh.el.clientHeight / 2 + on.offsetHeight / 2; }, 0);
       row.appendChild(wh.el);
       var go = document.createElement("button");
       go.type = "button";
