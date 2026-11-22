@@ -59,18 +59,16 @@
     ".ga-filters{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}" +
     ".ga-filters select{min-height:34px;padding:0 10px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:13px;font-weight:600;color:#111}" +
     ".ga-paused{opacity:.55}" +
-    /* Circle-Aufzeichnungen wie in der App */
+    /* Circle-Aufzeichnungen: Markup und Klassen der App (go-rec-wheel, go-rec-detail, go-rec-round) */
     ".ga-rec .ga-info__card{width:min(100%,520px)}" +
-    ".ga-rec__days{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}" +
-    ".ga-rec__days button{min-height:32px;padding:0 12px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:13px;font-weight:600;cursor:pointer}" +
-    ".ga-rec__days button.is-on{background:#111;color:#fff}" +
-    ".ga-rec__head{text-align:center;font-weight:600;margin:4px 0}" +
-    ".ga-rec__pts{text-align:center;font:600 26px/1.2 'Playfair Display',Georgia,serif;margin:6px 0 2px}" +
-    ".ga-rec__meta{text-align:center;font-size:13px;color:rgba(42,33,24,.65);margin-bottom:10px}" +
-    ".ga-rec__round{border-top:1px solid rgba(42,33,24,.12);padding:6px 0}" +
-    ".ga-rec__rh{font:700 11px/1.3 Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:rgba(42,33,24,.55)}" +
-    ".ga-rec__row{display:flex;justify-content:space-between;gap:10px;font-size:15px;padding:2px 0}" +
-    ".ga-rec__row button{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer}" +
+    ".ga-pills{flex:none;align-self:center;display:flex;gap:6px}" +
+    "@media (max-width:600px){.ga-item:has(.ga-pills){flex-wrap:wrap}.ga-item:has(.ga-pills) .ga-copy{flex:1 1 calc(100% - 85px)}.ga-item .ga-pills{margin-left:73px}}" +
+    ".ga-rec .go-rec-detail__pts{text-align:center;font:600 28px/1.2 'Playfair Display',Georgia,serif;margin-top:4px}" +
+    ".ga-rec .go-rec-detail__meta{text-align:center;font-size:13px;margin-bottom:6px}" +
+    /* Dreh-Knöpfe: Tippen schaltet zum nächsten Wert */
+    ".ga-dreh{max-width:240px;overflow:hidden;text-overflow:ellipsis}" +
+    ".ga-dreh.is-on{background:#111;color:#fff}" +
+    ".ga-ucount{font-size:13px;color:rgba(42,33,24,.65);margin:4px 0 0}" +
     ".ga-del{margin-left:6px;color:#C7413B;border-color:#C7413B}" +
     ".ga-wa{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:#128C7E;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-grid;place-items:center}" +
     ".ga-item.is-sent{opacity:.5}" +
@@ -361,6 +359,66 @@
     if (coachRequested(id)) return '<button type="button" class="ga-pill" data-ga-req="' + esc(id) + '">Anfrage Coach</button>';
     return '<button type="button" class="ga-pill" data-ga-user="' + esc(id) + '">' + (ci.paused_at ? "Pausiert" : "Nutzer") + "</button>";
   }
+  /* Nutzer-Filter: je Merkmal ein Dreh-Knopf (alle → Werte → ohne → alle) */
+  var UF = [["goal", "Ziel"], ["coach", "Coach"], ["place", "Ort"], ["plan", "Wochenplan"], ["circle", "Circle"], ["group", "Gruppe"], ["day", "Workout"]];
+  var NONE = "\u2205";
+  function berlinDay(at) {
+    try { return new Date(at).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }); } catch (e) { return String(at || "").slice(0, 10); }
+  }
+  function dayDe(iso) {
+    var p = String(iso).split("-");
+    return p.length === 3 ? p[2] + "." + p[1] + "." + p[0] : iso;
+  }
+  function facets(a) {
+    var id = String(a.account_id);
+    var ci = coachInfo(id);
+    var x = extrasOf(id) || {};
+    var ln = (st.links && st.links[id]) || {};
+    var hit = ci.trainer_id ? (st.accounts || []).filter(function (q) { return String(q.account_id) === String(ci.trainer_id); })[0] : null;
+    var days = {};
+    hxdOf(id).forEach(function (r) { days[r.day] = 1; });
+    (x.doubles || []).forEach(function (d) { if (d.at) days[berlinDay(d.at)] = 1; });
+    return {
+      goal: goalText(id) ? goalText(id).split(" · ") : [],
+      coach: ci.trainer_id ? [hit ? String(hit.name || "Coach").split(" ")[0] : "Coach"] : [],
+      place: placeList(ci.workout_places),
+      plan: x.plan && x.plan.title ? [x.plan.title] : [],
+      circle: ln.circles || [],
+      group: ln.groups || [],
+      day: Object.keys(days)
+    };
+  }
+  function ufValues(key) {
+    var seen = {};
+    (st.accounts || []).forEach(function (a) { facets(a)[key].forEach(function (v) { seen[v] = 1; }); });
+    var vals = Object.keys(seen);
+    if (key === "day") vals.sort().reverse(); else vals.sort(function (p, q) { return p.localeCompare(q, "de"); });
+    return [""].concat(vals, [NONE]);
+  }
+  function ufLabel(key, label, v) {
+    if (!v) return label + ": alle";
+    if (v === NONE) return label + ": ohne";
+    return label + ": " + (key === "day" ? dayDe(v) : v);
+  }
+  function ufMatch(a) {
+    var f = st.uf || {};
+    var fx = null;
+    return UF.every(function (u) {
+      var v = f[u[0]];
+      if (!v) return true;
+      fx = fx || facets(a);
+      var have = fx[u[0]];
+      return v === NONE ? !have.length : have.indexOf(v) >= 0;
+    });
+  }
+  function ufBar(n, total) {
+    var f = st.uf || {};
+    var on = UF.some(function (u) { return f[u[0]]; });
+    return '<div class="ga-filters">' + UF.map(function (u) {
+      return '<button type="button" class="ga-pill ga-dreh' + (f[u[0]] ? " is-on" : "") + '" data-ga-uf="' + u[0] + '">' + esc(ufLabel(u[0], u[1], f[u[0]])) + "</button>";
+    }).join("") + "</div>" +
+      '<p class="ga-ucount">' + n + " von " + total + " Nutzern" + (on ? ' · <button type="button" class="ga-link" data-ga-uf="reset">Filter zurücksetzen</button>' : "") + "</p>";
+  }
   function paintCoaches() {
     if (!st.coachInfo) loadCoachInfo();
     if (!st.links) loadLinks();
@@ -378,7 +436,9 @@
     function parts(list) {
       return list.filter(Boolean).map(function (h, i) { return i ? '<span class="ga-sep"></span>' + h : h; }).join("");
     }
-    return '<p class="cp-hint">Profilbild: alles zur Person. Pille rechts: Rolle ändern, pausieren oder löschen.</p>' +
+    var total = accs.length;
+    accs = accs.filter(ufMatch);
+    return '<p class="cp-hint">Profilbild: alles zur Person. Pille rechts: Rolle ändern, pausieren oder löschen. Circle: Aufzeichnungen.</p>' + ufBar(accs.length, total) +
       accs.map(function (a) {
         var id = String(a.account_id);
         var ci = coachInfo(id);
@@ -403,7 +463,7 @@
         var r5 = x ? parts(stampLine(x).map(esc).concat([esc(doubleLine(x, function (aid) {
           var hit = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(aid); })[0];
           return hit ? String(hit.name || "").split(" ")[0] : "";
-        }))]).concat(nRec ? ['<button type="button" class="ga-link" data-ga-rec="' + esc(id) + '">Circle-Aufzeichnungen (' + nRec + ")</button>"] : [])) : "";
+        }))])) : "";
         var pl = placeList(ci.workout_places);
         var r4 = '<button type="button" class="ga-link" data-ga-places="' + esc(id) + '">' + esc(pl.length ? pl.join(" · ") : "Ort hinzufügen") + "</button>";
         var photo = ci.photo_url || a.photo_url;
@@ -411,66 +471,102 @@
         return '<div class="ga-item is-top' + (ci.paused_at ? " ga-paused" : "") + '"><button type="button" class="ga-rectbtn" data-ga-info="' + esc(id) + '" aria-label="Infos zu ' + esc(a.name || "") + '">' + rect + "</button>" +
           '<div class="ga-copy ga-rows"><div class="ga-r1">' + r1 + "</div>" +
           (r2 ? "<div>" + r2 + "</div>" : "") + "<div>" + r3 + "</div><div>" + r4 + "</div>" + (r5 ? "<div>" + r5 + "</div>" : "") + "</div>" +
-          rolePill(a) + "</div>";
+          '<span class="ga-pills">' + (nRec ? '<button type="button" class="ga-pill" data-ga-rec="' + esc(id) + '" aria-label="Circle-Aufzeichnungen">Circle</button>' : "") + rolePill(a) + "</span></div>";
       }).join("");
   }
-  /* Circle-Aufzeichnungen eines Nutzers, so wie die App sie zeigt; Werte antippen = nachpflegen */
-  function openRec(id, pick) {
+  /* Circle-Aufzeichnungen eines Nutzers im Design der App (Datumsrad, Punkte, Runden); Stift = Werte nachpflegen */
+  function openRec(id, pick, editing) {
     var rows = hxdOf(id);
     if (!rows.length || !global.GoHyroxDoubles) return;
+    var H = global.GoHyroxDoubles;
     var a = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(id); })[0] || {};
-    var cur = rows.filter(function (r) { return String(r.id) === String(pick); })[0] || rows[0];
+    var idx = 0;
+    rows.forEach(function (r, i) { if (String(r.id) === String(pick)) idx = i; });
+    function labelOf(r) {
+      var names = String(r.team || "").split(/\s*&\s*/);
+      var me = (r.account_ids || []).map(String).indexOf(String(id));
+      var partner = names[me === 0 ? 1 : 0] || "";
+      return dayDe(r.day) + " · " + (r.title || "HYROX Double") + (partner ? " mit " + partner : "");
+    }
     var box = document.createElement("div");
     box.className = "ga-info ga-rec";
-    var sc = GoHyroxDoubles.score(cur);
-    var names = String(cur.team || "").split(/\s*&\s*/);
-    var me = (cur.account_ids || []).map(String).indexOf(String(id));
-    var partner = names[me === 0 ? 1 : 0] || "";
-    var d = new Date(cur.day + "T12:00:00");
-    var work = Number(cur.work_sec) || 360;
-    box.innerHTML = '<div class="ga-info__card" role="dialog" aria-modal="true"><p class="ga-info__name" style="text-align:center">' + esc(String(a.name || "").split(" ")[0]) + "</p>" +
-      '<div class="ga-rec__days">' + rows.map(function (r) {
-        var dd = new Date(r.day + "T12:00:00");
-        return '<button type="button" data-rec-pick="' + esc(r.id) + '"' + (r === cur ? ' class="is-on"' : "") + ">" + esc(dd.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })) + "</button>";
-      }).join("") + "</div>" +
-      '<p class="ga-rec__head">' + esc(d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) + " · " + (cur.title || "HYROX Double") + (partner ? " mit " + partner : "")) + "</p>" +
-      '<p class="ga-rec__pts">' + esc(sc.total.toLocaleString("de-DE")) + " Punkte</p>" +
-      '<p class="ga-rec__meta">' + Math.floor(work / 60) + ":" + String(work % 60).padStart(2, "0") + " Workout ohne Laufen · " + sc.stations.length + " Runden · " + esc(cur.category) + "</p>" +
-      sc.stations.map(function (stn, k) {
-        return '<div class="ga-rec__round"><div class="ga-rec__rh">Runde ' + (k + 1) + '</div><div class="ga-rec__row"><span>' + esc(stn.label) + "</span>" +
-          '<button type="button" data-rec-edit="' + esc(stn.key) + '">' + esc(Number(stn.value).toLocaleString("de-DE") + " " + stn.unit) + (stn.points != null ? " · " + stn.points + " P" : "") + "</button></div></div>";
-      }).join("") +
-      '<div class="ga-info__btns"><button type="button" data-rec-add="1">Station nachtragen</button><button type="button" class="is-quiet" data-gi-close="1">Schließen</button></div></div>';
+    box.innerHTML = '<div class="ga-info__card go-slide__ffc-plain" role="dialog" aria-modal="true"><p class="ga-info__name" style="text-align:center">' + esc(String(a.name || "").split(" ")[0]) + "</p>" +
+      '<div class="go-rec-wheel"><div class="go-rec-wheel__mark"></div><div class="go-rec-wheel__col">' + rows.map(function (r, i) {
+        return '<button type="button" class="go-rec-wheel__item' + (i === idx ? " is-on" : "") + '" data-idx="' + i + '">' + esc(labelOf(r)) + "</button>";
+      }).join("") + '</div></div><div class="go-rec-detail"></div>' +
+      '<div class="ga-info__btns"><button type="button" class="is-quiet" data-gi-close="1">Schließen</button></div></div>';
     document.body.appendChild(box);
+    var col = box.querySelector(".go-rec-wheel__col");
+    var detail = box.querySelector(".go-rec-detail");
+    var pen = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5-10.5a2.8 2.8 0 0 0-4-4L4 16v4z"/></svg>';
+    function show(i) {
+      idx = i;
+      var cur = rows[i];
+      Array.prototype.forEach.call(col.children, function (el, k) { el.classList.toggle("is-on", k === i); });
+      var pl = H.plan(cur);
+      var sc = H.score(cur);
+      var work = Number(cur.work_sec) || 360;
+      detail.innerHTML = '<div class="go-rec-detail__head"><span>' + esc(labelOf(cur)) + '</span><button type="button" class="go-rec-detail__pen' + (editing ? " is-on" : "") + '" data-rec-pen="1" aria-label="' + (editing ? "Bearbeiten beenden" : "Werte bearbeiten") + '">' + pen + "</button></div>" +
+        '<div class="go-rec-detail__pts">' + esc(sc.total.toLocaleString("de-DE")) + " Punkte</div>" +
+        '<div class="go-rec-detail__meta">' + Math.floor(work / 60) + ":" + String(work % 60).padStart(2, "0") + " Workout ohne Laufen · " + pl.length + " Runden · " + esc(cur.category) + "</div>" +
+        pl.map(function (s, k) {
+          var txt = esc(H.valueText(s) + (s.points != null ? " · " + s.points + " P" : ""));
+          return '<div class="go-rec-round"><div class="go-rec-round__head">Runde ' + (k + 1) + '</div><div class="go-rec-detail__row"><span>' + esc(s.label) + "</span>" +
+            (editing ? '<button type="button" class="go-rec-detail__edit' + (s.value == null ? " is-empty" : "") + '" data-rec-edit="' + esc(s.key) + '">' + txt + "</button>" : "<span>" + txt + "</span>") + "</div></div>";
+        }).join("") +
+        (editing && !H.EVENTS[cur.day] ? '<button type="button" class="go-rec-detail__story" data-rec-add="1">Station nachtragen</button>' : "");
+    }
+    function center(smooth) {
+      var el = col.children[idx];
+      if (!el) return;
+      var top = Math.max(0, el.offsetTop - (col.clientHeight - el.offsetHeight) / 2);
+      if (smooth && col.scrollTo) col.scrollTo({ top: top, behavior: "smooth" }); else col.scrollTop = top;
+    }
+    show(idx);
+    requestAnimationFrame(function () { center(false); });
+    col.addEventListener("scroll", function () {
+      var mid = col.scrollTop + col.clientHeight / 2, best = idx, dist = Infinity;
+      Array.prototype.forEach.call(col.children, function (el, k) {
+        var d = Math.abs(el.offsetTop + el.offsetHeight / 2 - mid);
+        if (d < dist) { dist = d; best = k; }
+      });
+      if (best !== idx) show(best);
+    }, { passive: true });
     function close() { box.remove(); }
     function save(results) {
+      var cur = rows[idx];
       return host.rest("go_hyrox_doubles?id=eq." + encodeURIComponent(cur.id), { method: "PATCH", prefer: "return=minimal", body: { results: results } })
-        .then(function () { cur.results = results; close(); openRec(id, cur.id); paint(); if (host.toast) host.toast("Gespeichert"); })
+        .then(function () { cur.results = results; show(idx); paint(); if (host.toast) host.toast("Gespeichert"); })
         .catch(function () { GoDialog.alert("Speichern ging nicht (go-hyrox-doubles.sql ausgeführt?)"); });
     }
+    /* Runden-Stationen (Farmers 25 m, Lunges 4,5 m): Eingabe in Runden, gespeichert wird das Ergebnis in Metern */
     function ask(key) {
-      var ref = GoHyroxDoubles.REFS[key];
-      var hint = key === "farmers" ? " (Runden × 25 m)" : key === "lunges" ? " (Bahnen × 4,5 m)" : "";
-      return GoDialog.prompt(ref.label + " in " + ref.unit + hint, (cur.results || {})[key] != null ? String(cur.results[key]) : "", { ok: "Speichern" }).then(function (v) {
+      var cur = rows[idx];
+      var ref = H.REFS[key];
+      var have = (cur.results || {})[key];
+      var q = ref.per ? ref.label + ": Runden (je " + String(ref.per).replace(".", ",") + " m)" : ref.label + " in " + ref.unit;
+      var start = have == null ? "" : String(ref.per ? Math.round(have / ref.per * 10) / 10 : have).replace(".", ",");
+      return GoDialog.prompt(q, start, { ok: "Speichern" }).then(function (v) {
         if (v == null) return;
         var res = Object.assign({}, cur.results || {});
         v = String(v).replace(",", ".").trim();
         if (v === "") delete res[key];
         else if (!(Number(v) >= 0)) { GoDialog.alert("Bitte eine Zahl eingeben."); return; }
-        else res[key] = Number(v);
+        else res[key] = ref.per ? Math.round(Number(v) * ref.per * 10) / 10 : Number(v);
         return save(res);
       });
     }
     box.addEventListener("click", function (e) {
       if (e.target === box || e.target.closest("[data-gi-close]")) { close(); return; }
-      var pk = e.target.closest("[data-rec-pick]");
-      if (pk) { close(); openRec(id, pk.getAttribute("data-rec-pick")); return; }
+      var it = e.target.closest(".go-rec-wheel__item");
+      if (it) { show(Number(it.getAttribute("data-idx")) || 0); center(true); return; }
+      if (e.target.closest("[data-rec-pen]")) { editing = !editing; show(idx); return; }
       var ed = e.target.closest("[data-rec-edit]");
       if (ed) { ask(ed.getAttribute("data-rec-edit")); return; }
       if (e.target.closest("[data-rec-add]")) {
-        var have = cur.results || {};
-        var opts = Object.keys(GoHyroxDoubles.REFS).filter(function (k) { return have[k] == null; })
-          .map(function (k) { return { label: GoHyroxDoubles.REFS[k].label, value: k }; });
+        var have = rows[idx].results || {};
+        var opts = Object.keys(H.REFS).filter(function (k) { return have[k] == null; })
+          .map(function (k) { return { label: H.REFS[k].label, value: k }; });
         GoDialog.choose("Station nachtragen", opts, { cancel: "Abbrechen" }).then(function (k) { if (k) ask(k); });
       }
     });
@@ -585,7 +681,7 @@
   }
   function shortDay(at) {
     var d = new Date(at);
-    return isNaN(d.getTime()) ? "" : d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" }).replace(/,/, "");
+    return isNaN(d.getTime()) ? "" : d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" }).replace(/,/, "");
   }
   function sqlHint(kind) { GoDialog.alert("Das braucht " + ORG[kind].sql + " in Supabase."); }
   function paintOrgs(kind) {
@@ -1346,7 +1442,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -1357,6 +1453,18 @@
     if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
     if (t.hasAttribute("data-ga-plan")) { userPlan(t.getAttribute("data-ga-plan")); return; }
     if (t.hasAttribute("data-ga-rec")) { openRec(t.getAttribute("data-ga-rec")); return; }
+    if (t.hasAttribute("data-ga-uf")) {
+      var uk = t.getAttribute("data-ga-uf");
+      st.uf = st.uf || {};
+      if (uk === "reset") st.uf = {};
+      else {
+        var vals = ufValues(uk);
+        var at = vals.indexOf(st.uf[uk] || "");
+        st.uf[uk] = vals[(at + 1) % vals.length];
+      }
+      paint();
+      return;
+    }
     if (t.hasAttribute("data-gx")) {
       var gx = t.getAttribute("data-gx"), gk = t.getAttribute("data-gk"), gid = t.getAttribute("data-gid");
       if (gx === "coach") orgCoach(gk, gid);
