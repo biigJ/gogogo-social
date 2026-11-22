@@ -4247,7 +4247,7 @@
     #plan-settings .view-toggle { display: flex !important; align-items: center; gap: 10px; }
     #plan-settings .view-toggle__label { flex: 0 0 auto; }
     #plan-settings .view-toggle__ico { display: inline-grid; place-items: center; color: #2A2118; }
-    #plan-settings .view-toggle__swap { font-size: 18px; line-height: 1; }
+    #plan-settings .view-toggle__swap { display: inline-grid; place-items: center; color: #2A2118; }
     .friend-view button { width: 50px; height: 50px; padding: 0; border: 0; background: none; color: rgba(42,33,24,.4); display: grid; place-items: center; cursor: pointer; }
     .friend-view button.is-on { color: #2A2118; }
     .friend-view svg { width: 31px; height: 31px; }
@@ -8639,6 +8639,7 @@
       var planPane = "profil";
       var todayPick = null;
       var sessionIsTrainer = !!(sessionAccount && sessionAccount.is_trainer);
+      var sessionTrainerChecked = false;
       try {
         if (sessionMode && new URLSearchParams(location.search).get("plan") === "settings") {
           setTimeout(function () { showPlan("settings"); }, 0);
@@ -10871,6 +10872,12 @@
         if (ffcForeign === on) return;
         ffcForeign = on;
         if (!on) return;
+        /* Zirkel-Login gehört zu einem anderen Nickname (Gerät wurde mit anderem Konto genutzt):
+           abmelden, damit Circle und Punkte nicht falsch verknüpft sind */
+        if (window.FFC && FFC.logout) {
+          FFC.logout().catch(function () {});
+          gogogoToast("Zirkel-Login gehörte zu einem anderen Konto und wurde abgemeldet.");
+        }
         ffcIncoming = [];
         teamPeople = (teamPeople || []).filter(function (p) { return !(p && p.isFfcOnly); });
         ffcCircleByNick = {};
@@ -10936,11 +10943,12 @@
       function paintViewToggles() {
         var CIRCLE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>';
         var SQUARE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/></svg>';
+        var SWAP = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3l3 3-3 3"/><path d="M4 11V9a3 3 0 0 1 3-3h13"/><path d="M7 21l-3-3 3-3"/><path d="M20 13v2a3 3 0 0 1-3 3H4"/></svg>';
         [["friends_view", "gogogo_friends_view", "Freunde"], ["bubbles_view", "gogogo_bubbles_view", "Bubbles"]].forEach(function (x) {
           var b = document.querySelector('#plan-settings [data-menu="' + x[0] + '"]');
           if (!b) return;
           var w = viewIsWallet(x[1]);
-          b.innerHTML = '<span class="view-toggle__label">' + x[2] + '</span><span class="view-toggle__ico">' + (w ? SQUARE : CIRCLE) + '</span><span class="view-toggle__swap" aria-hidden="true">🔁</span>';
+          b.innerHTML = '<span class="view-toggle__label">' + x[2] + '</span><span class="view-toggle__ico">' + (w ? SQUARE : CIRCLE) + '</span><span class="view-toggle__swap" aria-hidden="true">' + SWAP + '</span>';
           b.setAttribute("aria-label", x[2] + ": " + (w ? "Karten" : "Liste") + ", tippen zum Umschalten");
         });
       }
@@ -18381,8 +18389,8 @@
             }, coacheeList);
           });
         }
-        /* Coachees-Reiter nur für Coaches */
-        if (sessionIsTrainer) box.appendChild(coacheeSlide);
+        /* Coachees-Reiter nur für Coaches, und erst wenn die Datenbank is_trainer bestätigt hat (kein Cache) */
+        if (sessionIsTrainer && sessionTrainerChecked) box.appendChild(coacheeSlide);
         syncGroupOptions();
         syncHScrollDock();
         syncTeamGoRailNav();
@@ -20079,6 +20087,7 @@
               if (me.trainer_id) sessionAccount.trainer_id = me.trainer_id;
               sessionAccount.is_trainer = !!me.is_trainer;
               sessionIsTrainer = !!me.is_trainer;
+              sessionTrainerChecked = true;
               if (sessionIsTrainer) markCoachOfferOwned();
               if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
               applyInstalledIdentity(sessionAccount);
@@ -25804,8 +25813,9 @@
             if (mine ? row.is_me : (nick && String(row.nickname || "").toLowerCase() === nick)) hit = row;
           });
           var noZirkel = document.getElementById("profile-nozirkel-block");
+          /* nicht gestartet: Block bleibt weg */
           if (!hit) {
-            if (noZirkel) noZirkel.hidden = false;
+            if (noZirkel) noZirkel.hidden = true;
             return;
           }
           if (noZirkel) noZirkel.hidden = true;
@@ -25886,6 +25896,9 @@
         var started = mine ? routineStart() : (about.challenge_started || "");
         document.getElementById("profile-challenge").textContent = started ? "12-Wochenroutine gestartet" : "12-Wochenroutine nicht gestartet";
         renderProfileWeeks(started, mine);
+        /* 12-Wochenroutine nur zeigen, wenn gestartet */
+        var routineBlock = document.getElementById("profile-routine-block");
+        if (routineBlock) routineBlock.hidden = !started;
         var notes = document.getElementById("profile-notes");
         if (notes) notes.textContent = "";
         var grid = document.getElementById("profile-photos");
@@ -25894,14 +25907,19 @@
         var noZirkel = document.getElementById("profile-nozirkel-block");
         if (noZirkel) noZirkel.hidden = true;
         var list = (photos || []).filter(Boolean);
+        var photosBlock = document.getElementById("profile-photos-block");
         list.forEach(function (src) {
           var img = document.createElement("img");
           img.alt = "";
+          /* nicht ladbares Bild (blaues Fragezeichen) entfernen, leeren Block ausblenden */
+          img.onerror = function () {
+            img.remove();
+            if (photosBlock && !grid.querySelector("img") && !mine) photosBlock.hidden = true;
+          };
           img.src = src;
           grid.appendChild(img);
         });
         if (label) label.hidden = true;
-        var photosBlock = document.getElementById("profile-photos-block");
         if (photosBlock) photosBlock.hidden = !list.length && !mine;
       }
 
