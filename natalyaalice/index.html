@@ -1566,6 +1566,9 @@
       border: 1px solid #2A2118; background: #2A2118; color: #F6F1E8; font-weight: 600; cursor: pointer;
     }
     .acc-card { margin: 0 0 28px; color: #2A2118; }
+    /* Zugesagte Events (Einladung angenommen / Herz): sehr dicker farbiger Rahmen */
+    .acc-card.is-going { position: relative; z-index: 2; }
+    .acc-card.is-going .acc-card__media { box-shadow: 0 0 0 8px #C7413B; }
     /* Wallet (Events ab morgen): Kopf mit Name links, Tag rechts, darunter Eventname linksbündig */
     .acc-card.is-wallet { position: relative; isolation: isolate; border-radius: 16px; transition: margin .28s ease; }
     .acc-card.is-wallet .acc-card__media { border-radius: 16px; transition: height .28s ease; }
@@ -7272,8 +7275,7 @@
       <label class="heute-filter-pick">
         <select id="heute-filter-select" aria-label="Heute filtern">
           <option value="ich">Ich</option>
-          <option value="circle">Circle</option>
-          <option value="team">Team</option>
+          <option value="team">Community</option>
           <option value="alles">Alles</option>
         </select>
       </label>
@@ -7671,9 +7673,9 @@
       <p id="invite-in-place"></p>
       <p id="invite-in-activity"></p>
       <p id="invite-in-time"></p>
-      <button type="button" id="invite-accept">annehmen</button>
-      <button type="button" class="sand-quiet" id="invite-decline">ablehnen</button>
-      <button type="button" class="sand-quiet" id="invite-later">später</button>
+      <button type="button" id="invite-accept">Annehmen</button>
+      <button type="button" class="sand-quiet" id="invite-decline">Klappt nicht</button>
+      <button type="button" class="sand-quiet" id="invite-later">Vielleicht</button>
     </div>
   </div>
   <div class="sand-modal" id="goal-modal" hidden>
@@ -8559,7 +8561,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-107"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-108"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-78"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -17390,18 +17392,15 @@
         if (!heute) return;
         var cur = heute.value === "crew" ? "team" : heute.value;
         if (String(cur).indexOf("group:") === 0) cur = "gruppe";
-        /* Reihenfolge: Ich, Gruppe, Circle, Team, Bubble, Alles (kein Tagebuch mehr) */
+        /* Reihenfolge: Ich, Community, Meine Bubble, Alles (Gruppe/Circle gehen in Community auf) */
         var bub = window.GoBubbles ? GoBubbles.mine() : null;
-        var html = '<option value="ich">Ich</option>';
-        if (myGroups().length) html += '<option value="gruppe">Gruppe</option>';
-        html += '<option value="circle">Circle</option>' +
-          '<option value="team">Team</option>';
-        if (bub) html += '<option value="bubble">Bubble</option>';
+        var html = '<option value="ich">Ich</option><option value="team">Community</option>';
+        if (bub) html += '<option value="bubble">Meine Bubble</option>';
         html += '<option value="alles">Alles</option>';
         if (cur === "tagebuch") cur = "alles";
+        if (cur === "gruppe" || cur === "circle") cur = "team";
         heute.innerHTML = html;
         if (cur === "bubble" && !bub) cur = "alles";
-        if (cur === "gruppe" && !myGroups().length) cur = "team";
         if (cur && [].some.call(heute.options, function (o) { return o.value === cur; })) heute.value = cur;
       }
 
@@ -21840,10 +21839,23 @@
           var sDay = new Date(sIso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long" });
           var sWho = String(next.from_name || "Dein Freund").split(" ")[0];
           GoDialog.choose(sWho + " lädt Dich jeden " + sDay + " ein: " + (next.workout_label || "Training") +
-            (next.meet_time ? ", " + next.meet_time : "") + ".", [{ label: "In Woche zusagen", value: "woche" }],
-            { cancel: "Später", sub: "Dann steht es jede Woche in Deiner Woche." }).then(function (v) {
+            (next.meet_time ? ", " + next.meet_time : "") + ".", [
+              { label: "Annehmen", value: "woche" },
+              { label: "Klappt nicht", value: "declined" },
+              { label: "Vielleicht", value: "maybe" }
+            ], { sub: "Annehmen: Es steht dann jede Woche in Deiner Woche." }).then(function (v) {
             invitePromptSkip[sKey] = true;
             invitePromptOn = false;
+            if (v === "declined" || v === "maybe") {
+              (remoteInvites || []).forEach(function (r) {
+                if (!r || String(r.to_id) !== me || r.status !== "pending" || inviteSeriesKey(r) !== sKey) return;
+                r.status = v;
+                rest("go_workout_invites?id=eq." + encodeURIComponent(r.id), { method: "PATCH", prefer: "return=minimal", body: { status: v } }).catch(function () {});
+              });
+              syncInviteStore();
+              setTimeout(promptPendingInvites, 250);
+              return;
+            }
             if (v !== "woche") { setTimeout(promptPendingInvites, 250); return; }
             showWoche();
             setTimeout(function () {
@@ -22029,7 +22041,11 @@
         if (!pendingIncoming) return;
         var invite = pendingIncoming;
         var path = "go_workout_invites?id=eq." + encodeURIComponent(invite.id);
-        rest(path, { method: "PATCH", prefer: "return=minimal", body: { status: status } }).catch(function () {});
+        rest(path, { method: "PATCH", prefer: "return=minimal", body: { status: status } }).catch(function (err) {
+          if (status === "maybe" && /check|constraint|23514/i.test(String((err && err.message) || ""))) {
+            GoDialog.alert("„Vielleicht“ braucht go-invite-maybe.sql in Supabase.");
+          }
+        });
         invite.status = status;
         /* Wiederkehrende Einladung (aus der Woche): Zusage gilt für die ganze Serie */
         if (status === "accepted" && invite.from_id && invite.workout_label && invite.workout_date) {
@@ -24899,9 +24915,11 @@
           var pr = entry.presence;
           var done = (entry.today && entry.today.done) || (pr && pr.status === "done");
           var open = !done && ((entry.today && entry.today.training) || (pr && pr.status === "active"));
+          /* oder heute eine Story gepostet (Event gemacht, Foto) */
+          var story = !!(entry.story || (entry.today && entry.today.photoEventId));
           var mine = teamPeople.some(function (tp) { return tp && !tp.isSelf && String(tp.id) === pid; });
-          if (!open || !mine) doneIds[pid] = true;
-          return open && mine;
+          if (!(open || story) || !mine) doneIds[pid] = true;
+          return (open || story) && mine;
         });
         crewActive = friends.length;
         /* Gelesene Bubble-Kreise: hinter die aktiven Profile (trainiert gerade, heute dran, heute fertig) */
@@ -26120,7 +26138,8 @@
       });
       document.getElementById("invite-accept").addEventListener("click", function () { decideIncoming("accepted"); });
       document.getElementById("invite-decline").addEventListener("click", function () { decideIncoming("declined"); });
-      document.getElementById("invite-later").addEventListener("click", laterIncoming);
+      /* „Vielleicht“: Status maybe (go-invite-maybe.sql), Einladung fragt nicht erneut */
+      document.getElementById("invite-later").addEventListener("click", function () { decideIncoming("maybe"); });
       (function bindHeuteInfo() {
         var btn = document.getElementById("heute-info");
         if (!btn) return;
@@ -27168,9 +27187,10 @@
         if (storedHeute === "all" || storedHeute === "alles") heuteFilter = "alles";
         else if (storedHeute === "mine" || storedHeute === "ich") heuteFilter = "ich";
         else if (storedHeute === "crew" || storedHeute === "team") heuteFilter = "team";
-        else if (storedHeute === "gruppe" || String(storedHeute).indexOf("group:") === 0) heuteFilter = "gruppe";
+        else if (storedHeute === "gruppe" || String(storedHeute).indexOf("group:") === 0) heuteFilter = "team";
         else if (storedHeute === "tagebuch") heuteFilter = "alles";
-        else if (storedHeute === "circle" || storedHeute === "bubble") heuteFilter = storedHeute;
+        else if (storedHeute === "circle") heuteFilter = "team";
+        else if (storedHeute === "bubble") heuteFilter = storedHeute;
       } catch (eSH) {}
       paintVisibility();
       paintHeuteFilter();

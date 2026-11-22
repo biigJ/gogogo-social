@@ -99,10 +99,11 @@
     if (v === "crew") return "team";
     if (v === "all") return "alles";
     if (v === "mine") return "ich";
-    if (String(v || "").indexOf("group:") === 0) return "gruppe";
+    /* Gruppe und Circle gehen in Community (team) auf */
+    if (String(v || "").indexOf("group:") === 0 || v === "gruppe" || v === "circle") return "team";
     /* Tagebuch gibt es im Dropdown nicht mehr → Alles */
     if (v === "tagebuch") return "alles";
-    if (["ich", "team", "gruppe", "alles", "bubble", "circle"].indexOf(v) >= 0) return v;
+    if (["ich", "team", "alles", "bubble"].indexOf(v) >= 0) return v;
     return "";
   }
 
@@ -2105,6 +2106,8 @@
           heart: acceptedInv || (upcoming && !invite && iAmGoing(ev.id))
         });
     return renderCardShell({
+      /* zugesagt (Einladung angenommen oder Herz) → dicker Rahmen */
+      extraClass: !mine && (acceptedInv || iAmGoing(ev.id)) ? "is-going" : "",
       attrs:
         ' data-post-id="' +
         esc(ev.id) +
@@ -5144,8 +5147,7 @@
       else {
         sel.innerHTML =
           '<option value="ich">Ich</option>' +
-          '<option value="circle">Circle</option>' +
-          '<option value="team">Team</option>' +
+          '<option value="team">Community</option>' +
           '<option value="alles">Alles</option>';
       }
       if (!normalizeFilter(sel.value)) sel.value = state.filter || "ich";
