@@ -66,8 +66,10 @@
     ".ga-qrcard__code-line{margin-top:14px;font-size:15px;font-weight:600;white-space:nowrap;text-align:center}" +
     ".ga-rec__next{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid rgba(42,33,24,.12);font-size:15px}" +
     ".ga-rec__next span:last-child{color:rgba(42,33,24,.65);text-align:right}" +
-    ".ga-search{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}" +
-    ".ga-search input{min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid rgba(42,33,24,.3);background:transparent;font:inherit;font-size:15px;color:#111;min-width:0}" +
+    /* Suchfelder in der Breite der Knöpfe (1/5, mind. 168 px), linksbündig */
+    ".ga-search{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}" +
+    ".ga-search input{flex:0 0 auto;width:max(20%,168px);box-sizing:border-box}" +
+    ".ga-search input{min-height:44px;padding:0 14px;border-radius:999px;border:1.5px solid rgba(42,33,24,.3);background:transparent;font:inherit;font-size:15px;color:#111;min-width:0}" +
     ".ga-search input:focus{outline:none;border-color:#111}" +
     /* Knöpfe 1/5 der vollen Breite (mobil breiter), Formular ohne Rahmen und Flächen */
     ".ga-btn5{width:max(20%,168px);min-height:44px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:14px;font-weight:700;cursor:pointer}" +
@@ -369,7 +371,7 @@
     ], f.kind === "report" ? 0 : list.length, all.length, "Nachrichten");
     var showReports = !f.kind || f.kind === "report";
     if (f.kind === "report") list = [];
-    var compose = (showReports ? paintReports() : "") + '<button type="button" class="cp-btn cp-btn--ghost" data-ga-broadcast="1" style="margin:0 0 10px">Mitteilung an alle Nutzer</button>' +
+    var compose = (showReports ? paintReports() : "") + '<div class="ga-tk__top"><button type="button" class="ga-btn5" data-ga-broadcast="1">Mitteilung an alle</button></div>' +
       '<p class="cp-hint">Erscheint bei allen einmal mittig in Aktuell. Tippen schließt. Neue öffentliche Wochenpläne melden sich von selbst.</p>';
     compose += searchBar("news") + bar;
     if (!list.length) return compose + (f.kind === "report" ? "" : '<p class="cp-hint">' + (all.length ? "Nichts gefunden." : "Noch keine Nachrichten.") + "</p>");
