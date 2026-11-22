@@ -50,6 +50,18 @@
     ".ga-pill.is-blue{background:#1D9BF0;border-color:#1D9BF0;color:#fff}" +
     ".ga-pill.is-admin{background:#C7413B;border-color:#C7413B;color:#fff}" +
     "@media (max-width:600px){.ga-item:has(.ga-wa){flex-wrap:wrap}.ga-item:has(.ga-wa) .ga-copy{flex:1 1 calc(100% - 54px)}.ga-item .ga-wa{margin-left:54px}}" +
+    ".ga-nf{display:block;margin:0 0 12px}" +
+    ".ga-nf span{display:block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:rgba(42,33,24,.6);margin-bottom:6px}" +
+    ".ga-nf input,.ga-nf select,.ga-nf__pick{display:block;width:100%;box-sizing:border-box;min-height:46px;padding:0 16px;border-radius:999px;border:1.5px solid rgba(42,33,24,.3);background:transparent;font:inherit;font-size:15px;color:#111;text-align:left;cursor:pointer}" +
+    ".ga-newacc .ga-info__top{margin-bottom:14px}" +
+    ".ga-newacc__btns{grid-template-columns:1fr 1fr}" +
+    ".ga-qrcard{width:min(86vw,340px);aspect-ratio:5/8;box-sizing:border-box;background:#C7413B;color:#F6F1E8;border-radius:18px;padding:18px 14px 16px;display:flex;flex-direction:column;align-items:center;box-shadow:0 18px 40px rgba(0,0,0,.28)}" +
+    "body .ga-qrcard .ga-qrcard__brand{font-family:'Playfair Display',Georgia,serif !important;font-weight:600 !important;font-size:26px !important;line-height:1.05;letter-spacing:-.02em;margin:2px 0 14px}" +
+    ".ga-qrcard__band{width:calc(100% + 28px);margin:0 -14px;padding:18px 0;background:rgba(0,0,0,.22);display:grid;place-items:center}" +
+    ".ga-qrcard__code{background:#fff;padding:10px;border-radius:10px;line-height:0}" +
+    "body .ga-qrcard .ga-qrcard__name{margin-top:auto;font-family:'Playfair Display',Georgia,serif !important;font-weight:600 !important;font-size:22px !important;line-height:1.2;text-align:center}" +
+    ".ga-qrcard__nick{font-size:15px;font-weight:600;opacity:.9;margin-top:4px;text-align:center}" +
+    ".ga-qrcard__hint{text-align:center;font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.8;margin-top:12px}" +
     ".ga-search{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0}" +
     ".ga-search input{min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid rgba(42,33,24,.3);background:transparent;font:inherit;font-size:15px;color:#111;min-width:0}" +
     ".ga-search input:focus{outline:none;border-color:#111}" +
@@ -557,7 +569,8 @@
     }
     var total = accs.length;
     accs = accs.filter(function (a) { return qMatch("coaches", a.account_id, a.name) && ufMatch(a); });
-    return '<p class="cp-hint">Profilbild: alles zur Person. Pille rechts: Rolle ändern, pausieren oder löschen. Circle: Aufzeichnungen.</p>' + searchBar("coaches") + ufBar(accs.length, total) +
+    return '<div class="ga-tk__top"><button type="button" class="ga-btn5 is-dark" data-ga-new="1">Neu</button></div>' +
+      '<p class="cp-hint">Profilbild: alles zur Person. Pille rechts: Rolle ändern, pausieren oder löschen. Circle: Aufzeichnungen. QR: Login-Karte.</p>' + searchBar("coaches") + ufBar(accs.length, total) +
       accs.map(function (a) {
         var id = String(a.account_id);
         var ci = coachInfo(id);
@@ -592,7 +605,7 @@
         return '<div class="ga-item is-top' + (ci.paused_at ? " ga-paused" : "") + '"><button type="button" class="ga-rectbtn" data-ga-info="' + esc(id) + '" aria-label="Infos zu ' + esc(a.name || "") + '">' + rect + "</button>" +
           '<div class="ga-copy ga-rows"><div class="ga-r1">' + r1 + "</div>" +
           (r2 ? "<div>" + r2 + "</div>" : "") + "<div>" + r3 + "</div><div>" + r4 + "</div>" + (r5 ? "<div>" + r5 + "</div>" : "") + "</div>" +
-          '<span class="ga-pills">' + (nRec ? '<button type="button" class="ga-pill" data-ga-rec="' + esc(id) + '" aria-label="Circle-Aufzeichnungen">Circle</button>' : "") + rolePill(a) + "</span></div>";
+          '<span class="ga-pills">' + (nRec ? '<button type="button" class="ga-pill" data-ga-rec="' + esc(id) + '" aria-label="Circle-Aufzeichnungen">Circle</button>' : "") + rolePill(a) + '<button type="button" class="ga-pill" data-ga-qr="' + esc(id) + '">QR-Code</button>' + "</span></div>";
       }).join("");
   }
   /* Circle-Aufzeichnungen eines Nutzers im Design der App (Datumsrad, Punkte, Runden); Stift = Werte nachpflegen */
@@ -1624,6 +1637,130 @@
     if (d.getUTCHours() === 12 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0) return when(at).split(" · ")[0];
     return when(at);
   }
+  /* ---------- Neuer Nutzer: Feld wie die Profilansicht, Speichern legt das Konto an (Login mit Vorname + Login-Code) ---------- */
+  function randDigits(n) { var s = ""; while (s.length < n) s += String(Math.floor(Math.random() * 10)); return s; }
+  function freeValue(col, n) {
+    var v = randDigits(n);
+    if (n === 4 && v[0] === "0") v = "1" + v.slice(1);
+    return host.rest("go_accounts?" + col + "=eq." + v + "&select=id&limit=1").then(function (r) { return r && r.length ? freeValue(col, n) : v; });
+  }
+  function openNew() {
+    if (!st) return;
+    var d = { photo: "", goals: [] };
+    var coaches = (st.accounts || []).filter(isCoachAcc).map(function (a) { return [String(a.account_id), String(a.name || "Coach")]; });
+    var box = document.createElement("div");
+    box.className = "ga-info ga-newacc";
+    document.body.appendChild(box);
+    function field(id, label, type, ph, val) {
+      return '<label class="ga-nf"><span>' + esc(label) + '</span><input id="' + id + '" type="' + (type || "text") + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : "") + ' value="' + esc(val || "") + '" autocomplete="off" /></label>';
+    }
+    function draw(code) {
+      box.innerHTML = '<div class="ga-info__card" role="dialog" aria-modal="true">' +
+        '<div class="ga-info__top"><div class="ga-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" />' : "<span>+</span>") +
+        '<button type="button" class="ga-pen" data-gn="photo" aria-label="Foto">' + PEN + '</button></div><p class="ga-info__name">Neuer Nutzer</p></div>' +
+        field("gn-first", "Vorname *", "text", "für den Login") + field("gn-last", "Nachname") +
+        field("gn-nick", "Nickname", "text", "ohne @") +
+        field("gn-code", "Login-Code *", "text", "4 Ziffern", code) +
+        field("gn-phone", "Telefon / WhatsApp", "tel", "+49 …") + field("gn-mail", "E-Mail", "email") +
+        '<label class="ga-nf"><span>Ziele</span><button type="button" class="ga-nf__pick" data-gn="goals">' + esc(d.goals.length ? d.goals.join(" · ") : "wählen") + "</button></label>" +
+        '<label class="ga-nf"><span>Coach</span><select id="gn-coach"><option value="">ohne</option>' + coaches.map(function (c) { return '<option value="' + esc(c[0]) + '">' + esc(c[1]) + "</option>"; }).join("") + "</select></label>" +
+        field("gn-places", "Orte", "text", "mit Komma trennen") +
+        '<div class="ga-info__btns ga-newacc__btns"><button type="button" class="is-quiet" data-gn="cancel">Abbrechen</button><button type="button" class="is-dark" data-gn="save">Speichern</button></div></div>';
+    }
+    function keep() {
+      ["gn-first", "gn-last", "gn-nick", "gn-code", "gn-phone", "gn-mail", "gn-places", "gn-coach"].forEach(function (k) { var el = document.getElementById(k); if (el) d[k] = el.value; });
+    }
+    function restore() {
+      Object.keys(d).forEach(function (k) { var el = /^gn-/.test(k) && document.getElementById(k); if (el) el.value = d[k]; });
+    }
+    freeValue("invite_code", 4).catch(function () { return randDigits(4); }).then(function (code) { draw(code); });
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest ? e.target.closest("[data-gn]") : null;
+      if (e.target === box) { box.remove(); return; }
+      if (!b) return;
+      var act = b.getAttribute("data-gn");
+      if (act === "cancel") { box.remove(); return; }
+      if (act === "photo") { keep(); pickPhoto(function (url) { d.photo = url || ""; draw(d["gn-code"]); restore(); }); return; }
+      if (act === "goals") {
+        keep();
+        GoDialog.pick("Ziele", GOAL_OPTIONS.map(function (g) { return { label: g, value: g, checked: d.goals.indexOf(g) >= 0 }; }), { ok: "Übernehmen", cancel: "Abbrechen" })
+          .then(function (v) { if (v) d.goals = v; draw(d["gn-code"]); restore(); });
+        return;
+      }
+      if (act === "save") {
+        keep();
+        var first = String(d["gn-first"] || "").trim(), last = String(d["gn-last"] || "").trim();
+        var code = String(d["gn-code"] || "").replace(/\D/g, "");
+        var nick = String(d["gn-nick"] || "").trim().replace(/^@/, "");
+        var mail = String(d["gn-mail"] || "").trim(), phone = String(d["gn-phone"] || "").trim();
+        if (!first) { GoDialog.alert("Bitte den Vornamen eintragen."); return; }
+        if (code.length !== 4) { GoDialog.alert("Der Login-Code hat 4 Ziffern."); return; }
+        var places = String(d["gn-places"] || "").split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+        b.disabled = true;
+        /* Vorname + Code muss eindeutig sein, Nickname auch */
+        Promise.all([
+          host.rest("go_accounts?invite_code=eq." + code + "&select=name&limit=50"),
+          nick ? host.rest("go_accounts?nickname=ilike." + encodeURIComponent(nick.replace(/[%_]/g, "\\$&")) + "&select=id&limit=1") : Promise.resolve([]),
+          freeValue("serial_number", 8)
+        ]).then(function (r) {
+          var clash = (r[0] || []).some(function (x) { return String(x.name || "").split(" ")[0].toLowerCase() === first.toLowerCase(); });
+          if (clash) { b.disabled = false; GoDialog.alert("Vorname und Login-Code gibt es schon. Bitte einen anderen Code."); return; }
+          if ((r[1] || []).length) { b.disabled = false; GoDialog.alert("Den Nickname gibt es schon."); return; }
+          var body = {
+            name: (first + " " + last).trim(), invite_code: code, serial_number: r[2], phone: phone, whatsapp_phone: phone || null,
+            nickname: nick || null, email: mail || null, about_me: mail ? JSON.stringify({ email: mail }) : null,
+            training_goal: d.goals.join(", ") || null, trainer_id: d["gn-coach"] || null, workout_places: places, photo_url: d.photo || null
+          };
+          return host.rest("go_accounts", { method: "POST", prefer: "return=representation", body: body }).then(function (rows) {
+            var acc = rows && rows[0];
+            box.remove();
+            return load().then(function (data) {
+              st.data = data || {};
+              st.accounts = (data && data.accounts) || [];
+              st.coachInfo = null; st.extras = null; st.links = null;
+              paint();
+              if (acc && acc.id) openQr(String(acc.id), acc);
+            });
+          });
+        }).catch(function (err) {
+          b.disabled = false;
+          GoDialog.alert("Anlegen ging nicht: " + String((err && err.message) || err).slice(0, 160));
+        });
+      }
+    });
+  }
+
+  /* ---------- QR-Code als Login-Karte im Format der Stempelkarte: oben gogogo, mittig QR, unten Name und Nickname ---------- */
+  var QR_LIB = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+  function loadQrLib() {
+    if (global.QRCode) return Promise.resolve();
+    return new Promise(function (res, rej) {
+      var sc = document.createElement("script");
+      sc.src = QR_LIB; sc.onload = res; sc.onerror = rej;
+      document.head.appendChild(sc);
+    });
+  }
+  function openQr(id, known) {
+    var a = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0] || {};
+    var job = host.rest("go_accounts?id=eq." + encodeURIComponent(id) + "&select=name,nickname,invite_code").then(function (r) { return (r && r[0]) || known || {}; });
+    Promise.all([job, loadQrLib()]).then(function (r) {
+      var acc = r[0];
+      var first = String(acc.name || a.name || "").split(" ")[0];
+      /* Login-Link: Login-Seite füllt Vorname und Code aus (login/index.html, ?n=&c=); QR entsteht im Browser */
+      var url = location.origin + "/login/?n=" + encodeURIComponent(first) + "&c=" + encodeURIComponent(acc.invite_code || "");
+      var box = document.createElement("div");
+      box.className = "ga-info ga-qr";
+      box.innerHTML = '<div class="ga-qrcard" role="dialog" aria-modal="true"><div class="ga-qrcard__brand">gogogo</div>' +
+        '<div class="ga-qrcard__band"><div class="ga-qrcard__code"></div></div>' +
+        '<div class="ga-qrcard__name">' + esc(acc.name || a.name || "") + "</div>" +
+        '<div class="ga-qrcard__nick">' + (acc.nickname ? "@" + esc(acc.nickname) : "&nbsp;") + "</div>" +
+        '<div class="ga-qrcard__hint">Scannen und einloggen · Code ' + esc(acc.invite_code || "–") + "</div></div>";
+      document.body.appendChild(box);
+      new global.QRCode(box.querySelector(".ga-qrcard__code"), { text: url, width: 176, height: 176, colorDark: "#2A2118", colorLight: "#ffffff", correctLevel: global.QRCode.CorrectLevel.M });
+      box.addEventListener("click", function () { box.remove(); });
+    }).catch(function () { GoDialog.alert("QR-Code ging nicht (keine Verbindung?)."); });
+  }
+
   function openInfo(id) {
     if (!st) return;
     var person = (st.accounts || []).filter(function (a) { return String(a.account_id) === String(id); })[0] || {};
@@ -1737,7 +1874,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -1746,6 +1883,8 @@
     if (t.hasAttribute("data-ga-role")) { roleMenu(t.getAttribute("data-ga-role")); return; }
     if (t.hasAttribute("data-ga-admin")) { adminMenu(t.getAttribute("data-ga-admin")); return; }
     if (t.hasAttribute("data-gt")) { ticketAction(t); return; }
+    if (t.hasAttribute("data-ga-new")) { openNew(); return; }
+    if (t.hasAttribute("data-ga-qr")) { openQr(t.getAttribute("data-ga-qr")); return; }
     if (t.hasAttribute("data-ga-user")) { userMenu(t.getAttribute("data-ga-user")); return; }
     if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
     if (t.hasAttribute("data-ga-plan")) { userPlan(t.getAttribute("data-ga-plan")); return; }
