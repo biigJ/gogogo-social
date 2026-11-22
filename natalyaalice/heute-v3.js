@@ -1158,8 +1158,8 @@
     var uid = me();
     var mine = String(ev.user_id) === uid;
     var vis = normalizeVisibility(ev.visibility);
-    /* privat: immer nur für den Ersteller */
-    if (vis === "privat" && !mine) return false;
+    /* privat: nur für den Ersteller und für Eingeladene/Zugesagte (go-events-invited.sql) */
+    if (vis === "privat" && !mine && !inviteFor(ev.id) && !iAmGoing(ev.id)) return false;
     /* Bubble-Events von Nicht-Freunden nur im Bubble-Filter */
     if (!mine && ev.bubble_id && !(host.teamPeople || []).some(function (p) { return p && String(p.id) === String(ev.user_id); })) return false;
     if (ev.status === "ausgefallen") return false;
@@ -1177,7 +1177,7 @@
       return !!flags.showOthersUpcoming;
     }
     /* Freund verbunden, aber nicht im Feed (Team → Meine Freunde): seine Events nur, wenn ich dabei bin */
-    if (!mine && !inv && host.feedMuted && host.feedMuted[String(ev.user_id)] && !iAmGoing(ev.id)) return false;
+    if (!mine && !inv && !flags.todayAll && host.feedMuted && host.feedMuted[String(ev.user_id)] && !iAmGoing(ev.id)) return false;
     if (ev.status === "geplant") {
       /* Eigene Events von heute bleiben bis Mitternacht sichtbar, damit man sie nachträglich abschließen kann */
       if (mine && t <= week && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString())) return true;
@@ -1198,7 +1198,9 @@
     if (ev.status === "erledigt") {
       if (mine) return !!flags.showOwnHistory;
       if (!flags.showFriendsHistory || !(vis === "team" || vis === "gruppe")) return false;
-      if (!ownerShares(ev.user_id) && !iAmGoing(ev.id)) return false;
+      /* Profilreihe (todayAll): heute erledigtes Event ist die Story des Tages, gilt ohne „Historie teilen“ */
+      var todayStory = flags.todayAll && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString());
+      if (!todayStory && !ownerShares(ev.user_id) && !iAmGoing(ev.id)) return false;
       if (!inTeamFilter(ev.user_id, flags)) return false;
       return inGroupFilter(ev.user_id, flags);
     }
@@ -2107,7 +2109,8 @@
         });
     return renderCardShell({
       /* zugesagt (Einladung angenommen oder Herz) → dicker Rahmen */
-      extraClass: !mine && (acceptedInv || iAmGoing(ev.id)) ? "is-going" : "",
+      extraClass: !mine && (acceptedInv || iAmGoing(ev.id)) ? "is-going"
+        : mine && upcoming && day >= todayIso() ? "is-mine-next" : "",
       attrs:
         ' data-post-id="' +
         esc(ev.id) +
