@@ -44,7 +44,7 @@ Einfache Herangehensweise: Grundübungen in jeder Variante.
 - Hypertrophie hängt nicht an 10 bis 12 Wiederholungen. Entscheidend ist, dass die letzten Wiederholungen schwer werden.
 - Keine Sätze, Wiederholungen oder Pausen als Felder. Varianten stehen im Übungsnamen, der Hinweis höchstens „Ungefähr: Sätze × Wdh × Gewicht“.
 - Keine doppelten Übungen unter verschiedenen Namen. Vor dem Anlegen im Katalog nach vorhandenem Namen suchen.
-- In der App erscheint der Kurztext dazu nach dem Anwenden eines Wochenplans (`PRINZIP` in `natalyaalice/plan-picker.js`).
+- In der App erscheint der Kurztext dazu beim Weg zu den Plänen („Alle Pläne zeigen“ / „Passende Pläne zeigen“) (`PRINZIP` in `natalyaalice/plan-picker.js`).
 
 ## Abweichungen der bestehenden Pläne vom Level-Schema
 

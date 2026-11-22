@@ -17,7 +17,7 @@
 (function (global) {
   "use strict";
 
-  /* gogogo-Hybrid-Prinzip (docs/ZIELE-WOCHENPLAENE.md), erscheint nach dem Anwenden eines Plans */
+  /* gogogo-Hybrid-Prinzip (docs/ZIELE-WOCHENPLAENE.md), erscheint beim Weg zu den Plänen */
   var PRINZIP =
     "Einfach und wirksam: Grundübungen in jeder Variante.\n\n" +
     "Jede Einheit startet mit Mobilität: Hüftöffnung, Hängen, Hocksitz oder Kniebeuge. Mit Gewicht, sobald Du kräftig genug bist.\n\n" +
@@ -439,8 +439,6 @@
       var done = st.onDone;
       close();
       if (done) done(r);
-      /* gogogo-Hybrid-Prinzip: kurz erklären, wie die Einheiten aufgebaut sind */
-      if (global.GoDialog) global.GoDialog.alert("So trainierst Du mit gogogo", { body: PRINZIP, center: true, ok: "Los geht's" });
     }).catch(function (err) {
       btn.disabled = false;
       var m = String((err && err.message) || "");
@@ -516,7 +514,13 @@
       var ownEl = st.root.querySelector("#gpl-own-goal");
       if (ownEl) st.ownGoal = ownEl.value;
       saveGoalToProfile();
-      return paintList();
+      paintList();
+      /* gogogo-Hybrid-Prinzip: einmal je Öffnen, wenn die Pläne erscheinen */
+      if (!st.prinzipShown && global.GoDialog) {
+        st.prinzipShown = true;
+        global.GoDialog.alert("So trainierst Du mit gogogo", { body: PRINZIP, center: true, ok: "Pläne ansehen" });
+      }
+      return;
     }
     if (t.closest("[data-gpp-goals]")) return paintGoals();
     if (t.closest("[data-gpp-indiv]")) return paintIndividual();
