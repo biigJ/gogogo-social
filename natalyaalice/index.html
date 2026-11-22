@@ -24786,6 +24786,14 @@
           if (ra !== rb) return ra - rb;
           return String((a.person && a.person.name) || "").localeCompare(String((b.person && b.person.name) || ""), "de");
         });
+        /* Wer heute schon abgehakt hat, fällt aus der Reihe (steht als erledigt im Feed) */
+        var doneIds = {};
+        friends = friends.filter(function (entry) {
+          var pr = entry.presence;
+          var done = (entry.today && entry.today.done) || (pr && pr.status === "done");
+          if (done) doneIds[String(entry.person.id)] = true;
+          return !done;
+        });
         crewActive = friends.length;
         /* Gelesene Bubble-Kreise: hinter die aktiven Profile (trainiert gerade, heute dran, heute fertig) */
         function flushSeenBub() {
@@ -24808,7 +24816,7 @@
         /* Alle: dazu die Mitglieder meiner Bubble (gleiche Kreise), zuletzt aktiv zuerst */
         if (crewView === "alles" && window.GoBubbles && GoBubbles.mine && GoBubbles.mine()) {
           var bubIds = (GoBubbles.memberIds ? GoBubbles.memberIds(GoBubbles.mine().id) : []).filter(function (id) {
-            return id !== String(sessionAccount.id) && !friends.some(function (en) { return String(en.person.id) === id; });
+            return id !== String(sessionAccount.id) && !doneIds[id] && !friends.some(function (en) { return String(en.person.id) === id; });
           });
           bubIds.sort(function (x, y) {
             var ax = bubbleAct[x] || "", ay = bubbleAct[y] || "";
@@ -24825,13 +24833,7 @@
           });
           loadBubbleCrew().then(function (changed) { if (changed && heuteView() === "alles") paintHeuteCrew(); });
         }
-        var add = document.createElement("button");
-        add.type = "button";
-        add.className = "crew-story crew-story--add";
-        add.innerHTML = '<span class="crew-story__ring"><span class="team-avatar"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span></span><span class="crew-story__name">Freund</span>';
-        add.setAttribute("aria-label", "Freund hinzufügen");
-        add.addEventListener("click", function () { openTeamSearch("friend"); });
-        box.appendChild(add);
+        /* Kein „Freund hinzufügen“-Kreis mehr in der Reihe: das geht in Community → Freunde */
         paintStoriesVisibility();
         if (!teamPeople.length && !paintHeuteCrew.loading) {
           paintHeuteCrew.loading = true;
@@ -26787,6 +26789,13 @@
       function requireFfc(action, opts) {
         if (!window.FFC) return;
         if (FFC.user()) { action(); return; }
+        /* Sitzung wird beim Start noch geladen: erst abwarten, sonst kommt das Login, obwohl man angemeldet ist */
+        if (FFC.authReady && !(opts && opts._waited)) {
+          FFC.authReady().then(function () {
+            requireFfc(action, Object.assign({}, opts || {}, { _waited: true }));
+          });
+          return;
+        }
         opts = opts || {};
         var email = accountEmail();
         function askLogin() {
@@ -27101,6 +27110,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/natalyaalice/hyrox-doubles.js?v=hxd-3"></script>
   <script src="/natalyaalice/circle-sheet.js?v=cs-3"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-19"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-20"></script>
 </body>
 </html>
