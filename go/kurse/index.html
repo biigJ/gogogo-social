@@ -153,6 +153,16 @@
     .ico:hover { background: rgba(42,33,28,.08); }
     .ico--del { color: var(--accent); }
     .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }
+    .exform label { display: block; margin: 10px 0 4px; }
+    .exform label:first-child { margin-top: 0; }
+    .exform__two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 640px) { .exform__two { grid-template-columns: 1fr; } }
+    .mfield { display: block; width: 100%; min-height: 42px; padding: 8px 12px; text-align: left; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+    .mfield.is-empty { color: rgba(42,33,24,.5); }
+    .exform + .vstrip { margin-top: 12px; }
+    .fsel { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+    .fsel select { width: auto; min-height: 36px; padding: 0 30px 0 12px; border-radius: 999px; border: 1.5px solid var(--ink); background-color: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); }
+    .fsel select.is-on { background-color: var(--ink); color: #F6F1E8; }
     .chip { padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--ink); background: transparent; color: var(--ink); font-size: 13px; font-weight: 600; }
     .chip.is-on { background: var(--ink); color: #F6F1E8; }
     /* Übungsauswahl links: angetippte Übung wird 6 Reihen hoch, Mini-Vorschau des Videos */
@@ -206,7 +216,7 @@
     .vlink-inline { width: 100%; padding: 6px 8px; font-size: 13px; }
     .list-tools { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
     .list-tools input[type="search"] { flex: 1; }
-    .plan-filter { width: auto; min-width: min(100%, 320px); max-width: 100%; flex: 0 1 auto; min-height: 44px; padding: 0 40px 0 16px; border-radius: 999px; border: 1.5px solid var(--ink); background: transparent; font: inherit; font-size: 15px; font-weight: 600; color: var(--ink); }
+    .plan-filter { width: auto; min-width: min(100%, 448px); max-width: 100%; flex: 0 1 auto; min-height: 62px; padding: 0 56px 0 22px; border-radius: 999px; border: 1.5px solid var(--ink); background-color: transparent; font: inherit; font-size: 15px; font-weight: 600; color: var(--ink); }
     .item .vlink { grid-column: 1 / -1; font-size: 13px; padding: 6px 8px; }
     .item.item--simple, .item.item--simple { grid-template-columns: 22px minmax(0, 1fr) auto !important; }
     .item.item--simple .vlink, .item.item--simple .nt { grid-column: 2 / -1; }
@@ -361,7 +371,10 @@
           toast("go-wochenplan-slots.sql fehlt noch: Tage ohne Einzeleinheiten");
           return rest("courses?select=" + sel.replace(",unit_course_id", "").replace("image_url,", "") + "&order=title.asc,level.asc");
         }),
-        rest("go_exercise_catalog?select=name_key,name,block_type,cue&order=name.asc").catch(function () { return []; }),
+        rest("go_exercise_catalog?select=name_key,name,block_type,cue,block_types,muscles&order=name.asc")
+          .then(function (r) { state.exCols = true; return r; })
+          .catch(function () { state.exCols = false; return rest("go_exercise_catalog?select=name_key,name,block_type,cue&order=name.asc"); })
+          .catch(function () { return []; }),
         /* gelöschte Pläne mit Trainingshistorie (go-kurs-loeschen.sql) */
         rest("courses?deleted_at=not.is.null&select=id").catch(function () { return []; })
       ]).then(function (res) {
@@ -413,8 +426,13 @@
         });
       });
       state.catalog.forEach(function (c) {
-        if (!idx[c.name_key]) idx[c.name_key] = { key: c.name_key, name: c.name, block: c.block_type || "", units: [], cue: c.cue };
-        else idx[c.name_key].cue = c.cue;
+        if (!idx[c.name_key]) idx[c.name_key] = { key: c.name_key, name: c.name, block: c.block_type || "", units: [] };
+        var e = idx[c.name_key];
+        e.cue = c.cue;
+        e.inCatalog = true;
+        /* Kategorien und Muskelgruppen (go-exercise-muskeln.sql); ohne Spalte: Kategorie aus block_type */
+        e.blocks = (c.block_types && c.block_types.length) ? c.block_types : (c.block_type ? [c.block_type] : (e.block ? [e.block] : []));
+        e.muscles = c.muscles || [];
       });
       state.exIndex = idx;
       $("ex-names").innerHTML = Object.keys(idx).map(function (k) { return '<option value="' + esc(idx[k].name) + '">'; }).join("");
@@ -477,19 +495,35 @@
         el.classList.toggle("is-current", el.getAttribute("data-open") === open);
       });
     }
-    /* Filter als Auswahl statt Texteingabe */
+    /* Filter als Dropdowns: je Gruppe ein Wert (Schlüssel wie bisher in state.chips[v]) */
+    var MUSCLES = ["Beine", "Glutes", "Waden", "Adduktoren", "Abduktoren", "Hüftbeuger", "Brust", "Schultern", "Oberer Rücken", "Latissimus",
+      "Unterer Rücken", "Bizeps", "Trizeps", "Unterarme", "Bauch", "Rumpf", "Ganzkörper", "Herz-Kreislauf"];
+    var LEVELS = [["l1", "Level 1"], ["l2", "Level 2"], ["l3", "Level 3"]];
     var CHIPS = {
-      plans: [["l1", "Level 1"], ["l2", "Level 2"], ["l3", "Level 3"], ["cat", "Im Katalog"], ["off", "Entwurf"]],
-      units: [["kraft", "Kraft"], ["ausdauer", "Ausdauer"], ["l1", "Level 1"], ["l2", "Level 2"], ["l3", "Level 3"], ["count", "Anzahl Übungen"]],
-      exercises: BLOCK_TYPES.concat([["video", "mit Video"], ["novideo", "ohne Video"]])
+      plans: [["Level", LEVELS, "Level: alle"], ["Status", [["cat", "Im Katalog"], ["off", "Entwurf"]], "Status: alle"]],
+      units: [["Kategorie", [["kraft", "Kraft"], ["ausdauer", "Ausdauer"]], "Kategorie: alle"], ["Level", LEVELS, "Level: alle"],
+        ["Sortierung", [["count", "nach Anzahl Übungen"]], "Sortierung: Kategorie, Name"]],
+      exercises: [["Kategorie", BLOCK_TYPES, "Kategorie: alle"], ["Muskelgruppe", MUSCLES.map(function (m) { return ["m:" + m, m]; }), "Muskelgruppe: alle"],
+        ["Video", [["video", "mit Video"], ["novideo", "ohne Video"]], "Video: alle"]]
     };
     function chipsOn(v) { state.chips = state.chips || {}; return state.chips[v] || (state.chips[v] = {}); }
     function chipsHtml(v) {
       var on = chipsOn(v);
-      return '<div class="chips" data-chips="' + v + '">' + CHIPS[v].map(function (c) {
-        return '<button type="button" class="chip' + (on[c[0]] ? " is-on" : "") + '" data-chip="' + c[0] + '">' + esc(c[1]) + "</button>";
+      return '<div class="fsel" data-chips="' + v + '">' + CHIPS[v].map(function (g, gi) {
+        var cur = g[1].filter(function (o) { return on[o[0]]; })[0];
+        return '<select data-fgroup="' + gi + '" aria-label="' + esc(g[0]) + '"' + (cur ? ' class="is-on"' : "") + '><option value="">' + esc(g[2]) + "</option>" +
+          g[1].map(function (o) { return '<option value="' + esc(o[0]) + '"' + (cur && cur[0] === o[0] ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") + "</select>";
       }).join("") + "</div>";
     }
+    /* Auswahl in einer Gruppe: andere Werte der Gruppe aus, gewählten an; Liste neu zeichnen */
+    document.addEventListener("change", function (e) {
+      var sel = e.target && e.target.closest ? e.target.closest("select[data-fgroup]") : null;
+      if (!sel) return;
+      var v = sel.closest("[data-chips]").getAttribute("data-chips"), on = chipsOn(v);
+      CHIPS[v][Number(sel.getAttribute("data-fgroup"))][1].forEach(function (o) { delete on[o[0]]; });
+      if (sel.value) on[sel.value] = true;
+      if (sel.closest("#pd-units")) paintUnitList(); else renderListOnly();
+    });
     function levelOk(c, on) {
       var lv = ["l1", "l2", "l3"].filter(function (k) { return on[k]; });
       return !lv.length || lv.indexOf("l" + c.level) >= 0;
@@ -570,10 +604,13 @@
     function exerciseRows(on, pickMode) {
       var types = BLOCK_TYPES.map(function (t) { return t[0]; }).filter(function (k) { return on[k]; });
       var ex = Object.keys(state.exIndex).map(function (k) { return state.exIndex[k]; }).filter(function (e) {
-        if (types.length && types.indexOf(e.block || "") < 0) return false;
+        var eb = e.blocks && e.blocks.length ? e.blocks : [e.block || ""];
+        if (types.length && !types.some(function (t) { return eb.indexOf(t) >= 0; })) return false;
         var has = !!GoExMedia.urlFor(e.name);
         if (on.video && !has) return false;
         if (on.novideo && has) return false;
+        var mOn = MUSCLES.filter(function (m) { return on["m:" + m]; });
+        if (mOn.length && !mOn.some(function (m) { return (e.muscles || []).indexOf(m) >= 0; })) return false;
         return true;
       }).sort(function (a, b) { return a.name.localeCompare(b.name, "de"); });
       return ex.map(function (e) {
@@ -585,7 +622,7 @@
           (picked ? '<button type="button" class="erow__vid" data-exvid="' + esc(e.name) + '" style="' + (thumb ? "background-image:url(" + esc(thumb) + ")" : "") + '"><span>' + GoExMedia.playIcon + "</span></button>"
             : rectHtml(thumb, url ? "Video" : "")) +
           '<div class="erow__c"><span class="erow__t">' + esc(e.name) + "</span>" +
-          "<span>" + esc(blockLabel(e.block)) + "</span>" +
+          "<span>" + esc((e.blocks && e.blocks.length ? e.blocks.map(blockLabel).join(", ") : blockLabel(e.block))) + (e.muscles && e.muscles.length ? " · " + esc(e.muscles.join(", ")) : "") + "</span>" +
           "<span>" + (e.units.length ? "in " + e.units.length + (e.units.length === 1 ? " Event" : " Events") : "in keinem Event") + "</span>" +
           "<span>" + (url ? "Video ✓" : "ohne Video") + "</span>" +
           (picked ? "<span>Jetzt „+ Übung“ im gewünschten Block tippen: sie kommt oben in den Block.</span>" + (e.cue ? "<span>" + esc(e.cue) + "</span>" : "") : "") +
@@ -613,15 +650,6 @@
 
     $("list-view").addEventListener("click", function (e) {
       if (e.target.closest("[data-vname]")) return;
-      var chip = e.target.closest("[data-chip]");
-      if (chip) {
-        var v = chip.closest("[data-chips]").getAttribute("data-chips"), k = chip.getAttribute("data-chip"), on = chipsOn(v);
-        on[k] = !on[k];
-        if (k === "video" && on.video) on.novideo = false;
-        if (k === "novideo" && on.novideo) on.video = false;
-        renderListOnly();
-        return;
-      }
       if (e.target.closest("#pick-close")) { closePicker(); return; }
       var rc = e.target.closest("[data-rcopy]"), rd = e.target.closest("[data-rdel]");
       if (rc || rd) {
@@ -833,7 +861,7 @@
         [1, 2, 3].map(function (l) { return '<option value="' + l + '"' + (c.level === l ? " selected" : "") + ">Level " + l + "</option>"; }).join("") + "</select>" +
         '<label class="check"><input id="f-active" type="checkbox"' + (c.is_active ? " checked" : "") + " /> Im Katalog sichtbar</label></div>" +
         '<div style="margin-top:8px"><label>Beschreibung</label><textarea id="f-desc">' + esc(c.description || "") + "</textarea></div></div></div>" +
-        '<div class="row" style="margin-top:12px; justify-content: space-between"><button id="f-save">Speichern</button>' +
+        '<div class="row" style="margin-top:12px; justify-content: flex-end"><button id="f-save">Speichern</button>' +
         '<button type="button" class="danger" id="f-del">Löschen</button></div></div>';
     }
     /* Bild groß in Breite eines Handys */
@@ -874,7 +902,7 @@
         '<div class="row"><label class="check"><input id="f-active" type="checkbox"' + (c.is_active ? " checked" : "") + " /> im Katalog sichtbar</label>" +
         (!isUnit && state.newCols ? '<label class="check"><input id="f-public" type="checkbox"' + (c.is_public ? " checked" : "") + " /> öffentlich (Nutzer wählen ihn unter Woche)</label>" : "") +
         "</div></div>" +
-        '<div class="row" style="margin-top:12px; justify-content: space-between"><button id="f-save">Speichern</button>' +
+        '<div class="row" style="margin-top:12px; justify-content: flex-end"><button id="f-save">Speichern</button>' +
         '<button type="button" class="danger" id="f-del">Löschen</button></div></div>';
     }
 
@@ -1034,7 +1062,7 @@
         [1, 2, 3].map(function (l) { return '<option value="' + l + '"' + (c.level === l ? " selected" : "") + ">Level " + l + "</option>"; }).join("") + "</select></div>" +
         '<label class="pd-lab">Woche</label><div class="pd-week">' + days + "</div>" +
         '<p class="pd-mix" id="mix">' + esc(mixText(mixOf(c))) + "</p>" +
-        '<div class="row pd-foot"><button id="p-save">Speichern</button><span class="grow"></span><button type="button" class="danger" id="p-del">Löschen</button></div>' +
+        '<div class="row pd-foot"><span class="grow"></span><button id="p-save">Speichern</button><button type="button" class="danger" id="p-del">Löschen</button></div>' +
         "</aside></div>";
       paintCover(c.image_url, "p");
       paintUnitList();
@@ -1118,9 +1146,6 @@
             '<span class="epill' + (u.is_active ? " is-fill" : "") + '">' + (u.is_active ? "Katalog" : "Entwurf") + "</span></div>";
         }).join("") + "</div>";
       $("pd-unew").addEventListener("click", function () { createUnit(true); });
-      host.querySelectorAll("[data-chip]").forEach(function (chip) {
-        chip.addEventListener("click", function () { var k = chip.getAttribute("data-chip"); on[k] = !on[k]; paintUnitList(); });
-      });
       host.querySelectorAll("[data-unit]").forEach(function (el) {
         el.addEventListener("dragstart", function (e) { e.dataTransfer.setData("text/plain", el.getAttribute("data-unit")); e.dataTransfer.effectAllowed = "copy"; });
         el.addEventListener("click", function () { openUnitInDesk(el.getAttribute("data-unit")); });
@@ -1341,30 +1366,93 @@
       return job.then(loadAll).then(function () { toast("Übungen gespeichert"); }).catch(function (err) { toast(err.message); });
     }
 
+    /* Mehrfachauswahl als Feld: zeigt die Auswahl, Tippen öffnet die Liste zum Ankreuzen */
+    function multiField(id, list, chosen, empty) {
+      var labels = chosen.map(function (v) { var x = list.find(function (o) { return o[0] === v; }); return x ? x[1] : v; });
+      return '<button type="button" class="mfield' + (labels.length ? "" : " is-empty") + '" id="' + id + '">' + esc(labels.length ? labels.join(", ") : empty) + "</button>";
+    }
     function exerciseDetail(box, key) {
       state.view = "exercises";
       var e = state.exIndex[key];
       if (!e) { setHeader("–"); box.innerHTML = '<p class="muted">Übung nicht gefunden.</p>'; return; }
       setHeader(e.name);
       var url = GoExMedia.urlFor(e.name);
-      box.innerHTML = '<div class="vstrip" id="x-vids"></div><div class="card">' +
+      var blocks = (e.blocks || (e.block ? [e.block] : [])).slice();
+      var muscles = (e.muscles || []).slice();
+      var MUS = MUSCLES.map(function (m) { return [m, m]; });
+      box.innerHTML = '<div class="card exform">' +
+        '<label>Name</label><input id="x-name" type="text" value="' + esc(e.name) + '" />' +
+        '<div class="exform__two"><div><label>Kategorie</label><span id="x-blocks-w">' + multiField("x-blocks", BLOCK_TYPES, blocks, "Kategorie wählen") + "</span></div>" +
+        '<div><label>Muskelgruppen</label><span id="x-mus-w">' + multiField("x-mus", MUS, muscles, "Muskelgruppen wählen") + "</span></div></div>" +
+        '<label>Kommentar</label><textarea id="x-cue" placeholder="z. B. Ausführung, Einstellung an der Maschine">' + esc(e.cue || "") + "</textarea>" +
+        (state.exCols ? "" : '<p class="muted">Mehrere Kategorien und Muskelgruppen speichern geht nach go-exercise-muskeln.sql.</p>') +
+        '<div class="row" style="margin-top:10px; justify-content:flex-end"><button type="button" data-xsave="1">Speichern</button></div></div>' +
+        '<div class="vstrip" id="x-vids"></div><div class="card">' +
         '<label>Video (YouTube oder Instagram)</label><div class="row"><input id="x-url" type="url" inputmode="url" class="grow" value="' + esc(url) + '" placeholder="https://…" />' +
         '<button class="ghost small" id="x-play"' + (url ? "" : " disabled") + ">Abspielen</button></div>" +
-        '<div style="margin-top:8px"><label>Hinweis zur Ausführung</label><textarea id="x-cue">' + esc(e.cue || "") + "</textarea></div>" +
-        '<div class="row" style="margin-top:10px; justify-content:flex-end"><button id="x-save">Speichern</button></div></div>' +
+        '<div class="row" style="margin-top:10px; justify-content:flex-end"><button type="button" data-xsave="1">Speichern</button></div></div>' +
         "<h2>In Einzeleinheiten</h2>" +
         '<p class="uses">' + (e.units.length ? e.units.map(function (id) { var u = byId(id); return u ? '<a href="#unit/' + u.id + '">' + esc(u.title) + "</a>" : ""; }).join(" · ") : '<span class="muted">Noch in keiner Einzeleinheit. Trag sie dort unter Übungen ein.</span>') + "</p>";
+      function bindMulti(fid, wrap, title, list, arr, empty) {
+        $(fid).addEventListener("click", function () {
+          GoDialog.pick(title, list.map(function (o) { return { label: o[1], value: o[0], checked: arr.indexOf(o[0]) >= 0 }; }), { ok: "Übernehmen", cancel: "Abbrechen" })
+            .then(function (picked) {
+              if (!picked) return;
+              arr.length = 0;
+              list.forEach(function (o) { if (picked.indexOf(o[0]) >= 0) arr.push(o[0]); });
+              $(wrap).innerHTML = multiField(fid, list, arr, empty);
+              bindMulti(fid, wrap, title, list, arr, empty);
+            });
+        });
+      }
+      bindMulti("x-blocks", "x-blocks-w", "Kategorie", BLOCK_TYPES, blocks, "Kategorie wählen");
+      bindMulti("x-mus", "x-mus-w", "Muskelgruppen", MUS, muscles, "Muskelgruppen wählen");
       $("x-play").addEventListener("click", function () { GoExMedia.open(e.name, $("x-url").value.trim()); });
       paintVideoStrip(e, url);
-      $("x-save").addEventListener("click", function () {
+      function saveEx() {
         var u = $("x-url").value.trim();
         if (u && !GoExMedia.parse(u)) { toast("Bitte einen vollständigen Link mit https:// einfügen"); return; }
-        Promise.all([
-          saveVideo(e.name, u),
-          rest("go_exercise_catalog?on_conflict=name_key", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
-            body: { name_key: e.key, name: e.name, block_type: e.block || null, cue: $("x-cue").value.trim() || null } })
-        ]).then(loadAll).then(function () { toast("Gespeichert"); $("x-play").disabled = !u; })
+        var name = $("x-name").value.trim().replace(/\s+/g, " ");
+        if (!name) { toast("Bitte einen Namen eingeben"); return; }
+        var nk = exKey(name);
+        if (nk !== e.key && state.exIndex[nk]) { toast("„" + name + "“ gibt es schon"); return; }
+        var body = { name_key: nk, name: name, block_type: blocks[0] || null, cue: $("x-cue").value.trim() || null };
+        if (state.exCols) { body.block_types = blocks; body.muscles = muscles; }
+        var job = rest("go_exercise_catalog?on_conflict=name_key", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal", body: body });
+        if (nk !== e.key) job = job.then(function () { return renameExercise(e, name); });
+        job.then(function () { return saveVideo(name, u); })
+          .then(loadAll).then(function () {
+            toast("Gespeichert");
+            if (nk !== e.key) location.hash = "ex/" + encodeURIComponent(nk);
+            else $("x-play").disabled = !u;
+          })
           .catch(function (err) { toast(err.message); });
+      }
+      [].forEach.call(box.querySelectorAll("[data-xsave]"), function (b) { b.addEventListener("click", saveEx); });
+    }
+    /* Umbenennen: Name in allen Events ersetzen, Video und eingereichte Links mitnehmen, alten Katalogeintrag löschen.
+       Trainingshistorie der Nutzer bleibt beim alten Namen. */
+    function renameExercise(e, name) {
+      var jobs = [];
+      units().forEach(function (u) {
+        mainSessions(u).forEach(function (s) {
+          var hit = false;
+          var blocks = (s.blocks || []).map(function (b) {
+            return Object.assign({}, b, { items: (b.items || []).map(function (it) {
+              if (it && it.name && exKey(it.name) === e.key) { hit = true; return Object.assign({}, it, { name: name }); }
+              return it;
+            }) });
+          });
+          if (hit) jobs.push(rest("course_sessions?id=eq." + s.id, { method: "PATCH", prefer: "return=minimal", body: { blocks: blocks } }));
+        });
+      });
+      var nk = exKey(name);
+      jobs.push(rest("go_exercise_links?name_key=eq." + encodeURIComponent(e.key), { method: "PATCH", prefer: "return=minimal", body: { name_key: nk } }).catch(function () {}));
+      return Promise.all(jobs).then(function () {
+        var oldUrl = GoExMedia.urlFor(e.name);
+        return (oldUrl ? saveVideo(name, oldUrl).then(function () { return saveVideo(e.name, ""); }) : null);
+      }).then(function () {
+        return rest("go_exercise_catalog?name_key=eq." + encodeURIComponent(e.key), { method: "DELETE", prefer: "return=minimal" }).catch(function () {});
       });
     }
 
