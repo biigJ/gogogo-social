@@ -24527,6 +24527,21 @@
         syncTrainingPresence("active", label);
       }
 
+      /* Trainiert gerade, aber ohne Event (spontan gestartet, Event entsteht erst beim Abschluss): Einheit und Startzeit zeigen */
+      function openPresencePopup(person) {
+        var pr = presenceFor(person && person.id);
+        if (!pr || pr.status !== "active" || !window.GoDialog) return false;
+        var first = String(person.name || person.nickname || "").split(" ")[0];
+        var since = "";
+        try {
+          since = new Date(pr.started_at || pr.updated_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+        } catch (eT) {}
+        GoDialog.alert(person.isSelf ? "Du trainierst gerade" : first + " trainiert gerade", {
+          center: true,
+          body: (pr.workout_label || "Training") + (since ? "\nseit " + since + " Uhr" : "")
+        });
+        return true;
+      }
       function openTrainingPopup(person, done) {
         if (!window.HeuteAccountability || !HeuteAccountability.todayCardFor) return false;
         var card = HeuteAccountability.todayCardFor(person.id, { done: !!done });
@@ -24772,7 +24787,7 @@
             /* Pulsierender Kreis: heutiges Training als Karte zeigen */
             var item = e && e.currentTarget;
             if (item && item.classList && item.classList.contains("is-training") &&
-                (openPersonStory(person) || openTrainingPopup(person, item.classList.contains("is-training-done")))) return;
+                (openPersonStory(person) || openTrainingPopup(person, item.classList.contains("is-training-done")) || openPresencePopup(person))) return;
             if (story && window.FFC && FFC.openStory && FFC.openStory(story.index)) return;
             openProfile(person);
           };
