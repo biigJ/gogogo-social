@@ -138,8 +138,8 @@
       var legacy = normalizeFilter(localStorage.getItem("gogogo_heute_filter") || "");
       if (legacy) return legacy;
     } catch (e) {}
-    /* Standard „Alles“: kommende Events der Freunde stehen im Stapel (vorher „Ich“, dann sah man nur sich) */
-    return "alles";
+    /* Standard „Ich“: neue Nutzer sehen zuerst ihre eigene Woche */
+    return "ich";
   }
 
   function saveFilter(v) {
