@@ -390,6 +390,10 @@
     }
   });
 
+  // Sitzung geprüft (mit oder ohne Nutzer): host wartet darauf, bevor er ein Login zeigt
+  let authReadyResolve;
+  const authReadyP = new Promise(r=>{ authReadyResolve = r; });
+  setTimeout(()=>authReadyResolve(), 6000);
   (async function initAuth(){
     // Abgelaufener oder schon benutzter Link aus der Mail
     const hashParams = new URLSearchParams(location.hash.slice(1));
@@ -400,7 +404,8 @@
         ? 'Der Link ist abgelaufen oder wurde schon benutzt. Fordere hier einfach einen neuen an.'
         : 'Der Link funktioniert nicht mehr. Fordere hier einfach einen neuen an.';
     }
-    const { data } = await sb.auth.getSession();
+    let data = null;
+    try { ({ data } = await sb.auth.getSession()); } finally { authReadyResolve(); }
     if(recoveryMode){
       if(data && data.session && data.session.user){
         currentUser = data.session.user;
@@ -3645,6 +3650,7 @@
   }
   window.FFC = {
     user: ()=> currentUser,
+    authReady: ()=> authReadyP,
     /* gogogo: Circle per Name finden und beitreten. Braucht RPCs search_groups(p_query) und join_group(p_group_id)
        in Hendriks Backend; fehlen sie, kommt { missing: true } zurück. */
     async searchGroups(q){
