@@ -20024,7 +20024,7 @@
             (acc || []).forEach(function (a) { by[String(a.id)] = a; });
             friendReqs = {
               ok: true,
-              incoming: (r[0] || []).map(function (x) { return { id: x.id, person: by[String(x.from_id)] || { id: x.from_id } }; }),
+              incoming: (r[0] || []).map(function (x) { return { id: x.id, created_at: x.created_at, person: by[String(x.from_id)] || { id: x.from_id } }; }),
               outgoing: (r[1] || []).map(function (x) { return { id: x.id, person: by[String(x.to_id)] || { id: x.to_id } }; })
             };
           });
@@ -20057,21 +20057,28 @@
         if (!window.GoDialog) return;
         /* anderer Dialog offen: kurz warten (höchstens ~1 min) */
         if (document.querySelector(".god, .gob, #go-boot") || document.querySelector(".sand-modal:not([hidden])")) {
-          if (friendReqWait++ < 25) setTimeout(promptFriendRequests, 2500);
+          /* bis ~5 min warten; danach bleibt die Anfrage am Herz in Aktuell */
+          if (friendReqWait++ < 120) setTimeout(promptFriendRequests, 2500);
           return;
         }
         friendReqWait = 0;
         var next = (friendReqs.incoming || []).filter(function (r) { return !friendReqAsked[r.id]; })[0];
         if (!next) return;
         friendReqAsked[next.id] = true;
-        var p = next.person || {};
+        askFriendRequest(next).then(function () { setTimeout(promptFriendRequests, 400); });
+      }
+      /* eine Anfrage beantworten: beim Öffnen von Aktuell und über das Herz */
+      function askFriendRequest(req) {
+        var p = req.person || {};
         var name = String(p.name || p.nickname || "Jemand").split(" ")[0];
-        GoDialog.choose(name + (p.nickname ? " (@" + p.nickname + ")" : "") + " möchte mit Dir befreundet sein.", [
+        return GoDialog.choose(name + (p.nickname ? " (@" + p.nickname + ")" : "") + " möchte mit Dir befreundet sein.", [
           { label: "Annehmen", value: "yes" },
           { label: "Ablehnen", value: "no" }
         ], { cancel: "Später", photo: p.photo_url || "" }).then(function (v) {
-          if (v === "yes" || v === "no") return answerFriendRequest(next, v === "yes");
-        }).then(function () { setTimeout(promptFriendRequests, 400); });
+          if (v === "yes" || v === "no") return answerFriendRequest(req, v === "yes");
+        }).then(function () {
+          if (window.HeuteAccountability && HeuteAccountability.refreshHeart) HeuteAccountability.refreshHeart();
+        });
       }
       document.addEventListener("go:aktuell-ready", function () {
         loadFriendRequests().then(function () { setTimeout(promptFriendRequests, 1800); });
@@ -25091,7 +25098,8 @@
             reloadInvites: function () { return loadInvites(); },
             /* weitere Meldungen fürs Herz: Gruppenanfragen */
             heartNotices: function () {
-              return Promise.all([loadGroupInvites(), loadGroupJoinRequests(), loadStampLinkRequests(), loadGroupNews(), loadCircleNews().catch(function () { return []; })]).then(function (r) {
+              return Promise.all([loadGroupInvites(), loadGroupJoinRequests(), loadStampLinkRequests(), loadGroupNews(), loadCircleNews().catch(function () { return []; }),
+                loadFriendRequests().then(function () { return friendReqs.incoming || []; }).catch(function () { return []; })]).then(function (r) {
                 return (r[0] || []).map(function (gi) {
                   return { kind: "group", created_at: gi.created_at, open: function () { openGroupInvite(gi); } };
                 }).concat((r[1] || []).map(function (gr) {
@@ -25102,6 +25110,8 @@
                   return { kind: "stamplink", created_at: lr.created_at, open: function () { openStampLinkRequest(lr); } };
                 })).concat((r[4] || []).map(function (cn) {
                   return { kind: "circlenews", created_at: cn.created_at, open: function () { openCircleNews(cn); } };
+                })).concat((r[5] || []).map(function (fr) {
+                  return { kind: "friend", created_at: fr.created_at, open: function () { askFriendRequest(fr); } };
                 }));
               });
             },
