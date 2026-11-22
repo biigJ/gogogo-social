@@ -160,6 +160,11 @@
     .mfield { display: block; width: 100%; min-height: 42px; padding: 8px 12px; text-align: left; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
     .mfield.is-empty { color: rgba(42,33,24,.5); }
     .exform + .vstrip { margin-top: 12px; }
+    .mx-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+    .mx-btn { text-align: left; white-space: normal; background: #fff; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); padding: 8px 10px; font-weight: 500; }
+    .mx-mix { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 6px 0 2px; }
+    .mx-mix__l { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted, #6b6258); }
+    .mx-mix__l select { width: 100%; }
     .fsel { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
     .fsel select { width: auto; min-height: 36px; padding: 0 30px 0 12px; border-radius: 999px; border: 1.5px solid var(--ink); background-color: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); }
     .fsel select.is-on { background-color: var(--ink); color: #F6F1E8; }
@@ -319,7 +324,20 @@
     ];
     var CATS = [["kraft", "Kraft"], ["ausdauer", "Ausdauer"], ["alternative", "Sonstiges"], ["zirkel", "Zirkeltraining"]];
     var DAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-    var GOALS = [["laufen", "Gesund laufen"], ["ruecken", "Rücken stärken"], ["gesund", "Gesund bleiben"], ["abnehmen", "Abnehmen"], ["muskeln", "Muskeln erhalten"], ["gelenke", "Gelenke schonen"]];
+    /* Matrix der Wochenpläne (go-matrix.sql): Ziele, Equipment, Einschränkungen; Level 1–3 */
+    var GOALS = [["abnehmen", "Abnehmen"], ["hybrid", "Hybrid-Athletik"], ["laufen", "Gesund laufen"], ["schmerzfrei", "Schmerzfreiheit im Alltag"],
+      ["muskelaufbau", "Muskelaufbau"], ["muskeln", "Muskeln erhalten"], ["beweglich", "Beweglichkeit verbessern"], ["longevity", "Langlebigkeit (Longevity)"],
+      ["stress", "Stressabbau"], ["bouldern", "Bouldern lernen"], ["klimmzug", "Erste Klimmzüge schaffen"], ["halbmarathon", "Für einen Halbmarathon trainieren"],
+      ["hyrox", "Für HYROX trainieren"], ["schlaf", "Besser schlafen"], ["haltung", "Körperhaltung optimieren"], ["energie", "Mehr Energie im Alltag"],
+      ["tanzen", "Besser tanzen"], ["selbstbewusst", "Selbstbewusstsein stärken"], ["leute", "Neue Leute kennenlernen"], ["natur", "Zeit in der Natur verbringen"],
+      ["balance", "Koordination und Balance"], ["kopf", "Den Kopf freibekommen"], ["praevention", "Verletzungsprävention"], ["schwimmen", "Schwimmen lernen"],
+      ["herz", "Herz-Kreislauf stärken"], ["spielerisch", "Spielerisch bewegen ohne Leistungsdruck"], ["routine", "Eine feste Routine aufbauen"],
+      ["ruecken", "Rücken stärken"], ["gesund", "Gesund bleiben"], ["gelenke", "Gelenke schonen"]];
+    var EQUIP = ["Kettlebells", "Kurzhanteln", "Langhantel 20 kg", "Langhantel 15 kg", "Gym-Geräte", "Körpergewicht", "Laufschuhe", "Boxhandschuhe",
+      "Schlitten", "Medizinball", "Slam-Ball", "Widerstandsband", "Matte"].map(function (x) { return [x, x]; });
+    var RESTR = ["Fuß verletzt", "Schulterschmerzen", "Hüftmobilität eingeschränkt", "Asthma", "Adipositas", "Tennisarm", "Rundrücken",
+      "LWS leicht eingeschränkt", "BWS leicht eingeschränkt", "HWS leicht eingeschränkt", "Bluthochdruck", "Menopause"].map(function (x) { return [x, x]; });
+    var LEVEL_TXT = { 1: "Level 1 · unsportlich", 2: "Level 2 · Freizeitsport", 3: "Level 3 · ambitioniert" };
     var ZIRKEL_INFO = "Zirkeltraining 30 min – buche unter FFC mit E-Mail-Adresse und Passwort und erstell dort ein wiederkehrendes Training.";
     var HIDE_SLUGS = ["eigenes-training", "12-wochen-routine"];
 
@@ -365,15 +383,17 @@
     function loadAll() {
       var sel = "id,title,slug,level,sessions_per_week,category_default,description,is_active,private_for,image_url,course_sessions!course_sessions_course_id_fkey(id,title,category,block_no,session_no,is_travel,unit_course_id,blocks)";
       return Promise.all([
-        rest("courses?select=" + sel + ",is_public,goals,preview_url&order=title.asc,level.asc")
-          .then(function (rows) { state.newCols = true; return rows; })
+        rest("courses?select=" + sel + ",is_public,goals,preview_url,equipment,restrictions,plan_mix&order=title.asc,level.asc")
+          .then(function (rows) { state.newCols = true; state.mxCols = true; return rows; })
+          .catch(function () { state.mxCols = false; return rest("courses?select=" + sel + ",is_public,goals,preview_url&order=title.asc,level.asc").then(function (rows) { state.newCols = true; return rows; }); })
           .catch(function () { state.newCols = false; return rest("courses?select=" + sel + "&order=title.asc,level.asc"); })
           .catch(function () {
           toast("go-wochenplan-slots.sql fehlt noch: Tage ohne Einzeleinheiten");
           return rest("courses?select=" + sel.replace(",unit_course_id", "").replace("image_url,", "") + "&order=title.asc,level.asc");
         }),
-        rest("go_exercise_catalog?select=name_key,name,block_type,cue,block_types,muscles&order=name.asc")
-          .then(function (r) { state.exCols = true; return r; })
+        rest("go_exercise_catalog?select=name_key,name,block_type,cue,block_types,muscles,equipment&order=name.asc")
+          .then(function (r) { state.exCols = true; state.exMx = true; return r; })
+          .catch(function () { state.exMx = false; return rest("go_exercise_catalog?select=name_key,name,block_type,cue,block_types,muscles&order=name.asc").then(function (r) { state.exCols = true; return r; }); })
           .catch(function () { state.exCols = false; return rest("go_exercise_catalog?select=name_key,name,block_type,cue&order=name.asc"); })
           .catch(function () { return []; }),
         /* gelöschte Pläne mit Trainingshistorie (go-kurs-loeschen.sql) */
@@ -434,6 +454,7 @@
         /* Kategorien und Muskelgruppen (go-exercise-muskeln.sql); ohne Spalte: Kategorie aus block_type */
         e.blocks = (c.block_types && c.block_types.length) ? c.block_types : (c.block_type ? [c.block_type] : (e.block ? [e.block] : []));
         e.muscles = c.muscles || [];
+        e.equipment = c.equipment || [];
       });
       state.exIndex = idx;
       $("ex-names").innerHTML = Object.keys(idx).map(function (k) { return '<option value="' + esc(idx[k].name) + '">'; }).join("");
@@ -501,10 +522,16 @@
       "Unterer Rücken", "Bizeps", "Trizeps", "Unterarme", "Bauch", "Rumpf", "Ganzkörper", "Herz-Kreislauf"];
     var LEVELS = [["l1", "Level 1"], ["l2", "Level 2"], ["l3", "Level 3"]];
     var CHIPS = {
-      plans: [["Level", LEVELS, "Level: alle"], ["Status", [["cat", "Im Katalog"], ["off", "Entwurf"]], "Status: alle"]],
+      plans: [["Level", LEVELS, "Level: alle"], ["Status", [["cat", "Im Katalog"], ["off", "Entwurf"]], "Status: alle"],
+        ["Ziel", GOALS.map(function (g) { return ["g:" + g[0], g[1]]; }), "Ziel: alle"],
+        ["Equipment", EQUIP.map(function (x) { return ["e:" + x[0], x[1]]; }), "Equipment: alle"],
+        ["Einschränkung", RESTR.map(function (x) { return ["r:" + x[0], x[1]]; }).concat([["r:-", "ohne Einschränkung"]]), "Einschränkung: alle"]],
       units: [["Kategorie", [["kraft", "Kraft"], ["ausdauer", "Ausdauer"]], "Kategorie: alle"], ["Level", LEVELS, "Level: alle"],
+        ["Equipment", EQUIP.map(function (x) { return ["e:" + x[0], x[1]]; }), "Equipment: alle"],
+        ["Einschränkung", RESTR.map(function (x) { return ["r:" + x[0], x[1]]; }).concat([["r:-", "ohne Einschränkung"]]), "Einschränkung: alle"],
         ["Sortierung", [["count", "nach Anzahl Übungen"]], "Sortierung: Kategorie, Name"]],
       exercises: [["Kategorie", BLOCK_TYPES, "Kategorie: alle"], ["Muskelgruppe", MUSCLES.map(function (m) { return ["m:" + m, m]; }), "Muskelgruppe: alle"],
+        ["Equipment", EQUIP.map(function (x) { return ["e:" + x[0], x[1]]; }), "Equipment: alle"],
         ["Video", [["video", "mit Video"], ["novideo", "ohne Video"]], "Video: alle"]]
     };
     function chipsOn(v) { state.chips = state.chips || {}; return state.chips[v] || (state.chips[v] = {}); }
@@ -525,6 +552,17 @@
       if (sel.value) on[sel.value] = true;
       if (sel.closest("#pd-units")) paintUnitList(); else renderListOnly();
     });
+    /* Matrix-Filter: Ziel (g:), Equipment (e:), Einschränkung (r:, „r:-“ = ohne) */
+    function matrixOk(c, on, withGoals) {
+      var keys = Object.keys(on).filter(function (k) { return on[k] && /^[ger]:/.test(k); });
+      return keys.every(function (k) {
+        var v = k.slice(2);
+        if (k[0] === "g") return !withGoals || (c.goals || []).indexOf(v) >= 0;
+        if (k[0] === "e") return (c.equipment || []).indexOf(v) >= 0;
+        if (v === "-") return !(c.restrictions || []).length;
+        return (c.restrictions || []).indexOf(v) >= 0;
+      });
+    }
     function levelOk(c, on) {
       var lv = ["l1", "l2", "l3"].filter(function (k) { return on[k]; });
       return !lv.length || lv.indexOf("l" + c.level) >= 0;
@@ -560,6 +598,7 @@
       if (v === "plans") {
         html = plans().filter(function (c) {
           if (!levelOk(c, on)) return false;
+          if (!matrixOk(c, on, true)) return false;
           if (on.cat && !c.is_active) return false;
           if (on.off && c.is_active) return false;
           return true;
@@ -567,8 +606,8 @@
           var goals = (c.goals || []).map(function (g) { var x = GOALS.find(function (y) { return y[0] === g; }); return x ? x[1] : g; });
           return '<div class="erow' + (c.is_active ? "" : " is-off") + '" data-open="plan/' + c.id + '">' + rectHtml(c.image_url, "Plan") +
             '<div class="erow__c"><span class="erow__t">' + esc(c.title) + "</span>" +
-            "<span>" + esc(mixText(mixOf(c))) + "</span>" +
-            "<span>" + (c.level ? "Level " + c.level : "ohne Level") + (c.is_public ? " · Nutzer" : "") + "</span>" +
+            "<span>" + esc(c.plan_mix ? mixText(planMixCounts(c)) : mixText(mixOf(c))) + "</span>" +
+            "<span>" + (c.level ? "Level " + c.level : "ohne Level") + (c.is_public ? " · Nutzer" : "") + ((c.restrictions || []).length ? " · " + esc(c.restrictions.join(", ")) : "") + "</span>" +
             (goals.length ? "<span>" + esc(goals.join(" · ")) + "</span>" : "") + "</div>" +
             '<span class="epill' + (c.is_active ? " is-fill" : "") + '">' + (c.is_active ? "Katalog" : "Entwurf") + "</span>" + actsHtml("plan", c.id) + "</div>";
         }).join("");
@@ -580,6 +619,7 @@
         var list = (fp ? units() : listUnits()).filter(function (c) {
           if (fp && dayOf[c.id] == null) return false;
           if (cats.length && cats.indexOf(c.category_default || "kraft") < 0) return false;
+          if (!matrixOk(c, on, false)) return false;
           return levelOk(c, on);
         }).sort(function (a, b) {
           if (fp && !on.count) return dayOf[a.id] - dayOf[b.id];
@@ -610,6 +650,7 @@
         var has = !!GoExMedia.urlFor(e.name);
         if (on.video && !has) return false;
         if (on.novideo && has) return false;
+        if (!matrixOk({ equipment: e.equipment }, on, false)) return false;
         var mOn = MUSCLES.filter(function (m) { return on["m:" + m]; });
         if (mOn.length && !mOn.some(function (m) { return (e.muscles || []).indexOf(m) >= 0; })) return false;
         return true;
@@ -861,7 +902,8 @@
         '</select><select id="f-level" aria-label="Level"><option value="">Level –</option>' +
         [1, 2, 3].map(function (l) { return '<option value="' + l + '"' + (c.level === l ? " selected" : "") + ">Level " + l + "</option>"; }).join("") + "</select>" +
         '<label class="check"><input id="f-active" type="checkbox"' + (c.is_active ? " checked" : "") + " /> Im Katalog sichtbar</label></div>" +
-        '<div style="margin-top:8px"><label>Beschreibung</label><textarea id="f-desc">' + esc(c.description || "") + "</textarea></div></div></div>" +
+        '<div style="margin-top:8px"><label>Beschreibung</label><textarea id="f-desc">' + esc(c.description || "") + "</textarea></div>" +
+        '<div style="margin-top:8px">' + matrixHtml(c) + "</div></div></div>" +
         '<div class="row" style="margin-top:12px; justify-content: flex-end"><button id="f-save">Speichern</button>' +
         '<button type="button" class="danger" id="f-del">Löschen</button></div></div>';
     }
@@ -878,6 +920,57 @@
         document.body.appendChild(v);
       }
     });
+    /* Verteilung im Plan: je Kategorie Anzahl Tage (Dropdown 0–7); Zirkeltraining = Platzhalter-Event zum Planen */
+    function planMixCounts(c) {
+      var m = c.plan_mix || {};
+      var have = mixOf(c);
+      return { kraft: m.kraft != null ? m.kraft : have.kraft || 0, ausdauer: m.ausdauer != null ? m.ausdauer : have.ausdauer || 0,
+        alternative: m.sonstige != null ? m.sonstige : have.alternative || 0, zirkel: m.zirkel != null ? m.zirkel : have.zirkel || 0 };
+    }
+    function mixSelectsHtml(c) {
+      var n = planMixCounts(c);
+      return '<div class="mx-mix">' + CATS.map(function (k) {
+        return '<label class="mx-mix__l">' + k[1] + '<select data-mx-mix="' + k[0] + '">' + [0, 1, 2, 3, 4, 5, 6, 7].map(function (i) {
+          return '<option value="' + i + '"' + ((n[k[0]] || 0) === i ? " selected" : "") + ">" + i + "</option>";
+        }).join("") + "</select></label>";
+      }).join("") + "</div>";
+    }
+    function mxField(id, label, list, chosen) {
+      var names = chosen.map(function (v) { var x = list.find(function (o) { return o[0] === v; }); return x ? x[1] : v; });
+      return '<button type="button" class="mx-btn ghost" id="' + id + '">' + esc(label) + ": " + esc(names.length ? names.join(", ") : "keine") + "</button>";
+    }
+    /* Equipment und Einschränkungen: Knöpfe öffnen die Liste mit Haken; Werte in state.mx */
+    function matrixHtml(c) {
+      state.mx = { equipment: (c.equipment || []).slice(), restrictions: (c.restrictions || []).slice() };
+      if (!state.mxCols) return '<p class="muted">Equipment, Einschränkungen und Verteilung gehen nach go-matrix.sql.</p>';
+      return '<div class="mx-row">' + mxField("mx-eq", "Equipment", EQUIP, state.mx.equipment) + mxField("mx-rs", "Einschränkungen", RESTR, state.mx.restrictions) + "</div>";
+    }
+    function bindMatrix() {
+      [["mx-eq", "Equipment", EQUIP, "equipment"], ["mx-rs", "Einschränkungen", RESTR, "restrictions"]].forEach(function (d) {
+        var b = $(d[0]);
+        if (!b) return;
+        b.addEventListener("click", function () {
+          GoDialog.pick(d[1], d[2].map(function (o) { return { label: o[1], value: o[0], checked: state.mx[d[3]].indexOf(o[0]) >= 0 }; }), { ok: "Übernehmen", cancel: "Abbrechen" })
+            .then(function (v) {
+              if (!v) return;
+              state.mx[d[3]] = d[2].map(function (o) { return o[0]; }).filter(function (x) { return v.indexOf(x) >= 0; });
+              b.outerHTML = mxField(d[0], d[1], d[2], state.mx[d[3]]);
+              bindMatrix();
+              toast(d[1] + " übernommen, Speichern nicht vergessen");
+            });
+        });
+      });
+    }
+    function readMatrix(withMix) {
+      if (!state.mxCols || !state.mx) return {};
+      var f = { equipment: state.mx.equipment, restrictions: state.mx.restrictions };
+      if (withMix) {
+        var m = {};
+        document.querySelectorAll("[data-mx-mix]").forEach(function (sel) { m[sel.getAttribute("data-mx-mix") === "alternative" ? "sonstige" : sel.getAttribute("data-mx-mix")] = Number(sel.value) || 0; });
+        if (Object.keys(m).length) f.plan_mix = m;
+      }
+      return f;
+    }
     function baseFormHtml(c, isUnit) {
       return '<div class="card">' +
         '<label>Titel</label><input id="f-title" value="' + esc(c.title) + '" />' +
@@ -889,6 +982,7 @@
         [1, 2, 3].map(function (l) { return "<option" + (c.level === l ? " selected" : "") + ">" + l + "</option>"; }).join("") + "</select></div>" +
         "</div>" +
         '<div style="margin-top:8px"><label>Beschreibung</label><textarea id="f-desc">' + esc(c.description || "") + "</textarea></div>" +
+        '<div style="margin-top:8px">' + matrixHtml(c) + (!isUnit && state.mxCols ? mixSelectsHtml(c) : "") + "</div>" +
         '<div class="cover-row" style="margin-top:10px"><div class="cover-prev" id="f-cover-prev"></div><div class="grow">' +
         "<label>Coverbild (Aktuell und Woche)</label>" +
         '<div class="row"><label class="file-btn"><input id="f-cover" type="file" accept="image/*" hidden />Bild wählen</label>' +
@@ -963,6 +1057,7 @@
 
     function bindBaseForm(c, isUnit) {
       paintCover(c.image_url);
+      bindMatrix();
       $("f-del").addEventListener("click", function () { deleteCourse(c, isUnit); });
       $("f-save").addEventListener("click", function () {
         var f = {
@@ -972,6 +1067,7 @@
           is_active: $("f-active").checked
         };
         if (isUnit) f.category_default = $("f-cat").value;
+        Object.assign(f, readMatrix(!isUnit));
         if (!isUnit && state.newCols) {
           f.is_public = $("f-public").checked;
           f.goals = [].map.call(document.querySelectorAll("[data-goal]:checked"), function (x) { return x.getAttribute("data-goal"); });
@@ -1053,7 +1149,7 @@
         /* Freitext unter dem Titel in voller Breite */
         '<textarea id="p-desc" placeholder="Beschreibung">' + esc(c.description || "") + "</textarea>" +
         /* Ziele: antippen öffnet die Liste mit Haken */
-        (state.newCols ? '<button type="button" class="pd-goals ghost" id="p-goals"></button>' : "") +
+        (state.newCols ? '<button type="button" class="pd-goals ghost" id="p-goals"></button>' : "") + matrixHtml(c) +
         '<div class="pd-media"><div class="cover-prev" id="p-cover-prev"></div>' +
         '<div class="pd-media__btns"><label class="file-btn"><input id="p-cover" type="file" accept="image/*" hidden />Bild wählen</label>' +
         '<button class="ghost small" id="p-cover-del" type="button">Entfernen</button></div><span></span></div>' +
@@ -1062,10 +1158,12 @@
         '<select id="p-level" style="width:auto" aria-label="Level"><option value="">Level –</option>' +
         [1, 2, 3].map(function (l) { return '<option value="' + l + '"' + (c.level === l ? " selected" : "") + ">Level " + l + "</option>"; }).join("") + "</select></div>" +
         '<label class="pd-lab">Woche</label><div class="pd-week">' + days + "</div>" +
-        '<p class="pd-mix" id="mix">' + esc(mixText(mixOf(c))) + "</p>" +
+        (state.mxCols ? '<label class="pd-lab">Verteilung</label>' + mixSelectsHtml(c) + '<p class="muted" id="mix">Belegt: ' + esc(mixText(mixOf(c))) + "</p>"
+          : '<p class="pd-mix" id="mix">' + esc(mixText(mixOf(c))) + "</p>") +
         '<div class="row pd-foot"><span class="grow"></span><button id="p-save">Speichern</button><button type="button" class="danger" id="p-del">Löschen</button></div>' +
         "</aside></div>";
       paintCover(c.image_url, "p");
+      bindMatrix();
       paintUnitList();
       makeSplit($("pd-split"), box.querySelector(".pd"), "--pl", "kurse_pl", 300, 0.8);
       var pgoals = (c.goals || []).slice();
@@ -1096,6 +1194,7 @@
           f.is_public = $("p-users").checked;
           f.goals = pgoals.slice();
         }
+        Object.assign(f, readMatrix(true));
         if (!f.title) { toast("Titel fehlt"); return; }
         /* Nutzer sehen nur, was auch im Katalog ist */
         if (f.is_public && !f.is_active) f.is_active = true;
@@ -1129,6 +1228,7 @@
       var cats = ["kraft", "ausdauer"].filter(function (k) { return on[k]; });
       var list = units().filter(function (u) {
         if (cats.length && cats.indexOf(u.category_default || "kraft") < 0) return false;
+        if (!matrixOk(u, on, false)) return false;
         return levelOk(u, on);
       }).sort(function (a, b) {
         if (on.count) return exCount(b) - exCount(a) || a.title.localeCompare(b.title, "de");
@@ -1180,7 +1280,7 @@
       job.then(loadAll).then(function () {
         var p = byId(plan.id);
         if (p) {
-          if ($("mix")) $("mix").textContent = mixText(mixOf(p));
+          if ($("mix")) $("mix").textContent = (state.mxCols ? "Belegt: " : "") + mixText(mixOf(p));
           var n = mainSessions(p).length;
           if (n && p.sessions_per_week !== 7) rest("courses?id=eq." + p.id, { method: "PATCH", body: { sessions_per_week: 7 } });
         }
@@ -1380,11 +1480,13 @@
       var url = GoExMedia.urlFor(e.name);
       var blocks = (e.blocks || (e.block ? [e.block] : [])).slice();
       var muscles = (e.muscles || []).slice();
+      var equip = (e.equipment || []).slice();
       var MUS = MUSCLES.map(function (m) { return [m, m]; });
       box.innerHTML = '<div class="card exform">' +
         '<label>Name</label><input id="x-name" type="text" value="' + esc(e.name) + '" />' +
         '<div class="exform__two"><div><label>Kategorie</label><span id="x-blocks-w">' + multiField("x-blocks", BLOCK_TYPES, blocks, "Kategorie wählen") + "</span></div>" +
         '<div><label>Muskelgruppen</label><span id="x-mus-w">' + multiField("x-mus", MUS, muscles, "Muskelgruppen wählen") + "</span></div></div>" +
+        (state.exMx ? '<label>Equipment</label><span id="x-eq-w">' + multiField("x-eq", EQUIP, equip, "Equipment wählen") + "</span>" : "") +
         '<label>Kommentar</label><textarea id="x-cue" placeholder="z. B. Ausführung, Einstellung an der Maschine">' + esc(e.cue || "") + "</textarea>" +
         (state.exCols ? "" : '<p class="muted">Mehrere Kategorien und Muskelgruppen speichern geht nach go-exercise-muskeln.sql.</p>') +
         '<div class="row" style="margin-top:10px; justify-content:flex-end"><button type="button" data-xsave="1">Speichern</button></div></div>' +
@@ -1408,6 +1510,7 @@
       }
       bindMulti("x-blocks", "x-blocks-w", "Kategorie", BLOCK_TYPES, blocks, "Kategorie wählen");
       bindMulti("x-mus", "x-mus-w", "Muskelgruppen", MUS, muscles, "Muskelgruppen wählen");
+      if (state.exMx) bindMulti("x-eq", "x-eq-w", "Equipment", EQUIP, equip, "Equipment wählen");
       $("x-play").addEventListener("click", function () { GoExMedia.open(e.name, $("x-url").value.trim()); });
       paintVideoStrip(e, url);
       function saveEx() {
@@ -1419,6 +1522,7 @@
         if (nk !== e.key && state.exIndex[nk]) { toast("„" + name + "“ gibt es schon"); return; }
         var body = { name_key: nk, name: name, block_type: blocks[0] || null, cue: $("x-cue").value.trim() || null };
         if (state.exCols) { body.block_types = blocks; body.muscles = muscles; }
+        if (state.exMx) body.equipment = equip;
         var job = rest("go_exercise_catalog?on_conflict=name_key", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal", body: body });
         if (nk !== e.key) job = job.then(function () { return renameExercise(e, name); });
         job.then(function () { return saveVideo(name, u); })
