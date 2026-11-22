@@ -301,6 +301,10 @@
   /* HYROX Doubles aller Circles (go-hyrox-doubles.sql), für Admin → Nutzer → Aufzeichnungen */
   function loadHxd() {
     st.hxd = [];
+    /* Termine mit Stationen (go-hyrox-eintragen.sql); ohne die Tabelle gilt die Voreinstellung im Code */
+    host.rest("go_hyrox_events?select=*").then(function (ev) {
+      if (global.GoHyroxDoubles && GoHyroxDoubles.setEvents) GoHyroxDoubles.setEvents(ev);
+    }).catch(function () {});
     return host.rest("go_hyrox_doubles?select=*&order=day.desc&limit=2000")
       .then(function (rows) { if (st) { st.hxd = rows || []; if (st.tab === "coaches") paint(); } })
       .catch(function () {});
