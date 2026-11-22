@@ -48,6 +48,22 @@
     ".ga-pill{flex:none;align-self:center;min-height:34px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}" +
     ".ga-pill.is-fill{background:#111;color:#fff}" +
     ".ga-pill.is-blue{background:#1D9BF0;border-color:#1D9BF0;color:#fff}" +
+    ".ga-pill.is-admin{background:#111;border-color:#111;color:#fff}" +
+    ".ga-tk__top{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px}" +
+    ".ga-tk__form{border:1px solid rgba(42,33,24,.15);border-radius:16px;padding:14px;margin:0 0 12px;background:rgba(255,255,255,.5)}" +
+    ".ga-tk__row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}" +
+    "@media (max-width:600px){.ga-tk__row{grid-template-columns:1fr}}" +
+    ".ga-tk__l{display:block;font-size:12px;font-weight:700;letter-spacing:.03em;color:rgba(42,33,24,.65);margin:0 0 8px}" +
+    ".ga-tk__l select,.ga-tk__l textarea{display:block;width:100%;box-sizing:border-box;margin-top:4px;min-height:40px;padding:8px 10px;border-radius:10px;border:1px solid rgba(42,33,24,.25);background:#fff;font:inherit;font-size:15px;font-weight:400;color:#111}" +
+    ".ga-tk__btns{display:flex;gap:8px;justify-content:flex-end}" +
+    ".ga-tk{border-top:1px solid rgba(42,33,24,.12);padding:12px 0}" +
+    ".ga-tk.is-done{opacity:.55}" +
+    ".ga-tk__head{display:flex;gap:10px;align-items:center;font-size:14px}" +
+    ".ga-tk__head span{flex:1;color:rgba(42,33,24,.65)}" +
+    ".ga-tk__head select{min-height:32px;padding:0 8px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:13px;font-weight:600}" +
+    ".ga-tk__path{margin:4px 0 2px;font-size:13px;font-weight:700}" +
+    ".ga-tk__body{margin:0;white-space:pre-wrap;font-size:15px}" +
+    ".ga-tk__acts{display:flex;gap:16px;justify-content:flex-end;margin-top:4px}" +
     /* Bild fest 4 Schriftreihen hoch, Rechteck 4:5 */
     ".ga-cimg,.ga-rect{width:61px;height:76px;flex:none;align-self:flex-start;border-radius:10px;object-fit:cover;background:#E6DED0;display:grid;place-items:center;font-weight:700}" +
     ".ga-rectbtn{flex:none;align-self:flex-start;padding:0;border:0;background:none;cursor:pointer;border-radius:10px}" +
@@ -210,7 +226,7 @@
     if (!ids.length) return;
     var base = "go_accounts?id=in.(" + ids.join(",") + ")&select=";
     var more = ",serial_number,invite_code,phone,whatsapp_phone,about_me,training_goal,trainer_id,workout_places,photo_url";
-    host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at,seen_at,ffc_seen_at" + more)
+    host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at,seen_at,ffc_seen_at,is_admin" + more)
       .catch(function () { return host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at" + more); })
       .catch(function () { return host.rest(base + "id,nickname,coach_self_at,coach_verified_at" + more); })
       .catch(function () { return host.rest(base + "id,nickname"); })
@@ -268,12 +284,55 @@
           .catch(function () { if (host.toast) host.toast("Sperren ging nicht"); });
       });
   }
+  /* Dropdown-Filter für Nachrichten und Tickets: groups = [[key, label, [[value, label], …]], …] */
+  function nfOf(scope) { st.nf = st.nf || {}; return st.nf[scope] || (st.nf[scope] = {}); }
+  function selBar(scope, groups, n, total, noun) {
+    var f = nfOf(scope);
+    var on = groups.some(function (g) { return f[g[0]]; });
+    return '<div class="ga-filters is-u">' + groups.map(function (g) {
+      return '<select data-ga-nf="' + scope + "|" + g[0] + '" aria-label="' + esc(g[1]) + '"' + (f[g[0]] ? ' class="is-on"' : "") + '><option value="">' + esc(g[1]) + ": alle</option>" +
+        g[2].map(function (o) { return '<option value="' + esc(o[0]) + '"' + (f[g[0]] === o[0] ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") + "</select>";
+    }).join("") + "</div>" +
+      '<p class="ga-ucount">' + n + " von " + total + " " + noun + (on ? ' · <button type="button" class="ga-link" data-ga-nfreset="' + scope + '">Filter zurücksetzen</button>' : "") + "</p>";
+  }
+  function uniq(arr) {
+    var seen = {};
+    return arr.filter(function (x) { if (!x || seen[x]) return false; seen[x] = 1; return true; });
+  }
+  var NEWS_KIND = [["account", "Neu dabei"], ["feedback", "Feedback"], ["coach", "Coach-Anfrage"], ["booking", "Buchung"], ["report", "Gemeldet"]];
   function paintNews() {
     var since = st.seenBefore;
-    var list = items(st.data);
-    var compose = paintReports() + '<button type="button" class="cp-btn cp-btn--ghost" data-ga-broadcast="1" style="margin:0 0 10px">Mitteilung an alle Nutzer</button>' +
+    var all = items(st.data);
+    var f = nfOf("news");
+    var now = Date.now(), DAY = 864e5;
+    function age(at) { var t = new Date(at).getTime(); return isNaN(t) ? 1e12 : now - t; }
+    var list = all.filter(function (it) {
+      if (f.kind && it.kind !== f.kind) return false;
+      if (f.type && !(it.kind === "booking" && String(it.a.type) === f.type)) return false;
+      if (f.who && String(it.a.name || "") !== f.who) return false;
+      if (f.time === "d1" && age(it.at) > DAY) return false;
+      if (f.time === "d7" && age(it.at) > 7 * DAY) return false;
+      if (f.time === "d30" && age(it.at) > 30 * DAY) return false;
+      if (f.time === "old" && age(it.at) <= 30 * DAY) return false;
+      var isNew = since && String(it.at) > since;
+      if (f.seen === "new" && !isNew) return false;
+      if (f.seen === "old" && isNew) return false;
+      return true;
+    });
+    var types = uniq(all.filter(function (it) { return it.kind === "booking"; }).map(function (it) { return String(it.a.type || ""); }));
+    var bar = selBar("news", [
+      ["kind", "Art", NEWS_KIND],
+      ["type", "Buchung", types.map(function (t) { return [t, TYPE_TITLE[t] || t]; })],
+      ["time", "Zeitraum", [["d1", "letzte 24 Stunden"], ["d7", "letzte 7 Tage"], ["d30", "letzte 30 Tage"], ["old", "älter als 30 Tage"]]],
+      ["who", "Person", uniq(all.map(function (it) { return String(it.a.name || ""); })).sort(function (x, y) { return x.localeCompare(y, "de"); }).map(function (x) { return [x, x]; })],
+      ["seen", "Status", [["new", "neu"], ["old", "gelesen"]]]
+    ], f.kind === "report" ? 0 : list.length, all.length, "Nachrichten");
+    var showReports = !f.kind || f.kind === "report";
+    if (f.kind === "report") list = [];
+    var compose = (showReports ? paintReports() : "") + '<button type="button" class="cp-btn cp-btn--ghost" data-ga-broadcast="1" style="margin:0 0 10px">Mitteilung an alle Nutzer</button>' +
       '<p class="cp-hint">Erscheint bei allen einmal mittig in Aktuell. Tippen schließt. Neue öffentliche Wochenpläne melden sich von selbst.</p>';
-    if (!list.length) return compose + '<p class="cp-hint">Noch keine Nachrichten.</p>';
+    compose += bar;
+    if (!list.length) return compose + (f.kind === "report" ? "" : '<p class="cp-hint">' + (all.length ? "Nichts gefunden." : "Noch keine Nachrichten.") + "</p>");
     return compose + list.map(function (it) {
       var a = it.a;
       var name = "<b>" + esc(a.name || "Jemand") + "</b>";
@@ -360,6 +419,7 @@
   function rolePill(a) {
     var id = String(a.account_id);
     var ci = coachInfo(id);
+    if (ci.is_admin) return '<button type="button" class="ga-pill is-admin" data-ga-admin="' + esc(id) + '">Admin</button>';
     if (ci.coach_verified_at) return '<button type="button" class="ga-pill is-blue" data-ga-role="' + esc(id) + '">Coach</button>';
     if (isCoachAcc(a)) return '<button type="button" class="ga-pill is-fill" data-ga-role="' + esc(id) + '">Coach</button>';
     if (coachRequested(id)) return '<button type="button" class="ga-pill" data-ga-req="' + esc(id) + '">Anfrage Coach</button>';
@@ -369,13 +429,14 @@
   var UF = [["role", "Rolle"], ["login", "Login"], ["member", "Stempelkarte"], ["goal", "Ziel"], ["coach", "Coach"], ["place", "Ort"], ["plan", "Wochenplan"], ["circle", "Circle"], ["group", "Gruppe"], ["day", "Workout"]];
   /* feste Werte statt aus den Daten gesammelt; „Aktiv“: gogogo = Stempelkarte aktiv, Circle = aktive Circle-Karte */
   var UF_FIXED = {
-    role: ["Nutzer", "Coach", "Zertifiziert"],
+    role: ["Admin", "Zertifiziert", "Coach", "Nutzer"],
     /* gogogo = selbst mit Vorname und Login-Code angemeldet, Circle = in der App mit FFC (E-Mail und Passwort) eingeloggt (go-login-stand.sql) */
     login: ["gogogo, ohne Circle", "kein gogogo, nur Circle", "beides", "keins"],
     member: ["gogogo, ohne Circle", "kein gogogo, nur Circle", "beides aktiv", "keins aktiv"]
   };
   function roleOf(a) {
     var ci = coachInfo(String(a.account_id));
+    if (ci.is_admin) return "Admin";
     if (ci.coach_verified_at) return "Zertifiziert";
     return isCoachAcc(a) ? "Coach" : "Nutzer";
   }
@@ -644,6 +705,29 @@
       .catch(function () { GoDialog.alert("Das braucht go-admin-user-extras.sql in Supabase."); });
   }
   /* Nutzer-Pille: Löschen / Pausieren */
+  /* Admin-Rechte (oberste Rolle), z. B. für GbR-Mitglieder; sich selbst nicht entziehen */
+  function setAdmin(id, on) {
+    var a = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0] || {};
+    var name = a.name || "Diese Person";
+    return GoDialog.confirm(on ? name + " zum Admin machen? Admins sehen und ändern alles hier im Admin." : name + " die Admin-Rechte entziehen?", { ok: on ? "Admin machen" : "Entziehen", cancel: "Abbrechen" })
+      .then(function (yes) {
+        if (!yes) return;
+        return host.rest("rpc/go_admin_set_admin", { method: "POST", body: { p_account: id, p_on: on } }).then(function () {
+          (st.coachInfo[String(id)] || (st.coachInfo[String(id)] = {})).is_admin = on;
+          paint();
+          if (host.toast) host.toast(on ? name + " ist jetzt Admin" : name + " ist kein Admin mehr");
+        }).catch(function (e) {
+          var m = String((e && e.message) || "");
+          GoDialog.alert(/last_admin/.test(m) ? "Es muss mindestens ein Admin bleiben." : /self/.test(m) ? "Dir selbst kannst Du die Rechte nicht entziehen." : "Das braucht go-admin-tickets.sql in Supabase.");
+        });
+      });
+  }
+  function adminMenu(id) {
+    var a = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0] || {};
+    if (String(id) === String(me())) { GoDialog.alert("Das bist Du. Admin-Rechte entzieht Dir nur ein anderer Admin."); return; }
+    GoDialog.choose(a.name || "Admin", [{ label: "Admin-Rechte entziehen", value: "off" }], { center: true, cancel: "Abbrechen" })
+      .then(function (v) { if (v === "off") setAdmin(id, false); });
+  }
   function userMenu(id) {
     var a = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0] || {};
     var ci = coachInfo(id);
@@ -651,6 +735,7 @@
     var items = [];
     if (id !== String(me()) && ADMIN_IDS.indexOf(id) === -1) items.push({ label: "Löschen", value: "del" });
     items.push({ label: ci.paused_at ? "Fortsetzen" : "Pausieren", value: "pause" });
+    items.push({ label: "Zum Admin machen", value: "admin" });
     GoDialog.choose(name, items, { center: true, sub: ci.paused_at ? "Pausiert: keine WhatsApp-Erinnerung." : "", cancel: "Abbrechen" }).then(function (v) {
       if (v === "del") {
         var fake = document.createElement("button");
@@ -658,6 +743,7 @@
         deleteAccount(fake);
         return;
       }
+      if (v === "admin") { setAdmin(id, true); return; }
       if (v !== "pause") return;
       var on = !ci.paused_at;
       host.rest("rpc/go_admin_pause_account", { method: "POST", body: { p_account: id, p_on: on } })
@@ -676,9 +762,11 @@
     var name = a.name || "Coach";
     GoDialog.choose(name, [
       { label: "Coach-Rolle entziehen", value: "revoke" },
-      { label: ci.coach_verified_at ? "Verifiziert ✓ (blaues c entfernen)" : "Verifizieren (blaues c)", value: ci.coach_verified_at ? "unverify" : "verify" }
+      { label: ci.coach_verified_at ? "Verifiziert ✓ (blaues c entfernen)" : "Verifizieren (blaues c)", value: ci.coach_verified_at ? "unverify" : "verify" },
+      { label: "Zum Admin machen", value: "admin" }
     ], { center: true, cancel: "Abbrechen" }).then(function (mode) {
       if (!mode) return;
+      if (mode === "admin") { setAdmin(id, true); return; }
       host.rest("rpc/go_admin_coach_role", { method: "POST", body: { p_account: id, p_mode: mode } })
         .then(function () {
           var c = st.coachInfo[String(id)] || (st.coachInfo[String(id)] = {});
@@ -898,6 +986,137 @@
       });
   }
 
+  /* ---------- Tickets (go-admin-tickets.sql): Änderungswünsche sammeln und zum Kopieren für Claude ---------- */
+  var TK_AREAS = {
+    frontend: { label: "Frontend", sections: {
+      "Aktuell-Feed": ["Feed-Karten", "Filter", "Herz und Kommentare", "Bubble-Chat", "Mitteilungen", "Posten"],
+      "Woche": ["Wochen-Reels", "Wochenplan wählen", "Events und Termine", "Kalender", "Tagebuch", "Trainingslog"],
+      "Team": ["Coach", "Gruppe", "Gesichter", "Einladen", "Stempelkarte"],
+      "Plus": ["Inhaltsverzeichnis", "Ernährung", "Friday Fitness Circle", "Leaderboard", "Aufzeichnungen", "HYROX Doubles", "Circle verwalten", "Buchungen"],
+      "Profil": ["Foto", "Ziele", "Orte", "Login", "WhatsApp-Erinnerung", "Datenschutz", "Coach werden"],
+      "Allgemein": ["Navigation und Pille", "Onboarding", "Design", "Geschwindigkeit", "PWA und Installation"]
+    } },
+    backend: { label: "Backend", sections: {
+      "Nachrichten": ["Liste", "Filter", "Gemeldet", "Mitteilung an alle"],
+      "Erinnerungen": ["WhatsApp-Texte", "Zeitpunkt", "Liste"],
+      "Nutzer": ["Liste", "Filter", "Rollen", "Wochenplan", "Circle-Aufzeichnungen", "Stempelkarte", "Profil-Infos"],
+      "Editor": ["Wochenpläne", "Events", "Übungen", "Videos"],
+      "Social Media Links": ["Freigabe", "Liste"],
+      "Circles": ["Liste", "Coach", "Teilnehmer", "Orte", "Foto"],
+      "Gruppen": ["Liste", "Coach", "Teilnehmer", "Orte", "Foto"],
+      "Tickets": ["Liste", "Formular"],
+      "Datenbank": ["Tabellen", "Rechte", "Import", "Auswertung"]
+    } }
+  };
+  var TK_STATUS = ["offen", "in Arbeit", "erledigt"];
+  function loadTickets() {
+    st.tickets = "loading";
+    return host.rest("go_tickets?select=*&order=id.desc&limit=500")
+      .then(function (r) { if (st) { st.tickets = r || []; paint(); } })
+      .catch(function () { if (st) { st.tickets = "missing"; paint(); } });
+  }
+  function tkWhen(at) {
+    var d = new Date(at);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" }) + ", " +
+      d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+  }
+  function tkPath(t) { return [(TK_AREAS[t.area] || {}).label || t.area, t.section, t.sub].filter(Boolean).join(" › "); }
+  function tkText(t) {
+    return "Ticket #" + t.id + " · " + tkWhen(t.created_at) + " · " + (t.created_name || "?") + " · Status: " + t.status + "\n" + tkPath(t) + "\n" + t.body;
+  }
+  function tkSelect(id, label, opts, cur) {
+    return '<label class="ga-tk__l">' + esc(label) + '<select id="' + id + '">' + opts.map(function (o) {
+      return '<option value="' + esc(o[0]) + '"' + (o[0] === cur ? " selected" : "") + ">" + esc(o[1]) + "</option>";
+    }).join("") + "</select></label>";
+  }
+  function tkForm() {
+    var d = st.tkDraft || (st.tkDraft = { area: "frontend", section: "", sub: "", body: "" });
+    var secs = Object.keys(TK_AREAS[d.area].sections);
+    if (secs.indexOf(d.section) < 0) d.section = secs[0];
+    var subs = TK_AREAS[d.area].sections[d.section].concat(["Sonstiges"]);
+    if (subs.indexOf(d.sub) < 0) d.sub = subs[0];
+    return '<div class="ga-tk__form">' +
+      '<div class="ga-tk__row">' + tkSelect("gt-area", "Bereich", Object.keys(TK_AREAS).map(function (k) { return [k, TK_AREAS[k].label]; }), d.area) +
+      tkSelect("gt-sec", d.area === "frontend" ? "Abschnitt" : "Admin-Bereich", secs.map(function (x) { return [x, x]; }), d.section) +
+      tkSelect("gt-sub", "Unterkategorie", subs.map(function (x) { return [x, x]; }), d.sub) + "</div>" +
+      '<label class="ga-tk__l">Wunsch<textarea id="gt-body" rows="4" placeholder="Was soll sich wo ändern?">' + esc(d.body) + "</textarea></label>" +
+      '<div class="ga-tk__btns"><button type="button" class="cp-btn cp-btn--ghost" data-gt="cancel">Abbrechen</button><button type="button" class="cp-btn" data-gt="save">Ticket speichern</button></div></div>';
+  }
+  function paintTickets() {
+    if (!st.tickets) { loadTickets(); return '<p class="cp-hint">Lädt …</p>'; }
+    if (st.tickets === "loading") return '<p class="cp-hint">Lädt …</p>';
+    if (st.tickets === "missing") return '<p class="cp-hint">Tickets brauchen go-admin-tickets.sql in Supabase.</p>';
+    var all = st.tickets;
+    var f = nfOf("tickets");
+    var list = all.filter(function (t) {
+      if (f.status && t.status !== f.status) return false;
+      if (f.area && t.area !== f.area) return false;
+      if (f.section && t.section !== f.section) return false;
+      if (f.who && (t.created_name || "") !== f.who) return false;
+      return true;
+    });
+    var secs = uniq(all.map(function (t) { return t.section; }));
+    var open = list.filter(function (t) { return t.status !== "erledigt"; });
+    return (st.tkNew ? tkForm() : '<div class="ga-tk__top"><button type="button" class="cp-btn" data-gt="new">Neues Ticket</button>' +
+        (open.length ? '<button type="button" class="cp-btn cp-btn--ghost" data-gt="copyall">' + open.length + (open.length === 1 ? " offenes Ticket" : " offene Tickets") + " kopieren</button>" : "") + "</div>") +
+      selBar("tickets", [
+        ["status", "Status", TK_STATUS.map(function (x) { return [x, x]; })],
+        ["area", "Bereich", Object.keys(TK_AREAS).map(function (k) { return [k, TK_AREAS[k].label]; })],
+        ["section", "Abschnitt", secs.map(function (x) { return [x, x]; })],
+        ["who", "Von", uniq(all.map(function (t) { return t.created_name || ""; })).map(function (x) { return [x, x]; })]
+      ], list.length, all.length, "Tickets") +
+      (list.length ? list.map(function (t) {
+        return '<div class="ga-tk' + (t.status === "erledigt" ? " is-done" : "") + '">' +
+          '<div class="ga-tk__head"><b>#' + t.id + "</b><span>" + esc(tkWhen(t.created_at)) + " · " + esc(t.created_name || "?") + "</span>" +
+          '<select data-gt-status="' + t.id + '" aria-label="Status">' + TK_STATUS.map(function (x) { return '<option' + (x === t.status ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select></div>" +
+          '<p class="ga-tk__path">' + esc(tkPath(t)) + "</p>" +
+          '<p class="ga-tk__body">' + esc(t.body) + "</p>" +
+          '<div class="ga-tk__acts"><button type="button" class="ga-link" data-gt="copy" data-gt-id="' + t.id + '">Kopieren</button>' +
+          '<button type="button" class="ga-link" data-gt="del" data-gt-id="' + t.id + '">Löschen</button></div></div>';
+      }).join("") : '<p class="cp-hint">' + (all.length ? "Nichts gefunden." : "Noch keine Tickets.") + "</p>");
+  }
+  function tkCopy(text) {
+    function done() { if (host.toast) host.toast("Kopiert"); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(function () { GoDialog.prompt("Kopieren", text); });
+    } else GoDialog.prompt("Kopieren", text);
+  }
+  function ticketAction(t) {
+    var act = t.getAttribute("data-gt");
+    var id = Number(t.getAttribute("data-gt-id"));
+    var tk = (Array.isArray(st.tickets) ? st.tickets : []).filter(function (x) { return x.id === id; })[0];
+    if (act === "new") { st.tkNew = true; paint(); return; }
+    if (act === "cancel") { st.tkNew = false; st.tkDraft = null; paint(); return; }
+    if (act === "copy" && tk) { tkCopy(tkText(tk)); return; }
+    if (act === "copyall") {
+      var f = nfOf("tickets");
+      var open = st.tickets.filter(function (x) { return x.status !== "erledigt" && (!f.area || x.area === f.area) && (!f.section || x.section === f.section) && (!f.status || x.status === f.status) && (!f.who || x.created_name === f.who); });
+      tkCopy(open.slice().reverse().map(tkText).join("\n\n"));
+      return;
+    }
+    if (act === "del" && tk) {
+      GoDialog.confirm("Ticket #" + tk.id + " löschen?", { ok: "Löschen", cancel: "Abbrechen" }).then(function (yes) {
+        if (!yes) return;
+        host.rest("go_tickets?id=eq." + tk.id, { method: "DELETE", prefer: "return=minimal" }).then(loadTickets)
+          .catch(function () { GoDialog.alert("Löschen ging nicht."); });
+      });
+      return;
+    }
+    if (act === "save") {
+      var d = st.tkDraft;
+      d.body = (document.getElementById("gt-body") || {}).value || "";
+      if (!d.body.trim()) { GoDialog.alert("Bitte den Wunsch eintragen."); return; }
+      var mine = (st.accounts || []).filter(function (a) { return String(a.account_id) === String(me()); })[0] || {};
+      var acc = host.sessionAccount || null;
+      var name = String((acc && acc.name) || mine.name || "").split(" ")[0];
+      host.rest("go_tickets", { method: "POST", prefer: "return=minimal", body: {
+        created_by: me(), created_name: name, area: d.area, section: d.section, sub: d.sub, body: d.body.trim()
+      } }).then(function () { st.tkNew = false; st.tkDraft = null; if (host.toast) host.toast("Ticket gespeichert"); return loadTickets(); })
+        .catch(function () { GoDialog.alert("Speichern ging nicht (go-admin-tickets.sql ausgeführt?)"); });
+    }
+  }
+
   var TABS = [
     { id: "news", label: "Nachrichten" },
     { id: "wa", label: "Erinnerungen" },
@@ -905,7 +1124,8 @@
     { id: "editor", label: "Editor" },
     { id: "ex", label: "Social Media Links" },
     { id: "circles", label: "Circles" },
-    { id: "groups", label: "Gruppen" }
+    { id: "groups", label: "Gruppen" },
+    { id: "tickets", label: "Tickets" }
   ];
   function tabLabel(id) {
     var t = TABS.filter(function (x) { return x.id === id; })[0];
@@ -925,7 +1145,7 @@
       st.body.innerHTML = '<p class="cp-hint">' + esc(st.error) + "</p>";
       return;
     }
-    st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : st.tab === "circles" ? paintOrgs("circle") : st.tab === "groups" ? paintOrgs("group") : paintCoaches();
+    st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : st.tab === "circles" ? paintOrgs("circle") : st.tab === "groups" ? paintOrgs("group") : st.tab === "tickets" ? paintTickets() : paintCoaches();
   }
 
   /* ---------- Ziele der Nutzer (go_accounts.training_goal, mehrere mit Komma) ---------- */
@@ -1479,18 +1699,21 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
     if (t.hasAttribute("data-ga-broadcast")) { broadcast(); return; }
     if (t.hasAttribute("data-ga-del")) { deleteAccount(t); return; }
     if (t.hasAttribute("data-ga-role")) { roleMenu(t.getAttribute("data-ga-role")); return; }
+    if (t.hasAttribute("data-ga-admin")) { adminMenu(t.getAttribute("data-ga-admin")); return; }
+    if (t.hasAttribute("data-gt")) { ticketAction(t); return; }
     if (t.hasAttribute("data-ga-user")) { userMenu(t.getAttribute("data-ga-user")); return; }
     if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
     if (t.hasAttribute("data-ga-plan")) { userPlan(t.getAttribute("data-ga-plan")); return; }
     if (t.hasAttribute("data-ga-rec")) { openRec(t.getAttribute("data-ga-rec")); return; }
     if (t.getAttribute("data-ga-uf") === "reset") { st.uf = {}; paint(); return; }
+    if (t.hasAttribute("data-ga-nfreset")) { st.nf[t.getAttribute("data-ga-nfreset")] = {}; paint(); return; }
     if (t.hasAttribute("data-gx")) {
       var gx = t.getAttribute("data-gx"), gk = t.getAttribute("data-gk"), gid = t.getAttribute("data-gid");
       if (gx === "coach") orgCoach(gk, gid);
@@ -1577,6 +1800,25 @@
   function onChange(e) {
     var uf = e.target && e.target.closest ? e.target.closest("select[data-ga-uf]") : null;
     if (uf && st) { st.uf = st.uf || {}; st.uf[uf.getAttribute("data-ga-uf")] = uf.value; paint(); return; }
+    var tid = e.target && e.target.id;
+    if (st && st.tkDraft && (tid === "gt-area" || tid === "gt-sec" || tid === "gt-sub")) {
+      st.tkDraft.body = (document.getElementById("gt-body") || {}).value || st.tkDraft.body;
+      if (tid === "gt-area") { st.tkDraft.area = e.target.value; st.tkDraft.section = ""; st.tkDraft.sub = ""; }
+      if (tid === "gt-sec") { st.tkDraft.section = e.target.value; st.tkDraft.sub = ""; }
+      if (tid === "gt-sub") st.tkDraft.sub = e.target.value;
+      paint();
+      return;
+    }
+    var tst = e.target && e.target.getAttribute ? e.target.getAttribute("data-gt-status") : null;
+    if (tst && st) {
+      var nst = e.target.value;
+      host.rest("go_tickets?id=eq." + tst, { method: "PATCH", prefer: "return=minimal", body: { status: nst, updated_at: new Date().toISOString() } })
+        .then(function () { (st.tickets || []).forEach(function (x) { if (String(x.id) === tst) x.status = nst; }); paint(); })
+        .catch(function () { GoDialog.alert("Status ändern ging nicht."); });
+      return;
+    }
+    var nfs = e.target && e.target.closest ? e.target.closest("select[data-ga-nf]") : null;
+    if (nfs && st) { var nk = nfs.getAttribute("data-ga-nf").split("|"); nfOf(nk[0])[nk[1]] = nfs.value; paint(); return; }
     var sel = e.target && e.target.closest ? e.target.closest("[data-ga-cf]") : null;
     if (!sel || !st) return;
     st.cfs = st.cfs || {};
