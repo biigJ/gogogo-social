@@ -6087,6 +6087,7 @@
     .hxd-board { border-top: 1px solid rgba(42, 33, 24, 0.12); margin-top: 4px; }
     .hxd-hint { margin: 10px 0 0; font-size: 12px; color: rgba(42, 33, 24, 0.6); }
     .go-circle-where { margin: 6px 0 2px; font-size: 14px; color: rgba(42, 33, 24, 0.75); text-align: center; }
+    .go-circle-pdf { margin-left: 10px; min-height: 28px; padding: 0 12px; border-radius: 999px; border: 1.5px solid currentColor; background: transparent; color: inherit; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
     .go-circle-pick { position: relative; display: inline-block; max-width: 100%; }
     .go-circle-pick select { -webkit-appearance: none; appearance: none; border: 0; background: transparent; color: inherit; text-align: center; text-align-last: center; padding: 2px 22px 2px 4px; max-width: 100%; cursor: pointer; }
     .go-circle-pick::after { content: ""; position: absolute; right: 4px; top: 50%; width: 7px; height: 7px; margin-top: -6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); pointer-events: none; }
@@ -8527,10 +8528,10 @@
   <script src="/natalyaalice/go-covers.js?v=cov-5"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-6"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-8"></script>
-  <script src="/natalyaalice/ffc-points.js?v=ffp-1"></script>
+  <script src="/natalyaalice/ffc-points.js?v=ffp-2"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-33"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-35"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-3"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-16"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-2"></script>
@@ -13501,6 +13502,12 @@
           return rest(
             "events?id=eq." + encodeURIComponent(eventId) + "&select=id,user_id,starts_at,note,status"
           ).then(function (rows) {
+            /* Stationen des Coaches (note st=, circle-sheet.js) als Vorauswahl; im Workout frei änderbar */
+            if (rows && rows[0] && window.GoCircleSheet) {
+              var FFC_ID = { bike_m: "assaultbike" };
+              var ids = GoCircleSheet.noteStations(rows[0].note).map(function (k) { return FFC_ID[k] || k; });
+              if (ids.length) base.stations = ids;
+            }
             return rows && rows[0] ? GoZirkelSetup.startInfo(rows[0]) : null;
           });
         }
@@ -20437,9 +20444,50 @@
             r.textContent = [circleMode(ev), n ? n + " Runden" : ""].filter(Boolean).join(" · ");
             row.appendChild(l);
             row.appendChild(r);
+            /* Coach: Workout als PDF (A5) zum Ausdrucken und Eintragen (circle-sheet.js) */
+            if (circleCanManage(g) && window.GoCircleSheet) {
+              var pdfBtn = document.createElement("button");
+              pdfBtn.type = "button";
+              pdfBtn.className = "go-circle-pdf";
+              pdfBtn.textContent = "PDF";
+              pdfBtn.addEventListener("click", function (e) { e.stopPropagation(); circleEventPdf(g, ev); });
+              r.appendChild(pdfBtn);
+            }
             ui.evList.appendChild(row);
           });
         });
+      }
+      function circleEventPdf(g, ev) {
+        var day = new Date(ev.starts_at).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+        var z = window.GoZirkelSetup && GoZirkelSetup.parse ? GoZirkelSetup.parse(ev.note) : null;
+        rest("rpc/go_circle_hyrox_meta", { method: "POST", body: { p_group: String(g.group_id) } }).catch(function () { return null; })
+          .then(function (m) {
+            if (m && window.GoHyroxDoubles && GoHyroxDoubles.setEvents) GoHyroxDoubles.setEvents(m.events);
+            /* Stationen: aus dem Event (st=), sonst HYROX-Termin, sonst jetzt wählen und am Event speichern */
+            var keys = GoCircleSheet.noteStations(ev.note);
+            var st = keys.length ? GoCircleSheet.labels(keys) : window.GoHyroxDoubles ? GoHyroxDoubles.plan({ day: day, circle_id: String(g.group_id), results: {} }).map(function (x) { return x.label; }) : [];
+            if (!st.length) {
+              return GoCircleSheet.pickStations("Stationen für dieses Event").then(function (k) {
+                if (!k) return;
+                ev.note = String(ev.note || "zirkel:single").replace(/\|st=[^|]*/, "") + "|st=" + k.join(",");
+                rest("events?id=eq." + encodeURIComponent(ev.id), { method: "PATCH", prefer: "return=minimal", body: { note: ev.note } }).catch(function () {});
+                return circleEventPdf(g, ev);
+              });
+            }
+            var mm = function (sec) { return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); };
+            var next = {
+              title: "Anstehendes Workout",
+              sub: [circleDayLabel(ev.starts_at, true), g.name || "", circleMode(ev), z && z.workSec ? mm(z.workSec) + " Arbeit" + (z.restSec ? " / " + mm(z.restSec) + " Pause" : "") : ""].filter(Boolean).join(" · "),
+              stations: st, rounds: st.length, start: null
+            };
+            var ask = GoDialog.choose("Wo ist Start?", st.map(function (x, i) { return { label: x, value: String(i) }; }).concat([{ label: "Offen lassen (zum Eintragen)", value: "open" }]), { cancel: "Abbrechen" });
+            return ask.then(function (v) {
+              if (!v) return;
+              next.start = v === "open" ? null : Number(v);
+              return GoCircleSheet.pdf([{ name: "", partner: "", last: null, next: next }], { format: "a5", file: "gogogo-" + day + "-" + String(g.name || "circle").replace(/[^A-Za-z0-9]+/g, "-") + ".pdf" });
+            });
+          })
+          .catch(function () { gogogoToast("PDF ging nicht (keine Verbindung?)"); });
       }
       function circleDates() {
         var out = [];
@@ -20477,6 +20525,12 @@
           .then(function (r) {
             if (!r) return null;
             pick.rounds = parseInt(r, 10) || 6;
+            /* Stationen in der Reihenfolge an der Tafel: stehen dann auf dem PDF (circle-sheet.js) */
+            return window.GoCircleSheet ? GoCircleSheet.pickStations("Stationen") : [];
+          })
+          .then(function (stK) {
+            if (!stK) return null;
+            pick.st = stK;
             var w = circleWhere(g);
             if (!asCircle || w.locs.length < 2) { pick.loc = asCircle ? w.locs[0] || "" : ""; return true; }
             return GoDialog.choose("Ort", w.locs.map(function (l) { return { label: l, value: l }; })).then(function (l) {
@@ -20488,7 +20542,7 @@
           .then(function (ok) {
             if (!ok) return;
             var w = circleWhere(g);
-            var note = window.GoZirkelSetup ? GoZirkelSetup.toNote({ mode: "single", rounds: pick.rounds, workSec: 240, restSec: 30, online: asCircle && w.online }) : null;
+            var note = window.GoZirkelSetup ? GoZirkelSetup.toNote({ mode: "single", rounds: pick.rounds, workSec: 240, restSec: 30, online: asCircle && w.online }, (pick.st || []).length ? "|st=" + pick.st.join(",") : "") : null;
             return rest("courses?title=eq.Zirkeltraining&select=id&limit=1").catch(function () { return []; }).then(function (rows) {
               var body = {
                 user_id: sessionAccount.id, category: "zirkel", course_id: rows && rows[0] ? rows[0].id : null,
@@ -26970,6 +27024,7 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/natalyaalice/hyrox-doubles.js?v=hxd-3"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-17"></script>
+  <script src="/natalyaalice/circle-sheet.js?v=cs-3"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-19"></script>
 </body>
 </html>

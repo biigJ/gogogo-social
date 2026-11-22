@@ -36,14 +36,19 @@
           rounds: r.rounds || null,
           work_sec: r.workSec || null,
           rest_sec: r.restSec || null,
+          /* Runden mit Werten wie unter Aufzeichnungen (go-ffc-lines.sql) */
+          lines: (r.lines || []).filter(function (l) { return l && !l.empty; }).map(function (l) { return { label: String(l.label || ""), value: String(l.value || "") }; }),
           synced_at: new Date().toISOString()
         };
       });
       if (!rows.length) return true;
-      return host.rest("go_ffc_sessions?on_conflict=id", {
-        method: "POST",
-        prefer: "resolution=merge-duplicates,return=minimal",
-        body: rows
+      function put(body) {
+        return host.rest("go_ffc_sessions?on_conflict=id", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal", body: body });
+      }
+      /* ohne Spalte lines (SQL noch nicht ausgeführt): Punkte trotzdem spiegeln */
+      return put(rows).catch(function (err) {
+        if (!/lines/.test(String((err && err.message) || ""))) throw err;
+        return put(rows.map(function (r) { var c = Object.assign({}, r); delete c.lines; return c; }));
       }).then(function () { return true; });
     }).catch(function (err) {
       if (/go_ffc_sessions|relation|42P01/.test(String((err && err.message) || ""))) missing = true;
