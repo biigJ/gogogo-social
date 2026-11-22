@@ -162,10 +162,11 @@
     st.id = "tama-css";
     st.textContent =
       ".crew-story__ring{position:relative}" +
-      ".crew-story.tama-0:not(.is-training) .crew-story__ring{outline:2px solid #2E9E5B;outline-offset:6px}" +
-      ".crew-story.tama-1 .crew-story__ring{outline:3px solid #F2C94C;outline-offset:6px}" +
-      ".crew-story.tama-2 .crew-story__ring{outline:3px solid #F29A2E;outline-offset:6px}" +
-      ".crew-story.tama-3 .crew-story__ring{outline:3px solid #E5251B;outline-offset:6px}" +
+      /* Ampel-Ring: 5 px, wenn er nicht pulsiert */
+      ".crew-story.tama-0:not(.is-training) .crew-story__ring{outline:5px solid #2E9E5B;outline-offset:5px}" +
+      ".crew-story.tama-1 .crew-story__ring{outline:5px solid #F2C94C;outline-offset:5px}" +
+      ".crew-story.tama-2 .crew-story__ring{outline:5px solid #F29A2E;outline-offset:5px}" +
+      ".crew-story.tama-3 .crew-story__ring{outline:5px solid #E5251B;outline-offset:5px}" +
       ".tama-badge{position:absolute;top:-6px;right:-6px;min-width:24px;height:24px;padding:0 5px;box-sizing:border-box;" +
       "border-radius:12px;background:#2A2118;color:#F6F1E8;border:2px solid #F3EEE4;font:800 14px/20px var(--display, system-ui);" +
       "text-align:center;z-index:2;pointer-events:none}";
