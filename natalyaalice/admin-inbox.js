@@ -59,6 +59,18 @@
     ".ga-filters{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}" +
     ".ga-filters select{min-height:34px;padding:0 10px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:13px;font-weight:600;color:#111}" +
     ".ga-paused{opacity:.55}" +
+    /* Circle-Aufzeichnungen wie in der App */
+    ".ga-rec .ga-info__card{width:min(100%,520px)}" +
+    ".ga-rec__days{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px}" +
+    ".ga-rec__days button{min-height:32px;padding:0 12px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:13px;font-weight:600;cursor:pointer}" +
+    ".ga-rec__days button.is-on{background:#111;color:#fff}" +
+    ".ga-rec__head{text-align:center;font-weight:600;margin:4px 0}" +
+    ".ga-rec__pts{text-align:center;font:600 26px/1.2 'Playfair Display',Georgia,serif;margin:6px 0 2px}" +
+    ".ga-rec__meta{text-align:center;font-size:13px;color:rgba(42,33,24,.65);margin-bottom:10px}" +
+    ".ga-rec__round{border-top:1px solid rgba(42,33,24,.12);padding:6px 0}" +
+    ".ga-rec__rh{font:700 11px/1.3 Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:rgba(42,33,24,.55)}" +
+    ".ga-rec__row{display:flex;justify-content:space-between;gap:10px;font-size:15px;padding:2px 0}" +
+    ".ga-rec__row button{background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer}" +
     ".ga-del{margin-left:6px;color:#C7413B;border-color:#C7413B}" +
     ".ga-wa{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:#128C7E;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-grid;place-items:center}" +
     ".ga-item.is-sent{opacity:.5}" +
@@ -92,7 +104,7 @@
     ".ga-info__btns button{min-height:46px;border-radius:999px;border:1.5px solid #111;background:transparent;color:#111;font:inherit;font-size:15px;font-weight:700;cursor:pointer}" +
     ".ga-info__btns button.is-dark{background:#111;color:#fff}" +
     ".ga-info__btns button.is-quiet{border:0;color:rgba(42,33,24,.7);font-weight:600}" +
-    "@media (min-width:900px){.cp .cp-body{max-width:760px;margin:0 auto;width:100%;box-sizing:border-box}.cp.ga-root .cp-body{max-width:1064px}}";
+    "@media (min-width:900px){.cp .cp-body{max-width:760px;margin:0 auto;width:100%;box-sizing:border-box}.cp.ga-root .cp-body{max-width:1280px}}";
 
   function ensureCss() {
     if (document.getElementById("ga-css")) return;
@@ -288,6 +300,16 @@
       .catch(function () {});
   }
   function extrasOf(id) { return (st.extras && st.extras[String(id)]) || null; }
+  /* HYROX Doubles aller Circles (go-hyrox-doubles.sql), für Admin → Nutzer → Aufzeichnungen */
+  function loadHxd() {
+    st.hxd = [];
+    return host.rest("go_hyrox_doubles?select=*&order=day.desc&limit=2000")
+      .then(function (rows) { if (st) { st.hxd = rows || []; if (st.tab === "coaches") paint(); } })
+      .catch(function () {});
+  }
+  function hxdOf(id) {
+    return (st.hxd || []).filter(function (r) { return (r.account_ids || []).map(String).indexOf(String(id)) >= 0; });
+  }
   function stampTxt(n) { return (Number(n) || 0) + "/12"; }
   /* Stempelkarte aktiv mit Stempeln, sonst inaktiv; dazu je Gruppe und Circle die verknüpfte Karte (inaktiv, angefragt oder Stempel) */
   function stampLine(x) {
@@ -343,6 +365,7 @@
     if (!st.coachInfo) loadCoachInfo();
     if (!st.links) loadLinks();
     if (!st.extras) loadExtras();
+    if (!st.hxd) loadHxd();
     if (!st.goals) loadGoals();
     var accs = (st.accounts || []).slice().sort(function (x, y) {
       if (isCoachAcc(y) !== isCoachAcc(x)) return isCoachAcc(y) ? 1 : -1;
@@ -376,10 +399,11 @@
           (ln.groups || []).length ? "Gruppe: " + esc(ln.groups.join(", ")) : "Gruppe: –",
           "Circle: " + ((ln.circles || []).length ? esc(ln.circles.join(", ")) : "–")
         ]);
+        var nRec = hxdOf(id).length;
         var r5 = x ? parts(stampLine(x).map(esc).concat([esc(doubleLine(x, function (aid) {
           var hit = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(aid); })[0];
           return hit ? String(hit.name || "").split(" ")[0] : "";
-        }))])) : "";
+        }))]).concat(nRec ? ['<button type="button" class="ga-link" data-ga-rec="' + esc(id) + '">Circle-Aufzeichnungen (' + nRec + ")</button>"] : [])) : "";
         var pl = placeList(ci.workout_places);
         var r4 = '<button type="button" class="ga-link" data-ga-places="' + esc(id) + '">' + esc(pl.length ? pl.join(" · ") : "Ort hinzufügen") + "</button>";
         var photo = ci.photo_url || a.photo_url;
@@ -389,6 +413,67 @@
           (r2 ? "<div>" + r2 + "</div>" : "") + "<div>" + r3 + "</div><div>" + r4 + "</div>" + (r5 ? "<div>" + r5 + "</div>" : "") + "</div>" +
           rolePill(a) + "</div>";
       }).join("");
+  }
+  /* Circle-Aufzeichnungen eines Nutzers, so wie die App sie zeigt; Werte antippen = nachpflegen */
+  function openRec(id, pick) {
+    var rows = hxdOf(id);
+    if (!rows.length || !global.GoHyroxDoubles) return;
+    var a = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(id); })[0] || {};
+    var cur = rows.filter(function (r) { return String(r.id) === String(pick); })[0] || rows[0];
+    var box = document.createElement("div");
+    box.className = "ga-info ga-rec";
+    var sc = GoHyroxDoubles.score(cur);
+    var names = String(cur.team || "").split(/\s*&\s*/);
+    var me = (cur.account_ids || []).map(String).indexOf(String(id));
+    var partner = names[me === 0 ? 1 : 0] || "";
+    var d = new Date(cur.day + "T12:00:00");
+    var work = Number(cur.work_sec) || 360;
+    box.innerHTML = '<div class="ga-info__card" role="dialog" aria-modal="true"><p class="ga-info__name" style="text-align:center">' + esc(String(a.name || "").split(" ")[0]) + "</p>" +
+      '<div class="ga-rec__days">' + rows.map(function (r) {
+        var dd = new Date(r.day + "T12:00:00");
+        return '<button type="button" data-rec-pick="' + esc(r.id) + '"' + (r === cur ? ' class="is-on"' : "") + ">" + esc(dd.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })) + "</button>";
+      }).join("") + "</div>" +
+      '<p class="ga-rec__head">' + esc(d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) + " · " + (cur.title || "HYROX Double") + (partner ? " mit " + partner : "")) + "</p>" +
+      '<p class="ga-rec__pts">' + esc(sc.total.toLocaleString("de-DE")) + " Punkte</p>" +
+      '<p class="ga-rec__meta">' + Math.floor(work / 60) + ":" + String(work % 60).padStart(2, "0") + " Workout ohne Laufen · " + sc.stations.length + " Runden · " + esc(cur.category) + "</p>" +
+      sc.stations.map(function (stn, k) {
+        return '<div class="ga-rec__round"><div class="ga-rec__rh">Runde ' + (k + 1) + '</div><div class="ga-rec__row"><span>' + esc(stn.label) + "</span>" +
+          '<button type="button" data-rec-edit="' + esc(stn.key) + '">' + esc(Number(stn.value).toLocaleString("de-DE") + " " + stn.unit) + (stn.points != null ? " · " + stn.points + " P" : "") + "</button></div></div>";
+      }).join("") +
+      '<div class="ga-info__btns"><button type="button" data-rec-add="1">Station nachtragen</button><button type="button" class="is-quiet" data-gi-close="1">Schließen</button></div></div>';
+    document.body.appendChild(box);
+    function close() { box.remove(); }
+    function save(results) {
+      return host.rest("go_hyrox_doubles?id=eq." + encodeURIComponent(cur.id), { method: "PATCH", prefer: "return=minimal", body: { results: results } })
+        .then(function () { cur.results = results; close(); openRec(id, cur.id); paint(); if (host.toast) host.toast("Gespeichert"); })
+        .catch(function () { GoDialog.alert("Speichern ging nicht (go-hyrox-doubles.sql ausgeführt?)"); });
+    }
+    function ask(key) {
+      var ref = GoHyroxDoubles.REFS[key];
+      var hint = key === "farmers" ? " (Runden × 25 m)" : key === "lunges" ? " (Bahnen × 4,5 m)" : "";
+      return GoDialog.prompt(ref.label + " in " + ref.unit + hint, (cur.results || {})[key] != null ? String(cur.results[key]) : "", { ok: "Speichern" }).then(function (v) {
+        if (v == null) return;
+        var res = Object.assign({}, cur.results || {});
+        v = String(v).replace(",", ".").trim();
+        if (v === "") delete res[key];
+        else if (!(Number(v) >= 0)) { GoDialog.alert("Bitte eine Zahl eingeben."); return; }
+        else res[key] = Number(v);
+        return save(res);
+      });
+    }
+    box.addEventListener("click", function (e) {
+      if (e.target === box || e.target.closest("[data-gi-close]")) { close(); return; }
+      var pk = e.target.closest("[data-rec-pick]");
+      if (pk) { close(); openRec(id, pk.getAttribute("data-rec-pick")); return; }
+      var ed = e.target.closest("[data-rec-edit]");
+      if (ed) { ask(ed.getAttribute("data-rec-edit")); return; }
+      if (e.target.closest("[data-rec-add]")) {
+        var have = cur.results || {};
+        var opts = Object.keys(GoHyroxDoubles.REFS).filter(function (k) { return have[k] == null; })
+          .map(function (k) { return { label: GoHyroxDoubles.REFS[k].label, value: k }; });
+        GoDialog.choose("Station nachtragen", opts, { cancel: "Abbrechen" }).then(function (k) { if (k) ask(k); });
+      }
+    });
   }
   /* Wochenplan setzen oder entfernen (z. B. wenn der Coach jemanden aus seinen Coachees genommen hat) */
   var WD = [[1, "Mo"], [2, "Di"], [3, "Mi"], [4, "Do"], [5, "Fr"], [6, "Sa"], [0, "So"]];
@@ -1261,7 +1346,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -1271,6 +1356,7 @@
     if (t.hasAttribute("data-ga-user")) { userMenu(t.getAttribute("data-ga-user")); return; }
     if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
     if (t.hasAttribute("data-ga-plan")) { userPlan(t.getAttribute("data-ga-plan")); return; }
+    if (t.hasAttribute("data-ga-rec")) { openRec(t.getAttribute("data-ga-rec")); return; }
     if (t.hasAttribute("data-gx")) {
       var gx = t.getAttribute("data-gx"), gk = t.getAttribute("data-gk"), gid = t.getAttribute("data-gid");
       if (gx === "coach") orgCoach(gk, gid);
