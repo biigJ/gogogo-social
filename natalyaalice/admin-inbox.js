@@ -113,6 +113,13 @@
     ".ga-filters select{max-width:220px}" +
     "@media (max-width:600px){.ga-filters.is-u{display:grid;grid-template-columns:1fr 1fr}.ga-filters.is-u select{max-width:none;width:100%;min-width:0;font-size:12px;padding:0 6px}}" +
     ".ga-filters select.is-on{background:#111;color:#fff}" +
+    ".ga-us{margin:6px 0 2px}.ga-usbtn{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:13px;font-weight:600;color:#111;cursor:pointer}" +
+    ".ga-usbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ga-usbtn.is-open{background:#111;color:#fff}" +
+    ".ga-uspanel{margin-top:8px;padding:10px;border:1px solid rgba(0,0,0,.12);border-radius:14px;background:#fff;box-shadow:0 6px 20px rgba(0,0,0,.08);max-width:440px}" +
+    ".ga-usrow{display:grid;grid-template-columns:18px minmax(0,1.3fr) minmax(0,1fr) 24px 24px;gap:6px;align-items:center;margin-bottom:8px}" +
+    ".ga-usno{font-size:12px;color:rgba(0,0,0,.45);text-align:center}" +
+    ".ga-usrow select{min-height:34px;min-width:0;padding:0 8px;border-radius:10px;border:1px solid rgba(0,0,0,.2);background:#fff;font:inherit;font-size:13px;color:#111}" +
+    ".ga-usx{width:28px;height:28px;border:0;background:transparent;font-size:18px;line-height:1;color:rgba(0,0,0,.5);cursor:pointer;padding:0}" +
     ".ga-ucount{font-size:13px;color:rgba(42,33,24,.65);margin:4px 0 0}" +
     ".ga-del{margin-left:6px;color:#C7413B;border-color:#C7413B}" +
     ".ga-wa{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:#128C7E;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-grid;place-items:center}" +
@@ -254,7 +261,7 @@
     if (!ids.length) return;
     var base = "go_accounts?id=in.(" + ids.join(",") + ")&select=";
     var more = ",serial_number,invite_code,phone,whatsapp_phone,about_me,training_goal,trainer_id,workout_places,photo_url";
-    host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at,seen_at,ffc_seen_at,is_admin" + more)
+    host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at,seen_at,ffc_seen_at,is_admin,created_at" + more)
       .catch(function () { return host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at" + more); })
       .catch(function () { return host.rest(base + "id,nickname,coach_self_at,coach_verified_at" + more); })
       .catch(function () { return host.rest(base + "id,nickname"); })
@@ -697,6 +704,86 @@
       '<p class="ga-ucount">' + n + " von " + total + " Nutzern" + (on ? ' · <button type="button" class="ga-link" data-ga-uf="reset">Filter zurücksetzen</button>' : "") +
       (f.day && f.day !== NONE && f.day.split("|")[0] >= todayBerlin() && n ? ' · <button type="button" class="ga-link" data-ga-pdfall="1">PDF für alle (' + n + ")</button>" : "") + "</p>";
   }
+  /* Nutzer sortieren wie in Notion: mehrere Sortierungen untereinander, erste gewinnt; gemerkt pro Gerät */
+  var US = [
+    ["name", "Name", "text"], ["nick", "Nickname", "text"], ["role", "Rolle", "rank"], ["created", "Angelegt", "date"],
+    ["seen", "Login gogogo", "date"], ["ffc", "Login Circle", "date"], ["coach", "Coach", "text"], ["goal", "Ziel", "text"],
+    ["place", "Ort", "text"], ["plan", "Wochenplan", "text"], ["group", "Gruppe", "text"], ["circle", "Circle", "text"], ["id", "ID", "num"]
+  ];
+  var US_DEFAULT = [{ k: "role", d: "asc" }, { k: "name", d: "asc" }];
+  var ROLE_RANK = { Inhaber: 0, Admin: 1, "Zertifiziert": 2, Coach: 3, Nutzer: 4 };
+  function usGet() {
+    if (st.us) return st.us;
+    try { var v = JSON.parse(localStorage.getItem("ga_user_sort") || "null"); if (Array.isArray(v)) return (st.us = v); } catch (e) {}
+    return (st.us = US_DEFAULT.map(function (x) { return { k: x.k, d: x.d }; }));
+  }
+  function usSave() { try { localStorage.setItem("ga_user_sort", JSON.stringify(st.us || [])); } catch (e) {} }
+  function usVal(a, k) {
+    var id = String(a.account_id), ci = coachInfo(id), f;
+    if (k === "name") return String(a.name || "");
+    if (k === "nick") return String(ci.nickname || "");
+    if (k === "role") return ROLE_RANK[roleOf(a)];
+    if (k === "created") return String(ci.created_at || "");
+    if (k === "seen") return String(ci.seen_at || "");
+    if (k === "ffc") return String(ci.ffc_seen_at || "");
+    if (k === "id") { var n = parseInt(String(ci.serial_number || "").replace(/\D/g, ""), 10); return isNaN(n) ? null : n; }
+    f = facets(a)[k];
+    return f && f.length ? f.join(", ") : "";
+  }
+  function usCompare(x, y) {
+    var list = usGet();
+    for (var i = 0; i < list.length; i++) {
+      var k = list[i].k, dir = list[i].d === "desc" ? -1 : 1;
+      var a = usVal(x, k), b = usVal(y, k);
+      var ea = a === "" || a == null, eb = b === "" || b == null;
+      if (ea || eb) { if (ea !== eb) return ea ? 1 : -1; continue; } /* leere Werte immer unten */
+      var c = typeof a === "number" ? a - b : String(a).localeCompare(String(b), "de", { numeric: true });
+      if (c) return c * dir;
+    }
+    return 0;
+  }
+  function usDirs(k) {
+    var t = (US.filter(function (u) { return u[0] === k; })[0] || [])[2];
+    if (t === "date") return [["asc", "alt → neu"], ["desc", "neu → alt"]];
+    if (t === "num" || t === "rank") return [["asc", "aufsteigend"], ["desc", "absteigend"]];
+    return [["asc", "A → Z"], ["desc", "Z → A"]];
+  }
+  function usBar() {
+    var list = usGet();
+    var btn = '<button type="button" class="ga-usbtn' + (st.usOpen ? " is-open" : "") + '" data-ga-us="toggle">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/></svg>' +
+      "Sortieren nach" + (list.length ? " · " + list.length : "") + "</button>";
+    if (!st.usOpen) return '<div class="ga-us">' + btn + "</div>";
+    return '<div class="ga-us">' + btn + '<div class="ga-uspanel">' +
+      list.map(function (r, i) {
+        return '<div class="ga-usrow"><span class="ga-usno">' + (i + 1) + "</span>" +
+          '<select data-ga-usk="' + i + '" aria-label="Feld">' + US.map(function (u) {
+            return '<option value="' + u[0] + '"' + (u[0] === r.k ? " selected" : "") + ">" + u[1] + "</option>";
+          }).join("") + "</select>" +
+          '<select data-ga-usd="' + i + '" aria-label="Richtung">' + usDirs(r.k).map(function (d) {
+            return '<option value="' + d[0] + '"' + (d[0] === r.d ? " selected" : "") + ">" + d[1] + "</option>";
+          }).join("") + "</select>" +
+          (i ? '<button type="button" class="ga-usx" data-ga-us="up" data-i="' + i + '" aria-label="nach oben">↑</button>' : '<span class="ga-usx"></span>') +
+          '<button type="button" class="ga-usx" data-ga-us="del" data-i="' + i + '" aria-label="Sortierung entfernen">×</button></div>';
+      }).join("") +
+      '<button type="button" class="ga-link" data-ga-us="add">+ Sortierung hinzufügen</button>' +
+      (list.length ? ' · <button type="button" class="ga-link" data-ga-us="clear">Sortierung löschen</button>' : "") +
+      "</div></div>";
+  }
+  function onUserSort(t) {
+    var act = t.getAttribute("data-ga-us"), i = parseInt(t.getAttribute("data-i"), 10);
+    var list = usGet();
+    if (act === "toggle") st.usOpen = !st.usOpen;
+    else if (act === "add") {
+      var used = list.map(function (r) { return r.k; });
+      var next = US.filter(function (u) { return used.indexOf(u[0]) === -1; })[0];
+      if (next) list.push({ k: next[0], d: "asc" });
+    } else if (act === "del") list.splice(i, 1);
+    else if (act === "up" && i > 0) { var tmp = list[i - 1]; list[i - 1] = list[i]; list[i] = tmp; }
+    else if (act === "clear") list.length = 0;
+    usSave();
+    paint();
+  }
   function paintCoaches() {
     if (!st.coachInfo) loadCoachInfo();
     if (!st.links) loadLinks();
@@ -705,8 +792,7 @@
     if (!st.cw) loadCw();
     if (!st.goals) loadGoals();
     var accs = (st.accounts || []).slice().sort(function (x, y) {
-      if (isCoachAcc(y) !== isCoachAcc(x)) return isCoachAcc(y) ? 1 : -1;
-      return String(x.name || "").localeCompare(String(y.name || ""), "de");
+      return usCompare(x, y) || String(x.name || "").localeCompare(String(y.name || ""), "de");
     });
     var nameOf = function (aid) {
       var hit = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(aid); })[0];
@@ -718,7 +804,7 @@
     var total = accs.length;
     accs = accs.filter(function (a) { return qMatch("coaches", a.account_id, a.name) && ufMatch(a); });
     return '<div class="ga-tk__top"><button type="button" class="ga-btn5 is-dark" data-ga-new="1">Neu</button></div>' +
-      '<p class="cp-hint">Profilbild: alles zur Person. Pille rechts: Rolle ändern, pausieren oder löschen. Circle: Aufzeichnungen. QR: Login-Karte.</p>' + searchBar("coaches") + ufBar(accs.length, total) +
+      '<p class="cp-hint">Profilbild: alles zur Person. Pille rechts: Rolle ändern, pausieren oder löschen. Circle: Aufzeichnungen. QR: Login-Karte.</p>' + searchBar("coaches") + usBar() + ufBar(accs.length, total) +
       accs.map(function (a) {
         var id = String(a.account_id);
         var ci = coachInfo(id);
@@ -2037,7 +2123,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall],[data-ga-us]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -2058,6 +2144,7 @@
     if (t.hasAttribute("data-ga-plan")) { userPlan(t.getAttribute("data-ga-plan")); return; }
     if (t.hasAttribute("data-ga-rec")) { openRec(t.getAttribute("data-ga-rec")); return; }
     if (t.getAttribute("data-ga-uf") === "reset") { st.uf = {}; paint(); return; }
+    if (t.hasAttribute("data-ga-us")) { onUserSort(t); return; }
     if (t.hasAttribute("data-ga-nfreset")) { st.nf[t.getAttribute("data-ga-nfreset")] = {}; paint(); return; }
     if (t.hasAttribute("data-gx")) {
       var gx = t.getAttribute("data-gx"), gk = t.getAttribute("data-gk"), gid = t.getAttribute("data-gid");
@@ -2143,6 +2230,15 @@
   }
 
   function onChange(e) {
+    var usk = e.target && e.target.closest ? e.target.closest("select[data-ga-usk],select[data-ga-usd]") : null;
+    if (usk && st) {
+      var ui = parseInt(usk.getAttribute("data-ga-usk") || usk.getAttribute("data-ga-usd"), 10), ul = usGet();
+      if (ul[ui]) {
+        if (usk.hasAttribute("data-ga-usk")) { ul[ui].k = usk.value; ul[ui].d = "asc"; } else ul[ui].d = usk.value;
+        usSave(); paint();
+      }
+      return;
+    }
     var uf = e.target && e.target.closest ? e.target.closest("select[data-ga-uf]") : null;
     if (uf && st) { st.uf = st.uf || {}; st.uf[uf.getAttribute("data-ga-uf")] = uf.value; paint(); return; }
     var tid = e.target && e.target.id;
