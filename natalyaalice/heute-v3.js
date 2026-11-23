@@ -3249,16 +3249,15 @@
     function target() {
       var el = document.querySelector(".acc-card.acc-snap");
       if (!el) return null;
-      var row = document.querySelector(".heute-filter-row");
-      var headerH = row ? row.getBoundingClientRect().height || 0 : 0;
       var r = el.getBoundingClientRect();
       if (!r.height) return null;
-      return { delta: r.top + r.height / 2 - (headerH + (window.innerHeight - headerH) / 2), radius: Math.max(120, r.height * CATCH_R) };
+      /* Karte mittig auf dem ganzen Screen: oben und unten blitzen die Nachbarbeiträge */
+      return { delta: r.top + r.height / 2 - window.innerHeight / 2, radius: Math.max(120, r.height * CATCH_R) };
     }
     function glide(delta) {
       var from = scroller.scrollTop || 0;
       var to = Math.max(0, from + delta);
-      var t0 = 0, dur = Math.min(520, 260 + Math.abs(delta));
+      var t0 = 0, dur = Math.min(1040, 520 + 2 * Math.abs(delta)); /* halb so schnell wie zuvor */
       anim++;
       var my = anim;
       /* Schwung stoppen: iOS hält beim kurzen overflow hidden an */
@@ -3344,8 +3343,8 @@
       if (!el) return;
       var rect = el.getBoundingClientRect();
       if (!rect.height && !rect.width) return;
-      var headerH = row ? row.getBoundingClientRect().height || 0 : 0;
-      var mid = headerH + (window.innerHeight - headerH) / 2;
+      /* Mitte des ganzen Screens, wie der Magnet (bindMagnet) */
+      var mid = window.innerHeight / 2;
       var elMid = rect.top + rect.height / 2;
       var delta = elMid - mid;
       if (Math.abs(delta) < 4) return;
