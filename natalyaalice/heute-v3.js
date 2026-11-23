@@ -191,7 +191,10 @@
         "&select=id,event_id,to_id,status,decided_at,events(title)&order=decided_at.desc&limit=20").catch(function () { return []; }),
       rest("go_coachee_requests?and=(or(coach_id.eq." + me() + ",user_id.eq." + me() + "),or(status.eq.pending,created_at.gte." + since + ",decided_at.gte." + since + "))" +
         "&select=id,user_id,coach_id,status,created_at,decided_at&order=created_at.desc&limit=20").catch(function () { return []; }),
-      rest("go_messages?or=(to_id.is.null,to_id.eq." + me() + ")&created_at=gte." + sinceQ + "&select=id,body,created_at&order=created_at.desc&limit=20").catch(function () { return []; })
+      rest("go_messages?or=(to_id.is.null,to_id.eq." + me() + ")&created_at=gte." + sinceQ + "&select=id,body,created_at&order=created_at.desc&limit=20").catch(function () { return []; }),
+      /* Kommentare anderer unter meinen Events */
+      rest("event_comments?account_id=neq." + uid + "&created_at=gte." + sinceQ + "&events.user_id=eq." + uid +
+        "&select=id,event_id,account_id,text,created_at,reply_to_account,events!inner(user_id,title)&order=created_at.desc&limit=30").catch(function () { return []; })
     ];
     var ST = { accepted: "angenommen", declined: "abgelehnt", withdrawn: "zurückgezogen" };
     return Promise.all(jobs).then(function (r) {
@@ -237,6 +240,13 @@
         out.push({ kind: "msg", created_at: plans[0].created_at, past: true, label: "Es gibt neue Trainingspläne.",
           open: function () { if (global.GoDialog) GoDialog.alert("Es gibt neue Trainingspläne.", { body: names.join(", ") + "\n\nDu findest sie unter Woche → Stift → Wochenplan ändern." }); } });
       } else restMsgs = restMsgs.concat(plans);
+      (r[6] || []).forEach(function (c) {
+        /* Antworten an mich kommen schon als „reply“ */
+        if (String(c.reply_to_account || "") === me()) return;
+        out.push({ kind: "comment", created_at: c.created_at, account_id: c.account_id, past: false,
+          labelFn: function () { return first(c.account_id) + " kommentiert " + ((c.events && c.events.title) || "Dein Event") + ": „" + String(c.text || "").slice(0, 80) + "“"; },
+          open: function () { openReplyEvent(c.event_id); } });
+      });
       restMsgs.forEach(function (m) {
         out.push({ kind: "msg", created_at: m.created_at, past: true, label: String(m.body || "Mitteilung").slice(0, 120),
           open: function () { if (global.GoDialog) GoDialog.alert(String(m.body || "")); } });
