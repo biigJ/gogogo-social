@@ -2896,7 +2896,8 @@
       background: transparent;
     }
     .team-pencil svg { width: 16px; height: 16px; display: block; }
-    .team-msg { margin-top: 8px; min-height: 1.2em; color: #C7413B; }
+    /* Meldungen in Dialogen im gogogo-Stil (Tinte), nicht rot */
+    .team-msg { margin-top: 8px; min-height: 1.2em; color: inherit; }
     .orte-search, .invite-place, .team-id {
       width: 100%;
       min-height: 46px;
@@ -8588,7 +8589,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-120"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-123"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-85"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -15217,6 +15218,10 @@
       }
 
       function gogogoToast(msg) {
+        /* Meldung im gleichen Dialog wie die Meldungen am Herz (GoDialog) */
+        if (window.GoDialog && GoDialog.alert) {
+          try { GoDialog.alert(String(msg || ""), { center: true }); return; } catch (eGD) {}
+        }
         var modal = document.getElementById("gogogo-toast");
         var el = document.getElementById("gogogo-toast-msg");
         if (!modal || !el) {
@@ -25347,19 +25352,19 @@
                 loadFriendRequests().then(function () { return friendReqs.incoming || []; }).catch(function () { return []; }),
                 loadCoachRequests().then(function () { return coachReqs.incoming || []; }).catch(function () { return []; })]).then(function (r) {
                 return (r[0] || []).map(function (gi) {
-                  return { kind: "group", created_at: gi.created_at, open: function () { openGroupInvite(gi); } };
+                  return { kind: "group", created_at: gi.created_at, label: String(gi.owner_name || "Jemand").split(" ")[0] + " lädt Dich in die Gruppe " + (gi.name || "") + " ein", open: function () { openGroupInvite(gi); } };
                 }).concat((r[1] || []).map(function (gr) {
-                  return { kind: "groupjoin", created_at: gr.created_at, open: function () { openGroupJoinRequest(gr); } };
+                  return { kind: "groupjoin", created_at: gr.created_at, label: String(gr.name || gr.nickname || "Jemand").split(" ")[0] + " möchte Deiner Gruppe " + (gr.group_name || "") + " beitreten", open: function () { openGroupJoinRequest(gr); } };
                 })).concat((r[3] || []).map(function (gn) {
-                  return { kind: "groupnews", created_at: gn.accepted_at, open: function () { openGroupNews(gn); } };
+                  return { kind: "groupnews", created_at: gn.accepted_at, label: gn.mine ? "Du bist jetzt in der Gruppe " + (gn.group_name || "") : (String(gn.name || "").split(" ")[0] || "Jemand") + " ist jetzt in Deiner Gruppe " + (gn.group_name || ""), open: function () { openGroupNews(gn); } };
                 })).concat((r[2] || []).map(function (lr) {
-                  return { kind: "stamplink", created_at: lr.created_at, open: function () { openStampLinkRequest(lr); } };
+                  return { kind: "stamplink", created_at: lr.created_at, label: String(lr.from_name || "Dein Coach").split(" ")[0] + " verknüpft die Stempelkarten der Gruppe " + (lr.group_name || ""), open: function () { openStampLinkRequest(lr); } };
                 })).concat((r[4] || []).map(function (cn) {
-                  return { kind: "circlenews", created_at: cn.created_at, open: function () { openCircleNews(cn); } };
+                  return { kind: "circlenews", created_at: cn.created_at, label: "Neues Circle-Event" + (cn.circle_name ? " in " + cn.circle_name : ""), open: function () { openCircleNews(cn); } };
                 })).concat((r[5] || []).map(function (fr) {
-                  return { kind: "friend", created_at: fr.created_at, open: function () { askFriendRequest(fr); } };
+                  return { kind: "friend", created_at: fr.created_at, label: String(((fr.person || {}).name) || "Jemand").split(" ")[0] + " möchte mit Dir befreundet sein", photo: (fr.person || {}).photo_url || "", open: function () { askFriendRequest(fr); } };
                 })).concat((r[6] || []).map(function (cr) {
-                  return { kind: "coachee", created_at: cr.created_at, open: function () { askCoachRequest(cr); } };
+                  return { kind: "coachee", created_at: cr.created_at, label: String(((cr.person || {}).name) || "Jemand").split(" ")[0] + " möchte Dich als Coach", photo: (cr.person || {}).photo_url || "", open: function () { askCoachRequest(cr); } };
                 }));
               });
             },

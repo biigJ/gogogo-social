@@ -5047,25 +5047,86 @@
     var replies = rest(
       "event_comments?reply_to_account=eq." + encodeURIComponent(me()) +
         "&account_id=neq." + encodeURIComponent(me()) +
-        "&select=id,event_id,created_at&order=created_at.desc&limit=1"
+        "&select=id,event_id,account_id,created_at&order=created_at.desc&limit=20"
     ).catch(function () { return null; });
     var invites = rest(
       "go_workout_invites?to_id=eq." + encodeURIComponent(me()) +
         "&status=eq.pending&event_id=not.is.null&workout_date=gte." + encodeURIComponent(todayIso()) +
-        "&select=id,event_id,created_at&order=created_at.desc&limit=1"
+        "&select=id,event_id,from_id,workout_label,workout_date,created_at&order=created_at.desc&limit=20"
     ).catch(function () { return null; });
     var extra = host && host.heartNotices ? Promise.resolve(host.heartNotices()).catch(function () { return []; }) : Promise.resolve([]);
     var bub = latestBubbleNews().catch(function () { return null; });
     return Promise.all([replies, invites, extra, bub]).then(function (r) {
       var list = [];
-      if (r[0] && r[0][0]) list.push(Object.assign({ kind: "reply" }, r[0][0]));
-      if (r[1] && r[1][0]) list.push(Object.assign({ kind: "invite" }, r[1][0]));
+      (r[0] || []).forEach(function (x) { list.push(Object.assign({ kind: "reply" }, x)); });
+      (r[1] || []).forEach(function (x) { list.push(Object.assign({ kind: "invite" }, x)); });
       (r[2] || []).forEach(function (x) { if (x && x.created_at) list.push(x); });
       if (r[3]) list.push(r[3]);
       list.sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); });
       state.lastReply = list[0] || null;
       state.heartList = list;
       paintReplyHeart();
+      var pids = [];
+      list.forEach(function (x) { if (x.account_id) pids.push(String(x.account_id)); if (x.from_id) pids.push(String(x.from_id)); });
+      if (pids.length) return ensurePeople(pids).catch(function () {});
+    });
+  }
+  function heartLabel(x) {
+    if (x.label) return x.label;
+    var first = function (id) { return String(personOf(id).name || "Jemand").split(" ")[0]; };
+    if (x.kind === "reply") return first(x.account_id) + " hat auf Deinen Kommentar geantwortet";
+    if (x.kind === "invite") return first(x.from_id) + " lädt Dich ein" + (x.workout_label ? ": " + x.workout_label : "");
+    if (x.kind === "bubble") return "Neues in Deiner Bubble";
+    return "Neue Meldung";
+  }
+  function heartWhen(at) {
+    var d = new Date(at);
+    if (isNaN(d.getTime())) return "";
+    var day = dayKey(at), t = todayIso();
+    var y = new Date(t + "T12:00:00"); y.setDate(y.getDate() - 1);
+    var lab = day === t ? "Heute" : day === y.toLocaleDateString("en-CA") ? "Gestern" : d.toLocaleDateString("de-DE", { day: "numeric", month: "numeric", timeZone: "Europe/Berlin" });
+    return lab + ", " + d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+  }
+  /* Herz: alle Meldungen als Liste, neueste oben, ohne Überschrift; neue mit Punkt */
+  function openHeartList(list) {
+    var seen = replySeen();
+    var old = document.querySelector(".hl-wrap");
+    if (old) old.remove();
+    if (!document.getElementById("hl-css")) {
+      var st = document.createElement("style");
+      st.id = "hl-css";
+      st.textContent =
+        ".hl-wrap{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(20,16,12,.42)}" +
+        ".hl-card{width:min(100%,400px);max-height:80vh;overflow-y:auto;box-sizing:border-box;background:#F3EEE4;color:#2A2118;border-radius:22px;padding:10px 16px 14px;font-family:Inter,system-ui,sans-serif;box-shadow:0 18px 50px rgba(0,0,0,.25)}" +
+        ".hl-row{display:flex;align-items:flex-start;gap:10px;width:100%;padding:12px 0;border:0;border-bottom:1px solid rgba(42,33,24,.12);background:none;text-align:left;color:inherit;font:inherit;cursor:pointer}" +
+        ".hl-row:last-of-type{border-bottom:0}" +
+        ".hl-dot{flex:none;width:8px;height:8px;margin-top:7px;border-radius:50%;background:transparent}.hl-row.is-new .hl-dot{background:#E5383B}" +
+        ".hl-txt{font-size:15px;font-weight:500;line-height:1.35}.hl-row.is-new .hl-txt{font-weight:700}" +
+        ".hl-when{display:block;margin-top:2px;font-size:12px;color:rgba(42,33,24,.6)}" +
+        ".hl-close{display:block;width:100%;min-height:44px;margin-top:8px;border:1.5px solid #2A2118;border-radius:999px;background:transparent;color:#2A2118;font:600 15px Inter,system-ui,sans-serif;cursor:pointer}";
+      document.head.appendChild(st);
+    }
+    var wrap = document.createElement("div");
+    wrap.className = "hl-wrap";
+    wrap.innerHTML = '<div class="hl-card" role="dialog" aria-label="Meldungen">' + list.map(function (x, i) {
+      var isNew = String(x.created_at || "") > seen;
+      return '<button type="button" class="hl-row' + (isNew ? " is-new" : "") + '" data-hl="' + i + '"><span class="hl-dot"></span><span><span class="hl-txt">' +
+        esc(heartLabel(x)) + '</span><span class="hl-when">' + esc(heartWhen(x.created_at)) + "</span></span></button>";
+    }).join("") + '<button type="button" class="hl-close">Schließen</button></div>';
+    document.body.appendChild(wrap);
+    /* geöffnet = gelesen (roter Punkt am Herz aus) */
+    try { localStorage.setItem(replySeenKey(), String(list[0].created_at)); } catch (e) {}
+    paintReplyHeart();
+    wrap.addEventListener("click", function (e) {
+      var row = e.target.closest(".hl-row");
+      if (row) {
+        var x = list[Number(row.getAttribute("data-hl"))];
+        wrap.remove();
+        if (x && typeof x.open === "function") { x.open(); return; }
+        if (x && x.event_id) openReplyEvent(x.event_id);
+        return;
+      }
+      if (e.target.closest(".hl-close") || e.target === wrap) wrap.remove();
     });
   }
   function replyThreadText(eventId) {
@@ -5128,9 +5189,14 @@
       if (typeof r.open === "function") { r.open(); return; }
       openReplyEvent(r.event_id);
     }
-    if (state.lastReply) { go(state.lastReply); return; }
+    function show() {
+      var list = (state.heartList || []).slice().sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); });
+      if (list.length) { openHeartList(list); return; }
+      go(list[0] || null);
+    }
+    if (state.heartList && state.heartList.length) { show(); return; }
     state.repliesAt = 0;
-    checkReplies().then(function () { go(state.lastReply); });
+    checkReplies().then(show);
   }
   document.addEventListener("click", function (e) {
     if (e.target && e.target.closest && e.target.closest("#heute-replies")) { e.preventDefault(); onReplyHeart(); }
