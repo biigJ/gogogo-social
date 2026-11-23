@@ -588,15 +588,15 @@
     if (typeof v === "string") { try { v = JSON.parse(v); } catch (e) { v = {}; } }
     return v && typeof v === "object" ? v : {};
   }
-  /* Pille rechts: Nutzer (leer) · Coach (gefüllt) · Coach mit blauem c (blau) · Anfrage Coach */
+  /* Pille rechts: Nutzer (leer) · Coach (schwarz: als Coach angemeldet, auch per „Ich als Coach“) · Zertifikat (blau: zertifizierter Coach) */
   function rolePill(a) {
     var id = String(a.account_id);
     var ci = coachInfo(id);
     /* Rolle (Coach/Nutzer) oben, darunter Inhaber bzw. Admin als eigene Pille: Admin geht auch ohne Coach */
     var base;
-    if (ci.coach_verified_at) base = '<button type="button" class="ga-pill is-blue" data-ga-role="' + esc(id) + '">Coach</button>';
+    if (ci.coach_verified_at) base = '<button type="button" class="ga-pill is-blue" data-ga-role="' + esc(id) + '">Zertifikat</button>';
     else if (isCoachAcc(a)) base = '<button type="button" class="ga-pill is-fill" data-ga-role="' + esc(id) + '">Coach</button>';
-    else if (coachRequested(id)) base = '<button type="button" class="ga-pill" data-ga-req="' + esc(id) + '">Anfrage Coach</button>';
+    else if (coachRequested(id)) base = '<button type="button" class="ga-pill is-fill" data-ga-req="' + esc(id) + '">Coach</button>';
     else base = '<button type="button" class="ga-pill" data-ga-user="' + esc(id) + '">' + (ci.paused_at ? "Pausiert" : "Nutzer") + "</button>";
     var adm = id === OWNER_ID ? '<button type="button" class="ga-pill is-owner" data-ga-admin="' + esc(id) + '">Inhaber</button>'
       : ci.is_admin ? '<button type="button" class="ga-pill is-admin" data-ga-admin="' + esc(id) + '">Admin</button>' : "";
@@ -616,7 +616,7 @@
     if (String(a.account_id) === OWNER_ID) return "Inhaber";
     if (ci.is_admin) return "Admin";
     if (ci.coach_verified_at) return "Zertifiziert";
-    return isCoachAcc(a) ? "Coach" : "Nutzer";
+    return isCoachAcc(a) || coachRequested(String(a.account_id)) ? "Coach" : "Nutzer";
   }
   function loginOf(a) {
     var ci = coachInfo(String(a.account_id));
