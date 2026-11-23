@@ -5170,7 +5170,7 @@
       if (host && host.syncHeuteFilterOptions) host.syncHeuteFilterOptions();
       else {
         sel.innerHTML =
-          '<option value="ich">Ich</option>' +
+          '<option value="ich">Nur Ich</option>' +
           '<option value="team">Community</option>' +
           '<option value="alles">Alles</option>';
       }
