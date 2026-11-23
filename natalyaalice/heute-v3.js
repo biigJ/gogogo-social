@@ -4801,8 +4801,7 @@
       openPartnerSheet(zp.getAttribute("data-zpartner"));
       return;
     }
-    /* Kraft-/Ausdauer-Event antippen: vergangen → gespeicherte Übungen, heute/später → Workout tracken.
-       Eingeladene/Teilnehmer tracken die Einheit des Erstellers unter ihrem eigenen Profil. */
+    /* Event-Bild antippen: nur Stempelkarte (heute, aktive Karte). */
     var visDots = t.closest("[data-vis-ev]");
     if (visDots) {
       e.preventDefault();
@@ -4820,53 +4819,8 @@
           host.openStampCard(evA)) {
         return;
       }
-      if (evA && (evA.category === "kraft" || evA.category === "ausdauer")) {
-        var evIso = new Date(evA.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
-        var mine = String(evA.user_id) === me();
-        var joined = !mine && (iAmGoing(evA.id) || !!inviteFor(evA.id));
-        if (evIso < todayIso() && global.GoKraftTracking) {
-          var names = {};
-          var authorEl = cardW.querySelector(".acc-card__author span");
-          if (authorEl) names[String(evA.user_id)] = authorEl.textContent;
-          GoKraftTracking.openDay({
-            people: mine ? [me()] : [String(evA.user_id)].concat(joined ? [me()] : []),
-            names: names,
-            iso: evIso,
-            title: ((cardW.querySelector(".acc-card__title") || {}).textContent || evA.title || "").trim()
-          });
-          return;
-        }
-        if ((mine || joined) && evIso === todayIso() && evA.status !== "erledigt") {
-          startEvent(evA);
-          return;
-        }
-        if ((mine || joined) && evA.course_id && host.openEventWorkout && evA.category === "kraft") {
-          host.openEventWorkout(evA);
-          return;
-        }
-      }
-      /* Diverses von heute: „Schreib, wie es war“ */
-      if (evA && String(evA.user_id) === me() && evA.category === "alternative" && evA.status !== "erledigt" &&
-          new Date(evA.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }) === todayIso()) {
-        startEvent(evA);
-        return;
-      }
-      /* Tagesplan-Karte (Wochenplan ohne Event) → gleichnamige Einheit bzw. Historie */
-      var planCard = mediaHit.closest(".acc-card[data-plan-iso]");
-      if (planCard && host.openEventWorkout) {
-        var pIso = planCard.getAttribute("data-plan-iso");
-        var pCat = mediaHit.classList.contains("tone-ausdauer") ? "ausdauer"
-          : mediaHit.classList.contains("tone-kraft-basics") ? "kraft" : "";
-        var pTitle = ((planCard.querySelector(".acc-card__title") || {}).textContent || "").trim();
-        if (pCat && pTitle && pIso && pIso < todayIso() && global.GoKraftTracking) {
-          GoKraftTracking.openDay({ people: [me()], iso: pIso, title: pTitle });
-          return;
-        }
-        if (pCat && pTitle && pIso) {
-          host.openEventWorkout({ title: pTitle, category: pCat, starts_at: pIso + "T12:00:00+01:00" });
-          return;
-        }
-      }
+      /* Sonst ist das Bild nicht aktiv: Start nur über den Kreis unten links oder „Start“ */
+      return;
     }
     var onl = t.closest("[data-online-join]");
     if (onl) {
