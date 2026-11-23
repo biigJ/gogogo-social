@@ -3226,10 +3226,12 @@
     );
   }
 
-  /* Magnet aufs aktuelle Event, ohne CSS-Snap (der bremste auf iOS jeden Schwung):
-     erst wenn der Finger weg ist und der Schwung von selbst ausläuft, prüfen, ob die Karte
-     nah an der Mitte steht (MAGNET px), dann weich hinziehen. Schneller Wisch endet weit weg → nichts. */
-  var MAGNET = 140;
+  /* Magnet aufs aktuelle Event wie eine Roulettekugel, ohne CSS-Snap (der bremste auf iOS jeden Schwung):
+     - Finger weg, Feed rollt aus: kommt die Karte langsam genug (CATCH_V) in die Nähe der Mitte, wird der
+       Schwung abgefangen und sie gleitet mit Ausrollen in die Mitte.
+     - Schneller Schwung rauscht drüber. Bleibt der Feed von selbst nah daneben stehen, zieht es nach. */
+  var CATCH_V = 1.6;   /* px pro ms, darunter fängt der Magnet ein */
+  var CATCH_R = 0.55;  /* Fangradius als Anteil der Kartenhöhe */
   function markSnapCard() {
     var el = currentEventCard();
     [].forEach.call(document.querySelectorAll(".acc-card.acc-snap"), function (c) {
@@ -3243,27 +3245,70 @@
     var scroller = welcomeScrollEl();
     if (!scroller || scroller._magnetBound) return;
     scroller._magnetBound = true;
-    var touching = false, idle = null;
-    function check() {
-      idle = null;
-      if (touching || document.body.dataset.shell !== "heute") return;
-      if (Date.now() < (state.progScrollUntil || 0)) return;
+    var touching = false, idle = null, anim = 0, lastY = 0, lastT = 0, v = 0;
+    function target() {
       var el = document.querySelector(".acc-card.acc-snap");
-      if (!el) return;
+      if (!el) return null;
       var row = document.querySelector(".heute-filter-row");
       var headerH = row ? row.getBoundingClientRect().height || 0 : 0;
       var r = el.getBoundingClientRect();
-      if (!r.height) return;
-      var delta = r.top + r.height / 2 - (headerH + (window.innerHeight - headerH) / 2);
-      if (Math.abs(delta) < 3 || Math.abs(delta) > MAGNET) return;
-      state.progScrollUntil = Date.now() + 600;
-      scroller.scrollTo({ top: Math.max(0, scroller.scrollTop + delta), behavior: "smooth" });
+      if (!r.height) return null;
+      return { delta: r.top + r.height / 2 - (headerH + (window.innerHeight - headerH) / 2), radius: Math.max(120, r.height * CATCH_R) };
     }
-    function later() { if (idle) clearTimeout(idle); idle = setTimeout(check, 140); }
-    scroller.addEventListener("touchstart", function () { touching = true; if (idle) clearTimeout(idle); }, { passive: true });
-    scroller.addEventListener("touchend", function () { touching = false; later(); }, { passive: true });
-    scroller.addEventListener("touchcancel", function () { touching = false; later(); }, { passive: true });
-    scroller.addEventListener("scroll", function () { if (!touching) later(); }, { passive: true });
+    function glide(delta) {
+      var from = scroller.scrollTop || 0;
+      var to = Math.max(0, from + delta);
+      var t0 = 0, dur = Math.min(520, 260 + Math.abs(delta));
+      anim++;
+      var my = anim;
+      /* Schwung stoppen: iOS hält beim kurzen overflow hidden an */
+      scroller.style.overflowY = "hidden";
+      state.progScrollUntil = Date.now() + dur + 200;
+      function step(ts) {
+        if (my !== anim) return;
+        if (!t0) t0 = ts;
+        var k = Math.min(1, (ts - t0) / dur);
+        var e = 1 - Math.pow(1 - k, 3);
+        scroller.scrollTop = from + (to - from) * e;
+        if (k < 1) requestAnimationFrame(step);
+        else { scroller.style.overflowY = ""; anim++; }
+      }
+      requestAnimationFrame(step);
+    }
+    function stopGlide() {
+      if (!scroller.style.overflowY) return;
+      anim++;
+      scroller.style.overflowY = "";
+    }
+    function settle() {
+      idle = null;
+      if (touching || document.body.dataset.shell !== "heute" || scroller.style.overflowY) return;
+      var t = target();
+      if (t && Math.abs(t.delta) > 3 && Math.abs(t.delta) < t.radius) glide(t.delta);
+    }
+    scroller.addEventListener("touchstart", function () {
+      touching = true;
+      stopGlide();
+      if (idle) clearTimeout(idle);
+    }, { passive: true });
+    function lift() { touching = false; if (idle) clearTimeout(idle); idle = setTimeout(settle, 160); }
+    scroller.addEventListener("touchend", lift, { passive: true });
+    scroller.addEventListener("touchcancel", lift, { passive: true });
+    scroller.addEventListener("wheel", function () { if (idle) clearTimeout(idle); idle = setTimeout(settle, 200); }, { passive: true });
+    scroller.addEventListener("scroll", function () {
+      var now = performance.now(), y = scroller.scrollTop || 0;
+      if (lastT && now - lastT < 100) v = Math.abs(y - lastY) / Math.max(1, now - lastT); else v = 99;
+      lastY = y; lastT = now;
+      if (touching || scroller.style.overflowY || document.body.dataset.shell !== "heute") return;
+      if (Date.now() < (state.progScrollUntil || 0)) return;
+      if (idle) clearTimeout(idle);
+      idle = setTimeout(settle, 160);
+      /* im Ausrollen: langsam genug über der Karte → einfangen */
+      if (v < CATCH_V) {
+        var t = target();
+        if (t && Math.abs(t.delta) < t.radius && Math.abs(t.delta) > 3) glide(t.delta);
+      }
+    }, { passive: true });
   }
 
   function currentEventCard() {
