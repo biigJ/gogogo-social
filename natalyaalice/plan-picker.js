@@ -73,6 +73,8 @@
     ".gpl__back{width:44px;height:44px;border:0;background:transparent;color:inherit;display:grid;place-items:center;padding:0;cursor:pointer}" +
     ".gpl__body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:6px 16px calc(28px + env(safe-area-inset-bottom))}" +
     ".gpl__lead{margin:4px 0 14px;font-size:15px;line-height:1.4}" +
+    ".gpl__tier{display:flex;align-items:center;gap:14px;margin:4px 0 14px}.gpl__pyr{flex:none;width:64px;height:46px;color:#2A2118}" +
+    ".gpl__tier small{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:rgba(42,33,24,.6)}.gpl__tier b{display:block;font:600 20px/1.2 'Playfair Display',Georgia,serif}.gpl__tier span{display:block;font-size:14px;color:rgba(42,33,24,.7)}" +
     ".gpl__goals{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0 0 12px}" +
     ".gpl__goals .gpl__goal{margin:0;padding:10px 12px;min-width:0}.gpl__goal>span:last-child{min-width:0;overflow-wrap:anywhere;hyphens:auto}.gpl__goals .gpl__goal b{font-size:14px;line-height:1.25}" +
     ".gpl__goal{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:0 0 8px;padding:12px 14px;border-radius:14px;border:1.5px solid rgba(42,33,24,.2);background:#F6F1E8;color:inherit;font:inherit;cursor:pointer}" +
@@ -200,19 +202,51 @@
   }
 
   /* ---------- Schritte ---------- */
+  /* Ziele in drei Pyramiden-Schritten: Fundament → Wohlbefinden → Leistung (Schlüssel bleiben GOALS) */
+  var TIERS = [
+    { name: "Fundament", sub: "Gesund und schmerzfrei", keys: ["gesund", "schmerzfrei", "ruecken", "haltung", "gelenke", "beweglich", "balance", "praevention", "comeback", "knochen", "sturz", "schwangerschaft"] },
+    { name: "Wohlbefinden", sub: "Energie, Kopf und Freude", keys: ["energie", "schlaf", "stress", "kopf", "routine", "longevity", "selbstbewusst", "leute", "natur", "spielerisch", "tanzen"] },
+    { name: "Leistung", sub: "Stärker, schneller, ein konkretes Ziel", keys: ["abnehmen", "muskelaufbau", "muskeln", "herz", "laufen", "hybrid", "hyrox", "halbmarathon", "klimmzug", "bouldern", "schwimmen"] }
+  ];
+  /* neue Ziele ohne Stufe landen im Fundament */
+  GOALS.forEach(function (g) {
+    if (!TIERS.some(function (t) { return t.keys.indexOf(g.key) !== -1; })) TIERS[0].keys.push(g.key);
+  });
+
+  function pyramidSvg(on) {
+    /* Stufe 0 unten (breit) … Stufe 2 oben (Spitze) */
+    var rows = [
+      '<path d="M4 44h56l-7-13H11z"/>',
+      '<path d="M12 29h40l-7-13H19z"/>',
+      '<path d="M20 14h24L32 1z"/>'
+    ];
+    return '<svg class="gpl__pyr" viewBox="0 0 64 46" aria-hidden="true">' + rows.map(function (r, i) {
+      return r.replace("<path", '<path fill="currentColor" opacity="' + (i === on ? "1" : i < on ? ".55" : ".18") + '"');
+    }).join("") + "</svg>";
+  }
+
   function paintGoals() {
     st.step = "goals";
     st.title.textContent = "Dein Ziel";
+    var n = Math.max(0, Math.min(2, st.goalStep || 0));
+    st.goalStep = n;
+    var tier = TIERS[n];
+    var list = GOALS.filter(function (g) { return tier.keys.indexOf(g.key) !== -1; });
+    var last = n === 2;
     st.body.innerHTML =
-      '<p class="gpl__lead">Was ist wichtig? Mehrauswahl möglich.</p><div class="gpl__goals">' +
-      GOALS.map(function (g) {
+      '<div class="gpl__tier">' + pyramidSvg(n) + '<div><small>Schritt ' + (n + 1) + " von 3</small><b>" + esc(tier.name) + "</b><span>" + esc(tier.sub) + "</span></div></div>" +
+      '<div class="gpl__goals">' +
+      list.map(function (g) {
         var on = st.goals.indexOf(g.key) !== -1;
         return '<button type="button" class="gpl__goal' + (on ? " is-on" : "") + '" data-gpp-goal="' + g.key + '">' +
           '<span class="gpl__tick">' + (on ? "✓" : "") + "</span><span><b>" + esc(g.label) + "</b>" + (g.sub ? "<small>" + esc(g.sub) + "</small>" : "") + "</span></button>";
       }).join("") + "</div>" +
-      '<input type="text" class="gpl__own" id="gpl-own-goal" maxlength="60" placeholder="Oder eigenes Ziel eingeben" value="' + esc(st.ownGoal || "") + '" />' +
-      '<button type="button" class="gpl__btn" data-gpp-next>' + (st.goals.length ? "Passende Pläne zeigen" : "Alle Pläne zeigen") + "</button>" +
-      (st.mode === "self" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-indiv>Individuell</button>' : "");
+      (last ? '<input type="text" class="gpl__own" id="gpl-own-goal" maxlength="60" placeholder="Oder eigenes Ziel eingeben" value="' + esc(st.ownGoal || "") + '" />' : "") +
+      (last
+        ? '<button type="button" class="gpl__btn" data-gpp-next>' + (st.goals.length ? "Passende Pläne zeigen" : "Alle Pläne zeigen") + "</button>"
+        : '<button type="button" class="gpl__btn" data-gpp-tier="' + (n + 1) + '">Weiter</button>') +
+      (n > 0 ? '<button type="button" class="gpl__link" data-gpp-tier="' + (n - 1) + '">Zurück</button>' : "") +
+      (last && st.mode === "self" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-indiv>Individuell</button>' : "");
   }
 
   /* ---------- Individuell: Coach anfragen ---------- */
@@ -348,7 +382,7 @@
         (st.mode === "self" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-goals>Ziel ändern</button>' : "");
       return;
     }
-    st.body.innerHTML = '<p class="gpl__lead">' + lead + "</p>" +
+    st.body.innerHTML = (st.mode === "coach" ? '<p class="gpl__lead">' + lead + "</p>" : "") +
       '<div class="gpl__rail">' + list.map(function (c) {
         var thumb = thumbOf(c.preview_url);
         var img = thumb || coverOf(c);
@@ -510,6 +544,13 @@
       if (i === -1) st.goals.push(k); else st.goals.splice(i, 1);
       return paintGoals();
     }
+    var tierBtn = t.closest("[data-gpp-tier]");
+    if (tierBtn) {
+      st.goalStep = parseInt(tierBtn.getAttribute("data-gpp-tier"), 10) || 0;
+      paintGoals();
+      if (st.body) st.body.scrollTop = 0;
+      return;
+    }
     if (t.closest("[data-gpp-next]")) {
       var ownEl = st.root.querySelector("#gpl-own-goal");
       if (ownEl) st.ownGoal = ownEl.value;
@@ -522,7 +563,7 @@
       }
       return;
     }
-    if (t.closest("[data-gpp-goals]")) return paintGoals();
+    if (t.closest("[data-gpp-goals]")) { st.goalStep = 0; return paintGoals(); }
     if (t.closest("[data-gpp-indiv]")) return paintIndividual();
     if (t.closest("[data-gpp-coach]")) return chooseCoach();
     var send = t.closest("[data-gpp-send]");
