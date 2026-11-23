@@ -58,6 +58,13 @@
       clearTimeout(timer);
       clearTimeout(holdT);
       wrap.remove();
+      swallowClick();
+    }
+    /* Story schließt bei pointerup; der folgende click landete sonst auf dem Event darunter (Stempelkarte) */
+    function swallowClick() {
+      function eat(e) { e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); }
+      document.addEventListener("click", eat, true);
+      setTimeout(function () { document.removeEventListener("click", eat, true); }, 450);
     }
     function run(ms) {
       clearTimeout(timer);
@@ -125,6 +132,8 @@
       show();
     }
     wrap.addEventListener("pointerup", up);
+    /* iOS: kein synthetischer click nach dem Tippen (Story ist dann schon weg, click träfe das Event darunter) */
+    wrap.addEventListener("touchend", function (e) { if (e.cancelable) e.preventDefault(); }, { passive: false });
     wrap.addEventListener("pointercancel", function () { clearTimeout(holdT); downAt = 0; resume(); });
     wrap.addEventListener("contextmenu", function (e) { e.preventDefault(); });
     wrap.addEventListener("click", function (e) {
