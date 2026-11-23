@@ -3251,8 +3251,8 @@
       if (!el) return null;
       var r = el.getBoundingClientRect();
       if (!r.height) return null;
-      /* Karte mittig auf dem ganzen Screen: oben und unten blitzen die Nachbarbeiträge */
-      return { delta: r.top + r.height / 2 - window.innerHeight / 2, radius: Math.max(120, r.height * CATCH_R) };
+      /* Karte mittig auf dem Screen, um die Icon-Zeile oben nach unten versetzt (parkMid) */
+      return { delta: r.top + r.height / 2 - parkMid(), radius: Math.max(120, r.height * CATCH_R) };
     }
     function glide(delta) {
       var from = scroller.scrollTop || 0;
@@ -3261,6 +3261,9 @@
       anim++;
       var my = anim;
       gliding = true;
+      /* Beim Einparken kommt der Kopf (Icons + Profilkreise) wieder rein */
+      var head = document.querySelector(".heute-filter-row");
+      if (head) head.classList.remove("is-scroll-hide");
       /* Schwung stoppen: iOS hält beim kurzen overflow hidden an. Nur einen Frame lang, sonst
          ist ein neuer Wisch während des Einparkens tot (iOS entscheidet beim touchstart). */
       scroller.style.overflowY = "hidden";
@@ -3315,6 +3318,15 @@
     }, { passive: true });
   }
 
+  /* Parkplatz: Screenmitte plus Höhe der Icon-Zeile (Info, Filter, Herz, Aktualisieren) */
+  function parkMid() {
+    var row = document.querySelector(".heute-filter-row");
+    var btn = document.getElementById("heute-refresh") || document.getElementById("heute-info");
+    var off = 0;
+    if (row && btn) off = Math.max(0, btn.getBoundingClientRect().bottom - row.getBoundingClientRect().top);
+    return window.innerHeight / 2 + off;
+  }
+
   function currentEventCard() {
     var today = $("acc-feed-today");
     if (!today) return null;
@@ -3348,8 +3360,8 @@
       if (!el) return;
       var rect = el.getBoundingClientRect();
       if (!rect.height && !rect.width) return;
-      /* Mitte des ganzen Screens, wie der Magnet (bindMagnet) */
-      var mid = window.innerHeight / 2;
+      /* gleiche Parkposition wie der Magnet (bindMagnet) */
+      var mid = parkMid();
       var elMid = rect.top + rect.height / 2;
       var delta = elMid - mid;
       if (Math.abs(delta) < 4) return;
@@ -3386,6 +3398,8 @@
       function () {
         if (document.body.dataset.shell !== "heute") return;
         var y = scroller.scrollTop || 0;
+        /* Einparken/Zentrieren per Code: Kopf nicht wegblenden */
+        if (Date.now() < (state.progScrollUntil || 0)) { last = y; return; }
         if (Math.abs(y - last) > 8 && Date.now() > (state.progScrollUntil || 0)) state.userScrolledAktuell = true;
         var todayEl = $("acc-feed-today");
         var goingDown = y > last + 2;
