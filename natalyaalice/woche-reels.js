@@ -2591,6 +2591,12 @@
           }).catch(function () {}));
         }
         if (z.mode === "alt" && evs.length) jobs.push(replacePlanUnits(dates.map(function (x) { return x.day; }), evs));
+        /* gilt, bis man es ändert: Regel für go_week_topup */
+        jobs.push(loadWeekRules().then(function (rules) {
+          if (!rules) return;
+          var old = rules.filter(function (r) { return r.kind === "zirkel" && Number(r.wd) === (z.wd || 7); })[0];
+          return upsertRule(old, { kind: "zirkel", wd: z.wd || 7, at_time: z.time, visibility: z.vis, replaces_plan: z.mode === "alt", note: note, skip_days: [] });
+        }));
         return Promise.all(jobs).then(function () { return evs.length; });
       })
       .then(function (n) {
@@ -2798,6 +2804,21 @@
     GoDialog.choose(x.title + " · " + when, opts).then(function (v) {
       if (v === "fmt") { setTimeout(function () { openZirkelFormat(x); }, 0); return; }
       if (v !== "del") return;
+      if (x.kind === "own") {
+        GoDialog.choose("Zirkeltraining am " + when + " löschen", [
+          { label: "Nur diesen Termin", value: "one" },
+          { label: "Diesen und alle folgenden", value: "all" }
+        ]).then(function (w) {
+          if (!w) return;
+          (w === "all" ? deleteZirkelSeries(x) : deleteZirkelRow(x).then(function () { return skipZirkelDay(x); })).then(function () {
+            state.zEdit.rows = state.zEdit.rows.filter(function (r) { return r !== x; });
+            paintZirkelEditor();
+            if (host.toast) host.toast("Gelöscht");
+            return refresh().then(notifyAktuell);
+          }).catch(function () { if (host.toast) host.toast("Hat nicht geklappt"); });
+        });
+        return;
+      }
       GoDialog.confirm(mine ? "Zirkeltraining am " + when + " löschen?" : "Beim Zirkeltraining am " + when + " absagen?", {
         ok: mine ? "Löschen" : "Absagen",
         cancel: "Abbrechen"
@@ -2810,6 +2831,45 @@
           return refresh().then(notifyAktuell);
         }).catch(function () { if (host.toast) host.toast("Hat nicht geklappt"); });
       });
+    });
+  }
+
+  /* einzeln gelöschter Termin kommt über go_week_topup nicht wieder */
+  function skipZirkelDay(x) {
+    var day = dayKey(x.at);
+    return loadWeekRules().then(function (rules) {
+      var r = (rules || []).filter(function (q) { return q.kind === "zirkel" && Number(q.wd) === isoWd(day); })[0];
+      if (!r) return;
+      var sk = (r.skip_days || []).filter(function (d) { return d >= berlinToday(); });
+      if (sk.indexOf(day) === -1) sk.push(day);
+      return upsertRule(r, { skip_days: sk });
+    });
+  }
+  /* Serie beenden: Regel weg, alle kommenden eigenen Zirkel an diesem Wochentag löschen */
+  function deleteZirkelSeries(x) {
+    var day = dayKey(x.at), wd = isoWd(day);
+    return deleteZirkelRow(x).then(function () {
+      return loadWeekRules();
+    }).then(function (rules) {
+      var r = (rules || []).filter(function (q) { return q.kind === "zirkel" && Number(q.wd) === wd; })[0];
+      var jobs = [];
+      if (r) jobs.push(rest("go_week_rules?id=eq." + encodeURIComponent(r.id), { method: "DELETE", prefer: "return=minimal" }).catch(function () {}));
+      jobs.push(rest("events?user_id=eq." + encodeURIComponent(me()) + "&category=eq.zirkel&status=eq.geplant&starts_at=gt." + encodeURIComponent(new Date(x.at).toISOString()) + "&select=id,starts_at&limit=500")
+        .then(function (rows) {
+          var ids = (rows || []).filter(function (e) { return isoWd(dayKey(e.starts_at)) === wd; }).map(function (e) { return e.id; });
+          if (!ids.length) return;
+          return rest("events?id=in.(" + ids.join(",") + ")&user_id=eq." + encodeURIComponent(me()), { method: "DELETE", prefer: "return=minimal" });
+        }));
+      /* Plan-Einheiten, die das Zirkeltraining ersetzt hatte, wieder planen */
+      if (r && r.replaces_plan) {
+        jobs.push(rest("events?user_id=eq." + encodeURIComponent(me()) + "&status=eq.ausgefallen&enrollment_id=not.is.null&starts_at=gte." + encodeURIComponent(day + "T00:00:00Z") + "&select=id,starts_at&limit=500")
+          .then(function (rows) {
+            var ids = (rows || []).filter(function (e) { return isoWd(dayKey(e.starts_at)) === wd; }).map(function (e) { return e.id; });
+            if (!ids.length) return;
+            return rest("events?id=in.(" + ids.join(",") + ")", { method: "PATCH", prefer: "return=minimal", body: { status: "geplant" } });
+          }).catch(function () {}));
+      }
+      return Promise.all(jobs);
     });
   }
 
@@ -2917,6 +2977,31 @@
         if (body.starts_at && x.circleCopy) return moveCircleCopy(x.circleCopy, body.starts_at);
       }));
     });
+    /* Serie: geänderte Uhrzeit/Sichtbarkeit gilt für die Regel und alle kommenden Zirkel am selben Wochentag */
+    jobs.push(loadWeekRules().then(function (rules) {
+      if (!rules) return;
+      var sub = [];
+      ze.rows.forEach(function (x) {
+        if (x.kind !== "own") return;
+        var day = dayKey(x.at), wd = isoWd(day);
+        var r = rules.filter(function (q) { return q.kind === "zirkel" && Number(q.wd) === wd; })[0];
+        if (!r) return;
+        var pick = ze.times[x.ev.id];
+        var t = pick === NO_TIME ? null : pick;
+        var vis = ze.vis[x.ev.id] === "privat" ? "privat" : "team";
+        if (String(r.at_time || "").slice(0, 5) === String(t || "") && r.visibility === vis) return;
+        sub.push(upsertRule(r, { at_time: t, visibility: vis }));
+        sub.push(rest("events?user_id=eq." + encodeURIComponent(me()) + "&category=eq.zirkel&status=eq.geplant&starts_at=gt." + encodeURIComponent(day + "T23:59:59Z") + "&select=id,starts_at&limit=500")
+          .then(function (rows) {
+            return Promise.all((rows || []).filter(function (e) { return isoWd(dayKey(e.starts_at)) === wd; }).map(function (e) {
+              var d = dayKey(e.starts_at);
+              return rest("events?id=eq." + encodeURIComponent(e.id), { method: "PATCH", prefer: "return=minimal",
+                body: { starts_at: t ? timedStarts(d, t) : d + "T12:00:00Z", visibility: vis } });
+            }));
+          }));
+      });
+      return Promise.all(sub);
+    }).catch(function () {}));
     Promise.all(jobs).then(function () {
       showSavedNote();
       return refresh().then(notifyAktuell);
@@ -3615,6 +3700,17 @@
       .catch(function () { return []; });
   }
   function weekdayOf(iso) { return new Date(iso + "T12:00:00").getDay(); }
+  function isoWd(iso) { return weekdayOf(iso) || 7; }
+  /* dauerhafte Regeln (go-woche-regeln.sql); ohne Tabelle läuft alles wie bisher */
+  function loadWeekRules() {
+    return rest("go_week_rules?user_id=eq." + encodeURIComponent(me()) + "&select=*").catch(function () { return null; });
+  }
+  function upsertRule(existing, row) {
+    row.updated_at = new Date().toISOString();
+    if (existing) return rest("go_week_rules?id=eq." + encodeURIComponent(existing.id), { method: "PATCH", prefer: "return=minimal", body: row }).catch(function () {});
+    row.user_id = me();
+    return rest("go_week_rules", { method: "POST", prefer: "return=minimal", body: row }).catch(function () {});
+  }
   function seriesJobs(future, ev, iso, untimed, hhmm, body) {
     if (!ev.enrollment_id || !future.length) return [];
     var fromWd = weekdayOf(dayKey(ev.starts_at));
@@ -3642,9 +3738,9 @@
     if (!de) return;
     var saveBtn0 = document.querySelector("[data-wr-days-save]");
     if (saveBtn0) saveBtn0.disabled = true;
-    loadFutureSeries(de).then(function (future) { saveDaysEditorWith(de, future || []); });
+    Promise.all([loadFutureSeries(de), loadWeekRules()]).then(function (r) { saveDaysEditorWith(de, r[0] || [], r[1]); });
   }
-  function saveDaysEditorWith(de, future) {
+  function saveDaysEditorWith(de, future, rules) {
     var jobs = [];
     de.slots.forEach(function (ev, i) {
       if (!ev) return;
@@ -3666,6 +3762,18 @@
         var serBody = { visibility: vis, bubble_id: wantBub && bubId ? bubId : wantBub ? ev.bubble_id || null : null };
         if (grp) serBody.group_id = grp.id;
         jobs = jobs.concat(seriesJobs(future, ev, iso, untimed, hhmm, serBody));
+        /* Regel merken, damit auch später erzeugte Wochen so aussehen */
+        if (rules && ev.enrollment_id) {
+          var curWd = isoWd(dayKey(ev.starts_at));
+          var old = rules.filter(function (r) {
+            return r.kind === "plan" && String(r.enrollment_id) === String(ev.enrollment_id) && String(r.title) === String(ev.title || "") && Number(r.wd) === curWd;
+          })[0];
+          jobs.push(upsertRule(old, {
+            kind: "plan", enrollment_id: ev.enrollment_id, title: String(ev.title || ""),
+            from_wd: old ? old.from_wd : curWd, wd: isoWd(iso), at_time: untimed ? null : hhmm,
+            visibility: vis, bubble_id: serBody.bubble_id || null, group_id: grp ? grp.id : null
+          }));
+        }
       }
       if (sameDay && (ev.visibility || "team") === vis && !bubChanged && !(grp && String(ev.group_id || "") !== String(grp.id))) return;
       var body = { starts_at: starts, visibility: vis };
@@ -6319,6 +6427,13 @@
       state.loadError = "Nicht angemeldet.";
       render();
       return Promise.resolve();
+    }
+    /* wiederkehrende Zirkel für die nächsten 8 Wochen anlegen (go-woche-regeln.sql), einmal pro Start */
+    if (!state.topupDone) {
+      state.topupDone = true;
+      rest("rpc/go_week_topup", { method: "POST", body: { p_weeks: 8 } })
+        .then(function (n) { if (Number(n) > 0) refresh(); })
+        .catch(function () {});
     }
     loadTravelPref();
     state.loadError = "";
