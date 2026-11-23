@@ -8637,7 +8637,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-129"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-130"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-87"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -17509,11 +17509,15 @@
         var bub = window.GoBubbles ? GoBubbles.mine() : null;
         var html = '<option value="ich">Nur Ich</option><option value="team">Community</option>';
         if (bub) html += '<option value="bubble">Meine Bubble</option>';
+        /* Coach: nur meine Coachees (auch private Events) */
+        var hasCoachees = sessionIsTrainer && (teamPeople || []).some(function (p) { return p && !p.isSelf && String(p.trainer_id || "") === String(sessionAccount && sessionAccount.id); });
+        if (hasCoachees) html += '<option value="coach">Coach</option>';
         html += '<option value="alles">Alles</option>';
         if (cur === "tagebuch") cur = "alles";
         if (cur === "gruppe" || cur === "circle") cur = "team";
         heute.innerHTML = html;
         if (cur === "bubble" && !bub) cur = "alles";
+        if (cur === "coach" && !hasCoachees) cur = "team";
         if (cur && [].some.call(heute.options, function (o) { return o.value === cur; })) heute.value = cur;
       }
 
@@ -25506,7 +25510,7 @@
               if (v === "crew") v = "team";
               if (String(v).indexOf("group:") === 0) v = "gruppe";
               heuteFilter =
-                v === "team" || v === "gruppe" || v === "circle" || v === "bubble" || v === "alles" ? v : v === "tagebuch" ? "alles" : "ich";
+                v === "team" || v === "gruppe" || v === "circle" || v === "bubble" || v === "alles" || v === "coach" ? v : v === "tagebuch" ? "alles" : "ich";
               document.body.dataset.heute = heuteFilter;
               try { localStorage.setItem(HOME_HEUTE, heuteFilter); } catch (eHF2) {}
               paintHeuteJoins(heuteFlags());
