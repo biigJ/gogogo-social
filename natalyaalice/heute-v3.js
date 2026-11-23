@@ -57,7 +57,7 @@
   function normalizeVisibility(v) {
     /* Legacy-UI/DB: alle|gruppe (Freundeskreis) → team. Neu: gruppe = groups.group_id. */
     if (v === "alle" || v === "all" || v === "friends") return "team";
-    if (v === "privat" || v === "team" || v === "gruppe" || v === "bubble" || v === "circle") return v;
+    if (v === "privat" || v === "team" || v === "gruppe" || v === "bubble" || v === "circle" || v === "coach") return v;
     return "team";
   }
 
@@ -1287,6 +1287,9 @@
     var mine = String(ev.user_id) === uid;
     var vis = normalizeVisibility(ev.visibility);
     /* privat: nur für den Ersteller und für Eingeladene/Zugesagte (go-events-invited.sql) */
+    /* coach (go-visibility-coach.sql): wie privat, der Coach liest es über RLS */
+    if (vis === "coach" && !mine && !inviteFor(ev.id) && !iAmGoing(ev.id) &&
+        !(state.share && state.share[String(ev.user_id)] && state.share[String(ev.user_id)].coach === me())) return false;
     if (vis === "privat" && !mine && !inviteFor(ev.id) && !iAmGoing(ev.id)) return false;
     /* Bubble-Events von Nicht-Freunden nur im Bubble-Filter */
     if (!mine && ev.bubble_id && !(host.teamPeople || []).some(function (p) { return p && String(p.id) === String(ev.user_id); })) return false;
