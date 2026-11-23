@@ -3160,6 +3160,10 @@
       align-items: center;
       min-height: 31px;
     }
+    /* Profil-Tab: kein Zurückpfeil, zurück geht über die Pill (Änderungen fragt die App ab) */
+    body.is-session[data-shell="profil"] .profile-sheet.is-self #profile-back,
+    body.is-session[data-shell="profil"] #plan-settings .plan-backbar .profile-back,
+    body.is-session[data-shell="profil"] #plan-info .plan-backbar .profile-back { visibility: hidden !important; pointer-events: none; }
     .plan-backbar { display: grid; grid-template-columns: 31px 1fr 31px; align-items: center; gap: 8px; margin: 0 0 10px; }
     .plan-backbar h2 { margin: 0; text-align: center; font: 600 22px/1.2 "Playfair Display", Georgia, serif; color: #2A2118; }
     #plan-settings .plan-backbar { border: 0 !important; padding: 0 !important; }
@@ -22823,6 +22827,11 @@
           var now = Date.now();
           if (now - lastAt < 280) return;
           lastAt = now;
+          var sheetOpen = document.getElementById("profile-sheet");
+          if (sheetOpen && !sheetOpen.hidden && sheetOpen.classList.contains("is-open")) {
+            leaveOwnProfile(function () { lastAt = 0; goTab(tab); });
+            return;
+          }
           if (tab === "woche") showWoche();
           else if (tab === "team") showPlan("team");
           else if (tab === "kurse") {
@@ -26258,6 +26267,8 @@
         }
         paintProfileFace(person);
         var sheet = document.getElementById("profile-sheet");
+        sheet.classList.toggle("is-self", mine);
+        profileSnap = null;
         sheet.hidden = false;
         requestAnimationFrame(function () { sheet.classList.add("is-open"); });
         var id = encodeURIComponent(person.id);
@@ -26304,6 +26315,68 @@
             profileTrainerChoices = [];
             paintTrainerBlock(account, []);
           }
+        });
+      }
+
+      /* Eigenes Profil: Stand der Textfelder beim ersten Antippen merken, damit die Pill fragen kann */
+      var profileSnap = null;
+      var PROFILE_TEXT_IDS = ["profile-about", "profile-recs", "profile-instagram", "profile-linkedin", "profile-mantra"];
+      function profileTextValues() {
+        var out = {};
+        PROFILE_TEXT_IDS.forEach(function (id) {
+          var el = document.getElementById(id);
+          out[id] = el ? String(el.value || "") : "";
+        });
+        return out;
+      }
+      document.getElementById("profile-sheet").addEventListener("focusin", function (event) {
+        if (profileSnap || !profilePerson || !profilePerson.isSelf) return;
+        if (PROFILE_TEXT_IDS.indexOf(event.target && event.target.id) < 0) return;
+        profileSnap = profileTextValues();
+      });
+      function profileDirty() {
+        if (!profileSnap) return false;
+        var now = profileTextValues();
+        return PROFILE_TEXT_IDS.some(function (id) { return now[id] !== profileSnap[id]; });
+      }
+      function saveProfileTexts() {
+        if (!sessionAccount) return;
+        var about = profileAbout(sessionAccount);
+        about.text = String(document.getElementById("profile-about").value || "").slice(0, 300);
+        about.recs = String(document.getElementById("profile-recs").value || "").slice(0, 400);
+        about.instagram = String(document.getElementById("profile-instagram").value || "").trim().slice(0, 80);
+        about.linkedin = String(document.getElementById("profile-linkedin").value || "").trim().slice(0, 160);
+        var savedMantra = mantraToSave(document.getElementById("profile-mantra").value);
+        sessionAccount.mantra = savedMantra;
+        saveProfileFields({ about_me: about, mantra: savedMantra });
+      }
+      /* Verlassen über die Pill: bei Änderungen fragen. done() läuft nach dem Schließen. */
+      function leaveOwnProfile(done) {
+        var sheet = document.getElementById("profile-sheet");
+        var open = sheet && !sheet.hidden && sheet.classList.contains("is-open");
+        if (!open) { done(); return; }
+        if (!profilePerson || !profilePerson.isSelf || !profileDirty()) {
+          profileSnap = null;
+          closeProfile();
+          done();
+          return;
+        }
+        GoDialog.choose("Änderungen speichern?", [
+          { label: "Speichern", value: "save" },
+          { label: "Verwerfen", value: "drop" }
+        ], { center: true }).then(function (pick) {
+          if (!pick) return;
+          if (pick === "drop") {
+            /* Felder speichern beim Verlassen schon selbst: alten Stand zurückschreiben */
+            PROFILE_TEXT_IDS.forEach(function (id) {
+              var el = document.getElementById(id);
+              if (el) el.value = profileSnap[id];
+            });
+          }
+          saveProfileTexts();
+          profileSnap = null;
+          closeProfile();
+          done();
         });
       }
 
