@@ -3200,7 +3200,9 @@
     bindHeuteScrollFilter();
     requestAnimationFrame(function () {
       if (keepScroll != null) {
-        scroller.scrollTop = keepScroll;
+        /* Nur zurücksetzen, wenn das Neuzeichnen wirklich verschoben hat: jedes scrollTop-Setzen
+           stoppt auf iOS den Schwung, das fühlte sich wie magnetisches Einrasten an */
+        if (Math.abs((scroller.scrollTop || 0) - keepScroll) > 1) scroller.scrollTop = keepScroll;
         return;
       }
       scrollCurrentToCenter({ soft: false, force: true });
@@ -3282,6 +3284,13 @@
     if (!row || !scroller || scroller._heuteFilterBound) return;
     scroller._heuteFilterBound = true;
     var last = scroller.scrollTop || 0;
+    /* Eigenes Scrollen am Finger erkennen: kleine Schritte (< 8 px je Event) zählten sonst nicht,
+       und Nachladen in den ersten 15 s zog den Feed zurück aufs aktuelle Event */
+    ["touchmove", "wheel"].forEach(function (t) {
+      scroller.addEventListener(t, function () {
+        if (document.body.dataset.shell === "heute") state.userScrolledAktuell = true;
+      }, { passive: true });
+    });
     scroller.addEventListener(
       "scroll",
       function () {
