@@ -1246,7 +1246,7 @@
       if (mine) return !!flags.showOwnHistory;
       if (!flags.showFriendsHistory || !(vis === "team" || vis === "gruppe")) return false;
       /* Profilreihe (todayAll): heute erledigtes Event ist die Story des Tages, gilt ohne „Historie teilen“ */
-      var todayStory = flags.todayAll && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString());
+      var todayStory = flags.todayAll && dayKey(ev.starts_at) >= (flags.storyFrom || dayKey(new Date(now).toISOString()));
       if (!todayStory && !ownerShares(ev.user_id) && !iAmGoing(ev.id)) return false;
       if (!inTeamFilter(ev.user_id, flags)) return false;
       return inGroupFilter(ev.user_id, flags);
@@ -5319,6 +5319,27 @@
     }).sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
   }
 
+  /* Story einer Person: erst Erledigtes seit gestern, dann heute Anstehendes, chronologisch.
+     Sichtbarkeit wie im Feed (privat, Community, Gruppe, Bubble); gelöschte oder ohne Posting gespeicherte fehlen. */
+  function storyEventsFor(personId) {
+    var t = todayIso();
+    var y = new Date(t + "T12:00:00");
+    y.setDate(y.getDate() - 1);
+    var from = y.toLocaleDateString("en-CA");
+    var flags = viewFlags("alles");
+    flags.todayAll = true;
+    flags.storyFrom = from;
+    var list = (state.events || []).filter(function (e) {
+      if (!e || String(e.user_id) !== String(personId) || e.status === "ausgefallen") return false;
+      var d = evDayIso(e);
+      if (e.status === "erledigt") return d >= from && d <= t && eventVisibleToMe(e, flags);
+      return d === t && eventVisibleToMe(e, flags);
+    });
+    function by(a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); }
+    return list.filter(function (e) { return e.status === "erledigt"; }).sort(by)
+      .concat(list.filter(function (e) { return e.status !== "erledigt"; }).sort(by));
+  }
+
   global.HeuteAccountability = {
     install: install,
     refresh: refresh,
@@ -5335,6 +5356,7 @@
     focusEvent: focusEvent,
     todayCardFor: todayCardFor,
     todayEventsFor: todayEventsFor,
+    storyEventsFor: storyEventsFor,
     /* Herz neu prüfen (z. B. nach Bestätigen einer Anfrage) */
     refreshHeart: function () { state.repliesAt = 0; return checkReplies(); }
   };
