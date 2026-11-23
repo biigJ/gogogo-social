@@ -3230,7 +3230,7 @@
      - Finger weg, Feed rollt aus: kommt die Karte langsam genug (CATCH_V) in die Nähe der Mitte, wird der
        Schwung abgefangen und sie gleitet mit Ausrollen in die Mitte.
      - Schneller Schwung rauscht drüber. Bleibt der Feed von selbst nah daneben stehen, zieht es nach. */
-  var CATCH_V = 1.6;   /* px pro ms, darunter fängt der Magnet ein */
+  var CATCH_V = 2.4;   /* px pro ms, darunter fängt der Magnet ein (vorher 1,6) */
   var CATCH_R = 0.55;  /* Fangradius als Anteil der Kartenhöhe */
   function markSnapCard() {
     var el = currentEventCard();
