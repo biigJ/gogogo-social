@@ -4963,6 +4963,7 @@
       display: block;
     }
     .team-slide__art.is-upload { cursor: pointer; border: 1px dashed rgba(42, 33, 24, 0.35); }
+    .team-slide__art.is-frame { background: transparent; border: 1.5px solid currentColor; color: inherit; box-sizing: border-box; font-size: 48px; }
     .team-slide__art input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
     .team-slide__head {
       margin: 0 0 10px;
@@ -18330,11 +18331,10 @@
         var coachSlide = document.createElement("article");
         coachSlide.className = "team-slide is-scroll is-coach";
         coachSlide.dataset.title = "Mein Coach";
-        coachSlide.appendChild(teamPortrait(
-          trainer,
-          trainer ? String(trainer.name || "?").slice(0, 1) : "C",
-          { fallbackSrc: "/assets/gogogo/gogogo-Coach-small.jpg" }
-        ));
+        /* ohne Coach-Foto: leerer Rahmen ohne Füllung; mit Foto: kein Rahmen */
+        var coachArt = teamPortrait(trainer, trainer ? String(trainer.name || "?").slice(0, 1) : "", {});
+        if (!(trainer && trainer.photo_url)) coachArt.classList.add("is-frame");
+        coachSlide.appendChild(coachArt);
         var ptCta = document.createElement("button");
         ptCta.type = "button";
         ptCta.className = "team-slide__cta is-solid is-pt";
