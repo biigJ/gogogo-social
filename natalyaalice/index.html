@@ -8588,7 +8588,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-120"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-121"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-85"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -24836,8 +24836,17 @@
           var nick = String((person && person.nickname) || "").toLowerCase();
           return nick && byNick[nick] && !byNick[nick].is_me ? byNick[nick] : null;
         }
+        /* Story = erledigtes Event der letzten 24 Stunden (sichtbar für mich) */
+        function recentStory(pid) {
+          try {
+            return !!(window.HeuteAccountability && HeuteAccountability.storyEventsFor &&
+              HeuteAccountability.storyEventsFor(pid).some(function (ev) { return ev.status === "erledigt"; }));
+          } catch (eRS) { return false; }
+        }
         function openFor(person, story) {
           return function (e) {
+            /* Story-Ring mit Erledigtem der letzten 24 h: erst die Story (Erledigtes, dann heute Anstehendes) */
+            if (recentStory(person.id) && openPersonStory(person)) return;
             /* Pulsierender Kreis: heutiges Training als Karte zeigen */
             var item = e && e.currentTarget;
             if (item && item.classList && item.classList.contains("is-training") &&
@@ -24918,13 +24927,13 @@
           });
         });
         var meToday = act[String(sessionAccount.id)];
-        if (meToday && meToday.photoEventId && !myStory) {
+        if (((meToday && meToday.photoEventId) || recentStory(sessionAccount.id)) && !myStory) {
           meItem.classList.add("has-story");
           meItem.onclick = null;
           var meFresh = meItem.cloneNode(true);
           meFresh.addEventListener("click", function () {
             if (openPersonStory(me)) return;
-            if (!(window.HeuteAccountability && HeuteAccountability.focusEvent(meToday.photoEventId))) openProfile(me);
+            if (!(meToday && meToday.photoEventId && window.HeuteAccountability && HeuteAccountability.focusEvent(meToday.photoEventId))) openProfile(me);
           });
           box.replaceChild(meFresh, meItem);
         }
@@ -24986,7 +24995,7 @@
           var done = (entry.today && entry.today.done) || (pr && pr.status === "done");
           var open = !done && ((entry.today && entry.today.training) || (pr && pr.status === "active"));
           /* oder heute eine Story gepostet (Event gemacht, Foto) */
-          var story = !!(entry.story || (entry.today && entry.today.photoEventId));
+          var story = !!(entry.story || (entry.today && entry.today.photoEventId) || recentStory(pid));
           var mine = teamPeople.some(function (tp) { return tp && !tp.isSelf && String(tp.id) === pid; });
           if (!(open || story) || !mine) doneIds[pid] = true;
           return (open || story) && mine;
@@ -25003,7 +25012,8 @@
           var photoId = entry.today && entry.today.photoEventId;
           /* Tipp: pulsierend → heutige Einheit quadratisch, dicker Rand → erledigte Einheit (openFor) */
           var opener = openFor(entry.person, entry.story);
-          var el = storyItem(entry.person, entry.story || (photoId ? { seen: false } : null), opener);
+          /* Story-Ring auch für Erledigtes der letzten 24 Stunden */
+          var el = storyItem(entry.person, entry.story || (photoId || recentStory(entry.person.id) ? { seen: false } : null), opener);
           if (entry.today) el.classList.add("is-today");
           applyTrainingRing(el, entry.today, entry.presence);
           if (window.GoTama) GoTama.decorate(el, entry.person.id);
