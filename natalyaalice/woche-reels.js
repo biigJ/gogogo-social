@@ -3167,18 +3167,18 @@
         '<div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " + esc(ev.title || "Training") + "</span>" +
         '<div class="wr-dayrow__ctl"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
         opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
-        '<button type="button" class="wr-dayrow__vis' + (vis === "privat" ? "" : " is-on") + '" data-wr-dayvis="' + esc(ev.id) + '">' + VIS_LABEL[vis] + "</button>" +
-        (host.bubbleId && host.bubbleId()
-          ? '<button type="button" class="wr-dayrow__vis wr-dayrow__bub' + (state.daysEdit.bub[ev.id] ? " is-on" : "") + '" data-wr-daybub="' + esc(ev.id) + '" aria-pressed="' + (state.daysEdit.bub[ev.id] ? "true" : "false") + '">' +
-            (global.GoBubbles ? GoBubbles.SOAP_SVG : "") + "Bubble</button>"
-          : "") +
+        /* Sichtbarkeit und Bubble in einem Dropdown wie der Filter in Aktuell */
+        '<label class="wr-dayrow__pick"><select data-wr-dayvissel="' + esc(ev.id) + '" aria-label="Wer sieht es">' +
+          visCycle().map(function (v) {
+            return '<option value="' + v + '"' + ((state.daysEdit.bub[ev.id] ? v === "bubble" : v === vis) ? " selected" : "") + ">" + esc(visPickLabel(v)) + "</option>";
+          }).join("") + "</select></label>" +
         '<button type="button" class="wr-dayrow__vis" data-wr-daymedia="' + esc(ev.id) + '">Media</button>' +
         "</div></div>" +
         '<span class="wr-dayrow__grip" data-wr-grip="' + i + '" aria-label="Ziehen"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span></div>';
     }).join("");
     openSheet(
       '<p class="wr-sheet-title">Tage bearbeiten</p>' +
-      '<p class="wr-sheet-hint">Einheiten verschieben, Uhrzeit anpassen und wählen, wer sie sieht: privat, Gruppe, Circle, Bubble oder Team.</p>' +
+      '<p class="wr-sheet-hint">Einheiten verschieben, Uhrzeit anpassen und wählen, wer sie sieht.</p>' +
       '<div class="wr-days wr-days--all">' + rows + "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Verlassen</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-days-save="1">Speichern</button></div>'
@@ -3205,6 +3205,14 @@
     });
     if (card._wrDaysBound) return;
     card._wrDaysBound = true;
+    card.addEventListener("change", function (e) {
+      var sel = e.target && e.target.closest ? e.target.closest("select[data-wr-dayvissel]") : null;
+      if (!sel || !state.daysEdit) return;
+      var id = sel.getAttribute("data-wr-dayvissel");
+      state.daysEdit.vis[id] = sel.value;
+      /* Bubble gewählt = Event in der Bubble; alles andere nimmt es aus der Bubble */
+      state.daysEdit.bub[id] = sel.value === "bubble";
+    });
     card.addEventListener("click", function (e) {
       if (!state.daysEdit) return;
       var vb = e.target.closest && e.target.closest("[data-wr-dayvis]");
@@ -3595,6 +3603,18 @@
   /* Sichtbarkeit je Event: privat (nur ich), Gruppe (meine Gruppe), Circle (nur im Circle der Zirkel-App),
      Bubble (nur meine Bubble), Team (alle Freunde). go-visibility-fein.sql */
   var VIS_LABEL = { privat: "privat", gruppe: "Gruppe", circle: "Circle", bubble: "Bubble", team: "Team" };
+  /* Wörter wie im Aktuell-Filter */
+  function visPickLabel(v) {
+    if (v === "privat") return "Nur Ich";
+    if (v === "team") return "Community";
+    if (v === "bubble") return "Meine Bubble";
+    if (v === "gruppe") {
+      var g = host.myGroups ? (host.myGroups() || [])[0] : null;
+      return g && g.name ? "Gruppe " + g.name : "Gruppe";
+    }
+    if (v === "circle") return "Circle";
+    return VIS_LABEL[v] || v;
+  }
   function visCycle() {
     var out = ["privat"];
     if (host.myGroups && (host.myGroups() || []).length) out.push("gruppe");
