@@ -3226,18 +3226,44 @@
     );
   }
 
-  /* Magnet aufs aktuelle Event: nur diese Karte ist Snap-Ziel (CSS proximity in index.html).
-     Langsam in die Nähe → rastet sanft in der Mitte ein; schneller Schwung → fliegt drüber. */
+  /* Magnet aufs aktuelle Event, ohne CSS-Snap (der bremste auf iOS jeden Schwung):
+     erst wenn der Finger weg ist und der Schwung von selbst ausläuft, prüfen, ob die Karte
+     nah an der Mitte steht (MAGNET px), dann weich hinziehen. Schneller Wisch endet weit weg → nichts. */
+  var MAGNET = 140;
   function markSnapCard() {
-    var scroller = welcomeScrollEl();
     var el = currentEventCard();
     [].forEach.call(document.querySelectorAll(".acc-card.acc-snap"), function (c) {
       if (c !== el) c.classList.remove("acc-snap");
     });
-    if (!el || !el.classList || !el.classList.contains("acc-card")) return;
-    el.classList.add("acc-snap");
-    var row = document.querySelector(".heute-filter-row");
-    if (scroller && row) scroller.style.scrollPaddingTop = Math.round(row.getBoundingClientRect().height || 0) + "px";
+    if (el && el.classList && el.classList.contains("acc-card")) el.classList.add("acc-snap");
+    bindMagnet();
+  }
+
+  function bindMagnet() {
+    var scroller = welcomeScrollEl();
+    if (!scroller || scroller._magnetBound) return;
+    scroller._magnetBound = true;
+    var touching = false, idle = null;
+    function check() {
+      idle = null;
+      if (touching || document.body.dataset.shell !== "heute") return;
+      if (Date.now() < (state.progScrollUntil || 0)) return;
+      var el = document.querySelector(".acc-card.acc-snap");
+      if (!el) return;
+      var row = document.querySelector(".heute-filter-row");
+      var headerH = row ? row.getBoundingClientRect().height || 0 : 0;
+      var r = el.getBoundingClientRect();
+      if (!r.height) return;
+      var delta = r.top + r.height / 2 - (headerH + (window.innerHeight - headerH) / 2);
+      if (Math.abs(delta) < 3 || Math.abs(delta) > MAGNET) return;
+      state.progScrollUntil = Date.now() + 600;
+      scroller.scrollTo({ top: Math.max(0, scroller.scrollTop + delta), behavior: "smooth" });
+    }
+    function later() { if (idle) clearTimeout(idle); idle = setTimeout(check, 140); }
+    scroller.addEventListener("touchstart", function () { touching = true; if (idle) clearTimeout(idle); }, { passive: true });
+    scroller.addEventListener("touchend", function () { touching = false; later(); }, { passive: true });
+    scroller.addEventListener("touchcancel", function () { touching = false; later(); }, { passive: true });
+    scroller.addEventListener("scroll", function () { if (!touching) later(); }, { passive: true });
   }
 
   function currentEventCard() {
