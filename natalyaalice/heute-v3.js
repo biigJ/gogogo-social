@@ -3197,6 +3197,7 @@
     }
     bindObserver(root);
     bindPhotoPinch(root);
+    markSnapCard();
     bindHeuteScrollFilter();
     requestAnimationFrame(function () {
       if (keepScroll != null) {
@@ -3223,6 +3224,20 @@
       document.scrollingElement ||
       document.documentElement
     );
+  }
+
+  /* Magnet aufs aktuelle Event: nur diese Karte ist Snap-Ziel (CSS proximity in index.html).
+     Langsam in die Nähe → rastet sanft in der Mitte ein; schneller Schwung → fliegt drüber. */
+  function markSnapCard() {
+    var scroller = welcomeScrollEl();
+    var el = currentEventCard();
+    [].forEach.call(document.querySelectorAll(".acc-card.acc-snap"), function (c) {
+      if (c !== el) c.classList.remove("acc-snap");
+    });
+    if (!el || !el.classList || !el.classList.contains("acc-card")) return;
+    el.classList.add("acc-snap");
+    var row = document.querySelector(".heute-filter-row");
+    if (scroller && row) scroller.style.scrollPaddingTop = Math.round(row.getBoundingClientRect().height || 0) + "px";
   }
 
   function currentEventCard() {
