@@ -2991,6 +2991,84 @@
     });
   }
 
+  /* Zwei Finger auf einem Eventbild: nur das Bild zoomt (wie Instagram), die Seite bleibt stehen.
+     Kopie liegt fixiert über allem, beim Loslassen federt sie zurück. */
+  function bindPhotoPinch(root) {
+    if (!root || root._pinchBound) return;
+    root._pinchBound = true;
+    var z = null;
+    function dist(t) { return Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY); }
+    function mid(t) { return { x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 }; }
+    function photoOf(t) {
+      /* Titel/Overlay liegt über dem Bild: Karte suchen, dann prüfen, ob der Finger im Bild liegt */
+      for (var i = 0; i < t.length; i++) {
+        var card = t[i].target && t[i].target.closest ? t[i].target.closest(".acc-card") : null;
+        var el = card && root.contains(card) ? card.querySelector(".acc-card__photo") : null;
+        if (!el) continue;
+        var r = el.getBoundingClientRect();
+        if (t[i].clientX >= r.left && t[i].clientX <= r.right && t[i].clientY >= r.top && t[i].clientY <= r.bottom) return el;
+      }
+      return null;
+    }
+    function end() {
+      if (!z) return;
+      var cur = z;
+      z = null;
+      state.pinchClickUntil = Date.now() + 500;
+      cur.clone.style.transition = "transform .22s ease";
+      cur.shade.style.transition = "opacity .22s ease";
+      cur.clone.style.transform = "none";
+      cur.shade.style.opacity = "0";
+      setTimeout(function () {
+        cur.clone.remove();
+        cur.shade.remove();
+        cur.img.style.visibility = "";
+      }, 230);
+    }
+    root.addEventListener("touchstart", function (e) {
+      if (z || e.touches.length !== 2) return;
+      var img = photoOf(e.touches);
+      if (!img) return;
+      e.preventDefault();
+      var r = img.getBoundingClientRect();
+      var cs = getComputedStyle(img);
+      var shade = document.createElement("div");
+      shade.style.cssText = "position:fixed;inset:0;background:#000;opacity:0;z-index:9998;pointer-events:none";
+      var clone = img.cloneNode(false);
+      clone.removeAttribute("loading");
+      clone.style.cssText =
+        "position:fixed;margin:0;z-index:9999;pointer-events:none;will-change:transform;" +
+        "left:" + r.left + "px;top:" + r.top + "px;width:" + r.width + "px;height:" + r.height + "px;" +
+        "object-fit:" + cs.objectFit + ";object-position:" + cs.objectPosition + ";border-radius:" + cs.borderRadius;
+      var m = mid(e.touches);
+      clone.style.transformOrigin = (m.x - r.left) + "px " + (m.y - r.top) + "px";
+      document.body.appendChild(shade);
+      document.body.appendChild(clone);
+      img.style.visibility = "hidden";
+      z = { img: img, clone: clone, shade: shade, d0: dist(e.touches) || 1, m0: m };
+    }, { passive: false });
+    document.addEventListener("touchmove", function (e) {
+      if (!z) return;
+      if (e.cancelable) e.preventDefault();
+      if (e.touches.length < 2) return;
+      var s = Math.max(1, Math.min(4, dist(e.touches) / z.d0));
+      var m = mid(e.touches);
+      z.clone.style.transform = "translate(" + (m.x - z.m0.x) + "px," + (m.y - z.m0.y) + "px) scale(" + s + ")";
+      z.shade.style.opacity = String(Math.min(0.6, (s - 1) * 0.6));
+    }, { passive: false });
+    document.addEventListener("touchend", function (e) { if (z && e.touches.length < 2) end(); }, { passive: true });
+    document.addEventListener("touchcancel", end, { passive: true });
+    /* iOS: Seiten-Zoom auf dem Bild verhindern */
+    root.addEventListener("gesturestart", function (e) {
+      var c = e.target && e.target.closest ? e.target.closest(".acc-card") : null;
+      if (z || (c && c.querySelector(".acc-card__photo"))) e.preventDefault();
+    }, { passive: false });
+    /* Nach dem Zoomen kein versehentlicher Tipp (Stempelkarte, Story) */
+    root.addEventListener("click", function (e) {
+      if (Date.now() < (state.pinchClickUntil || 0)) { e.preventDefault(); e.stopPropagation(); }
+    }, true);
+  }
+
   function bindObserver(root) {
     if (state.observer) {
       state.observer.disconnect();
@@ -3118,6 +3196,7 @@
       if (wOpen) wOpen.classList.add("is-open"); else state.walletOpen = "";
     }
     bindObserver(root);
+    bindPhotoPinch(root);
     bindHeuteScrollFilter();
     requestAnimationFrame(function () {
       if (keepScroll != null) {
