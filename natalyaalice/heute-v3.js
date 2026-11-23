@@ -214,6 +214,11 @@
 
   function personOf(uid) {
     if (!uid) return { id: "", name: "?", photo: "" };
+    /* ich: Bild immer aus dem eigenen Konto (Team-Liste hat für mich kein Foto → Gruppen-Event zeigte nur „M“) */
+    if (String(uid) === me() && host.sessionAccount && host.sessionAccount.photo_url &&
+        !(state.people[uid] && state.people[uid].photo)) {
+      state.people[uid] = { id: me(), name: host.sessionAccount.name || "Ich", photo: host.sessionAccount.photo_url };
+    }
     if (state.people[uid]) return state.people[uid];
     var fromTeam = (host.teamPeople || []).find(function (p) {
       return p && String(p.id) === String(uid);
