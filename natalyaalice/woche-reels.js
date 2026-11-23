@@ -4611,26 +4611,37 @@
     state.shareEventId = eventId;
     state.sharePick = {};
     state.shareInvited = {};
+    state.shareStatus = {};
+    state.shareReq = {};
     function paint() {
-      var friends = state.friends || [];
+      /* Anfragende stehen auch drin, wenn sie (noch) nicht in Meine Freunde sind */
+      var friends = (state.friends || []).slice();
+      Object.keys(state.shareReq).forEach(function (fid) { if (friends.indexOf(fid) < 0) friends.push(fid); });
       var list = friends
         .map(function (fid) {
           var p = personOf(fid);
-          var done = !!state.shareInvited[fid];
-          var on = done || !!state.sharePick[fid];
+          /* Status: eingeladen (grau, Haken) · macht mit (schwarz, Haken) · angefragt (ohne Haken, antippen) · nimmt teil (Anfrage angenommen) */
+          var stt = state.shareStatus[fid] || "";
+          var req = state.shareReq[fid];
+          if (req && req.status === "pending") {
+            return '<div class="wr-friend-row is-request" role="button" data-wr-friend-req="' + esc(fid) + '">' +
+              '<input type="checkbox" tabindex="-1" />' + avatarHtml(p) +
+              "<span>" + esc(p.name || "?") + ' <small class="wr-invited-tag">angefragt</small></span></div>';
+          }
+          if (stt === "accepted") {
+            var lab = req && req.status === "accepted" ? "nimmt teil" : "macht mit";
+            return '<div class="wr-friend-row is-going"><input type="checkbox" checked tabindex="-1" />' + avatarHtml(p) +
+              "<span>" + esc(p.name || "?") + ' <small class="wr-invited-tag">' + lab + "</small></span></div>";
+          }
+          if (stt === "pending") {
+            return '<div class="wr-friend-row is-invited"><input type="checkbox" checked tabindex="-1" />' + avatarHtml(p) +
+              "<span>" + esc(p.name || "?") + ' <small class="wr-invited-tag">eingeladen</small></span></div>';
+          }
           return (
-            '<label class="wr-friend-row' + (done ? " is-invited" : "") + '"' +
-            (done ? "" : ' data-wr-friend-pick="' + esc(fid) + '"') +
-            ">" +
-            '<input type="checkbox"' +
-            (on ? " checked" : "") +
-            (done ? " disabled" : "") +
-            " />" +
+            '<label class="wr-friend-row" data-wr-friend-pick="' + esc(fid) + '">' +
+            '<input type="checkbox"' + (state.sharePick[fid] ? " checked" : "") + " />" +
             avatarHtml(p) +
-            "<span>" +
-            esc(p.name || "?") +
-            (done ? ' <small class="wr-invited-tag">eingeladen</small>' : "") +
-            "</span></label>"
+            "<span>" + esc(p.name || "?") + "</span></label>"
           );
         })
         .join("");
@@ -4670,11 +4681,57 @@
       Promise.resolve(FFC.groups()).then(function (gs) { state.shareCircles = gs || []; if (state.shareEventId === eventId) paint(); }).catch(function () {});
     }
     /* Schon eingeladene Freunde: Haken gesetzt, keine zweite Einladung */
+    var realReq = /^[0-9a-f-]{36}$/i.test(String(eventId || "")) ? String(eventId) : "";
     loadFriends().then(function () {
-      return sentInvitesFor(eventId, iso).then(function (rows) {
-        (rows || []).forEach(function (r) { state.shareInvited[String(r.to_id)] = true; });
-      });
+      return Promise.all([
+        sentInvitesFor(eventId, iso).then(function (rows) {
+          (rows || []).forEach(function (r) {
+            var k = String(r.to_id);
+            state.shareInvited[k] = true;
+            if (state.shareStatus[k] !== "accepted") state.shareStatus[k] = r.status || "pending";
+          });
+        }),
+        /* Anfragen „Ich möchte mitmachen“ zu diesem Event (go-event-requests.sql) */
+        realReq ? rest("go_event_requests?to_id=eq." + encodeURIComponent(me()) + "&event_id=eq." + encodeURIComponent(realReq) +
+          "&status=in.(pending,accepted)&select=id,from_id,status&limit=100").then(function (rows) {
+            (rows || []).forEach(function (r) { state.shareReq[String(r.from_id)] = r; });
+            var need = (rows || []).map(function (r) { return String(r.from_id); }).filter(function (id) { return !personOf(id).name; });
+            if (need.length) return ensurePeople(need);
+          }).catch(function () {}) : null
+      ]);
     }).then(paint, paint);
+  }
+
+  /* Anfrage eines Freundes in der Liste: Annehmen? Ja → Einladung angenommen, Status „nimmt teil“ */
+  function answerShareRequest(fid) {
+    var r = state.shareReq[fid];
+    if (!r || !global.GoDialog) return;
+    var p = personOf(fid);
+    var ev = findOwnEvent(state.shareEventId) || {};
+    GoDialog.confirm(String(p.name || "Freund").split(" ")[0] + " möchte mitmachen. Annehmen?", { ok: "Ja", cancel: "Nein", row: true }).then(function (yes) {
+      var now = new Date().toISOString();
+      var jobs = [rest("go_event_requests?id=eq." + encodeURIComponent(r.id), {
+        method: "PATCH", prefer: "return=minimal", body: { status: yes ? "accepted" : "declined", decided_at: now }
+      })];
+      if (yes) {
+        jobs.push(rest("go_workout_invites", {
+          method: "POST", prefer: "return=minimal",
+          body: {
+            from_id: me(), to_id: fid, workout_date: ev.starts_at ? dayKey(ev.starts_at) : state.shareIso,
+            workout_label: ev.title || "Training", from_name: (host.sessionAccount && host.sessionAccount.name) || "gogogo",
+            place: ev.location || null, meet_time: ev.starts_at && displayTime(ev.starts_at) ? formatTime(ev.starts_at) : null,
+            status: "accepted", event_id: ev.id || state.shareEventId
+          }
+        }));
+      }
+      Promise.all(jobs).then(function () {
+        r.status = yes ? "accepted" : "declined";
+        if (yes) state.shareStatus[fid] = "accepted";
+        else delete state.shareReq[fid];
+        if (state.sharePaint) state.sharePaint();
+        if (yes) refreshKeepDay(state.shareIso);
+      }).catch(function () { if (host.toast) host.toast("Hat gerade nicht geklappt"); });
+    });
   }
 
   /* Eigene offene oder angenommene Einladungen zu diesem Termin (Event-ID, sonst Tag) */
@@ -4683,7 +4740,7 @@
     return rest(
       "go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&status=in.(pending,accepted)" +
         (realId ? "&event_id=eq." + encodeURIComponent(realId) : "&workout_date=eq." + encodeURIComponent(iso || "")) +
-        "&select=to_id,event_id,workout_date&limit=200"
+        "&select=to_id,event_id,workout_date,status&limit=200"
     ).catch(function () { return []; });
   }
 
@@ -5550,7 +5607,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-inv-yes],[data-wr-inv-no],[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-pick-plan],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-group-pick],[data-wr-circle-pick],[data-wr-plane],[data-wr-ics],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-share-circle],[data-wr-csv],[data-wr-friend-pick],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-inv-yes],[data-wr-inv-no],[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-pick-plan],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-group-pick],[data-wr-circle-pick],[data-wr-plane],[data-wr-ics],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-share-circle],[data-wr-csv],[data-wr-friend-pick],[data-wr-friend-req],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -5963,6 +6020,10 @@
         t.getAttribute("data-wr-share"),
         t.getAttribute("data-wr-event")
       );
+      return;
+    }
+    if (t.hasAttribute("data-wr-friend-req")) {
+      answerShareRequest(t.getAttribute("data-wr-friend-req"));
       return;
     }
     if (t.hasAttribute("data-wr-friend-pick")) {
