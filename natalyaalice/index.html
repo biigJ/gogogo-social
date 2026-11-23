@@ -8584,7 +8584,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-119"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-120"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-84"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -24719,7 +24719,9 @@
       /* Heutige Events einer Person als Story (Freunde-Posts, eigener Post, heutiges Event) */
       function openPersonStory(person) {
         if (!window.GoStory || !window.HeuteAccountability || !HeuteAccountability.todayEventsFor) return false;
-        var evs = HeuteAccountability.todayEventsFor(person.id);
+        /* erst Erledigtes seit gestern, dann heute Anstehendes (chronologisch) */
+        var evs = HeuteAccountability.storyEventsFor ? HeuteAccountability.storyEventsFor(person.id) : HeuteAccountability.todayEventsFor(person.id);
+        var todayIsoS = Log.berlinToday();
         if (!evs.length) return false;
         var first = person.isSelf ? "Du" : String(person.nickname || person.name || "").split(" ")[0];
         return GoStory.open(evs.map(function (ev) {
@@ -24730,7 +24732,11 @@
             id: ev.id,
             bg: window.GoBubbles && GoBubbles.eventCover ? GoBubbles.eventCover(ev) : (ev.photo_url || ""),
             title: String(ev.title || (ev.courses && ev.courses.title) || "Training"),
-            sub: (untimed ? "Heute" : "Heute · " + d.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" })) +
+            sub: (function () {
+                var dIso = d.toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+                var lab = dIso === todayIsoS ? "Heute" : dIso < todayIsoS ? "Gestern" : "Morgen";
+                return untimed ? lab : lab + " · " + d.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" });
+              })() +
               (ev.location ? " · " + ev.location : ""),
             note: note,
             done: ev.status === "erledigt"
