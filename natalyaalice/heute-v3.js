@@ -3245,7 +3245,7 @@
     var scroller = welcomeScrollEl();
     if (!scroller || scroller._magnetBound) return;
     scroller._magnetBound = true;
-    var touching = false, idle = null, anim = 0, lastY = 0, lastT = 0, v = 0;
+    var touching = false, gliding = false, idle = null, anim = 0, lastY = 0, lastT = 0, v = 0;
     function target() {
       var el = document.querySelector(".acc-card.acc-snap");
       if (!el) return null;
@@ -3260,28 +3260,33 @@
       var t0 = 0, dur = Math.min(1040, 520 + 2 * Math.abs(delta)); /* halb so schnell wie zuvor */
       anim++;
       var my = anim;
-      /* Schwung stoppen: iOS hält beim kurzen overflow hidden an */
+      gliding = true;
+      /* Schwung stoppen: iOS hält beim kurzen overflow hidden an. Nur einen Frame lang, sonst
+         ist ein neuer Wisch während des Einparkens tot (iOS entscheidet beim touchstart). */
       scroller.style.overflowY = "hidden";
       state.progScrollUntil = Date.now() + dur + 200;
       function step(ts) {
         if (my !== anim) return;
-        if (!t0) t0 = ts;
+        if (!t0) { t0 = ts; scroller.style.overflowY = ""; }
         var k = Math.min(1, (ts - t0) / dur);
         var e = 1 - Math.pow(1 - k, 3);
         scroller.scrollTop = from + (to - from) * e;
         if (k < 1) requestAnimationFrame(step);
-        else { scroller.style.overflowY = ""; anim++; }
+        else { gliding = false; anim++; }
       }
       requestAnimationFrame(step);
     }
+    /* Finger wieder drauf: Einparken sofort lösen, der Wisch gehört dem Nutzer */
     function stopGlide() {
-      if (!scroller.style.overflowY) return;
+      if (!gliding) return;
       anim++;
+      gliding = false;
       scroller.style.overflowY = "";
+      state.progScrollUntil = 0;
     }
     function settle() {
       idle = null;
-      if (touching || document.body.dataset.shell !== "heute" || scroller.style.overflowY) return;
+      if (touching || gliding || document.body.dataset.shell !== "heute") return;
       var t = target();
       if (t && Math.abs(t.delta) > 3 && Math.abs(t.delta) < t.radius) glide(t.delta);
     }
@@ -3293,12 +3298,12 @@
     function lift() { touching = false; if (idle) clearTimeout(idle); idle = setTimeout(settle, 160); }
     scroller.addEventListener("touchend", lift, { passive: true });
     scroller.addEventListener("touchcancel", lift, { passive: true });
-    scroller.addEventListener("wheel", function () { if (idle) clearTimeout(idle); idle = setTimeout(settle, 200); }, { passive: true });
+    scroller.addEventListener("wheel", function () { stopGlide(); if (idle) clearTimeout(idle); idle = setTimeout(settle, 200); }, { passive: true });
     scroller.addEventListener("scroll", function () {
       var now = performance.now(), y = scroller.scrollTop || 0;
       if (lastT && now - lastT < 100) v = Math.abs(y - lastY) / Math.max(1, now - lastT); else v = 99;
       lastY = y; lastT = now;
-      if (touching || scroller.style.overflowY || document.body.dataset.shell !== "heute") return;
+      if (touching || gliding || document.body.dataset.shell !== "heute") return;
       if (Date.now() < (state.progScrollUntil || 0)) return;
       if (idle) clearTimeout(idle);
       idle = setTimeout(settle, 160);
