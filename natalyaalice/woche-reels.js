@@ -3602,10 +3602,11 @@
 
   /* Sichtbarkeit je Event: privat (nur ich), Gruppe (meine Gruppe), Circle (nur im Circle der Zirkel-App),
      Bubble (nur meine Bubble), Team (alle Freunde). go-visibility-fein.sql */
-  var VIS_LABEL = { privat: "privat", gruppe: "Gruppe", circle: "Circle", bubble: "Bubble", team: "Team" };
+  var VIS_LABEL = { privat: "privat", coach: "Coach", gruppe: "Gruppe", circle: "Circle", bubble: "Bubble", team: "Team" };
   /* Wörter wie im Aktuell-Filter */
   function visPickLabel(v) {
     if (v === "privat") return "Nur Ich";
+    if (v === "coach") return "Nur Coach";
     if (v === "team") return "Community";
     if (v === "bubble") return "Meine Bubble";
     if (v === "gruppe") {
@@ -3617,6 +3618,8 @@
   }
   function visCycle() {
     var out = ["privat"];
+    /* mit Coach: Event nur für mich und meinen Coach (go-visibility-coach.sql) */
+    if (host.sessionAccount && host.sessionAccount.trainer_id) out.push("coach");
     if (host.myGroups && (host.myGroups() || []).length) out.push("gruppe");
     if (ffcOk() && FFC.groups) out.push("circle");
     if (host.bubbleId && host.bubbleId()) out.push("bubble");
@@ -3701,6 +3704,7 @@
           method: "PATCH", prefer: "return=minimal", body: body
         }).catch(function (err) {
           /* ohne go-visibility-fein.sql kennt die Datenbank Circle/Bubble noch nicht */
+          if (vis === "coach") throw new Error("go-visibility-coach.sql fehlt");
           if (vis === "circle" || vis === "bubble") throw new Error("go-visibility-fein.sql fehlt");
           throw err;
         }).then(function () {

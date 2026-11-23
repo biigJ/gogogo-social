@@ -59,7 +59,7 @@
   function normalizeVisibility(v) {
     /* Legacy-UI/DB: alle|gruppe (Freundeskreis) → team. Neu: gruppe = groups.group_id. */
     if (v === "alle" || v === "all" || v === "friends") return "team";
-    if (v === "privat" || v === "team" || v === "gruppe" || v === "bubble" || v === "circle") return v;
+    if (v === "privat" || v === "team" || v === "gruppe" || v === "bubble" || v === "circle" || v === "coach") return v;
     return "team";
   }
 
@@ -1296,11 +1296,11 @@
     var uid = me();
     var mine = String(ev.user_id) === uid;
     var vis = normalizeVisibility(ev.visibility);
-    /* Coach sieht die Events seiner Coachees immer, auch privat (RLS: go_is_coach_of) */
+    /* Coach sieht die Events seiner Coachees immer, auch privat und „Nur Coach“ (RLS: go_is_coach_of) */
     var coachSees = !mine && isMyCoachee(ev.user_id);
     if (flags.coachOnly && !mine && !coachSees) return false;
-    /* privat: nur für den Ersteller, den Coach und für Eingeladene/Zugesagte (go-events-invited.sql) */
-    if (vis === "privat" && !mine && !coachSees && !inviteFor(ev.id) && !iAmGoing(ev.id)) return false;
+    /* privat und coach (go-visibility-coach.sql): nur Ersteller, Coach und Eingeladene/Zugesagte (go-events-invited.sql) */
+    if ((vis === "privat" || vis === "coach") && !mine && !coachSees && !inviteFor(ev.id) && !iAmGoing(ev.id)) return false;
     /* Bubble-Events von Nicht-Freunden nur im Bubble-Filter */
     if (!mine && ev.bubble_id && !(host.teamPeople || []).some(function (p) { return p && String(p.id) === String(ev.user_id); })) return false;
     if (ev.status === "ausgefallen") return false;
