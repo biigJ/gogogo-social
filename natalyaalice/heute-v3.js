@@ -1941,11 +1941,16 @@
   }
 
   /* Gruppen-Event einer Gruppe, in der ich bin: Gruppenname (und Gruppenbild) statt Vorname */
-  function groupAuthor(ev) {
+  /* Gruppen-Event: Name der Gruppe, Bild bleibt das des Erstellers */
+  function groupAuthor(ev, creator) {
     if (!ev || !ev.group_id || !host || !host.myGroups) return null;
     var g = (host.myGroups() || []).filter(function (x) { return x && String(x.id) === String(ev.group_id); })[0];
     if (!g || !g.name) return null;
-    return { id: "group-" + g.id, name: g.name, photo_url: g.photo_url || "", isGroup: true };
+    var a = {};
+    Object.keys(creator || {}).forEach(function (k) { a[k] = creator[k]; });
+    a.name = g.name;
+    a.isGroup = true;
+    return a;
   }
 
   function authorHtml(person, show) {
@@ -2095,7 +2100,8 @@
           isDone: ev.status === "erledigt",
           /* vergangene Tage: kein Kreis, die Einheit lässt sich nicht mehr nachholen */
           noCheck: ev.status !== "erledigt" && day < todayIso(),
-          menu: ev.status !== "erledigt" && day >= todayIso(),
+          /* nur das heutige Event ist im Kreis antippbar; kommende Tage: Kreis ohne Aktion */
+          menu: ev.status !== "erledigt" && day === todayIso(),
           badge: eventBadgeKind(ev),
           /* Papierflieger nur für heute und kommende Events, nicht für vergangene */
           shareId: day >= todayIso() ? String(ev.id) : "",
@@ -2131,7 +2137,7 @@
       enrollmentId: ev.enrollment_id || "",
       emoji: emoji,
       actions: (tools || "") + (actions || ""),
-      author: authorHtml(groupAuthor(ev) || p, true),
+      author: authorHtml(groupAuthor(ev, p) || p, true),
       when: zirkelPillsHtml(ev) ? "Heute · " + timeLabel(ev.starts_at) : whenLine(ev.starts_at),
       whenTs: zirkelPillsHtml(ev) ? "" : ev.starts_at,
       zpills: zirkelPillsHtml(ev),
@@ -4273,6 +4279,7 @@
     var ev = evById(id);
     if (!ev || !global.GoDialog) return;
     var today = evDayIso(ev) === todayIso();
+    if (!today) return;
     var choices = [];
     if (today) choices.push({ label: ev.category === "zirkel" ? "Start: Zirkeltraining" : "Start", value: "start" });
     /* eingetragene Alternative: nur noch starten, kein zweites Ausweichen */
