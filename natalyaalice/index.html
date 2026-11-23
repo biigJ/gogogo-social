@@ -17263,7 +17263,7 @@
           var circles = [];
           String(inGroup[String(p.id)] || "").split(" · ").forEach(function (c) { if (c) circles.push(c); });
           var ffcC = ffcCircleByNick[String(p.nickname || "").toLowerCase()];
-          if (ffcC && circles.indexOf("Circle " + ffcC) < 0) circles.push("Circle " + ffcC);
+          if (ffcC && circles.indexOf(ffcC) < 0) circles.push(ffcC);
           var card = document.createElement("article");
           card.className = "fw-card" + (opts ? " fw-card--bubble" : "");
           if (p.photo_url) card.style.backgroundImage = "url(\"" + String(p.photo_url).replace(/"/g, "%22") + "\")";
@@ -17861,8 +17861,8 @@
           myGroups().forEach(function (g) {
             (g.members || []).forEach(function (id) {
               var k = String(id);
-              var nmG = String(g.name || "Gruppe").trim();
-              nmG = "Circle " + nmG;
+              /* nur der Name, ohne „Circle“/„Gruppe“ davor (Platz, und Gruppen sind keine Circles) */
+              var nmG = String(g.name || "Gruppe").trim().replace(/^(circle|gruppe)\s+/i, "") || "Gruppe";
               inGroup[k] = inGroup[k] ? (inGroup[k].indexOf(nmG) < 0 ? inGroup[k] + " · " + nmG : inGroup[k]) : nmG;
             });
           });
@@ -17998,14 +17998,14 @@
               nm.appendChild(nk);
             }
             text.appendChild(nm);
-            /* Zeile 2: Rolle, dann Circle- und Gruppennamen ohne „Gruppe“ */
+            /* Zeile 2: Rolle, dann Circle- und Gruppennamen ohne „Circle“/„Gruppe“ davor */
             var meta = [];
             if (myTrainer && String(p.id) === myTrainer) meta.push("mein Coach");
             else if (p.is_trainer) meta.push("Coach");
             if (p.trainer_id && String(p.trainer_id) === mineId) meta.push("Coachee");
             if (inGroup[String(p.id)]) meta.push(inGroup[String(p.id)]);
             var ffcCircle = ffcCircleByNick[String(p.nickname || "").toLowerCase()];
-            if (ffcCircle && String(inGroup[String(p.id)] || "").indexOf("Circle " + ffcCircle) < 0) meta.push("Circle " + ffcCircle);
+            if (ffcCircle && String(inGroup[String(p.id)] || "").split(" · ").indexOf(ffcCircle) < 0) meta.push(ffcCircle);
             if (meta.length) {
               var sub = document.createElement("span");
               sub.className = "friend-list__meta";
