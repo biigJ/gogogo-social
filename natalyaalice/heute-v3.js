@@ -26,7 +26,7 @@
 
   var FILTER_KEY = "gogogo_heute_filter_v3";
   /* Ich ⊂ Team ⊂ Gruppe ⊂ Tagebuch ⊂ Alles — Gruppe nur wenn vorhanden */
-  var VIEW_LEVEL = { ich: 0, team: 1, gruppe: 1, tagebuch: 2, alles: 3, bubble: 3, circle: 3 };
+  var VIEW_LEVEL = { ich: 0, team: 1, gruppe: 1, coach: 1, tagebuch: 2, alles: 3, bubble: 3, circle: 3 };
 
   function viewFlags(view) {
     view = normalizeFilter(view) || "ich";
@@ -39,6 +39,8 @@
       teamOnly: view === "team",
       diaryOnly: view === "tagebuch",
       bubbleOnly: view === "bubble",
+      /* Coach = nur ich und meine Coachees (auch ihre privaten Events) */
+      coachOnly: view === "coach",
       /* Circle = Zirkeltrainings: FFC-Events und -Posts, Zirkel-Events und mit dem Circle geteilte Events */
       circleOnly: view === "circle",
       showIncomingInvites: level >= 1,
@@ -103,7 +105,7 @@
     if (String(v || "").indexOf("group:") === 0 || v === "gruppe" || v === "circle") return "team";
     /* Tagebuch gibt es im Dropdown nicht mehr → Alles */
     if (v === "tagebuch") return "alles";
-    if (["ich", "team", "alles", "bubble"].indexOf(v) >= 0) return v;
+    if (["ich", "team", "alles", "bubble", "coach"].indexOf(v) >= 0) return v;
     return "";
   }
 
@@ -370,6 +372,14 @@
       .catch(function () {});
   }
 
+  /* Ich bin Coach dieser Person (go_accounts.trainer_id) */
+  function isMyCoachee(uid) {
+    uid = String(uid || "");
+    if (!uid || uid === me()) return false;
+    var s = state.share && state.share[uid];
+    if (s && s.coach) return s.coach === me();
+    return (host.teamPeople || []).some(function (p) { return p && String(p.id) === uid && String(p.trainer_id || "") === me(); });
+  }
   function ownerShares(uid) {
     uid = String(uid || "");
     if (!uid || uid === me()) return true;
@@ -1286,8 +1296,11 @@
     var uid = me();
     var mine = String(ev.user_id) === uid;
     var vis = normalizeVisibility(ev.visibility);
-    /* privat: nur für den Ersteller und für Eingeladene/Zugesagte (go-events-invited.sql) */
-    if (vis === "privat" && !mine && !inviteFor(ev.id) && !iAmGoing(ev.id)) return false;
+    /* Coach sieht die Events seiner Coachees immer, auch privat (RLS: go_is_coach_of) */
+    var coachSees = !mine && isMyCoachee(ev.user_id);
+    if (flags.coachOnly && !mine && !coachSees) return false;
+    /* privat: nur für den Ersteller, den Coach und für Eingeladene/Zugesagte (go-events-invited.sql) */
+    if (vis === "privat" && !mine && !coachSees && !inviteFor(ev.id) && !iAmGoing(ev.id)) return false;
     /* Bubble-Events von Nicht-Freunden nur im Bubble-Filter */
     if (!mine && ev.bubble_id && !(host.teamPeople || []).some(function (p) { return p && String(p.id) === String(ev.user_id); })) return false;
     if (ev.status === "ausgefallen") return false;
@@ -1319,6 +1332,7 @@
       }
       if (!flags.showOthersUpcoming) return false;
       /* Kommende Events: „zeigen“ am Event reicht (Historie teilen gilt nur für Vergangenes) */
+      if (coachSees) return true;
       if (!inTeamFilter(ev.user_id, flags)) return false;
       if (!(vis === "team" || vis === "gruppe")) return false;
       return inGroupFilter(ev.user_id, flags);
@@ -1327,6 +1341,7 @@
       /* ohne Posting gespeichert: auch im eigenen Verlauf nicht zeigen */
       if (ev.feed_hidden) return false;
       if (mine) return !!flags.showOwnHistory;
+      if (coachSees && flags.showFriendsHistory) return true;
       if (!flags.showFriendsHistory || !(vis === "team" || vis === "gruppe")) return false;
       /* Profilreihe (todayAll): heute erledigtes Event ist die Story des Tages, gilt ohne „Historie teilen“ */
       var todayStory = flags.todayAll && dayKey(ev.starts_at) >= (flags.storyFrom || dayKey(new Date(now).toISOString()));
