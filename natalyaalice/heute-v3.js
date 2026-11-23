@@ -212,8 +212,9 @@
           open: pend && host.promptJoinRequests ? function () { host.promptJoinRequests(); } : (q.event_id ? function () { openReplyEvent(q.event_id); } : null) });
       });
       (r[3] || []).forEach(function (q) {
-        out.push({ kind: "joinans", created_at: q.decided_at, to_id: q.to_id, past: true,
-          labelFn: function () { return first(q.to_id) + " hat Deine Anfrage " + (ST[q.status] || q.status) + ": " + ((q.events && q.events.title) || "Training"); },
+        /* Antwort auf meine Mitmach-Anfrage: neu (roter Punkt), bis ich das Herz öffne */
+        out.push({ kind: "joinans", created_at: q.decided_at, to_id: q.to_id, past: false,
+          labelFn: function () { return "Deine Anfrage für " + ((q.events && q.events.title) || "das Training") + " wurde von " + first(q.to_id) + " " + (ST[q.status] || q.status); },
           open: q.event_id ? function () { openReplyEvent(q.event_id); } : null });
       });
       (r[4] || []).forEach(function (c) {
