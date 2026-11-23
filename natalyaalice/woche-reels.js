@@ -3602,9 +3602,49 @@
     return out;
   }
 
+  /* Die Woche gilt global: Tag, Uhrzeit, Sichtbarkeit und Bubble einer Plan-Einheit gelten für alle
+     kommenden Wochen desselben Plans (gleiche Einheit am gleichen Wochentag), bis man es wieder ändert. */
+  function loadFutureSeries(de) {
+    var enr = {};
+    de.slots.forEach(function (ev) { if (ev && ev.enrollment_id) enr[ev.enrollment_id] = 1; });
+    var ids = Object.keys(enr);
+    if (!ids.length || !me()) return Promise.resolve([]);
+    var after = addDays(de.days[de.days.length - 1], 1);
+    return rest("events?user_id=eq." + encodeURIComponent(me()) + "&enrollment_id=in.(" + ids.join(",") + ")" +
+      "&status=eq.geplant&starts_at=gte." + after + "T00:00:00Z&select=id,title,starts_at,enrollment_id,visibility,bubble_id,group_id&limit=1000")
+      .catch(function () { return []; });
+  }
+  function weekdayOf(iso) { return new Date(iso + "T12:00:00").getDay(); }
+  function seriesJobs(future, ev, iso, untimed, hhmm, body) {
+    if (!ev.enrollment_id || !future.length) return [];
+    var fromWd = weekdayOf(dayKey(ev.starts_at));
+    /* Montag ist Wochenanfang: Sonntag → Montag heißt 6 Tage zurück */
+    var shift = ((weekdayOf(iso) + 6) % 7) - ((fromWd + 6) % 7);
+    var out = [];
+    future.forEach(function (f) {
+      if (String(f.enrollment_id) !== String(ev.enrollment_id) || String(f.title || "") !== String(ev.title || "")) return;
+      if (weekdayOf(dayKey(f.starts_at)) !== fromWd || String(f.id) === String(ev.id)) return;
+      var d = addDays(dayKey(f.starts_at), shift);
+      var want = untimed ? d + "T12:00:00Z" : timedStarts(d, hhmm);
+      var b = {};
+      if (new Date(want).getTime() !== new Date(f.starts_at).getTime()) b.starts_at = want;
+      Object.keys(body).forEach(function (k) {
+        if (String(f[k] == null ? "" : f[k]) !== String(body[k] == null ? "" : body[k])) b[k] = body[k];
+      });
+      if (!Object.keys(b).length) return;
+      out.push(rest("events?id=eq." + encodeURIComponent(f.id), { method: "PATCH", prefer: "return=minimal", body: b }));
+    });
+    return out;
+  }
+
   function saveDaysEditor() {
     var de = state.daysEdit;
     if (!de) return;
+    var saveBtn0 = document.querySelector("[data-wr-days-save]");
+    if (saveBtn0) saveBtn0.disabled = true;
+    loadFutureSeries(de).then(function (future) { saveDaysEditorWith(de, future || []); });
+  }
+  function saveDaysEditorWith(de, future) {
     var jobs = [];
     de.slots.forEach(function (ev, i) {
       if (!ev) return;
@@ -3620,6 +3660,13 @@
       var bubId = host.bubbleId ? host.bubbleId() : "";
       var bubChanged = wantBub !== !!ev.bubble_id && (!!bubId || !wantBub);
       var grp = vis === "gruppe" && host.myGroups ? (host.myGroups() || [])[0] : null;
+      /* auch wenn diese Woche schon passt: kommende Wochen angleichen (Tag, Uhrzeit, Sichtbarkeit, Bubble).
+         Circle teilt einzelne Termine in der Zirkel-App, deshalb nicht für die Serie. */
+      if (vis !== "circle") {
+        var serBody = { visibility: vis, bubble_id: wantBub && bubId ? bubId : wantBub ? ev.bubble_id || null : null };
+        if (grp) serBody.group_id = grp.id;
+        jobs = jobs.concat(seriesJobs(future, ev, iso, untimed, hhmm, serBody));
+      }
       if (sameDay && (ev.visibility || "team") === vis && !bubChanged && !(grp && String(ev.group_id || "") !== String(grp.id))) return;
       var body = { starts_at: starts, visibility: vis };
       /* Durch eine Alternative ersetzte Einheit auf einen anderen Tag gelegt: dort wieder geplant */
