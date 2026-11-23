@@ -166,6 +166,83 @@
       try { paintReplyHeart(); } catch (eP) {}
     }
   }
+  /* Weitere Meldungen fürs Herz (letzte 7 Tage): Bubble, „Ich möchte mitmachen“, Coaching, Mitteilungen der App */
+  function moreHeartItems() {
+    var uid = encodeURIComponent(me());
+    if (!me()) return Promise.resolve([]);
+    var since = new Date(Date.now() - 7 * 86400000).toISOString();
+    var sinceQ = encodeURIComponent(since);
+    var bid = host && host.bubbleId ? String(host.bubbleId() || "") : "";
+    var bSeen = bubbleSeen();
+    function openBubble() {
+      saveFilter("bubble");
+      var sel = $("heute-filter-select");
+      if (sel) sel.value = "bubble";
+      refresh();
+    }
+    var jobs = [
+      bid ? rest("go_bubble_messages?bubble_id=eq." + encodeURIComponent(bid) + "&author_id=neq." + uid + "&created_at=gte." + sinceQ +
+        "&select=id,author_id,body,created_at&order=created_at.desc&limit=20").catch(function () { return []; }) : [],
+      bid ? rest("events?bubble_id=eq." + encodeURIComponent(bid) + "&user_id=neq." + uid + "&created_at=gte." + sinceQ +
+        "&select=id,user_id,title,created_at&order=created_at.desc&limit=20").catch(function () { return []; }) : [],
+      rest("go_event_requests?to_id=eq." + uid + "&or=(status.eq.pending,created_at.gte." + since + ")" +
+        "&select=id,event_id,from_id,status,created_at,decided_at,events(title)&order=created_at.desc&limit=20").catch(function () { return []; }),
+      rest("go_event_requests?from_id=eq." + uid + "&status=neq.pending&decided_at=gte." + sinceQ +
+        "&select=id,event_id,to_id,status,decided_at,events(title)&order=decided_at.desc&limit=20").catch(function () { return []; }),
+      rest("go_coachee_requests?and=(or(coach_id.eq." + me() + ",user_id.eq." + me() + "),or(status.eq.pending,created_at.gte." + since + ",decided_at.gte." + since + "))" +
+        "&select=id,user_id,coach_id,status,created_at,decided_at&order=created_at.desc&limit=20").catch(function () { return []; }),
+      rest("go_messages?or=(to_id.is.null,to_id.eq." + me() + ")&created_at=gte." + sinceQ + "&select=id,body,created_at&order=created_at.desc&limit=20").catch(function () { return []; })
+    ];
+    var ST = { accepted: "angenommen", declined: "abgelehnt", withdrawn: "zurückgezogen" };
+    return Promise.all(jobs).then(function (r) {
+      var out = [];
+      var first = function (id) { return String(personOf(id).name || "Jemand").split(" ")[0]; };
+      (r[0] || []).forEach(function (m) {
+        out.push({ kind: "bubblemsg", created_at: m.created_at, author_id: m.author_id, past: String(m.created_at) <= bSeen, body: m.body,
+          labelFn: function () { return first(m.author_id) + " in der Bubble" + (m.body ? ": " + String(m.body).slice(0, 80) : ""); }, open: openBubble });
+      });
+      (r[1] || []).forEach(function (e) {
+        out.push({ kind: "bubbleev", created_at: e.created_at, user_id: e.user_id, past: String(e.created_at) <= bSeen,
+          labelFn: function () { return first(e.user_id) + " plant in der Bubble: " + (e.title || "Training"); }, open: openBubble });
+      });
+      (r[2] || []).forEach(function (q) {
+        var pend = q.status === "pending";
+        out.push({ kind: "joinreq", created_at: pend ? q.created_at : (q.decided_at || q.created_at), from_id: q.from_id, past: !pend,
+          labelFn: function () { return first(q.from_id) + " möchte mitmachen: " + ((q.events && q.events.title) || "Training") + (pend ? "" : " · " + (ST[q.status] || q.status)); },
+          open: pend && host.promptJoinRequests ? function () { host.promptJoinRequests(); } : (q.event_id ? function () { openReplyEvent(q.event_id); } : null) });
+      });
+      (r[3] || []).forEach(function (q) {
+        out.push({ kind: "joinans", created_at: q.decided_at, to_id: q.to_id, past: true,
+          labelFn: function () { return first(q.to_id) + " hat Deine Anfrage " + (ST[q.status] || q.status) + ": " + ((q.events && q.events.title) || "Training"); },
+          open: q.event_id ? function () { openReplyEvent(q.event_id); } : null });
+      });
+      (r[4] || []).forEach(function (c) {
+        var toMe = String(c.coach_id) === me();
+        /* offene Anfragen an mich als Coach liefert der Host (mit Annehmen/Ablehnen) */
+        if (toMe && c.status === "pending") return;
+        var at = c.status === "pending" ? c.created_at : (c.decided_at || c.created_at);
+        out.push({ kind: "coach", created_at: at, user_id: c.user_id, coach_id: c.coach_id, past: true,
+          labelFn: function () {
+            if (toMe) return first(c.user_id) + " möchte Dich als Coach · " + (ST[c.status] || c.status);
+            return c.status === "pending" ? "Deine Coach-Anfrage an " + first(c.coach_id) + " · offen"
+              : first(c.coach_id) + " hat Deine Coach-Anfrage " + (ST[c.status] || c.status);
+          } });
+      });
+      /* Mehr als 2 neue Wochenpläne auf einmal: eine Meldung (wie beim Öffnen der App) */
+      var plans = (r[5] || []).filter(function (m) { return /^Neuer Wochenplan/.test(String(m.body || "")); });
+      var restMsgs = (r[5] || []).filter(function (m) { return !/^Neuer Wochenplan/.test(String(m.body || "")); });
+      if (plans.length > 2) {
+        var names = plans.map(function (m) { var mm = String(m.body).match(/„([^“]+)“/); return mm ? mm[1] : ""; }).filter(Boolean);
+        out.push({ kind: "msg", created_at: plans[0].created_at, past: true, label: "Es gibt neue Trainingspläne.",
+          open: function () { if (global.GoDialog) GoDialog.alert("Es gibt neue Trainingspläne.", { body: names.join(", ") + "\n\nDu findest sie unter Woche → Stift → Wochenplan ändern." }); } });
+      } else restMsgs = restMsgs.concat(plans);
+      restMsgs.forEach(function (m) {
+        out.push({ kind: "msg", created_at: m.created_at, past: true, label: String(m.body || "Mitteilung").slice(0, 120),
+          open: function () { if (global.GoDialog) GoDialog.alert(String(m.body || "")); } });
+      });
+      return out;
+    });
+  }
   function latestBubbleNews() {
     var bid = host && host.bubbleId ? String(host.bubbleId() || "") : "";
     if (!bid || !me() || state.filter === "bubble") return Promise.resolve(null);
@@ -5061,7 +5138,7 @@
         "&select=id,event_id,from_id,workout_label,workout_date,status,created_at&order=created_at.desc&limit=40"
     ).catch(function () { return null; });
     var extra = host && host.heartNotices ? Promise.resolve(host.heartNotices()).catch(function () { return []; }) : Promise.resolve([]);
-    var bub = latestBubbleNews().catch(function () { return null; });
+    var bub = moreHeartItems().catch(function () { return []; });
     return Promise.all([replies, invites, extra, bub]).then(function (r) {
       var list = [];
       (r[0] || []).forEach(function (x) { list.push(Object.assign({ kind: "reply" }, x)); });
@@ -5070,7 +5147,7 @@
         list.push(Object.assign({ kind: "invite", past: !open }, x));
       });
       (r[2] || []).forEach(function (x) { if (x && x.created_at) list.push(x); });
-      if (r[3]) list.push(r[3]);
+      (r[3] || []).forEach(function (x) { if (x && x.created_at) list.push(x); });
       list.sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); });
       /* Liste: alles der letzten 7 Tage, offene Anfragen auch älter */
       var since = new Date(Date.now() - 7 * 86400000).toISOString();
@@ -5080,12 +5157,15 @@
       state.heartList = list;
       paintReplyHeart();
       var pids = [];
-      list.forEach(function (x) { if (x.account_id) pids.push(String(x.account_id)); if (x.from_id) pids.push(String(x.from_id)); });
+      list.forEach(function (x) {
+        ["account_id", "from_id", "author_id", "user_id", "coach_id", "to_id"].forEach(function (k) { if (x[k]) pids.push(String(x[k])); });
+      });
       if (pids.length) return ensurePeople(pids).catch(function () {});
     });
   }
   function heartLabel(x) {
     if (x.label) return x.label;
+    if (typeof x.labelFn === "function") return x.labelFn();
     var first = function (id) { return String(personOf(id).name || "Jemand").split(" ")[0]; };
     if (x.kind === "reply") return first(x.account_id) + " hat auf Deinen Kommentar geantwortet";
     if (x.kind === "invite") {
