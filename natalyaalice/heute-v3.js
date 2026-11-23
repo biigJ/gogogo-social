@@ -151,6 +151,41 @@
     var sel = $("heute-filter-select");
     if (sel && document.activeElement !== sel) sel.value = v;
     if (host && host.onFilterChange) host.onFilterChange(v);
+    if (v === "bubble") markBubbleSeen();
+  }
+
+  /* Neues in der Bubble (Nachricht oder Event eines anderen) → roter Punkt am Herz, egal welcher Filter.
+     Gesehen, sobald man auf Bubble schaltet oder die Meldung am Herz öffnet. */
+  function bubbleSeenKey() { return "gogogo_bubble_seen_" + me(); }
+  function bubbleSeen() { try { return localStorage.getItem(bubbleSeenKey()) || ""; } catch (e) { return ""; } }
+  function markBubbleSeen() {
+    try { localStorage.setItem(bubbleSeenKey(), new Date().toISOString()); } catch (e) {}
+    if (state.heartList) {
+      state.heartList = state.heartList.filter(function (x) { return x.kind !== "bubble"; });
+      state.lastReply = state.heartList[0] || null;
+      try { paintReplyHeart(); } catch (eP) {}
+    }
+  }
+  function latestBubbleNews() {
+    var bid = host && host.bubbleId ? String(host.bubbleId() || "") : "";
+    if (!bid || !me() || state.filter === "bubble") return Promise.resolve(null);
+    var msg = rest("go_bubble_messages?bubble_id=eq." + encodeURIComponent(bid) + "&author_id=neq." + encodeURIComponent(me()) +
+      "&select=created_at&order=created_at.desc&limit=1").catch(function () { return []; });
+    var ev = rest("events?bubble_id=eq." + encodeURIComponent(bid) + "&user_id=neq." + encodeURIComponent(me()) +
+      "&select=created_at&order=created_at.desc&limit=1").catch(function () { return []; });
+    return Promise.all([msg, ev]).then(function (r) {
+      var at = [(r[0] && r[0][0] && r[0][0].created_at) || "", (r[1] && r[1][0] && r[1][0].created_at) || ""].sort().pop();
+      if (!at || at <= bubbleSeen()) return null;
+      return {
+        kind: "bubble", created_at: at,
+        open: function () {
+          saveFilter("bubble");
+          var sel = $("heute-filter-select");
+          if (sel) sel.value = "bubble";
+          refresh();
+        }
+      };
+    });
   }
 
   function rest(path, opts) {
@@ -5056,11 +5091,13 @@
         "&select=id,event_id,created_at&order=created_at.desc&limit=1"
     ).catch(function () { return null; });
     var extra = host && host.heartNotices ? Promise.resolve(host.heartNotices()).catch(function () { return []; }) : Promise.resolve([]);
-    return Promise.all([replies, invites, extra]).then(function (r) {
+    var bub = latestBubbleNews().catch(function () { return null; });
+    return Promise.all([replies, invites, extra, bub]).then(function (r) {
       var list = [];
       if (r[0] && r[0][0]) list.push(Object.assign({ kind: "reply" }, r[0][0]));
       if (r[1] && r[1][0]) list.push(Object.assign({ kind: "invite" }, r[1][0]));
       (r[2] || []).forEach(function (x) { if (x && x.created_at) list.push(x); });
+      if (r[3]) list.push(r[3]);
       list.sort(function (a, b) { return String(b.created_at).localeCompare(String(a.created_at)); });
       state.lastReply = list[0] || null;
       state.heartList = list;
