@@ -73,8 +73,7 @@
     ".gpl__back{width:44px;height:44px;border:0;background:transparent;color:inherit;display:grid;place-items:center;padding:0;cursor:pointer}" +
     ".gpl__body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:6px 16px calc(28px + env(safe-area-inset-bottom))}" +
     ".gpl__lead{margin:4px 0 14px;font-size:15px;line-height:1.4}" +
-    ".gpl__tier{display:flex;align-items:center;gap:14px;margin:4px 0 14px}.gpl__pyr{flex:none;width:64px;height:46px;color:#2A2118}" +
-    ".gpl__tier small{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:rgba(42,33,24,.6)}.gpl__tier b{display:block;font:600 20px/1.2 'Playfair Display',Georgia,serif}.gpl__tier span{display:block;font-size:14px;color:rgba(42,33,24,.7)}" +
+    ".gpl__q{margin:4px 0 14px}.gpl__q small{display:block;font-size:12px;letter-spacing:.04em;text-transform:uppercase;color:rgba(42,33,24,.6)}.gpl__q b{display:block;font:600 20px/1.2 'Playfair Display',Georgia,serif}" +
     ".gpl__goals{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;margin:0 0 12px}" +
     ".gpl__goals .gpl__goal{margin:0;padding:10px 12px;min-width:0}.gpl__goal>span:last-child{min-width:0;overflow-wrap:anywhere;hyphens:auto}.gpl__goals .gpl__goal b{font-size:14px;line-height:1.25}" +
     ".gpl__goal{display:flex;align-items:center;gap:12px;width:100%;text-align:left;margin:0 0 8px;padding:12px 14px;border-radius:14px;border:1.5px solid rgba(42,33,24,.2);background:#F6F1E8;color:inherit;font:inherit;cursor:pointer}" +
@@ -166,7 +165,7 @@
   var PLAN_SEL = "id,title,level,description,image_url,is_active,private_for,course_sessions!course_sessions_course_id_fkey(session_no,block_no,is_travel,category,title,unit_course_id)";
   function load() {
     var sel = PLAN_SEL;
-    var extra = ",is_public,goals,preview_url";
+    var extra = ",is_public,goals,preview_url,equipment";
     var q = "courses?is_active=eq.true&private_for=is.null&order=title.asc,level.asc&limit=300&select=";
     return st.host.rest(q + sel + extra)
       .then(function (rows) { st.newCols = true; return rows; })
@@ -202,27 +201,38 @@
   }
 
   /* ---------- Schritte ---------- */
-  /* Ziele in drei Pyramiden-Schritten: Fundament → Wohlbefinden → Leistung (Schlüssel bleiben GOALS) */
+  /* Drei Fragen von allgemein zu spezifisch, damit man nicht alle Wochenpläne auf einmal sieht:
+     1) Worum geht es Dir? (Bereich)  2) Was genau? (Ziel, nur mit passendem Plan)  3) Was hast Du zur Verfügung? (Ort/Equipment) */
   var TIERS = [
-    { name: "Fundament", sub: "Gesund und schmerzfrei", keys: ["gesund", "schmerzfrei", "ruecken", "haltung", "gelenke", "beweglich", "balance", "praevention", "comeback", "knochen", "sturz", "schwangerschaft"] },
-    { name: "Wohlbefinden", sub: "Energie, Kopf und Freude", keys: ["energie", "schlaf", "stress", "kopf", "routine", "longevity", "selbstbewusst", "leute", "natur", "spielerisch", "tanzen"] },
-    { name: "Leistung", sub: "Stärker, schneller, ein konkretes Ziel", keys: ["abnehmen", "muskelaufbau", "muskeln", "herz", "laufen", "hybrid", "hyrox", "halbmarathon", "klimmzug", "bouldern", "schwimmen"] }
+    { name: "Gesund und schmerzfrei", sub: "Rücken, Gelenke, Beweglichkeit, wieder einsteigen", keys: ["gesund", "schmerzfrei", "ruecken", "haltung", "gelenke", "beweglich", "balance", "praevention", "comeback", "knochen", "sturz", "schwangerschaft"] },
+    { name: "Wohlfühlen", sub: "Energie, Kopf frei, Routine, Spaß mit anderen", keys: ["energie", "schlaf", "stress", "kopf", "routine", "longevity", "selbstbewusst", "leute", "natur", "spielerisch", "tanzen"] },
+    { name: "Stärker und fitter", sub: "Abnehmen, Muskeln, Ausdauer, ein Wettkampf", keys: ["abnehmen", "muskelaufbau", "muskeln", "herz", "laufen", "hybrid", "hyrox", "halbmarathon", "klimmzug", "bouldern", "schwimmen"] }
   ];
-  /* neue Ziele ohne Stufe landen im Fundament */
+  /* neue Ziele ohne Bereich landen bei „Gesund und schmerzfrei“ */
   GOALS.forEach(function (g) {
     if (!TIERS.some(function (t) { return t.keys.indexOf(g.key) !== -1; })) TIERS[0].keys.push(g.key);
   });
-
-  function pyramidSvg(on) {
-    /* Stufe 0 unten (breit) … Stufe 2 oben (Spitze) */
-    var rows = [
-      '<path d="M4 44h56l-7-13H11z"/>',
-      '<path d="M12 29h40l-7-13H19z"/>',
-      '<path d="M20 14h24L32 1z"/>'
-    ];
-    return '<svg class="gpl__pyr" viewBox="0 0 64 46" aria-hidden="true">' + rows.map(function (r, i) {
-      return r.replace("<path", '<path fill="currentColor" opacity="' + (i === on ? "1" : i < on ? ".55" : ".18") + '"');
-    }).join("") + "</svg>";
+  var PLACES = [
+    { key: "zuhause", label: "Nur mein Körper", sub: "Zuhause oder draußen, ohne Geräte" },
+    { key: "hanteln", label: "Hanteln zuhause", sub: "Kurzhanteln, Kettlebell, Band" },
+    { key: "gym", label: "Fitnessstudio", sub: "Geräte und Langhantel" }
+  ];
+  function placeOf(c) {
+    var eq = c.equipment || [];
+    if (eq.some(function (x) { return /Gym-Geräte|Langhantel|Schlitten/.test(x); })) return "gym";
+    if (eq.some(function (x) { return /Kurzhantel|Kettlebell|Medizinball|Slam-Ball|Boxhandschuhe/.test(x); })) return "hanteln";
+    return "zuhause";
+  }
+  /* wer mehr hat, kann auch das Einfachere: Gym → alle, Hanteln → Hanteln + ohne Geräte */
+  function placeOk(c, place) {
+    if (!place) return true;
+    var p = placeOf(c);
+    return place === "gym" || p === "zuhause" || (place === "hanteln" && p === "hanteln");
+  }
+  function plansFor(goal, place) {
+    return (st.plans || []).filter(function (c) {
+      return (!goal || (c.goals || []).indexOf(goal) !== -1) && placeOk(c, place);
+    });
   }
 
   function paintGoals() {
@@ -230,23 +240,34 @@
     st.title.textContent = "Dein Ziel";
     var n = Math.max(0, Math.min(2, st.goalStep || 0));
     st.goalStep = n;
-    var tier = TIERS[n];
-    var list = GOALS.filter(function (g) { return tier.keys.indexOf(g.key) !== -1; });
-    var last = n === 2;
-    st.body.innerHTML =
-      '<div class="gpl__tier">' + pyramidSvg(n) + '<div><small>Schritt ' + (n + 1) + " von 3</small><b>" + esc(tier.name) + "</b><span>" + esc(tier.sub) + "</span></div></div>" +
-      '<div class="gpl__goals">' +
-      list.map(function (g) {
-        var on = st.goals.indexOf(g.key) !== -1;
-        return '<button type="button" class="gpl__goal' + (on ? " is-on" : "") + '" data-gpp-goal="' + g.key + '">' +
-          '<span class="gpl__tick">' + (on ? "✓" : "") + "</span><span><b>" + esc(g.label) + "</b>" + (g.sub ? "<small>" + esc(g.sub) + "</small>" : "") + "</span></button>";
-      }).join("") + "</div>" +
-      (last ? '<input type="text" class="gpl__own" id="gpl-own-goal" maxlength="60" placeholder="Oder eigenes Ziel eingeben" value="' + esc(st.ownGoal || "") + '" />' : "") +
-      (last
-        ? '<button type="button" class="gpl__btn" data-gpp-next>' + (st.goals.length ? "Passende Pläne zeigen" : "Alle Pläne zeigen") + "</button>"
-        : '<button type="button" class="gpl__btn" data-gpp-tier="' + (n + 1) + '">Weiter</button>') +
-      (n > 0 ? '<button type="button" class="gpl__link" data-gpp-tier="' + (n - 1) + '">Zurück</button>' : "") +
-      (last && st.mode === "self" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-indiv>Individuell</button>' : "");
+    var html = "";
+    if (n === 0) {
+      html = '<p class="gpl__q"><small>Frage 1 von 3</small><b>Worum geht es Dir am meisten?</b></p><div class="gpl__goals">' +
+        TIERS.map(function (t, i) {
+          return '<button type="button" class="gpl__goal' + (st.tier === i ? " is-on" : "") + '" data-gpp-tierpick="' + i + '"><span><b>' + esc(t.name) + "</b><small>" + esc(t.sub) + "</small></span></button>";
+        }).join("") + "</div>" +
+        (st.mode === "self" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-indiv>Individuell mit Coach</button>' : "");
+    } else if (n === 1) {
+      var tier = TIERS[st.tier || 0];
+      /* nur Ziele, zu denen es einen Plan gibt */
+      var goals = GOALS.filter(function (g) { return tier.keys.indexOf(g.key) !== -1 && (!st.plans || plansFor(g.key).length); });
+      html = '<p class="gpl__q"><small>Frage 2 von 3</small><b>Was genau?</b></p><div class="gpl__goals">' +
+        goals.map(function (g) {
+          return '<button type="button" class="gpl__goal' + (st.goals[0] === g.key ? " is-on" : "") + '" data-gpp-goal="' + g.key + '"><span><b>' + esc(g.label) + "</b>" + (g.sub ? "<small>" + esc(g.sub) + "</small>" : "") + "</span></button>";
+        }).join("") + "</div>" +
+        '<button type="button" class="gpl__link" data-gpp-tier="0">Zurück</button>';
+    } else {
+      var goal = st.goals[0] || "";
+      var opts = PLACES.filter(function (p) { return plansFor(goal, p.key).length; });
+      html = '<p class="gpl__q"><small>Frage 3 von 3</small><b>Was hast Du zum Trainieren?</b></p><div class="gpl__goals">' +
+        opts.map(function (p) {
+          var k = plansFor(goal, p.key).length;
+          return '<button type="button" class="gpl__goal" data-gpp-place="' + p.key + '"><span><b>' + esc(p.label) + "</b><small>" + esc(p.sub) + " · " + k + (k === 1 ? " Plan" : " Pläne") + "</small></span></button>";
+        }).join("") + "</div>" +
+        '<button type="button" class="gpl__link" data-gpp-tier="1">Zurück</button>';
+    }
+    st.body.innerHTML = html;
+    if (st.body) st.body.scrollTop = 0;
   }
 
   /* ---------- Individuell: Coach anfragen ---------- */
@@ -371,6 +392,7 @@
         return (c.goals || []).some(function (g) { return st.goals.indexOf(g) !== -1; });
       });
     }
+    if (st.place) list = list.filter(function (c) { return placeOk(c, st.place); });
     list.sort(function (a, b) { return (a.level || 9) - (b.level || 9) || String(a.title).localeCompare(String(b.title), "de"); });
     var lead = st.mode === "coach"
       ? "Für " + esc(st.userName || "Coachee") + ": Plan wählen, dann die Tage schieben."
@@ -531,18 +553,39 @@
     });
   }
 
+  function showPlans() {
+    saveGoalToProfile();
+    paintList();
+    /* gogogo-Hybrid-Prinzip: einmal je Öffnen, wenn die Pläne erscheinen */
+    if (!st.prinzipShown && global.GoDialog) {
+      st.prinzipShown = true;
+      global.GoDialog.alert("So trainierst Du mit gogogo", { body: PRINZIP, center: true, ok: "Pläne ansehen" });
+    }
+  }
+
   function onClick(e) {
     if (st.suppressClick) { st.suppressClick = false; return; }
     var t = e.target;
     if (t.closest("[data-gpp-close]")) return back();
+    var tp = t.closest("[data-gpp-tierpick]");
+    if (tp) {
+      st.tier = parseInt(tp.getAttribute("data-gpp-tierpick"), 10) || 0;
+      st.goalStep = 1;
+      return paintGoals();
+    }
     var g = t.closest("[data-gpp-goal]");
     if (g) {
-      var ownIn = st.root.querySelector("#gpl-own-goal");
-      if (ownIn) st.ownGoal = ownIn.value;
-      var k = g.getAttribute("data-gpp-goal");
-      var i = st.goals.indexOf(k);
-      if (i === -1) st.goals.push(k); else st.goals.splice(i, 1);
-      return paintGoals();
+      st.goals = [g.getAttribute("data-gpp-goal")];
+      st.place = "";
+      /* nur ein Ort mit Plänen: Frage 3 überspringen */
+      var places = PLACES.filter(function (p) { return plansFor(st.goals[0], p.key).length; });
+      if (places.length > 1) { st.goalStep = 2; return paintGoals(); }
+      return showPlans();
+    }
+    var pl = t.closest("[data-gpp-place]");
+    if (pl) {
+      st.place = pl.getAttribute("data-gpp-place");
+      return showPlans();
     }
     var tierBtn = t.closest("[data-gpp-tier]");
     if (tierBtn) {
@@ -551,19 +594,8 @@
       if (st.body) st.body.scrollTop = 0;
       return;
     }
-    if (t.closest("[data-gpp-next]")) {
-      var ownEl = st.root.querySelector("#gpl-own-goal");
-      if (ownEl) st.ownGoal = ownEl.value;
-      saveGoalToProfile();
-      paintList();
-      /* gogogo-Hybrid-Prinzip: einmal je Öffnen, wenn die Pläne erscheinen */
-      if (!st.prinzipShown && global.GoDialog) {
-        st.prinzipShown = true;
-        global.GoDialog.alert("So trainierst Du mit gogogo", { body: PRINZIP, center: true, ok: "Pläne ansehen" });
-      }
-      return;
-    }
-    if (t.closest("[data-gpp-goals]")) { st.goalStep = 0; return paintGoals(); }
+    if (t.closest("[data-gpp-next]")) return showPlans();
+    if (t.closest("[data-gpp-goals]")) { st.goalStep = 0; st.goals = []; st.place = ""; return paintGoals(); }
     if (t.closest("[data-gpp-indiv]")) return paintIndividual();
     if (t.closest("[data-gpp-coach]")) return chooseCoach();
     var send = t.closest("[data-gpp-send]");
