@@ -5385,7 +5385,7 @@
     }).sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
   }
 
-  /* Story einer Person: erst Erledigtes seit gestern, dann heute Anstehendes, chronologisch.
+  /* Story einer Person: erst Erledigtes der letzten 24 Stunden, dann heute Anstehendes, chronologisch.
      Sichtbarkeit wie im Feed (privat, Community, Gruppe, Bubble); gelöschte oder ohne Posting gespeicherte fehlen. */
   function storyEventsFor(personId) {
     var t = todayIso();
@@ -5398,7 +5398,8 @@
     var list = (state.events || []).filter(function (e) {
       if (!e || String(e.user_id) !== String(personId) || e.status === "ausgefallen") return false;
       var d = evDayIso(e);
-      if (e.status === "erledigt") return d >= from && d <= t && eventVisibleToMe(e, flags);
+      /* Erledigtes bleibt 24 Stunden Story (wie Instagram) */
+      if (e.status === "erledigt") return d >= from && d <= t && new Date(e.starts_at).getTime() >= Date.now() - 86400000 && eventVisibleToMe(e, flags);
       return d === t && eventVisibleToMe(e, flags);
     });
     function by(a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); }

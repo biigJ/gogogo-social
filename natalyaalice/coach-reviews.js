@@ -30,7 +30,10 @@
     ".gcr-coach__copy{flex:1;min-width:0}" +
     ".gcr-coach__name{font-weight:700;font-size:16px}" +
     ".gcr-mini{font-size:13px;color:rgba(42,33,24,.7)}" +
-    ".gcr-vc{display:inline-grid;place-items:center;width:14px;height:14px;margin-left:3px;vertical-align:super;border-radius:50%;background:#1D9BF0;color:#fff;font:700 9px/1 Inter,system-ui,sans-serif}" +
+    ".gcr-vc{display:inline-block;width:14px;height:14px;margin-left:3px;vertical-align:super;border-radius:50%;background:#1D9BF0}" +
+    ".gcr-vc svg{display:block;width:100%;height:100%}" +
+    /* Sterne: ohne Bewertung grau und leer, mit Bewertung schwarzer Rand, Füllung nach Schnitt */
+    ".gcr-stars{display:inline-flex;gap:2px;vertical-align:-2px;margin-right:6px}.gcr-stars svg{width:15px;height:15px;display:block}" +
     ".gcr-coach .gcr-mini{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
     ".gcr-coach__acts{display:flex;gap:8px;margin-top:8px}" +
     ".gcr-mini b{color:#2A2118}" +
@@ -113,10 +116,24 @@
       .catch(function () { return {}; });
   }
 
+  var STAR_PATH = "M12 2.6l2.9 6 6.5.8-4.8 4.5 1.2 6.5L12 17.3l-5.8 3.1 1.2-6.5-4.8-4.5 6.5-.8z";
+  var starUid = 0;
+  function starsSvg(avg, rated) {
+    var out = "";
+    for (var i = 0; i < 5; i++) {
+      var f = rated ? Math.max(0, Math.min(1, (avg || 0) - i)) : 0;
+      var id = "gcrs" + (++starUid);
+      var col = rated ? "#2A2118" : "#B5ACA0";
+      out += '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+        (f > 0 ? '<defs><linearGradient id="' + id + '"><stop offset="' + f + '" stop-color="#2A2118"/><stop offset="' + f + '" stop-color="#2A2118" stop-opacity="0"/></linearGradient></defs>' : "") +
+        '<path d="' + STAR_PATH + '" fill="' + (f > 0 ? "url(#" + id + ")" : "none") + '" stroke="' + col + '" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+    }
+    return '<span class="gcr-stars" role="img" aria-label="' + (rated ? String(Math.round(avg * 10) / 10).replace(".", ",") + " von 5 Sternen" : "Noch keine Bewertung") + '">' + out + "</span>";
+  }
   function summaryLine(s) {
     return s && s.n
-      ? "<b>" + starsText(s.avg) + "</b> " + String(Math.round(s.avg * 10) / 10).replace(".", ",") + " · " + s.n + (s.n === 1 ? " Bewertung" : " Bewertungen")
-      : "Noch keine Bewertung";
+      ? starsSvg(s.avg, true) + String(Math.round(s.avg * 10) / 10).replace(".", ",") + " · " + s.n + (s.n === 1 ? " Bewertung" : " Bewertungen")
+      : starsSvg(0, false);
   }
 
   /* ---------- Bewertung schreiben ---------- */
@@ -339,7 +356,7 @@
               /* Name, darunter Bewertung in einer Zeile, darunter Über + Wählen/Entfernen */
               var groupOnly = !c.is_trainer;
               return '<div class="gcr-coach">' + face(c) + '<div class="gcr-coach__copy"><div class="gcr-coach__name">' + esc(c.name || c.nickname || "Coach") +
-                (c.coach_verified_at ? '<span class="gcr-vc" aria-label="Verifizierter Coach">c</span>' : "") +
+                (c.coach_verified_at ? '<span class="gcr-vc" role="img" aria-label="Verifizierter Coach"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.1 6.6A4.6 4.6 0 1 0 13.1 13.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></span>' : "") +
                 '</div><div class="gcr-mini">' + (groupOnly ? "Coach ohne Zertifikat · Training in seiner Gruppe" : summaryLine(sum[c.id])) + "</div>" +
                 '<div class="gcr-coach__acts"><button type="button" class="gcr-pill" data-gcr-about="' + esc(c.id) + '">Über</button>' +
                 (groupOnly
