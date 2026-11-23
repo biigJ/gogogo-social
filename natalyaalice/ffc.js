@@ -353,7 +353,7 @@
   });
 
   document.getElementById('logoutBtn').addEventListener('click', async ()=>{
-    await sb.auth.signOut();
+    await sb.auth.signOut({ scope: 'local' });
     currentUser = null;
     cachedHistory = [];
     setAuthMode('login');
@@ -4011,7 +4011,9 @@
       return res;
     },
     async logout(){
-      await sb.auth.signOut();
+      /* nur dieses Gerät abmelden: signOut() ohne scope meldet das Zirkel-Konto auf ALLEN Geräten ab
+         (so flog biig__J überall raus, als Bens Handy mit biig__J als fremd erkannt wurde) */
+      await sb.auth.signOut({ scope: 'local' });
       currentUser = null;
       cachedHistory = [];
       setAuthMode('login');
