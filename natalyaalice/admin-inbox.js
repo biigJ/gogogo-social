@@ -115,10 +115,10 @@
     ".ga-filters select.is-on{background:#111;color:#fff}" +
     ".ga-us{margin:6px 0 2px}.ga-usbtn{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 14px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:13px;font-weight:600;color:#111;cursor:pointer}" +
     ".ga-usbtn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.ga-usbtn.is-open{background:#111;color:#fff}" +
-    ".ga-uspanel{margin-top:8px;padding:10px;border:1px solid rgba(0,0,0,.12);border-radius:14px;background:#fff;box-shadow:0 6px 20px rgba(0,0,0,.08);max-width:440px}" +
+    ".ga-uspanel{margin-top:8px;padding:10px;border:1px solid rgba(0,0,0,.12);border-radius:14px;background:#F3EEE4;box-shadow:0 6px 20px rgba(42,33,24,.08);max-width:440px}" +
     ".ga-usrow{display:grid;grid-template-columns:18px minmax(0,1.3fr) minmax(0,1fr) 24px 24px;gap:6px;align-items:center;margin-bottom:8px}" +
     ".ga-usno{font-size:12px;color:rgba(0,0,0,.45);text-align:center}" +
-    ".ga-usrow select{min-height:34px;min-width:0;padding:0 8px;border-radius:10px;border:1px solid rgba(0,0,0,.2);background:#fff;font:inherit;font-size:13px;color:#111}" +
+    ".ga-usrow select{min-height:34px;min-width:0;padding:0 8px;border-radius:10px;border:1px solid rgba(0,0,0,.2);background:#F3EEE4;font:inherit;font-size:13px;color:#111}" +
     ".ga-usx{width:28px;height:28px;border:0;background:transparent;font-size:18px;line-height:1;color:rgba(0,0,0,.5);cursor:pointer;padding:0}" +
     ".ga-ucount{font-size:13px;color:rgba(42,33,24,.65);margin:4px 0 0}" +
     ".ga-del{margin-left:6px;color:#C7413B;border-color:#C7413B}" +
@@ -683,7 +683,7 @@
     return v;
   }
   function ufMatch(a) {
-    var f = st.uf || {};
+    var f = ufLoad();
     var fx = null;
     return UF.every(function (u) {
       var v = f[u[0]];
@@ -694,7 +694,7 @@
     });
   }
   function ufBar(n, total) {
-    var f = st.uf || {};
+    var f = ufLoad();
     var on = UF.some(function (u) { return f[u[0]]; });
     return '<div class="ga-filters is-u">' + UF.map(function (u) {
       return '<select data-ga-uf="' + u[0] + '" aria-label="' + u[1] + '"' + (f[u[0]] ? ' class="is-on"' : "") + ">" + ufValues(u[0]).map(function (v) {
@@ -714,10 +714,18 @@
   var ROLE_RANK = { Inhaber: 0, Admin: 1, "Zertifiziert": 2, Coach: 3, Nutzer: 4 };
   function usGet() {
     if (st.us) return st.us;
-    try { var v = JSON.parse(localStorage.getItem("ga_user_sort") || "null"); if (Array.isArray(v)) return (st.us = v); } catch (e) {}
+    try { var v = JSON.parse(localStorage.getItem(prefKey("sort")) || "null"); if (Array.isArray(v)) return (st.us = v); } catch (e) {}
     return (st.us = US_DEFAULT.map(function (x) { return { k: x.k, d: x.d }; }));
   }
-  function usSave() { try { localStorage.setItem("ga_user_sort", JSON.stringify(st.us || [])); } catch (e) {} }
+  function usSave() { try { localStorage.setItem(prefKey("sort"), JSON.stringify(st.us || [])); } catch (e) {} }
+  /* Sortierung und Filter je eingeloggtem Konto (auf diesem Gerät) */
+  function prefKey(kind) { return "ga_user_" + kind + "_" + (me() || "anon"); }
+  function ufLoad() {
+    if (st.uf) return st.uf;
+    try { var v = JSON.parse(localStorage.getItem(prefKey("filter")) || "null"); if (v && typeof v === "object") return (st.uf = v); } catch (e) {}
+    return (st.uf = {});
+  }
+  function ufSave() { try { localStorage.setItem(prefKey("filter"), JSON.stringify(st.uf || {})); } catch (e) {} }
   function usVal(a, k) {
     var id = String(a.account_id), ci = coachInfo(id), f;
     if (k === "name") return String(a.name || "");
@@ -2143,7 +2151,7 @@
     if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
     if (t.hasAttribute("data-ga-plan")) { userPlan(t.getAttribute("data-ga-plan")); return; }
     if (t.hasAttribute("data-ga-rec")) { openRec(t.getAttribute("data-ga-rec")); return; }
-    if (t.getAttribute("data-ga-uf") === "reset") { st.uf = {}; paint(); return; }
+    if (t.getAttribute("data-ga-uf") === "reset") { st.uf = {}; ufSave(); paint(); return; }
     if (t.hasAttribute("data-ga-us")) { onUserSort(t); return; }
     if (t.hasAttribute("data-ga-nfreset")) { st.nf[t.getAttribute("data-ga-nfreset")] = {}; paint(); return; }
     if (t.hasAttribute("data-gx")) {
@@ -2240,7 +2248,7 @@
       return;
     }
     var uf = e.target && e.target.closest ? e.target.closest("select[data-ga-uf]") : null;
-    if (uf && st) { st.uf = st.uf || {}; st.uf[uf.getAttribute("data-ga-uf")] = uf.value; paint(); return; }
+    if (uf && st) { ufLoad(); st.uf[uf.getAttribute("data-ga-uf")] = uf.value; ufSave(); paint(); return; }
     var tid = e.target && e.target.id;
     if (st && st.tkDraft && (tid === "gt-area" || tid === "gt-sec" || tid === "gt-sub")) {
       st.tkDraft.body = (document.getElementById("gt-body") || {}).value || st.tkDraft.body;
