@@ -6271,11 +6271,16 @@
     }
     .nutrition-macros { text-align: center; margin: 8px 0 12px; font-size: 14px !important; }
     .team-slide__cta--gevents { margin-top: 28px; }
-    .team-gevents { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
-    .team-gevents__row { display: grid; grid-template-columns: 40px 34px 1fr; align-items: center; gap: 10px; text-align: left; }
-    .team-gevents__img { width: 40px; height: 40px; border-radius: 8px; background: rgba(255,255,255,.12) center / cover no-repeat; }
-    .team-gevents__day { font-weight: 700; opacity: .8; }
-    .team-gevents__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* Gruppe: globale Wochenplanung der Mitglieder (wie Woche → Zirkeltrainings eintragen, ohne Schieben)
+       Tag · Eventname (eine Zeile, höchstens halbe Breite) · Zusagen · Profilbild des Erstellers rechts */
+    .team-gevents { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+    .team-gevents__row { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto 36px; align-items: center; gap: 8px; min-height: 56px; padding: 6px 8px 6px 10px; border-radius: 12px; background: #F6F1E8; border: 1px solid rgba(42,33,24,.12); color: #2A2118; text-align: left; }
+    .team-gevents__day { font-weight: 700; font-size: 14px; }
+    .team-gevents__name { max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 15px; }
+    .team-gevents__going { display: flex; justify-content: flex-end; min-width: 0; }
+    .team-gevents__going span { width: 24px; height: 24px; margin-left: -6px; border-radius: 50%; border: 2px solid #F6F1E8; background: #E6DED0 center / cover no-repeat; display: grid; place-items: center; font: 700 10px/1 Inter, system-ui, sans-serif; color: #2A2118; }
+    .team-gevents__going span:first-child { margin-left: 0; }
+    .team-gevents__who { width: 36px; height: 36px; border-radius: 50%; background: #E6DED0 center / cover no-repeat; display: grid; place-items: center; font: 700 14px/1 Inter, system-ui, sans-serif; color: #2A2118; }
     .team-slide__invite-friends {
       display: flex; align-items: center; gap: 10px;
       width: 100%; min-height: 48px; margin-top: 8px;
@@ -25229,46 +25234,98 @@
         list.className = "team-gevents";
         list.hidden = true;
         slide.appendChild(list);
-        /* Aus dem Zwischenspeicher sofort zeichnen (sonst ist die Slide nach dem Neuzeichnen kurz kürzer und springt) */
-        function paintRows(rows) {
+        /* Globale Planung: jedes wiederkehrende Gruppen-Event einmal (gleicher Ersteller, Wochentag, Titel),
+           sortiert Mo → So, gleicher Tag untereinander. Zusagen = angenommene Einladungen und Zusagen zum nächsten Termin. */
+        var WD_ORDER = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+        function faceEl(cls, p) {
+          var el = document.createElement("span");
+          el.className = cls;
+          if (p && p.photo_url) el.style.backgroundImage = 'url("' + String(p.photo_url).replace(/"/g, "%22") + '")';
+          else el.textContent = String((p && p.name) || "?").slice(0, 1);
+          if (p && p.name) el.title = p.name;
+          return el;
+        }
+        function paintRows(data) {
           list.textContent = "";
+          var rows = (data && data.rows) || [], people = (data && data.people) || {}, going = (data && data.going) || {};
+          var seen = {}, series = [];
           rows.forEach(function (ev) {
+            var wd = new Date(ev.starts_at).toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }).replace(".", "");
+            var title = String(ev.title || (ev.courses && ev.courses.title) || "Event");
+            var key = ev.user_id + "|" + wd + "|" + title;
+            if (seen[key]) return;
+            seen[key] = true;
+            series.push({ ev: ev, wd: wd, title: title });
+          });
+          series.sort(function (a, b) { return WD_ORDER.indexOf(a.wd) - WD_ORDER.indexOf(b.wd); });
+          series.forEach(function (x) {
             var li = document.createElement("li");
             li.className = "team-gevents__row";
-            var img = document.createElement("span");
-            img.className = "team-gevents__img";
-            var src = ev.photo_url || (window.GoCovers && GoCovers.url ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id) : "");
-            if (src) img.style.backgroundImage = 'url("' + String(src).replace(/"/g, "%22") + '")';
             var day = document.createElement("span");
             day.className = "team-gevents__day";
-            day.textContent = new Date(ev.starts_at).toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }).replace(".", "");
+            day.textContent = x.wd;
             var name = document.createElement("span");
             name.className = "team-gevents__name";
-            name.textContent = String(ev.title || (ev.courses && ev.courses.title) || "Event");
-            li.appendChild(img);
+            name.textContent = x.title;
+            var gw = document.createElement("span");
+            gw.className = "team-gevents__going";
+            (going[String(x.ev.id)] || []).slice(0, 5).forEach(function (uid) { gw.appendChild(faceEl("", people[uid])); });
             li.appendChild(day);
             li.appendChild(name);
+            li.appendChild(gw);
+            li.appendChild(faceEl("team-gevents__who", people[String(x.ev.user_id)]));
             list.appendChild(li);
           });
-          list.hidden = !rows.length;
+          list.hidden = !series.length;
         }
         var gKey = String(group.id);
         var cached = groupEventsCache[gKey];
-        if (cached) paintRows(cached.rows);
+        if (cached) paintRows(cached.data);
         if (cached && Date.now() - cached.at < 60000) return;
         var from = new Date(Log.berlinToday() + "T00:00:00").toISOString();
         rest(
           "events?group_id=eq." + encodeURIComponent(group.id) +
           "&starts_at=gte." + encodeURIComponent(from) +
-          "&status=neq.ausgefallen&select=id,title,starts_at,photo_url,category,course_id,enrollment_id,courses(title)" +
-          "&order=starts_at.asc&limit=30"
+          "&status=neq.ausgefallen&select=id,user_id,title,starts_at,courses(title)" +
+          "&order=starts_at.asc&limit=60"
         )
           .then(function (rows) {
             rows = Array.isArray(rows) ? rows : [];
-            var sig = JSON.stringify(rows.map(function (r) { return [r.id, r.title, r.starts_at, r.photo_url]; }));
+            /* nächster Termin je Serie: dort hängen die Zusagen */
+            var firstIds = {}, ids = [];
+            rows.forEach(function (ev) {
+              var k = ev.user_id + "|" + new Date(ev.starts_at).toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }) + "|" + (ev.title || "");
+              if (!firstIds[k]) { firstIds[k] = 1; ids.push(String(ev.id)); }
+            });
+            var inQ = ids.map(encodeURIComponent).join(",");
+            return Promise.all([
+              ids.length ? rest("go_workout_invites?event_id=in.(" + inQ + ")&status=eq.accepted&select=event_id,to_id").catch(function () { return []; }) : [],
+              ids.length ? rest("event_rsvps?event_id=in.(" + inQ + ")&status=eq.zugesagt&select=event_id,user_id").catch(function () { return []; }) : []
+            ]).then(function (r) {
+              var going = {}, pids = {};
+              function add(eid, uid) {
+                eid = String(eid); uid = String(uid);
+                var arr = going[eid] || (going[eid] = []);
+                if (arr.indexOf(uid) < 0) arr.push(uid);
+                pids[uid] = 1;
+              }
+              (r[0] || []).forEach(function (x) { add(x.event_id, x.to_id); });
+              (r[1] || []).forEach(function (x) { add(x.event_id, x.user_id); });
+              rows.forEach(function (ev) { pids[String(ev.user_id)] = 1; });
+              var idList = Object.keys(pids);
+              return (idList.length ? rest("go_accounts?id=in.(" + idList.map(encodeURIComponent).join(",") + ")&select=id,name,photo_url").catch(function () { return []; }) : Promise.resolve([]))
+                .then(function (acc) {
+                  var people = {};
+                  (acc || []).forEach(function (p) { people[String(p.id)] = p; });
+                  return { rows: rows, going: going, people: people };
+                });
+            });
+          })
+          .then(function (data) {
+            var sig = JSON.stringify([data.rows.map(function (r) { return [r.id, r.title, r.starts_at]; }), data.going]);
             var same = cached && cached.sig === sig;
-            groupEventsCache[gKey] = { rows: rows, sig: sig, at: Date.now() };
-            if (!same) paintRows(rows);
+            groupEventsCache[gKey] = { data: data, sig: sig, at: Date.now() };
+            if (!same) paintRows(data);
           })
           .catch(function () {});
       }
