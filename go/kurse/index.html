@@ -166,6 +166,17 @@
     .mx-mix__l { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted, #6b6258); }
     .mx-mix__l select { width: 100%; }
     .fsel { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 10px; }
+    /* Sortieren nach (wie Notion): mehrere Sortierungen, erste gewinnt */
+    .esort { margin: 0 0 10px; }
+    .esort__btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--ink); background: transparent; color: var(--ink); font: inherit; font-size: 13px; font-weight: 600; }
+    .esort__btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .esort__btn.is-open { background: var(--ink); color: #F6F1E8; }
+    .esort__panel { margin-top: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); box-shadow: 0 6px 20px rgba(42,33,24,.08); max-width: 440px; }
+    .esort__row { display: grid; grid-template-columns: 18px minmax(0, 1.3fr) minmax(0, 1fr) 24px 24px; gap: 6px; align-items: center; margin-bottom: 8px; }
+    .esort__no { font-size: 12px; color: rgba(42,33,24,.5); text-align: center; }
+    .esort__row select { min-height: 34px; min-width: 0; padding: 0 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 13px; }
+    .esort__x { width: 24px; height: 28px; padding: 0; border: 0; background: transparent; color: rgba(42,33,24,.55); font-size: 18px; line-height: 1; }
+    .esort__links button { border: 0; background: transparent; padding: 0; color: var(--ink); font: inherit; font-size: 13px; text-decoration: underline; }
     .fsel select { width: auto; min-height: 36px; padding: 0 30px 0 12px; border-radius: 999px; border: 1.5px solid var(--ink); background-color: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); }
     .fsel select.is-on { background-color: var(--ink); color: #F6F1E8; }
     .chip { padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--ink); background: transparent; color: var(--ink); font-size: 13px; font-weight: 600; }
@@ -529,8 +540,7 @@
         ["Einschränkung", RESTR.map(function (x) { return ["r:" + x[0], x[1]]; }).concat([["r:-", "ohne Einschränkung"]]), "Einschränkung: alle"]],
       units: [["Kategorie", [["kraft", "Kraft"], ["ausdauer", "Ausdauer"]], "Kategorie: alle"], ["Level", LEVELS, "Level: alle"],
         ["Equipment", EQUIP.map(function (x) { return ["e:" + x[0], x[1]]; }), "Equipment: alle"],
-        ["Einschränkung", RESTR.map(function (x) { return ["r:" + x[0], x[1]]; }).concat([["r:-", "ohne Einschränkung"]]), "Einschränkung: alle"],
-        ["Sortierung", [["count", "nach Anzahl Übungen"]], "Sortierung: Kategorie, Name"]],
+        ["Einschränkung", RESTR.map(function (x) { return ["r:" + x[0], x[1]]; }).concat([["r:-", "ohne Einschränkung"]]), "Einschränkung: alle"]],
       exercises: [["Kategorie", BLOCK_TYPES, "Kategorie: alle"], ["Muskelgruppe", MUSCLES.map(function (m) { return ["m:" + m, m]; }), "Muskelgruppe: alle"],
         ["Equipment", EQUIP.map(function (x) { return ["e:" + x[0], x[1]]; }), "Equipment: alle"],
         ["Video", [["video", "mit Video"], ["novideo", "ohne Video"]], "Video: alle"]]
@@ -583,6 +593,120 @@
     }
     /* Events ohne Zirkeltraining: das kommt aus FFC, die Einheit braucht es nur als Kurs für Zirkel-Termine */
     function listUnits() { return units().filter(function (u) { return (u.category_default || "kraft") !== "zirkel"; }); }
+    /* ---------- Sortieren nach: je Bereich eigene Felder, gemerkt pro Gerät ---------- */
+    var SORTS = {
+      plans: [["title", "Name", "text"], ["level", "Level", "num"], ["status", "Status", "text"], ["public", "Für Nutzer", "text"],
+        ["goals", "Ziele", "text"], ["restr", "Einschränkung", "text"], ["mix", "Kraft-Tage", "num"]],
+      units: [["title", "Name", "text"], ["cat", "Kategorie", "text"], ["level", "Level", "num"], ["count", "Anzahl Übungen", "num"],
+        ["status", "Status", "text"], ["day", "Wochentag (Plan-Filter)", "num"]],
+      exercises: [["name", "Name", "text"], ["block", "Kategorie", "text"], ["muscle", "Muskelgruppe", "text"],
+        ["events", "Anzahl Events", "num"], ["video", "Video", "text"]]
+    };
+    var SORT_DEFAULT = { plans: [{ k: "title", d: "asc" }], units: [{ k: "cat", d: "asc" }, { k: "title", d: "asc" }], exercises: [{ k: "name", d: "asc" }] };
+    /* je eingeloggtem Konto gemerkt (auf diesem Gerät) */
+    function sortKey(v) { return "gk_sort_" + ((me && me.id) || "anon") + "_" + v; }
+    function sortList(v) {
+      state.sorts = state.sorts || {};
+      if (state.sorts[v]) return state.sorts[v];
+      try { var x = JSON.parse(localStorage.getItem(sortKey(v)) || "null"); if (Array.isArray(x)) return (state.sorts[v] = x); } catch (e) {}
+      return (state.sorts[v] = SORT_DEFAULT[v].map(function (r) { return { k: r.k, d: r.d }; }));
+    }
+    function sortSave(v) { try { localStorage.setItem(sortKey(v), JSON.stringify(state.sorts[v] || [])); } catch (e) {} }
+    function sortVal(v, c, k, ctx) {
+      if (v === "plans") {
+        if (k === "title") return c.title || "";
+        if (k === "level") return c.level == null ? null : Number(c.level);
+        if (k === "status") return c.is_active ? "Katalog" : "Entwurf";
+        if (k === "public") return c.is_public ? "ja" : "nein";
+        if (k === "goals") return (c.goals || []).map(function (g) { var x = GOALS.find(function (y) { return y[0] === g; }); return x ? x[1] : g; }).join(", ");
+        if (k === "restr") return (c.restrictions || []).join(", ");
+        if (k === "mix") { var m = c.plan_mix ? planMixCounts(c) : mixOf(c); return m && m.kraft != null ? Number(m.kraft) : null; }
+      }
+      if (v === "units") {
+        if (k === "title") return c.title || "";
+        if (k === "cat") { var ci = CATS.findIndex(function (x) { return x[0] === (c.category_default || "kraft"); }); return ci < 0 ? 99 : ci; }
+        if (k === "level") return c.level == null ? null : Number(c.level);
+        if (k === "count") return exCount(c);
+        if (k === "status") return c.is_active ? "Katalog" : "Entwurf";
+        if (k === "day") return ctx && ctx.dayOf && ctx.dayOf[c.id] != null ? ctx.dayOf[c.id] : null;
+      }
+      if (v === "exercises") {
+        if (k === "name") return c.name || "";
+        if (k === "block") return (c.blocks && c.blocks.length ? c.blocks.map(blockLabel).join(", ") : blockLabel(c.block)) || "";
+        if (k === "muscle") return (c.muscles || []).join(", ");
+        if (k === "events") return (c.units || []).length;
+        if (k === "video") return GoExMedia.urlFor(c.name) ? "mit Video" : "ohne Video";
+      }
+      return "";
+    }
+    function sortCmp(v, ctx) {
+      var list = sortList(v);
+      return function (a, b) {
+        for (var i = 0; i < list.length; i++) {
+          var dir = list[i].d === "desc" ? -1 : 1;
+          var x = sortVal(v, a, list[i].k, ctx), y = sortVal(v, b, list[i].k, ctx);
+          var ex = x === "" || x == null, ey = y === "" || y == null;
+          if (ex || ey) { if (ex !== ey) return ex ? 1 : -1; continue; } /* leere Werte immer unten */
+          var r = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "de", { numeric: true });
+          if (r) return r * dir;
+        }
+        var na = a.title || a.name || "", nb = b.title || b.name || "";
+        return na.localeCompare(nb, "de");
+      };
+    }
+    function sortDirs(v, k) {
+      var f = (SORTS[v] || []).filter(function (x) { return x[0] === k; })[0];
+      return f && f[2] === "num" ? [["asc", "aufsteigend"], ["desc", "absteigend"]] : [["asc", "A → Z"], ["desc", "Z → A"]];
+    }
+    function sortHtml(v) {
+      var list = sortList(v), open = state.sortOpen === v;
+      var btn = '<button type="button" class="esort__btn' + (open ? " is-open" : "") + '" data-sort="toggle">' +
+        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/></svg>' +
+        "Sortieren nach" + (list.length ? " · " + list.length : "") + "</button>";
+      if (!open) return '<div class="esort" data-sortv="' + v + '">' + btn + "</div>";
+      return '<div class="esort" data-sortv="' + v + '">' + btn + '<div class="esort__panel">' +
+        list.map(function (r, i) {
+          return '<div class="esort__row"><span class="esort__no">' + (i + 1) + "</span>" +
+            '<select data-sortk="' + i + '" aria-label="Feld">' + SORTS[v].map(function (f) {
+              return '<option value="' + f[0] + '"' + (f[0] === r.k ? " selected" : "") + ">" + esc(f[1]) + "</option>";
+            }).join("") + "</select>" +
+            '<select data-sortd="' + i + '" aria-label="Richtung">' + sortDirs(v, r.k).map(function (d) {
+              return '<option value="' + d[0] + '"' + (d[0] === r.d ? " selected" : "") + ">" + d[1] + "</option>";
+            }).join("") + "</select>" +
+            (i ? '<button type="button" class="esort__x" data-sort="up" data-i="' + i + '" aria-label="nach oben">↑</button>' : "<span></span>") +
+            '<button type="button" class="esort__x" data-sort="del" data-i="' + i + '" aria-label="Sortierung entfernen">×</button></div>';
+        }).join("") +
+        '<div class="esort__links"><button type="button" data-sort="add">+ Sortierung hinzufügen</button>' +
+        (list.length ? ' · <button type="button" data-sort="clear">Sortierung löschen</button>' : "") + "</div></div></div>";
+    }
+    function sortRepaint(el) { if (el.closest("#pd-units")) paintUnitList(); else renderListOnly(); }
+    document.addEventListener("click", function (e) {
+      var b = e.target && e.target.closest ? e.target.closest("[data-sort]") : null;
+      if (!b) return;
+      var v = b.closest("[data-sortv]").getAttribute("data-sortv"), list = sortList(v);
+      var act = b.getAttribute("data-sort"), i = Number(b.getAttribute("data-i"));
+      if (act === "toggle") state.sortOpen = state.sortOpen === v ? "" : v;
+      else if (act === "add") {
+        var used = list.map(function (r) { return r.k; });
+        var nx = SORTS[v].filter(function (f) { return used.indexOf(f[0]) < 0; })[0];
+        if (nx) list.push({ k: nx[0], d: "asc" });
+      } else if (act === "del") list.splice(i, 1);
+      else if (act === "up" && i > 0) { var t = list[i - 1]; list[i - 1] = list[i]; list[i] = t; }
+      else if (act === "clear") list.length = 0;
+      sortSave(v);
+      sortRepaint(b);
+    });
+    document.addEventListener("change", function (e) {
+      var sel = e.target && e.target.closest ? e.target.closest("select[data-sortk],select[data-sortd]") : null;
+      if (!sel) return;
+      var v = sel.closest("[data-sortv]").getAttribute("data-sortv"), list = sortList(v);
+      var i = Number(sel.getAttribute("data-sortk") || sel.getAttribute("data-sortd"));
+      if (!list[i]) return;
+      if (sel.hasAttribute("data-sortk")) { list[i].k = sel.value; list[i].d = "asc"; } else list[i].d = sel.value;
+      sortSave(v);
+      sortRepaint(sel);
+    });
+
     function renderListOnly() {
       var box = $("list-view");
       box.classList.remove("hidden");
@@ -595,7 +719,7 @@
           return '<option value="' + esc(p.id) + '"' + (state.planFilter === p.id ? " selected" : "") + ">" + esc(p.title) + (p.private_for ? " (persönlich)" : "") + "</option>";
         }).join("") + "</select>" : "";
       var tools = '<div class="list-tools">' + planSel + '<span class="grow"></span>' +
-        '<button type="button" id="list-new">Neu</button></div>' + chipsHtml(v);
+        '<button type="button" id="list-new">Neu</button></div>' + sortHtml(v) + chipsHtml(v);
       if (v === "plans") {
         html = plans().filter(function (c) {
           if (!levelOk(c, on)) return false;
@@ -603,7 +727,7 @@
           if (on.cat && !c.is_active) return false;
           if (on.off && c.is_active) return false;
           return true;
-        }).map(function (c) {
+        }).sort(sortCmp("plans")).map(function (c) {
           var goals = (c.goals || []).map(function (g) { var x = GOALS.find(function (y) { return y[0] === g; }); return x ? x[1] : g; });
           return '<div class="erow' + (c.is_active ? "" : " is-off") + '" data-open="plan/' + c.id + '">' + rectHtml(c.image_url, "Plan") +
             '<div class="erow__c"><span class="erow__t">' + esc(c.title) + "</span>" +
@@ -623,10 +747,9 @@
           if (!matrixOk(c, on, false)) return false;
           return levelOk(c, on);
         }).sort(function (a, b) {
-          if (fp && !on.count) return dayOf[a.id] - dayOf[b.id];
-          if (on.count) return exCount(b) - exCount(a) || a.title.localeCompare(b.title, "de");
-          var ca = CATS.findIndex(function (k) { return k[0] === a.category_default; }), cb = CATS.findIndex(function (k) { return k[0] === b.category_default; });
-          return ca !== cb ? ca - cb : a.title.localeCompare(b.title, "de");
+          /* Plan-Filter ohne eigene Sortierung: Tagesreihenfolge */
+          if (fp && !sortList("units").length) return dayOf[a.id] - dayOf[b.id];
+          return sortCmp("units", { dayOf: dayOf })(a, b);
         });
         html = list.map(function (c) {
           var n = exCount(c);
@@ -655,7 +778,7 @@
         var mOn = MUSCLES.filter(function (m) { return on["m:" + m]; });
         if (mOn.length && !mOn.some(function (m) { return (e.muscles || []).indexOf(m) >= 0; })) return false;
         return true;
-      }).sort(function (a, b) { return a.name.localeCompare(b.name, "de"); });
+      }).sort(pickMode ? function (a, b) { return a.name.localeCompare(b.name, "de"); } : sortCmp("exercises"));
       return ex.map(function (e) {
         var url = GoExMedia.urlFor(e.name);
         var info = url ? GoExMedia.parse(url) : null;
@@ -1231,14 +1354,10 @@
         if (cats.length && cats.indexOf(u.category_default || "kraft") < 0) return false;
         if (!matrixOk(u, on, false)) return false;
         return levelOk(u, on);
-      }).sort(function (a, b) {
-        if (on.count) return exCount(b) - exCount(a) || a.title.localeCompare(b.title, "de");
-        var ca = CATS.findIndex(function (k) { return k[0] === a.category_default; }), cb = CATS.findIndex(function (k) { return k[0] === b.category_default; });
-        return ca !== cb ? ca - cb : a.title.localeCompare(b.title, "de");
-      });
+      }).sort(sortCmp("units"));
       host.innerHTML =
         '<div class="list-tools"><span class="muted grow">Auf einen Wochentag rechts ziehen. Klick öffnet das Event.</span><button type="button" id="pd-unew">Neu</button></div>' +
-        chipsHtml("units") +
+        sortHtml("units") + chipsHtml("units") +
         '<div class="elist">' + list.map(function (u) {
           var n = exCount(u);
           return '<div class="erow' + (u.is_active ? "" : " is-off") + '" draggable="true" data-unit="' + u.id + '">' + rectHtml(u.image_url, catLabel(u.category_default)) +
