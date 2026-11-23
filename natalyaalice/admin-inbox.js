@@ -127,6 +127,14 @@
     ".ga-msg{display:block;white-space:pre-wrap;font-size:13px;color:rgba(42,33,24,.75);margin-top:2px}" +
     ".ga-bar{display:grid;grid-template-columns:31px 1fr 31px;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 8px;position:relative}" +
     ".ga-bar h2{margin:0;text-align:center;font:600 22px/1.2 'Playfair Display',Georgia,serif}" +
+    /* Desktop: Reiter statt Burger und Zurück-Pfeil; Schrift wie die Headline, Trennlinien dazwischen, Linie darunter */
+    ".ga-tabs{display:none}" +
+    "@media (min-width:900px){.ga-root .ga-bar{display:none}" +
+    ".ga-tabs{display:flex;align-items:center;justify-content:center;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 0 14px;padding:calc(14px + env(safe-area-inset-top,0px)) 24px 0;border-bottom:1px solid rgba(42,33,24,.22)}" +
+    ".ga-tabs::-webkit-scrollbar{display:none}" +
+    ".ga-tabs button{flex:none;border:0;background:none;padding:6px 16px 12px;margin:0 0 -1px;border-bottom:2px solid transparent;color:rgba(42,33,24,.5);font-family:'Playfair Display',Georgia,serif !important;font-size:22px !important;font-weight:600 !important;line-height:1.2;white-space:nowrap;cursor:pointer}" +
+    ".ga-tabs button:hover{color:#2A2118}.ga-tabs button.is-on{color:#2A2118;border-bottom-color:#2A2118}" +
+    ".ga-tabs .ga-tabsep{flex:none;width:1px;height:22px;margin-bottom:6px;background:rgba(42,33,24,.25)}}" +
     ".ga-round{width:31px;height:31px;padding:0;border:1px solid #2A2118;border-radius:50%;display:grid;place-items:center;background:transparent;color:#2A2118;cursor:pointer}" +
     ".ga-round.ga-burger{border:0;border-radius:0}" +
     ".ga-burger span{display:block;width:30px;height:2.5px;background:currentColor;border-radius:2px;box-shadow:0 -11px 0 currentColor,0 11px 0 currentColor}" +
@@ -1426,6 +1434,11 @@
     return t ? t.label : "Admin";
   }
   function paintMenu() {
+    if (st && st.tabs) {
+      st.tabs.innerHTML = '<button type="button" data-ga-close>Zurück zu Profil</button>' + TABS.map(function (t) {
+        return '<span class="ga-tabsep" aria-hidden="true"></span><button type="button" data-ga-tab="' + t.id + '" class="' + (st.tab === t.id ? "is-on" : "") + '">' + t.label + "</button>";
+      }).join("");
+    }
     if (!st || !st.menu) return;
     st.menu.innerHTML = TABS.map(function (t) {
       return '<button type="button" data-ga-tab="' + t.id + '" class="' + (st.tab === t.id ? "is-on" : "") + '">' + t.label + "</button>";
@@ -2295,13 +2308,15 @@
       '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
       '</button><h2>Admin</h2><button type="button" class="ga-round ga-burger" data-ga-burger aria-label="Menü"><span></span></button>' +
       '<div class="ga-menu" hidden></div></div>' +
+      '<nav class="ga-tabs" aria-label="Admin"></nav>' +
       '<div class="cp-body"><p class="cp-hint">Lade…</p></div>';
     document.body.appendChild(root);
     document.body.classList.add("cp-open");
-    st = { root: root, body: root.querySelector(".cp-body"), title: root.querySelector(".ga-bar h2"), menu: root.querySelector(".ga-menu"),
+    st = { root: root, body: root.querySelector(".cp-body"), title: root.querySelector(".ga-bar h2"), menu: root.querySelector(".ga-menu"), tabs: root.querySelector(".ga-tabs"),
       tab: tab || "news", seenBefore: lastSeen(), data: null, accounts: [] };
     root.addEventListener("click", onClick);
     root.addEventListener("change", onChange);
+    paintMenu();
     load().then(function (data) {
       if (!st) return;
       st.data = data || {};
