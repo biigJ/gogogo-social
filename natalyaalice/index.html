@@ -7659,6 +7659,8 @@
       <input id="zirkel-reg-pass2" type="password" placeholder="Passwort wiederholen" autocomplete="new-password" />
       <p class="team-msg" id="zirkel-register-msg"></p>
       <button type="button" id="zirkel-register-save">Buchen</button>
+      <button type="button" class="sand-quiet" id="zirkel-register-login">Schon ein Zirkel-Konto? Anmelden</button>
+      <button type="button" class="sand-quiet" id="zirkel-register-forgot">Passwort vergessen?</button>
       <button type="button" class="sand-quiet" id="zirkel-register-cancel">Abbrechen</button>
     </div>
   </div>
@@ -27312,6 +27314,27 @@
         });
         document.getElementById("zirkel-register-btn").addEventListener("click", openZirkelRegister);
         document.getElementById("zirkel-register-save").addEventListener("click", submitZirkelRegister);
+        /* Bestehendes Zirkel-Konto: anmelden statt neu registrieren */
+        document.getElementById("zirkel-register-login").addEventListener("click", function () {
+          var mail = String(document.getElementById("zirkel-reg-email").value || "").trim();
+          document.getElementById("zirkel-register").hidden = true;
+          if (!window.FFC || !FFC.showAuth) return;
+          ffcAuthWanted = true;
+          document.body.classList.add("ffc-open");
+          FFC.showAuth("login", { title: "Zirkeltraining", tagline: "Mit Deiner Zirkel-E-Mail und Deinem Passwort anmelden.", email: mail || accountEmail() });
+        });
+        /* Passwort vergessen: Link zum Zurücksetzen an die eingegebene E-Mail */
+        document.getElementById("zirkel-register-forgot").addEventListener("click", function () {
+          var msg = document.getElementById("zirkel-register-msg");
+          var mail = String(document.getElementById("zirkel-reg-email").value || "").trim().toLowerCase();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) { msg.textContent = "Bitte oben Deine E-Mail-Adresse eingeben."; return; }
+          if (!window.FFC || !FFC.sendPasswordReset) { msg.textContent = "Zirkeltraining ist noch nicht geladen."; return; }
+          msg.textContent = "Link wird gesendet …";
+          FFC.sendPasswordReset(mail).then(function (res) {
+            if (res && res.error) throw res.error;
+            msg.textContent = "Wenn es zu dieser E-Mail ein Zirkel-Konto gibt, ist ein Link zum Zurücksetzen unterwegs (auch Spam prüfen).";
+          }).catch(function (err) { msg.textContent = friendlyFfcPassError(err); });
+        });
         document.getElementById("zirkel-register-cancel").addEventListener("click", function () {
           document.getElementById("zirkel-register").hidden = true;
         });
