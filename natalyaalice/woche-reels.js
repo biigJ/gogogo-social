@@ -1661,12 +1661,13 @@
       '" data-wr-travel="1" aria-label="Reisemodus">' +
       '<span class="wr-travel-emoji" aria-hidden="true">🛫</span>' +
       "</button>" +
-      '<div class="wr-week-nav">' +
-      '<button type="button" class="wr-week-label" data-wr-week-menu="1"' +
-      (state.editMode ? " disabled" : "") +
-      '><span class="wr-week-label__text">' +
-      esc(label) +
-      '</span><svg class="wr-week-label__chev" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>' +
+      /* Zeitraum als natives Dropdown wie in Aktuell */
+      '<div class="wr-week-nav"><label class="wr-week-pick">' +
+      '<select data-wr-week-select aria-label="Zeitraum"' + (state.editMode ? " disabled" : "") + ">" +
+      WEEK_MODES.map(function (m) {
+        return '<option value="' + esc(m.id) + '"' + (m.id === state.weekMode ? " selected" : "") + ">" + esc(m.label) + "</option>";
+      }).join("") +
+      '</select><svg class="wr-week-label__chev" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></label>' +
       "</div>" +
       '<button type="button" class="wr-icon-btn' +
       (state.editMode ? " is-on" : "") +
@@ -1674,6 +1675,7 @@
       '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20h4L18 10l-4-4L4 16v4zM13 7l4 4"/></svg>' +
       "</button>" +
       "</div>" +
+      '<p class="wr-day-label wr-plan-label">Plane Deine Woche</p>' +
       '<p class="wr-day-label">' +
       esc(dayLabel) +
       "</p>" +
@@ -1978,7 +1980,7 @@
   }
 
   function patchDayLabel() {
-    var el = document.querySelector("#" + ROOT_ID + " .wr-day-label");
+    var el = document.querySelector("#" + ROOT_ID + " .wr-day-label:not(.wr-plan-label)");
     if (!el) return;
     el.textContent = formatDayLong(currentDayIso());
   }
@@ -6486,6 +6488,12 @@
     if (!root._wrBound) {
       root._wrBound = true;
       root.addEventListener("click", onRootClick);
+      root.addEventListener("change", function (e) {
+        var sel = e.target && e.target.closest ? e.target.closest("select[data-wr-week-select]") : null;
+        if (!sel || state.editMode) return;
+        setWeekMode(sel.value);
+        refresh();
+      });
       root.addEventListener("submit", onSubmit);
       bindSwipe(root);
       root.addEventListener(
