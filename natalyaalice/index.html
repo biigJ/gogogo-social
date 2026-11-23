@@ -10874,6 +10874,14 @@
       /* Zirkel-Login gehört zu einem anderen gogogo-Konto (z. B. Coach testet auf seinem Handy als Coachee):
          dann keine Zirkel-Freunde, Circles oder Anfragen in dieses Konto übernehmen */
       var ffcForeign = false;
+      /* erst wenn der Zirkel-Nickname zum gogogo-Konto passt, Circles an gogogo melden
+         (sonst bekam BenTest die Circles von biig__J, als sein Handy als biig__J im Zirkel war) */
+      var ffcNickOk = false;
+      function ffcNickConfirmed() {
+        if (ffcNickOk) return;
+        ffcNickOk = true;
+        try { if (typeof syncMyCircles === "function") syncMyCircles(); } catch (eS) {}
+      }
       function ffcMine() {
         return !!(window.FFC && FFC.user && FFC.user()) && !ffcForeign;
       }
@@ -10899,6 +10907,7 @@
         if (!sessionMode || !sessionAccount || !profile) return;
         var mine = String(sessionAccount.nickname || "");
         var theirs = String(profile.nickname || "");
+        if (mine && theirs && mine.toLowerCase() === theirs.toLowerCase()) ffcNickConfirmed();
         if (mine && theirs && mine.toLowerCase() !== theirs.toLowerCase()) {
           /* Gemerkte Sitzung kann einen alten Nickname haben: erst in der Datenbank nachsehen */
           rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id) + "&select=nickname")
@@ -10908,6 +10917,7 @@
                 sessionAccount.nickname = fresh;
                 if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
                 markFfcForeign(false);
+                ffcNickConfirmed();
                 try { mergeFfcFriends(); syncFfcGroupIntoTeam(); } catch (eN) {}
                 return;
               }
@@ -10917,7 +10927,7 @@
                 .then(function (others) {
                   var foreign = (others || []).some(function (o) { return o && String(o.id) !== String(sessionAccount.id); });
                   markFfcForeign(foreign);
-                  if (!foreign) { try { mergeFfcFriends(); syncFfcGroupIntoTeam(); } catch (eN2) {} }
+                  if (!foreign) { ffcNickConfirmed(); try { mergeFfcFriends(); syncFfcGroupIntoTeam(); } catch (eN2) {} }
                 });
             })
             .catch(function () {});
@@ -10925,6 +10935,7 @@
         }
         if (mine && !theirs && window.FFC) {
           FFC.setNickname(mine);
+          ffcNickConfirmed();
           return;
         }
         if (mine || !theirs || !NICKNAME_RE.test(theirs)) return;
@@ -10939,6 +10950,7 @@
             }).then(function () {
               sessionAccount.nickname = theirs;
               if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+              ffcNickConfirmed();
             });
           })
           .catch(function () {});
@@ -20506,6 +20518,8 @@
          in FFC beitreten, wenn FFC das erlaubt, sonst nur für Circle-Events und Herz merken (go-admin-circles.sql) */
       function syncMyCircles() {
         if (cst().synced || !sessionAccount) return;
+        /* nur mit eigenem, bestätigtem Zirkel-Login (Nickname passt) */
+        if (!ffcNickOk || !ffcMine() || !cst().loaded) return;
         cst().synced = true;
         /* FFC-Login steht: für Admin → Nutzer merken (go-login-stand.sql) */
         rest("rpc/go_mark_seen", { method: "POST", body: { p_ffc: true } }).catch(function () {});
