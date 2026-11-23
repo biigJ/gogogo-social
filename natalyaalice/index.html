@@ -17509,11 +17509,15 @@
         var bub = window.GoBubbles ? GoBubbles.mine() : null;
         var html = '<option value="ich">Nur Ich</option><option value="team">Community</option>';
         if (bub) html += '<option value="bubble">Meine Bubble</option>';
+        /* Coach: nur meine Coachees (auch private Events) */
+        var hasCoachees = sessionIsTrainer && (teamPeople || []).some(function (p) { return p && !p.isSelf && String(p.trainer_id || "") === String(sessionAccount && sessionAccount.id); });
+        if (hasCoachees) html += '<option value="coach">Coach</option>';
         html += '<option value="alles">Alles</option>';
         if (cur === "tagebuch") cur = "alles";
         if (cur === "gruppe" || cur === "circle") cur = "team";
         heute.innerHTML = html;
         if (cur === "bubble" && !bub) cur = "alles";
+        if (cur === "coach" && !hasCoachees) cur = "team";
         if (cur && [].some.call(heute.options, function (o) { return o.value === cur; })) heute.value = cur;
       }
 
@@ -25274,8 +25278,9 @@
             : Promise.resolve(true);
           ask.then(function (ok) { if (!ok) openGruppen(); });
         });
-        slide.appendChild(add);
+        /* Challenge oben, darunter „Events hinzufügen“ */
         appendGroupChallenge(slide, group);
+        slide.appendChild(add);
         var list = document.createElement("ul");
         list.className = "team-gevents";
         list.hidden = true;
@@ -25505,7 +25510,7 @@
               if (v === "crew") v = "team";
               if (String(v).indexOf("group:") === 0) v = "gruppe";
               heuteFilter =
-                v === "team" || v === "gruppe" || v === "circle" || v === "bubble" || v === "alles" ? v : v === "tagebuch" ? "alles" : "ich";
+                v === "team" || v === "gruppe" || v === "circle" || v === "bubble" || v === "alles" || v === "coach" ? v : v === "tagebuch" ? "alles" : "ich";
               document.body.dataset.heute = heuteFilter;
               try { localStorage.setItem(HOME_HEUTE, heuteFilter); } catch (eHF2) {}
               paintHeuteJoins(heuteFlags());
