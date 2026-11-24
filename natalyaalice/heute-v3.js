@@ -2116,12 +2116,16 @@
         ? '<p class="acc-card__when"' + (opts.whenTs ? ' data-when-ts="' + esc(opts.whenTs) + '" data-when-base="' + esc(whenLine(opts.whenTs)) + '"' : "") + ">" + esc(opts.when) + "</p>"
         : "") +
       (opts.zpills || "") +
+      (opts.place && opts.author
+        ? '<p class="acc-card__place acc-card__place--top">' + esc(opts.place) + "</p>"
+        : "") +
       (opts.title
         ? '<h2 class="acc-card__title">' + esc(opts.title) + "</h2>"
         : "") +
-      (opts.place
+      (opts.place && !opts.author
         ? '<p class="acc-card__place">' + esc(opts.place) + "</p>"
         : "") +
+      (opts.exlist || "") +
       (opts.desc || "") +
       "</div>"
     );
@@ -2290,6 +2294,45 @@
     return "";
   }
 
+  /* Übungen auf der Karte: geplant = aus dem Katalog, erledigt = gespeicherte Übungen mit Anzahl Sätze.
+     Kommen asynchron und werden je Event gecacht. */
+  var accExCache = {};
+  function accExKey(ev) {
+    return String(ev.id) + "|" + (ev.status === "erledigt" ? "d|" + dayKey(ev.starts_at) : "p|" + String(ev.course_session_id || "") + "|" + String(ev.title || ""));
+  }
+  function accExItems(list) {
+    if (!list || !list.length) return "";
+    var max = 8;
+    var html = list.slice(0, max).map(function (x) {
+      var name = typeof x === "string" ? x : x.name;
+      var sets = typeof x === "string" ? 0 : x.sets;
+      return "<li><span>" + esc(name) + "</span>" + (sets ? "<span>" + sets + (sets === 1 ? " Satz" : " Sätze") + "</span>" : "") + "</li>";
+    }).join("");
+    if (list.length > max) html += "<li><span>+ " + (list.length - max) + " weitere</span></li>";
+    return html;
+  }
+  function accExListHtml(ev) {
+    if (!ev || ev.category === "zirkel" || ev.category === "ausdauer" && ev.status !== "erledigt") return "";
+    var k = accExKey(ev);
+    var hit = accExCache[k];
+    if (hit === undefined) {
+      accExCache[k] = null;
+      var job = ev.status === "erledigt"
+        ? (global.GoKraftTracking && GoKraftTracking.dayExercises ? GoKraftTracking.dayExercises(String(ev.user_id), dayKey(ev.starts_at)) : Promise.resolve([]))
+        : (host.exercisesForEvent ? Promise.resolve(host.exercisesForEvent(ev)) : Promise.resolve([]));
+      job.then(function (list) {
+        accExCache[k] = list || [];
+        if (!accExCache[k].length) return;
+        document.querySelectorAll('.acc-exlist[data-acc-ex="' + k.replace(/"/g, "") + '"]').forEach(function (ul) {
+          ul.innerHTML = accExItems(accExCache[k]);
+          ul.hidden = false;
+        });
+      }).catch(function () { accExCache[k] = []; });
+      return '<ul class="acc-exlist" data-acc-ex="' + esc(k) + '" hidden></ul>';
+    }
+    return '<ul class="acc-exlist" data-acc-ex="' + esc(k) + '"' + (hit && hit.length ? "" : " hidden") + ">" + accExItems(hit) + "</ul>";
+  }
+
   function renderEventCard(ev) {
     var uid = me();
     var mine = String(ev.user_id) === uid;
@@ -2355,6 +2398,7 @@
       emoji: emoji,
       actions: (tools || "") + (actions || ""),
       author: authorHtml(groupAuthor(ev, p) || p, true),
+      exlist: accExListHtml(ev),
       when: zirkelPillsHtml(ev) ? "Heute · " + timeLabel(ev.starts_at) : whenLine(ev.starts_at),
       whenTs: zirkelPillsHtml(ev) ? "" : ev.starts_at,
       zpills: zirkelPillsHtml(ev),

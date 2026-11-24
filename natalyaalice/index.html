@@ -1646,6 +1646,37 @@
       text-align: right; font-size: 13px; color: #fff !important; text-shadow: 0 1px 3px rgba(0,0,0,.45); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .acc-card.is-wallet .acc-card__title { margin: 40px 0 0; font-size: 21px; text-align: left; color: #fff; }
+    /* Karte: Ort unter dem Namen (bündig), Übungen unter dem Titel, alles weiß */
+    .acc-card .acc-card__overlay > .acc-card__place.acc-card__place--top {
+      position: absolute; top: 46px; left: 52px; right: 14px; margin: 0;
+      font-size: 13px; font-weight: 600; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      color: #fff !important; text-shadow: 0 1px 3px rgba(0,0,0,.5);
+    }
+    .acc-card__overlay:has(.acc-card__place--top) > .acc-card__title { margin-top: 62px !important; }
+    .acc-card .acc-card__media.has-photo .acc-card__overlay, .acc-card .acc-card__media.has-photo .acc-card__overlay *:not(.acc-card__visdots) { color: #fff !important; }
+    .acc-card__media.has-photo .acc-card__overlay { text-shadow: 0 1px 4px rgba(0,0,0,.45); }
+    .acc-exlist { list-style: none; margin: 6px 0 0; padding: 0; text-align: left; align-self: stretch;
+      display: flex; flex-direction: column; gap: 2px; font: 600 14px/1.3 Inter, system-ui, sans-serif; color: #fff !important; }
+    .acc-exlist[hidden] { display: none; }
+    .acc-exlist li { display: flex; gap: 10px; min-width: 0; color: #fff !important; }
+    .acc-exlist li span:first-child { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .acc-exlist li span:first-child::before { content: "· "; }
+    .acc-exlist li span + span { flex: none; opacity: .85; font-variant-numeric: tabular-nums; }
+    .acc-card.is-wallet:not(.is-open) .acc-exlist, .acc-card.is-wallet:not(.is-open) .acc-card__place--top { display: none !important; }
+    /* gleicher Aufbau für heutige und vergangene Event-Karten: Name + Datum oben in einer Zeile, darunter Ort, Titel, Übungen */
+    .acc-card[data-event-id]:not(.is-wallet) .acc-card__overlay {
+      justify-content: flex-start; align-items: stretch; text-align: left; padding: 14px 14px 12px;
+      background: linear-gradient(180deg, rgba(20,16,12,.5) 0, rgba(20,16,12,.12) 120px, rgba(20,16,12,.25) 100%);
+    }
+    .acc-card[data-event-id]:not(.is-wallet) .acc-card__overlay > .acc-card__author { top: 14px; left: 14px; }
+    .acc-card[data-event-id]:not(.is-wallet) .acc-card__when {
+      position: absolute; top: 20px; right: 14px; margin: 0; max-width: 55%;
+      text-align: right; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .acc-card[data-event-id]:not(.is-wallet) .acc-card__title { margin: 40px 0 0; font-size: 21px; text-align: left; }
+    .acc-card[data-event-id]:not(.is-wallet) .acc-card__place,
+    .acc-card[data-event-id]:not(.is-wallet) .acc-card__desc { text-align: left; }
+    .acc-card[data-event-id]:not(.is-wallet) .acc-card__emoji { display: none; }
     /* Datum/„Heute“ auf Fotos immer weiß (#fff wird von keinem Theme umgefärbt) */
     .acc-card__media.has-photo .acc-card__when { color: #fff !important; text-shadow: 0 1px 3px rgba(0,0,0,.45); }
     .acc-card.is-wallet .acc-card__place, .acc-card.is-wallet .acc-card__desc { text-align: left; color: rgba(246,241,232,.9) !important; }
@@ -8780,7 +8811,7 @@
   <script src="/assets/go-checklist.js"></script>
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js?v=log-2"></script>
-  <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
+  <script src="/natalyaalice/kraft-tracking.js?v=kt-4"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-5"></script>
   <script src="/natalyaalice/go-story.js?v=gst-2"></script>
   <script src="/natalyaalice/bubbles.js?v=bub-15"></script>
@@ -8798,7 +8829,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-156"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-157"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-104"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -26169,6 +26200,20 @@
             },
             clearInvitesForDay: clearInvitesForDay,
             groupMemberIds: groupMemberIds,
+            /* Karte: Übungen der Einheit aus dem Katalog (wie im Kalender) */
+            exercisesForEvent: function (ev) {
+              var load = ev && ev.category !== "zirkel" && typeof loadEventSession === "function" ? loadEventSession(ev) : null;
+              if (!load) return Promise.resolve([]);
+              return load.then(function (rows) {
+                var seen = {};
+                return exercisesFromSession(rows && rows[0]).map(function (x) { return x.name; }).filter(function (n) {
+                  var k = String(n).toLowerCase();
+                  if (seen[k]) return false;
+                  seen[k] = true;
+                  return true;
+                });
+              }).catch(function () { return []; });
+            },
             /* Circle einzeln: Nicknames und (sobald geladen) gogogo-Konten der Mitglieder */
             circleMembers: function (gid) {
               if (!circleNicks(gid).length) loadCircleCrew().then(function (ch) { if (ch && window.HeuteAccountability) HeuteAccountability.refresh(); });
