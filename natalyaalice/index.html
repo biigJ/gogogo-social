@@ -15535,7 +15535,7 @@
         modal.hidden = false;
         modal.removeAttribute("hidden");
         modal.style.display = "grid";
-        loadStampStack(stamps);
+        loadStampStack(stamps, opts.only || null);
         /* „Später“ gilt bis zum nächsten Öffnen der Karte */
         Object.keys(stampAsked).forEach(function (k) { delete stampAsked[k]; });
         pollStampChecks();
@@ -15562,7 +15562,16 @@
         }
         if (pass) pass.style.background = STAMP_COLORS[card.kind] || STAMP_COLORS.main;
       }
-      function loadStampStack(mainStamps) {
+      /* Event antippen: nur die Karte, die zum Event passt (Zirkel → Circle-Karte, Gruppen-Event → Gruppen-Karte, sonst gogogo) */
+      function stampKindForEvent(ev) {
+        if (!ev) return null;
+        if (ev.group_id) return { kind: "group", ref: String(ev.group_id) };
+        if (ev.circle_id || ev.category === "zirkel" || ev.visibility === "circle" || /zirkel/i.test(String(ev.title || ""))) {
+          return { kind: "circle", ref: ev.circle_id ? String(ev.circle_id) : "" };
+        }
+        return { kind: "main" };
+      }
+      function loadStampStack(mainStamps, only) {
         var modal = document.getElementById("stamp-card-modal");
         var pass = modal && modal.querySelector(".stamp-pass");
         if (!pass) return;
@@ -15573,14 +15582,28 @@
         pass.style.background = "";
         if (dots) dots.hidden = true;
         if (!sessionAccount) return;
-        rest("go_stamp_links?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&status=eq.linked&select=id,kind,name,stamps&order=created_at.asc")
+        modal._only = only || null;
+        if (only && only.kind === "main") return;
+        if (only) pass.style.visibility = "hidden";
+        rest("go_stamp_links?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&status=eq.linked&select=id,kind,ref,name,stamps&order=created_at.asc")
           .then(function (rows) {
+            if (only) {
+              pass.style.visibility = "";
+              var hit = (rows || []).filter(function (r) { return r.kind === only.kind && (!only.ref || String(r.ref) === only.ref); })[0] ||
+                (rows || []).filter(function (r) { return r.kind === only.kind; })[0];
+              /* keine passende verknüpfte Karte: gogogo-Karte bleibt */
+              if (!hit || modal.hidden) return;
+              modal._stack = [{ kind: hit.kind, name: hit.name, stamps: hit.stamps }];
+              modal._stackAt = 0;
+              paintStampFace(modal._stack[0]);
+              return;
+            }
             if (!rows || !rows.length || modal.hidden) return;
             modal._stack = modal._stack.concat(rows.map(function (r) { return { kind: r.kind, name: r.name, stamps: r.stamps }; }));
             pass.classList.add("has-stack");
             paintStackDots();
           })
-          .catch(function () {});
+          .catch(function () { pass.style.visibility = ""; });
         if (!pass._stackBound) {
           pass._stackBound = true;
           pass.addEventListener("click", function (e) {
@@ -26041,7 +26064,7 @@
             openStampCard: function (ev) {
               var ord = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
               if (!ord || !ev) return false;
-              openStampCardModal(ord, { eventId: ev.id });
+              openStampCardModal(ord, { eventId: ev.id, only: stampKindForEvent(ev) });
               return true;
             },
           eventMinutes: function (ev) { return eventMinutes(ev); },
