@@ -947,6 +947,9 @@
         try { localStorage.removeItem(videosKey()); } catch (eU) {}
         return Promise.resolve();
       }
+      if (type === "kraft_tracking") {
+        try { localStorage.removeItem(trackingKey()); } catch (eK) {}
+      }
       var list = state.orders.filter(function (o) {
         var p = o.support_products || o.product || {};
         return (o.status === "aktiv" || o.status === "freigeschaltet") && String(p.type) === String(type);
