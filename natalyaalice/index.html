@@ -8744,7 +8744,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-147"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-148"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-92"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -17640,18 +17640,9 @@
         var sel = document.getElementById("heute-filter-select");
         if (sel) sel.addEventListener("change", function () { setTimeout(syncHeuteSay, 0); });
       }
-      function circleAccountIds() {
-        var nicks = Object.keys((circleCrew && circleCrew.members) || {});
-        var go = function () {
-          var n2 = Object.keys(circleCrew.members || {});
-          if (!n2.length) return Promise.resolve([]);
-          var list = [];
-          n2.forEach(function (n) { list.push(n, "@" + n); });
-          return rest("go_accounts?nickname=in.(" + list.map(function (n) { return '"' + String(n).replace(/"/g, "") + '"'; }).map(encodeURIComponent).join(",") + ")&select=id")
-            .then(function (rows) { return (rows || []).map(function (r) { return String(r.id); }); })
-            .catch(function () { return []; });
-        };
-        return nicks.length ? go() : Promise.resolve(loadCircleCrew()).then(go, go);
+      function circleAccountIds(gid) {
+        var go = function () { return circleIdsFor(gid); };
+        return circleNicks(gid).length ? go() : Promise.resolve(loadCircleCrew()).then(go, go);
       }
       function kreisRecipients(view) {
         var mine = String(sessionAccount && sessionAccount.id);
@@ -17665,7 +17656,7 @@
         else if (view === "team") job = Promise.resolve(team);
         else if (view === "coach") job = Promise.resolve(coachees);
         else if (view === "gruppe") job = Promise.resolve(grp);
-        else if (view === "circle") job = circleAccountIds();
+        else if (String(view).indexOf("circle:") === 0) job = circleAccountIds(String(view).slice(7));
         else job = circleAccountIds().then(function (c) { return team.concat(grp, bubIds, coachees, c); });
         return job.then(function (ids) {
           var seen = {};
@@ -17680,9 +17671,11 @@
         ex = ex || {};
         var body = String(text || "").trim();
         if (!sessionAccount || (!body && !ex.media_url)) return Promise.resolve(false);
-        var aud = ["ich", "team", "gruppe", "circle", "coach", "alles"].indexOf(view) >= 0 ? view : "alles";
-        return kreisRecipients(aud).then(function (ids) {
+        var cGid = String(view).indexOf("circle:") === 0 ? String(view).slice(7) : "";
+        var aud = cGid ? "circle" : ["ich", "team", "gruppe", "coach", "alles"].indexOf(view) >= 0 ? view : "alles";
+        return kreisRecipients(cGid ? view : aud).then(function (ids) {
           var row = { author_id: sessionAccount.id, audience: aud, recipients: ids, body: body.slice(0, 2000) };
+          if (cGid) row.audience_id = cGid;
           if (aud === "gruppe") { var g = (myGroups() || [])[0]; if (g && g.id) row.audience_id = String(g.id); }
           if (ex.media_url) { row.media_url = ex.media_url; row.media_kind = ex.media_kind || "img"; }
           if (ex.reply_to) row.reply_to = ex.reply_to;
@@ -17702,7 +17695,7 @@
         var grp = (myGroups() || [])[0] || null;
         if (grp) html += opt("gruppe", grp.name || "Meine Gruppe");
         var circles = (cst().groups || []).filter(function (g) { return g && g.group_id; });
-        if (circles.length) html += opt("circle", circles.length === 1 ? String(circles[0].name || "Circle") : "Circles");
+        circles.forEach(function (g) { html += opt("circle:" + g.group_id, String(g.name || "Circle")); });
         var bub = window.GoBubbles ? GoBubbles.mine() : null;
         if (bub) html += opt("bubble", bub.name || "Bubble");
         /* Coach: nur meine Coachees (auch private Events) */
@@ -17716,7 +17709,8 @@
         if (cur === "bubble" && !bub) cur = "alles";
         if (cur === "coach" && !hasCoachees) cur = "team";
         if (cur === "gruppe" && !grp) cur = "team";
-        if (cur === "circle" && !circles.length) cur = "team";
+        if (cur === "circle") cur = circles.length ? "circle:" + circles[0].group_id : "team";
+        if (String(cur).indexOf("circle:") === 0 && !circles.some(function (g) { return "circle:" + g.group_id === cur; })) cur = "team";
         if (cur && [].some.call(heute.options, function (o) { return o.value === cur; })) heute.value = cur;
       }
 
@@ -23921,7 +23915,7 @@
         if (value === "mine") value = "ich";
         if (String(value).indexOf("group:") === 0) value = "gruppe";
         if (value === "tagebuch") value = "alles";
-        var allowed = value === "team" || value === "gruppe" || value === "circle" || value === "bubble" || value === "alles" ? value : "ich";
+        var allowed = value === "team" || value === "gruppe" || /^circle(:|$)/.test(String(value)) || value === "bubble" || value === "coach" || value === "alles" ? value : "ich";
         if (window.HeuteAccountability) {
           HeuteAccountability.setFilter(allowed);
           heuteFilter = allowed;
@@ -25426,7 +25420,26 @@
       }
 
       /* Mitglieder meiner Circles (FFC-Gruppen) für Aktuell → Circle, höchstens alle 5 min neu */
-      var circleCrew = { members: {}, at: 0, loading: false, sig: "" };
+      var circleCrew = { members: {}, byGid: {}, at: 0, loading: false, sig: "" };
+      /* Circle-Mitglieder als gogogo-Konten (über den Nickname), je group_id */
+      var circleIdCache = {};
+      function circleNicks(gid) {
+        var src = gid ? ((circleCrew.byGid || {})[String(gid)] || {}) : (circleCrew.members || {});
+        return Object.keys(src);
+      }
+      function circleIdsFor(gid) {
+        var key = String(gid || "*");
+        if (circleIdCache[key]) return circleIdCache[key];
+        var nicks = circleNicks(gid);
+        if (!nicks.length) return Promise.resolve([]);
+        var list = [];
+        nicks.forEach(function (n) { list.push(n, "@" + n); });
+        var job = rest("go_accounts?nickname=in.(" + list.map(function (n) { return encodeURIComponent('"' + String(n).replace(/"/g, "") + '"'); }).join(",") + ")&select=id")
+          .then(function (rows) { var ids = (rows || []).map(function (r) { return String(r.id); }); job.ids = ids; return ids; })
+          .catch(function () { delete circleIdCache[key]; return []; });
+        circleIdCache[key] = job;
+        return job;
+      }
       function loadCircleCrew() {
         if (circleCrew.loading || Date.now() - circleCrew.at < 300000) return Promise.resolve(false);
         if (!window.FFC || !FFC.user || !FFC.user() || !FFC.groups || !FFC.weeklyPoints) return Promise.resolve(false);
@@ -25434,20 +25447,24 @@
         return Promise.resolve(FFC.groups())
           .then(function (groups) {
             return Promise.all((groups || []).map(function (g) {
-              return Promise.resolve(FFC.weeklyPoints(g.group_id)).catch(function () { return []; });
+              return Promise.resolve(FFC.weeklyPoints(g.group_id)).catch(function () { return []; })
+                .then(function (rows) { return { gid: String(g.group_id), rows: rows || [] }; });
             }));
           })
           .then(function (lists) {
             var next = {};
-            (lists || []).forEach(function (rows) {
-              (rows || []).forEach(function (r) {
+            var byGid = {};
+            (lists || []).forEach(function (pack) {
+              var one = byGid[pack.gid] = {};
+              (pack.rows || []).forEach(function (r) {
                 var n = String((r && r.nickname) || "").replace(/^@/, "").toLowerCase();
-                if (n) next[n] = r;
+                if (n) { next[n] = r; one[n] = r; }
               });
             });
-            var sig = Object.keys(next).sort().join(",");
+            var sig = Object.keys(byGid).sort().map(function (k) { return k + ":" + Object.keys(byGid[k]).sort().join(","); }).join("|");
             var changed = sig !== circleCrew.sig;
-            circleCrew = { members: next, at: Date.now(), loading: false, sig: sig };
+            circleCrew = { members: next, byGid: byGid, at: Date.now(), loading: false, sig: sig };
+            circleIdCache = {};
             return changed;
           })
           .catch(function () { circleCrew.loading = false; circleCrew.at = Date.now(); return false; });
@@ -25605,9 +25622,10 @@
             var pid = String(entry.person.id);
             return teamPeople.some(function (tp) { return tp && String(tp.id) === pid; });
           });
-        } else if (crewView === "circle") {
-          /* Circle: nur Mitglieder meiner Circles (FFC), Abgleich über den Nickname; fehlende kommen dazu */
-          var cm = circleCrew.members;
+        } else if (crewView === "circle" || String(crewView).indexOf("circle:") === 0) {
+          /* Circle: nur Mitglieder dieses Circles (FFC), Abgleich über den Nickname; fehlende kommen dazu */
+          var cGid = String(crewView).indexOf("circle:") === 0 ? String(crewView).slice(7) : "";
+          var cm = cGid ? ((circleCrew.byGid || {})[cGid] || {}) : circleCrew.members;
           var nickOf = function (p) { return String((p && p.nickname) || "").replace(/^@/, "").toLowerCase(); };
           friends = friends.filter(function (entry) { var n = nickOf(entry.person); return !!(n && cm[n]); });
           var shown = {};
@@ -25619,7 +25637,7 @@
             var pid = "ffc-" + m.user_id;
             friends.push({ person: { id: pid, name: m.nickname, nickname: m.nickname, photo_url: m.avatar_url || "" }, story: null, presence: presenceFor(pid), today: null });
           });
-          loadCircleCrew().then(function (changed) { if (changed && heuteView() === "circle") paintHeuteCrew(); });
+          loadCircleCrew().then(function (changed) { if (changed && String(heuteView()).indexOf("circle") === 0) paintHeuteCrew(); });
         }
         friends.sort(function (a, b) {
           function rank(entry) {
@@ -25646,7 +25664,7 @@
           /* oder heute eine Story gepostet (Event gemacht, Foto) */
           var story = !!(entry.story || (entry.today && entry.today.photoEventId) || recentStory(pid));
           /* Gruppe/Circle: Mitglieder zählen auch ohne Freundschaft */
-          var mine = crewView === "gruppe" || crewView === "circle" || teamPeople.some(function (tp) { return tp && !tp.isSelf && String(tp.id) === pid; });
+          var mine = crewView === "gruppe" || String(crewView).indexOf("circle") === 0 || teamPeople.some(function (tp) { return tp && !tp.isSelf && String(tp.id) === pid; });
           if (!(open || story) || !mine) doneIds[pid] = true;
           return (open || story) && mine;
         });
@@ -26109,13 +26127,24 @@
             },
             clearInvitesForDay: clearInvitesForDay,
             groupMemberIds: groupMemberIds,
+            /* Circle einzeln: Nicknames und (sobald geladen) gogogo-Konten der Mitglieder */
+            circleMembers: function (gid) {
+              if (!circleNicks(gid).length) loadCircleCrew().then(function (ch) { if (ch && window.HeuteAccountability) HeuteAccountability.refresh(); });
+              return circleNicks(gid);
+            },
+            circleMemberIds: function (gid) {
+              var job = circleIdsFor(gid);
+              if (job && job.ids) return job.ids;
+              if (job && job.then && !job.__hooked) { job.__hooked = true; job.then(function (ids) { if (ids.length && window.HeuteAccountability) HeuteAccountability.refresh(); }); }
+              return [];
+            },
             syncHeuteFilterOptions: syncHeuteFilterOptions,
             maybeAskHistoryShare: maybeAskHistoryShare,
             onFilterChange: function (v) {
               if (v === "crew") v = "team";
               if (String(v).indexOf("group:") === 0) v = "gruppe";
               heuteFilter =
-                v === "team" || v === "gruppe" || v === "circle" || v === "bubble" || v === "alles" || v === "coach" ? v : v === "tagebuch" ? "alles" : "ich";
+                v === "team" || v === "gruppe" || /^circle(:|$)/.test(String(v)) || v === "bubble" || v === "alles" || v === "coach" ? v : v === "tagebuch" ? "alles" : "ich";
               document.body.dataset.heute = heuteFilter;
               try { localStorage.setItem(HOME_HEUTE, heuteFilter); } catch (eHF2) {}
               paintHeuteJoins(heuteFlags());
@@ -28162,10 +28191,10 @@
         if (storedHeute === "all" || storedHeute === "alles") heuteFilter = "alles";
         else if (storedHeute === "mine" || storedHeute === "ich") heuteFilter = "ich";
         else if (storedHeute === "crew" || storedHeute === "team") heuteFilter = "team";
-        else if (storedHeute === "gruppe" || String(storedHeute).indexOf("group:") === 0) heuteFilter = "team";
+        else if (storedHeute === "gruppe" || String(storedHeute).indexOf("group:") === 0) heuteFilter = "gruppe";
         else if (storedHeute === "tagebuch") heuteFilter = "alles";
         else if (storedHeute === "circle") heuteFilter = "team";
-        else if (storedHeute === "bubble") heuteFilter = storedHeute;
+        else if (/^circle:/.test(String(storedHeute)) || storedHeute === "coach" || storedHeute === "bubble") heuteFilter = storedHeute;
       } catch (eSH) {}
       paintVisibility();
       paintHeuteFilter();

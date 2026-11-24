@@ -30,9 +30,13 @@
 
   function viewFlags(view) {
     view = normalizeFilter(view) || "ich";
-    var level = VIEW_LEVEL[view] != null ? VIEW_LEVEL[view] : 0;
+    /* Circle einzeln: „circle:<group_id>“ */
+    var circleId = view.indexOf("circle:") === 0 ? view.slice(7) : "";
+    var base = circleId ? "circle" : view;
+    var level = VIEW_LEVEL[base] != null ? VIEW_LEVEL[base] : 0;
     return {
       view: view,
+      circleId: circleId,
       level: level,
       groupOnly: view === "gruppe",
       /* Team = Freunde + Coach/Coachees; Tagebuch = Erledigtes + heute, keine Zukunft */
@@ -42,7 +46,7 @@
       /* Coach = nur ich und meine Coachees (auch ihre privaten Events) */
       coachOnly: view === "coach",
       /* Circle = Zirkeltrainings: FFC-Events und -Posts, Zirkel-Events und mit dem Circle geteilte Events */
-      circleOnly: view === "circle",
+      circleOnly: base === "circle",
       showIncomingInvites: level >= 1,
       showOwnFfc: true,
       showAcceptedFfc: true,
@@ -103,6 +107,7 @@
     if (v === "mine") return "ich";
     /* Kreise einzeln: Gruppe und Circle sind wieder eigene Ansichten */
     if (String(v || "").indexOf("group:") === 0) return "gruppe";
+    if (/^circle:[^,()\s]+$/.test(String(v || ""))) return String(v);
     /* Tagebuch gibt es im Dropdown nicht mehr → Alles */
     if (v === "tagebuch") return "alles";
     if (["ich", "team", "gruppe", "circle", "alles", "bubble", "coach"].indexOf(v) >= 0) return v;
@@ -795,7 +800,8 @@
     var range = "&starts_at=gte." + encodeURIComponent(fromIso) + "&starts_at=lte." + encodeURIComponent(toIso) + "&order=starts_at.desc&limit=500";
     /* bubble_id erst nach go-bubbles.sql vorhanden; group_id für Gruppen-Events (Gruppenname statt Vorname) */
     /* feed_hidden: „Speichern ohne Posting“ (go-events-feed-hidden.sql) */
-    return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden" + range)
+    return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id" + range)
+      .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id" + range); })
       .catch(function () {
@@ -2476,7 +2482,7 @@
   /* Nachrichten aus der Sprechblase (go-aktuell-posts.sql): stehen in der Ansicht ihres Kreises und unter Alles */
   function loadKreisMsgs() {
     if (!me()) { state.kreisMsgs = []; return Promise.resolve(); }
-    return rest("go_aktuell_posts?select=id,author_id,audience,body,media_url,media_kind,reply_to,created_at&order=created_at.desc&limit=150")
+    return rest("go_aktuell_posts?select=id,author_id,audience,audience_id,body,media_url,media_kind,reply_to,created_at&order=created_at.desc&limit=150")
       .then(function (rows) {
         state.kreisMsgs = (rows || []).map(function (m) { m._kreis = true; return m; });
         return ensurePeople(state.kreisMsgs.map(function (m) { return String(m.author_id); }));
@@ -2486,6 +2492,7 @@
   function kreisMsgsFor(view) {
     return (state.kreisMsgs || []).filter(function (m) {
       if (view === "alles") return true;
+      if (view.indexOf("circle:") === 0) return m.audience === "circle" && String(m.audience_id || "") === view.slice(7);
       if (m.audience === view) return true;
       /* Nachricht meines Coachs an seine Coachees steht bei mir unter Freunde */
       return view === "team" && m.audience === "coach" && String(m.author_id) !== me();
@@ -2856,10 +2863,23 @@
       });
     }
     if (flags.circleOnly) {
+      /* einzelner Circle: nur, was von seinen Mitgliedern (oder mir) kommt bzw. dem Circle gehört */
+      var cid = flags.circleId;
+      var cNick = {}, cAcc = {};
+      if (cid && host.circleMembers) {
+        (host.circleMembers(cid) || []).forEach(function (n) { cNick[String(n).replace(/^@/, "").toLowerCase()] = true; });
+        (host.circleMemberIds ? host.circleMemberIds(cid) || [] : []).forEach(function (id) { cAcc[String(id)] = true; });
+      }
+      var nickIn = function (n) { return !!cNick[String(n || "").replace(/^@/, "").toLowerCase()]; };
       var isCircle = function (it) {
-        if (it.kind === "ffc" || it.kind === "ffc_post") return true;
+        if (it.kind === "ffc") return !cid || !!(it.ev && (it.ev.is_mine || nickIn(it.ev.creator_nickname)));
+        if (it.kind === "ffc_post") return !cid || !!(it.post && (it.post.is_me || nickIn(it.post.nickname)));
         var ev = it.ev || it.item;
-        return !!(ev && (ev.category === "zirkel" || ev.visibility === "circle"));
+        if (!ev) return false;
+        if (cid && ev.circle_id) return String(ev.circle_id) === cid;
+        var circleLike = ev.category === "zirkel" || ev.visibility === "circle" || !!ev.circle_id;
+        if (!circleLike) return false;
+        return !cid || String(ev.user_id) === me() || !!cAcc[String(ev.user_id)];
       };
       myToday = myToday.filter(isCircle);
       upcoming = upcoming.filter(isCircle);
