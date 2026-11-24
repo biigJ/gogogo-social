@@ -467,6 +467,16 @@
     mount: mount,
     openDay: openDay,
     openChart: openChart,
+    /* Aktuell-Karte: gespeicherte Übungen eines Tages → [{ name, sets }] (sets = Anzahl gespeicherter Sätze) */
+    dayExercises: function (accountId, iso) {
+      if (!host) return Promise.resolve([]);
+      return loadLogs(accountId, false).then(function (rows) {
+        return exercisesOn(rows, iso).map(function (ex) {
+          var used = ex.sets.filter(function (st) { return st.done || st.reps != null || st.kg != null; });
+          return { name: ex.name, sets: ex.check ? 0 : used.length, done: used.length > 0 || ex.sets.some(function (st) { return st.done; }) };
+        }).filter(function (ex) { return ex.done; });
+      }).catch(function () { return []; });
+    },
     chartIcon: CHART_SVG,
     invalidate: function () { cache = {}; }
   };
