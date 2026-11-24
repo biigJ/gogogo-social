@@ -3322,6 +3322,130 @@
       }, 0);
     });
   }
+  /* ---------- Gruppe → „Events zuordnen“: 7 Tage. Eigene Events mit + in die Gruppe / − heraus (ganze Serie),
+     Events der anderen Mitglieder mit Zusagen / Absagen (ganze Serie). Ersetzt „Gruppen-Events“ und „zusätzliche Gruppen-Events“. ---------- */
+  function sameSlot(a, b) {
+    return new Date(a).getDay() === new Date(b).getDay() && formatTime(a) === formatTime(b);
+  }
+  function openGroupAssign() {
+    var g = groupOfMine();
+    if (!g) { if (host.toast) host.toast("Du bist in keiner Gruppe"); return; }
+    var days = [];
+    for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
+    state.ga = { group: g, days: days, mine: [], others: [], going: {} };
+    openSheet('<p class="wr-sheet-title">Events zuordnen</p><p class="wr-sheet-hint">Lädt …</p>');
+    loadGroupAssign().then(paintGroupAssign, function () {
+      openSheet('<p class="wr-sheet-title">Events zuordnen</p><p class="wr-sheet-hint">Laden ging gerade nicht.</p>' +
+        '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button></div>');
+    });
+  }
+  function loadGroupAssign() {
+    var st = state.ga;
+    var from = st.days[0] + "T00:00:00" + berlinOffsetSuffix(st.days[0]);
+    var to = addDays(st.days[6], 1) + "T00:00:00" + berlinOffsetSuffix(st.days[6]);
+    var range = "&starts_at=gte." + encodeURIComponent(from) + "&starts_at=lt." + encodeURIComponent(to);
+    var sel = "&select=id,user_id,title,category,starts_at,visibility,group_id,status,item_type,enrollment_id,course_id&order=starts_at.asc&limit=80";
+    return Promise.all([
+      rest("events?user_id=eq." + encodeURIComponent(me()) + "&status=eq.geplant" + range + sel),
+      rest("events?group_id=eq." + encodeURIComponent(st.group.id) + "&user_id=neq." + encodeURIComponent(me()) + "&status=eq.geplant" + range + sel)
+    ]).then(function (r) {
+      st.mine = (r[0] || []).filter(function (e) { return e.item_type !== "support_session" && e.item_type !== "nutrition_log"; });
+      st.others = r[1] || [];
+      if (!st.others.length) return;
+      return Promise.all([
+        rest("event_rsvps?user_id=eq." + encodeURIComponent(me()) + "&event_id=in.(" + st.others.map(function (e) { return e.id; }).join(",") + ")&select=event_id,status").catch(function () { return []; }),
+        ensurePeople(st.others.map(function (e) { return e.user_id; }))
+      ]).then(function (x) {
+        st.going = {};
+        (x[0] || []).forEach(function (y) { if (y && y.status === "zugesagt") st.going[String(y.event_id)] = true; });
+      });
+    });
+  }
+  function paintGroupAssign() {
+    var st = state.ga;
+    if (!st) return;
+    var gid = String(st.group.id);
+    var rows = st.days.map(function (iso) {
+      var d = new Date(iso + "T12:00:00");
+      var label = DAYS_DE[d.getDay()] + " " + d.getDate() + ".";
+      var html = "";
+      var k = 0;
+      st.mine.filter(function (e) { return dayKey(e.starts_at) === iso; }).forEach(function (e) {
+        var inGroup = String(e.group_id || "") === gid && e.visibility === "gruppe";
+        var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
+        html += '<div class="wr-dayrow wr-zrec-row' + (inGroup ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
+          (inGroup ? "👥 " : "") + esc(e.title || "Training") + esc(tm) + "</span>" +
+          (inGroup ? '<span class="wr-dayrow__tag">in der Gruppe</span>' : "") + "</div>" +
+          (inGroup
+            ? '<button type="button" class="wr-dayrow__minus" data-ga-rm="' + esc(e.id) + '" aria-label="Aus der Gruppe nehmen">−</button>'
+            : '<button type="button" class="wr-dayrow__minus wr-dayrow__plus" data-ga-add="' + esc(e.id) + '" aria-label="Zur Gruppe hinzufügen">+</button>') +
+          "</div>";
+      });
+      st.others.filter(function (e) { return dayKey(e.starts_at) === iso; }).forEach(function (e) {
+        var on = !!st.going[String(e.id)];
+        var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
+        var who = String(personOf(e.user_id).name || "").split(" ")[0];
+        html += '<div class="wr-dayrow wr-zrec-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
+          "👥 " + esc(e.title || "Training") + esc(tm) + "</span>" +
+          '<span class="wr-dayrow__tag">von ' + esc(who || "Gruppe") + (on ? " · Du bist dabei" : "") + "</span></div>" +
+          '<button type="button" class="wr-pill-btn' + (on ? "" : " wr-pill-btn--dark") + ' wr-ga-rsvp" data-ga-' + (on ? "no" : "yes") + '="' + esc(e.id) + '">' + (on ? "Absagen" : "Zusagen") + "</button></div>";
+      });
+      if (!k) html = '<div class="wr-dayrow wr-zrec-row is-empty"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + '</b> <span class="wr-dayrow__free">frei</span></span></div><span></span></div>';
+      return html;
+    }).join("");
+    openSheet(
+      '<p class="wr-sheet-title">Events zuordnen</p>' +
+      '<p class="wr-sheet-hint">Mit + teilst Du ein Event aus Deinem Wochenplan mit ' + esc(st.group.name || "Deiner Gruppe") +
+      ", mit − nimmst Du es heraus (jede Woche). Events der anderen sagst Du zu oder ab.</p>" +
+      '<div class="wr-days wr-days--all">' + rows + "</div>" +
+      '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Fertig</button></div>'
+    );
+    bindGroupSheet();
+  }
+  function groupAssignDo(kind, id, btn) {
+    var st = state.ga;
+    if (!st) return;
+    if (btn) btn.disabled = true;
+    var gid = String(st.group.id);
+    var job;
+    if (kind === "add" || kind === "rm") {
+      var ev = st.mine.filter(function (e) { return String(e.id) === id; })[0];
+      if (!ev) return;
+      job = ownSeries(ev).then(function (list) {
+        var ids = list.map(function (x) { return String(x.id); }).filter(function (x) { return /^[0-9a-f-]{36}$/i.test(x); });
+        if (!ids.length) return;
+        return rest("events?id=in.(" + ids.join(",") + ")&user_id=eq." + encodeURIComponent(me()), {
+          method: "PATCH", prefer: "return=minimal",
+          body: kind === "add" ? { visibility: "gruppe", group_id: gid } : { visibility: "team", group_id: null }
+        });
+      });
+    } else {
+      var oe = st.others.filter(function (e) { return String(e.id) === id; })[0];
+      if (!oe) return;
+      /* Serie des Mitglieds: gleicher Titel, Wochentag und Uhrzeit ab diesem Termin */
+      job = rest("events?user_id=eq." + encodeURIComponent(oe.user_id) + "&group_id=eq." + encodeURIComponent(gid) +
+        "&title=eq." + encodeURIComponent(oe.title || "") + "&status=eq.geplant&starts_at=gte." + encodeURIComponent(oe.starts_at) +
+        "&select=id,starts_at&order=starts_at.asc&limit=40").catch(function () { return []; }).then(function (rows) {
+        var ids = (rows || []).filter(function (r) { return sameSlot(r.starts_at, oe.starts_at); }).map(function (r) { return String(r.id); }).slice(0, 12);
+        if (ids.indexOf(id) < 0) ids.unshift(id);
+        if (kind === "yes") {
+          return rest("event_rsvps?on_conflict=event_id,user_id", {
+            method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+            body: ids.map(function (x) { return { event_id: x, user_id: me(), status: "zugesagt" }; })
+          });
+        }
+        return rest("event_rsvps?user_id=eq." + encodeURIComponent(me()) + "&event_id=in.(" + ids.join(",") + ")", { method: "DELETE", prefer: "return=minimal" });
+      });
+    }
+    job.then(function () {
+      if (host.toast) host.toast(kind === "add" ? "Mit der Gruppe geteilt" : kind === "rm" ? "Aus der Gruppe genommen" : kind === "yes" ? "Zugesagt" : "Abgesagt");
+      return loadGroupAssign().then(paintGroupAssign);
+    }).then(function () { return refresh().then(notifyAktuell); }).catch(function () {
+      if (btn) btn.disabled = false;
+      if (host.toast) host.toast("Ging gerade nicht");
+    });
+  }
+
   function bindGroupSheet() {
     var card = $("wr-sheet-card");
     if (card) card.classList.add("wr-sheet__card--days");
@@ -3339,6 +3463,13 @@
       }
       var sv = e.target.closest("[data-wr-gev-save]");
       if (sv) { e.stopPropagation(); saveGroupEventsPick(sv); return; }
+      var ga = e.target.closest("[data-ga-add],[data-ga-rm],[data-ga-yes],[data-ga-no]");
+      if (ga) {
+        e.stopPropagation();
+        var kindGa = ga.hasAttribute("data-ga-add") ? "add" : ga.hasAttribute("data-ga-rm") ? "rm" : ga.hasAttribute("data-ga-yes") ? "yes" : "no";
+        groupAssignDo(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
+        return;
+      }
       var add = e.target.closest("[data-wr-gextra-add]");
       if (add) { e.stopPropagation(); groupExtraAdd(add.getAttribute("data-wr-gextra-add")); return; }
     });
@@ -4276,6 +4407,7 @@
     /* abgebrochenes „+ Gruppen-Event“: nächstes normales Anlegen ist wieder privat/Team */
     state.groupExtraNext = null;
     if (sheet) sheet.hidden = true;
+    if (state.ga && state.gaBack) { var back = state.gaBack; state.gaBack = null; state.ga = null; setTimeout(back, 0); }
     document.body.classList.remove("wr-sheet-open");
   }
 
@@ -6073,10 +6205,7 @@
         items.push({ info: "Zirkeltraining am: " + (zDays.length ? zDays.join(", ") : "–") });
         items.push({ label: "Zirkeltrainings eintragen", value: "zrec" });
         items.push({ label: "Zirkeltrainings bearbeiten", value: "zedit" });
-        /* Gruppe: Mitglieder übernehmen Gruppen-Events, der Ersteller (Coach) trägt zusätzliche ein */
-        var myGrp = host && host.myGroups ? (host.myGroups() || [])[0] : null;
-        if (myGrp && String(myGrp.owner || "") !== me()) items.push({ label: "Gruppen-Events", value: "gev" });
-        if (myGrp && String(myGrp.owner || "") === me()) items.push({ label: "zusätzliche Gruppen-Events", value: "gextra" });
+        /* Gruppen-Events ordnet man unter Community → Gruppe → „Events zuordnen“ zu */
         /* früher rechts am Bild: Einladen, Extern teilen, ics */
         var curIt = currentItem();
         var curEv = curIt && curIt.ev && !curIt.ev._pt && curIt.kind !== "ffc" ? curIt.ev : null;
@@ -6799,6 +6928,11 @@
   }
 
   global.WocheReels = {
+    /* Gruppe → „Events zuordnen“; onBack: nach „Fertig“ zurück zur Gruppe */
+    openGroupAssign: function (onBack) {
+      state.gaBack = onBack || null;
+      openGroupAssign();
+    },
     refreshKeepDay: refreshKeepDay,
     shareToCircle: function (id, gid) { return shareToCircle(id, gid); },
     openZirkelRecurring: function () { openZirkelRecurring(); },
