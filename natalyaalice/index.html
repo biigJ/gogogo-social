@@ -1498,6 +1498,8 @@
     .is-bubbles .gbub-rows:not(.kreise-rows) [data-gbub-add] { display: none !important; }
     .kreis-row .gbub-row__ico.is-plain { color: #2A2118; filter: none; }
     .kreis-row .kreis-row__pen { margin-left: auto; flex: none; }
+    .kreis-wico { position: absolute; top: 66px; right: 22px; z-index: 2; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); pointer-events: none; }
+    .kreis-wico svg { width: 34px; height: 34px; }
     .kreis-page { position: fixed; inset: 0; z-index: 70; background: #F3EEE4; display: flex; flex-direction: column; }
     .kreis-page__bar { display: grid; grid-template-columns: 31px 1fr 31px; align-items: center; gap: 8px; padding: max(12px, env(safe-area-inset-top)) 16px 8px; }
     .kreis-page__bar h2 { margin: 0; text-align: center; font: 600 22px/1.2 "Playfair Display", Georgia, serif; color: #2A2118; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -6978,7 +6980,7 @@
       <button type="button" data-menu="garmin">Garmin verbinden</button>
       <button type="button" data-menu="darstellung">Darstellung</button>
       <button type="button" data-menu="friends_view" class="view-toggle">Freunde</button>
-      <button type="button" data-menu="bubbles_view" class="view-toggle">Bubbles</button>
+      <button type="button" data-menu="bubbles_view" class="view-toggle">Kreise</button>
       <button type="button" data-menu="website">Website besuchen</button>
       <button type="button" data-menu="info">Info</button>
       <a href="/impressum/?from=app">Impressum</a>
@@ -11056,7 +11058,7 @@
         var CIRCLE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>';
         var SQUARE = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/></svg>';
         var SWAP = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3l3 3-3 3"/><path d="M4 11V9a3 3 0 0 1 3-3h13"/><path d="M7 21l-3-3 3-3"/><path d="M20 13v2a3 3 0 0 1-3 3H4"/></svg>';
-        [["friends_view", "gogogo_friends_view", "Freunde"], ["bubbles_view", "gogogo_bubbles_view", "Bubbles"]].forEach(function (x) {
+        [["friends_view", "gogogo_friends_view", "Freunde"], ["bubbles_view", "gogogo_bubbles_view", "Kreise"]].forEach(function (x) {
           var b = document.querySelector('#plan-settings [data-menu="' + x[0] + '"]');
           if (!b) return;
           var w = viewIsWallet(x[1]);
@@ -17915,6 +17917,33 @@
         if (old) old.remove();
         document.body.classList.remove("kreis-open");
       }
+      /* Karten der Kreise (Gruppe, Circles, Coach) im Format der Bubble-Karten */
+      function kreiseWalletItems() {
+        var st = kreiseState || {};
+        var out = [];
+        if (st.group) out.push({ id: "k:group", name: st.group.name || "Meine Gruppe", photo_url: st.group.photo_url || "/assets/gogogo/gogogo-Gruppe-small.jpg",
+          _kreis: { kind: "group" }, _tag: "Meine Gruppe", _about: st.group.description || "" });
+        (cst().groups || []).forEach(function (g) {
+          out.push({ id: "k:circle:" + g.group_id, name: String(g.name || "Circle"), photo_url: circlePhoto(g) || "/assets/gogogo/gogogo-Zirkeltraining.jpg",
+            _kreis: { kind: "circle", id: String(g.group_id) }, _tag: "Circle", _about: "Zirkeltraining" });
+        });
+        if (st.coach) out.push({ id: "k:coach", name: String(st.coach.name || "Coach").split(" ")[0], photo_url: st.coach.photo_url || "",
+          _kreis: { kind: "coach" }, _tag: "Mein Coach", _about: "" });
+        return out;
+      }
+      function fillKreisCard(card, p) {
+        var body = card.querySelector(".fw-card__body");
+        if (!body) return;
+        body.innerHTML = '<span class="gbub-card__me" style="position:static;display:inline-block;align-self:flex-start;width:auto;margin-bottom:8px">' + escapeHtml(p._tag) + "</span>" +
+          '<h3 class="fw-card__name">' + escapeHtml(p.name) + "</h3>" +
+          (p._about ? '<p class="fw-card__about">' + escapeHtml(p._about) + "</p>" : "");
+        if (!card.querySelector(".kreis-wico")) {
+          var ic = document.createElement("span");
+          ic.className = "kreis-wico";
+          ic.innerHTML = KREIS_ICON[p._kreis.kind] || "";
+          card.insertBefore(ic, card.firstChild);
+        }
+      }
       function zirkelHolder() {
         var h = document.getElementById("go-zirkel-holder");
         if (!h) {
@@ -18222,6 +18251,7 @@
 
         /* Bubbles: Themen-Communities, man ist in genau einer (bubbles.js) */
         var kreiseRows = null;
+        var kreisePaintView = null;
         if (window.GoBubbles) {
           var bubSlide = document.createElement("article");
           bubSlide.className = "team-slide is-scroll is-friends is-bubbles";
@@ -18264,8 +18294,12 @@
             if (kreiseRows) kreiseRows.hidden = bubWalletOn;
             bubWallet.hidden = !bubWalletOn;
             if (bubWalletOn) {
+              /* Karten: erst Gruppe, Circles, Coach (wie die Liste), dann die Bubbles */
               GoBubbles.wallet(function (items, fill, open) {
-                paintFriendWallet(bubWallet, items, {}, { fill: fill, open: open });
+                paintFriendWallet(bubWallet, kreiseWalletItems().concat(items), {}, {
+                  fill: function (card, p) { if (p._kreis) fillKreisCard(card, p); else fill(card, p); },
+                  open: function (p) { if (p._kreis) openKreis(p._kreis.kind, p._kreis.id); else open(p); }
+                });
               });
             }
           }
@@ -18284,6 +18318,7 @@
           box.appendChild(bubSlide);
           GoBubbles.renderInto(bubList);
           paintBubView();
+          kreisePaintView = paintBubView;
         }
 
         var ffcGroup = ffcContextGroup();
@@ -18652,8 +18687,9 @@
           [groupHost, coachSlide].forEach(function (sl) { if (sl && sl.parentNode === box) box.removeChild(sl); });
           kreiseState = { group: myGroup, groupSlide: groupHost, coach: trainer, coachSlide: coachSlide };
           paintKreiseRows(kreiseRows);
-          var krEl = kreiseRows;
-          if (!cst().loaded) Promise.resolve(loadCircleState()).then(function () { paintKreiseRows(krEl); }).catch(function () {});
+          var krEl = kreiseRows, krView = kreisePaintView;
+          if (krView) krView();
+          if (!cst().loaded) Promise.resolve(loadCircleState()).then(function () { paintKreiseRows(krEl); if (krView) krView(); }).catch(function () {});
         }
         /* Coachees-Reiter nur für Coaches, und erst wenn die Datenbank is_trainer bestätigt hat (kein Cache) */
         if (sessionIsTrainer && sessionTrainerChecked) box.appendChild(coacheeSlide);
