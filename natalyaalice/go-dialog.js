@@ -6,7 +6,7 @@
  *   GoDialog.choose(text, [{ label, value }])  → Promise<value|null>
  *   GoDialog.pick(text, [{ label, value }], { ok }) → Promise<value[]|null>  (Mehrfachauswahl)
  *   GoDialog.note(text)                        → Promise<void>  (nur Text, Tippen schließt)
- *   GoDialog.time(text, { sub, times, ok, alt, cancel }) → Promise<"HH:MM"|"alt"|null>  (Drehrad, 30-Min-Schritte)
+ *   GoDialog.time(text, { sub, times, ok, alt, cancel, initial }) → Promise<"HH:MM"|"alt"|null>  (Drehrad, 30-Min-Schritte)
  *
  * Stil wie .sand-modal / .sand-card (Sandfläche, Playfair-Titel, schwarze Pill-Buttons).
  */
@@ -308,6 +308,15 @@
         }, 40);
       }, { passive: true });
       card.appendChild(wheel);
+      /* Startwert (z. B. "18:00") mittig ins Rad */
+      if (opts.initial) {
+        var want = String(opts.initial).replace(/^0/, "");
+        Array.prototype.forEach.call(wheel.children, function (b) {
+          var hit = b.textContent === want || b.textContent === opts.initial;
+          b.classList.toggle("is-on", hit);
+          if (hit) requestAnimationFrame(function () { wheel.scrollTop = b.offsetTop - (wheel.clientHeight - b.offsetHeight) / 2; });
+        });
+      }
       button(card, opts.ok || "Senden", "", function () {
         var on = wheel.querySelector(".is-on");
         close(on ? on.textContent : null);
