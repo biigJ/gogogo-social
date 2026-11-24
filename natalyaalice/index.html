@@ -7012,7 +7012,7 @@
       padding: 0 12px;
     }
   </style>
-  <script src="/natalyaalice/themes.js?v=thm-9"></script>
+  <script src="/natalyaalice/themes.js?v=thm-10"></script>
 </head>
 <body class="is-home">
   <div class="go-boot" id="go-boot" role="status" aria-live="polite">
@@ -19854,6 +19854,8 @@
           if (ib < 0) ib = 1000 + base.indexOf(b.key);
           return ia - ib;
         });
+        /* Aktive stehen immer vor nicht aktiven (Reihenfolge innerhalb der Gruppe bleibt) */
+        list = list.filter(plusOfferOwned).concat(list.filter(function (o) { return !plusOfferOwned(o); }));
         plusStore("order", list.map(function (o) { return o.key; }));
         return list;
       }
@@ -19881,8 +19883,14 @@
           function move(ev) {
             var dy = ev.clientY - startY;
             var next = tile.nextElementSibling, prev = tile.previousElementSibling;
-            if (dy > h / 2 && next && next.classList.contains("go-tile")) { nav.insertBefore(next, tile); startY += h; dy -= h; }
-            else if (dy < -h / 2 && prev && prev.classList.contains("go-tile")) { nav.insertBefore(tile, prev); startY -= h; dy += h; }
+            /* nur innerhalb der eigenen Gruppe tauschen: Nicht aktive nie vor aktive */
+            var on = tile.classList.contains("is-on");
+            function same(t) { return t && t.classList.contains("go-tile") && t.classList.contains("is-on") === on; }
+            if (dy > h / 2 && same(next)) { nav.insertBefore(next, tile); startY += h; dy -= h; }
+            else if (dy < -h / 2 && same(prev)) { nav.insertBefore(tile, prev); startY -= h; dy += h; }
+            /* an der Gruppengrenze nicht weiter ziehen */
+            if (dy > 0 && !same(next)) dy = Math.min(dy, 12);
+            if (dy < 0 && !same(prev)) dy = Math.max(dy, -12);
             tile.style.transform = "translateY(" + dy + "px)";
           }
           function up() {

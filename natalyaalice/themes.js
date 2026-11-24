@@ -263,7 +263,8 @@
     ".wr-pill-btn--dark",
     ".acc-rsvp:not(.is-on)",
     ".go-primary",
-    ".god__btn--primary"
+    ".god__btn--primary",
+    ".go-tile.is-on .go-tile__pill"
   ].join(",");
   var extraEl = null;
   function paintExtra() {
