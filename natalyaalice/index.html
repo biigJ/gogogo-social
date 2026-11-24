@@ -8840,7 +8840,7 @@
   <script src="/natalyaalice/log.js?v=log-2"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-4"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-5"></script>
-  <script src="/natalyaalice/go-story.js?v=gst-2"></script>
+  <script src="/natalyaalice/go-story.js?v=gst-3"></script>
   <script src="/natalyaalice/bubbles.js?v=bub-15"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-5"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-8"></script>
@@ -8851,7 +8851,7 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-44"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-26"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-4"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-5"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-4"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
@@ -25311,7 +25311,23 @@
         item.appendChild(name);
         item.setAttribute("aria-label", (person.label || person.name || "Team") + (story ? ", Story ansehen" : ", Profil ansehen"));
         item.addEventListener("click", onOpen);
+        if (person && person.id) {
+          item.setAttribute("data-story-person", String(person.id));
+          storyPeople[String(person.id)] = person;
+        }
         return item;
+      }
+      var storyPeople = {};
+      /* Story zu Ende: weiter mit der nächsten Person in der Profilkreis-Reihe, die eine Story hat; sonst zurück zu Aktuell */
+      function openNextPersonStory(fromId) {
+        var els = [].slice.call(document.querySelectorAll("[data-story-person]")).filter(function (el) { return el.offsetParent; });
+        var ids = els.map(function (el) { return el.getAttribute("data-story-person"); });
+        var at = ids.indexOf(String(fromId));
+        for (var k = at + 1; k < ids.length && at >= 0; k++) {
+          var p = storyPeople[ids[k]];
+          if (p && openPersonStory(p)) return true;
+        }
+        return false;
       }
 
 
@@ -25599,6 +25615,7 @@
           };
         }), {
           title: first,
+          onEnd: function () { openNextPersonStory(person.id); },
           onItem: function (it) {
             if (HeuteAccountability.focusEvent(it.id)) return;
             HeuteAccountability.setFilter("alles");

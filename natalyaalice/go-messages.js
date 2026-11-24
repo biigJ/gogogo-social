@@ -42,6 +42,11 @@
       key: "news:2026-11-24-online",
       at: "2026-11-24T12:00:03Z",
       text: "Ein grüner Punkt am Profilkreis heißt: Die Person hat gogogo gerade offen. Unter Profil → Einstellungen → Privatsphäre schaltest Du das für Dich aus, ebenso die Suche über Orte und erledigte Events für Freunde."
+    },
+    {
+      key: "news:2026-11-24-story-weiter",
+      at: "2026-11-24T16:30:00Z",
+      text: "Stories laufen jetzt durch: Tippen zeigt die nächste Story, danach die der nächsten Person. Am Ende bist Du wieder in Aktuell."
     }
   ];
 
