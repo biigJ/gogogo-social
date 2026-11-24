@@ -179,6 +179,14 @@
     }
   }
 
+  function formatWeekday(iso) {
+    try {
+      return new Date(iso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", timeZone: "Europe/Berlin" });
+    } catch (e) {
+      return iso;
+    }
+  }
+
   function formatDayLong(iso) {
     try {
       return new Date(iso + "T12:00:00").toLocaleDateString("de-DE", {
@@ -1129,7 +1137,57 @@
     return groups;
   }
 
+  /* ---------- Kalender zeigt nur Wiederkehrendes (Einzeltermine stehen in Aktuell) ----------
+     Wiederkehrend: Wochenplan (enrollment / Plan-Vorlage), Reise-Ersatz für den Plan, Gruppen-Events,
+     Serien-Einladungen, oder dasselbe Event (Titel, Wochentag, Uhrzeit) in mindestens zwei Wochen. */
+  function seriesKey(title, ts) {
+    var d = new Date(ts);
+    if (isNaN(d.getTime())) return "";
+    var wd = "";
+    try { wd = d.toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }); } catch (e) { wd = String(d.getDay()); }
+    return String(title || "").trim().toLowerCase() + "|" + wd + "|" + formatTime(ts);
+  }
+  function loadSeriesKeys() {
+    var id = me();
+    if (!id) { state.seriesKeys = {}; return Promise.resolve(); }
+    var start = addDays(weekStart(), -35);
+    var end = addDays(weekStart(), 42);
+    return rest(
+      "events?user_id=eq." + encodeURIComponent(id) + "&status=neq.ausgefallen" +
+        "&starts_at=gte." + encodeURIComponent(start + "T00:00:00+01:00") +
+        "&starts_at=lt." + encodeURIComponent(end + "T00:00:00+01:00") +
+        "&select=title,starts_at&order=starts_at.asc&limit=1000"
+    ).then(function (rows) {
+      var weeks = {};
+      (rows || []).forEach(function (r) {
+        var k = seriesKey(r.title, r.starts_at);
+        if (!k) return;
+        (weeks[k] = weeks[k] || {})[dayKey(r.starts_at)] = true;
+      });
+      var out = {};
+      Object.keys(weeks).forEach(function (k) { if (Object.keys(weeks[k]).length >= 2) out[k] = true; });
+      state.seriesKeys = out;
+    }).catch(function () { state.seriesKeys = null; });
+  }
+  function isRecurringItem(it) {
+    if (!it || !it.ev) return false;
+    var ev = it.ev;
+    if (it._fromPlan || ev.enrollment_id) return true;
+    if (it.kind === "invited" || it.kind === "joined") return true;
+    if (it.kind === "ffc") return false;
+    if (ev.travel_auto || ev.item_type === "hotel_workout") return true;
+    if (ev.group_id) return true;
+    if (isSupportEvent(ev) || ev.is_unplanned) return false;
+    /* Serien noch nicht geladen: lieber zeigen als leer */
+    if (!state.seriesKeys) return true;
+    return !!state.seriesKeys[seriesKey(ev.title, ev.starts_at)];
+  }
+
   function itemsForDay(iso) {
+    return itemsForDayAll(iso).filter(isRecurringItem);
+  }
+
+  function itemsForDayAll(iso) {
     var list = [];
     state.events.forEach(function (ev) {
       if (dayKey(ev.starts_at) === iso && ev.status !== "ausgefallen") {
@@ -1356,22 +1414,51 @@
       '">' +
       '<div class="wr-media tone-neutral">' +
       '<div class="wr-overlay wr-overlay--empty">' +
-      '<p class="wr-empty-title">Noch nichts geplant</p>' +
-      '<div class="wr-empty-btns wr-empty-btns--grid">' +
-      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-kind="kraft" data-iso="' +
-      esc(iso) +
-      '">Kraft</button>' +
-      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-kind="ausdauer" data-iso="' +
-      esc(iso) +
-      '">Ausdauer</button>' +
-      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-kind="alternative" data-iso="' +
-      esc(iso) +
-      '">Sonstiges</button>' +
-      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-add-kind="zirkel" data-iso="' +
-      esc(iso) +
-      '">Zirkeltraining</button>' +
+      '<p class="wr-empty-title">Kein festes Training</p>' +
+      '<div class="wr-empty-btns">' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-pick-plan="1">Wochenplan ändern</button>' +
+      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zrec="1">Zirkeltraining jede Woche</button>' +
       "</div></div></div></div>"
     );
+  }
+
+  /* Übungen der Einheit als Liste auf dem Bild (nur Anzeige). Kommen asynchron vom Host und werden gecacht. */
+  var exCache = {};
+  function exKey(ev) {
+    return String(ev.id || "") + "|" + String(ev.course_session_id || "") + "|" + String(ev.title || "");
+  }
+  function exListHtml(ev) {
+    if (!ev || ev.category === "zirkel" || !host || !host.exercisesForEvent) return "";
+    var k = exKey(ev);
+    var names = exCache[k];
+    if (names === undefined) {
+      exCache[k] = null;
+      Promise.resolve(host.exercisesForEvent(ev)).then(function (list) {
+        exCache[k] = (list || []).filter(Boolean);
+        if (exCache[k].length) patchExLists();
+      }).catch(function () { exCache[k] = []; });
+      return '<ul class="wr-exlist" data-ex-key="' + esc(k) + '" hidden></ul>';
+    }
+    return '<ul class="wr-exlist" data-ex-key="' + esc(k) + '"' + (names && names.length ? "" : " hidden") + ">" + exItems(names) + "</ul>";
+  }
+  function exItems(names) {
+    if (!names || !names.length) return "";
+    var max = 8;
+    var html = names.slice(0, max).map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("");
+    if (names.length > max) html += '<li class="wr-exlist__more">+ ' + (names.length - max) + " weitere</li>";
+    return html;
+  }
+  function patchExLists() {
+    var root = $(ROOT_ID);
+    if (!root) return;
+    root.querySelectorAll(".wr-exlist[data-ex-key]").forEach(function (ul) {
+      var names = exCache[ul.getAttribute("data-ex-key")];
+      if (!names || !names.length || !ul.hidden) return;
+      ul.innerHTML = exItems(names);
+      ul.hidden = false;
+    });
+    /* gleiches HTML beim nächsten render(): Cache steckt schon drin */
+    root.__wrHtml = "";
   }
 
   function eventCardHtml(item, iso) {
@@ -1414,9 +1501,7 @@
         ">" +
         placePrefix +
         (notePack.text ? esc(notePack.text) : "") +
-        (notePack.more
-          ? ' <button type="button" class="wr-more" data-wr-more="1">mehr</button>'
-          : "") +
+        "" +
         "</p>";
     }
     var going = goingLine(ev);
@@ -1442,8 +1527,6 @@
       '" data-event-id="' +
       esc(ev.id) +
       '"' +
-      (isNutrition ? ' data-wr-nutrition="1"' : "") +
-      (isZirkel ? ' data-wr-zirkel-open="1"' : "") +
       ">" +
       '<div class="wr-media ' +
       toneClass(cat) +
@@ -1455,10 +1538,7 @@
           ? '<img class="wr-photo wr-cover" src="' + esc(cover) + '" alt="" loading="lazy" />'
           : "") +
       '<div class="wr-bottom">' +
-      '<div class="wr-bottom__main"' +
-      (isNutrition ? ' data-wr-nutrition-open="1"' : "") +
-      (isZirkel ? ' data-wr-zirkel-open="1"' : "") +
-      ">" +
+      '<div class="wr-bottom__main">' +
       '<div class="wr-author">' +
       avatarHtml(p) +
       inviteAvatarsHtml(iso) +
@@ -1472,6 +1552,7 @@
       '<h2 class="wr-title">' +
       esc(title) +
       "</h2>" +
+      exListHtml(ev) +
       desc +
       (zSet && zSet.online
         ? '<button type="button" class="go-online-cta" data-wr-zirkel-go="1">Online mitmachen</button>'
@@ -1692,7 +1773,8 @@
     var label = weekModeMeta().label;
     var travelOn = travelActive();
     var dayIso = currentDayIso();
-    var dayLabel = formatDayLong(dayIso);
+    /* Kalender = wiederkehrende Woche: Wochentag reicht, kein Datum */
+    var dayLabel = formatWeekday(dayIso);
     var travelHint = "";
     if (travelOn) {
       travelHint =
@@ -2040,7 +2122,7 @@
   function patchDayLabel() {
     var el = document.querySelector("#" + ROOT_ID + " .wr-day-label:not(.wr-plan-label)");
     if (!el) return;
-    el.textContent = formatDayLong(currentDayIso());
+    el.textContent = formatWeekday(currentDayIso());
   }
 
   function syncSurface() {
@@ -5706,7 +5788,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-inv-yes],[data-wr-inv-no],[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-cal],[data-wr-pick-plan],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-group-pick],[data-wr-circle-pick],[data-wr-plane],[data-wr-ics],[data-wr-dsq],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-share-circle],[data-wr-csv],[data-wr-friend-pick],[data-wr-friend-req],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-inv-yes],[data-wr-inv-no],[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-cal],[data-wr-pick-plan],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-group-pick],[data-wr-circle-pick],[data-wr-plane],[data-wr-ics],[data-wr-dsq],[data-wr-zrec],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-share-circle],[data-wr-csv],[data-wr-friend-pick],[data-wr-friend-req],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -5874,6 +5956,10 @@
     }
     if (t.getAttribute("data-wr-pick-plan")) {
       setTimeout(openPlanPicker, 0);
+      return;
+    }
+    if (t.hasAttribute("data-wr-zrec")) {
+      if (global.GoCircle && GoCircle.askBeforeOwn) GoCircle.askBeforeOwn(openZirkelRecurring); else openZirkelRecurring();
       return;
     }
     if (t.hasAttribute("data-wr-dsq")) {
@@ -6524,7 +6610,8 @@
       loadCourses().catch(function () {}),
       loadTrainingLists().catch(function () {}),
       loadInvites().catch(function () {}),
-      loadRecent().catch(function () {})
+      loadRecent().catch(function () {}),
+      loadSeriesKeys().catch(function () {})
     ])
       .then(function () {
         syncZirkelAccess();
