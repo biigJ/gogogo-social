@@ -5129,6 +5129,10 @@
     .team-slide__art + .team-slide__title {
       margin-top: 36px;
     }
+    /* Gruppe: Abstand Foto → Gruppenname 2,5-fach (sichtbar ca. 6px → 15px) */
+    .team-slide__art + .team-slide__group-name-row { margin-top: 9px; }
+    .team-gassign { margin-top: 14px; }
+    .team-gassign .wr-sheet-hint { margin: 0 0 10px; font-size: 14px; line-height: 1.4; opacity: .7; text-align: left; }
     .team-slide__art + .team-wa {
       margin-top: 72px; /* doppelter Abstand zum Bild */
     }
@@ -8786,7 +8790,7 @@
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-155"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-100"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-101"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
   <script>
     (function () {
@@ -13870,7 +13874,7 @@
       }
       window.GoZirkelSync = { preset: zirkelSyncPreset, admin: zirkelAdminStart, finished: zirkelFinished };
 
-      function installWocheReels() {
+      function installWocheReels(noShow) {
         if (!window.WocheReels || !sessionMode || !sessionAccount) {
           document.body.classList.remove("is-woche-reels");
           var bare = document.getElementById("woche-reels");
@@ -14106,6 +14110,7 @@
           openCalendar: function () { openGoCalendar(); }
         };
         WocheReels.install(host);
+        if (noShow) return;
         return WocheReels.show();
       }
 
@@ -26014,120 +26019,15 @@
         });
       }
 
+      /* Gruppe: Challenge oben, darunter direkt die Zuordnung der Events (7 Tage):
+         eigene Events mit + / −, Events der anderen Mitglieder mit Zusagen / Absagen (woche-reels.js) */
       function appendGroupEvents(slide, group) {
-        var add = document.createElement("button");
-        add.type = "button";
-        add.className = "team-slide__cta team-slide__cta--gevents";
-        add.textContent = "Events zuordnen";
-        add.addEventListener("click", function () {
-          /* Liste liegt im Kalender: dorthin, Blatt öffnen, nach „Fertig“ zurück zur Gruppe */
-          if (typeof closeKreisPage === "function") closeKreisPage();
-          showWoche();
-          setTimeout(function () {
-            if (window.WocheReels && WocheReels.openGroupAssign) WocheReels.openGroupAssign(function () { openGruppen(); });
-          }, 350);
-        });
-        /* Challenge oben, darunter „Events hinzufügen“ */
         appendGroupChallenge(slide, group);
-        slide.appendChild(add);
-        var list = document.createElement("ul");
-        list.className = "team-gevents";
-        list.hidden = true;
-        slide.appendChild(list);
-        /* Globale Planung: jedes wiederkehrende Gruppen-Event einmal (gleicher Ersteller, Wochentag, Titel),
-           sortiert Mo → So, gleicher Tag untereinander. Zusagen = angenommene Einladungen und Zusagen zum nächsten Termin. */
-        var WD_ORDER = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-        function faceEl(cls, p) {
-          var el = document.createElement("span");
-          el.className = cls;
-          if (p && p.photo_url) el.style.backgroundImage = 'url("' + String(p.photo_url).replace(/"/g, "%22") + '")';
-          else el.textContent = String((p && p.name) || "?").slice(0, 1);
-          if (p && p.name) el.title = p.name;
-          return el;
-        }
-        function paintRows(data) {
-          list.textContent = "";
-          var rows = (data && data.rows) || [], people = (data && data.people) || {}, going = (data && data.going) || {};
-          var seen = {}, series = [];
-          rows.forEach(function (ev) {
-            var wd = new Date(ev.starts_at).toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }).replace(".", "");
-            var title = String(ev.title || (ev.courses && ev.courses.title) || "Event");
-            var key = ev.user_id + "|" + wd + "|" + title;
-            if (seen[key]) return;
-            seen[key] = true;
-            series.push({ ev: ev, wd: wd, title: title });
-          });
-          series.sort(function (a, b) { return WD_ORDER.indexOf(a.wd) - WD_ORDER.indexOf(b.wd); });
-          series.forEach(function (x) {
-            var li = document.createElement("li");
-            li.className = "team-gevents__row";
-            var day = document.createElement("span");
-            day.className = "team-gevents__day";
-            day.textContent = x.wd;
-            var name = document.createElement("span");
-            name.className = "team-gevents__name";
-            name.textContent = x.title;
-            var gw = document.createElement("span");
-            gw.className = "team-gevents__going";
-            (going[String(x.ev.id)] || []).slice(0, 5).forEach(function (uid) { gw.appendChild(faceEl("", people[uid])); });
-            li.appendChild(day);
-            li.appendChild(name);
-            li.appendChild(gw);
-            li.appendChild(faceEl("team-gevents__who", people[String(x.ev.user_id)]));
-            list.appendChild(li);
-          });
-          list.hidden = !series.length;
-        }
-        var gKey = String(group.id);
-        var cached = groupEventsCache[gKey];
-        if (cached) paintRows(cached.data);
-        if (cached && Date.now() - cached.at < 60000) return;
-        var from = new Date(Log.berlinToday() + "T00:00:00").toISOString();
-        rest(
-          "events?group_id=eq." + encodeURIComponent(group.id) +
-          "&starts_at=gte." + encodeURIComponent(from) +
-          "&status=neq.ausgefallen&select=id,user_id,title,starts_at,courses(title)" +
-          "&order=starts_at.asc&limit=60"
-        )
-          .then(function (rows) {
-            rows = Array.isArray(rows) ? rows : [];
-            /* nächster Termin je Serie: dort hängen die Zusagen */
-            var firstIds = {}, ids = [];
-            rows.forEach(function (ev) {
-              var k = ev.user_id + "|" + new Date(ev.starts_at).toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }) + "|" + (ev.title || "");
-              if (!firstIds[k]) { firstIds[k] = 1; ids.push(String(ev.id)); }
-            });
-            var inQ = ids.map(encodeURIComponent).join(",");
-            return Promise.all([
-              ids.length ? rest("go_workout_invites?event_id=in.(" + inQ + ")&status=eq.accepted&select=event_id,to_id").catch(function () { return []; }) : [],
-              ids.length ? rest("event_rsvps?event_id=in.(" + inQ + ")&status=eq.zugesagt&select=event_id,user_id").catch(function () { return []; }) : []
-            ]).then(function (r) {
-              var going = {}, pids = {};
-              function add(eid, uid) {
-                eid = String(eid); uid = String(uid);
-                var arr = going[eid] || (going[eid] = []);
-                if (arr.indexOf(uid) < 0) arr.push(uid);
-                pids[uid] = 1;
-              }
-              (r[0] || []).forEach(function (x) { add(x.event_id, x.to_id); });
-              (r[1] || []).forEach(function (x) { add(x.event_id, x.user_id); });
-              rows.forEach(function (ev) { pids[String(ev.user_id)] = 1; });
-              var idList = Object.keys(pids);
-              return (idList.length ? rest("go_accounts?id=in.(" + idList.map(encodeURIComponent).join(",") + ")&select=id,name,photo_url").catch(function () { return []; }) : Promise.resolve([]))
-                .then(function (acc) {
-                  var people = {};
-                  (acc || []).forEach(function (p) { people[String(p.id)] = p; });
-                  return { rows: rows, going: going, people: people };
-                });
-            });
-          })
-          .then(function (data) {
-            var sig = JSON.stringify([data.rows.map(function (r) { return [r.id, r.title, r.starts_at]; }), data.going]);
-            var same = cached && cached.sig === sig;
-            groupEventsCache[gKey] = { data: data, sig: sig, at: Date.now() };
-            if (!same) paintRows(data);
-          })
-          .catch(function () {});
+        var box = document.createElement("div");
+        box.className = "team-gassign";
+        slide.appendChild(box);
+        if (typeof installWocheReels === "function") installWocheReels(true);
+        if (window.WocheReels && WocheReels.renderGroupAssign) WocheReels.renderGroupAssign(box);
       }
       var groupEventsCache = {};
 
