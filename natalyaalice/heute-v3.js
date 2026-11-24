@@ -1258,18 +1258,7 @@
     })();
     var t = timeLabel(isoTs);
     var sep = t ? " · " + t : "";
-    if (day === today && t) {
-      /* Countdown bis zum Start */
-      var ms = new Date(isoTs).getTime() - Date.now();
-      if (ms > 60000) {
-        var h = Math.floor(ms / 3600000), mi = Math.ceil((ms % 3600000) / 60000);
-        if (mi === 60) { h += 1; mi = 0; }
-        sep += " · in " + (h ? h + " Std. " : "") + (mi || !h ? mi + " Min." : "").trim();
-        sep = sep.replace(/\s+$/, "");
-      } else if (ms > -60000) {
-        sep += " · jetzt";
-      }
-    }
+    /* Countdown steht nicht mehr hier, sondern rechts in der Ort-Zeile (countdownHtml) */
     if (day === today) return "Heute" + sep;
     if (day === tom) return "Morgen" + sep;
     try {
@@ -2126,6 +2115,34 @@
     return "";
   }
 
+  /* Countdown bis zum Start (heute): Stunden:Minuten:Sekunden, rechts in der Zeile des Orts */
+  function cdText(ms) {
+    var sec = Math.max(0, Math.floor(ms / 1000));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s2 = sec % 60;
+    return h + ":" + (m < 10 ? "0" : "") + m + ":" + (s2 < 10 ? "0" : "") + s2;
+  }
+  function countdownHtml(ts) {
+    if (!ts || dayKey(ts) !== todayIso() || !timeLabel(ts)) return "";
+    var ms = new Date(ts).getTime() - Date.now();
+    if (!(ms > 0)) return "";
+    startCdTicker();
+    return '<span class="acc-card__cd" data-cd-ts="' + esc(ts) + '" aria-label="Zeit bis zum Start">' + cdText(ms) + "</span>";
+  }
+  var cdTicker = null;
+  function startCdTicker() {
+    if (cdTicker) return;
+    cdTicker = setInterval(function () {
+      var els = document.querySelectorAll(".acc-card__cd[data-cd-ts]");
+      if (!els.length) { clearInterval(cdTicker); cdTicker = null; return; }
+      if (document.hidden) return;
+      [].forEach.call(els, function (el) {
+        var ms = new Date(el.getAttribute("data-cd-ts")).getTime() - Date.now();
+        if (ms > 0) el.textContent = cdText(ms);
+        else el.remove();
+      });
+    }, 1000);
+  }
+
   function overlayHtml(opts) {
     return (
       '<div class="acc-card__overlay">' +
@@ -2134,6 +2151,7 @@
         ? '<p class="acc-card__when"' + (opts.whenTs ? ' data-when-ts="' + esc(opts.whenTs) + '" data-when-base="' + esc(whenLine(opts.whenTs)) + '"' : "") + ">" + esc(opts.when) + "</p>"
         : "") +
       (opts.zpills || "") +
+      (opts.whenTs && opts.author ? countdownHtml(opts.whenTs) : "") +
       (opts.place && opts.author
         ? '<p class="acc-card__place acc-card__place--top">' + esc(opts.place) + "</p>"
         : "") +
