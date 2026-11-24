@@ -1493,6 +1493,14 @@
     .fw-card--bubble { background-size: cover; background-position: center; }
     .is-bubbles .gbub-rows[hidden], .is-bubbles .friend-list__hint[hidden] { display: none !important; }
     .is-bubbles .gbub-rows { display: flex; flex-direction: column; gap: 14px; }
+    .is-bubbles .kreise-rows:not(:empty) { margin-bottom: 14px; }
+    .kreis-row .gbub-row__ico.is-plain { color: #2A2118; filter: none; }
+    .kreis-row .kreis-row__pen { margin-left: auto; flex: none; }
+    .kreis-page { position: fixed; inset: 0; z-index: 70; background: #F3EEE4; display: flex; flex-direction: column; }
+    .kreis-page__bar { display: grid; grid-template-columns: 31px 1fr 31px; align-items: center; gap: 8px; padding: max(12px, env(safe-area-inset-top)) 16px 8px; }
+    .kreis-page__bar h2 { margin: 0; text-align: center; font: 600 22px/1.2 "Playfair Display", Georgia, serif; color: #2A2118; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .kreis-page__body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 20px calc(110px + env(safe-area-inset-bottom)); }
+    .kreis-page .team-slide { width: 100% !important; min-width: 0 !important; max-width: none !important; height: auto !important; min-height: 0 !important; flex: none !important; scroll-snap-align: none; overflow: visible !important; }
     /* Bubble hinzufügen: Kreis so groß wie die Bubble-Kreise */
     .is-bubbles .friend-list__plus { width: 72px; height: 72px; font-size: 30px !important; }
     /* Bubble ohne Foto: Farbkarte, dunkle Schrift, kein Schatten-Verlauf */
@@ -17822,6 +17830,69 @@
         });
       }
 
+      /* ---------- Kreise: Gruppe und Coach als Zeilen, Inhalt als eigene Seite ---------- */
+      var kreiseState = null;
+      var KREIS_ICON = {
+        group: '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="4.5" cy="8" r="2.2"/><path d="M1 18.5c.35-2.4 1.9-3.8 3.5-3.8S7.7 16.1 8 18.5"/><circle cx="19.5" cy="8" r="2.2"/><path d="M16 18.5c.35-2.4 1.9-3.8 3.5-3.8s3.15 1.4 3.5 3.8"/><circle cx="12" cy="7" r="2.5"/><path d="M7.6 18.8c.45-3 2.5-4.8 4.4-4.8s3.95 1.8 4.4 4.8"/></svg>',
+        coach: '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M15.2 9.2a4 4 0 1 0 0 5.6"/></svg>'
+      };
+      var KREIS_PEN = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg>';
+      function kreisRowHtml(kind, photo, name, pen) {
+        return '<div class="gbub-row kreis-row" data-kreis="' + kind + '" role="button" tabindex="0">' +
+          '<span class="gbub-row__img" style="--gbub:#E9E1D2">' + (photo ? '<img src="' + escapeHtml(photo) + '" alt="" decoding="sync" />' : "") +
+          '<span class="gbub-row__ico' + (photo ? "" : " is-plain") + '">' + KREIS_ICON[kind] + "</span></span>" +
+          '<span class="gbub-row__txt"><span class="gbub-row__name">' + escapeHtml(name) + "</span></span>" +
+          (pen ? '<button type="button" class="team-pencil kreis-row__pen" data-kreis-pen="' + kind + '" aria-label="Bearbeiten">' + KREIS_PEN + "</button>" : "") +
+          "</div>";
+      }
+      function paintKreiseRows(el) {
+        var st = kreiseState || {};
+        var me = String((sessionAccount && sessionAccount.id) || "");
+        var html = "";
+        if (st.group) {
+          html += kreisRowHtml("group", st.group.photo_url || "/assets/gogogo/gogogo-Gruppe-small.jpg", st.group.name || "Meine Gruppe",
+            String(st.group.owner || "") === me);
+        }
+        if (st.coach) {
+          html += kreisRowHtml("coach", st.coach.photo_url || "", "Coach " + String(st.coach.name || "").split(" ")[0], false);
+        }
+        if (el._kreiseHtml === html) return;
+        el._kreiseHtml = html;
+        el.innerHTML = html;
+        if (el._kreiseBound) return;
+        el._kreiseBound = true;
+        el.addEventListener("click", function (e) {
+          var row = e.target.closest("[data-kreis]");
+          if (!row) return;
+          openKreis(row.getAttribute("data-kreis"));
+        });
+      }
+      /* Seite über der App (Pill bleibt sichtbar), Zurück oben links */
+      function openKreisPage(slide, title) {
+        if (!slide) return;
+        closeKreisPage();
+        var page = document.createElement("div");
+        page.className = "kreis-page";
+        page.innerHTML = '<div class="kreis-page__bar"><button type="button" class="profile-back kreis-page__back" aria-label="Zurück">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+          '</button><h2></h2><span></span></div><div class="kreis-page__body"></div>';
+        page.querySelector("h2").textContent = title || "";
+        page.querySelector(".kreis-page__body").appendChild(slide);
+        page.querySelector(".kreis-page__back").addEventListener("click", closeKreisPage);
+        document.body.appendChild(page);
+        document.body.classList.add("kreis-open");
+      }
+      function closeKreisPage() {
+        var old = document.querySelector(".kreis-page");
+        if (old) old.remove();
+        document.body.classList.remove("kreis-open");
+      }
+      function openKreis(kind) {
+        var st = kreiseState || {};
+        if (kind === "group") openKreisPage(st.groupSlide, (st.group && st.group.name) || "Meine Gruppe");
+        else if (kind === "coach") openKreisPage(st.coachSlide, "Mein Coach");
+      }
+
       function renderTeamNow() {
         var box = document.getElementById("plan-team");
         if (!box) return;
@@ -18062,6 +18133,7 @@
         })();
 
         /* Bubbles: Themen-Communities, man ist in genau einer (bubbles.js) */
+        var kreiseRows = null;
         if (window.GoBubbles) {
           var bubSlide = document.createElement("article");
           bubSlide.className = "team-slide is-scroll is-friends is-bubbles";
@@ -18074,7 +18146,10 @@
           bubList.className = "gbub-rows";
           var bubHint = document.createElement("p");
           bubHint.className = "friend-list__hint";
-          bubHint.textContent = "Tritt einer Bubble bei, teile Events zum Thema, diskutiere und verknüpfe Dich.";
+          bubHint.textContent = "Deine Gruppe, Dein Coach und Deine Bubble an einem Ort.";
+          /* Zeilen für Gruppe und Coach (paintKreiseRows), darunter die Bubbles */
+          kreiseRows = document.createElement("div");
+          kreiseRows.className = "gbub-rows kreise-rows";
           /* Ansicht wie Meine Freunde: Kreis = Liste, Quadrat = Wallet */
           var bubWalletOn = false;
           /* Bubbles: Standard Karten (Quadrate), Liste nur wenn gewählt */
@@ -18098,6 +18173,7 @@
             });
             bubList.hidden = bubWalletOn;
             bubHint.hidden = bubWalletOn;
+            if (kreiseRows) kreiseRows.hidden = bubWalletOn;
             bubWallet.hidden = !bubWalletOn;
             if (bubWalletOn) {
               GoBubbles.wallet(function (items, fill, open) {
@@ -18113,6 +18189,7 @@
             paintBubView();
           });
           bubOuter.appendChild(bubHint);
+          bubOuter.appendChild(kreiseRows);
           bubOuter.appendChild(bubList);
           bubOuter.appendChild(bubWallet);
           bubSlide.appendChild(bubOuter);
@@ -18481,6 +18558,12 @@
               row.appendChild(pencil);
             }, coacheeList);
           });
+        }
+        /* Kreise: Gruppe und Coach sind keine eigenen Reiter mehr, sondern Zeilen in Kreise (eigene Seite beim Tippen) */
+        if (kreiseRows) {
+          [groupHost, coachSlide].forEach(function (sl) { if (sl && sl.parentNode === box) box.removeChild(sl); });
+          kreiseState = { group: myGroup, groupSlide: groupHost, coach: trainer, coachSlide: coachSlide };
+          paintKreiseRows(kreiseRows);
         }
         /* Coachees-Reiter nur für Coaches, und erst wenn die Datenbank is_trainer bestätigt hat (kein Cache) */
         if (sessionIsTrainer && sessionTrainerChecked) box.appendChild(coacheeSlide);
@@ -22852,6 +22935,7 @@
           var now = Date.now();
           if (now - lastAt < 280) return;
           lastAt = now;
+          closeKreisPage();
           var sheetOpen = document.getElementById("profile-sheet");
           if (sheetOpen && !sheetOpen.hidden && sheetOpen.classList.contains("is-open")) {
             leaveOwnProfile(function () { lastAt = 0; goTab(tab); });
@@ -25424,6 +25508,8 @@
       function openGruppen() {
         showPlan("team");
         requestAnimationFrame(function () {
+          /* Gruppe ist eine Zeile in Kreise: Seite direkt öffnen */
+          if (kreiseState && kreiseState.groupSlide) { openKreis("group"); return; }
           var slide = document.querySelector('#plan-team [data-title="Meine Gruppe"], #plan-team [data-title="Meine Gruppen"]');
           if (slide && slide.scrollIntoView) slide.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
         });
