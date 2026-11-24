@@ -61,6 +61,10 @@
     ".gpt__hrow.is-off select,.gpt__hrow.is-off span{display:none}" +
     ".gpt__hrow.is-off i{display:inline}" +
     ".gpt__hrow.is-off b{opacity:.45}" +
+    ".gpt__sec{margin:16px 0 6px;font:700 12px Inter,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:rgba(42,33,24,.6)}" +
+    ".gpt__info{margin:6px 2px 0;font-size:13px;color:rgba(42,33,24,.65)}" +
+    ".gpt__link{border:0;background:none;padding:0;font:inherit;color:#2A2118;text-decoration:underline;cursor:pointer}" +
+    ".gpt__btn2{display:block;width:100%;min-height:46px;border-radius:999px;border:1.5px solid #2A2118;background:transparent;color:#2A2118;font:600 15px Inter,sans-serif;cursor:pointer}" +
     ".gpt__save{display:block;width:100%;min-height:48px;margin:12px 0 0;border:0;border-radius:999px;background:#2A2118;color:#F6F1E8;font:600 15px Inter,sans-serif;cursor:pointer}" +
     ".gpt__block{display:block;margin:12px auto 0;border:0;background:none;color:#2A2118;font:600 14px Inter,sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer}";
 
@@ -211,7 +215,7 @@
       var iso = isoOf(y, m, d);
       var past = iso < t;
       var full = freeCount(iso) === 0;
-      var blocked = !!st.blocked[iso] || full;
+      var blocked = !!st.blocked[iso] || full || !!holidayOf(iso);
       var mineDot = false;
       var det = st.detail[iso] || {};
       Object.keys(det).forEach(function (h) { if (det[h].session) mineDot = true; });
@@ -235,7 +239,8 @@
     var iso = st.day;
     var t = todayIso();
     var nowH = Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: "Europe/Berlin" }));
-    var blocked = !!st.blocked[iso];
+    var hol = holidayOf(iso);
+    var blocked = !!st.blocked[iso] || !!hol;
     var rows = "";
     for (var h = FROM_H; h < TO_H; h++) {
       var busy = !!(st.busy[iso] || {})[h];
@@ -255,7 +260,7 @@
         label = st.mode === "coach" && det.event ? String(det.event.title || "Event") : "belegt";
         cls = " is-busy" + (st.mode === "coach" ? "" : " is-plain");
       } else if (blocked) {
-        label = "gesperrt";
+        label = hol || "gesperrt";
         cls = " is-busy is-plain";
       } else if (!avail(iso, h)) {
         label = "nicht verfügbar";
@@ -268,8 +273,217 @@
       "<h2>" + esc(longDay(iso)) + "</h2><span></span></div>" +
       '<p class="gpt__sub">' + (st.mode === "coach" ? "Frei antippen: eigenes Event eintragen" : "Freie Stunde antippen, um zu buchen") + "</p>" +
       '<div class="gpt__rows">' + rows + "</div>" +
-      (st.mode === "coach" ? '<button type="button" class="gpt__block" data-gpt-toggle>' + (blocked ? "Tag freigeben" : "Tag sperren") + "</button>" : "")
+      (st.mode === "coach" ? (hol ? '<p class="gpt__info" style="text-align:center;margin-top:12px">' + esc(hol) + ": gesperrt (Zahnrad → Feiertage)</p>" : '<button type="button" class="gpt__block" data-gpt-toggle>' + (blocked ? "Tag freigeben" : "Tag sperren") + "</button>") : "")
     );
+  }
+
+  /* ---------- Feiertage Berlin (berechnet, gilt für jedes Jahr) ---------- */
+  var HOL_CACHE = {};
+  function easter(y) {
+    var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    var h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    var mo = Math.floor((h + l - 7 * m + 114) / 31), da = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(Date.UTC(y, mo - 1, da));
+  }
+  function holidays(y) {
+    if (HOL_CACHE[y]) return HOL_CACHE[y];
+    var out = {};
+    function fix(m, d, n) { out[y + "-" + pad(m) + "-" + pad(d)] = n; }
+    function rel(days, n) { var t = new Date(easter(y).getTime() + days * 864e5); out[t.toISOString().slice(0, 10)] = n; }
+    fix(1, 1, "Neujahr");
+    if (y >= 2019) fix(3, 8, "Frauentag");
+    rel(-2, "Karfreitag");
+    rel(1, "Ostermontag");
+    fix(5, 1, "Tag der Arbeit");
+    rel(39, "Christi Himmelfahrt");
+    rel(50, "Pfingstmontag");
+    fix(10, 3, "Tag der Deutschen Einheit");
+    fix(12, 25, "1. Weihnachtstag");
+    fix(12, 26, "2. Weihnachtstag");
+    return (HOL_CACHE[y] = out);
+  }
+  function holidaysOn() { return !(st.hours && st.hours.hours && st.hours.hours.holidays === false); }
+  function holidayOf(iso) { return holidaysOn() ? holidays(Number(iso.slice(0, 4)))[iso] || "" : ""; }
+
+  /* ---------- .ics-Import: nur Zeiträume als Block, keine Titel ---------- */
+  function tzOffset(ms, tz) {
+    var p = {};
+    new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      .formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - ms;
+  }
+  function zoned(c, tz) {
+    var guess = Date.UTC(c.y, c.mo - 1, c.d, c.h || 0, c.mi || 0, c.s || 0);
+    try {
+      var t = guess - tzOffset(guess, tz);
+      return guess - tzOffset(t, tz);
+    } catch (e) {
+      return tz === "Europe/Berlin" ? guess - 36e5 : zoned(c, "Europe/Berlin");
+    }
+  }
+  function icsDate(val, params) {
+    var m = String(val || "").match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$/);
+    if (!m) return null;
+    var c = { y: +m[1], mo: +m[2], d: +m[3], h: +(m[4] || 0), mi: +(m[5] || 0), s: +(m[6] || 0) };
+    var tz = (params.TZID || "Europe/Berlin").replace(/^"|"$/g, "");
+    try { new Intl.DateTimeFormat("en-US", { timeZone: tz }); } catch (e) { tz = "Europe/Berlin"; }
+    return { c: c, allDay: !m[4] || params.VALUE === "DATE", utc: !!m[7], tz: m[7] ? "UTC" : tz };
+  }
+  function toMs(c, d) { return d.allDay ? zoned({ y: c.y, mo: c.mo, d: c.d }, "Europe/Berlin") : d.utc ? Date.UTC(c.y, c.mo - 1, c.d, c.h, c.mi, c.s) : zoned(c, d.tz); }
+  function addDays(c, n) {
+    var t = new Date(Date.UTC(c.y, c.mo - 1, c.d + n));
+    return { y: t.getUTCFullYear(), mo: t.getUTCMonth() + 1, d: t.getUTCDate(), h: c.h, mi: c.mi, s: c.s };
+  }
+  function dow(c) { return new Date(Date.UTC(c.y, c.mo - 1, c.d)).getUTCDay(); }
+  function parseIcs(text, fromMs, toMs_) {
+    text = String(text || "").replace(/\r\n/g, "\n").replace(/\n[ \t]/g, "");
+    var evs = [];
+    text.split("BEGIN:VEVENT").slice(1).forEach(function (chunk) {
+      var body = chunk.split("END:VEVENT")[0];
+      var ev = { ex: [] };
+      body.split("\n").forEach(function (line) {
+        var i = line.indexOf(":");
+        if (i < 0) return;
+        var head = line.slice(0, i).split(";"), val = line.slice(i + 1).trim(), name = head[0].toUpperCase(), params = {};
+        head.slice(1).forEach(function (p) { var kv = p.split("="); params[kv[0].toUpperCase()] = kv.slice(1).join("="); });
+        if (name === "DTSTART") ev.start = icsDate(val, params);
+        else if (name === "DTEND") ev.end = icsDate(val, params);
+        else if (name === "DURATION") ev.dur = val;
+        else if (name === "RRULE") ev.rrule = val;
+        else if (name === "EXDATE") val.split(",").forEach(function (v) { var d = icsDate(v, params); if (d) ev.ex.push(toMs(d.c, d)); });
+        else if (name === "RECURRENCE-ID") { var r = icsDate(val, params); if (r) ev.recId = toMs(r.c, r); }
+        else if (name === "UID") ev.uid = val;
+        else if (name === "STATUS") ev.status = val.toUpperCase();
+        else if (name === "TRANSP") ev.transp = val.toUpperCase();
+      });
+      if (ev.start) evs.push(ev);
+    });
+    /* geänderte Einzeltermine ersetzen den Termin der Serie */
+    evs.forEach(function (e) {
+      if (e.recId == null) return;
+      evs.forEach(function (m) { if (m !== e && m.uid === e.uid && m.recId == null) m.ex.push(e.recId); });
+    });
+    var out = [];
+    var WDK = { SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6 };
+    evs.forEach(function (e) {
+      if (e.status === "CANCELLED" || e.transp === "TRANSPARENT") return;
+      var s0 = e.start, sMs = toMs(s0.c, s0), len;
+      if (e.end) len = toMs(e.end.c, e.end) - sMs;
+      else if (e.dur) {
+        var dm = e.dur.match(/P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?/) || [];
+        len = ((+dm[1] || 0) * 7 * 864e5) + ((+dm[2] || 0) * 864e5) + ((+dm[3] || 0) * 36e5) + ((+dm[4] || 0) * 6e4);
+      } else len = s0.allDay ? 864e5 : 36e5;
+      if (!(len > 0)) len = 30 * 6e4;
+      var ex = {};
+      e.ex.forEach(function (x) { ex[x] = 1; });
+      function push(c) {
+        var a = toMs(c, s0), b = a + len;
+        if (s0.allDay) b = toMs(addDays(c, Math.max(1, Math.round(len / 864e5))), s0);
+        if (ex[a] || b <= fromMs || a >= toMs_) return;
+        out.push([a, b]);
+      }
+      if (!e.rrule) { push(s0.c); return; }
+      var r = {};
+      e.rrule.split(";").forEach(function (p) { var kv = p.split("="); r[kv[0].toUpperCase()] = kv[1] || ""; });
+      var freq = r.FREQ, iv = Math.max(1, +r.INTERVAL || 1), count = +r.COUNT || 0, n = 0;
+      var until = r.UNTIL ? (function () { var u = icsDate(r.UNTIL, {}); return u ? toMs(u.c, u) + (u.allDay ? 864e5 - 1 : 0) : Infinity; })() : Infinity;
+      var byday = (r.BYDAY || "").split(",").filter(Boolean).map(function (x) { var m = x.match(/^([+-]?\d+)?([A-Z]{2})$/); return m ? { n: +(m[1] || 0), wd: WDK[m[2]] } : null; }).filter(Boolean);
+      var bymd = (r.BYMONTHDAY || "").split(",").filter(Boolean).map(Number);
+      function emit(c) {
+        var a = toMs(c, s0);
+        if (a < sMs) return true;
+        if (a > until || a >= toMs_ || (count && n >= count)) return false;
+        n++;
+        push(c);
+        return true;
+      }
+      var guard = 0, go = true, cur = s0.c;
+      while (go && guard++ < 3000) {
+        if (freq === "DAILY") { go = emit(cur); cur = addDays(cur, iv); }
+        else if (freq === "WEEKLY") {
+          var mon = addDays(cur, -((dow(cur) + 6) % 7));
+          var wds = byday.length ? byday.map(function (b) { return b.wd; }) : [dow(s0.c)];
+          wds.sort(function (a, b) { return ((a + 6) % 7) - ((b + 6) % 7); });
+          for (var k = 0; k < wds.length && go; k++) go = emit(addDays(mon, (wds[k] + 6) % 7));
+          cur = addDays(mon, 7 * iv);
+        } else if (freq === "MONTHLY" || freq === "YEARLY") {
+          var days = [];
+          var dim = new Date(Date.UTC(cur.y, cur.mo, 0)).getUTCDate();
+          if (freq === "MONTHLY" && byday.length) {
+            byday.forEach(function (b) {
+              var hits = [];
+              for (var dd = 1; dd <= dim; dd++) if (dow({ y: cur.y, mo: cur.mo, d: dd }) === b.wd) hits.push(dd);
+              if (!b.n) days = days.concat(hits); else { var hh = b.n > 0 ? hits[b.n - 1] : hits[hits.length + b.n]; if (hh) days.push(hh); }
+            });
+          } else if (freq === "MONTHLY" && bymd.length) bymd.forEach(function (x) { var dd = x < 0 ? dim + x + 1 : x; if (dd >= 1 && dd <= dim) days.push(dd); });
+          else if (s0.c.d <= dim) days.push(s0.c.d);
+          days.sort(function (a, b) { return a - b; });
+          for (var j = 0; j < days.length && go; j++) go = emit({ y: cur.y, mo: cur.mo, d: days[j], h: s0.c.h, mi: s0.c.mi, s: s0.c.s });
+          var step = freq === "MONTHLY" ? iv : 12 * iv, mo = cur.mo - 1 + step;
+          cur = { y: cur.y + Math.floor(mo / 12), mo: (mo % 12) + 1, d: 1, h: s0.c.h, mi: s0.c.mi, s: s0.c.s };
+        } else { push(s0.c); go = false; }
+      }
+    });
+    /* doppelte und überlappende Blöcke zusammenfassen */
+    out.sort(function (a, b) { return a[0] - b[0]; });
+    var merged = [];
+    out.forEach(function (x) {
+      var last = merged[merged.length - 1];
+      if (last && x[0] <= last[1]) last[1] = Math.max(last[1], x[1]);
+      else merged.push(x.slice());
+    });
+    return merged;
+  }
+  function importIcs() {
+    var inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = ".ics,text/calendar";
+    inp.hidden = true;
+    document.body.appendChild(inp);
+    inp.addEventListener("change", function () {
+      var f = inp.files && inp.files[0];
+      inp.remove();
+      if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        var now = new Date(todayIso() + "T00:00:00Z").getTime() - 2 * 36e5;
+        var blocks = parseIcs(String(rd.result || ""), now, now + 366 * 864e5);
+        if (!blocks.length) { GoDialog.alert("In der Datei sind keine kommenden Termine."); return; }
+        GoDialog.confirm(blocks.length + " Blöcke importieren?", { body: "Nur die Zeiten werden blockiert, Titel und Details nicht. Ein neuer Import ersetzt den alten. Berücksichtigt werden die nächsten 12 Monate.", ok: "Importieren", cancel: "Abbrechen" }).then(function (yes) {
+          if (!yes) return;
+          var rows = blocks.map(function (b) { return { coach_id: me(), starts_at: new Date(b[0]).toISOString(), ends_at: new Date(b[1]).toISOString(), source: "ics" }; });
+          var job = host.rest("go_coach_blocks?coach_id=eq." + encodeURIComponent(me()) + "&source=eq.ics", { method: "DELETE", prefer: "return=minimal" });
+          for (var i = 0; i < rows.length; i += 400) (function (part) {
+            job = job.then(function () { return host.rest("go_coach_blocks", { method: "POST", prefer: "return=minimal", body: part }); });
+          })(rows.slice(i, i + 400));
+          job.then(function () { st.icsCount = rows.length; host.toast(rows.length + " Blöcke importiert"); return loadMonth(); })
+            .then(function () { if (st) paintHours(); })
+            .catch(function () { GoDialog.alert("Import ging nicht (go-pt-blocks.sql in Supabase ausgeführt?)"); });
+        });
+      };
+      rd.readAsText(f);
+    });
+    inp.click();
+  }
+  function clearIcs() {
+    GoDialog.confirm("Importierte Blöcke entfernen?", { ok: "Entfernen", cancel: "Abbrechen" }).then(function (yes) {
+      if (!yes) return;
+      host.rest("go_coach_blocks?coach_id=eq." + encodeURIComponent(me()) + "&source=eq.ics", { method: "DELETE", prefer: "return=minimal" })
+        .then(function () { st.icsCount = 0; return loadMonth(); })
+        .then(function () { if (st) paintHours(); })
+        .catch(function () { host.toast("Ging nicht (go-pt-blocks.sql?)"); });
+    });
+  }
+  function loadIcsCount() {
+    host.rest("go_coach_blocks?coach_id=eq." + encodeURIComponent(me()) + "&source=eq.ics&ends_at=gte." + encodeURIComponent(new Date().toISOString()) + "&select=id&limit=5000")
+      .then(function (r) { if (!st) return; st.icsCount = (r || []).length; if (st.view === "hours") { var el = document.querySelector("[data-gpt-icsinfo]"); if (el) el.innerHTML = icsInfo(); } })
+      .catch(function () { if (st) st.icsCount = -1; });
+  }
+  function icsInfo() {
+    if (st.icsCount == null) return "";
+    if (st.icsCount < 0) return "Import braucht go-pt-blocks.sql in Supabase.";
+    if (!st.icsCount) return "Noch nichts importiert.";
+    return st.icsCount + " Blöcke aus Deinem Kalender · <button type=\"button\" class=\"gpt__link\" data-gpt-icsclear>Entfernen</button>";
   }
 
   /* Zahnrad: verfügbare Zeiten täglich gleich oder je Wochentag (wie Calendly) */
@@ -298,9 +512,15 @@
       '<label class="gpt__opt"><input type="radio" name="gpt-mode" value="weekday"' + (wk ? " checked" : "") + ">Individuell pro Wochentag</label></div>" +
       '<div data-gpt-pane="daily"' + (wk ? " hidden" : "") + '><div class="gpt__hrow"><b>Mo bis So</b>' + hourSel("df", daily[0]) + "<span>–</span>" + hourSel("dt", daily[1]) + "</div></div>" +
       '<div data-gpt-pane="weekday"' + (wk ? "" : " hidden") + ">" + rows + "</div>" +
-      '<button type="button" class="gpt__save" data-gpt-save>Speichern</button>'
+      '<label class="gpt__opt" style="margin-top:6px"><input type="checkbox" data-gpt-hol' + (hrs.holidays === false ? "" : " checked") + ">Feiertage in Berlin sperren</label>" +
+      '<button type="button" class="gpt__save" data-gpt-save>Speichern</button>' +
+      '<p class="gpt__sec">Kalender importieren</p>' +
+      '<button type="button" class="gpt__btn2" data-gpt-ics>.ics-Datei wählen</button>' +
+      '<p class="gpt__info" data-gpt-icsinfo>' + icsInfo() + "</p>" +
+      '<p class="gpt__info">Termine werden nur als belegte Zeit eingetragen, ohne Titel. Export z. B. aus Google Kalender (Einstellungen → Exportieren) oder Apple Kalender (Ablage → Exportieren).</p>'
     );
     st.view = "hours";
+    if (st.icsCount == null) loadIcsCount();
   }
   function onChange(e) {
     if (!st || st.view !== "hours") return;
@@ -317,7 +537,7 @@
     var card = document.querySelector(".gpt__card");
     var mode = card.querySelector('[name="gpt-mode"]:checked').value;
     function val(n) { return Number(card.querySelector('[data-gpt-sel="' + n + '"]').value); }
-    var hrs = { daily: [val("df"), val("dt")], days: {} };
+    var hrs = { daily: [val("df"), val("dt")], days: {}, holidays: !!card.querySelector("[data-gpt-hol]").checked };
     WEEK.forEach(function (wd) {
       if (card.querySelector('[data-gpt-wd="' + wd + '"] [data-gpt-on]').checked) hrs.days[String(wd)] = [val(wd + "f"), val(wd + "t")];
     });
@@ -404,10 +624,13 @@
     if (t.closest("[data-gpt-back]")) { st.day = ""; st.view = ""; paintMonth(); return; }
     if (t.closest("[data-gpt-gear]")) { paintHours(); return; }
     if (t.closest("[data-gpt-save]")) { saveHours(); return; }
+    if (t.closest("[data-gpt-ics]")) { importIcs(); return; }
+    if (t.closest("[data-gpt-icsclear]")) { clearIcs(); return; }
     if (t.closest("[data-gpt-toggle]")) { toggleBlock(st.day); return; }
     var dayBtn = t.closest("[data-gpt-day]");
     if (dayBtn && !dayBtn.disabled) {
       var iso = dayBtn.getAttribute("data-gpt-day");
+      if (st.mode === "client" && holidayOf(iso)) { GoDialog.alert(holidayOf(iso) + ": an Feiertagen gibt es kein Personal Training."); return; }
       if (st.mode === "client" && st.blocked[iso]) { GoDialog.alert((st.coachName || "Dein Coach") + " hat diesen Tag gesperrt."); return; }
       st.day = iso;
       paintDay();
@@ -418,7 +641,7 @@
       var h = Number(row.getAttribute("data-gpt-h"));
       var det = (st.detail[st.day] || {})[h] || {};
       if (st.mode === "coach") { coachSlot(st.day, h, det); return; }
-      if (det.session || (st.busy[st.day] || {})[h] || st.blocked[st.day] || !avail(st.day, h)) return;
+      if (det.session || (st.busy[st.day] || {})[h] || st.blocked[st.day] || holidayOf(st.day) || !avail(st.day, h)) return;
       bookSlot(st.day, h);
     }
   }
@@ -436,6 +659,8 @@
 
   global.GoPtCal = {
     init: function (h) { host = h; },
+    _parseIcs: parseIcs,
+    _holidays: holidays,
     open: open,
     close: close,
     shortDay: shortDay
