@@ -193,7 +193,11 @@
         "&select=id,event_id,to_id,status,decided_at,events(title)&order=decided_at.desc&limit=20").catch(function () { return []; }),
       rest("go_coachee_requests?and=(or(coach_id.eq." + me() + ",user_id.eq." + me() + "),or(status.eq.pending,created_at.gte." + since + ",decided_at.gte." + since + "))" +
         "&select=id,user_id,coach_id,status,created_at,decided_at&order=created_at.desc&limit=20").catch(function () { return []; }),
-      rest("go_messages?or=(to_id.is.null,to_id.eq." + me() + ")&created_at=gte." + sinceQ + "&select=id,body,created_at&order=created_at.desc&limit=20").catch(function () { return []; })
+      rest("go_messages?or=(to_id.is.null,to_id.eq." + me() + ")&created_at=gte." + sinceQ + "&select=id,body,created_at&order=created_at.desc&limit=20").catch(function () { return []; }),
+      /* Freunde haben eine Uhrzeit eingetragen (go-events-time-set.sql); privat filtert die RLS */
+      rest("events?user_id=neq." + uid + "&status=eq.geplant&time_set_at=gte." + sinceQ +
+        "&starts_at=gte." + encodeURIComponent(new Date(Date.now() - 3 * 3600000).toISOString()) +
+        "&select=id,user_id,title,starts_at,time_set_at,visibility&order=time_set_at.desc&limit=30").catch(function () { return []; })
     ];
     var ST = { accepted: "angenommen", declined: "abgelehnt", withdrawn: "zurückgezogen" };
     return Promise.all(jobs).then(function (r) {
@@ -239,12 +243,28 @@
         out.push({ kind: "msg", created_at: plans[0].created_at, past: true, label: "Es gibt neue Trainingspläne.",
           open: function () { if (global.GoDialog) GoDialog.alert("Es gibt neue Trainingspläne.", { body: names.join(", ") + "\n\nDu findest sie unter Woche → Stift → Wochenplan ändern." }); } });
       } else restMsgs = restMsgs.concat(plans);
+      var friendIds = {};
+      (host.teamPeople || []).forEach(function (p) { if (p && p.id) friendIds[String(p.id)] = true; });
+      (r[6] || []).forEach(function (e) {
+        if (!e || !friendIds[String(e.user_id)] || e.visibility === "privat" || !hasTime(e)) return;
+        out.push({ kind: "traintime", created_at: e.time_set_at, user_id: e.user_id, past: false,
+          labelFn: function () { return first(e.user_id) + " trainiert " + trainDayLabel(e.starts_at) + " um " + timeLabel(e.starts_at) + ": " + (e.title || "Training"); },
+          open: function () { openReplyEvent(e.id); } });
+      });
       restMsgs.forEach(function (m) {
         out.push({ kind: "msg", created_at: m.created_at, past: true, label: String(m.body || "Mitteilung").slice(0, 120),
           open: function () { if (global.GoDialog) GoDialog.alert(String(m.body || "")); } });
       });
       return out;
     });
+  }
+  /* heute / morgen / Wochentag */
+  function trainDayLabel(ts) {
+    var d = dayKey(ts), t = todayIso();
+    if (d === t) return "heute";
+    var tm = new Date(t + "T12:00:00Z"); tm.setUTCDate(tm.getUTCDate() + 1);
+    if (d === tm.toISOString().slice(0, 10)) return "morgen";
+    try { return "am " + new Date(ts).toLocaleDateString("de-DE", { weekday: "long", timeZone: "Europe/Berlin" }); } catch (e) { return "am " + d; }
   }
   function latestBubbleNews() {
     var bid = host && host.bubbleId ? String(host.bubbleId() || "") : "";
@@ -5565,10 +5585,11 @@
     var to = isoPlus(iso, 1) + "T00:00:00" + berlinOffsetOf(isoPlus(iso, 1));
     state.ttBusy = true;
     rest("events?user_id=eq." + encodeURIComponent(me()) + "&status=eq.geplant&starts_at=gte." + encodeURIComponent(from) +
-      "&starts_at=lt." + encodeURIComponent(to) + "&select=id,title,category,item_type,travel_auto,starts_at&order=starts_at.asc&limit=10")
+      "&starts_at=lt." + encodeURIComponent(to) + "&select=id,title,category,item_type,travel_auto,starts_at,visibility&order=starts_at.asc&limit=10")
       .then(function (rows) {
         var ev = (rows || []).filter(function (e) {
-          return e && !hasTime(e) && !e.travel_auto && e.category !== "zirkel" &&
+          /* „Nur Ich“: niemand sieht die Uhrzeit, also keine Frage beim Öffnen */
+          return e && !hasTime(e) && !e.travel_auto && e.category !== "zirkel" && e.visibility !== "privat" &&
             e.item_type !== "support_session" && e.item_type !== "hotel_workout";
         })[0];
         if (!ev) return;
@@ -5599,7 +5620,7 @@
           /* 12:00 UTC heißt „ohne Uhrzeit“: eine Sekunde dazu */
           if (!isNaN(d.getTime()) && d.getUTCHours() === 12 && d.getUTCMinutes() === 0) starts = iso + "T" + hhmm + ":01" + off;
           return rest("events?id=eq." + encodeURIComponent(ev.id), {
-            method: "PATCH", prefer: "return=minimal", body: { starts_at: starts }
+            method: "PATCH", prefer: "return=minimal", body: { starts_at: starts, time_set_at: new Date().toISOString() }
           }).then(function () {
             if (host.toast) host.toast((slot === "morgen" ? "Heute " : "Morgen ") + hhmm + " eingetragen");
             return refresh();
