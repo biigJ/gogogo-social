@@ -8944,7 +8944,7 @@
   <script src="/natalyaalice/heute-v3.js?v=feed-163"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-107"></script>
-  <script src="/natalyaalice/support.js?v=support-32"></script>
+  <script src="/natalyaalice/support.js?v=support-34"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -19377,6 +19377,8 @@
             if (!yes) return;
             GoSupport.cancelOffer(k).then(function () {
               paintGoRail(true);
+              /* Karten des Plus-Punkts (z. B. Ernährung heute 19:00) verschwinden aus Aktuell */
+              if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
               /* nach dem Neuaufbau zurück zu den Kacheln (paintGoRail stellt sonst die alte Seite wieder her) */
               setTimeout(function () { jumpToGoOffer("toc"); }, 60);
             }).catch(function () { gogogoToast("Deaktivieren ging gerade nicht"); });
@@ -20113,6 +20115,30 @@
         return box;
       }
 
+      /* Plus-Punkt aktivieren: immer erst die Bestätigung mittig, danach direkt nutzbar (Seite bzw. Karte öffnet sich) */
+      function plusActivate(key, title, btn) {
+        if (!window.GoDialog || !window.GoSupport || !GoSupport.bookOffer) return;
+        GoDialog.confirm("Möchtest Du " + (title || "diesen Plus-Punkt") + " aktivieren?", {
+          body: "Im nächsten Schritt kannst Du die Funktion sofort nutzen.", ok: "Aktivieren", cancel: "Abbrechen"
+        }).then(function (yes) {
+          if (!yes) return;
+          if (btn) btn.disabled = true;
+          Promise.resolve(GoSupport.bookOffer(key, { silent: true })).then(function (order) {
+            paintGoRail(true);
+            if (typeof renderProfil === "function") renderProfil();
+            if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
+            if (key === "stempelkarte") {
+              openStampCardModal(order || (GoSupport.activeOrderFor && GoSupport.activeOrderFor("stempelkarte")), { fromPlus: true, linkedOnly: true });
+            } else {
+              setTimeout(function () { jumpToGoOffer(key); }, 60);
+            }
+          }).catch(function () {
+            if (btn) btn.disabled = false;
+            gogogoToast("Aktivieren ging gerade nicht");
+          });
+        });
+      }
+
       function paintGoRail(force) {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
@@ -20329,7 +20355,7 @@
                 if (item.key === "stempelkarte") {
                   var stOrd = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
                   if (plusOfferOwned(item)) openStampCardModal(stOrd, { fromPlus: true, linkedOnly: true });
-                  else openStampBookModal();
+                  else plusActivate("stempelkarte", item.title);
                   return;
                 }
                 jumpToGoOffer(item.key);
@@ -20413,7 +20439,7 @@
                 return;
               }
               if (offer.key === "stempelkarte") {
-                openStampBookModal();
+                plusActivate("stempelkarte", offer.title, cta);
                 return;
               }
               if (offer.key === "web_call") {
@@ -20421,7 +20447,7 @@
                 return;
               }
               if (offer.key === "ernaehrung") {
-                openNutritionBookModal();
+                plusActivate("ernaehrung", offer.title, cta);
                 return;
               }
               if (offer.key === "coach_offer") {
@@ -20445,22 +20471,7 @@
                 });
                 return;
               }
-              cta.disabled = true;
-              var book =
-                window.GoSupport && GoSupport.bookOffer
-                  ? GoSupport.bookOffer(offer.key)
-                  : Promise.resolve();
-              Promise.resolve(book)
-                .then(function () {
-                  paintGoRail(true);
-                  if (typeof renderProfil === "function") renderProfil();
-                })
-                .catch(function () {
-                  cta.disabled = false;
-                  try {
-                    GoDialog.alert("Buchung fehlgeschlagen");
-                  } catch (eB) {}
-                });
+              plusActivate(offer.key, offer.title, cta);
             });
           }
           /* Stempelkarte: unter dem Bild „Aktivieren“, aktiv die Karten der Gruppen und Circles + Stift (Deaktivieren) */
@@ -27910,6 +27921,7 @@
             GoSupport.cancelOffer("stempelkarte").then(function () {
               closeStampCardModal();
               paintGoRail(true);
+              if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
             }).catch(function () { gogogoToast("Deaktivieren ging gerade nicht"); });
           });
         });
