@@ -1338,6 +1338,32 @@
     if (!ev || !ev.group_id || String(ev.user_id) === me() || !host || !host.myGroups) return false;
     return (host.myGroups() || []).some(function (g) { return g && String(g.id) === String(ev.group_id); });
   }
+  /* Meine Teilnahme an einem Gruppentraining (eigenes Event mit gleicher group_id am selben Tag) */
+  function myCopyOfGroupEvent(ev) {
+    if (!ev || !ev.group_id) return null;
+    var d = dayKey(ev.starts_at);
+    return (state.events || []).filter(function (e) {
+      return e && String(e.user_id) === me() && String(e.group_id || "") === String(ev.group_id) &&
+        dayKey(e.starts_at) === d && e.status !== "ausgefallen";
+    })[0] || null;
+  }
+  /* Mitglied startet das Gruppentraining: eigene Einheit (Sichtbarkeit Gruppe) + Zusage, dann wie eigenes Event */
+  function startGroupEvent(ev) {
+    var have = myCopyOfGroupEvent(ev);
+    if (have) return startEvent(have);
+    return createUnplannedEvent({
+      category: ev.category || "kraft", course_id: ev.course_id || null,
+      title: ev.title || "Gruppentraining", starts_at: ev.starts_at,
+      location: ev.location || null, visibility: "gruppe", group_id: ev.group_id
+    }).then(function (copy) {
+      return rest("event_rsvps?on_conflict=event_id,user_id", {
+        method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+        body: { event_id: ev.id, user_id: me(), status: "zugesagt" }
+      }).catch(function () {}).then(function () { return refresh(); }).then(function () {
+        startEvent(evById(copy.id) || copy);
+      });
+    }).catch(function () { if (host.toast) host.toast("Starten ging gerade nicht"); });
+  }
 
   function eventVisibleToMe(ev, flags) {
     if (!ev) return false;
@@ -1371,6 +1397,7 @@
       /* Eigene Events von heute bleiben bis Mitternacht sichtbar, damit man sie nachträglich abschließen kann */
       if (mine && t <= week && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString())) return true;
       /* Gruppentraining meiner Gruppe: heute bis Mitternacht und kommende Tage, auch unter „Nur ich“ */
+      if (isMyGroupEvent(ev) && myCopyOfGroupEvent(ev)) return false;
       if (isMyGroupEvent(ev) && vis !== "privat" && t <= week &&
           (dayKey(ev.starts_at) === dayKey(new Date(now).toISOString()) || t >= now - 3600000)) return true;
       /* Kreise oben (todayAll): heutige Trainings der Freunde bis Mitternacht, auch wenn die Uhrzeit vorbei ist
@@ -2280,7 +2307,8 @@
         accepted: invite.status === "accepted"
       });
     }
-    var tools = mine
+    var groupMember = !mine && upcoming && day === todayIso() && isMyGroupEvent(ev);
+    var tools = mine || groupMember
       ? eventToolRowHtml({
           eventId: ev.id,
           postId: String(ev.id),
@@ -2292,7 +2320,7 @@
           menu: ev.status !== "erledigt" && day === todayIso(),
           badge: eventBadgeKind(ev),
           /* Papierflieger nur für heute und kommende Events, nicht für vergangene */
-          shareId: day >= todayIso() ? String(ev.id) : "",
+          shareId: !groupMember && day >= todayIso() ? String(ev.id) : "",
           shareDay: day,
           removeId: "",
           removeMode: "delete"
@@ -4729,6 +4757,12 @@
     if (!ev || !global.GoDialog) return;
     var today = evDayIso(ev) === todayIso();
     if (!today) return;
+    if (isMyGroupEvent(ev)) {
+      GoDialog.choose(String(ev.title || "Gruppentraining"), [{ label: ev.category === "zirkel" ? "Start: Zirkeltraining" : "Start", value: "start" }]).then(function (v) {
+        if (v === "start") startGroupEvent(ev);
+      });
+      return;
+    }
     var choices = [];
     if (today) choices.push({ label: ev.category === "zirkel" ? "Start: Zirkeltraining" : "Start", value: "start" });
     /* eingetragene Alternative: nur noch starten, kein zweites Ausweichen */
@@ -5943,6 +5977,19 @@
       if (ev.status === "erledigt") a.done = true;
       if (ev.photo_url && !a.photoEventId) a.photoEventId = String(ev.id);
     });
+    /* Gruppentraining heute: alle Mitglieder trainieren mit (Gründer gehört dazu) */
+    var groupToday = (state.events || []).some(function (ev) {
+      return ev && ev.group_id && dayKey(ev.starts_at) === today && ev.status !== "ausgefallen" &&
+        (String(ev.user_id) === me() || isMyGroupEvent(ev));
+    });
+    if (groupToday && host.groupMemberIds) {
+      (host.groupMemberIds() || []).forEach(function (uid) {
+        uid = String(uid || "");
+        if (!uid || out[uid]) return;
+        var p = personOf(uid);
+        out[uid] = { id: uid, name: p.name, photo: p.photo, training: true, done: false, photoEventId: "", group: true };
+      });
+    }
     return out;
   }
 
