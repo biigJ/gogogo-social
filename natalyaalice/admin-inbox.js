@@ -92,6 +92,29 @@
     ".ga-tk__path{margin:4px 0 2px;font-size:13px;font-weight:700}" +
     ".ga-tk__body{margin:0;white-space:pre-wrap;font-size:15px}" +
     ".ga-tk__acts{display:flex;gap:16px;justify-content:flex-end;margin-top:4px}" +
+    /* Ticket-Zeile: Vorschau links, Text mittig, Pillen rechts */
+    ".ga-tk.is-row{display:grid;grid-template-columns:61px minmax(0,1fr) auto;gap:14px;align-items:start}" +
+    ".ga-tk__shot{position:relative;width:61px;height:76px;padding:0;border:0;border-radius:10px;background:#E6DED0 center/cover no-repeat;cursor:pointer;color:rgba(42,33,24,.6);font:600 12px/1.2 Inter,sans-serif}" +
+    ".ga-tk__shot.is-empty{background:transparent;border:1.5px dashed rgba(42,33,24,.35)}" +
+    ".ga-tk__shot i{position:absolute;right:-6px;top:-6px;min-width:20px;height:20px;border-radius:999px;background:#111;color:#fff;font:700 11px/20px Inter,sans-serif;font-style:normal;text-align:center}" +
+    ".ga-tk__main{min-width:0}" +
+    ".ga-tk__meta{font-size:13px;color:rgba(42,33,24,.65)}.ga-tk__meta b{color:#111;margin-right:6px}" +
+    ".ga-tk__note{display:block;width:100%;box-sizing:border-box;margin-top:8px;min-height:40px;padding:8px 12px;border-radius:12px;border:1px solid rgba(42,33,24,.2);background:rgba(255,255,255,.5);font:inherit;font-size:14px;color:#111;resize:vertical;field-sizing:content;max-height:160px}" +
+    ".ga-tk__note:focus{outline:none;border-color:#111;background:#fff}" +
+    ".ga-tk__pills{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;max-width:380px}" +
+    ".ga-tk__pill{display:inline-flex;align-items:center;min-height:28px;padding:0 12px;border-radius:999px;border:1.5px solid rgba(42,33,24,.35);font-size:12px;font-weight:600;white-space:nowrap;color:#111}" +
+    ".ga-tk__pills select{min-height:30px;padding:0 10px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:12px;font-weight:700;color:#111;cursor:pointer}" +
+    ".ga-tk__pills select.is-arbeit{background:#E8A33D;border-color:#E8A33D;color:#111}" +
+    ".ga-tk__pills select.is-erledigt{background:#111;color:#fff}" +
+    ".ga-tk__pill.is-admin{background:#111;border-color:#111;color:#fff}" +
+    "@media (max-width:600px){.ga-tk.is-row{grid-template-columns:61px minmax(0,1fr);row-gap:8px}.ga-tk.is-row .ga-tk__shot{grid-row:1 / span 2}.ga-tk__pills{grid-column:2;grid-row:1;max-width:none}.ga-tk__main{grid-column:2;grid-row:2}}" +
+    ".ga-tk__shots{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}" +
+    ".ga-tk__shots .ga-tk__shot{cursor:default}" +
+    ".ga-tkv{position:fixed;inset:0;z-index:10045;background:rgba(20,16,12,.8);display:flex;flex-direction:column;align-items:center;padding:16px;overflow-y:auto;gap:14px}" +
+    ".ga-tkv img{max-width:min(100%,900px);border-radius:10px;display:block}" +
+    ".ga-tkv__bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}" +
+    ".ga-tkv__bar button{min-height:40px;padding:0 16px;border-radius:999px;border:0;background:#F3EEE4;color:#111;font:600 14px Inter,sans-serif;cursor:pointer}" +
+    ".ga-tkv__one{display:flex;flex-direction:column;align-items:center;gap:8px}" +
     /* Bild fest 4 Schriftreihen hoch, Rechteck 4:5 */
     ".ga-cimg,.ga-rect{width:61px;height:76px;flex:none;align-self:flex-start;border-radius:10px;object-fit:cover;background:#E6DED0;display:grid;place-items:center;font-weight:700}" +
     ".ga-rectbtn{flex:none;align-self:flex-start;padding:0;border:0;background:none;cursor:pointer;border-radius:10px}" +
@@ -1325,7 +1348,126 @@
   }
   function tkPath(t) { return [(TK_AREAS[t.area] || {}).label || t.area, t.section, t.sub].filter(Boolean).join(" › "); }
   function tkText(t) {
-    return "Ticket #" + t.id + " · " + tkWhen(t.created_at) + " · " + (t.created_name || "?") + " · Status: " + t.status + "\n" + tkPath(t) + "\n" + t.body;
+    var urls = tkImgs(t).filter(function (u) { return /^https?:/.test(u); });
+    return "Ticket #" + t.id + " · " + tkWhen(t.created_at) + " · " + (t.created_name || "?") + " · Status: " + t.status + "\n" + tkPath(t) + "\n" + t.body +
+      (t.tech_note ? "\nTechnik: " + t.tech_note : "") + (urls.length ? "\nScreenshots: " + urls.join(" ") : "");
+  }
+  function tkImgs(t) { return Array.isArray(t && t.images) ? t.images.filter(Boolean) : []; }
+  function tkShot(imgs, attrs) {
+    var n = imgs.length;
+    return '<button type="button" class="ga-tk__shot' + (n ? "" : " is-empty") + '"' + attrs +
+      (n ? ' style="background-image:url(&quot;' + esc(imgs[0]).replace(/"/g, "%22") + '&quot;)" aria-label="Screenshots ansehen">' + (n > 1 ? "<i>" + n + "</i>" : "") : ' aria-label="Screenshot hochladen">+ Bild') + "</button>";
+  }
+  /* Sortieren wie bei Nutzer (Reihenfolge je Admin im Browser) */
+  var TS = [["id", "Nummer", "num"], ["created", "Datum", "date"], ["status", "Status", "rank"], ["area", "Bereich", "text"], ["section", "Abschnitt", "text"], ["sub", "Unterkategorie", "text"], ["who", "Admin", "text"], ["shots", "Screenshots", "num"]];
+  function tsKey() { return "ga_tk_sort_" + (me() || "anon"); }
+  function tsGet() {
+    if (st.ts) return st.ts;
+    try { var v = JSON.parse(localStorage.getItem(tsKey()) || "null"); if (Array.isArray(v)) return (st.ts = v); } catch (e) {}
+    return (st.ts = []);
+  }
+  function tsSave() { try { localStorage.setItem(tsKey(), JSON.stringify(st.ts || [])); } catch (e) {} }
+  function tsVal(t, k) {
+    if (k === "id") return Number(t.id) || 0;
+    if (k === "created") return String(t.created_at || "");
+    if (k === "status") return TK_STATUS.indexOf(t.status);
+    if (k === "area") return (TK_AREAS[t.area] || {}).label || String(t.area || "");
+    if (k === "section") return String(t.section || "");
+    if (k === "sub") return String(t.sub || "");
+    if (k === "who") return String(t.created_name || "");
+    if (k === "shots") return tkImgs(t).length;
+    return "";
+  }
+  function tsCompare(x, y) {
+    var list = tsGet();
+    for (var i = 0; i < list.length; i++) {
+      var dir = list[i].d === "desc" ? -1 : 1;
+      var a = tsVal(x, list[i].k), b = tsVal(y, list[i].k);
+      var ea = a === "" || a == null, eb = b === "" || b == null;
+      if (ea || eb) { if (ea !== eb) return ea ? 1 : -1; continue; }
+      var c = typeof a === "number" ? a - b : String(a).localeCompare(String(b), "de", { numeric: true });
+      if (c) return c * dir;
+    }
+    return (Number(y.id) || 0) - (Number(x.id) || 0);
+  }
+  function tsDirs(k) {
+    var t = (TS.filter(function (u) { return u[0] === k; })[0] || [])[2];
+    if (t === "date") return [["asc", "alt → neu"], ["desc", "neu → alt"]];
+    if (t === "rank") return [["asc", "offen zuerst"], ["desc", "erledigt zuerst"]];
+    if (t === "num") return [["asc", "aufsteigend"], ["desc", "absteigend"]];
+    return [["asc", "A → Z"], ["desc", "Z → A"]];
+  }
+  function tsBar() {
+    var list = tsGet();
+    var btn = '<button type="button" class="ga-usbtn' + (st.tsOpen ? " is-open" : "") + '" data-ga-ts="toggle">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/></svg>' +
+      "Sortieren nach" + (list.length ? " · " + list.length : "") + "</button>";
+    if (!st.tsOpen) return '<div class="ga-us">' + btn + "</div>";
+    return '<div class="ga-us">' + btn + '<div class="ga-uspanel">' +
+      list.map(function (r, i) {
+        return '<div class="ga-usrow"><span class="ga-usno">' + (i + 1) + "</span>" +
+          '<select data-ga-tsk="' + i + '" aria-label="Feld">' + TS.map(function (u) {
+            return '<option value="' + u[0] + '"' + (u[0] === r.k ? " selected" : "") + ">" + u[1] + "</option>";
+          }).join("") + "</select>" +
+          '<select data-ga-tsd="' + i + '" aria-label="Richtung">' + tsDirs(r.k).map(function (d) {
+            return '<option value="' + d[0] + '"' + (d[0] === r.d ? " selected" : "") + ">" + d[1] + "</option>";
+          }).join("") + "</select>" +
+          (i ? '<button type="button" class="ga-usx" data-ga-ts="up" data-i="' + i + '" aria-label="nach oben">↑</button>' : '<span class="ga-usx"></span>') +
+          '<button type="button" class="ga-usx" data-ga-ts="del" data-i="' + i + '" aria-label="Sortierung entfernen">×</button></div>';
+      }).join("") +
+      '<button type="button" class="ga-link" data-ga-ts="add">+ Sortierung hinzufügen</button>' +
+      (list.length ? ' · <button type="button" class="ga-link" data-ga-ts="clear">Sortierung löschen</button>' : "") +
+      "</div></div>";
+  }
+  function onTicketSort(t) {
+    var act = t.getAttribute("data-ga-ts"), i = parseInt(t.getAttribute("data-i"), 10);
+    var list = tsGet();
+    if (act === "toggle") st.tsOpen = !st.tsOpen;
+    else if (act === "add") {
+      var used = list.map(function (r) { return r.k; });
+      var next = TS.filter(function (u) { return used.indexOf(u[0]) === -1; })[0];
+      if (next) list.push({ k: next[0], d: next[2] === "date" || next[0] === "id" ? "desc" : "asc" });
+    } else if (act === "del") list.splice(i, 1);
+    else if (act === "up" && i > 0) { var tmp = list[i - 1]; list[i - 1] = list[i]; list[i] = tmp; }
+    else if (act === "clear") list.length = 0;
+    tsSave();
+    paint();
+  }
+  /* Screenshots groß: ansehen, hinzufügen, entfernen */
+  function tkViewer(tk) {
+    var old = document.querySelector(".ga-tkv");
+    if (old) old.remove();
+    var box = document.createElement("div");
+    box.className = "ga-tkv";
+    var imgs = tkImgs(tk);
+    box.innerHTML = '<div class="ga-tkv__bar"><button type="button" data-tkv="add">Screenshot hinzufügen</button><button type="button" data-tkv="close">Schließen</button></div>' +
+      imgs.map(function (u, i) {
+        return '<div class="ga-tkv__one"><img src="' + esc(u) + '" alt="Screenshot ' + (i + 1) + '" /><div class="ga-tkv__bar"><button type="button" data-tkv="del" data-i="' + i + '">Entfernen</button></div></div>';
+      }).join("");
+    document.body.appendChild(box);
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-tkv]");
+      if (e.target === box || (b && b.getAttribute("data-tkv") === "close")) { box.remove(); return; }
+      if (!b) return;
+      var act = b.getAttribute("data-tkv");
+      if (act === "add") { tkAddShot(tk, function () { tkViewer(tk); }); return; }
+      if (act === "del") {
+        GoDialog.confirm("Screenshot entfernen?", { ok: "Entfernen", cancel: "Abbrechen" }).then(function (yes) {
+          if (!yes) return;
+          var next = tkImgs(tk).slice();
+          next.splice(Number(b.getAttribute("data-i")), 1);
+          tkSaveShots(tk, next, function () { if (next.length) tkViewer(tk); else box.remove(); });
+        });
+      }
+    });
+  }
+  function tkSaveShots(tk, list, done) {
+    host.rest("go_tickets?id=eq." + tk.id, { method: "PATCH", prefer: "return=minimal", body: { images: list, updated_at: new Date().toISOString() } })
+      .then(function () { tk.images = list; paint(); if (done) done(); })
+      .catch(function () { GoDialog.alert("Speichern ging nicht (go-admin-tickets-bilder.sql ausgeführt?)"); });
+  }
+  function tkAddShot(tk, done) {
+    pickPhoto(function (url) { tkSaveShots(tk, tkImgs(tk).concat([url]), done); });
   }
   function tkSelect(id, label, opts, cur) {
     return '<label class="ga-tk__l">' + esc(label) + '<select id="' + id + '">' + opts.map(function (o) {
@@ -1343,6 +1485,7 @@
       tkSelect("gt-sec", d.area === "frontend" ? "Abschnitt" : "Admin-Bereich", secs.map(function (x) { return [x, x]; }), d.section) +
       tkSelect("gt-sub", "Unterkategorie", subs.map(function (x) { return [x, x]; }), d.sub) + "</div>" +
       '<label class="ga-tk__l">Wunsch<textarea id="gt-body" rows="4" placeholder="Was soll sich wo ändern?">' + esc(d.body) + "</textarea></label>" +
+      '<div class="ga-tk__shots">' + (d.images || []).map(function (u) { return tkShot([u], ""); }).join("") + tkShot([], ' data-gt="formshot"') + "</div>" +
       '<div class="ga-tk__btns"><button type="button" class="ga-btn5" data-gt="cancel">Abbrechen</button><button type="button" class="ga-btn5 is-dark" data-gt="save">Ticket speichern</button></div></div>';
   }
   function paintTickets() {
@@ -1355,9 +1498,12 @@
       if (f.status && t.status !== f.status) return false;
       if (f.area && t.area !== f.area) return false;
       if (f.section && t.section !== f.section) return false;
+      if (f.sub && (t.sub || "") !== f.sub) return false;
       if (f.who && (t.created_name || "") !== f.who) return false;
+      if (f.shots === "mit" && !tkImgs(t).length) return false;
+      if (f.shots === "ohne" && tkImgs(t).length) return false;
       return true;
-    });
+    }).sort(tsCompare);
     var secs = uniq(all.map(function (t) { return t.section; }));
     var open = list.filter(function (t) { return t.status !== "erledigt"; });
     return (st.tkNew ? tkForm() : '<div class="ga-tk__top"><button type="button" class="ga-btn5 is-dark" data-gt="new">Neues Ticket</button>' +
@@ -1366,16 +1512,24 @@
         ["status", "Status", TK_STATUS.map(function (x) { return [x, x]; })],
         ["area", "Bereich", Object.keys(TK_AREAS).map(function (k) { return [k, TK_AREAS[k].label]; })],
         ["section", "Abschnitt", secs.map(function (x) { return [x, x]; })],
-        ["who", "Von", uniq(all.map(function (t) { return t.created_name || ""; })).map(function (x) { return [x, x]; })]
-      ], list.length, all.length, "Tickets") +
+        ["sub", "Unterkategorie", uniq(all.filter(function (t) { return !f.section || t.section === f.section; }).map(function (t) { return t.sub || ""; })).sort(function (x, y) { return x.localeCompare(y, "de"); }).map(function (x) { return [x, x]; })],
+        ["who", "Admin", uniq(all.map(function (t) { return t.created_name || ""; })).map(function (x) { return [x, x]; })],
+        ["shots", "Screenshots", [["mit", "mit Screenshot"], ["ohne", "ohne Screenshot"]]]
+      ], list.length, all.length, "Tickets") + tsBar() +
       (list.length ? list.map(function (t) {
-        return '<div class="ga-tk' + (t.status === "erledigt" ? " is-done" : "") + '">' +
-          '<div class="ga-tk__head"><b>#' + t.id + "</b><span>" + esc(tkWhen(t.created_at)) + " · " + esc(t.created_name || "?") + "</span>" +
-          '<select data-gt-status="' + t.id + '" aria-label="Status">' + TK_STATUS.map(function (x) { return '<option' + (x === t.status ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select></div>" +
-          '<p class="ga-tk__path">' + esc(tkPath(t)) + "</p>" +
+        var imgs = tkImgs(t);
+        return '<div class="ga-tk is-row' + (t.status === "erledigt" ? " is-done" : "") + '">' +
+          tkShot(imgs, ' data-gt="' + (imgs.length ? "shots" : "shot") + '" data-gt-id="' + t.id + '"') +
+          '<div class="ga-tk__main"><div class="ga-tk__meta"><b>#' + t.id + "</b>" + esc(tkWhen(t.created_at)) + (t.sub ? " · " + esc(t.sub) : "") + "</div>" +
           '<p class="ga-tk__body">' + esc(t.body) + "</p>" +
+          '<textarea class="ga-tk__note" data-gt-note="' + t.id + '" rows="' + Math.min(6, Math.max(1, String(t.tech_note || "").split("\n").length + Math.floor(String(t.tech_note || "").length / 70))) + '" placeholder="Technische Umsetzbarkeit …">' + esc(t.tech_note || "") + "</textarea>" +
           '<div class="ga-tk__acts"><button type="button" class="ga-link" data-gt="copy" data-gt-id="' + t.id + '">Kopieren</button>' +
-          '<button type="button" class="ga-link" data-gt="del" data-gt-id="' + t.id + '">Löschen</button></div></div>';
+          '<button type="button" class="ga-link" data-gt="del" data-gt-id="' + t.id + '">Löschen</button></div></div>' +
+          '<div class="ga-tk__pills"><select class="is-' + (t.status === "in Arbeit" ? "arbeit" : t.status === "erledigt" ? "erledigt" : "offen") + '" data-gt-status="' + t.id + '" aria-label="Status">' +
+          TK_STATUS.map(function (x) { return '<option' + (x === t.status ? " selected" : "") + ">" + x + "</option>"; }).join("") + "</select>" +
+          '<span class="ga-tk__pill">' + esc((TK_AREAS[t.area] || {}).label || t.area) + "</span>" +
+          '<span class="ga-tk__pill">' + esc(t.section || "") + "</span>" +
+          '<span class="ga-tk__pill is-admin">' + esc(t.created_name || "?") + "</span></div></div>";
       }).join("") : '<p class="cp-hint">' + (all.length ? "Nichts gefunden." : "Noch keine Tickets.") + "</p>");
   }
   function tkCopy(text) {
@@ -1389,6 +1543,13 @@
     var id = Number(t.getAttribute("data-gt-id"));
     var tk = (Array.isArray(st.tickets) ? st.tickets : []).filter(function (x) { return x.id === id; })[0];
     if (act === "new") { st.tkNew = true; paint(); return; }
+    if (act === "shot" && tk) { tkAddShot(tk); return; }
+    if (act === "shots" && tk) { tkViewer(tk); return; }
+    if (act === "formshot" && st.tkDraft) {
+      st.tkDraft.body = (document.getElementById("gt-body") || {}).value || st.tkDraft.body;
+      pickPhoto(function (url) { if (!st || !st.tkDraft) return; st.tkDraft.images = (st.tkDraft.images || []).concat([url]); paint(); });
+      return;
+    }
     if (act === "cancel") { st.tkNew = false; st.tkDraft = null; paint(); return; }
     if (act === "copy" && tk) { tkCopy(tkText(tk)); return; }
     if (act === "copyall") {
@@ -1412,9 +1573,9 @@
       var mine = (st.accounts || []).filter(function (a) { return String(a.account_id) === String(me()); })[0] || {};
       var acc = host.sessionAccount || null;
       var name = String((acc && acc.name) || mine.name || "").split(" ")[0];
-      host.rest("go_tickets", { method: "POST", prefer: "return=minimal", body: {
+      host.rest("go_tickets", { method: "POST", prefer: "return=minimal", body: Object.assign({
         created_by: me(), created_name: name, area: d.area, section: d.section, sub: d.sub, body: d.body.trim()
-      } }).then(function () { st.tkNew = false; st.tkDraft = null; if (host.toast) host.toast("Ticket gespeichert"); return loadTickets(); })
+      }, (d.images || []).length ? { images: d.images } : {}) }).then(function () { st.tkNew = false; st.tkDraft = null; if (host.toast) host.toast("Ticket gespeichert"); return loadTickets(); })
         .catch(function () { GoDialog.alert("Speichern ging nicht (go-admin-tickets.sql ausgeführt?)"); });
     }
   }
@@ -2144,7 +2305,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall],[data-ga-us]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall],[data-ga-us],[data-ga-ts]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -2166,6 +2327,7 @@
     if (t.hasAttribute("data-ga-rec")) { openRec(t.getAttribute("data-ga-rec")); return; }
     if (t.getAttribute("data-ga-uf") === "reset") { st.uf = {}; ufSave(); paint(); return; }
     if (t.hasAttribute("data-ga-us")) { onUserSort(t); return; }
+    if (t.hasAttribute("data-ga-ts")) { onTicketSort(t); return; }
     if (t.hasAttribute("data-ga-nfreset")) { st.nf[t.getAttribute("data-ga-nfreset")] = {}; paint(); return; }
     if (t.hasAttribute("data-gx")) {
       var gx = t.getAttribute("data-gx"), gk = t.getAttribute("data-gk"), gid = t.getAttribute("data-gid");
@@ -2251,6 +2413,25 @@
   }
 
   function onChange(e) {
+    var tsk = e.target && e.target.closest ? e.target.closest("select[data-ga-tsk],select[data-ga-tsd]") : null;
+    if (tsk && st) {
+      var ti = parseInt(tsk.getAttribute("data-ga-tsk") || tsk.getAttribute("data-ga-tsd"), 10), tl = tsGet();
+      if (tl[ti]) {
+        if (tsk.hasAttribute("data-ga-tsk")) { tl[ti].k = tsk.value; tl[ti].d = "asc"; } else tl[ti].d = tsk.value;
+        tsSave(); paint();
+      }
+      return;
+    }
+    var tn = e.target && e.target.getAttribute ? e.target.getAttribute("data-gt-note") : null;
+    if (tn && st) {
+      var nv = String(e.target.value || "").trim();
+      var was = ((st.tickets || []).filter(function (x) { return String(x.id) === tn; })[0] || {}).tech_note || "";
+      if (nv === was) return;
+      host.rest("go_tickets?id=eq." + tn, { method: "PATCH", prefer: "return=minimal", body: { tech_note: nv || null, updated_at: new Date().toISOString() } })
+        .then(function () { (st.tickets || []).forEach(function (x) { if (String(x.id) === tn) x.tech_note = nv; }); })
+        .catch(function () { GoDialog.alert("Notiz speichern ging nicht (go-admin-tickets-bilder.sql ausgeführt?)"); });
+      return;
+    }
     var usk = e.target && e.target.closest ? e.target.closest("select[data-ga-usk],select[data-ga-usd]") : null;
     if (usk && st) {
       var ui = parseInt(usk.getAttribute("data-ga-usk") || usk.getAttribute("data-ga-usd"), 10), ul = usGet();
