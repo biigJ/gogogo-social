@@ -3378,7 +3378,9 @@
     var sel = "&select=id,user_id,title,category,starts_at,visibility,group_id,status,item_type,enrollment_id,course_id,location&order=starts_at.asc&limit=80";
     return Promise.all([
       rest("events?user_id=eq." + encodeURIComponent(me()) + "&status=in.(geplant,erledigt)" + range + sel),
-      rest("events?group_id=eq." + encodeURIComponent(st.group.id) + "&user_id=neq." + encodeURIComponent(me()) + "&status=eq.geplant" + range + sel)
+      rest("events?group_id=eq." + encodeURIComponent(st.group.id) + "&user_id=neq." + encodeURIComponent(me()) + "&status=eq.geplant" + range + sel),
+      /* übliche Uhrzeiten der Serien laden, falls der Kalender noch nicht offen war (sonst zeigt die Gruppe die Uhrzeit eines einzelnen Termins) */
+      state.seriesTime ? null : loadSeriesKeys()
     ]).then(function (r) {
       st.mine = (r[0] || []).filter(function (e) { return e.item_type !== "support_session" && e.item_type !== "nutrition_log"; });
       st.others = r[1] || [];
