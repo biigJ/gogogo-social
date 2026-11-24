@@ -155,6 +155,10 @@ Kalender (früher Woche, `woche-reels.js`) zeigt nur Wiederkehrendes und immer d
 
 ---
 
+## Neuigkeiten für Nutzer
+
+Spürbare Änderungen (neue Funktion, geänderte Bedienung, geänderte Voreinstellung) bekommen einen Eintrag in `NEWS` in `natalyaalice/go-messages.js`: kurzer Satz, sagt wo man es findet. Er erscheint einmal als Karte mittig in Aktuell beim nächsten Öffnen (auch nach Refresh mit neuer Version). Nicht für kleine Layout-Fixes.
+
 ## Kontakt-Kontext Produkt
 
 - Marke: **gogogo** / Friday Fitness Circle (FFC)
