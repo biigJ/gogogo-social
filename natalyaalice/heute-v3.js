@@ -5532,8 +5532,98 @@
     }, Math.max(60000, next - now));
   }
 
+  /* Trainingszeit-Frage: morgens (5 bis 12 Uhr) für heute, abends (ab 18 Uhr) für morgen.
+     Fragt beim nächsten eigenen geplanten Event ohne Uhrzeit, je Event und Tageszeit nur einmal.
+     Mit Uhrzeit sehen Freunde sie im Feed und am Profilkreis. */
+  function berlinHour() {
+    try { return Number(new Date().toLocaleString("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", hour12: false })) % 24; }
+    catch (e) { return new Date().getHours(); }
+  }
+  function isoPlus(iso, n) {
+    var d = new Date(iso + "T12:00:00Z");
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  }
+  function berlinOffsetOf(iso) {
+    try {
+      var d = new Date(iso + "T12:00:00Z");
+      var berlin = new Date(d.toLocaleString("en-US", { timeZone: "Europe/Berlin" }));
+      var utc = new Date(d.toLocaleString("en-US", { timeZone: "UTC" }));
+      var off = Math.round((berlin - utc) / 60000);
+      return (off >= 0 ? "+" : "-") + String(Math.floor(Math.abs(off) / 60)).padStart(2, "0") + ":" + String(Math.abs(off) % 60).padStart(2, "0");
+    } catch (e) { return "+01:00"; }
+  }
+  function askTrainTime() {
+    if (state.ttBusy || !me() || !global.GoDialog || !GoDialog.time) return;
+    if (document.hidden || document.querySelector(".god")) return;
+    var h = berlinHour();
+    var slot = h >= 5 && h < 12 ? "morgen" : h >= 18 ? "abend" : "";
+    if (!slot) return;
+    var iso = slot === "morgen" ? todayIso() : isoPlus(todayIso(), 1);
+    var off = berlinOffsetOf(iso);
+    var from = iso + "T00:00:00" + off;
+    var to = isoPlus(iso, 1) + "T00:00:00" + berlinOffsetOf(isoPlus(iso, 1));
+    state.ttBusy = true;
+    rest("events?user_id=eq." + encodeURIComponent(me()) + "&status=eq.geplant&starts_at=gte." + encodeURIComponent(from) +
+      "&starts_at=lt." + encodeURIComponent(to) + "&select=id,title,category,item_type,travel_auto,starts_at&order=starts_at.asc&limit=10")
+      .then(function (rows) {
+        var ev = (rows || []).filter(function (e) {
+          return e && !hasTime(e) && !e.travel_auto && e.category !== "zirkel" &&
+            e.item_type !== "support_session" && e.item_type !== "hotel_workout";
+        })[0];
+        if (!ev) return;
+        var key = "go_tt_" + ev.id + "_" + slot;
+        try { if (localStorage.getItem(key)) return; } catch (eLs0) { if (state[key]) return; }
+        /* Liegt schon ein anderer Dialog offen (Einladung, Anfrage): warten, bis er zu ist */
+        return new Promise(function (res) {
+          var tries = 0;
+          (function wait() {
+            if (!document.querySelector(".god") && !document.hidden) return res(true);
+            if (++tries > 80) return res(false);
+            setTimeout(wait, 1500);
+          })();
+        }).then(function (free) {
+          if (!free) return;
+          try { localStorage.setItem(key, "1"); } catch (eLs) { state[key] = 1; }
+          return GoDialog.time(slot === "morgen" ? "Wann trainierst Du heute?" : "Wann trainierst Du morgen?", {
+          sub: ev.title || "Training",
+          ok: "Eintragen",
+          cancel: "Später",
+          initial: "18:00"
+        }).then(function (t) {
+          if (!t || t === "alt") return;
+          var p = String(t).split(":");
+          var hhmm = String(Number(p[0])).padStart(2, "0") + ":" + String(Number(p[1] || 0)).padStart(2, "0");
+          var starts = iso + "T" + hhmm + ":00" + off;
+          var d = new Date(starts);
+          /* 12:00 UTC heißt „ohne Uhrzeit“: eine Sekunde dazu */
+          if (!isNaN(d.getTime()) && d.getUTCHours() === 12 && d.getUTCMinutes() === 0) starts = iso + "T" + hhmm + ":01" + off;
+          return rest("events?id=eq." + encodeURIComponent(ev.id), {
+            method: "PATCH", prefer: "return=minimal", body: { starts_at: starts }
+          }).then(function () {
+            if (host.toast) host.toast((slot === "morgen" ? "Heute " : "Morgen ") + hhmm + " eingetragen");
+            return refresh();
+          }).catch(function () {
+            if (host.toast) host.toast("Uhrzeit speichern ging nicht.");
+          });
+        });
+        });
+      })
+      .catch(function () {})
+      .then(function () { state.ttBusy = false; });
+  }
+  function bindTrainTimeAsk() {
+    if (state.ttBound) return;
+    state.ttBound = true;
+    setTimeout(askTrainTime, 3500);
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) setTimeout(askTrainTime, 1500);
+    });
+  }
+
   function install(h) {
     host = h || host || {};
+    bindTrainTimeAsk();
     scheduleMidnight();
     if (global.GoTimer) {
       /* Eieruhr fertig → Erledigt-Dialog des Events; laufende Uhr nach App-Start wieder zeigen */
