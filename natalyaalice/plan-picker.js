@@ -246,7 +246,9 @@
         TIERS.map(function (t, i) {
           return '<button type="button" class="gpl__goal' + (st.tier === i ? " is-on" : "") + '" data-gpp-tierpick="' + i + '"><span><b>' + esc(t.name) + "</b><small>" + esc(t.sub) + "</small></span></button>";
         }).join("") + "</div>" +
-        (st.mode === "self" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-indiv>Individuell mit Coach</button>' : "");
+        (st.mode === "self" ? '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-indiv>Individuell mit Coach</button>' +
+          /* ohne Fragen: alle freigegebenen Pläne (is_public) */
+          '<button type="button" class="gpl__btn gpl__btn--quiet" data-gpp-all>Alle öffentlichen Wochenpläne</button>' : "");
     } else if (n === 1) {
       var tier = TIERS[st.tier || 0];
       /* nur Ziele, zu denen es einen Plan gibt */
@@ -597,6 +599,7 @@
     if (t.closest("[data-gpp-next]")) return showPlans();
     if (t.closest("[data-gpp-goals]")) { st.goalStep = 0; st.goals = []; st.place = ""; return paintGoals(); }
     if (t.closest("[data-gpp-indiv]")) return paintIndividual();
+    if (t.closest("[data-gpp-all]")) { st.goalStep = 0; st.goals = []; st.place = ""; return showPlans(); }
     if (t.closest("[data-gpp-coach]")) return chooseCoach();
     var send = t.closest("[data-gpp-send]");
     if (send) return sendIndividual(send);
