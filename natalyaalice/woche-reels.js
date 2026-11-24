@@ -1160,14 +1160,26 @@
         "&select=title,starts_at&order=starts_at.asc&limit=1000"
     ).then(function (rows) {
       var weeks = {};
+      var times = {};
       (rows || []).forEach(function (r) {
         var k = seriesKey(r.title, r.starts_at);
         if (!k) return;
         (weeks[k] = weeks[k] || {})[dayKey(r.starts_at)] = true;
+        var t = displayTime(r.starts_at);
+        if (t) { var tk = times[k] = times[k] || {}; tk[t] = (tk[t] || 0) + 1; }
       });
       var out = {};
-      Object.keys(weeks).forEach(function (k) { if (Object.keys(weeks[k]).length >= 2) out[k] = true; });
+      var mode = {};
+      Object.keys(weeks).forEach(function (k) {
+        if (Object.keys(weeks[k]).length < 2) return;
+        out[k] = true;
+        /* übliche Uhrzeit der Serie (häufigste), damit ein einzeln verschobener Start hier nicht erscheint */
+        var best = "", n = 0;
+        Object.keys(times[k] || {}).forEach(function (t) { if (times[k][t] > n) { n = times[k][t]; best = t; } });
+        if (best) mode[k] = best;
+      });
       state.seriesKeys = out;
+      state.seriesTime = mode;
     }).catch(function () { state.seriesKeys = null; });
   }
   function isRecurringItem(it) {
@@ -1184,8 +1196,34 @@
     return !!state.seriesKeys[seriesKey(ev.title, ev.starts_at)];
   }
 
+  /* Kalender zeigt immer die globale Woche: individuelle Änderungen an einem Plan-Termin (Foto, Titel,
+     verschobener Start, ersetzt oder ausgefallen) stehen nur in Aktuell. Reise-Ersatz bleibt sichtbar. */
+  function isTravelAlt(it) {
+    return !!(it && it.ev && (it.ev.travel_auto || it.ev.item_type === "hotel_workout"));
+  }
+  function globalPlanFor(iso) {
+    try { return host && host.planItemForDay ? host.planItemForDay(iso) : null; } catch (e) { return null; }
+  }
+  function globalize(it, plan) {
+    if (!it || !it.ev || it._fromPlan || isTravelAlt(it) || !it.ev.enrollment_id) return it;
+    var ev = Object.assign({}, it.ev, { photo_url: null });
+    if (plan) {
+      ev.title = plan.title || ev.title;
+      if (plan.location) ev.location = plan.location;
+    }
+    var usual = (state.seriesTime || {})[seriesKey(it.ev.title, it.ev.starts_at)];
+    if (usual && usual !== displayTime(ev.starts_at)) ev.starts_at = timedStarts(dayKey(ev.starts_at), ("0" + usual).slice(-5)) || ev.starts_at;
+    return Object.assign({}, it, { ev: ev, starts_at: ev.starts_at });
+  }
   function itemsForDay(iso) {
-    return itemsForDayAll(iso).filter(isRecurringItem);
+    var list = itemsForDayAll(iso).filter(isRecurringItem);
+    var plan = globalPlanFor(iso);
+    var hasPlan = list.some(function (it) { return it._fromPlan || isTravelAlt(it) || (it.ev && it.ev.enrollment_id); });
+    if (!hasPlan && plan && plan.title) {
+      list.push({ kind: "event", starts_at: plan.starts_at, ev: plan, _fromPlan: true });
+      list.sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
+    }
+    return list.map(function (it) { return globalize(it, plan); });
   }
 
   function itemsForDayAll(iso) {

@@ -151,6 +151,8 @@ Neue Module: IIFE, `host`-Inject, kein Bundler. Globale Namen nicht kollidieren 
 
 Events und Wochenpläne folgen dem gogogo-Hybrid-Prinzip in [`docs/ZIELE-WOCHENPLAENE.md`](docs/ZIELE-WOCHENPLAENE.md). Keine doppelten Übungen unter verschiedenen Namen.
 
+Kalender (früher Woche, `woche-reels.js`) zeigt nur Wiederkehrendes und immer die **globalen** Informationen des Wochenplans (Bild, Titel, Übungen, Uhrzeit). Individuelle Änderungen an einem Termin (Foto, verschobener Start, ersetzt, ausgefallen) erscheinen nur in Aktuell. Gilt für alle neuen Features.
+
 ---
 
 ## Kontakt-Kontext Produkt
