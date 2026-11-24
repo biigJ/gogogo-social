@@ -3,7 +3,7 @@
  * Übungen kommen aus go_exercise_catalog (eine Liste, Labels, go-uebungen-katalog.sql).
  * Nutzer schreiben keinen Übungsnamen selbst, sie wählen ihn aus.
  *
- *   GoExLinks.init({ rest, me })
+ *   GoExLinks.init({ rest, me, toast, planNames() → Promise<string[]> })
  *   GoExLinks.mount(el)
  *
  * Reihenfolge je Übung: gogogo-Link zuerst, dann Nutzer-Links nach Sternen (exercise-media.js / linksFor).
@@ -21,36 +21,30 @@
   var photoOf = {};
   var LABELS = ["Push", "Pull", "Beine", "Glutes", "Oberkörper", "Arme", "Rumpf", "Mehrgelenkig", "Sprung", "Mobility", "Ausdauer"];
 
+  /* Pinterest-Raster: zwei Spalten, Videos hochkant (9:16), Übungen ohne Video kürzer; wenig Text */
   var CSS =
-    ".gxl{margin:18px 0 8px;text-align:left;color:#2A2118}" +
-    ".gxl__search{display:block;width:100%;box-sizing:border-box;min-height:42px;padding:0 12px;border:1px solid rgba(42,33,24,.25);border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118;margin:0 0 10px}" +
-    ".gxl__hint{margin:0 0 10px;font-size:13px;color:rgba(42,33,24,.65)}" +
-    ".gxl__ex{border-top:1px solid rgba(42,33,24,.14)}" +
-    ".gxl__ex:last-child{border-bottom:1px solid rgba(42,33,24,.14)}" +
-    ".gxl__ex summary{list-style:none;display:flex;align-items:center;gap:8px;padding:11px 2px;cursor:pointer}" +
-    ".gxl__ex summary::-webkit-details-marker{display:none}" +
-    ".gxl__name{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere;hyphens:auto}" +
-    ".gxl__count{font-size:12px;color:rgba(42,33,24,.6);white-space:nowrap}" +
-    ".gxl__link{display:flex;align-items:center;gap:8px;padding:6px 0}" +
-    ".gxl__src{flex:1;min-width:0;font-size:13px;color:rgba(42,33,24,.75);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
-    ".gxl__src b{color:#2A2118}" +
-    ".gxl__star{flex:none;display:inline-flex;align-items:center;gap:3px;min-height:34px;padding:0 10px;border-radius:999px;border:1px solid rgba(42,33,24,.3);background:transparent;color:#2A2118;font:inherit;font-size:13px;font-weight:700;cursor:pointer}" +
-    ".gxl__star.is-on{background:#2A2118;color:#F6F1E8;border-color:#2A2118}" +
-    ".gxl__add{display:flex;gap:6px;margin:6px 0 12px}" +
-    ".gxl__add input{flex:1;min-width:0;min-height:40px;box-sizing:border-box;padding:0 10px;border:1px solid rgba(42,33,24,.25);border-radius:10px;background:#fff;font:inherit;font-size:14px}" +
-    ".gxl__add button{flex:none;min-height:40px;padding:0 14px;border:0;border-radius:999px;background:#2A2118;color:#F6F1E8;font:inherit;font-weight:700;cursor:pointer}" +
-    ".gxl__empty{margin:8px 0;font-size:14px;color:rgba(42,33,24,.65)}" +
-    ".gxl__new{display:block;width:100%;box-sizing:border-box;min-height:46px;padding:0 12px;border:1.5px solid #2A2118;border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118;margin:0 0 6px}" +
-    ".gxl__newhint{margin:0 0 12px;font-size:13px;font-weight:600;color:#2A2118;min-height:18px}" +
-    ".gxl__chips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}" +
-    ".gxl__chip{min-height:32px;padding:0 12px;border-radius:999px;border:1px solid rgba(42,33,24,.3);background:transparent;color:#2A2118;font:inherit;font-size:13px;font-weight:600;cursor:pointer}" +
+    ".gxl{margin:6px 0 8px;text-align:left;color:#2A2118}" +
+    ".gxl__new{display:block;width:100%;box-sizing:border-box;min-height:44px;padding:0 12px;border:1.5px solid #2A2118;border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118;margin:0 0 4px}" +
+    ".gxl__newhint{margin:0 0 8px;font-size:13px;font-weight:600;color:#2A2118;min-height:16px}" +
+    ".gxl__chips{display:flex;flex-wrap:nowrap;gap:6px;margin:0 -2px 8px;overflow-x:auto;scrollbar-width:none;padding:0 2px}" +
+    ".gxl__chips::-webkit-scrollbar{display:none}" +
+    ".gxl__chip{flex:none;min-height:32px;padding:0 12px;border-radius:999px;border:1px solid rgba(42,33,24,.3);background:transparent;color:#2A2118;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}" +
     ".gxl__chip.is-on{background:#2A2118;color:#F6F1E8;border-color:#2A2118}" +
-    ".gxl__pick{flex:none;min-height:30px;padding:0 12px;border-radius:999px;border:0;background:#2A2118;color:#F6F1E8;font:inherit;font-size:12px;font-weight:700;cursor:pointer}" +
-    ".gxl__tags{display:block;font-size:11px;color:rgba(42,33,24,.55);font-weight:500}" +
-    ".gxl__media{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 8px}" +
-    ".gxl__frame{position:relative;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:rgba(42,33,24,.08);display:flex;align-items:center;justify-content:center;text-align:center;font-size:12px;color:rgba(42,33,24,.55)}" +
-    ".gxl__frame img,.gxl__frame iframe{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0}" +
-    ".gxl__frame--video{background:#111;color:rgba(246,241,232,.7)}" +
+    ".gxl__search{display:block;width:100%;box-sizing:border-box;min-height:40px;padding:0 12px;border:1px solid rgba(42,33,24,.25);border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118;margin:0 0 10px}" +
+    ".gxl__grid{column-count:2;column-gap:8px}" +
+    ".gxl__pin{position:relative;display:block;width:100%;break-inside:avoid;margin:0 0 8px;border-radius:12px;overflow:hidden;background:#1c1814;cursor:pointer;aspect-ratio:9/16}" +
+    ".gxl__pin.is-empty{aspect-ratio:1/1;background:rgba(42,33,24,.08)}" +
+    ".gxl__pin img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}" +
+    ".gxl__pin::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 55%,rgba(0,0,0,.65));pointer-events:none}" +
+    ".gxl__pin.is-empty::after{display:none}" +
+    ".gxl__pinname{position:absolute;z-index:1;left:8px;right:8px;bottom:7px;color:#fff;font:600 12.5px/1.25 Inter,system-ui,sans-serif;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}" +
+    ".gxl__pin.is-empty .gxl__pinname{color:#2A2118}" +
+    ".gxl__pin.is-empty img{opacity:.55}" +
+    ".gxl__pinplay{position:absolute;z-index:1;top:50%;left:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(0,0,0,.35);color:#fff;display:grid;place-items:center;pointer-events:none}" +
+    ".gxl__pinplay svg{width:20px;height:20px}" +
+    ".gxl__pinn{position:absolute;z-index:1;top:7px;right:7px;min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:999px;background:rgba(0,0,0,.45);color:#fff;font:700 11px/20px Inter,sans-serif;text-align:center}" +
+    ".gxl__pick{position:absolute;z-index:2;top:7px;left:7px;min-height:28px;padding:0 10px;border-radius:999px;border:0;background:#fff;color:#2A2118;font:inherit;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.3)}" +
+    ".gxl__empty{margin:8px 0;font-size:14px;color:rgba(42,33,24,.65)}" +
     ".gxl__submit{margin:14px 0 8px;display:grid;gap:8px}" +
     ".gxl__submit p{margin:0;font-size:14px;line-height:1.4}" +
     ".gxl__submit button:disabled{opacity:.4}" +
@@ -117,47 +111,36 @@
       .catch(function () { myStars = {}; });
   }
 
-  function linkRow(l, name) {
-    var info = GoExMedia.parse(l.url) || { label: "Link" };
-    return '<div class="gxl__link">' +
-      '<button type="button" class="gxm-btn" data-gxl-play="' + esc(l.url) + '" data-gxl-name="' + esc(name) + '" aria-label="Abspielen">' + GoExMedia.playIcon + "</button>" +
-      '<span class="gxl__src"><b>' + esc(info.label) + "</b> · " + esc(l.admin ? "gogogo" : (l.by || "Nutzer")) + "</span>" +
-      (l.admin ? "" : '<button type="button" class="gxl__star' + (myStars[l.id] ? " is-on" : "") + '" data-gxl-star="' + esc(l.id) + '" aria-label="Stern">★ ' + (l.stars || 0) + "</button>") +
-      "</div>";
+  var PLAN = "Mein Wochenplan";
+  var planNames = null;
+  function loadPlan() {
+    if (planNames) return Promise.resolve(planNames);
+    if (!host.planNames) { planNames = []; return Promise.resolve(planNames); }
+    return Promise.resolve(host.planNames()).catch(function () { return []; }).then(function (list) {
+      var seen = {};
+      planNames = (list || []).filter(function (n) { var k = GoExMedia.key(n); if (!n || seen[k]) return false; seen[k] = 1; return true; });
+      /* ohne Wochenplan-Übungen: alle zeigen */
+      if (!planNames.length && label === PLAN) label = "Alle";
+      return planNames;
+    });
   }
 
-  /* Aufgeklappt: Foto links, Hochformat-Video rechts (erstes Video, lädt erst beim Aufklappen) */
-  function mediaHtml(name, links) {
-    var photo = photoOf[GoExMedia.key(name)];
-    var first = null;
-    for (var i = 0; i < links.length; i++) {
-      var info = GoExMedia.parse(links[i].url);
-      if (info && info.embed) { first = info; break; }
-    }
-    return '<div class="gxl__media">' +
-      '<div class="gxl__frame">' + (photo ? '<img src="' + esc(photo) + '" alt="" loading="lazy" />' : "Foto folgt") + "</div>" +
-      '<div class="gxl__frame gxl__frame--video"' + (first ? ' data-gxl-embed="' + esc(first.embed.replace("autoplay=1", "autoplay=0")) + '"' : "") + ">" +
-      (first ? "" : "Noch kein Video") + "</div></div>";
-  }
-  function loadEmbed(details) {
-    var f = details && details.querySelector("[data-gxl-embed]");
-    if (!f || f.querySelector("iframe")) return;
-    f.innerHTML = '<iframe src="' + esc(f.getAttribute("data-gxl-embed")) + '" allow="encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" loading="lazy" title="Video"></iframe>';
-  }
-
-  function exHtml(name, open, picking) {
+  /* Kachel: Vorschaubild (YouTube) oder Übungsfoto, Name unten; ohne Video kurz und hell */
+  function pinHtml(name, picking) {
     var links = GoExMedia.linksFor(name);
-    var tags = labelsOf[GoExMedia.key(name)] || [];
-    return '<details class="gxl__ex" data-gxl-ex="' + esc(name) + '"' + (open ? " open" : "") + ">" +
-      '<summary><span class="gxl__name">' + esc(name) +
-      (tags.length ? '<span class="gxl__tags">' + esc(tags.join(" · ")) + "</span>" : "") +
-      '</span><span class="gxl__count">' +
-      (links.length ? links.length + (links.length === 1 ? " Video" : " Videos") : "kein Video") + "</span>" +
+    var thumb = "";
+    for (var i = 0; i < links.length && !thumb; i++) {
+      var info = GoExMedia.parse(links[i].url);
+      if (info && info.thumb) thumb = info.thumb;
+    }
+    if (!thumb) thumb = photoOf[GoExMedia.key(name)] || "";
+    var empty = !links.length;
+    return '<div class="gxl__pin' + (empty ? " is-empty" : "") + '" data-gxl-ex="' + esc(name) + '"' + (empty ? "" : ' data-gxl-open="1"') + ">" +
+      (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" />' : "") +
+      (empty ? "" : '<span class="gxl__pinplay">' + GoExMedia.playIcon + "</span>") +
+      (links.length > 1 ? '<span class="gxl__pinn">' + links.length + "</span>" : "") +
       (picking ? '<button type="button" class="gxl__pick" data-gxl-pick>Hierhin</button>' : "") +
-      "</summary>" +
-      mediaHtml(name, links) +
-      links.map(function (l) { return linkRow(l, name); }).join("") +
-      "</details>";
+      '<span class="gxl__pinname">' + esc(name) + "</span></div>";
   }
 
   function pendingUrl(el) {
@@ -169,29 +152,29 @@
 
   function paint(el) {
     var box = el.querySelector("[data-gxl-list]");
-    var open = {};
-    box.querySelectorAll("details[open]").forEach(function (d) { open[d.getAttribute("data-gxl-ex")] = true; });
     var picking = !!pendingUrl(el);
     var q = String(query || "").trim();
-    /* Liste erst nach Label („Alle“ inklusive) oder Übungsname */
-    if (!label && !q) {
-      box.innerHTML = "";
-    } else {
-      var list = (names || []).filter(function (n) {
-        if (q && n.toLowerCase().indexOf(q.toLowerCase()) === -1) return false;
-        if (label && label !== "Alle" && (labelsOf[GoExMedia.key(n)] || []).indexOf(label) === -1) return false;
-        return true;
-      });
-      var exact = q && (names || []).some(function (n) { return n.toLowerCase() === q.toLowerCase(); });
-      box.innerHTML = (list.length
-        ? list.map(function (n) { return exHtml(n, open[n], picking); }).join("")
-        : '<p class="gxl__empty">Keine Übung gefunden.</p>') +
-        (q.length >= 2 && !exact
-          ? '<div class="gxl__submit"><p>„' + esc(q) + '“ fehlt? ' + (picking ? "Sende das Video mit diesem Namen ein." : "Link oben einfügen, dann einreichen.") + "</p>" +
-            '<button type="button" data-gxl-submit' + (picking ? "" : " disabled") + ">Mit Video einreichen</button></div>"
-          : "");
-    }
-    box.querySelectorAll("details[open]").forEach(loadEmbed);
+    var planKeys = {};
+    (planNames || []).forEach(function (n) { planKeys[GoExMedia.key(n)] = 1; });
+    var list = (names || []).filter(function (n) {
+      if (q && n.toLowerCase().indexOf(q.toLowerCase()) === -1) return false;
+      if (!q && label === PLAN && !planKeys[GoExMedia.key(n)]) return false;
+      if (label && label !== "Alle" && label !== PLAN && (labelsOf[GoExMedia.key(n)] || []).indexOf(label) === -1) return false;
+      return true;
+    });
+    /* Videos zuerst (Bild vor Text), dann ohne Video */
+    list.sort(function (a, b) {
+      var va = GoExMedia.linksFor(a).length ? 0 : 1, vb = GoExMedia.linksFor(b).length ? 0 : 1;
+      return va - vb || a.localeCompare(b, "de");
+    });
+    var exact = q && (names || []).some(function (n) { return n.toLowerCase() === q.toLowerCase(); });
+    box.innerHTML = (list.length
+      ? '<div class="gxl__grid">' + list.map(function (n) { return pinHtml(n, picking); }).join("") + "</div>"
+      : '<p class="gxl__empty">Keine Übung gefunden.</p>') +
+      (q.length >= 2 && !exact
+        ? '<div class="gxl__submit"><p>„' + esc(q) + '“ fehlt? ' + (picking ? "Sende das Video mit diesem Namen ein." : "Link oben einfügen, dann einreichen.") + "</p>" +
+          '<button type="button" data-gxl-submit' + (picking ? "" : " disabled") + ">Mit Video einreichen</button></div>"
+        : "");
     el.querySelectorAll("[data-gxl-label]").forEach(function (c) {
       c.classList.toggle("is-on", c.getAttribute("data-gxl-label") === label);
     });
@@ -202,13 +185,7 @@
     }
   }
 
-  function refreshOne(el, name) {
-    var d = el.querySelector('details[data-gxl-ex="' + (global.CSS && CSS.escape ? CSS.escape(name) : name) + '"]');
-    if (d) {
-      d.outerHTML = exHtml(name, true, !!pendingUrl(el));
-      loadEmbed(el.querySelector('details[data-gxl-ex="' + (global.CSS && CSS.escape ? CSS.escape(name) : name) + '"]'));
-    }
-  }
+  function refreshOne(el) { paint(el); }
 
   function mount(el) {
     if (!el || !host || !global.GoExMedia) return;
@@ -216,17 +193,15 @@
     if (!el.dataset.gxlReady) {
       el.dataset.gxlReady = "1";
       el.className = "gxl";
+      label = PLAN;
       el.innerHTML =
         '<input type="url" inputmode="url" class="gxl__new" placeholder="Link aus Instagram oder YouTube" data-gxl-new />' +
         '<p class="gxl__newhint" data-gxl-newhint></p>' +
-        '<div class="gxl__chips">' + ["Alle"].concat(LABELS).map(function (l) {
+        '<div class="gxl__chips">' + [PLAN, "Alle"].concat(LABELS).map(function (l) {
           return '<button type="button" class="gxl__chip" data-gxl-label="' + esc(l) + '">' + esc(l) + "</button>";
         }).join("") + "</div>" +
         '<input type="search" class="gxl__search" placeholder="Übungsname" data-gxl-q />' +
         '<div data-gxl-list></div>';
-      el.querySelector("[data-gxl-list]").addEventListener("toggle", function (e) {
-        if (e.target && e.target.open) loadEmbed(e.target);
-      }, true);
       el.querySelector("[data-gxl-q]").addEventListener("input", function () {
         query = this.value;
         paint(el);
@@ -234,7 +209,7 @@
       el.querySelector("[data-gxl-new]").addEventListener("input", function () { paint(el); });
       el.addEventListener("click", function (e) { onClick(el, e); });
     }
-    Promise.all([GoExMedia.ready(), loadNames(), loadMyStars()]).then(function () { paint(el); })
+    Promise.all([GoExMedia.ready(), loadNames(), loadMyStars(), loadPlan()]).then(function () { paint(el); })
       .catch(function () { el.querySelector("[data-gxl-list]").innerHTML = '<p class="gxl__empty">Übungen konnten nicht geladen werden.</p>'; });
   }
 
@@ -262,6 +237,11 @@
         });
       return;
     }
+    var pin = e.target.closest("[data-gxl-open]");
+    if (pin && !e.target.closest("[data-gxl-pick]")) {
+      GoExMedia.open(pin.getAttribute("data-gxl-ex"));
+      return;
+    }
     var play = e.target.closest("[data-gxl-play]");
     if (play) {
       GoExMedia.open(play.getAttribute("data-gxl-name"), play.getAttribute("data-gxl-play"));
@@ -279,14 +259,14 @@
       job.then(function () {
         if (on) myStars[id] = true; else delete myStars[id];
         return GoExMedia.reload();
-      }).then(function () { refreshOne(el, name); })
+      }).then(function () { refreshOne(el); })
         .catch(function () { star.disabled = false; if (host.toast) host.toast("Stern konnte nicht gespeichert werden"); });
       return;
     }
     var chip = e.target.closest("[data-gxl-label]");
     if (chip) {
       var l = chip.getAttribute("data-gxl-label");
-      label = label === l ? "" : l;
+      label = l;
       paint(el);
       return;
     }
@@ -303,7 +283,6 @@
         .then(function () {
           el.querySelector("[data-gxl-new]").value = "";
           paint(el);
-          refreshOne(el, exName);
           if (host.toast) host.toast("Gespeichert bei " + exName);
         })
         .catch(function (err) {

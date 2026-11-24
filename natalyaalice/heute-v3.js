@@ -6231,6 +6231,17 @@
     todayCardFor: todayCardFor,
     todayEventsFor: todayEventsFor,
     storyEventsFor: storyEventsFor,
+    /* eigene Events von heute bis in 6 Tagen (Plus → Videos: Filter „Mein Wochenplan“) */
+    myWeekEvents: function () {
+      var t = todayIso();
+      var end = new Date(t + "T12:00:00"); end.setDate(end.getDate() + 6);
+      var to = end.toLocaleDateString("en-CA");
+      return (state.events || []).filter(function (e) {
+        if (!e || String(e.user_id) !== me() || e.status === "ausgefallen") return false;
+        var d = dayKey(e.starts_at);
+        return d >= t && d <= to;
+      });
+    },
     /* Story: geloggte Übungen eines erledigten Events als <li>-Liste (wie auf der Karte in Aktuell); Zirkel zeigt sein Tracking-Bild */
     storyExercisesHtml: function (ev) {
       if (!ev || ev.status !== "erledigt" || ev.category === "zirkel" || !global.GoKraftTracking || !GoKraftTracking.dayExercises) return Promise.resolve("");
