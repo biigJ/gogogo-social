@@ -6154,6 +6154,15 @@
       background: transparent;
       box-sizing: border-box;
     }
+    .stamp-pass.is-darkface, .stamp-pass.is-darkface .stamp-pass__brand, .stamp-pass.is-darkface .stamp-pass__meta,
+    .stamp-pass.is-darkface .stamp-pass__meta strong, .stamp-pass.is-darkface .stamp-pass__meta span,
+    .stamp-pass.is-darkface .stamp-pass__pen, .stamp-pass.is-darkface .stamp-pass__save { color: rgb(255, 255, 255) !important; }
+    /* Nummer unter dem QR steht immer auf Weiß: feste dunkle Schrift, auch im B/W-Schema */
+    .stamp-pass .stamp-pass__qr code, .stamp-pass .stamp-pass__qr { color: rgb(30, 30, 30) !important; }
+    .stamp-pass.is-darkface .stamp-pass__slot { border-color: rgba(255, 255, 255, .55) !important; }
+    .stamp-pass.is-darkface .stamp-pass__slot.is-filled { background: rgb(255, 255, 255) !important; border-color: rgb(255, 255, 255) !important; }
+    .stamp-pass.is-darkface .stamp-pass__stackdots i { background: rgba(255, 255, 255, .4) !important; }
+    .stamp-pass.is-darkface .stamp-pass__stackdots i.is-on { background: rgb(255, 255, 255) !important; }
     .stamp-pass__slot.is-filled {
       background: #2A2118;
       border-color: #2A2118;
@@ -15742,7 +15751,14 @@
             grid.appendChild(slot);
           }
         }
-        if (pass) pass.style.background = STAMP_COLORS[card.kind] || STAMP_COLORS.main;
+        if (pass) {
+          var bgc = STAMP_COLORS[card.kind] || STAMP_COLORS.main;
+          pass.style.background = bgc;
+          /* dunkle Karte → weiße Schrift, Ränder und Stempel (feste Farbe, unabhängig vom Farbschema) */
+          var hx = bgc.replace("#", "");
+          var lum = (0.299 * parseInt(hx.slice(0, 2), 16) + 0.587 * parseInt(hx.slice(2, 4), 16) + 0.114 * parseInt(hx.slice(4, 6), 16)) / 255;
+          pass.classList.toggle("is-darkface", lum < 0.6);
+        }
       }
       /* Event antippen: nur die Karte, die zum Event passt (Zirkel → Circle-Karte, Gruppen-Event → Gruppen-Karte, sonst gogogo) */
       function stampKindForEvent(ev) {
@@ -15760,7 +15776,7 @@
         var dots = document.getElementById("stamp-card-stackdots");
         modal._stack = [{ kind: "main", name: "gogogo", stamps: mainStamps }];
         modal._stackAt = 0;
-        pass.classList.remove("has-stack");
+        pass.classList.remove("has-stack", "is-darkface");
         pass.style.background = "";
         if (dots) dots.hidden = true;
         if (!sessionAccount) return;
