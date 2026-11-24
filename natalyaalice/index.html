@@ -8936,7 +8936,7 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-44"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-26"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-7"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-8"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-4"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
@@ -8945,6 +8945,7 @@
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-107"></script>
   <script src="/natalyaalice/support.js?v=support-34"></script>
+  <script src="/natalyaalice/pt-calendar.js?v=gpt-1"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -19112,14 +19113,8 @@
             openTeamSearch("trainer");
             return;
           }
-          requestPersonalTraining(trainer).then(function () {
-            /* auf Team bleiben: Aktuell nur im Hintergrund auffrischen */
-            paintWelcome();
-            refreshFfcHeute(false);
-            paintHeuteJoins();
-          }).catch(function (err) {
-            GoDialog.alert((err && err.message) || "Anfrage fehlgeschlagen.");
-          });
+          /* Monatskalender des Coaches: geblockte Tage hell, Tag antippen → Stunden 7 bis 21 Uhr */
+          openPtCal({ mode: "client", coachId: trainer.id, coachName: String(trainer.name || "").split(" ")[0] });
         });
         coachSlide.appendChild(ptCta);
         /* Bewertung schreiben (coach-reviews.js) */
@@ -20529,6 +20524,15 @@
               calBtn.textContent = sessionAccount && sessionAccount.calendly_url ? "Calendly verknüpft" : "Calendly hinzufügen";
               calBtn.addEventListener("click", function () { editOwnCalendly(calBtn); });
               card.appendChild(calBtn);
+              /* eigener PT-Kalender: Anfragen bestätigen, Tage sperren, Events eintragen */
+              var ptCalBtn = document.createElement("button");
+              ptCalBtn.type = "button";
+              ptCalBtn.className = "go-slide__cta go-slide__cta--editor";
+              ptCalBtn.textContent = "PT-Kalender";
+              ptCalBtn.addEventListener("click", function () {
+                if (sessionAccount) openPtCal({ mode: "coach", coachId: sessionAccount.id, coachName: "" });
+              });
+              card.appendChild(ptCalBtn);
             }
             /* Für alle Coaches gleich: Coachees wählen → Coach-Portal (Reihenfolge + Dauer). Voller Kurs-Editor nur unter Profil → Admin */
             if (isCoachSelf) {
@@ -20735,23 +20739,14 @@
           body.appendChild(name);
           var pack = document.createElement("div");
           pack.className = "go-package";
-          pack.innerHTML = "<strong>10 Treffen</strong><p>Dein Coach schickt Dir ein Angebot. Nach der Annahme wählst Du Termine — Calendly und Supabase bleiben synchron.</p>";
+          pack.innerHTML = "<strong>Personal Training</strong><p>Wähle im Kalender Deines Coaches eine freie Stunde. Dein Coach bestätigt den Termin.</p>";
           var buy = document.createElement("button");
           buy.type = "button";
           buy.className = "go-slide__cta";
           buy.textContent = "Personal Training vereinbaren";
           buy.disabled = !coach;
           buy.addEventListener("click", function () {
-            requestPersonalTraining(coach).then(function () {
-              closeGoSub();
-              setHome(true);
-              paintWelcome();
-              refreshFfcHeute(false);
-              setHeuteFilter("all");
-              paintHeuteJoins();
-            }).catch(function (err) {
-              GoDialog.alert((err && err.message) || "Anfrage fehlgeschlagen.");
-            });
+            openPtCal({ mode: "client", coachId: coach.id, coachName: String(coach.name || "").split(" ")[0] });
           });
           pack.appendChild(buy);
           body.appendChild(pack);
@@ -20995,6 +20990,24 @@
           me: function () { return sessionAccount ? sessionAccount.id : ""; },
           toast: function (msg) { gogogoToast(msg); }
         });
+      }
+
+      /* Personal Training im App-Kalender (pt-calendar.js, go-pt-kalender.sql) */
+      var ptCalInit = false;
+      function openPtCal(opts) {
+        if (!window.GoPtCal) { GoDialog.alert("Kalender lädt noch. Bitte gleich nochmal."); return; }
+        if (!ptCalInit) {
+          ptCalInit = true;
+          GoPtCal.init({
+            rest: rest,
+            me: function () { return sessionAccount ? sessionAccount.id : ""; },
+            toast: function (msg) { gogogoToast(msg); },
+            onChange: function () {
+              if (window.HeuteAccountability && HeuteAccountability.refreshHeart) HeuteAccountability.refreshHeart();
+            }
+          });
+        }
+        GoPtCal.open(opts);
       }
 
       /* Coach wählen = Anfrage stellen; Coach wird es erst, wenn er annimmt (go-coachee-requests.sql) */
@@ -26635,9 +26648,33 @@
             promptJoinRequests: function () { try { promptJoinRequests(); } catch (eJR) {} },
             /* weitere Meldungen fürs Herz: Gruppenanfragen */
             heartNotices: function () {
+              /* Coach: offene PT-Buchungen (go-pt-kalender.sql) */
+              function loadPtRequests() {
+                if (!sessionAccount || !sessionAccount.id) return Promise.resolve([]);
+                return rest("go_pt_sessions?status=eq.proposed&session_at=gte." + encodeURIComponent(new Date().toISOString()) +
+                  "&select=id,session_at,created_at,go_pt_bookings!inner(client_id,coach_id)&go_pt_bookings.coach_id=eq." + encodeURIComponent(sessionAccount.id) +
+                  "&order=session_at.asc&limit=20").then(function (rows) {
+                  rows = rows || [];
+                  var ids = rows.map(function (x) { return String((x.go_pt_bookings || {}).client_id || ""); }).filter(Boolean);
+                  if (!ids.length) return [];
+                  return rest("go_accounts?id=in.(" + ids.join(",") + ")&select=id,name,nickname,photo_url").catch(function () { return []; }).then(function (ppl) {
+                    var by = {};
+                    (ppl || []).forEach(function (p) { by[String(p.id)] = p; });
+                    return rows.map(function (x) {
+                      var p = by[String((x.go_pt_bookings || {}).client_id)] || {};
+                      var day = new Date(x.session_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+                      var hh = new Date(x.session_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+                      var when = window.GoPtCal ? GoPtCal.shortDay(day) : day;
+                      return { created_at: x.created_at, day: day, photo: p.photo_url || "",
+                        label: String(p.nickname || p.name || "Jemand").split(" ")[0] + " hat Personal Training gebucht: " + when + ", " + hh };
+                    });
+                  });
+                }).catch(function () { return []; });
+              }
               return Promise.all([loadGroupInvites(), loadGroupJoinRequests(), loadStampLinkRequests(), loadGroupNews(), loadCircleNews().catch(function () { return []; }),
                 loadFriendRequests().then(function () { return friendReqs.incoming || []; }).catch(function () { return []; }),
-                loadCoachRequests().then(function () { return coachReqs.incoming || []; }).catch(function () { return []; })]).then(function (r) {
+                loadCoachRequests().then(function () { return coachReqs.incoming || []; }).catch(function () { return []; }),
+                loadPtRequests()]).then(function (r) {
                 return (r[0] || []).map(function (gi) {
                   return { kind: "group", created_at: gi.created_at, label: String(gi.owner_name || "Jemand").split(" ")[0] + " lädt Dich in die Gruppe " + (gi.name || "") + " ein", open: function () { openGroupInvite(gi); } };
                 }).concat((r[1] || []).map(function (gr) {
@@ -26652,6 +26689,8 @@
                   return { kind: "friend", created_at: fr.created_at, label: String(((fr.person || {}).name) || "Jemand").split(" ")[0] + " möchte mit Dir befreundet sein", photo: (fr.person || {}).photo_url || "", open: function () { askFriendRequest(fr); } };
                 })).concat((r[6] || []).map(function (cr) {
                   return { kind: "coachee", created_at: cr.created_at, label: String(((cr.person || {}).name) || "Jemand").split(" ")[0] + " möchte Dich als Coach", photo: (cr.person || {}).photo_url || "", open: function () { askCoachRequest(cr); } };
+                })).concat((r[7] || []).map(function (pt) {
+                  return { kind: "pt", created_at: pt.created_at, label: pt.label, photo: pt.photo || "", open: function () { openPtCal({ mode: "coach", coachId: sessionAccount.id, day: pt.day }); } };
                 }));
               });
             },

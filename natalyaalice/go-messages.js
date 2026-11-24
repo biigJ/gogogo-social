@@ -52,6 +52,11 @@
       key: "news:2026-11-24-plus-kacheln",
       at: "2026-11-24T16:50:00Z",
       text: "Plus zeigt Deine Plus-Punkte jetzt als Kacheln. Tippen öffnet den Inhalt, „Plus“ unten bringt Dich zurück. Am Griff rechts sortierst Du sie, Aktiviertes rutscht nach oben."
+    },
+    {
+      key: "news:2026-11-24-pt-kalender",
+      at: "2026-11-24T20:00:00Z",
+      text: "Personal Training buchst Du jetzt direkt im Kalender Deines Coaches: Team → Mein Coach → Personal Training. Coaches finden ihren Kalender unter Plus → Ich als Coach → PT-Kalender."
     }
   ];
 
