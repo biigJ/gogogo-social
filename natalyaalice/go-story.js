@@ -32,6 +32,12 @@
       ".gstory .gstory__txt h3{margin:4px 0 8px !important;font-family:'Playfair Display',Georgia,serif !important;font-size:32px !important;font-weight:600 !important;line-height:1.1 !important;color:#fff !important;cursor:pointer}" +
       ".gstory__txt p{margin:0;font:600 16px/1.4 Inter,sans-serif}" +
       ".gstory__who{opacity:.85}" +
+      ".gstory .gstory__list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:3px;font:600 16px/1.3 Inter,sans-serif;text-align:left;color:#fff}" +
+      ".gstory .gstory__list[hidden]{display:none}" +
+      ".gstory .gstory__list li{display:flex;gap:12px;min-width:0}" +
+      ".gstory .gstory__list li span:first-child{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+      ".gstory .gstory__list li span:first-child::before{content:'· '}" +
+      ".gstory .gstory__list li span+span{flex:none;opacity:.85;font-variant-numeric:tabular-nums}" +
       ".gstory__note{margin-top:8px !important;font-weight:500 !important}" +
       ".gstory__done{margin-top:8px !important}" +
       ".gstory__bars{position:absolute;z-index:3;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;gap:4px}" +
@@ -87,6 +93,7 @@
         (it.who ? '<p class="gstory__who">' + esc(it.who) + "</p>" : "") +
         '<h3 data-gstory-open="1">' + esc(it.title || "Training") + "</h3>" +
         (it.sub ? "<p>" + esc(it.sub) + "</p>" : "") +
+        (it.loadList ? '<ul class="gstory__list" hidden></ul>' : "") +
         (it.note ? '<p class="gstory__note">' + esc(it.note) + "</p>" : "") +
         (it.done ? '<p class="gstory__done">Erledigt ✓</p>' : "") +
         "</div>" +
@@ -95,6 +102,16 @@
         }).join("") + "</div>";
       held = false;
       wrap.classList.remove("is-held");
+      /* Übungsliste kommt asynchron; nur einsetzen, wenn die Story noch dieselbe ist */
+      if (it.loadList) {
+        var at = i;
+        Promise.resolve(it.loadList()).then(function (html) {
+          var ul = wrap.querySelector(".gstory__list");
+          if (at !== i || !ul || !html) return;
+          ul.innerHTML = html;
+          ul.hidden = false;
+        }).catch(function () {});
+      }
       run(DUR);
     }
     function pause() {
