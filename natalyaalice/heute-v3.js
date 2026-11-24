@@ -101,11 +101,11 @@
     if (v === "crew") return "team";
     if (v === "all") return "alles";
     if (v === "mine") return "ich";
-    /* Gruppe und Circle gehen in Community (team) auf */
-    if (String(v || "").indexOf("group:") === 0 || v === "gruppe" || v === "circle") return "team";
+    /* Kreise einzeln: Gruppe und Circle sind wieder eigene Ansichten */
+    if (String(v || "").indexOf("group:") === 0) return "gruppe";
     /* Tagebuch gibt es im Dropdown nicht mehr → Alles */
     if (v === "tagebuch") return "alles";
-    if (["ich", "team", "alles", "bubble", "coach"].indexOf(v) >= 0) return v;
+    if (["ich", "team", "gruppe", "circle", "alles", "bubble", "coach"].indexOf(v) >= 0) return v;
     return "";
   }
 
@@ -241,7 +241,7 @@
       if (plans.length > 2) {
         var names = plans.map(function (m) { var mm = String(m.body).match(/„([^“]+)“/); return mm ? mm[1] : ""; }).filter(Boolean);
         out.push({ kind: "msg", created_at: plans[0].created_at, past: true, label: "Es gibt neue Trainingspläne.",
-          open: function () { if (global.GoDialog) GoDialog.alert("Es gibt neue Trainingspläne.", { body: names.join(", ") + "\n\nDu findest sie unter Woche → Stift → Wochenplan ändern." }); } });
+          open: function () { if (global.GoDialog) GoDialog.alert("Es gibt neue Trainingspläne.", { body: names.join(", ") + "\n\nDu findest sie unter Kalender → Stift → Wochenplan ändern." }); } });
       } else restMsgs = restMsgs.concat(plans);
       var friendIds = {};
       (host.teamPeople || []).forEach(function (p) { if (p && p.id) friendIds[String(p.id)] = true; });
@@ -3195,7 +3195,7 @@
     if (flags.bubbleOnly && state.bubbleQuery && !feed.myToday.length && !feed.upcoming.length && !feed.history.length) {
       html += '<p class="acc-bubble-empty">Nichts gefunden für „' + esc(state.bubbleQuery) + '“.</p>';
     } else if (flags.bubbleOnly && !feed.myToday.length && !feed.upcoming.length && !feed.history.length) {
-      html += '<p class="acc-bubble-empty">Noch ist es still hier.<br>Schreib unten etwas oder markiere ein Event in Woche → Stift → Tage bearbeiten → Bubble.</p>';
+      html += '<p class="acc-bubble-empty">Noch ist es still hier.<br>Schreib unten etwas oder markiere ein Event in Kalender → Stift → Tage bearbeiten → Bubble.</p>';
     }
 
     var firstPaint = !state.paintedAktuell;
@@ -4994,7 +4994,7 @@
       });
       var timed = invEv ? hasTime(invEv) : dayMine.some(hasTime);
       if (!timed && (invEv || dayMine.length)) {
-        if (global.GoDialog) GoDialog.note("Setz die Uhrzeit unter Woche fest, um Freunde einzuladen.");
+        if (global.GoDialog) GoDialog.note("Setz die Uhrzeit im Kalender fest, um Freunde einzuladen.");
         return;
       }
       if (host.openInviteForPost) host.openInviteForPost(invIso, invitePost.getAttribute("data-invite-post") || "");
@@ -5622,7 +5622,7 @@
           return GoDialog.time(slot === "morgen" ? "Wann trainierst Du heute?" : "Wann trainierst Du morgen?", {
           /* Nur Ich / Nur Coach: Hinweis, dass andere die Uhrzeit erst mit Community sehen */
           sub: (ev.title || "Training") + (ev.visibility === "privat" || ev.visibility === "coach"
-            ? " · Steht auf „" + (ev.visibility === "coach" ? "Nur Coach" : "Nur Ich") + "“. Stell es in Woche → Tage bearbeiten auf Community, damit andere sehen, wann Du trainierst, und sich bei Dir melden können."
+            ? " · Steht auf „" + (ev.visibility === "coach" ? "Nur Coach" : "Nur Ich") + "“. Stell es im Kalender → Stift → Tage bearbeiten auf Community, damit andere sehen, wann Du trainierst, und sich bei Dir melden können."
             : ""),
           ok: "Eintragen",
           cancel: "Später",
@@ -5680,8 +5680,8 @@
       if (host && host.syncHeuteFilterOptions) host.syncHeuteFilterOptions();
       else {
         sel.innerHTML =
-          '<option value="ich">Nur Ich</option>' +
-          '<option value="team">Community</option>' +
+          '<option value="ich">Nur ich</option>' +
+          '<option value="team">Freunde</option>' +
           '<option value="alles">Alles</option>';
       }
       if (!normalizeFilter(sel.value)) sel.value = state.filter || "ich";
