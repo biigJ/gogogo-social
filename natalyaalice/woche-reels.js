@@ -3138,7 +3138,12 @@
       /* je Tag die Einheit aus dem Wochenplan (Normalfall); Termine wie Initialgespräch verdrängen sie nicht */
       return normalDayEvents(iso).filter(function (e) { return e.status !== "erledigt"; })[0] || null;
     });
-    state.daysEdit = { days: days, slots: slots, times: {}, vis: {}, orig: {}, bub: {} };
+    /* Tag schon trainiert: erledigtes Event anzeigen statt „frei“ (nur Anzeige, nicht verschiebbar) */
+    var done = days.map(function (iso, i) {
+      if (slots[i]) return null;
+      return normalDayEvents(iso).filter(function (e) { return e.status === "erledigt"; })[0] || null;
+    });
+    state.daysEdit = { days: days, slots: slots, done: done, times: {}, vis: {}, orig: {}, bub: {} };
     slots.forEach(function (ev) {
       if (!ev) return;
       state.daysEdit.times[ev.id] = displayTime(ev.starts_at) ? formatTime(ev.starts_at) : NO_TIME;
@@ -3157,7 +3162,10 @@
       var label = DAYS_DE[d.getDay()] + " " + d.getDate() + ".";
       var ev = de.slots[i];
       if (!ev) {
-        return '<div class="wr-dayrow is-empty" data-wr-dayslot="' + i + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + '</b> <span class="wr-dayrow__free">frei</span></span></div><span></span></div>';
+        var doneEv = de.done && de.done[i];
+        return '<div class="wr-dayrow is-empty' + (doneEv ? " is-done" : "") + '" data-wr-dayslot="' + i + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " +
+          (doneEv ? '<span aria-label="erledigt">✓</span> ' + esc(doneEv.title || "Training") : '<span class="wr-dayrow__free">frei</span>') +
+          "</span></div><span></span></div>";
       }
       var opts = timeOptsFor(de.times[ev.id]);
       var ti = Math.max(0, opts.indexOf(de.times[ev.id]));
