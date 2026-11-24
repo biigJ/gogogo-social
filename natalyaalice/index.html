@@ -1498,6 +1498,7 @@
     .is-bubbles .gbub-rows:not(.kreise-rows) [data-gbub-add] { display: none !important; }
     .kreis-row .gbub-row__ico.is-plain { color: #2A2118; filter: none; }
     .kreis-row .kreis-row__pen { margin-left: auto; flex: none; }
+    .friend-list__pen { margin-left: auto; flex: none; }
     .kreis-wico { position: absolute; top: 66px; right: 22px; z-index: 2; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); pointer-events: none; }
     .kreis-wico svg { width: 34px; height: 34px; }
     .kreis-page { position: fixed; inset: 0; z-index: 70; background: #F3EEE4; display: flex; flex-direction: column; }
@@ -18243,7 +18244,7 @@
             }
             row.appendChild(text);
             row.addEventListener("click", function (ev) {
-              if (ev.target.closest(".friend-list__feed")) return;
+              if (ev.target.closest(".friend-list__feed") || ev.target.closest(".friend-list__pen")) return;
               openProfile(p);
             });
             /* Im Feed an/aus: höchstens 12 im Aktuell-Feed, verbunden bleiben alle */
@@ -18259,6 +18260,19 @@
               fb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
               fb.addEventListener("click", function () { toggleFeed(p, fb); });
               row.appendChild(fb);
+            } else if (sessionIsTrainer && p.trainer_id && String(p.trainer_id) === mineId) {
+              /* Eigener Coachee: Stift statt Haken, öffnet den Coach-Bereich (früher Reiter Coachees) */
+              var cpen = document.createElement("span");
+              cpen.className = "team-pencil friend-list__pen";
+              cpen.setAttribute("role", "button");
+              cpen.setAttribute("tabindex", "0");
+              cpen.setAttribute("aria-label", "Admin für " + (p.name || "Coachee"));
+              cpen.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg>';
+              cpen.addEventListener("click", function (evp) {
+                evp.stopPropagation();
+                openTrainerAdmin(p);
+              });
+              row.appendChild(cpen);
             } else {
               /* Coach-Verbindung oder FFC-Freund ohne gogogo-Konto: immer dabei, nicht wählbar */
               var fx = document.createElement("span");
@@ -18726,8 +18740,7 @@
           if (krView) krView();
           if (!cst().loaded) Promise.resolve(loadCircleState()).then(function () { paintKreiseRows(krEl); if (krView) krView(); }).catch(function () {});
         }
-        /* Coachees-Reiter nur für Coaches, und erst wenn die Datenbank is_trainer bestätigt hat (kein Cache) */
-        if (sessionIsTrainer && sessionTrainerChecked) box.appendChild(coacheeSlide);
+        /* Kein Reiter Coachees mehr: Coachees haben in der Freundesliste einen Stift, der PT-Kalender liegt in Woche → Kalender */
         syncGroupOptions();
         syncHScrollDock();
         syncTeamGoRailNav();
@@ -25514,7 +25527,8 @@
       function openMyCoachees() {
         showPlan("team");
         requestAnimationFrame(function () {
-          var slide = document.querySelector('#plan-team [data-title="Meine Coachees"]');
+          /* Coachees stehen in Meine Freunde (mit Stift) */
+          var slide = document.querySelector('#plan-team [data-title="Meine Freunde"]');
           if (slide && slide.scrollIntoView) slide.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
         });
       }
