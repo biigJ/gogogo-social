@@ -287,8 +287,11 @@
             ? shrinkVideo(media.file).then(function (bl) { return uploadChat(bl, /webm/.test(bl.type) ? "webm" : /quicktime/.test(bl.type) ? "mov" : "mp4"); })
             : shrinkImage(media.file).then(function (bl) { return uploadChat(bl, "jpg"); }))
         : Promise.resolve("");
+      /* Sprechblase in Aktuell: Host kann ein anderes Ziel setzen (Kreis statt Bubble) */
+      var tgt = host && host.composeTarget ? host.composeTarget() : null;
       up.then(function (url) {
-        return post(t, { media_url: url || "", media_kind: media ? media.kind : "", reply_to: draft.reply ? draft.reply.id : "" });
+        var ex = { media_url: url || "", media_kind: media ? media.kind : "", reply_to: draft.reply ? draft.reply.id : "" };
+        return tgt && tgt.send ? tgt.send(t, ex) : post(t, ex);
       }).then(function () {
         inp.value = "";
         draft.media = null;
@@ -297,6 +300,7 @@
         if (host.onMessage) host.onMessage();
       }).catch(function (err) {
         var m = String((err && err.message) || "");
+        if (tgt && tgt.send) { toast(/go_aktuell_posts|relation|schema cache/i.test(m) ? "Nachrichten fehlen noch: go-aktuell-posts.sql ausführen" : "Senden ging gerade nicht"); return; }
         toast(missing ? "Bubbles fehlen noch: go-bubbles.sql ausführen" : m && !/HTTP|fetch/i.test(m) ? m : "Senden ging gerade nicht");
       }).then(function () { btn.disabled = false; f.classList.remove("is-busy"); });
     });
@@ -832,7 +836,7 @@
       ".gbub-places__ok{border-style:solid;margin-top:8px}" +
       ".gbub-places__pp .gpp__map{height:180px}" +
       ".gbub-compose{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 77px);z-index:60;display:none;gap:8px;align-items:center;padding:6px 6px 6px 16px;border-radius:999px;background:#fff;box-shadow:0 6px 24px rgba(29,22,48,.14)}" +
-      "body[data-shell=heute][data-heute=bubble] .gbub-compose{display:flex}" +
+      "body[data-shell=heute][data-heute=bubble] .gbub-compose,body[data-shell=heute].go-say-open .gbub-compose{display:flex}" +
       "body.wr-sheet-open .gbub-compose,body.ffc-open .gbub-compose{display:none !important}" +
       ".gbub-compose{flex-direction:column;align-items:stretch;border-radius:24px}" +
       ".gbub-compose__row{display:flex;align-items:center;gap:6px;min-width:0}" +
@@ -898,6 +902,12 @@
     openWiki: openWiki,
     mountComposer: mountComposer,
     setReply: setReply,
+    /* Platzhalter der Eingabe (Sprechblase: „Nachricht an …“) */
+    setPlaceholder: function (txt) {
+      var f = document.getElementById("gbub-compose");
+      var inp = f && f.querySelector("input[type=text]");
+      if (inp) inp.placeholder = txt || "Nachricht an die Bubble";
+    },
     report: report,
     wallet: wallet,
     SOAP_SVG: SOAP_SVG
