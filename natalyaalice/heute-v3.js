@@ -816,7 +816,6 @@
     var range = "&starts_at=gte." + encodeURIComponent(fromIso) + "&starts_at=lte." + encodeURIComponent(toIso) + "&order=starts_at.desc&limit=500";
     /* bubble_id erst nach go-bubbles.sql vorhanden; group_id für Gruppen-Events (Gruppenname statt Vorname) */
     /* feed_hidden: „Speichern ohne Posting“ (go-events-feed-hidden.sql) */
-    /* feed_compact: vergangenes Event verkleinert (go-events-feed-compact.sql) */
     return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact,photos" + range)
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id" + range); })
@@ -2406,7 +2405,7 @@
       extraClass: (!mine && (acceptedInv || iAmGoing(ev.id)) ? "is-going"
         : mine && upcoming && day >= todayIso() ? "is-mine-next" : "")
         /* verkleinert (Besitzer über •••, gilt für alle): Höhe wie Wallet-Karte, Tipp klappt auf */
-        + (ev.status === "erledigt" && ev.feed_compact ? " is-wallet is-shrunk" : ""),
+        + (ev.status === "erledigt" && compactPast() ? " is-wallet is-shrunk" : ""),
       attrs:
         ' data-post-id="' +
         esc(ev.id) +
@@ -2433,7 +2432,8 @@
         onlineCtaHtml(ev),
       postId: String(ev.id),
       eventId: String(ev.id),
-      visDots: mine && /^[0-9a-f-]{36}$/i.test(String(ev.id)) ? String(ev.id) : "",
+      /* ••• : eigene Events immer, Freunde bei erledigten (Verkleinern) */
+      visDots: (mine || ev.status === "erledigt") && /^[0-9a-f-]{36}$/i.test(String(ev.id)) ? String(ev.id) : "",
       inviteIso: day,
       ownerId: String(ev.user_id || ""),
       canInvite: !mine
@@ -5026,17 +5026,29 @@
       .catch(function () { if (host.toast) host.toast("Ging gerade nicht"); });
   }
 
-  /* Vergangenes Event verkleinern/vergrößern: gilt für alle, die es sehen */
-  function setCompact(ev, on) {
+  /* Verkleinern gilt für alle erledigten Events in meinem Feed (eigene und von Freunden), pro Gerät gemerkt */
+  var COMPACT_KEY = "gogogo_feed_compact_past";
+  function compactPast() {
+    if (state.compactPast == null) { try { state.compactPast = localStorage.getItem(COMPACT_KEY) === "1"; } catch (e) { state.compactPast = false; } }
+    return state.compactPast;
+  }
+  function setCompact(on) {
+    state.compactPast = !!on;
     state.walletOpen = "";
-    rest("events?id=eq." + encodeURIComponent(ev.id), { method: "PATCH", prefer: "return=minimal", body: { feed_compact: on } })
-      .then(function () { ev.feed_compact = on; render(); })
-      .catch(function () { if (host.toast) host.toast("Ging nicht (go-events-feed-compact.sql?)"); });
+    try { localStorage.setItem(COMPACT_KEY, on ? "1" : "0"); } catch (e) {}
+    render();
   }
 
   function changeEventVisibility(id) {
     var ev = (state.events || []).filter(function (x) { return String(x.id) === String(id); })[0];
     if (!ev || !global.GoDialog || !GoDialog.vis) return;
+    /* Event eines Freundes: nur die Ansicht (Verkleinern gilt für alle) */
+    if (String(ev.user_id) !== me()) {
+      GoDialog.choose(String(ev.title || "Training"), [{ label: compactPast() ? "Vergrößern" : "Verkleinern", value: "c" }]).then(function (v) {
+        if (v === "c") setCompact(!compactPast());
+      });
+      return;
+    }
     /* wie das Dropdown in Aktuell: Ich · Community · Meine Bubble · Alles
        Alles = Community + Bubble (visibility team mit bubble_id) */
     var bid = host.bubbleId ? String(host.bubbleId() || "") : "";
@@ -5048,10 +5060,10 @@
     var acts = [];
     if (past && eventPhotoCount(ev) < MAX_EVENT_PHOTOS) acts.push({ label: "Foto hinzufügen", value: "__photo" });
     if (past && evDayIso(ev) === todayIso()) acts.push({ label: "Training wieder aufnehmen", value: "__reopen" });
-    if (past) acts.push({ label: ev.feed_compact ? "Vergrößern" : "Verkleinern", value: "__compact" });
+    if (past) acts.push({ label: compactPast() ? "Vergrößern" : "Verkleinern", value: "__compact" });
     GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, extra: "Löschen", actions: acts }).then(function (v) {
       if (v === "__extra") { removeEvent(id, "delete"); return; }
-      if (v === "__compact") { setCompact(ev, !ev.feed_compact); return; }
+      if (v === "__compact") { setCompact(!compactPast()); return; }
       if (v === "__photo") { addEventPhoto(ev); return; }
       if (v === "__reopen") { reopenEvent(ev); return; }
       if (!v || v === cur) return;
