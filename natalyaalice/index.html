@@ -8939,7 +8939,7 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-46"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-27"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-9"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-10"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-4"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
@@ -8949,6 +8949,7 @@
   <script src="/natalyaalice/woche-reels.js?v=woche-107"></script>
   <script src="/natalyaalice/support.js?v=support-34"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
+  <script src="/natalyaalice/coach-group.js?v=gcg-1"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -18346,6 +18347,8 @@
         if (st.coach) {
           html += kreisRowHtml("coach", st.coach.photo_url || "", "Coach " + String(st.coach.name || "").split(" ")[0], true);
         }
+        /* Coach: Gruppe mit seinen Kunden (coach-group.js) */
+        if (sessionIsTrainer) html += kreisRowHtml("coachgroup", "", "Meine Kunden", false);
         if (el._kreiseHtml === html) return;
         el._kreiseHtml = html;
         el.innerHTML = html;
@@ -18439,6 +18442,8 @@
         });
         if (st.coach) out.push({ id: "k:coach", name: String(st.coach.name || "Coach").split(" ")[0], photo_url: st.coach.photo_url || "",
           _kreis: { kind: "coach" }, _tag: "Mein Coach", _about: "" });
+        if (sessionIsTrainer) out.push({ id: "k:coachgroup", name: "Meine Kunden", photo_url: (sessionAccount && sessionAccount.photo_url) || "",
+          _kreis: { kind: "coachgroup" }, _tag: "Coach-Gruppe", _about: "Gruppentraining mit Deinen Kunden" });
         return out;
       }
       function fillKreisCard(card, p) {
@@ -18472,6 +18477,7 @@
       /* Circle-Zeilen (Zirkeltraining): alle Circles des Nutzers aus FFC */
       var CIRCLE_ICON = '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.3 2.4-5.4 3.6-8.3.5 1.9 1.6 3 2.6 3.4-.3-2.8.8-5.5 2.8-6.9-.1 3 1.6 4.7 2.9 6.5 1 1.4 1.6 3 1.6 5.1C19 18.4 16 21 12 21z"/></svg>';
       KREIS_ICON.circle = CIRCLE_ICON;
+      KREIS_ICON.coachgroup = KREIS_ICON.group;
       function circleRowsHtml() {
         var gs = (cst().groups || []);
         var def = "/assets/gogogo/gogogo-Zirkeltraining.jpg";
@@ -18526,12 +18532,41 @@
           }, 60);
         });
       }
+      var coachGroupInit = false;
+      function coachGroupReady() {
+        if (!window.GoCoachGroup) return false;
+        if (!coachGroupInit) {
+          coachGroupInit = true;
+          GoCoachGroup.init({
+            rest: rest,
+            me: function () { return sessionAccount ? sessionAccount.id : ""; },
+            myName: function () { return personName(); },
+            toast: function (msg) { gogogoToast(msg); },
+            openProfile: function (p) { openProfile(p); },
+            onChange: function () {
+              if (window.HeuteAccountability && HeuteAccountability.refresh) { try { HeuteAccountability.refresh(); } catch (eR) {} }
+              if (window.HeuteAccountability && HeuteAccountability.refreshHeart) HeuteAccountability.refreshHeart();
+            }
+          });
+        }
+        return true;
+      }
       function openKreis(kind, id) {
         var st = kreiseState || {};
         if (kind === "group") openKreisPage(st.groupSlide, (st.group && st.group.name) || "Meine Gruppe");
         else if (kind === "coach") {
           openKreisPage(st.coachSlide, "Mein Coach");
-          appendKreisStampBox(document.querySelector(".kreis-page .kreis-page__body"), "main");
+          var cBody = document.querySelector(".kreis-page .kreis-page__body");
+          appendKreisStampBox(cBody, "main");
+          /* Coach-Gruppe aus Kundensicht: Haken „offen“, andere mit Haken, Einladungen der Woche */
+          if (st.coach && st.coach.id && coachGroupReady()) GoCoachGroup.render(cBody, { mode: "client", coach: st.coach });
+        }
+        else if (kind === "coachgroup" && sessionAccount && coachGroupReady()) {
+          var cgSlide = document.createElement("article");
+          cgSlide.className = "team-slide is-scroll";
+          cgSlide.dataset.title = "Meine Kunden";
+          GoCoachGroup.render(cgSlide, { mode: "coach", coach: { id: sessionAccount.id, name: personName(), photo_url: sessionAccount.photo_url || "" } });
+          openKreisPage(cgSlide, "Meine Kunden");
         }
         else if (kind === "circle") openCirclePage(id);
       }

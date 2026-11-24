@@ -62,6 +62,11 @@
       key: "news:2026-11-24-sichtbarkeit",
       at: "2026-11-24T22:00:00Z",
       text: "Wer Dein Event sieht, wählst Du jetzt über die drei Punkte am Event aus derselben Liste wie den Filter oben in Aktuell: Nur ich, Freunde, Gruppe, Circle, Bubble oder Alles."
+    },
+    {
+      key: "news:2026-11-24-coach-gruppe",
+      at: "2026-11-24T23:30:00Z",
+      text: "Neu unter Community → Kreise: Coaches haben „Meine Kunden“ und laden dort zum Gruppentraining ein. Als Kunde setzt Du unter „Coach“ den Haken „Offen für Gruppentraining“ und siehst die Einladungen Deines Coaches."
     }
   ];
 
