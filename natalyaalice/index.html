@@ -1532,7 +1532,10 @@
     .acc-msg.is-mine { padding-right: 38px; }
     .acc-msg__more { position: absolute; top: 4px; right: 6px; width: 30px; height: 26px; padding: 0; border: 0; background: none; color: inherit; opacity: .7; display: grid; place-items: center; cursor: pointer; }
     .acc-msg__more svg { width: 18px; height: 18px; }
-    .acc-msg__who { display: block; font: 600 12px/1.2 Inter, sans-serif; opacity: .65; margin-bottom: 4px; }
+    .acc-msg__who { display: flex; justify-content: space-between; gap: 10px; font: 600 12px/1.2 Inter, sans-serif; margin-bottom: 4px; }
+    .acc-msg__who > span { opacity: .65; }
+    .acc-msg__to { white-space: nowrap; }
+    body.is-session .acc-msg .acc-msg__to, body.is-session .acc-msg .acc-msg__txt b { font-weight: 800 !important; }
     .acc-msg__txt { margin: 0; font: 500 16px/1.4 Inter, sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
     body[data-heute="bubble"] #heute-acc { padding-bottom: 90px; }
     /* Wiki: Flex statt Grid, sonst landet der versteckte Text "Info" als eigene Zeile über "Wiki" */
@@ -2236,8 +2239,8 @@
     .wr-act__n { font-size: 11px; font-weight: 700; min-height: 12px; }
     /* Kalender: Wochentage rechts, Zukunft oben, aktueller Tag gefüllt */
     .wr-dsqs {
-      /* Unterkante = Grundlinie des Titels (letzte Zeile des Blocks links), gemessen 3px höher als vorher */
-      position: absolute; right: 17px; bottom: calc(var(--wr-progress-h) + 13px); z-index: 4;
+      /* vertikal mittig am rechten Rand */
+      position: absolute; right: 17px; top: 50%; transform: translateY(-50%); z-index: 4;
       display: flex; flex-direction: column; gap: 15px; /* 2,5 × 6px */
     }
     .wr-dsq {
@@ -8931,7 +8934,7 @@
   <script src="/natalyaalice/kraft-tracking.js?v=kt-4"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-5"></script>
   <script src="/natalyaalice/go-story.js?v=gst-8"></script>
-  <script src="/natalyaalice/bubbles.js?v=bub-15"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-16"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-5"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-8"></script>
   <script src="/natalyaalice/plan-rules.js?v=gpr-1"></script>
@@ -8942,12 +8945,12 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-46"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-27"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-10"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-11"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-164"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-165"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-107"></script>
   <script src="/natalyaalice/support.js?v=support-34"></script>
@@ -18007,14 +18010,44 @@
           });
         });
       }
+      /* @Erwähnung (go-aktuell-mention.sql): Personen der aktuellen Ansicht mit Vorname und Nickname */
+      var mentionCache = {};
+      function mentionPeople(view) {
+        var cGid = String(view).indexOf("circle:") === 0;
+        var aud = cGid ? view : ["ich", "team", "gruppe", "coach", "alles"].indexOf(view) >= 0 ? view : "alles";
+        return kreisRecipients(aud).then(function (ids) {
+          var miss = ids.filter(function (id) { return !mentionCache[id]; });
+          var job = miss.length ? rest("go_accounts?id=in.(" + miss.map(encodeURIComponent).join(",") + ")&select=id,name,nickname,photo_url")
+            .then(function (rows) { (rows || []).forEach(function (r) { mentionCache[String(r.id)] = r; }); }).catch(function () {}) : Promise.resolve();
+          return job.then(function () {
+            return ids.map(function (id) { return mentionCache[id]; }).filter(Boolean);
+          });
+        });
+      }
+      function mentionKey(v) { return String(v || "").toLowerCase().replace(/^@/, "").normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+      function findMention(body, people) {
+        var re = /(^|\s)@([^\s@.,!?;:]+)/g, m;
+        while ((m = re.exec(body))) {
+          var k = mentionKey(m[2]);
+          var hit = people.filter(function (p) { return mentionKey(p.nickname) === k; })[0] ||
+            people.filter(function (p) { return mentionKey(String(p.name || "").split(" ")[0]) === k; })[0];
+          if (hit) return hit;
+        }
+        return null;
+      }
       function sendKreisPost(view, text, ex) {
         ex = ex || {};
         var body = String(text || "").trim();
         if (!sessionAccount || (!body && !ex.media_url)) return Promise.resolve(false);
         var cGid = String(view).indexOf("circle:") === 0 ? String(view).slice(7) : "";
         var aud = cGid ? "circle" : ["ich", "team", "gruppe", "coach", "alles"].indexOf(view) >= 0 ? view : "alles";
-        return kreisRecipients(cGid ? view : aud).then(function (ids) {
+        var mentionJob = /@/.test(body) && aud !== "ich" ? mentionPeople(view).then(function (pp) { return findMention(body, pp); }).catch(function () { return null; }) : Promise.resolve(null);
+        return Promise.all([kreisRecipients(cGid ? view : aud), mentionJob]).then(function (r) {
+          var ids = r[0];
+          var to = r[1];
           var row = { author_id: sessionAccount.id, audience: aud, recipients: ids, body: body.slice(0, 2000) };
+          /* @Name: nur diese Person sieht die Nachricht (in diesem Bereich) */
+          if (to && to.id) { row.recipients = [String(to.id)]; row.to_id = String(to.id); }
           if (cGid) row.audience_id = cGid;
           if (aud === "gruppe") { var g = (myGroups() || [])[0]; if (g && g.id) row.audience_id = String(g.id); }
           if (ex.media_url) { row.media_url = ex.media_url; row.media_kind = ex.media_kind || "img"; }
@@ -23856,6 +23889,12 @@
             var view = heuteView();
             if (view === "bubble") return null;
             return { send: function (text, ex) { return sendKreisPost(view, text, ex); } };
+          },
+          /* @ im Eingabefeld: Personen der aktuellen Ansicht */
+          mentionCandidates: function () {
+            var view = heuteView();
+            if (view === "bubble" || view === "ich") return Promise.resolve([]);
+            return mentionPeople(view);
           }
         }).then(function () { syncHeuteFilterOptions(); });
         GoBubbles.mountComposer();

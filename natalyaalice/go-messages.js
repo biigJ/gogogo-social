@@ -67,6 +67,11 @@
       key: "news:2026-11-24-coach-gruppe",
       at: "2026-11-24T23:30:00Z",
       text: "Neu unter Community → Kreise: Coaches haben „Meine Coachees“ und laden dort zum Gruppentraining ein. Als Coachee setzt Du unter „Coach“ den Haken „Offen für Gruppentraining“ und siehst die Einladungen Deines Coaches."
+    },
+    {
+      key: "news:2026-11-25-mention",
+      at: "2026-11-25T00:00:00Z",
+      text: "Nachricht an eine Person: Schreib in der Sprechblase in Aktuell @ und den Namen. Nur diese Person sieht die Nachricht, bei ihr steht „an Dich“."
     }
   ];
 

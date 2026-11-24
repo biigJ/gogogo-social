@@ -253,9 +253,11 @@
     f.className = "gbub-compose";
     f.innerHTML =
       '<div class="gbub-compose__reply" hidden><span></span><button type="button" data-gbub-noreply aria-label="Antwort abbrechen">×</button></div>' +
+      '<div class="gbub-compose__mention" hidden></div>' +
       '<div class="gbub-compose__row">' +
       '<span class="gbub-compose__prev" hidden></span>' +
-      '<textarea class="gbub-compose__inp" rows="1" maxlength="2000" placeholder="Nachricht an die Bubble" enterkeyhint="send" autocomplete="off"></textarea>' +
+      '<span class="gbub-compose__field"><span class="gbub-compose__mirror" aria-hidden="true"></span>' +
+      '<textarea class="gbub-compose__inp" rows="1" maxlength="2000" placeholder="Nachricht an die Bubble" enterkeyhint="send" autocomplete="off"></textarea></span>' +
       '<label class="gbub-compose__att" aria-label="Foto oder Video anhängen"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg>' +
       '<input type="file" accept="image/*,video/*" hidden /></label>' +
       '<button type="submit" aria-label="Senden"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-2.5-6.5L4 12z"/></svg></button>' +
@@ -269,6 +271,7 @@
       var max = line * 2 + 1;
       inp.style.height = Math.min(inp.scrollHeight, max) + "px";
       inp.style.overflowY = inp.scrollHeight > max ? "auto" : "hidden";
+      if (f.__paintMirror) f.__paintMirror();
     }
     /* Senden-Taste der Tastatur: iOS und Android liefern einen Zeilenumbruch (Android-IMEs oft ohne keydown „Enter“) */
     inp.addEventListener("input", function (e) {
@@ -289,6 +292,68 @@
       }
     });
     f.__fit = fit;
+    /* @Name fett: Spiegel hinter dem (transparenten) Text, gleiche Schrift und Umbrüche */
+    var mirror = f.querySelector(".gbub-compose__mirror");
+    function escM(x) { return String(x).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+    function paintMirror() {
+      mirror.innerHTML = escM(inp.value).replace(/(^|\s)(@[^\s@.,!?;:]+)/g, "$1<b>$2</b>") + "\u200b";
+      /* Spiegel genau über dem Textfeld (Lage je nach Zeilenzahl) */
+      mirror.style.top = inp.offsetTop + "px";
+      mirror.style.left = inp.offsetLeft + "px";
+      mirror.style.width = inp.clientWidth + "px";
+      mirror.style.height = inp.clientHeight + "px";
+      mirror.scrollTop = inp.scrollTop;
+    }
+    inp.addEventListener("scroll", function () { mirror.scrollTop = inp.scrollTop; });
+    f.__paintMirror = paintMirror;
+    /* @ tippen: Vorschläge aus der aktuellen Ansicht (Vorname, Nickname) */
+    var mBox = f.querySelector(".gbub-compose__mention");
+    var mList = null, mAt = -1;
+    function firstName(p) { return String(p.name || "").trim().split(" ")[0]; }
+    function normM(v) { return String(v || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+    function hideMention() { mBox.hidden = true; mBox.innerHTML = ""; mAt = -1; }
+    function checkMention() {
+      if (!host || !host.mentionCandidates) return hideMention();
+      var pos = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
+      var before = inp.value.slice(0, pos);
+      var m = before.match(/(^|\s)@([^\s@]*)$/);
+      if (!m) return hideMention();
+      mAt = pos - m[2].length - 1;
+      var q = normM(m[2]);
+      var job = mList ? Promise.resolve(mList) : Promise.resolve(host.mentionCandidates()).then(function (l) { mList = l || []; return mList; });
+      job.then(function (list) {
+        var hits = list.filter(function (p) { return !q || normM(firstName(p)).indexOf(q) === 0 || normM(p.nickname).indexOf(q) === 0; }).slice(0, 5);
+        if (!hits.length || mAt < 0) return hideMention();
+        mBox.innerHTML = hits.map(function (p) {
+          return '<button type="button" data-gbub-mention="' + escM(p.id) + '">' + (p.photo_url ? '<img src="' + escM(p.photo_url) + '" alt="" />' : "<i>" + escM(firstName(p).slice(0, 1)) + "</i>") +
+            "<b>" + escM(firstName(p) || p.nickname || "?") + "</b>" + (p.nickname ? "<small>@" + escM(String(p.nickname).replace(/^@/, "")) + "</small>" : "") + "</button>";
+        }).join("");
+        mBox.hidden = false;
+      });
+    }
+    mBox.addEventListener("pointerdown", function (e) { e.preventDefault(); });
+    mBox.addEventListener("click", function (e) {
+      var b = e.target.closest("[data-gbub-mention]");
+      if (!b || !mList || mAt < 0) return;
+      var p = mList.filter(function (x) { return String(x.id) === b.getAttribute("data-gbub-mention"); })[0];
+      if (!p) return;
+      var fn = firstName(p);
+      /* doppelter Vorname in der Ansicht: Nickname nehmen, damit die Nachricht eindeutig ankommt */
+      var dup = mList.filter(function (x) { return normM(firstName(x)) === normM(fn); }).length > 1;
+      var word = (dup && p.nickname ? String(p.nickname).replace(/^@/, "") : fn || String(p.nickname || "")).replace(/\s+/g, "");
+      var pos = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
+      inp.value = inp.value.slice(0, mAt) + "@" + word + " " + inp.value.slice(pos);
+      var c = mAt + word.length + 2;
+      inp.setSelectionRange(c, c);
+      hideMention();
+      fit();
+      paintMirror();
+      inp.focus();
+    });
+    inp.addEventListener("input", function () { paintMirror(); checkMention(); });
+    inp.addEventListener("click", checkMention);
+    inp.addEventListener("focus", function () { mList = null; });
+    inp.addEventListener("blur", function () { setTimeout(hideMention, 150); });
     /* beim Schreiben die Pill unten ausblenden */
     inp.addEventListener("focus", function () { document.body.classList.add("gbub-typing"); });
     inp.addEventListener("blur", function () { setTimeout(function () { if (document.activeElement !== inp) document.body.classList.remove("gbub-typing"); }, 150); });
@@ -323,6 +388,8 @@
       }).then(function () {
         inp.value = "";
         fit();
+        paintMirror();
+        hideMention();
         draft.media = null;
         draft.reply = null;
         paintDraft();
@@ -870,6 +937,17 @@
       ".gbub-compose{flex-direction:column;align-items:stretch;border-radius:24px}" +
       ".gbub-compose__row{display:flex;align-items:flex-end;gap:6px;min-width:0}" +
       ".gbub-compose__row .gbub-compose__inp{margin:8px 0 10px}" +
+      ".gbub-compose__field{position:relative;flex:1;min-width:0;display:flex;align-self:center}" +
+      ".gbub-compose__mirror{position:absolute;left:0;top:0;margin:0;padding:0;font:500 16px/22px Inter,sans-serif;color:#1D1630;white-space:pre-wrap;word-wrap:break-word;overflow:hidden;pointer-events:none}" +
+
+      ".gbub-compose__mirror b{font-weight:800 !important}" +
+      ".gbub-compose .gbub-compose__field .gbub-compose__inp{color:transparent;caret-color:#1D1630;position:relative}" +
+      ".gbub-compose .gbub-compose__field .gbub-compose__inp::placeholder{color:rgba(29,22,48,.45)}" +
+      ".gbub-compose__mention{display:flex;flex-direction:column;gap:2px;margin:2px 0 6px;max-height:220px;overflow-y:auto}" +
+      ".gbub-compose__mention[hidden]{display:none}" +
+      ".gbub-compose__mention button{display:flex;align-items:center;gap:10px;min-height:44px;padding:4px 8px;border:0;border-radius:12px;background:#F3EEE4;color:#1D1630;font:500 15px Inter,sans-serif;text-align:left;cursor:pointer}" +
+      ".gbub-compose__mention img,.gbub-compose__mention i{flex:none;width:32px;height:32px;border-radius:50%;object-fit:cover;background:#E9E1D2;display:grid;place-items:center;font-style:normal;font-weight:700}" +
+      ".gbub-compose__mention small{opacity:.6;font-size:13px}" +
       ".gbub-compose .gbub-compose__inp{flex:1;min-width:0;border:0;outline:0;background:transparent;font:500 16px/22px Inter,sans-serif;color:#1D1630;resize:none;height:22px;padding:0;margin:0;overflow-y:hidden;-webkit-appearance:none;appearance:none;border-radius:0;align-self:center;display:block}" +
       ".gbub-compose button[type=submit]{flex:none;width:42px;height:42px;border-radius:50%;border:0;background:#1D1630;color:#fff;display:flex;align-items:center;justify-content:center}" +
       ".gbub-compose.is-busy button[type=submit]{opacity:.5}" +

@@ -2603,10 +2603,12 @@
   /* Nachrichten aus der Sprechblase (go-aktuell-posts.sql): stehen in der Ansicht ihres Kreises und unter Alles */
   function loadKreisMsgs() {
     if (!me()) { state.kreisMsgs = []; return Promise.resolve(); }
-    return rest("go_aktuell_posts?select=id,author_id,audience,audience_id,body,media_url,media_kind,reply_to,created_at&order=created_at.desc&limit=150")
+    var cols = "id,author_id,audience,audience_id,body,media_url,media_kind,reply_to,created_at";
+    return rest("go_aktuell_posts?select=" + cols + ",to_id&order=created_at.desc&limit=150")
+      .catch(function () { return rest("go_aktuell_posts?select=" + cols + "&order=created_at.desc&limit=150"); })
       .then(function (rows) {
         state.kreisMsgs = (rows || []).map(function (m) { m._kreis = true; return m; });
-        return ensurePeople(state.kreisMsgs.map(function (m) { return String(m.author_id); }));
+        return ensurePeople(state.kreisMsgs.map(function (m) { return String(m.author_id); }).concat(state.kreisMsgs.filter(function (m) { return m.to_id; }).map(function (m) { return String(m.to_id); })));
       })
       .catch(function () { state.kreisMsgs = []; });
   }
@@ -2696,14 +2698,16 @@
         t.toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" });
     return '<article class="acc-msg' + (mine ? " is-mine" : "") + '" data-msg-id="' + esc(m.id) + '">' +
       (mine ? '<button type="button" class="acc-msg__more" data-msg-more="' + esc(m.id) + '" aria-label="Optionen"><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg></button>' : "") +
-      '<span class="acc-msg__who">' + esc(mine ? "Du" : String(p.name || "?").split(" ")[0]) + " · " + esc(when) + "</span>" +
+      '<span class="acc-msg__who"><span>' + esc(mine ? "Du" : String(p.name || "?").split(" ")[0]) + " · " + esc(when) + "</span>" +
+      /* @Erwähnung: nur an eine Person (go-aktuell-mention.sql) */
+      (m.to_id ? '<b class="acc-msg__to">' + (String(m.to_id) === me() ? "an Dich" : "an " + esc(String(personOf(String(m.to_id)).name || "?").split(" ")[0])) + "</b>" : "") + "</span>" +
       bubbleReplyQuote(m) +
       (m.media_url
         ? (m.media_kind === "video"
             ? '<video class="acc-msg__media" src="' + esc(m.media_url) + '" controls playsinline preload="metadata"></video>'
             : '<img class="acc-msg__media" src="' + esc(m.media_url) + '" alt="" loading="lazy" />')
         : "") +
-      (m.body ? '<p class="acc-msg__txt">' + esc(m.body) + "</p>" : "") + "</article>";
+      (m.body ? '<p class="acc-msg__txt">' + esc(m.body).replace(/(^|\s)(@[^\s@.,!?;:]+)/g, "$1<b>$2</b>") + "</p>" : "") + "</article>";
   }
 
   /* Bubble-Filter: nur Events, die in meiner Bubble markiert sind (eigene und die der anderen Mitglieder) */
