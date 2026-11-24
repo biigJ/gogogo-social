@@ -3360,7 +3360,7 @@
     var from = st.days[0] + "T00:00:00" + berlinOffsetSuffix(st.days[0]);
     var to = addDays(st.days[6], 1) + "T00:00:00" + berlinOffsetSuffix(st.days[6]);
     var range = "&starts_at=gte." + encodeURIComponent(from) + "&starts_at=lt." + encodeURIComponent(to);
-    var sel = "&select=id,user_id,title,category,starts_at,visibility,group_id,status,item_type,enrollment_id,course_id&order=starts_at.asc&limit=80";
+    var sel = "&select=id,user_id,title,category,starts_at,visibility,group_id,status,item_type,enrollment_id,course_id,location&order=starts_at.asc&limit=80";
     return Promise.all([
       rest("events?user_id=eq." + encodeURIComponent(me()) + "&status=in.(geplant,erledigt)" + range + sel),
       rest("events?group_id=eq." + encodeURIComponent(st.group.id) + "&user_id=neq." + encodeURIComponent(me()) + "&status=eq.geplant" + range + sel)
@@ -3391,8 +3391,9 @@
         var inGroup = String(e.group_id || "") === gid && e.visibility !== "privat";
         var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
         html += '<div class="wr-dayrow wr-zrec-row wr-ga-row' + (inGroup ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
-          (inGroup ? "👥 " : "") + (e.status === "erledigt" ? "✓ " : "") + esc(e.title || "Training") + esc(tm) + "</span>" +
-          (inGroup ? '<span class="wr-dayrow__tag">in der Gruppe' + (e.status === "erledigt" ? " · erledigt" : "") + "</span>" : "") + "</div>" +
+          (e.status === "erledigt" ? "✓ " : "") + esc(e.title || "Training") + esc(tm) + "</span>" +
+          /* zweite Zeile: Ort (zugeordnet heißt nicht „nur in der Gruppe sichtbar“) */
+          (e.location ? '<span class="wr-dayrow__tag">' + esc(e.location) + "</span>" : "") + "</div>" +
           (inGroup
             ? '<button type="button" class="wr-dayrow__minus" data-ga-rm="' + esc(e.id) + '" aria-label="Aus der Gruppe nehmen">−</button>'
             : '<button type="button" class="wr-dayrow__minus wr-dayrow__plus" data-ga-add="' + esc(e.id) + '" aria-label="Zur Gruppe hinzufügen">+</button>') +
@@ -3403,8 +3404,8 @@
         var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
         var who = String(personOf(e.user_id).name || "").split(" ")[0];
         html += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
-          "👥 " + esc(e.title || "Training") + esc(tm) + "</span>" +
-          '<span class="wr-dayrow__tag">von ' + esc(who || "Gruppe") + (on ? " · Du bist dabei" : "") + "</span></div>" +
+          esc(e.title || "Training") + esc(tm) + "</span>" +
+          '<span class="wr-dayrow__tag">' + esc([e.location, "von " + (who || "Gruppe"), on ? "Du bist dabei" : ""].filter(Boolean).join(" · ")) + "</span></div>" +
           '<button type="button" class="wr-pill-btn' + (on ? "" : " wr-pill-btn--dark") + ' wr-ga-rsvp" data-ga-' + (on ? "no" : "yes") + '="' + esc(e.id) + '">' + (on ? "Absagen" : "Zusagen") + "</button></div>";
       });
       if (!k) html = '<div class="wr-dayrow wr-zrec-row is-empty"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + '</b> <span class="wr-dayrow__free">frei</span></span></div><span></span></div>';
