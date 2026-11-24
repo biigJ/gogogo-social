@@ -8922,7 +8922,7 @@
   <script src="/natalyaalice/heute-v3.js?v=feed-163"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-105"></script>
-  <script src="/natalyaalice/support.js?v=support-28"></script>
+  <script src="/natalyaalice/support.js?v=support-29"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -19890,7 +19890,8 @@
         return null;
       }
       function sortPlusOffers(list) {
-        var order = plusStore("order") || [];
+        /* Voreinstellung beim ersten Öffnen (Joscha 24.11.) */
+        var order = plusStore("order") || ["stempelkarte", "web_call", "uebungen", "coach_offer", "ernaehrung", "kraft_tracking", "routine"];
         var seen = plusStore("active_seen");
         var active = list.filter(plusOfferOwned).map(function (o) { return o.key; });
         /* frisch aktiviert (nicht im letzten Stand): nach ganz oben */
@@ -20483,7 +20484,12 @@
             });
             card.appendChild(track);
           }
-          if (offer.key === "kraft_tracking" && owned) mountKraftTracking(card);
+          if (offer.key === "kraft_tracking" && owned) {
+            /* aktiv: nur das Tracking, ohne Titel, Bild, Text und „Gebucht“ */
+            cta.hidden = true; cta.style.display = "none";
+            card.classList.add("go-slide--pins");
+            mountKraftTracking(card);
+          }
           if (offer.key === "uebungen") {
             /* Videos: nicht aktiv = Bild, Text, „Aktivieren“; aktiv = nur das Raster (ohne Bild und Text oben) */
             if (owned) {

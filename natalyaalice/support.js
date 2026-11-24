@@ -552,16 +552,18 @@
     })[0];
   }
 
+  /* v2 (24.11. abends): Aktivierungen von Videos zurückgesetzt */
+  function videosKey() { return "gogogo_uebungen_on2_" + (me() || ""); }
   function trackingKey() {
     /* v2 (24.11.): alle wieder auf „Aktivieren“, es gibt noch keine Auswertung. Gespeichert werden Sätze trotzdem. */
-    return "gogogo_kraft_tracking_v2_" + (me() || "");
+    return "gogogo_kraft_tracking_v3_" + (me() || "");
   }
 
   function offerOwned(type) {
     if (type === "zirkel" && global.FFC && FFC.user && FFC.user()) return true;
     /* Videos: gratis, aber erst nach „Aktivieren“ (je Konto auf diesem Gerät) */
     if (type === "uebungen") {
-      try { return !!me() && localStorage.getItem("gogogo_uebungen_on_" + me()) === "1"; } catch (eU) { return false; }
+      try { return !!me() && localStorage.getItem(videosKey()) === "1"; } catch (eU) { return false; }
     }
     if (type === "kraft_tracking") {
       try {
@@ -644,7 +646,7 @@
   function bookOffer(key, opts) {
     key = String(key || "");
     if (key === "uebungen") {
-      try { localStorage.setItem("gogogo_uebungen_on_" + me(), "1"); } catch (eU) {}
+      try { localStorage.setItem(videosKey(), "1"); } catch (eU) {}
       return Promise.resolve(null);
     }
     if (key === "routine") {
@@ -942,7 +944,7 @@
     /* Plus-Punkt deaktivieren: Buchung zurück auf „angefragt“ (Stempel bleiben in meta), Aktivieren holt sie wieder */
     cancelOffer: function (type) {
       if (type === "uebungen") {
-        try { localStorage.removeItem("gogogo_uebungen_on_" + me()); } catch (eU) {}
+        try { localStorage.removeItem(videosKey()); } catch (eU) {}
         return Promise.resolve();
       }
       var list = state.orders.filter(function (o) {
