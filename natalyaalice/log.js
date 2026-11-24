@@ -237,11 +237,12 @@
     return { reps: "", kg: null, kgTouched: false, done: false };
   }
 
+  /* So viele Sätze, wie man möchte: geplante Sätze sind der Vorschlag, nach jedem erledigten Satz kommt ein neuer dazu */
+  var MAX_SETS = 20;
   function visibleSetCount(ex, sets) {
-    var max = setCount(ex);
     var n = 1;
     var list = sets || [];
-    for (var i = 0; i < max - 1; i++) {
+    for (var i = 0; i < MAX_SETS - 1; i++) {
       if (!list[i] || !list[i].done) break;
       n += 1;
     }
@@ -323,9 +324,12 @@
     }
     var history = suggestionKg(logs, ex.id, date);
     var out = [];
-    var max = setCount(ex);
+    var planned = setCount(ex);
+    var max = Math.max(planned, (draft.sets || []).length);
     for (var i = 0; i < max; i++) {
       var set = (draft.sets || [])[i] || blankSet();
+      /* zusätzliche Sätze nur speichern, wenn etwas drinsteht */
+      if (i >= planned && !set.done && !set.reps && set.kg == null) continue;
       out.push({
         storageId: storageId(ex, i),
         body: payloadForSet(ex, set, displayKg(ex, draft.sets, i, history))
@@ -491,6 +495,8 @@
       }
       var sets = [];
       var max = setCount(ex);
+      /* gespeicherte Zusatzsätze mitladen */
+      while (max < MAX_SETS && rowOn(logs, date, storageId(ex, max))) max += 1;
       for (var i = 0; i < max; i++) {
         var setRow = rowOn(logs, date, storageId(ex, i));
         sets.push({
