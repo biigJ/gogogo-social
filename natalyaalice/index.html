@@ -1500,6 +1500,12 @@
     .kreis-page__bar { display: grid; grid-template-columns: 31px 1fr 31px; align-items: center; gap: 8px; padding: max(12px, env(safe-area-inset-top)) 16px 8px; }
     .kreis-page__bar h2 { margin: 0; text-align: center; font: 600 22px/1.2 "Playfair Display", Georgia, serif; color: #2A2118; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .kreis-page__body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 20px calc(110px + env(safe-area-inset-bottom)); }
+    .kreis-page .go-circle-name { display: none !important; }
+    /* Seitentitel nennt den Circle schon; „Ich bin dabei“ ist auf der eigenen Circle-Seite klar */
+    .kreis-page .go-slide[data-offer="zirkel"] .go-slide__title,
+    .kreis-page .go-slide[data-offer="zirkel"] .go-slide__cta.is-owned { display: none !important; }
+    .kreis-page .go-slide { width: 100% !important; min-width: 0 !important; max-width: none !important; height: auto !important; flex: none !important; scroll-snap-align: none; overflow: visible !important; }
+    .kreis-page .go-slide > .go-slide__body { height: auto !important; max-height: none !important; overflow: visible !important; }
     .kreis-page .team-slide { width: 100% !important; min-width: 0 !important; max-width: none !important; height: auto !important; min-height: 0 !important; flex: none !important; scroll-snap-align: none; overflow: visible !important; }
     /* Bubble hinzufügen: Kreis so groß wie die Bubble-Kreise */
     .is-bubbles .friend-list__plus { width: 72px; height: 72px; font-size: 30px !important; }
@@ -17853,6 +17859,7 @@
           html += kreisRowHtml("group", st.group.photo_url || "/assets/gogogo/gogogo-Gruppe-small.jpg", st.group.name || "Meine Gruppe",
             String(st.group.owner || "") === me);
         }
+        html += circleRowsHtml();
         if (st.coach) {
           html += kreisRowHtml("coach", st.coach.photo_url || "", "Coach " + String(st.coach.name || "").split(" ")[0], false);
         }
@@ -17864,15 +17871,17 @@
         el.addEventListener("click", function (e) {
           var row = e.target.closest("[data-kreis]");
           if (!row) return;
-          openKreis(row.getAttribute("data-kreis"));
+          openKreis(row.getAttribute("data-kreis"), row.getAttribute("data-kreis-id"));
         });
       }
       /* Seite über der App (Pill bleibt sichtbar), Zurück oben links */
-      function openKreisPage(slide, title) {
+      function openKreisPage(slide, title, restoreTo) {
         if (!slide) return;
         closeKreisPage();
         var page = document.createElement("div");
         page.className = "kreis-page";
+        page._restoreTo = restoreTo || null;
+        page._slide = slide;
         page.innerHTML = '<div class="kreis-page__bar"><button type="button" class="profile-back kreis-page__back" aria-label="Zurück">' +
           '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
           '</button><h2></h2><span></span></div><div class="kreis-page__body"></div>';
@@ -17884,13 +17893,51 @@
       }
       function closeKreisPage() {
         var old = document.querySelector(".kreis-page");
+        /* Zirkel-Karte zurück in den Halter (sie bleibt die lebende Karte für Login und Leaderboard) */
+        if (old && old._restoreTo && old._slide) old._restoreTo.appendChild(old._slide);
         if (old) old.remove();
         document.body.classList.remove("kreis-open");
       }
-      function openKreis(kind) {
+      function zirkelHolder() {
+        var h = document.getElementById("go-zirkel-holder");
+        if (!h) {
+          h = document.createElement("div");
+          h.id = "go-zirkel-holder";
+          h.hidden = true;
+          (document.getElementById("plan-training") || document.body).appendChild(h);
+        }
+        return h;
+      }
+      function zirkelCard() {
+        var c = zirkelHolder().querySelector('.go-slide[data-offer="zirkel"]');
+        if (!c && typeof paintGoRail === "function") { paintGoRail(true); c = zirkelHolder().querySelector('.go-slide[data-offer="zirkel"]'); }
+        return c;
+      }
+      /* Circle-Zeilen (Zirkeltraining): alle Circles des Nutzers aus FFC */
+      var CIRCLE_ICON = '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.3 2.4-5.4 3.6-8.3.5 1.9 1.6 3 2.6 3.4-.3-2.8.8-5.5 2.8-6.9-.1 3 1.6 4.7 2.9 6.5 1 1.4 1.6 3 1.6 5.1C19 18.4 16 21 12 21z"/></svg>';
+      KREIS_ICON.circle = CIRCLE_ICON;
+      function circleRowsHtml() {
+        var gs = (cst().groups || []);
+        var def = "/assets/gogogo/gogogo-Zirkeltraining.jpg";
+        return gs.map(function (g) {
+          return kreisRowHtml("circle", circlePhoto(g) || def, String(g.name || "Circle"), false)
+            .replace('data-kreis="circle"', 'data-kreis="circle" data-kreis-id="' + escapeHtml(String(g.group_id)) + '"');
+        }).join("");
+      }
+      /* Seite für genau einen Circle: Circle setzen, dann die Zirkel-Karte ohne Circle-Auswahl öffnen */
+      function openCirclePage(gid) {
+        var card = zirkelCard();
+        if (!card) return;
+        var g = (cst().groups || []).filter(function (x) { return String(x.group_id) === String(gid); })[0];
+        var go = function () { openKreisPage(card, g ? String(g.name || "Circle") : "Zirkeltraining", zirkelHolder()); };
+        if (gid && typeof selectCircle === "function") Promise.resolve(selectCircle(gid)).then(go, go);
+        else go();
+      }
+      function openKreis(kind, id) {
         var st = kreiseState || {};
         if (kind === "group") openKreisPage(st.groupSlide, (st.group && st.group.name) || "Meine Gruppe");
         else if (kind === "coach") openKreisPage(st.coachSlide, "Mein Coach");
+        else if (kind === "circle") openCirclePage(id);
       }
 
       function renderTeamNow() {
@@ -18564,6 +18611,8 @@
           [groupHost, coachSlide].forEach(function (sl) { if (sl && sl.parentNode === box) box.removeChild(sl); });
           kreiseState = { group: myGroup, groupSlide: groupHost, coach: trainer, coachSlide: coachSlide };
           paintKreiseRows(kreiseRows);
+          var krEl = kreiseRows;
+          if (!cst().loaded) Promise.resolve(loadCircleState()).then(function () { paintKreiseRows(krEl); }).catch(function () {});
         }
         /* Coachees-Reiter nur für Coaches, und erst wenn die Datenbank is_trainer bestätigt hat (kein Cache) */
         if (sessionIsTrainer && sessionTrainerChecked) box.appendChild(coacheeSlide);
@@ -18771,6 +18820,8 @@
       }
 
       function jumpToGoOffer(key) {
+        /* Zirkeltraining liegt nicht mehr in Plus: aktuellen Circle als eigene Seite öffnen */
+        if (key === "zirkel") { openCirclePage(window.__goCircleGid ? window.__goCircleGid() : null); return; }
         var rail = document.getElementById("go-rail");
         if (!rail) return;
         var list = railSlides(rail);
@@ -19340,8 +19391,13 @@
         /* Plus-Punkte wählen: Friday Fitness Circle immer, die anderen nach Auswahl (gebuchte bleiben sichtbar) */
         var allOffers = offers;
         var plusPick = loadPlusPick();
+        /* Zirkeltraining ist kein Plus-Punkt mehr: jeder Circle hat eine eigene Seite unter Community → Kreise.
+           Die Karte entsteht weiter hier (Login, Leaderboard), liegt aber im Halter #go-zirkel-holder */
+        var zirkelOffer = offers.filter(function (o) { return o.key === "zirkel" || o.type === "zirkel"; })[0] || null;
+        allOffers = offers.filter(function (o) { return o !== zirkelOffer; });
         offers = offers.filter(function (o) {
-          if (o.key === "zirkel" || o.type === "zirkel" || plusPick === null) return true;
+          if (o === zirkelOffer) return false;
+          if (plusPick === null) return true;
           if (plusPick.indexOf(o.key) >= 0) return true;
           var ownedPick = window.GoSupport && GoSupport.offerOwned ? GoSupport.offerOwned(o.type || o.key) : false;
           return !!ownedPick;
@@ -19396,6 +19452,21 @@
                   if (lbKeep && recKeep) mountGoZirkelPanels(lbKeep, recKeep);
                 }
               }
+              /* Zirkel-Karte im Halter: Knopf und Leaderboard wie in der Reihe aktualisieren */
+              var zHeld = zirkelHolder().querySelector('.go-slide[data-offer="zirkel"]') || document.querySelector('.kreis-page .go-slide[data-offer="zirkel"]');
+              if (zHeld) {
+                var zBtn = zHeld.querySelector(".go-slide__cta:not(.go-slide__cta--signup)");
+                if (zBtn) {
+                  zBtn.textContent = ffcLoggedNow ? "Ich bin dabei" : "Beitreten";
+                  zBtn.disabled = !!ffcLoggedNow;
+                  zBtn.classList.toggle("is-owned", !!ffcLoggedNow);
+                }
+                if (ffcLoggedNow) {
+                  var zLb = zHeld.querySelector("#go-zirkel-board");
+                  var zRec = zHeld.querySelector("#go-zirkel-records");
+                  if (zLb && zRec) mountGoZirkelPanels(zLb, zRec);
+                }
+              }
               sizeGoRailSlides(rail);
               bindGoRailHardSnap(rail);
               syncHScrollDock();
@@ -19413,7 +19484,10 @@
           routineCardSafe.hidden = true;
         }
         rail.textContent = "";
-        sectionOffers.forEach(function (offer) {
+        /* Zirkel-Karte nur neu, wenn sie gerade nicht offen ist (sonst bleibt die offene Seite gültig) */
+        var zirkelOpen = !!document.querySelector('.kreis-page .go-slide[data-offer="zirkel"]');
+        if (!zirkelOpen) zirkelHolder().textContent = "";
+        sectionOffers.concat(zirkelOffer && !zirkelOpen ? [zirkelOffer] : []).forEach(function (offer) {
           var owned =
             window.GoSupport && GoSupport.offerOwned
               ? GoSupport.offerOwned(offer.type || offer.key)
@@ -19725,7 +19799,8 @@
             }
           }
           wrapGoSlideBody(card);
-          rail.appendChild(card);
+          if (isZirkel) zirkelHolder().appendChild(card);
+          else rail.appendChild(card);
         });
         bindGoRailHardSnap(rail);
         requestAnimationFrame(function () {
