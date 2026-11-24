@@ -1311,6 +1311,8 @@
   }
 
   function actionColHtml(item) {
+    /* Einladen, ics und Teilen liegen jetzt im Stift-Dialog; rechts stehen die Wochentage */
+    if (true) return "";
     if (!item || !item.ev) return "";
     var ev = item.ev;
     var id = String(ev.id);
@@ -1594,6 +1596,57 @@
     if (!it || it.kind !== "event" || !it.ev) return null;
     if (String(it.ev.user_id) !== me()) return null;
     return it.ev;
+  }
+
+  /* Kalender: Zukunft oben. Index 0 = erster Tag liegt unten im Track, Position = 6 − Index */
+  function dayPos(ix) {
+    return 6 - ix;
+  }
+  function dayElAt(ix) {
+    var track = $("wr-vtrack");
+    if (!track) return null;
+    return track.querySelector('[data-day-ix="' + ix + '"]');
+  }
+  function scrollTopFor(track, ix) {
+    return dayPos(ix) * track.clientHeight;
+  }
+  function ixFromScroll(track) {
+    var pos = Math.round(track.scrollTop / Math.max(1, track.clientHeight));
+    return Math.max(0, Math.min(6, 6 - pos));
+  }
+  var WD_SHORT = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  function daySquaresHtml(days) {
+    var html = "";
+    for (var ix = 6; ix >= 0; ix--) {
+      var iso = days[ix];
+      var wd = WD_SHORT[new Date(iso + "T12:00:00").getDay()];
+      html +=
+        '<button type="button" class="wr-dsq' + (ix === state.dayIndex ? " is-on" : "") +
+        '" data-wr-dsq="' + ix + '" aria-label="' + esc(formatDayLong(iso)) + '">' + wd + "</button>";
+    }
+    return '<div class="wr-dsqs" aria-label="Wochentage">' + html + "</div>";
+  }
+  /* Track war beim Zeichnen evtl. noch ohne Höhe: sonst stünde scrollTop 0 = letzter (zukünftiger) Tag */
+  function alignAndSync() {
+    var track = $("wr-vtrack");
+    if (track && track.clientHeight && ixFromScroll(track) !== state.dayIndex) {
+      track.scrollTop = scrollTopFor(track, state.dayIndex);
+    }
+    patchDaySquares();
+    syncSurface();
+  }
+  function patchDaySquares() {
+    var root = $(ROOT_ID);
+    if (!root) return;
+    root.querySelectorAll(".wr-dsq").forEach(function (b) {
+      b.classList.toggle("is-on", Number(b.getAttribute("data-wr-dsq")) === state.dayIndex);
+    });
+  }
+  function currentItem() {
+    var iso = currentDayIso();
+    var items = itemsForDay(iso);
+    if (!items.length) return null;
+    return items[Math.max(0, Math.min(items.length - 1, state.eventIndex || 0))] || null;
   }
 
   function dayReelHtml(iso) {
@@ -1967,9 +2020,8 @@
   function currentDayMediaEl() {
     var track = $("wr-vtrack");
     if (!track || !track.children.length) return null;
-    var ix = Math.max(0, Math.min(track.children.length - 1, state.dayIndex));
-    var day = track.children[ix];
-    return day.querySelector ? day.querySelector(".wr-media") : null;
+    var day = dayElAt(state.dayIndex);
+    return day && day.querySelector ? day.querySelector(".wr-media") : null;
   }
 
   function applyDayContrast() {
@@ -4000,25 +4052,30 @@
       editPanelHtml() +
       '<div class="wr-vtrack" id="wr-vtrack">' +
       days
-        .map(function (iso) {
+        .map(function (iso, ix) {
+          var inner;
           try {
-            return dayReelHtml(iso);
+            inner = dayReelHtml(iso);
           } catch (eDay) {
-            return emptyCardHtml(iso);
+            inner = emptyCardHtml(iso);
           }
+          return '<div class="wr-dwrap" data-day-ix="' + ix + '">' + inner + "</div>";
         })
+        .reverse()
         .join("") +
       "</div>" +
+      daySquaresHtml(days) +
       progressHtml() +
       sheetHtml();
     /* Gleicher Inhalt wie zuletzt: DOM stehen lassen (sonst blitzt die Woche beim Öffnen,
        weil show() sofort zeichnet und refresh() danach mit denselben Daten noch einmal) */
     if (root.__wrHtml === nextHtml && root.firstChild && !($("wr-sheet") && !$("wr-sheet").hidden)) {
       var trackSame = $("wr-vtrack");
-      if (trackSame && trackSame.clientHeight && Math.round(trackSame.scrollTop / trackSame.clientHeight) !== state.dayIndex) {
-        trackSame.scrollTop = state.dayIndex * trackSame.clientHeight;
+      if (trackSame && trackSame.clientHeight && ixFromScroll(trackSame) !== state.dayIndex) {
+        trackSame.scrollTop = scrollTopFor(trackSame, state.dayIndex);
       }
-      requestAnimationFrame(syncSurface);
+      patchDaySquares();
+      requestAnimationFrame(alignAndSync);
       return;
     }
     /* Offenes Sheet (Tage bearbeiten, Media …) über den Neuaufbau retten, sonst ist es weg
@@ -4037,9 +4094,9 @@
     if (state.lastDeleted) showUndoBar();
     var track = $("wr-vtrack");
     if (track && track.clientHeight) {
-      track.scrollTop = state.dayIndex * track.clientHeight;
+      track.scrollTop = scrollTopFor(track, state.dayIndex);
     }
-    requestAnimationFrame(syncSurface);
+    requestAnimationFrame(alignAndSync);
   }
 
   function sheetHtml() {
@@ -5649,7 +5706,7 @@
   }
 
   function onRootClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-wr-inv-yes],[data-wr-inv-no],[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-cal],[data-wr-pick-plan],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-group-pick],[data-wr-circle-pick],[data-wr-plane],[data-wr-ics],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-share-circle],[data-wr-csv],[data-wr-friend-pick],[data-wr-friend-req],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-wr-inv-yes],[data-wr-inv-no],[data-wr-zjoin],[data-wr-zown],[data-wr-leave],[data-wr-zadmin],[data-wr-zirkel-next],[data-wr-zirkel-go],[data-wr-travel],[data-wr-week],[data-wr-week-menu],[data-wr-set-mode],[data-wr-edit],[data-wr-cal],[data-wr-pick-plan],[data-wr-end-travel],[data-wr-add-kind],[data-wr-edit-kind],[data-wr-pick-training],[data-wr-rest-pick],[data-wr-rest-save],[data-wr-create-confirm],[data-wr-travel-alt],[data-wr-day-course],[data-wr-travel-pick],[data-wr-travel-go],[data-wr-sheet-close],[data-wr-book],[data-wr-pick-course],[data-wr-wd],[data-wr-book-step],[data-wr-book-confirm],[data-wr-delete],[data-wr-delete-confirm],[data-wr-edit-time],[data-wr-edit-day],[data-wr-day-move],[data-wr-time-save],[data-wr-edit-place],[data-wr-place-save],[data-wr-zirkel-login],[data-wr-time-h],[data-wr-time-m],[data-wr-undo-go],[data-wr-swap],[data-wr-share],[data-wr-group-pick],[data-wr-circle-pick],[data-wr-plane],[data-wr-ics],[data-wr-dsq],[data-wr-invite-friends],[data-wr-share-ext],[data-wr-share-circle],[data-wr-csv],[data-wr-friend-pick],[data-wr-friend-req],[data-wr-rsvp],[data-wr-done],[data-wr-ffc-rsvp],[data-wr-comments],[data-wr-coach-wa],[data-wr-enroll-menu],[data-wr-enroll-end],[data-wr-enroll-pause],[data-wr-enroll-days],[data-wr-more]") : null;
     if (!t) {
       if (e.target && e.target.id === "wr-sheet") {
         closeSheet();
@@ -5819,6 +5876,21 @@
       setTimeout(openPlanPicker, 0);
       return;
     }
+    if (t.hasAttribute("data-wr-dsq")) {
+      var dq = Number(t.getAttribute("data-wr-dsq"));
+      var vt = $("wr-vtrack");
+      if (dq >= 0 && dq <= 6 && dq !== state.dayIndex) {
+        state.dayIndex = dq;
+        state.eventIndex = 0;
+        patchDaySquares();
+        if (vt) vt.scrollTo({ top: scrollTopFor(vt, dq), behavior: "smooth" });
+        patchDayLabel();
+        patchTravelAlt();
+        if (state.editMode) patchEditPanelEvRow();
+        syncSurface();
+      }
+      return;
+    }
     if (t.getAttribute("data-wr-cal")) {
       if (host && host.openCalendar) host.openCalendar();
       return;
@@ -5846,6 +5918,14 @@
         var myGrp = host && host.myGroups ? (host.myGroups() || [])[0] : null;
         if (myGrp && String(myGrp.owner || "") !== me()) items.push({ label: "Gruppen-Events", value: "gev" });
         if (myGrp && String(myGrp.owner || "") === me()) items.push({ label: "zusätzliche Gruppen-Events", value: "gextra" });
+        /* früher rechts am Bild: Einladen, Extern teilen, ics */
+        var curIt = currentItem();
+        var curEv = curIt && curIt.ev ? curIt.ev : null;
+        if (curEv) {
+          items.push({ label: "Einladen", value: "share" });
+          items.push({ label: "Extern teilen", value: "plane" });
+        }
+        items.push({ label: "Kalender exportieren (ics)", value: "ics" });
         GoDialog.choose("Deine Woche", items, {
           center: true,
           sub: planNames.length ? planNames.join(" · ") : "Kein Wochenplan"
@@ -5859,6 +5939,9 @@
             if (v === "zedit") openZirkelEditor();
             if (v === "gev") openGroupEventsPick();
             if (v === "gextra") openGroupExtras();
+            if (v === "share" && curEv) openShareSheet(dayKey(curEv.starts_at), String(curEv.id));
+            if (v === "plane" && curEv) shareExternal(dayKey(curEv.starts_at), String(curEv.id));
+            if (v === "ics") exportWeekIcs();
           }, 0);
         });
         return;
@@ -6360,17 +6443,19 @@
             track = null;
             return;
           }
-          if (dy < 0 && state.dayIndex < 6) state.dayIndex += 1;
-          if (dy > 0 && state.dayIndex > 0) state.dayIndex -= 1;
+          /* Zukunft oben: Finger nach unten holt den nächsten Tag */
+          if (dy > 0 && state.dayIndex < 6) state.dayIndex += 1;
+          if (dy < 0 && state.dayIndex > 0) state.dayIndex -= 1;
+          patchDaySquares();
           if (vtrack) {
             vtrack.scrollTo({
-              top: state.dayIndex * vtrack.clientHeight,
+              top: scrollTopFor(vtrack, state.dayIndex),
               behavior: "smooth"
             });
           }
           syncSurface();
         } else if (Math.abs(dx) > 48) {
-          var dayEl = root.querySelectorAll(".wr-day")[state.dayIndex];
+          var dayEl = dayElAt(state.dayIndex);
           if (dayEl) {
             var h = dayEl.querySelector(".wr-htrack");
             if (h) {
@@ -6407,10 +6492,11 @@
   function syncDayFromScroll() {
     var vtrack = $("wr-vtrack");
     if (!vtrack || !vtrack.clientHeight) return;
-    var next = Math.round(vtrack.scrollTop / vtrack.clientHeight);
+    var next = ixFromScroll(vtrack);
     if (next !== state.dayIndex) {
       state.dayIndex = next;
       state.eventIndex = 0;
+      patchDaySquares();
       patchDayLabel();
       patchTravelAlt();
       if (state.editMode) patchEditPanelEvRow();
@@ -6468,8 +6554,9 @@
       } catch (e) {}
       var track = $("wr-vtrack");
       if (track && track.clientHeight) {
-        track.scrollTop = state.dayIndex * track.clientHeight;
+        track.scrollTop = scrollTopFor(track, state.dayIndex);
       }
+      patchDaySquares();
       patchDayLabel();
       patchTravelAlt();
       syncSurface();
