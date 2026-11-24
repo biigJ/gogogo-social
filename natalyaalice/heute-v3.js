@@ -4682,13 +4682,23 @@
     openDoneModal(ev.id, { title: "Schreib, wie es war", placeholder: "Wie war es?" });
   }
 
+  /* „Du hast für diesen Tag eine Reise vom 24.11. bis 28.11. eingestellt.“ oder "" */
+  function travelNoteFor(iso) {
+    var r = null;
+    try { r = host.travelRange ? host.travelRange() : null; } catch (e) {}
+    if (!r || !r.start || !r.end || iso < r.start || iso > r.end) return "";
+    function de(d) { var p = String(d).split("-"); return Number(p[2]) + "." + Number(p[1]) + "."; }
+    return "Du hast für diesen Tag eine Reise vom " + de(r.start) + " bis " + de(r.end) + " eingestellt.";
+  }
+
   function alternativeFor(ev) {
     var today = evDayIso(ev) === todayIso();
+    var trip = travelNoteFor(evDayIso(ev));
     var ask = today
-      ? GoDialog.choose("Alternativ oder zusätzlich zum heutigen Plan?", [
+      ? GoDialog.choose(trip || "Alternativ oder zusätzlich zum heutigen Plan?", [
           { label: "Statt " + (ev.title || "Plan"), value: "instead" },
           { label: "Zusätzlich", value: "extra" }
-        ])
+        ], trip ? { sub: "Alternativ oder zusätzlich zum heutigen Plan?" } : {})
       : Promise.resolve("extra");
     ask.then(function (v) {
       if (!v) return;
