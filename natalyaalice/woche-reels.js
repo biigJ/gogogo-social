@@ -3448,13 +3448,23 @@
     if (kind === "add" || kind === "rm") {
       var ev = st.mine.filter(function (e) { return String(e.id) === id; })[0];
       if (!ev) return;
+      /* Gruppe ist Organisation, keine Sichtbarkeit: group_id setzen, die Sichtbarkeit bleibt wie gewählt
+         (Community sieht es weiter). Nur „privat“ wird zu „Gruppe“, damit die Gruppe es überhaupt sieht. */
       job = ownSeries(ev).then(function (list) {
         var ids = list.map(function (x) { return String(x.id); }).filter(function (x) { return /^[0-9a-f-]{36}$/i.test(x); });
         if (!ids.length) return;
-        return rest("events?id=in.(" + ids.join(",") + ")&user_id=eq." + encodeURIComponent(me()), {
-          method: "PATCH", prefer: "return=minimal",
-          body: kind === "add" ? { visibility: "gruppe", group_id: gid } : { visibility: "team", group_id: null }
-        });
+        var base = "events?id=in.(" + ids.join(",") + ")&user_id=eq." + encodeURIComponent(me());
+        var opt = function (body) { return { method: "PATCH", prefer: "return=minimal", body: body }; };
+        if (kind === "add") {
+          return Promise.all([
+            rest(base, opt({ group_id: gid })),
+            rest(base + "&visibility=eq.privat", opt({ visibility: "gruppe" }))
+          ]);
+        }
+        return Promise.all([
+          rest(base, opt({ group_id: null })),
+          rest(base + "&visibility=eq.gruppe", opt({ visibility: "team" }))
+        ]);
       });
     } else {
       var oe = st.others.filter(function (e) { return String(e.id) === id; })[0];

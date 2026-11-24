@@ -1354,7 +1354,8 @@
     return createUnplannedEvent({
       category: ev.category || "kraft", course_id: ev.course_id || null,
       title: ev.title || "Gruppentraining", starts_at: ev.starts_at,
-      location: ev.location || null, visibility: "gruppe", group_id: ev.group_id
+      /* Sichtbarkeit wie gewohnt (Community), die Gruppe hängt über group_id dran */
+      location: ev.location || null, visibility: "team", group_id: ev.group_id
     }).then(function (copy) {
       return rest("event_rsvps?on_conflict=event_id,user_id", {
         method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
