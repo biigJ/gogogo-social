@@ -21988,6 +21988,28 @@
               return;
             }
             if (v !== "woche") { setTimeout(promptPendingInvites, 250); return; }
+            /* Annehmen speichert jetzt wirklich (wie answerInvite in der Woche): ganze Serie „accepted“
+               + Zusage für jedes Event. Vorher öffnete es nur die Woche, der Dialog kam bei jedem Start wieder. */
+            var acc = (remoteInvites || []).filter(function (r) {
+              return r && String(r.to_id) === me && r.status === "pending" && inviteSeriesKey(r) === sKey &&
+                String(r.workout_date || "") >= today;
+            });
+            acc.forEach(function (r) { r.status = "accepted"; });
+            syncInviteStore();
+            var accIds = acc.map(function (r) { return r.id; });
+            var accEv = acc.map(function (r) { return r.event_id; }).filter(Boolean);
+            Promise.all([
+              accIds.length ? rest("go_workout_invites?id=in.(" + accIds.map(encodeURIComponent).join(",") + ")", {
+                method: "PATCH", prefer: "return=minimal", body: { status: "accepted" }
+              }) : null,
+              accEv.length ? rest("event_rsvps?on_conflict=event_id,user_id", {
+                method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+                body: accEv.map(function (id) { return { event_id: id, user_id: me, status: "zugesagt" }; })
+              }) : null
+            ]).then(function () {
+              gogogoToast(accIds.length > 1 ? "Dabei, jede Woche" : "Dabei");
+              try { WocheReels.refreshKeepDay(sIso); } catch (eR) {}
+            }).catch(function () { gogogoToast("Zusagen ging gerade nicht"); });
             showWoche();
             setTimeout(function () {
               try { WocheReels.refreshKeepDay(sIso); } catch (eW) {}
