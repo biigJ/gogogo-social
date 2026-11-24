@@ -395,7 +395,13 @@
       });
     }
     if (st.place) list = list.filter(function (c) { return placeOk(c, st.place); });
-    list.sort(function (a, b) { return (a.level || 9) - (b.level || 9) || String(a.title).localeCompare(String(b.title), "de"); });
+    /* passende Anzahl Kraft-Einheiten zuerst (Onboarding), dann Level */
+    var want = global.GoPlanRules && st.prefs ? GoPlanRules.kraftWant(st.prefs) : null;
+    function kn(c) { return days(c).filter(function (s) { return (s.category || "kraft") === "kraft"; }).length; }
+    list.sort(function (a, b) {
+      return (want == null ? 0 : Math.abs(kn(a) - want) - Math.abs(kn(b) - want)) ||
+        (a.level || 9) - (b.level || 9) || String(a.title).localeCompare(String(b.title), "de");
+    });
     var lead = st.mode === "coach"
       ? "Für " + esc(st.userName || "Coachee") + ": Plan wählen, dann die Tage schieben."
       : st.goals.length ? "Passend zu Deinem Ziel. Wischen, dann „Anwenden“." : "Wischen, dann „Anwenden“.";
@@ -448,7 +454,16 @@
       order[4] = zi;
       order[pos] = tmp;
     }
-    st.arr = { plan: c, ds: ds, order: order, picked: null };
+    /* Regeln aus dem Onboarding: fester Termin, Abstand der Kraft-Einheiten, Vereinstage (plan-rules.js) */
+    var note = "";
+    if (st.prefs && global.GoPlanRules && ds.length === 7) {
+      var ruled = GoPlanRules.arrange(ds, st.prefs);
+      if (ruled && ruled.filter(function (x) { return x != null; }).length === ds.length) {
+        order = ruled;
+        note = GoPlanRules.note(ds, order, st.prefs);
+      }
+    }
+    st.arr = { plan: c, ds: ds, order: order, picked: null, note: note };
     paintArrange();
   }
 
@@ -459,6 +474,7 @@
     st.body.innerHTML =
       '<p class="gpl__lead"><b>' + esc(a.plan.title) + "</b>" + (a.plan.level ? " · Level " + a.plan.level : "") +
       "<br>Zieh die Einheiten auf den passenden Tag. Oder tipp zwei an, dann tauschen sie.</p>" +
+      (a.note ? '<p class="gpl__lead" style="margin-top:-4px">' + esc(a.note) + "</p>" : "") +
       DAYS.map(function (d, wd) {
         var i = a.order[wd];
         var s = i == null ? null : a.ds[i];
@@ -579,6 +595,9 @@
     if (g) {
       st.goals = [g.getAttribute("data-gpp-goal")];
       st.place = "";
+      /* Ort schon im Onboarding beantwortet: Frage 3 überspringen */
+      var known = st.prefs && st.prefs.place;
+      if (known && plansFor(st.goals[0], known).length) { st.place = known; return showPlans(); }
       /* nur ein Ort mit Plänen: Frage 3 überspringen */
       var places = PLACES.filter(function (p) { return plansFor(st.goals[0], p.key).length; });
       if (places.length > 1) { st.goalStep = 2; return paintGoals(); }
@@ -678,6 +697,11 @@
     var s0 = st;
     var arr = opts.arrange;
     var ready = load();
+    /* Onboarding-Antworten (go-training-prefs.sql): Ort vorbelegen, Pläne nach Kraft-Anzahl sortieren, Tage verteilen */
+    var prefJob = st.userId ? st.host.rest("go_accounts?id=eq." + encodeURIComponent(st.userId) + "&select=training_prefs")
+      .then(function (rows) { if (st === s0) st.prefs = (rows && rows[0] && rows[0].training_prefs) || null; })
+      .catch(function () {}) : Promise.resolve();
+    ready = Promise.all([ready, prefJob]).then(function () {});
     if (arr && arr.courseId) {
       /* privater Coachee-Plan fehlt in der Liste: einzeln nachladen */
       ready = ready.then(function () {
