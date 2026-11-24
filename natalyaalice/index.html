@@ -1855,6 +1855,9 @@
     .woche-reels.is-dark-day .wr-week-pick { color: #fff; }
     /* „Plane Deine Woche“ über der Tag-Zeile, gleiche Schrift */
     .wr-day-label.wr-plan-label { margin-top: 14px; }
+    body.is-session .woche-reels .wr-day-label.wr-plan-label { font-size: clamp(28px, 7.6vw, 36px) !important; font-family: "Playfair Display", Georgia, serif !important; font-weight: 600 !important; }
+    .wr-day-label[hidden] { display: none; }
+    .wr-author .wr-avatar + .wr-avatar { margin-left: -4px; }
     .wr-plan-label + .wr-day-label { margin-top: 2px; }
     .wr-week-label__chev {
       display: block; flex: none; width: 16px; height: 16px;
@@ -2266,10 +2269,11 @@
     .wr-exlist {
       list-style: none; margin: 2px 0 4px; padding: 0; pointer-events: none;
       display: flex; flex-direction: column; gap: 2px;
-      font: 600 14px/1.3 Inter, system-ui, sans-serif; color: inherit;
+      font: 600 14px/1.3 Inter, system-ui, sans-serif; color: #fff !important;
       text-shadow: 0 1px 6px rgba(0,0,0,.55);
     }
     .wr-exlist[hidden] { display: none; }
+    .wr-exlist li, .woche-reels.is-light-day .wr-exlist li { color: #fff !important; }
     .wr-exlist li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
     .wr-exlist li::before { content: "·"; display: inline-block; width: 12px; font-weight: 800; }
     .wr-exlist__more { opacity: .75; }
@@ -8769,7 +8773,7 @@
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-152"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-95"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-96"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
   <script>
     (function () {
@@ -14029,6 +14033,27 @@
           /* eigene Gruppen (ohne FFC-Circle) für den Einladen-Dialog */
           myGroups: function () { try { return ownGroups(); } catch (eG) { return []; } },
           bubbleId: function () { var b = window.GoBubbles ? GoBubbles.mine() : null; return b ? String(b.id) : ""; },
+          /* Kalender: Coaching-Termine des Tages (nicht abgelehnt), als Coach und als Coachee */
+          ptSessionsForDay: function (iso) {
+            if (!sessionAccount) return [];
+            var me = String(sessionAccount.id);
+            var bk = {};
+            (remotePtBookings || []).forEach(function (b) {
+              if (b && b.id && b.status !== "cancelled" && (String(b.coach_id) === me || String(b.client_id) === me)) bk[String(b.id)] = b;
+            });
+            return (remotePtSessions || []).filter(function (x) {
+              return x && x.status !== "declined" && bk[String(x.booking_id)] && x.session_at &&
+                new Date(x.session_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }) === iso;
+            }).map(function (x) {
+              var b = bk[String(x.booking_id)];
+              return { id: x.id, session_at: x.session_at, status: x.status, coach_id: b.coach_id, client_id: b.client_id };
+            });
+          },
+          ptPeopleIds: function () {
+            var ids = [];
+            (remotePtBookings || []).forEach(function (b) { if (b) ids.push(String(b.coach_id), String(b.client_id)); });
+            return ids;
+          },
           planItemForDay: function (iso) {
             if (!sessionMode || !sessionAccount || !iso) return null;
             var wd = weekdayIndex(iso);
