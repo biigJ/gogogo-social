@@ -3328,7 +3328,22 @@
   function sameSlot(a, b) {
     return new Date(a).getDay() === new Date(b).getDay() && formatTime(a) === formatTime(b);
   }
+  function renderGroupAssign(el) {
+    var g = groupOfMine();
+    if (!el || !g) return;
+    state.gaTarget = el;
+    var days = [];
+    for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
+    state.ga = { group: g, days: days, mine: [], others: [], going: {} };
+    if (!el.innerHTML) el.innerHTML = '<p class="wr-sheet-hint">Lädt …</p>';
+    if (!el._gaBound) {
+      el._gaBound = true;
+      el.addEventListener("click", groupAssignClick);
+    }
+    loadGroupAssign().then(paintGroupAssign, function () { el.innerHTML = '<p class="wr-sheet-hint">Laden ging gerade nicht.</p>'; });
+  }
   function openGroupAssign() {
+    state.gaTarget = null;
     var g = groupOfMine();
     if (!g) { if (host.toast) host.toast("Du bist in keiner Gruppe"); return; }
     var days = [];
@@ -3347,7 +3362,7 @@
     var range = "&starts_at=gte." + encodeURIComponent(from) + "&starts_at=lt." + encodeURIComponent(to);
     var sel = "&select=id,user_id,title,category,starts_at,visibility,group_id,status,item_type,enrollment_id,course_id&order=starts_at.asc&limit=80";
     return Promise.all([
-      rest("events?user_id=eq." + encodeURIComponent(me()) + "&status=eq.geplant" + range + sel),
+      rest("events?user_id=eq." + encodeURIComponent(me()) + "&status=in.(geplant,erledigt)" + range + sel),
       rest("events?group_id=eq." + encodeURIComponent(st.group.id) + "&user_id=neq." + encodeURIComponent(me()) + "&status=eq.geplant" + range + sel)
     ]).then(function (r) {
       st.mine = (r[0] || []).filter(function (e) { return e.item_type !== "support_session" && e.item_type !== "nutrition_log"; });
@@ -3372,11 +3387,12 @@
       var html = "";
       var k = 0;
       st.mine.filter(function (e) { return dayKey(e.starts_at) === iso; }).forEach(function (e) {
-        var inGroup = String(e.group_id || "") === gid && e.visibility === "gruppe";
+        /* in der Gruppe = group_id gesetzt (Sichtbarkeit kann beim Abhaken auf Community stehen) */
+        var inGroup = String(e.group_id || "") === gid && e.visibility !== "privat";
         var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
         html += '<div class="wr-dayrow wr-zrec-row wr-ga-row' + (inGroup ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
-          (inGroup ? "👥 " : "") + esc(e.title || "Training") + esc(tm) + "</span>" +
-          (inGroup ? '<span class="wr-dayrow__tag">in der Gruppe</span>' : "") + "</div>" +
+          (inGroup ? "👥 " : "") + (e.status === "erledigt" ? "✓ " : "") + esc(e.title || "Training") + esc(tm) + "</span>" +
+          (inGroup ? '<span class="wr-dayrow__tag">in der Gruppe' + (e.status === "erledigt" ? " · erledigt" : "") + "</span>" : "") + "</div>" +
           (inGroup
             ? '<button type="button" class="wr-dayrow__minus" data-ga-rm="' + esc(e.id) + '" aria-label="Aus der Gruppe nehmen">−</button>'
             : '<button type="button" class="wr-dayrow__minus wr-dayrow__plus" data-ga-add="' + esc(e.id) + '" aria-label="Zur Gruppe hinzufügen">+</button>') +
@@ -3394,10 +3410,14 @@
       if (!k) html = '<div class="wr-dayrow wr-zrec-row is-empty"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + '</b> <span class="wr-dayrow__free">frei</span></span></div><span></span></div>';
       return html;
     }).join("");
+    var hint = '<p class="wr-sheet-hint">Mit + teilst Du ein Event aus Deinem Wochenplan mit ' + esc(st.group.name || "Deiner Gruppe") +
+      ", mit − nimmst Du es heraus (jede Woche). Events der anderen sagst Du zu oder ab.</p>";
+    if (state.gaTarget) {
+      state.gaTarget.innerHTML = hint + '<div class="wr-days wr-days--all">' + rows + "</div>";
+      return;
+    }
     openSheet(
-      '<p class="wr-sheet-title">Events zuordnen</p>' +
-      '<p class="wr-sheet-hint">Mit + teilst Du ein Event aus Deinem Wochenplan mit ' + esc(st.group.name || "Deiner Gruppe") +
-      ", mit − nimmst Du es heraus (jede Woche). Events der anderen sagst Du zu oder ab.</p>" +
+      '<p class="wr-sheet-title">Events zuordnen</p>' + hint +
       '<div class="wr-days wr-days--all">' + rows + "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Fertig</button></div>'
     );
@@ -3457,10 +3477,24 @@
     job.then(function () {
       if (host.toast) host.toast(kind === "add" ? "Mit der Gruppe geteilt" : kind === "rm" ? "Aus der Gruppe genommen" : kind === "yes" ? "Zugesagt" : "Abgesagt");
       return loadGroupAssign().then(paintGroupAssign);
-    }).then(function () { return refresh().then(notifyAktuell); }).catch(function () {
+    }).then(function () {
+      /* auf der Gruppen-Seite: Kalender nicht neu zeichnen (er ist nicht sichtbar), nur Aktuell benachrichtigen */
+      if (state.gaTarget) return notifyAktuell();
+      return refresh().then(notifyAktuell);
+    }).catch(function () {
       if (btn) btn.disabled = false;
       if (host.toast) host.toast("Ging gerade nicht");
     });
+  }
+
+  function groupAssignClick(e) {
+    var ga = e.target.closest && e.target.closest("[data-ga-add],[data-ga-rm],[data-ga-yes],[data-ga-no]");
+    if (!ga) return false;
+    e.stopPropagation();
+    var kindGa = ga.hasAttribute("data-ga-add") ? "add" : ga.hasAttribute("data-ga-rm") ? "rm" : ga.hasAttribute("data-ga-yes") ? "yes" : "no";
+    if (kindGa === "add" || kindGa === "rm") confirmGroupAssign(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
+    else groupAssignDo(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
+    return true;
   }
 
   function bindGroupSheet() {
@@ -3480,14 +3514,7 @@
       }
       var sv = e.target.closest("[data-wr-gev-save]");
       if (sv) { e.stopPropagation(); saveGroupEventsPick(sv); return; }
-      var ga = e.target.closest("[data-ga-add],[data-ga-rm],[data-ga-yes],[data-ga-no]");
-      if (ga) {
-        e.stopPropagation();
-        var kindGa = ga.hasAttribute("data-ga-add") ? "add" : ga.hasAttribute("data-ga-rm") ? "rm" : ga.hasAttribute("data-ga-yes") ? "yes" : "no";
-        if (kindGa === "add" || kindGa === "rm") confirmGroupAssign(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
-        else groupAssignDo(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
-        return;
-      }
+      if (groupAssignClick(e)) return;
       var add = e.target.closest("[data-wr-gextra-add]");
       if (add) { e.stopPropagation(); groupExtraAdd(add.getAttribute("data-wr-gextra-add")); return; }
     });
@@ -6953,6 +6980,7 @@
 
   global.WocheReels = {
     /* Gruppe → „Events zuordnen“; onBack: nach „Fertig“ zurück zur Gruppe */
+    renderGroupAssign: function (el) { renderGroupAssign(el); },
     openGroupAssign: function (onBack) {
       state.gaBack = onBack || null;
       openGroupAssign();
