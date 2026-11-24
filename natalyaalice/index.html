@@ -8732,7 +8732,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-145"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-146"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-92"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -17604,19 +17604,28 @@
         if (!heute) return;
         var cur = heute.value === "crew" ? "team" : heute.value;
         if (String(cur).indexOf("group:") === 0) cur = "gruppe";
-        /* Reihenfolge: Ich, Community, Meine Bubble, Alles (Gruppe/Circle gehen in Community auf) */
+        if (cur === "tagebuch") cur = "alles";
+        /* Nur ich, dann jeder Kreis einzeln (Freunde, Gruppe, Circle, Bubble, Coachees), zuletzt Alles */
+        function opt(v, label) { return '<option value="' + v + '">' + escapeHtml(label) + "</option>"; }
+        var html = opt("ich", "Nur ich") + opt("team", "Freunde");
+        var grp = (myGroups() || [])[0] || null;
+        if (grp) html += opt("gruppe", grp.name || "Meine Gruppe");
+        var circles = (cst().groups || []).filter(function (g) { return g && g.group_id; });
+        if (circles.length) html += opt("circle", circles.length === 1 ? String(circles[0].name || "Circle") : "Circles");
         var bub = window.GoBubbles ? GoBubbles.mine() : null;
-        var html = '<option value="ich">Nur Ich</option><option value="team">Community</option>';
-        if (bub) html += '<option value="bubble">Meine Bubble</option>';
+        if (bub) html += opt("bubble", bub.name || "Bubble");
         /* Coach: nur meine Coachees (auch private Events) */
         var hasCoachees = sessionIsTrainer && (teamPeople || []).some(function (p) { return p && !p.isSelf && String(p.trainer_id || "") === String(sessionAccount && sessionAccount.id); });
-        if (hasCoachees) html += '<option value="coach">Coach</option>';
-        html += '<option value="alles">Alles</option>';
-        if (cur === "tagebuch") cur = "alles";
-        if (cur === "gruppe" || cur === "circle") cur = "team";
-        heute.innerHTML = html;
+        if (hasCoachees) html += opt("coach", "Coachees");
+        html += opt("alles", "Alles");
+        if (heute.__optHtml !== html) {
+          heute.innerHTML = html;
+          heute.__optHtml = html;
+        }
         if (cur === "bubble" && !bub) cur = "alles";
         if (cur === "coach" && !hasCoachees) cur = "team";
+        if (cur === "gruppe" && !grp) cur = "team";
+        if (cur === "circle" && !circles.length) cur = "team";
         if (cur && [].some.call(heute.options, function (o) { return o.value === cur; })) heute.value = cur;
       }
 
@@ -25476,7 +25485,14 @@
         var crewView = heuteView();
         var storiesWrap = document.getElementById("heute-stories");
         if (storiesWrap) storiesWrap.classList.remove("is-filter-hidden");
-        if (crewView === "gruppe") {
+        if (crewView === "ich") {
+          friends = [];
+        } else if (crewView === "coach") {
+          friends = friends.filter(function (entry) {
+            var pid = String(entry.person.id);
+            return teamPeople.some(function (tp) { return tp && String(tp.id) === pid && String(tp.trainer_id || "") === String(sessionAccount.id); });
+          });
+        } else if (crewView === "gruppe") {
           var gIds = groupMemberIds();
           gIds.forEach(function (gid) {
             if (gid === String(sessionAccount.id) || seenIds[gid]) return;
@@ -25531,7 +25547,8 @@
           var open = !done && ((entry.today && entry.today.training) || (pr && pr.status === "active"));
           /* oder heute eine Story gepostet (Event gemacht, Foto) */
           var story = !!(entry.story || (entry.today && entry.today.photoEventId) || recentStory(pid));
-          var mine = teamPeople.some(function (tp) { return tp && !tp.isSelf && String(tp.id) === pid; });
+          /* Gruppe/Circle: Mitglieder zählen auch ohne Freundschaft */
+          var mine = crewView === "gruppe" || crewView === "circle" || teamPeople.some(function (tp) { return tp && !tp.isSelf && String(tp.id) === pid; });
           if (!(open || story) || !mine) doneIds[pid] = true;
           return (open || story) && mine;
         });
