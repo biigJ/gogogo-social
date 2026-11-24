@@ -1910,6 +1910,11 @@
     .wr-dayrow { display: grid; grid-template-columns: 58px minmax(0,1fr) 32px; gap: 8px; align-items: center; min-height: 64px; padding: 6px 8px; border-radius: 12px; background: #F6F1E8; border: 1px solid rgba(42,33,24,.12); }
     .wr-dayrow.is-empty { border-style: dashed; background: transparent; }
     .wr-dayrow.is-drag { opacity: .35; }
+    .wr-ga-rsvp { flex: none; min-height: 36px; padding: 0 14px; font-size: 14px; align-self: center; margin-right: 8px; white-space: nowrap; }
+    .wr-days--all .wr-dayrow:has(.wr-ga-rsvp) { grid-template-columns: minmax(0,1fr) auto; }
+    .wr-ga-rsvp.wr-pill-btn--dark { background: #F6F1E8 !important; color: #2A2118 !important; border: 0 !important; }
+    .wr-ga-rsvp:not(.wr-pill-btn--dark) { background: transparent !important; color: #F6F1E8 !important; border: 1.5px solid rgba(246,241,232,.7) !important; }
+    .wr-days--all .wr-dayrow .wr-dayrow__plus, .wr-days--all .wr-dayrow [data-ga-rm] { align-self: center; margin-right: 6px; }
     .wr-dayrow__minus { width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid currentColor; background: transparent; color: inherit; font: 700 22px/1 Inter, sans-serif; cursor: pointer; }
     .wr-dayrow__tag { display: block; font-size: 12px; opacity: .7; }
     button.wr-dayrow--add { width: 100%; text-align: left; border-style: dashed !important; background: transparent; cursor: pointer; font: inherit; color: inherit; }
@@ -8773,7 +8778,7 @@
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-155"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-96"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-97"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
   <script>
     (function () {
@@ -26005,13 +26010,14 @@
         var add = document.createElement("button");
         add.type = "button";
         add.className = "team-slide__cta team-slide__cta--gevents";
-        add.textContent = "Events hinzufügen";
+        add.textContent = "Events zuordnen";
         add.addEventListener("click", function () {
+          /* Liste liegt im Kalender: dorthin, Blatt öffnen, nach „Fertig“ zurück zur Gruppe */
+          if (typeof closeKreisPage === "function") closeKreisPage();
           showWoche();
-          var ask = window.GoDialog && GoDialog.confirm
-            ? GoDialog.confirm("Teile über das Postausgang-Icon mit Deiner Gruppe", { ok: "Verstanden", cancel: "Abbrechen", row: true })
-            : Promise.resolve(true);
-          ask.then(function (ok) { if (!ok) openGruppen(); });
+          setTimeout(function () {
+            if (window.WocheReels && WocheReels.openGroupAssign) WocheReels.openGroupAssign(function () { openGruppen(); });
+          }, 350);
         });
         /* Challenge oben, darunter „Events hinzufügen“ */
         appendGroupChallenge(slide, group);
