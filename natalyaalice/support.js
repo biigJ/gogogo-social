@@ -553,7 +553,8 @@
   }
 
   function trackingKey() {
-    return "gogogo_kraft_tracking_" + (me() || "");
+    /* v2 (24.11.): alle wieder auf „Aktivieren“, es gibt noch keine Auswertung. Gespeichert werden Sätze trotzdem. */
+    return "gogogo_kraft_tracking_v2_" + (me() || "");
   }
 
   function offerOwned(type) {
