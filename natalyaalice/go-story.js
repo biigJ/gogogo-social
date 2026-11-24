@@ -49,7 +49,7 @@
     opts = opts || {};
     if (!items.length) return false;
     ensureCss();
-    var i = 0, timer = null, startAt = 0, left = DUR, held = false, holdT = null, downX = 0, downAt = 0;
+    var i = 0, timer = null, startAt = 0, left = DUR, held = false, holdT = null, downX = 0, downY = 0, downAt = 0;
     var wrap = document.createElement("div");
     wrap.className = "gstory";
     wrap.setAttribute("role", "dialog");
@@ -114,16 +114,21 @@
     wrap.addEventListener("pointerdown", function (e) {
       if (e.target.closest && e.target.closest("[data-gstory-close]")) return;
       downX = e.clientX;
+      downY = e.clientY;
       downAt = Date.now();
       clearTimeout(holdT);
       holdT = setTimeout(pause, HOLD_MS);
     });
     function up(e) {
       clearTimeout(holdT);
+      /* X zuerst: auf iOS kommt nach touchend kein click (preventDefault unten), pointerdown auf dem X setzt downAt nicht */
+      if (e.target.closest && e.target.closest("[data-gstory-close]")) { close(); return; }
       if (!downAt) return;
       var wasHeld = held || Date.now() - downAt >= HOLD_MS;
       downAt = 0;
-      if (e.target.closest && e.target.closest("[data-gstory-close]")) { close(); return; }
+      /* nach unten wischen schließt (wie Instagram) */
+      var dy = e.clientY - downY, dx = e.clientX - downX;
+      if (dy > 70 && Math.abs(dy) > Math.abs(dx) * 1.3) { close(); return; }
       if (wasHeld) { resume(); return; }
       if (e.target.closest && e.target.closest("[data-gstory-open]") && opts.onItem) {
         var it = items[i];
