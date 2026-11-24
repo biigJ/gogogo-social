@@ -1186,14 +1186,26 @@
     if (!it || !it.ev) return false;
     var ev = it.ev;
     if (it._fromPlan || ev.enrollment_id) return true;
-    if (it.kind === "invited" || it.kind === "joined") return true;
-    if (it.kind === "ffc") return false;
+    if (it.kind === "invited") return true;
+    if (it.kind === "ffc" || it.kind === "pt") return false;
     if (ev.travel_auto || ev.item_type === "hotel_workout") return true;
-    if (ev.group_id) return true;
     if (isSupportEvent(ev) || ev.is_unplanned) return false;
     /* Serien noch nicht geladen: lieber zeigen als leer */
     if (!state.seriesKeys) return true;
     return !!state.seriesKeys[seriesKey(ev.title, ev.starts_at)];
+  }
+  /* Einmalig, aber vereinbart: Coaching (mit Coachee oder Coach), Gruppe, Circle, vom Coach eingetragen.
+     Diese stehen mit Datum im Kalender. */
+  function isAgreedOnce(it) {
+    if (!it || !it.ev) return false;
+    var ev = it.ev;
+    if (it.kind === "pt" || it.kind === "ffc" || it.kind === "joined") return true;
+    return !!(ev.group_id || ev.circle_id || ev.assigned_by || ev.item_type === "support_session");
+  }
+  function kalenderItem(it) {
+    if (isRecurringItem(it)) return true;
+    if (isAgreedOnce(it)) { it._once = true; return true; }
+    return false;
   }
 
   /* Kalender zeigt immer die globale Woche: individuelle Änderungen an einem Plan-Termin (Foto, Titel,
@@ -1216,7 +1228,7 @@
     return Object.assign({}, it, { ev: ev, starts_at: ev.starts_at });
   }
   function itemsForDay(iso) {
-    var list = itemsForDayAll(iso).filter(isRecurringItem);
+    var list = itemsForDayAll(iso).filter(kalenderItem);
     var plan = globalPlanFor(iso);
     var hasPlan = list.some(function (it) { return it._fromPlan || isTravelAlt(it) || (it.ev && it.ev.enrollment_id); });
     if (!hasPlan && plan && plan.title) {
@@ -1248,6 +1260,18 @@
     });
     (state.invited || []).forEach(function (ev) {
       if (dayKey(ev.starts_at) === iso) list.push({ kind: "invited", starts_at: ev.starts_at, ev: ev });
+    });
+    /* Coaching-Termine (go_pt_sessions): als Coach mit dem Coachee, als Coachee mit dem Coach */
+    var pts = [];
+    try { pts = host && host.ptSessionsForDay ? host.ptSessionsForDay(iso) || [] : []; } catch (ePt) { pts = []; }
+    pts.forEach(function (ps) {
+      if (!ps || !ps.session_at) return;
+      var other = String(ps.coach_id) === me() ? ps.client_id : ps.coach_id;
+      list.push({ kind: "pt", starts_at: ps.session_at, ev: {
+        id: "pt:" + ps.id, user_id: other, title: "Coaching mit " + String(personOf(other).name || "").split(" ")[0],
+        category: "kraft", starts_at: ps.session_at, status: "geplant", item_type: "pt_session",
+        photo_url: "/assets/gogogo/personaltraining-1600.webp", _pt: true
+      } });
     });
     /* Wochenplan-Vorlage anzeigen, wenn noch kein echtes Event (z. B. Nächste Woche) */
     var hasOwn = list.some(function (it) {
@@ -1339,6 +1363,11 @@
     var first = names[0] || "Jemand";
     if (names.length === 1) return esc(first) + " ist dabei";
     return esc(first) + " und " + (names.length - 1) + " weitere sind dabei";
+  }
+
+  /* Wer (wiederkehrend) zugesagt hat, steht rechts neben dem Profilbild */
+  function goingAvatarsHtml(ev) {
+    return goingIds(ev).slice(0, 5).map(function (id) { return avatarHtml(personOf(id)); }).join("");
   }
 
   function facesHtml(ev) {
@@ -1467,7 +1496,7 @@
     return String(ev.id || "") + "|" + String(ev.course_session_id || "") + "|" + String(ev.title || "");
   }
   function exListHtml(ev) {
-    if (!ev || ev.category === "zirkel" || !host || !host.exercisesForEvent) return "";
+    if (!ev || ev._pt || ev.category === "zirkel" || !host || !host.exercisesForEvent) return "";
     var k = exKey(ev);
     var names = exCache[k];
     if (names === undefined) {
@@ -1498,6 +1527,14 @@
     });
     /* gleiches HTML beim nächsten render(): Cache steckt schon drin */
     root.__wrHtml = "";
+  }
+
+  /* Kalender-Zeile: Wochentag, bei einmaligen Terminen mit Datum (z. B. „Dienstag 24.11.“) */
+  function dayWord(iso, once) {
+    var wd = formatWeekday(iso);
+    if (!once) return wd;
+    var p = String(iso).split("-");
+    return wd + " " + Number(p[2]) + "." + Number(p[1]) + ".";
   }
 
   function eventCardHtml(item, iso) {
@@ -1580,12 +1617,11 @@
       '<div class="wr-bottom__main">' +
       '<div class="wr-author">' +
       avatarHtml(p) +
+      goingAvatarsHtml(ev) +
       inviteAvatarsHtml(iso) +
       "</div>" +
-      (when || place
-        ? '<p class="wr-when">' + (ev.bubble_id && global.GoBubbles ? '<span class="wr-when__bub" title="Bubble">' + GoBubbles.SOAP_SVG + "</span>" : "") +
-          esc([when, place].filter(Boolean).join(" · ")) + "</p>"
-        : "") +
+      '<p class="wr-when">' + (ev.bubble_id && global.GoBubbles ? '<span class="wr-when__bub" title="Bubble">' + GoBubbles.SOAP_SVG + "</span>" : "") +
+        esc([dayWord(iso, item._once), when, place].filter(Boolean).join(" · ")) + "</p>" +
       /* Countdown und „Start anhalten“ nebeneinander als gleiche Pillen */
       (cd || zirkelAdminHtml(ev, zSet, iso) ? '<div class="wr-zrow">' + cd + zirkelAdminHtml(ev, zSet, iso) + "</div>" : "") +
       '<h2 class="wr-title">' +
@@ -1607,9 +1643,7 @@
           '<button type="button" class="go-online-cta go-online-cta--ghost" data-wr-inv-no="' + esc(ev._inv.id) + '">Absagen</button>' +
           "</div>"
         : "") +
-      (going
-        ? '<div class="wr-going">' + facesHtml(ev) + "</div>"
-        : "") +
+      "" +
       travelHint +
       "</div>" +
       actionColHtml(item) +
@@ -1856,7 +1890,7 @@
       "</div>" +
       "</div>" +
       '<p class="wr-day-label wr-plan-label">Plane Deine Woche</p>' +
-      '<p class="wr-day-label">' +
+      '<p class="wr-day-label" hidden>' +
       esc(dayLabel) +
       "</p>" +
       "</header>" +
@@ -6045,7 +6079,7 @@
         if (myGrp && String(myGrp.owner || "") === me()) items.push({ label: "zusätzliche Gruppen-Events", value: "gextra" });
         /* früher rechts am Bild: Einladen, Extern teilen, ics */
         var curIt = currentItem();
-        var curEv = curIt && curIt.ev ? curIt.ev : null;
+        var curEv = curIt && curIt.ev && !curIt.ev._pt && curIt.kind !== "ffc" ? curIt.ev : null;
         if (curEv) {
           items.push({ label: "Einladen", value: "share" });
           items.push({ label: "Extern teilen", value: "plane" });
@@ -6650,7 +6684,8 @@
       loadTrainingLists().catch(function () {}),
       loadInvites().catch(function () {}),
       loadRecent().catch(function () {}),
-      loadSeriesKeys().catch(function () {})
+      loadSeriesKeys().catch(function () {}),
+      Promise.resolve(host && host.ptPeopleIds ? host.ptPeopleIds() : []).then(ensurePeople).catch(function () {})
     ])
       .then(function () {
         syncZirkelAccess();
