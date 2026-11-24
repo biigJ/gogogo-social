@@ -1616,6 +1616,8 @@
           : "") +
       '<div class="wr-bottom">' +
       '<div class="wr-bottom__main">' +
+      /* Übungen oben, eine Zeile Abstand, darunter Profilfotos, Tag · Uhrzeit, Titel */
+      exListHtml(ev) +
       '<div class="wr-author">' +
       avatarHtml(p) +
       goingAvatarsHtml(ev) +
@@ -1628,7 +1630,6 @@
       '<h2 class="wr-title">' +
       esc(title) +
       "</h2>" +
-      exListHtml(ev) +
       desc +
       (zSet && zSet.online
         ? '<button type="button" class="go-online-cta" data-wr-zirkel-go="1">Online mitmachen</button>'
