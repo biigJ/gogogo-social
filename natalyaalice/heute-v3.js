@@ -4970,7 +4970,10 @@
     var diff = (bh * 60 + bm) - (guess.getUTCHours() * 60 + guess.getUTCMinutes());
     if (diff > 720) diff -= 1440;
     if (diff < -720) diff += 1440;
-    return new Date(guess.getTime() - diff * 60000).toISOString();
+    var out = new Date(guess.getTime() - diff * 60000);
+    /* 12:00:00 UTC heißt „ohne Uhrzeit“ (Plan-Events): eine Sekunde später speichern */
+    if (out.getUTCHours() === 12 && out.getUTCMinutes() === 0 && out.getUTCSeconds() === 0) out = new Date(out.getTime() + 1000);
+    return out.toISOString();
   }
   function delayStart(ev) {
     var old = timeLabel(ev.starts_at);
