@@ -8936,7 +8936,7 @@
   <script src="/natalyaalice/ffc-points.js?v=ffp-2"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-6"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-45"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-46"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-27"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-9"></script>
@@ -23736,6 +23736,12 @@
       /* Gesperrtes Konto (Admin → Gemeldet → Sperren, go-bubble-chat.sql): Hinweis und abmelden */
       if (sessionMode && sessionAccount && sessionAccount.id) {
         rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id) + "&select=blocked_at").then(function (rows) {
+          /* Konto im Papierkorb (go-nutzer-papierkorb.sql): für den Nutzer nicht mehr lesbar → abmelden */
+          if (Array.isArray(rows) && !rows.length) {
+            try { if (window.GoAccountSession) GoAccountSession.clear(); } catch (eT) {}
+            location.replace("/login/");
+            return;
+          }
           if (!rows || !rows[0] || !rows[0].blocked_at) return;
           var leave = function () {
             try { if (window.GoAccountSession) GoAccountSession.clear(); } catch (eC) {}
@@ -27504,7 +27510,11 @@
         Promise.all([
           rest("go_accounts?id=eq." + id + "&select=id,name,nickname,photo_url,training_goal,about_me,mantra,workout_places,weekday_meet_prefs,diary_visibility,trainer_id").catch(function () { return []; }),
           rest("go_coach_plans?account_id=eq." + id + "&select=blurb,life_situation,goal,phase_steps,day_training_units,kraft_weekdays,ausdauer_weekdays,zirkel_weekday").catch(function () { return []; }),
-          rest("go_community_posts?author_id=eq." + id + "&select=author_id,photo_url&limit=60").catch(function () { return []; })
+          rest("go_community_posts?author_id=eq." + id + "&select=author_id,photo_url&limit=60").catch(function () { return []; }),
+          /* Event-Fotos aus der Datenbank (Aktuell → Foto, bis zu fünf je Event). Sichtbar ist, was die Datenbank-Regeln erlauben. */
+          rest("events?user_id=eq." + id + "&or=(photo_url.not.is.null,photos.not.is.null)&select=photo_url,photos,starts_at&order=starts_at.desc&limit=120")
+            .catch(function () { return rest("events?user_id=eq." + id + "&photo_url=not.is.null&select=photo_url,starts_at&order=starts_at.desc&limit=120"); })
+            .catch(function () { return []; })
         ]).then(function (pack) {
           if (!profilePerson || String(profilePerson.id || "") !== String(person.id || "")) return;
           var account = (pack[0] && pack[0][0]) || (mine ? sessionAccount : person);
@@ -27518,6 +27528,10 @@
             if (post.author_id && String(post.author_id) !== String(person.id)) return;
             photos.push(post.photo_url);
           }
+          (pack[3] || []).forEach(function (ev) {
+            if (ev.photo_url) photos.push(ev.photo_url);
+            (Array.isArray(ev.photos) ? ev.photos : []).forEach(function (u) { if (u) photos.push(u); });
+          });
           if (mine) {
             Object.keys(workoutPhotoMap()).forEach(function (iso) {
               if (workoutPhotoMap()[iso]) photos.push(workoutPhotoMap()[iso]);
@@ -27526,6 +27540,8 @@
           } else if (shared) {
             (pack[2] || []).forEach(pushPost);
           }
+          var seenPh = {};
+          photos = photos.filter(function (u) { if (!u || seenPh[u]) return false; seenPh[u] = 1; return true; });
           if (account && account.photo_url) {
             profilePerson.photo_url = account.photo_url;
             if (mine && sessionAccount) sessionAccount.photo_url = account.photo_url;

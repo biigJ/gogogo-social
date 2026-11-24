@@ -94,6 +94,7 @@
     ".ga-tk__acts{display:flex;gap:16px;justify-content:flex-end;margin-top:4px}" +
     /* Ticket-Zeile: Vorschau links, Text mittig, Pillen rechts */
     ".ga-tk.is-row{display:grid;grid-template-columns:61px minmax(0,1fr) auto;gap:14px;align-items:start}" +
+    ".ga-tk.is-row>.ga-tk__shotwrap{align-self:start}" +
     ".ga-tk__shot{position:relative;width:61px;height:76px;padding:0;border:0;border-radius:10px;background:#E6DED0 center/cover no-repeat;cursor:pointer;color:rgba(42,33,24,.6);font:600 12px/1.2 Inter,sans-serif}" +
     ".ga-tk__shot.is-empty{background:transparent;border:1.5px dashed rgba(42,33,24,.35)}" +
     ".ga-tk__shot i{position:absolute;right:-6px;top:-6px;min-width:20px;height:20px;border-radius:999px;background:#111;color:#fff;font:700 11px/20px Inter,sans-serif;font-style:normal;text-align:center}" +
@@ -101,13 +102,17 @@
     ".ga-tk__meta{font-size:13px;color:rgba(42,33,24,.65)}.ga-tk__meta b{color:#111;margin-right:6px}" +
     ".ga-tk__note{display:block;width:100%;box-sizing:border-box;margin-top:8px;min-height:40px;padding:8px 12px;border-radius:12px;border:1px solid rgba(42,33,24,.2);background:rgba(255,255,255,.5);font:inherit;font-size:14px;color:#111;resize:vertical;field-sizing:content;max-height:160px}" +
     ".ga-tk__note:focus{outline:none;border-color:#111;background:#fff}" +
-    ".ga-tk__pills{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:6px;max-width:380px}" +
+    ".ga-tk__pills{display:grid;grid-template-columns:112px 96px 136px 96px;gap:6px;align-items:center}" +
+    ".ga-tk__pills>*{width:100%;box-sizing:border-box;justify-content:center;overflow:hidden;text-overflow:ellipsis}" +
+    ".ga-tk__pill{display:block !important;line-height:25px;text-align:center}" +
     ".ga-tk__pill{display:inline-flex;align-items:center;min-height:28px;padding:0 12px;border-radius:999px;border:1.5px solid rgba(42,33,24,.35);font-size:12px;font-weight:600;white-space:nowrap;color:#111}" +
-    ".ga-tk__pills select{min-height:30px;padding:0 10px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:12px;font-weight:700;color:#111;cursor:pointer}" +
+    ".ga-tk__pills select{min-height:28px;height:28px;padding:0 10px;border-radius:999px;border:1.5px solid #111;background:transparent;font:inherit;font-size:12px;font-weight:700;color:#111;cursor:pointer;outline:none;box-shadow:none}" +
     ".ga-tk__pills select.is-arbeit{background:#E8A33D;border-color:#E8A33D;color:#111}" +
     ".ga-tk__pills select.is-erledigt{background:#111;color:#fff}" +
     ".ga-tk__pill.is-admin{background:#111;border-color:#111;color:#fff}" +
-    "@media (max-width:600px){.ga-tk.is-row{grid-template-columns:61px minmax(0,1fr);row-gap:8px}.ga-tk.is-row .ga-tk__shot{grid-row:1 / span 2}.ga-tk__pills{grid-column:2;grid-row:1;max-width:none}.ga-tk__main{grid-column:2;grid-row:2}}" +
+    "@media (max-width:600px){.ga-tk.is-row{grid-template-columns:61px minmax(0,1fr);row-gap:8px}.ga-tk.is-row>.ga-tk__shot,.ga-tk.is-row>.ga-tk__shotwrap{grid-row:1 / span 2}.ga-tk__pills{grid-column:2;grid-row:1;grid-template-columns:repeat(2,minmax(0,1fr))}.ga-tk__main{grid-column:2;grid-row:2}}" +
+    ".ga-tk__shotwrap{position:relative;display:inline-block;width:61px;height:76px}" +
+    ".ga-tk__x{position:absolute;left:-7px;top:-7px;width:22px;height:22px;border-radius:50%;border:0;background:#C7413B;color:#fff;font:700 15px/22px Inter,sans-serif;padding:0;cursor:pointer;z-index:1}" +
     ".ga-tk__shots{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}" +
     ".ga-tk__shots .ga-tk__shot{cursor:default}" +
     ".ga-tkv{position:fixed;inset:0;z-index:10045;background:rgba(20,16,12,.8);display:flex;flex-direction:column;align-items:center;padding:16px;overflow-y:auto;gap:14px}" +
@@ -143,6 +148,7 @@
     ".ga-usno{font-size:12px;color:rgba(0,0,0,.45);text-align:center}" +
     ".ga-usrow select{min-height:34px;min-width:0;padding:0 8px;border-radius:10px;border:1px solid rgba(0,0,0,.2);background:#F3EEE4;font:inherit;font-size:13px;color:#111}" +
     ".ga-usx{width:28px;height:28px;border:0;background:transparent;font-size:18px;line-height:1;color:rgba(0,0,0,.5);cursor:pointer;padding:0}" +
+    ".ga-trash{margin-top:22px;padding-top:12px;border-top:1px solid rgba(42,33,24,.15)}.ga-trash .ga-item{opacity:.75}" +
     ".ga-ucount{font-size:13px;color:rgba(42,33,24,.65);margin:4px 0 0}" +
     ".ga-del{margin-left:6px;color:#C7413B;border-color:#C7413B}" +
     ".ga-wa{flex:none;min-height:36px;padding:0 14px;border-radius:999px;border:0;background:#128C7E;color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-grid;place-items:center}" +
@@ -830,7 +836,7 @@
     if (!st.hxd) loadHxd();
     if (!st.cw) loadCw();
     if (!st.goals) loadGoals();
-    var accs = (st.accounts || []).slice().sort(function (x, y) {
+    var accs = (st.accounts || []).filter(function (a) { return !a.deleted_at; }).sort(function (x, y) {
       return usCompare(x, y) || String(x.name || "").localeCompare(String(y.name || ""), "de");
     });
     var nameOf = function (aid) {
@@ -879,7 +885,41 @@
           '<div class="ga-copy ga-rows"><div class="ga-r1">' + r1 + "</div>" +
           (r2 ? "<div>" + r2 + "</div>" : "") + "<div>" + r3 + "</div><div>" + r4 + "</div>" + (r5 ? "<div>" + r5 + "</div>" : "") + "</div>" +
           '<span class="ga-pills">' + (nRec ? '<button type="button" class="ga-pill" data-ga-rec="' + esc(id) + '" aria-label="Circle-Aufzeichnungen">Circle</button>' : "") + rolePill(a) + '<button type="button" class="ga-pill" data-ga-qr="' + esc(id) + '">QR-Code</button>' + "</span></div>";
-      }).join("");
+      }).join("") + paintTrash();
+  }
+  /* Papierkorb (go-nutzer-papierkorb.sql): gelöschte Konten bleiben gespeichert, nur für Admins sichtbar */
+  function paintTrash() {
+    var trash = (st.accounts || []).filter(function (a) { return a.deleted_at; })
+      .sort(function (x, y) { return String(y.deleted_at).localeCompare(String(x.deleted_at)); });
+    if (!trash.length) return "";
+    var btn = '<button type="button" class="ga-usbtn' + (st.trashOpen ? " is-open" : "") + '" data-ga-trash="toggle">Papierkorb · ' + trash.length + "</button>";
+    if (!st.trashOpen) return '<div class="ga-trash">' + btn + "</div>";
+    return '<div class="ga-trash">' + btn +
+      '<p class="cp-hint">Konto und Daten bleiben gespeichert, sind aber für alle außer Admins unsichtbar (kein Login, nicht im Feed).</p>' +
+      trash.map(function (a) {
+        var id = String(a.account_id);
+        return '<div class="ga-item"><span class="ga-rect">' + esc(String(a.name || "?").slice(0, 1)) + "</span>" +
+          '<div class="ga-copy"><b>' + esc(a.name || "?") + '</b><p>Gelöscht am ' + esc(tkWhen(a.deleted_at)) + "</p></div>" +
+          '<span class="ga-pills"><button type="button" class="ga-pill" data-ga-trash="restore" data-id="' + esc(id) + '">Wiederherstellen</button>' +
+          '<button type="button" class="ga-pill ga-del" data-ga-trash="final" data-id="' + esc(id) + '">Endgültig löschen</button></span></div>';
+      }).join("") + "</div>";
+  }
+  function onTrash(t) {
+    var act = t.getAttribute("data-ga-trash"), id = t.getAttribute("data-id");
+    if (act === "toggle") { st.trashOpen = !st.trashOpen; paint(); return; }
+    var a = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0] || {};
+    if (act === "restore") {
+      host.rest("rpc/go_admin_trash_account", { method: "POST", body: { p_account: id, p_on: false } })
+        .then(function () { a.deleted_at = null; paint(); if (host.toast) host.toast((a.name || "Konto") + " wiederhergestellt"); })
+        .catch(function () { GoDialog.alert("Wiederherstellen braucht go-nutzer-papierkorb.sql in Supabase."); });
+      return;
+    }
+    if (act === "final") {
+      var fake = document.createElement("button");
+      fake.setAttribute("data-ga-del", id);
+      fake.setAttribute("data-final", "1");
+      deleteAccount(fake);
+    }
   }
   /* Circle-Aufzeichnungen eines Nutzers im Design der App (Datumsrad, Punkte, Runden); Stift = Werte nachpflegen */
   function openRec(id, pick, editing) {
@@ -1353,8 +1393,9 @@
       (t.tech_note ? "\nTechnik: " + t.tech_note : "") + (urls.length ? "\nScreenshots: " + urls.join(" ") : "");
   }
   function tkImgs(t) { return Array.isArray(t && t.images) ? t.images.filter(Boolean) : []; }
-  function tkShot(imgs, attrs) {
+  function tkShot(imgs, attrs, delAttrs) {
     var n = imgs.length;
+    if (n && delAttrs) return '<span class="ga-tk__shotwrap">' + tkShot(imgs, attrs) + '<button type="button" class="ga-tk__x"' + delAttrs + ' aria-label="Screenshot entfernen">×</button></span>';
     return '<button type="button" class="ga-tk__shot' + (n ? "" : " is-empty") + '"' + attrs +
       (n ? ' style="background-image:url(&quot;' + esc(imgs[0]).replace(/"/g, "%22") + '&quot;)" aria-label="Screenshots ansehen">' + (n > 1 ? "<i>" + n + "</i>" : "") : ' aria-label="Screenshot hochladen">+ Bild') + "</button>";
   }
@@ -1485,7 +1526,7 @@
       tkSelect("gt-sec", d.area === "frontend" ? "Abschnitt" : "Admin-Bereich", secs.map(function (x) { return [x, x]; }), d.section) +
       tkSelect("gt-sub", "Unterkategorie", subs.map(function (x) { return [x, x]; }), d.sub) + "</div>" +
       '<label class="ga-tk__l">Wunsch<textarea id="gt-body" rows="4" placeholder="Was soll sich wo ändern?">' + esc(d.body) + "</textarea></label>" +
-      '<div class="ga-tk__shots">' + (d.images || []).map(function (u) { return tkShot([u], ""); }).join("") + tkShot([], ' data-gt="formshot"') + "</div>" +
+      '<div class="ga-tk__shots">' + (d.images || []).map(function (u, i) { return tkShot([u], "", ' data-gt="formshotdel" data-i="' + i + '"'); }).join("") + tkShot([], ' data-gt="formshot"') + "</div>" +
       '<div class="ga-tk__btns"><button type="button" class="ga-btn5" data-gt="cancel">Abbrechen</button><button type="button" class="ga-btn5 is-dark" data-gt="save">Ticket speichern</button></div></div>';
   }
   function paintTickets() {
@@ -1519,7 +1560,7 @@
       (list.length ? list.map(function (t) {
         var imgs = tkImgs(t);
         return '<div class="ga-tk is-row' + (t.status === "erledigt" ? " is-done" : "") + '">' +
-          tkShot(imgs, ' data-gt="' + (imgs.length ? "shots" : "shot") + '" data-gt-id="' + t.id + '"') +
+          tkShot(imgs, ' data-gt="' + (imgs.length ? "shots" : "shot") + '" data-gt-id="' + t.id + '"', ' data-gt="shotdel" data-gt-id="' + t.id + '"') +
           '<div class="ga-tk__main"><div class="ga-tk__meta"><b>#' + t.id + "</b>" + esc(tkWhen(t.created_at)) + (t.sub ? " · " + esc(t.sub) : "") + "</div>" +
           '<p class="ga-tk__body">' + esc(t.body) + "</p>" +
           '<textarea class="ga-tk__note" data-gt-note="' + t.id + '" rows="' + Math.min(6, Math.max(1, String(t.tech_note || "").split("\n").length + Math.floor(String(t.tech_note || "").length / 70))) + '" placeholder="Technische Umsetzbarkeit …">' + esc(t.tech_note || "") + "</textarea>" +
@@ -1545,6 +1586,18 @@
     if (act === "new") { st.tkNew = true; paint(); return; }
     if (act === "shot" && tk) { tkAddShot(tk); return; }
     if (act === "shots" && tk) { tkViewer(tk); return; }
+    /* × an der Vorschau: ein Bild direkt entfernen, bei mehreren die große Ansicht mit „Entfernen“ */
+    if (act === "shotdel" && tk) {
+      if (tkImgs(tk).length > 1) { tkViewer(tk); return; }
+      GoDialog.confirm("Screenshot entfernen?", { ok: "Entfernen", cancel: "Abbrechen" }).then(function (yes) { if (yes) tkSaveShots(tk, []); });
+      return;
+    }
+    if (act === "formshotdel" && st.tkDraft) {
+      st.tkDraft.body = (document.getElementById("gt-body") || {}).value || st.tkDraft.body;
+      (st.tkDraft.images || []).splice(Number(t.getAttribute("data-i")), 1);
+      paint();
+      return;
+    }
     if (act === "formshot" && st.tkDraft) {
       st.tkDraft.body = (document.getElementById("gt-body") || {}).value || st.tkDraft.body;
       pickPhoto(function (url) { if (!st || !st.tkDraft) return; st.tkDraft.images = (st.tkDraft.images || []).concat([url]); paint(); });
@@ -1955,7 +2008,22 @@
     var person = (st.accounts || []).filter(function (a) { return String(a.account_id) === String(id); })[0];
     var name = (person && person.name) || "Diese Person";
     if (!global.GoDialog) return;
-    GoDialog.confirm(name + " löschen? Termine, Kommentare und Tracking sind danach weg.", { ok: "Löschen" })
+    if (btn.getAttribute("data-final") !== "1") {
+      GoDialog.confirm(name + " löschen?", { body: "Das Konto kommt in den Papierkorb: unsichtbar für alle, Daten bleiben gespeichert. Wiederherstellen oder endgültig löschen unter Nutzer → Papierkorb.", ok: "In den Papierkorb", cancel: "Abbrechen" })
+        .then(function (ok) {
+          if (!ok) return;
+          return host.rest("rpc/go_admin_trash_account", { method: "POST", body: { p_account: id, p_on: true } }).then(function (at) {
+            if (person) person.deleted_at = at || new Date().toISOString();
+            paint();
+            if (host.toast) host.toast(name + " ist im Papierkorb");
+          }).catch(function (err) {
+            var m = String((err && err.message) || "");
+            GoDialog.alert(/admin/.test(m) ? "Admins können nicht gelöscht werden." : /self/.test(m) ? "Dein eigenes Konto kannst Du hier nicht löschen." : "Löschen braucht go-nutzer-papierkorb.sql in Supabase.");
+          });
+        });
+      return;
+    }
+    GoDialog.confirm(name + " endgültig löschen? Termine, Kommentare und Tracking sind danach weg.", { ok: "Endgültig löschen" })
       .then(function (ok) {
         if (!ok) return null;
         return GoDialog.prompt("Zum Bestätigen den Namen eingeben: " + name, "", { ok: "Endgültig löschen" });
@@ -1976,7 +2044,7 @@
           .catch(function (err) {
             btn.disabled = false;
             var m = String((err && err.message) || "");
-            GoDialog.alert(/go_admin_delete_account|function/.test(m) ? "Löschen braucht go-admin-delete-user.sql in Supabase." : "Löschen ging nicht: " + m.slice(0, 120));
+            GoDialog.alert(/Papierkorb/.test(m) ? "Erst in den Papierkorb legen, dann endgültig löschen." : /go_admin_delete_account|function/.test(m) ? "Löschen braucht go-admin-delete-user.sql in Supabase." : "Löschen ging nicht: " + m.slice(0, 120));
           });
       });
   }
@@ -2305,7 +2373,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall],[data-ga-us],[data-ga-ts]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall],[data-ga-us],[data-ga-ts],[data-ga-trash]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -2328,6 +2396,7 @@
     if (t.getAttribute("data-ga-uf") === "reset") { st.uf = {}; ufSave(); paint(); return; }
     if (t.hasAttribute("data-ga-us")) { onUserSort(t); return; }
     if (t.hasAttribute("data-ga-ts")) { onTicketSort(t); return; }
+    if (t.hasAttribute("data-ga-trash")) { onTrash(t); return; }
     if (t.hasAttribute("data-ga-nfreset")) { st.nf[t.getAttribute("data-ga-nfreset")] = {}; paint(); return; }
     if (t.hasAttribute("data-gx")) {
       var gx = t.getAttribute("data-gx"), gk = t.getAttribute("data-gk"), gid = t.getAttribute("data-gid");
