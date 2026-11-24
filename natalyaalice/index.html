@@ -6088,6 +6088,12 @@
       justify-content: center; gap: 10px;
       margin: 0; padding: 2px 34px 10px; flex: 0 0 auto;
     }
+    .stamp-pass__pen {
+      position: absolute; top: 8px; left: 8px; z-index: 2;
+      width: 36px; height: 36px; border: 0; background: transparent;
+      color: #F6F1E8; display: grid; place-items: center; cursor: pointer; padding: 0;
+    }
+    .stamp-pass__pen[hidden] { display: none; }
     .stamp-pass__save {
       position: absolute; top: 8px; right: 8px; z-index: 2;
       width: 36px; height: 36px; border: 0; background: transparent;
@@ -8030,6 +8036,9 @@
   </div>
   <div class="sand-modal" id="stamp-card-modal" hidden>
     <div class="stamp-pass" role="dialog" aria-modal="true" aria-label="Stempelkarte">
+      <button type="button" class="stamp-pass__pen" id="stamp-card-pen" aria-label="Stempelkarte bearbeiten" hidden>
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/></svg>
+      </button>
       <button type="button" class="stamp-pass__save" id="stamp-card-wallet" aria-label="Stempelkarte speichern">
         <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/></svg>
       </button>
@@ -15706,7 +15715,9 @@
         modal.hidden = false;
         modal.removeAttribute("hidden");
         modal.style.display = "grid";
-        loadStampStack(stamps, opts.only || null);
+        var pen = document.getElementById("stamp-card-pen");
+        if (pen) pen.hidden = !opts.fromPlus;
+        loadStampStack(stamps, opts.only || null, !!opts.linkedOnly);
         /* „Später“ gilt bis zum nächsten Öffnen der Karte */
         Object.keys(stampAsked).forEach(function (k) { delete stampAsked[k]; });
         pollStampChecks();
@@ -15742,7 +15753,7 @@
         }
         return { kind: "main" };
       }
-      function loadStampStack(mainStamps, only) {
+      function loadStampStack(mainStamps, only, linkedOnly) {
         var modal = document.getElementById("stamp-card-modal");
         var pass = modal && modal.querySelector(".stamp-pass");
         if (!pass) return;
@@ -15770,6 +15781,16 @@
               return;
             }
             if (!rows || !rows.length || modal.hidden) return;
+            /* aus Plus: nur die in Gruppen und Circles verknüpften Karten, ohne die allgemeine gogogo-Karte */
+            var linked = rows.filter(function (r) { return r.kind === "group" || r.kind === "circle"; });
+            if (linkedOnly && linked.length) {
+              modal._stack = linked.map(function (r) { return { kind: r.kind, name: r.name, stamps: r.stamps }; });
+              modal._stackAt = 0;
+              paintStampFace(modal._stack[0]);
+              if (modal._stack.length > 1) pass.classList.add("has-stack");
+              paintStackDots();
+              return;
+            }
             modal._stack = modal._stack.concat(rows.map(function (r) { return { kind: r.kind, name: r.name, stamps: r.stamps }; }));
             pass.classList.add("has-stack");
             paintStackDots();
@@ -15780,7 +15801,7 @@
           pass.addEventListener("click", function (e) {
             var st = modal._stack || [];
             if (st.length < 2) return;
-            if (e.target.closest("#stamp-card-wallet, .stamp-pass__qr")) return;
+            if (e.target.closest("#stamp-card-wallet, #stamp-card-pen, .stamp-pass__qr")) return;
             modal._stackAt = (modal._stackAt + 1) % st.length;
             paintStampFace(st[modal._stackAt]);
             paintStackDots();
@@ -20188,6 +20209,13 @@
               tile.appendChild(grip);
               tile.addEventListener("click", function (ev) {
                 if (ev.target.closest && ev.target.closest(".go-tile__grip")) return;
+                /* Stempelkarte: keine eigene Seite. Aktiv → direkt die Karten (wie „Stempelkarte anzeigen“), sonst Aktivieren */
+                if (item.key === "stempelkarte") {
+                  var stOrd = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
+                  if (plusOfferOwned(item)) openStampCardModal(stOrd, { fromPlus: true, linkedOnly: true });
+                  else openStampBookModal();
+                  return;
+                }
                 jumpToGoOffer(item.key);
               });
               tocNav.appendChild(tile);
@@ -27728,6 +27756,18 @@
       (function bindStampGroupNutritionUi() {
         var stampClose = document.getElementById("stamp-card-close");
         if (stampClose) stampClose.addEventListener("click", closeStampCardModal);
+        var stampPen = document.getElementById("stamp-card-pen");
+        if (stampPen) stampPen.addEventListener("click", function (e) {
+          e.stopPropagation();
+          if (!window.GoDialog) return;
+          GoDialog.choose("Stempelkarte", [{ label: "Deaktivieren", value: "off" }], { center: true, cancel: "Abbrechen" }).then(function (v) {
+            if (v !== "off" || !window.GoSupport || !GoSupport.cancelOffer) return;
+            GoSupport.cancelOffer("stempelkarte").then(function () {
+              closeStampCardModal();
+              paintGoRail(true);
+            }).catch(function () { gogogoToast("Deaktivieren ging gerade nicht"); });
+          });
+        });
         var stampModal = document.getElementById("stamp-card-modal");
         if (stampModal) {
           stampModal.addEventListener("click", function (event) {
@@ -27792,7 +27832,8 @@
             "click",
             bindBookOffer("stempelkarte", function (order) {
               hideModal("stamp-book-modal");
-              openStampCardModal(order || (GoSupport.activeOrderFor && GoSupport.activeOrderFor("stempelkarte")));
+              openStampCardModal(order || (GoSupport.activeOrderFor && GoSupport.activeOrderFor("stempelkarte")), { fromPlus: true, linkedOnly: true });
+              try { paintGoRail(true); } catch (ePg) {}
             })
           );
         }
