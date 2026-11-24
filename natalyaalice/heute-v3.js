@@ -3387,7 +3387,9 @@
     var scroller = welcomeScrollEl();
     if (!scroller || scroller._magnetBound) return;
     scroller._magnetBound = true;
-    var touching = false, gliding = false, idle = null, anim = 0, lastY = 0, lastT = 0, v = 0;
+    var touching = false, gliding = false, idle = null, anim = 0, lastY = 0, lastT = 0, v = 0, dir = 0;
+    /* Zweiter Magnet: oberer Rand. Wer nach oben gerollt ist, bleibt oben; erst ein Wisch löst es. */
+    var TOP_EPS = 4, TOP_R = 140;
     function target() {
       var el = document.querySelector(".acc-card.acc-snap");
       if (!el) return null;
@@ -3432,6 +3434,9 @@
     function settle() {
       idle = null;
       if (touching || gliding || document.body.dataset.shell !== "heute") return;
+      var y0 = scroller.scrollTop || 0;
+      if (y0 <= TOP_EPS) return;
+      if (y0 < TOP_R && dir < 0) { glide(-y0); return; }
       var t = target();
       if (t && Math.abs(t.delta) > 3 && Math.abs(t.delta) < t.radius) glide(t.delta);
     }
@@ -3447,11 +3452,16 @@
     scroller.addEventListener("scroll", function () {
       var now = performance.now(), y = scroller.scrollTop || 0;
       if (lastT && now - lastT < 100) v = Math.abs(y - lastY) / Math.max(1, now - lastT); else v = 99;
+      if (y !== lastY) dir = y < lastY ? -1 : 1;
       lastY = y; lastT = now;
       if (touching || gliding || document.body.dataset.shell !== "heute") return;
       if (Date.now() < (state.progScrollUntil || 0)) return;
       if (idle) clearTimeout(idle);
       idle = setTimeout(settle, 160);
+      /* oben angekommen: dort bleiben, kein Einparken */
+      if (y <= TOP_EPS) return;
+      /* im Ausrollen nach oben nah am Rand: an den Rand ziehen */
+      if (dir < 0 && y < TOP_R && v < CATCH_V * 1.5) { glide(-y); return; }
       /* im Ausrollen: langsam genug über der Karte → einfangen */
       if (v < CATCH_V) {
         var t = target();
