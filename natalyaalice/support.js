@@ -399,7 +399,7 @@
       title: "Ernährung",
       price: "gratis",
       description:
-        "4 Wochen tägliches Ernährungs-Event unter Aktuell, gratis. Protokolliere Mahlzeiten im Dialog, Tracking unter Plus. Coach-Feedback und Plan auf Wunsch."
+        "Mach mit uns vier Wochen lang täglich einen Ernährungs Checkin. Protokolliere Mahlzeiten per Spracherkennung. Jeden Tag mit Erinnerung und zwei- bis dreimal Feedback, direkt und menschlich."
     },
     {
       key: "uebungen",
