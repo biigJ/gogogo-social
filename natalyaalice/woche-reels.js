@@ -3569,12 +3569,21 @@
       if (v === null || v === undefined) return;
       de.place = de.place || {};
       de.place[ev.id] = String(v).trim().slice(0, 80);
+      markDaysDirty();
       var btn = document.querySelector('[data-wr-dayplace="' + String(id).replace(/"/g, "") + '"]');
       if (btn) {
         btn.textContent = de.place[ev.id] || "Ort";
         btn.classList.toggle("is-empty", !de.place[ev.id]);
       }
     });
+  }
+
+  /* Speichern-Knopf: nach dem Speichern „Gespeichert“ (hell), jede Änderung macht ihn wieder zu „Speichern“ */
+  function markDaysDirty() {
+    if (!state.daysSaved) return;
+    state.daysSaved = false;
+    var b = document.querySelector("[data-wr-days-save]");
+    if (b) { b.textContent = "Speichern"; b.disabled = false; b.classList.remove("is-saved"); }
   }
 
   function paintDaysEditor() {
@@ -3614,7 +3623,9 @@
       '<p class="wr-sheet-hint">Einheiten verschieben, Uhrzeit anpassen und wählen, wer sie sieht.</p>' +
       '<div class="wr-days wr-days--all">' + rows + "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Verlassen</button>' +
-      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-days-save="1">Speichern</button></div>'
+      (state.daysSaved
+        ? '<button type="button" class="wr-pill-btn wr-pill-btn--dark is-saved" data-wr-days-save="1" disabled>Gespeichert</button></div>'
+        : '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-days-save="1">Speichern</button></div>')
     );
     var cardAll = $("wr-sheet-card");
     if (cardAll) cardAll.classList.add("wr-sheet__card--days");
@@ -3632,7 +3643,7 @@
           if (!state.daysEdit) return;
           var o = timeOptsFor(state.daysEdit.orig[id]);
           var n = Math.max(0, Math.min(o.length - 1, Math.round(w.scrollTop / 36)));
-          state.daysEdit.times[id] = o[n];
+          if (state.daysEdit.times[id] !== o[n]) { state.daysEdit.times[id] = o[n]; markDaysDirty(); }
         }, 80);
       }, { passive: true });
     });
@@ -3645,6 +3656,7 @@
       state.daysEdit.vis[id] = sel.value;
       /* Bubble gewählt = Event in der Bubble; alles andere nimmt es aus der Bubble */
       state.daysEdit.bub[id] = sel.value === "bubble";
+      markDaysDirty();
     });
     card.addEventListener("click", function (e) {
       if (!state.daysEdit) return;
@@ -3663,6 +3675,7 @@
         if (bb2) { bb2.classList.toggle("is-on", !!state.daysEdit.bub[id]); bb2.setAttribute("aria-pressed", state.daysEdit.bub[id] ? "true" : "false"); }
         vb.classList.toggle("is-on", nv !== "privat");
         vb.textContent = VIS_LABEL[nv];
+        markDaysDirty();
         return;
       }
       if (e.target.closest && e.target.closest("[data-wr-days-save]")) saveDaysEditor();
@@ -3672,6 +3685,7 @@
         state.daysEdit.bub[bid] = !state.daysEdit.bub[bid];
         bb.classList.toggle("is-on", state.daysEdit.bub[bid]);
         bb.setAttribute("aria-pressed", state.daysEdit.bub[bid] ? "true" : "false");
+        markDaysDirty();
         return;
       }
       var pl = e.target.closest && e.target.closest("[data-wr-dayplace]");
@@ -3716,6 +3730,7 @@
       var tmp = sl[to];
       sl[to] = sl[d.from];
       sl[d.from] = tmp;
+      state.daysSaved = false;
       paintDaysEditor();
     }
     card.addEventListener("pointerup", endDrag);
@@ -4158,6 +4173,7 @@
     Promise.all(jobs).then(function () {
       if (global.GoTama) global.GoTama.invalidate();
       showSavedNote();
+      state.daysSaved = true;
       return refresh().then(function () {
         notifyAktuell();
         /* Dialog bleibt offen und zeigt den gespeicherten Stand */
@@ -4165,6 +4181,7 @@
       });
     }).catch(function (err) {
       if (saveBtn) saveBtn.disabled = false;
+      state.daysSaved = false;
       var m = String((err && err.message) || "");
       if (host.toast) host.toast(/sql/.test(m) ? "Speichern ging nicht: " + m : "Speichern ging nicht");
     });
@@ -6283,7 +6300,7 @@
           /* erst nach dem Dialog-Klick öffnen, sonst schließt derselbe Klick das neue Sheet wieder */
           setTimeout(function () {
             if (v === "plan") openPlanPicker();
-            if (v === "days") openDaysEditor();
+            if (v === "days") { state.daysSaved = false; openDaysEditor(); }
             /* Mitglieder: vorher fragen, ob sie lieber das nächste Zirkeltraining ihres Circles übernehmen */
             if (v === "zrec") { if (global.GoCircle && GoCircle.askBeforeOwn) GoCircle.askBeforeOwn(openZirkelRecurring); else openZirkelRecurring(); }
             if (v === "zedit") openZirkelEditor();
