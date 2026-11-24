@@ -1,6 +1,6 @@
 /* themes.js — Darstellung: Original, GTA, Bauhaus, B/W
  *
- *   GoThemes.current()        → "original" | "gta" | "bauhaus" | "bw" | "postmodern"
+ *   GoThemes.current()        → "original" | "gta" | "bauhaus" | "bw" | "postmodern" | "terra"
  *   GoThemes.apply(id)        → Theme setzen + merken (localStorage, pro Gerät)
  *   GoThemes.list()           → [{ id, label }]
  *   GoThemes.openPicker()     → Auswahl über GoDialog.choose
@@ -24,7 +24,7 @@
       body: "Rubik",
       serif: "Oswald",
       hex: {
-        C7413B: "E0187A", A5332E: "B0105E", F7F5F0: "FFF6FB",
+        "2E9E5B": "FFC400", C7413B: "E0187A", A5332E: "B0105E", F7F5F0: "FFF6FB",
         F6F1E8: "FFF0F5", F3EEE4: "FDE8F1", EDE6DA: "F9DDEB", E4DDD0: "F2CFE2",
         E8E2D6: "F6D7E8", D8D0C4: "E7BCD6", ECECEB: "F6E4EE",
         "2A2118": "2B0B3F", "1A1510": "1A0628", "6B6358": "7A4E8C"
@@ -43,7 +43,7 @@
       serif: "Jost",
       /* Weiß, Dessau-Rot für graue Flächen, Rot-Akzente → Blau (Stempelkarte bleibt blau), CTAs Orange-Gelb */
       hex: {
-        C7413B: "1E4FA3", A5332E: "163C7E", F7F5F0: "FFFFFF",
+        "2E9E5B": "F5A400", C7413B: "1E4FA3", A5332E: "163C7E", F7F5F0: "FFFFFF",
         F6F1E8: "FFFFFF", F3EEE4: "FFFFFF", EDE6DA: "C8102E", E4DDD0: "C8102E",
         E8E2D6: "C8102E", D8D0C4: "A50D26", ECECEB: "C8102E",
         "2A2118": "111111", "1A1510": "000000", "6B6358": "555555"
@@ -65,6 +65,7 @@
       dark: true,
       /* Umgedreht: schwarzer Grund, weiße Schrift */
       hex: {
+        "2E9E5B": "FFFFFF",
         C7413B: "FFFFFF", A5332E: "D9D9D9", F7F5F0: "FFFFFF",
         F6F1E8: "0A0A0A", F3EEE4: "000000", EDE6DA: "1A1A1A", E4DDD0: "262626",
         E8E2D6: "1F1F1F", D8D0C4: "333333", ECECEB: "1F1F1F",
@@ -115,6 +116,27 @@
         "#gbub-compose .gbub-compose__att{color:#fff !important}" +
         "#gbub-compose .gbub-compose__reply{background:#1A1A1A !important;color:#fff !important;border-left-color:#fff !important}"
     },
+    /* Terrakotta: Olivgrau, Rost, Terrakotta, Blush, Taubenblau, Schiefer. Kontraste geprüft:
+       Text #34362B auf Hell ≥ 10:1, Nebentext #5D646D ≥ 5:1, Weiß auf Rost 5,4:1 (Terrakotta nie als Texthintergrund) */
+    terra: {
+      label: "Terrakotta",
+      display: "Space Grotesk",
+      body: "Inter",
+      serif: "Playfair Display",
+      hex: {
+        "2E9E5B": "C46852",
+        C7413B: "B04A2F", A5332E: "8E3A24", F7F5F0: "F7F2EF",
+        F6F1E8: "F5EDE8", F3EEE4: "F3ECE7", EDE6DA: "DEC4B8", E4DDD0: "B6B8C1",
+        E8E2D6: "E6DAD3", D8D0C4: "B6B8C1", ECECEB: "E4E5E9",
+        "2A2118": "34362B", "1A1510": "23241C", "6B6358": "5D646D"
+      },
+      rgb: {
+        "199,65,59": "176,74,47", "165,51,46": "142,58,36", "247,245,240": "247,242,239",
+        "246,241,232": "245,237,232", "243,238,228": "243,236,231",
+        "42,33,24": "52,54,43", "52,34,32": "52,54,43", "20,16,12": "35,36,28"
+      },
+      cta: { bg: "#B04A2F", ink: "#FFFFFF" }
+    },
     postmodern: {
       label: "Postmodern",
       fonts: "family=Archivo+Black&family=Archivo:wght@500;600;700;800",
@@ -123,7 +145,7 @@
       serif: "Archivo Black",
       /* Memphis: knallige Neonfarben, fette Schrift, CTAs in Gold */
       hex: {
-        C7413B: "FF2E93", A5332E: "D4007A", F7F5F0: "FFFFFF",
+        "2E9E5B": "B4FF39", C7413B: "FF2E93", A5332E: "D4007A", F7F5F0: "FFFFFF",
         F6F1E8: "FFF9EC", F3EEE4: "FFF4DA", EDE6DA: "7DF9FF", E4DDD0: "B4FF39",
         E8E2D6: "7DF9FF", D8D0C4: "B4FF39", ECECEB: "7DF9FF",
         "2A2118": "1B0B3A", "1A1510": "0D0420", "6B6358": "5B3F8C"
@@ -137,7 +159,7 @@
       extra: "body{font-weight:600}"
     }
   };
-  var ORDER = ["original", "gta", "bauhaus", "bw", "postmodern"];
+  var ORDER = ["original", "gta", "bauhaus", "bw", "postmodern", "terra"];
 
   var current = "original";
   var originals = new WeakMap(); // <style> → Originaltext
