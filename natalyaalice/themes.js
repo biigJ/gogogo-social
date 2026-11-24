@@ -97,7 +97,19 @@
         ".god__btn:not(.god__btn--quiet):not(.god__btn--choice){background:#fff !important;color:#000 !important}" +
         ".god__btn--quiet,.god__btn--choice{color:#fff !important;border-color:#fff !important}" +
         ".profile-goal,.gcr-pill:not(.is-solid),.acc-heart-me{background-color:#000 !important;color:#fff !important;border:1px solid #fff !important}" +
-        ".gcr-pill.is-solid{background:#fff !important;color:#000 !important}"
+        ".gcr-pill.is-solid{background:#fff !important;color:#000 !important}" +
+        /* Bubble (Dunkelblau #1D1630 kennt die Farbtabelle nicht): Kreiszeile, Liste, Nachrichten, Eingabe */
+        ".gbub-strip__item,.gbub-row{color:#fff !important}" +
+        ".gbub-strip__ring.is-empty{box-shadow:inset 0 0 0 2px #fff !important}" +
+        ".gbub-strip__ring.has{box-shadow:0 0 0 3px #fff !important}" +
+        ".gbub-card__me:not(.is-leave){box-shadow:0 0 0 1px rgba(255,255,255,.45)}" +
+        ".acc-msg:not(.is-mine){background:#000 !important;color:#fff !important;border:1px solid rgba(255,255,255,.35)}" +
+        ".acc-msg:not(.is-mine) .acc-msg__who,.acc-msg:not(.is-mine) .acc-msg__txt{color:#fff !important}" +
+        "#gbub-compose{background:#000 !important;box-shadow:0 0 0 1px rgba(255,255,255,.5) !important}" +
+        "#gbub-compose input[type=text]{background:transparent !important;border:0 !important;color:#fff !important}" +
+        "#gbub-compose button[type=submit]{background:#fff !important;color:#000 !important}" +
+        "#gbub-compose .gbub-compose__att{color:#fff !important}" +
+        "#gbub-compose .gbub-compose__reply{background:#1A1A1A !important;color:#fff !important;border-left-color:#fff !important}"
     },
     postmodern: {
       label: "Postmodern",
