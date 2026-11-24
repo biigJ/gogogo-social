@@ -525,7 +525,8 @@
   }
 
   /* ---------- Bubble anlegen: Name, Foto, Beschreibung, Orte ---------- */
-  function openCreate(onDone) {
+  /* edit: bestehende Bubble (nur Ersteller, RLS go_bubbles_update) → Formular vorbelegt, Speichern statt Anlegen */
+  function openCreate(onDone, edit) {
     ensureCss();
     var file = null;
     var wrap = document.createElement("div");
@@ -533,7 +534,7 @@
     wrap.setAttribute("role", "dialog");
     wrap.innerHTML =
       '<form class="gbub-sheet__card">' +
-      '<h2>Neue Bubble</h2>' +
+      '<h2>' + (edit ? "Bubble bearbeiten" : "Neue Bubble") + '</h2>' +
       '<label class="gbub-photo"><span>Foto</span><input type="file" accept="image/*" hidden /></label>' +
       '<input name="name" maxlength="40" placeholder="Name" required />' +
       '<textarea name="desc" rows="3" maxlength="400" placeholder="Beschreibung"></textarea>' +
@@ -545,7 +546,7 @@
       '<div class="gbub-places__picker" hidden><div class="gbub-places__pp"></div>' +
       '<button type="button" class="gbub-places__ok" data-gbub-placeok>Ort übernehmen</button></div></div>' +
       '<div class="gbub-sheet__btns"><button type="button" data-gbub-cancel>Abbrechen</button>' +
-      '<button type="submit" class="is-dark">Anlegen</button></div></form>';
+      '<button type="submit" class="is-dark">' + (edit ? "Speichern" : "Anlegen") + '</button></div></form>';
     document.body.appendChild(wrap);
     var form = wrap.querySelector("form");
     var photo = wrap.querySelector(".gbub-photo");
@@ -566,6 +567,17 @@
       }).join("");
     }
     var color = PALETTE[bubbles.length % PALETTE.length];
+    if (edit) {
+      form.name.value = edit.name || "";
+      form.desc.value = edit.description || "";
+      if (edit.photo_url) { photo.style.backgroundImage = "url(\"" + String(edit.photo_url).replace(/"/g, "%22") + "\")"; photo.classList.add("has-img"); }
+      if (edit.color) {
+        color = edit.color;
+        wrap.querySelectorAll("[data-gbub-color]").forEach(function (x) { x.classList.toggle("is-on", x.getAttribute("data-gbub-color") === color); });
+      }
+      (edit.places || []).forEach(function (pl) { if (pl && pl.name) chosen.push(pl); });
+      paintChips();
+    }
     wrap.addEventListener("click", function (e) {
       if (e.target === wrap || (e.target.closest && e.target.closest("[data-gbub-cancel]"))) { close(); return; }
       var col = e.target.closest && e.target.closest("[data-gbub-color]");
@@ -602,11 +614,27 @@
       var desc = String(form.desc.value || "").trim();
       var places = chosen.slice();
       if (!name) return;
-      if (!file) { toast("Bitte ein Foto wählen"); return; }
+      if (!file && !(edit && edit.photo_url)) { toast("Bitte ein Foto wählen"); return; }
       if (!desc) { toast("Bitte eine Beschreibung"); return; }
       if (!places.length) { toast("Bitte mindestens einen Ort"); return; }
       var btn = form.querySelector("[type=submit]");
       btn.disabled = true;
+      if (edit) {
+        var upE = file ? (global.GoExMedia && GoExMedia.uploadImage ? GoExMedia.uploadImage(file, "bubbles") : Promise.reject(new Error("Upload nicht verfügbar"))) : Promise.resolve(edit.photo_url);
+        upE.then(function (url) {
+          return host.rest("go_bubbles?id=eq." + encodeURIComponent(edit.id), {
+            method: "PATCH", prefer: "return=minimal",
+            body: { name: name, description: desc, photo_url: url, places: places, color: color }
+          });
+        }).then(function () {
+          close();
+          return load().then(function () { if (host.onChange) host.onChange(); if (onDone) onDone(); });
+        }).catch(function (err) {
+          btn.disabled = false;
+          toast(String((err && err.message) || "") || "Speichern ging gerade nicht");
+        });
+        return;
+      }
       var up = global.GoExMedia && GoExMedia.uploadImage ? GoExMedia.uploadImage(file, "bubbles") : Promise.reject(new Error("Upload nicht verfügbar"));
       up.then(function (url) {
         return host.rest("go_bubbles", {
@@ -652,7 +680,10 @@
       '<span class="gbub-row__img" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' + (b.photo_url ? '<img src="' + esc(b.photo_url) + '" alt="" decoding="sync" /><span class="gbub-row__ico">' + SOAP_SVG + "</span>" : SOAP_SVG) + "</span>" +
       '<span class="gbub-row__txt">' +
       (isMine ? '<span class="gbub-row__pills"><span class="gbub-card__me">Meine Bubble</span><button type="button" class="gbub-card__me is-leave" data-gbub-leave="' + esc(b.id) + '">Verlassen</button></span>' : "") +
-      '<span class="gbub-row__name">' + esc(b.name) + "</span></span></div>";
+      '<span class="gbub-row__name">' + esc(b.name) + "</span></span>" +
+      /* selbst erstellt: Stift rechts wie bei Gruppe (Bearbeiten) */
+      (b.created_by && String(b.created_by) === me() ? '<button type="button" class="team-pencil gbub-row__pen" data-gbub-edit="' + esc(b.id) + '" aria-label="Bubble bearbeiten"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg></button>' : "") +
+      "</div>";
   }
 
   function paint(el) {
@@ -681,6 +712,13 @@
       el.addEventListener("click", function (e) {
         var t = e.target;
         if (t.closest("[data-gbub-add]")) { openCreate(function () { paint(el); }); return; }
+        var ed = t.closest("[data-gbub-edit]");
+        if (ed) {
+          e.stopPropagation();
+          var be = bubbles.filter(function (x) { return String(x.id) === ed.getAttribute("data-gbub-edit"); })[0];
+          if (be) openCreate(function () { el._gbubHtml = ""; paint(el); }, be);
+          return;
+        }
         var lv = t.closest("[data-gbub-leave]");
         if (lv) {
           e.stopPropagation();
@@ -766,10 +804,11 @@
       ".gbub-row__img img{width:100%;height:100%;object-fit:cover;display:block}" +
       ".gbub-row__img svg{width:34px;height:34px}" +
       ".gbub-row__img{position:relative}" +
+      ".gbub-row .gbub-row__pen{margin-left:auto;flex:none}" +
       ".gbub-row__ico{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.55))}" +
       ".gbub-row__txt{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:6px}" +
       ".gbub-row__pills{display:flex;gap:6px}" +
-      ".gbub-row__pills .gbub-card__me{position:static;border:0;cursor:pointer}" +
+      ".gbub-row__pills .gbub-card__me{position:static;border:0;cursor:pointer;white-space:nowrap}" +
       ".gbub-card__me.is-leave{background:#D93A3A !important;color:#fff}" +
       ".gbub-row .gbub-row__name{font:600 18px/1.2 Inter,sans-serif !important}" +
       ".gbub-card__leave{position:absolute;bottom:10px;right:12px;border:0;background:transparent;color:inherit;font:600 12px Inter,sans-serif;text-decoration:underline;opacity:.7;cursor:pointer}" +
