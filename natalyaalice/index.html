@@ -11735,6 +11735,7 @@
       }
 
       function dayFullyDone(iso) {
+        if (!Log.EXERCISES.length) return false;
         return Log.EXERCISES.every(function (ex) {
           return Log.exerciseComplete(serverLogs, iso, ex);
         });
@@ -11744,6 +11745,9 @@
         var entry = diaryEntry(iso);
         if (entry.cleared) return "";
         if (entry.move) return entry.move;
+        /* „Einfache Basics“ ist Natalyas alte Routine (Seite ohne Konto). Mit Konto kommt der Titel nur vom Event:
+           sonst machte ein leerer Tagebuch-Tag oder ein einzelner Übungs-Haken eine Karte ohne Besitzer (leere Übungsliste → every() = true) */
+        if (sessionMode) return "";
         if (dayFullyDone(iso)) return "Einfache Basics";
         if (shortDone().indexOf(iso) >= 0) return "Einfache Basics kurz";
         return "";
