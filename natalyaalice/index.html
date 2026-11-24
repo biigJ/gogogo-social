@@ -27223,24 +27223,54 @@
         if (!sel) return;
         var cv = document.createElement("canvas").getContext("2d");
         var last = "";
+        var open = false;
+        /* Platz zwischen Sprechblase und Herz: Select steht mittig, also zählt die engere Seite doppelt */
+        function room(cs) {
+          var say = document.getElementById("heute-say");
+          var heart = document.getElementById("heute-replies");
+          var mid = window.innerWidth / 2;
+          var left = say && say.offsetParent ? say.getBoundingClientRect().right : 90;
+          var right = heart && heart.offsetParent ? heart.getBoundingClientRect().left : window.innerWidth - 90;
+          return Math.max(80, 2 * Math.min(mid - left, right - mid) - 16);
+        }
+        /* lange Gruppen-/Circle-Namen in der Anzeige kürzen, in der Auswahlliste voll zeigen */
+        function full(o) { return o.getAttribute("data-full") || o.text; }
+        function restore() {
+          [].forEach.call(sel.options, function (o) { if (o.hasAttribute("data-full")) { o.text = o.getAttribute("data-full"); o.removeAttribute("data-full"); } });
+        }
         function fit() {
+          if (open) return;
           var opt = sel.options[sel.selectedIndex];
           if (!opt || !sel.offsetParent) return;
           var cs = getComputedStyle(sel);
-          var key = opt.text + "|" + cs.font;
+          var max = room(cs);
+          var key = full(opt) + "|" + cs.font + "|" + max + "|" + sel.selectedIndex;
           if (key === last) return;
           last = key;
+          restore();
           cv.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
-          var w = cv.measureText(opt.text).width;
-          sel.style.width = Math.ceil(w + parseFloat(cs.paddingRight || 0) + parseFloat(cs.paddingLeft || 0) + 2) + "px";
+          var pad = parseFloat(cs.paddingRight || 0) + parseFloat(cs.paddingLeft || 0) + 2;
+          var t = opt.text;
+          if (cv.measureText(t).width + pad > max) {
+            opt.setAttribute("data-full", t);
+            while (t.length > 3 && cv.measureText(t.replace(/\s+$/, "") + "…").width + pad > max) t = t.slice(0, -1);
+            opt.text = t.replace(/\s+$/, "") + "…";
+          }
+          sel.style.width = Math.ceil(cv.measureText(opt.text).width + pad) + "px";
         }
         window.GoFitHeuteFilter = function () { last = ""; fit(); };
-        sel.addEventListener("change", fit);
+        sel.addEventListener("change", function () { open = false; last = ""; fit(); });
+        /* beim Öffnen volle Namen in der Liste */
+        function onOpen() { open = true; restore(); last = ""; }
+        sel.addEventListener("focus", onOpen);
+        sel.addEventListener("mousedown", onOpen);
+        sel.addEventListener("touchstart", onOpen, { passive: true });
+        sel.addEventListener("blur", function () { open = false; last = ""; fit(); });
+        window.addEventListener("resize", function () { last = ""; fit(); });
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(window.GoFitHeuteFilter);
         /* Wert wird auch per Code gesetzt (Filter laden, Shellwechsel): leicht nachziehen */
         setInterval(fit, 700);
       })();
-      /* Kalender-Dropdown: Breite = gewähltes Wort wie in Aktuell (Select wird bei jedem Render neu gebaut) */
       /* Online-Status: Herzschlag jede Minute, solange die App sichtbar ist; beim Verlassen sofort zurückgesetzt.
          Online = Herzschlag jünger als 2,5 Minuten. show_online false: kein Herzschlag gespeichert (go-online-status.sql) */
       (function goOnline() {
