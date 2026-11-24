@@ -19,11 +19,11 @@ Du übernimmst ein laufendes Produkt mit frischer, schmerzhafter Scroll-Regressi
 
 1. **Kleine Diffs.** Eine Ursache, ein Fix, ein PR. Keine „gleich noch Headline/FFC/Gruppe mit“.
 2. **Vor Touch/Scroll-CSS nie raten.** `touch-action`, `overflow`, `scroll-snap`, nested scroll (Rail vs. `.go-slide__body`) und JS-Settle (`snapLock`, Timer) sind gekoppelt. Ändere **eine** Schicht, dann verifizieren.
-3. **Plus-Rail-Regressionstests (Pflicht bei jedem `#go-rail`-Diff):**
-   - Plus öffnen → TOC → **Ernährung** tippen → **L-R swipen** (muss gehen).
-   - Pfeil rechts **mindestens 5×** hintereinander (jedes Mal neuer Slide).
-   - Pfeil links zurück, inkl. über TOC.
-   - FFC/Zirkel-Slide: Login-State darf **nicht** flackern (kein unnötiger Full-Rebuild).
+3. **Plus-Regressionstests (Pflicht bei jedem `#go-rail`-Diff):** Seit 24.11.2026 hat Plus keine Pfeile und kein seitliches Wischen mehr (Wunsch Joscha).
+   - Plus öffnen → Kachel **Ernährung** tippen → Ernährung offen, hoch/runter scrollt.
+   - Seitlich wischen ändert die Seite **nicht**.
+   - „Plus“ in der Leiste → zurück zu den Kacheln; andere Kachel öffnet ihre Seite.
+   - FFC/Zirkel: Login-State darf **nicht** flackern (kein unnötiger Full-Rebuild).
 4. **iOS / PWA mitdenken.** Desktop-Chrome allein ist kein Freigabesignal für Swipe.
 5. **Kein Full-Rebuild von `paintGoRail`**, wenn Offer-Keys + FFC-Login gleich sind — der Skip existiert absichtlich.
 6. **`#go-card-routine` vor Rail-`textContent=""` retten** (bestehendes Muster beibehalten).
@@ -56,11 +56,11 @@ Du übernimmst ein laufendes Produkt mit frischer, schmerzhafter Scroll-Regressi
 ## Plus-Rail — Vertrag (nicht brechen)
 
 ```
-#go-rail          → horizontaler Scroll + snap (touch-action: pan-x)
+#go-rail          → Slides nebeneinander, overflow-x hidden, touch-action pan-y (kein Wischen; Wechsel nur per Code)
 .go-slide         → feste Breite = Rail-Viewport, kein eigener Vertikal-Scroll
-.go-slide__body   → vertikaler Scroll INHALT (touch-action: pan-x pan-y)
-#go-rail-nav      → Titel + Pfeile; Pfeile → sofort snapGoRailToIndex(..., false)
-                   Timer + snapLock clearen; KEIN smooth-Fight gegen settle
+.go-slide__body   → vertikaler Scroll INHALT (touch-action: pan-y)
+#go-rail-nav      → nur Titel; Pfeile ausgeblendet
+TOC-Slide         → Kacheln (.go-tile), Tipp → jumpToGoOffer, Griff rechts sortiert (Reihenfolge je Konto)
 jumpToGoOffer     → Lock clearen, snap sofort, body.scrollTop = 0
 ```
 
