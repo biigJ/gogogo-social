@@ -171,7 +171,8 @@
         body: {
           status: "freigeschaltet",
           payment_status: paymentFor(product),
-          meta: meta || existing.meta || {}
+          /* bisherige Angaben (z. B. Stempel) behalten, Deaktiviert-Merker entfernen */
+          meta: (function () { var m = Object.assign({}, existing.meta || {}, meta || {}); delete m.deaktiviert; return m; })()
         }
       })
         .catch(function () {
@@ -930,6 +931,24 @@
     activeOrderFor: activeOrderFor,
     openStampCard: openStampCard,
     cancelAllOrdersForUser: cancelAllOrdersForUser,
+    /* Plus-Punkt deaktivieren: Buchung zurück auf „angefragt“ (Stempel bleiben in meta), Aktivieren holt sie wieder */
+    cancelOffer: function (type) {
+      var list = state.orders.filter(function (o) {
+        var p = o.support_products || o.product || {};
+        return (o.status === "aktiv" || o.status === "freigeschaltet") && String(p.type) === String(type);
+      });
+      return Promise.all(list.map(function (o) {
+        var meta = Object.assign({}, o.meta || {}, { deaktiviert: new Date().toISOString() });
+        o.status = "angefragt";
+        o.meta = meta;
+        if (!o.id || /^local-/.test(String(o.id))) return null;
+        return rest("support_orders?id=eq." + encodeURIComponent(o.id), {
+          method: "PATCH", prefer: "return=minimal", body: { status: "angefragt", meta: meta }
+        });
+      })).then(function () {
+        if (host.paintProfil) host.paintProfil();
+      });
+    },
     offerOwned: offerOwned,
     paypalDonateUrl: function () { return PAYPAL_DONATE_URL; },
     joschaWa: function () { return JOSCHA_WA; }

@@ -5770,6 +5770,12 @@
     /* Plus: „+ mehr Plus-Punkte“ im Stil des Inhaltsverzeichnisses, ohne Linie */
     .go-toc .go-toc__item.go-toc__add, .go-toc .go-toc__item.go-toc__add:last-child { border-bottom: 0; color: rgba(42, 33, 24, 0.55); }
     /* Plus-Übersicht als Kacheln (Höhe wie zusammengeschobene Events in Aktuell), eckig, 1px Linie, Griff rechts zum Sortieren */
+    .go-stampplus { width: 100%; max-width: 340px; margin: 14px auto 0; }
+    .go-stampplus__head { display: flex; justify-content: flex-end; }
+    .go-stampplus__pen { border: 0; background: transparent; color: #2A2118; width: 44px; height: 44px; display: grid; place-items: center; cursor: pointer; padding: 0; }
+    .go-stampplus__list { display: flex; flex-direction: column; gap: 18px; align-items: stretch; }
+    .go-stampplus__list .kreis-stamps { margin: 0; }
+    .go-stampplus__empty { margin: 0; text-align: center; font-size: 14px; opacity: .7; }
     .go-tiles { display: flex; flex-direction: column; gap: 10px; padding: 8px 0 24px; width: 100%; }
     .go-tile { position: relative; height: 104px; flex: none; overflow: hidden; border: 0; border-radius: 0; background: #F3EEE4; cursor: pointer; touch-action: pan-y; }
     .go-tile__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .3; pointer-events: none; }
@@ -8895,7 +8901,7 @@
   <script src="/natalyaalice/heute-v3.js?v=feed-162"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-104"></script>
-  <script src="/natalyaalice/support.js?v=support-24"></script>
+  <script src="/natalyaalice/support.js?v=support-25"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -19915,6 +19921,61 @@
         });
       }
 
+      /* Plus → Stempelkarte: nicht aktiv = Knopf „Aktivieren“; aktiv = die in Gruppen und Circles verknüpften Karten, mittig,
+         Stift rechts öffnet „Deaktivieren“. Die allgemeine gogogo-Karte zeigt sich hier nicht (kommt später). */
+      function stampPlusBlock(owned) {
+        var box = document.createElement("div");
+        box.className = "go-stampplus";
+        if (!owned) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "go-slide__cta";
+          b.textContent = "Aktivieren";
+          b.addEventListener("click", function () {
+            b.disabled = true;
+            Promise.resolve(window.GoSupport && GoSupport.bookOffer ? GoSupport.bookOffer("stempelkarte") : null)
+              .then(function () { paintGoRail(true); })
+              .catch(function () { b.disabled = false; gogogoToast("Aktivieren ging gerade nicht"); });
+          });
+          box.appendChild(b);
+          return box;
+        }
+        var head = document.createElement("div");
+        head.className = "go-stampplus__head";
+        head.innerHTML = '<span></span><button type="button" class="go-stampplus__pen" aria-label="Stempelkarte bearbeiten">' +
+          '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M14 6l4 4"/></svg></button>';
+        head.querySelector("button").addEventListener("click", function () {
+          if (!window.GoDialog) return;
+          GoDialog.choose("Stempelkarte", [{ label: "Deaktivieren", value: "off" }], { center: true, cancel: "Abbrechen" }).then(function (v) {
+            if (v !== "off" || !window.GoSupport || !GoSupport.cancelOffer) return;
+            GoSupport.cancelOffer("stempelkarte").then(function () { paintGoRail(true); })
+              .catch(function () { gogogoToast("Deaktivieren ging gerade nicht"); });
+          });
+        });
+        box.appendChild(head);
+        var list = document.createElement("div");
+        list.className = "go-stampplus__list";
+        box.appendChild(list);
+        if (sessionAccount && sessionAccount.id) {
+          rest("go_stamp_links?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&status=eq.linked&select=id,kind,ref,name,stamps&order=created_at.asc")
+            .catch(function () { return []; })
+            .then(function (rows) {
+              rows = (rows || []).filter(function (r) { return r.kind === "group" || r.kind === "circle"; });
+              if (!rows.length) {
+                list.innerHTML = '<p class="go-stampplus__empty">Noch keine Stempelkarte in Deinen Gruppen oder Circles aktiv.</p>';
+                return;
+              }
+              rows.forEach(function (r) {
+                var el = kreisStampsEl();
+                el.querySelector(".kreis-stamps__head span").textContent = r.name || (r.kind === "group" ? "Gruppe" : "Circle");
+                paintKreisStamps(el, r.stamps);
+                list.appendChild(el);
+              });
+            });
+        }
+        return box;
+      }
+
       function paintGoRail(force) {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
@@ -20031,6 +20092,7 @@
                 if (isZ && ffcLoggedNow) ownedNow = true;
                 var coachSelf = of.key === "coach_offer" && !!(sessionIsTrainer || (sessionAccount && sessionAccount.is_trainer));
                 if (coachSelf) ownedNow = true;
+                if (of.key === "stempelkarte") continue; /* eigener Block (stampPlusBlock), Neuaufbau beim Umschalten */
                 var btn = existing[ei].querySelector(".go-slide__cta:not(.go-slide__cta--signup)");
                 if (!btn) continue;
                 if (ownedNow) {
@@ -20161,14 +20223,6 @@
             var stampOwned = !!(window.GoSupport && ((GoSupport.activeOrderFor && GoSupport.activeOrderFor("stempelkarte")) || (GoSupport.offerOwned && GoSupport.offerOwned("stempelkarte"))));
             /* Bild statt Mini-Karte (Wunsch 24.11.); Tipp öffnet weiter Karte bzw. Buchung */
             art.innerHTML = '<img src="' + IMG.stempelkarte + '" alt="" />';
-            /* Tipp auf die Karte: gebucht → Karte zeigen, sonst Buchen */
-            art.removeAttribute("aria-hidden");
-            art.style.cursor = "pointer";
-            art.addEventListener("click", function () {
-              var ownedNow = !!(window.GoSupport && ((GoSupport.activeOrderFor && GoSupport.activeOrderFor("stempelkarte")) || (GoSupport.offerOwned && GoSupport.offerOwned("stempelkarte"))));
-              if (ownedNow) openStampCardModal(GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null);
-              else openStampBookModal();
-            });
           } else {
             var img = document.createElement("img");
             img.src = IMG[offer.type] || IMG.routine;
@@ -20265,8 +20319,9 @@
                 });
             });
           }
-          /* Stempelkarte: Tipp aufs Bild öffnet bzw. bucht, kein Button darunter */
-          if (offer.key !== "stempelkarte") card.appendChild(cta);
+          /* Stempelkarte: unter dem Bild „Aktivieren“, aktiv die Karten der Gruppen und Circles + Stift (Deaktivieren) */
+          if (offer.key === "stempelkarte") card.appendChild(stampPlusBlock(owned));
+          else card.appendChild(cta);
           if (isZirkel) {
             /* Circle = FFC-Gruppe: hier beitreten oder gründen (nicht mehr unter Team → Meine Gruppe) */
             var circleBtn = document.createElement("button");
