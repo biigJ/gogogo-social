@@ -759,7 +759,8 @@
       ".gbub-card .gbub-card__meta{font:600 13px/1.3 Inter,sans-serif !important;opacity:.75}" +
       ".gbub-card .gbub-card__desc{font:500 14px/1.35 Inter,sans-serif !important;opacity:.85;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}" +
       ".gbub-card__me{position:absolute;top:10px;right:12px;font:700 11px/1 Inter,sans-serif;background:#1D1630;color:#fff;border-radius:999px;padding:5px 9px}" +
-      ".gbub-row{display:flex;align-items:center;gap:14px;cursor:pointer;color:#1D1630}" +
+      /* Schriftfarbe erben wie die Freundesliste: bleibt im Dark Mode lesbar */
+      ".gbub-row{display:flex;align-items:center;gap:14px;cursor:pointer;color:inherit}" +
       ".gbub-row__img{flex:none;width:72px;height:72px;border-radius:50%;overflow:hidden;background:var(--gbub);display:flex;align-items:center;justify-content:center}" +
       ".gbub-row__img img{width:100%;height:100%;object-fit:cover;display:block}" +
       ".gbub-row__img svg{width:34px;height:34px}" +
