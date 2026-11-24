@@ -2095,7 +2095,23 @@
     return GoCovers.url(opts.courseId, cat, opts.enrollmentId);
   }
 
+  /* Punkte unter der Foto-Galerie folgen dem Wischen */
+  document.addEventListener("scroll", function (e) {
+    var g = e.target;
+    if (!g || !g.classList || !g.classList.contains("acc-card__gallery")) return;
+    var i = Math.round(g.scrollLeft / Math.max(1, g.clientWidth));
+    var dots = g.parentNode && g.parentNode.querySelectorAll(".acc-card__gdots i");
+    if (dots) dots.forEach(function (d, k) { d.classList.toggle("is-on", k === i); });
+  }, true);
+
   function mediaInnerHtml(opts) {
+    /* mehrere Fotos am Event: seitlich wischen */
+    if (opts.photo && opts.extraPhotos && opts.extraPhotos.length) {
+      var all = [opts.photo].concat(opts.extraPhotos);
+      return '<div class="acc-card__gallery">' + all.map(function (u) {
+        return '<img class="acc-card__gphoto" src="' + esc(u) + '" alt="" loading="lazy" />';
+      }).join("") + '</div><div class="acc-card__gdots">' + all.map(function (_, i) { return '<i class="' + (i ? "" : "is-on") + '"></i>'; }).join("") + "</div>";
+    }
     if (opts.photo) {
       return '<img class="acc-card__photo" src="' + esc(opts.photo) + '" alt="" />';
     }
@@ -2137,6 +2153,7 @@
       '<div class="acc-card__media ' +
       tone +
       (opts.photo || coverFor(opts) ? " has-photo" : "") +
+      (opts.photo && opts.extraPhotos && opts.extraPhotos.length ? " has-gallery" : "") +
       '">' +
       mediaInnerHtml(opts) +
       overlayHtml(opts) +
@@ -2393,6 +2410,7 @@
         '"',
       category: ev.category,
       photo: ev.photo_url || "",
+      extraPhotos: (state.extraPhotos || {})[String(ev.id)] || null,
       courseId: ev.course_id || "",
       enrollmentId: ev.enrollment_id || "",
       emoji: emoji,
@@ -2730,6 +2748,7 @@
   }
 
   function buildFeedItems(flags) {
+    state.extraPhotos = {};
     if (flags && flags.bubbleOnly) return bubbleFeedItems();
     var today = todayIso();
     var pack = filterOwnEvents(flags);
@@ -2936,12 +2955,22 @@
          das Event steht schon im Feed (z. B. Zirkel nach FFC-Workout → „Heute · 12:00“ doppelt) */
       var doneDay = {};
       (state.events || []).forEach(function (e) {
-        if (e && e.status === "erledigt" && e.starts_at) doneDay[String(e.user_id) + "|" + dayKey(e.starts_at)] = true;
+        var k0 = e && e.starts_at ? String(e.user_id) + "|" + dayKey(e.starts_at) : "";
+        if (e && e.status === "erledigt" && e.starts_at && !doneDay[k0]) doneDay[k0] = e;
       });
       diaryItems.forEach(function (d) {
         if (!d || !d.starts_at) return;
         if (flags.groupOnly && !inGroupFilter(d.user_id, flags)) return;
-        if (!String(d.note || "").trim() && !d.photo_url && doneDay[String(d.user_id) + "|" + dayKey(d.starts_at)]) return;
+        /* Tag mit erledigtem Event derselben Person: keine zweite Karte („Heute · 12:00“).
+           Ein Foto aus dem Tagebuch (z. B. während des Trainings gemacht) kommt als weiteres Bild an das Event, seitlich wischen. */
+        var hitEv = doneDay[String(d.user_id) + "|" + dayKey(d.starts_at)];
+        if (hitEv) {
+          if (d.photo_url && d.photo_url !== hitEv.photo_url) {
+            var arr = state.extraPhotos[String(hitEv.id)] || (state.extraPhotos[String(hitEv.id)] = []);
+            if (arr.indexOf(d.photo_url) < 0) arr.push(d.photo_url);
+          }
+          return;
+        }
         history.push({
           kind: "diary",
           starts_at: d.starts_at,
@@ -3190,10 +3219,11 @@
       /* Titel/Overlay liegt über dem Bild: Karte suchen, dann prüfen, ob der Finger im Bild liegt */
       for (var i = 0; i < t.length; i++) {
         var card = t[i].target && t[i].target.closest ? t[i].target.closest(".acc-card") : null;
-        var el = card && root.contains(card) ? card.querySelector(".acc-card__photo") : null;
-        if (!el) continue;
-        var r = el.getBoundingClientRect();
-        if (t[i].clientX >= r.left && t[i].clientX <= r.right && t[i].clientY >= r.top && t[i].clientY <= r.bottom) return el;
+        var els = card && root.contains(card) ? card.querySelectorAll(".acc-card__photo, .acc-card__gphoto") : [];
+        for (var k = 0; k < els.length; k++) {
+          var r = els[k].getBoundingClientRect();
+          if (t[i].clientX >= r.left && t[i].clientX <= r.right && t[i].clientY >= r.top && t[i].clientY <= r.bottom) return els[k];
+        }
       }
       return null;
     }
@@ -3248,7 +3278,7 @@
     /* iOS: Seiten-Zoom auf dem Bild verhindern */
     root.addEventListener("gesturestart", function (e) {
       var c = e.target && e.target.closest ? e.target.closest(".acc-card") : null;
-      if (z || (c && c.querySelector(".acc-card__photo"))) e.preventDefault();
+      if (z || (c && c.querySelector(".acc-card__photo, .acc-card__gphoto"))) e.preventDefault();
     }, { passive: false });
     /* Nach dem Zoomen kein versehentlicher Tipp (Stempelkarte, Story) */
     root.addEventListener("click", function (e) {
