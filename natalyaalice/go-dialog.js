@@ -469,15 +469,17 @@
       r1.appendChild(pill);
       r1.appendChild(ok);
       card.appendChild(r1);
-      /* optional eine zweite Aktion über Löschen (z. B. Verkleinern) → "__extra2" */
-      if (opts.extra2) {
+      /* weitere Aktionen über Löschen: opts.actions [{label,value}] → value; extra2 (alt) → "__extra2" */
+      var acts = (opts.actions || []).slice();
+      if (opts.extra2) acts.push({ label: opts.extra2, value: "__extra2" });
+      acts.forEach(function (a) {
         var r3 = document.createElement("button");
         r3.type = "button";
         r3.className = "god__sheet-row god__sheet-act";
-        r3.textContent = opts.extra2;
-        r3.addEventListener("click", function () { close("__extra2"); });
+        r3.textContent = a.label;
+        r3.addEventListener("click", function () { close(a.value); });
         card.appendChild(r3);
-      }
+      });
       var r2 = document.createElement("button");
       r2.type = "button";
       r2.className = "god__sheet-row god__sheet-danger";
