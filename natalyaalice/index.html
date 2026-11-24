@@ -1569,6 +1569,17 @@
       background: transparent; color: #2A2118; cursor: pointer;
       font: 600 13px/1 Inter, system-ui, sans-serif; letter-spacing: .02em;
     }
+    /* Sprechblase rechts vom Tamagotchi: Eingabe unten wie in der Bubble, Ziel = gewählter Kreis */
+    .heute-say { display: none; }
+    body.is-session[data-shell="heute"] .heute-say {
+      display: grid; place-items: center; position: absolute; left: 50px;
+      top: calc(max(6px, env(safe-area-inset-top, 0px)) + var(--heute-filter-line) - 4.5px);
+      width: 36px; height: 36px; padding: 0; border: 0; border-radius: 50%;
+      background: transparent; color: #2A2118; cursor: pointer;
+    }
+    .heute-say svg { width: 24px; height: 24px; }
+    body.go-say-open .heute-say svg { fill: currentColor; }
+    body.go-say-open #heute-acc { padding-bottom: 90px; }
     .heute-refresh.is-busy svg { animation: heute-spin .8s linear infinite; }
     @keyframes heute-spin { to { transform: rotate(360deg); } }
     /* Dropdown oben in Aktuell: fett, 1,3 × M (gegen die globale Typo-Regel mit !important) */
@@ -7440,6 +7451,7 @@
     </div>
     <div class="heute-filter-row shell-heute">
       <button type="button" class="heute-info" id="heute-info" aria-label="Tamagotchi"><svg class="tama-ico" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8c4.3 0 7.2 3.6 7.2 8.6 0 5.6-3.1 9.8-7.2 9.8s-7.2-4.2-7.2-9.8c0-5 2.9-8.6 7.2-8.6z"/><rect x="8.2" y="7.4" width="7.6" height="6" rx="1.4"/><circle cx="9.3" cy="16.9" r=".9"/><circle cx="12" cy="17.6" r=".9"/><circle cx="14.7" cy="16.9" r=".9"/><path class="tama-ico__off" d="M3.5 21.5 20.5 2.5" stroke-width="2"/></svg><span class="tama-ico__txt">Info</span></button>
+      <button type="button" class="heute-say" id="heute-say" aria-label="Nachricht schreiben"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M12 4c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-1.9-.1-2.8-.4L5 19.5l1.2-3.6C4.5 14.7 3.5 12.9 3.5 11c0-3.9 3.8-7 8.5-7z"/></svg></button>
       <label class="heute-filter-pick">
         <select id="heute-filter-select" aria-label="Heute filtern">
           <option value="ich">Nur Ich</option>
@@ -8717,7 +8729,7 @@
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-5"></script>
   <script src="/natalyaalice/go-story.js?v=gst-2"></script>
-  <script src="/natalyaalice/bubbles.js?v=bub-13"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-14"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-5"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-8"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-14"></script>
@@ -8732,7 +8744,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-146"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-147"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-92"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
@@ -17599,6 +17611,85 @@
         });
       }
 
+      /* ---------- Sprechblase in Aktuell (go-aktuell-posts.sql) ---------- */
+      function heuteViewLabel(view) {
+        var sel = document.getElementById("heute-filter-select");
+        var o = sel ? [].filter.call(sel.options, function (x) { return x.value === view; })[0] : null;
+        return o ? o.textContent : "";
+      }
+      function sayPlaceholder() {
+        var view = heuteView();
+        if (view === "ich") return "Notiz nur für Dich";
+        if (view === "alles") return "Nachricht an alle Deine Kreise";
+        return "Nachricht an " + (heuteViewLabel(view) || "Deinen Kreis");
+      }
+      function syncHeuteSay() {
+        if (window.GoBubbles && GoBubbles.setPlaceholder) GoBubbles.setPlaceholder(heuteView() === "bubble" ? "" : sayPlaceholder());
+      }
+      function bindHeuteSay() {
+        var btn = document.getElementById("heute-say");
+        if (!btn || btn.dataset.bound === "1") return;
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", function () {
+          var open = !document.body.classList.contains("go-say-open");
+          document.body.classList.toggle("go-say-open", open);
+          syncHeuteSay();
+          var inp = document.querySelector("#gbub-compose input[type=text]");
+          if (open && inp) inp.focus();
+        });
+        var sel = document.getElementById("heute-filter-select");
+        if (sel) sel.addEventListener("change", function () { setTimeout(syncHeuteSay, 0); });
+      }
+      function circleAccountIds() {
+        var nicks = Object.keys((circleCrew && circleCrew.members) || {});
+        var go = function () {
+          var n2 = Object.keys(circleCrew.members || {});
+          if (!n2.length) return Promise.resolve([]);
+          var list = [];
+          n2.forEach(function (n) { list.push(n, "@" + n); });
+          return rest("go_accounts?nickname=in.(" + list.map(function (n) { return '"' + String(n).replace(/"/g, "") + '"'; }).map(encodeURIComponent).join(",") + ")&select=id")
+            .then(function (rows) { return (rows || []).map(function (r) { return String(r.id); }); })
+            .catch(function () { return []; });
+        };
+        return nicks.length ? go() : Promise.resolve(loadCircleCrew()).then(go, go);
+      }
+      function kreisRecipients(view) {
+        var mine = String(sessionAccount && sessionAccount.id);
+        var team = (teamPeople || []).filter(function (p) { return p && !p.isSelf && p.id; }).map(function (p) { return String(p.id); });
+        var coachees = (teamPeople || []).filter(function (p) { return p && !p.isSelf && String(p.trainer_id || "") === mine; }).map(function (p) { return String(p.id); });
+        var grp = groupMemberIds();
+        var bub = window.GoBubbles ? GoBubbles.mine() : null;
+        var bubIds = bub && GoBubbles.memberIds ? GoBubbles.memberIds(bub.id) : [];
+        var job;
+        if (view === "ich") job = Promise.resolve([]);
+        else if (view === "team") job = Promise.resolve(team);
+        else if (view === "coach") job = Promise.resolve(coachees);
+        else if (view === "gruppe") job = Promise.resolve(grp);
+        else if (view === "circle") job = circleAccountIds();
+        else job = circleAccountIds().then(function (c) { return team.concat(grp, bubIds, coachees, c); });
+        return job.then(function (ids) {
+          var seen = {};
+          return (ids || []).map(String).filter(function (id) {
+            if (!id || id === mine || id.indexOf("ffc-") === 0 || seen[id]) return false;
+            seen[id] = true;
+            return true;
+          });
+        });
+      }
+      function sendKreisPost(view, text, ex) {
+        ex = ex || {};
+        var body = String(text || "").trim();
+        if (!sessionAccount || (!body && !ex.media_url)) return Promise.resolve(false);
+        var aud = ["ich", "team", "gruppe", "circle", "coach", "alles"].indexOf(view) >= 0 ? view : "alles";
+        return kreisRecipients(aud).then(function (ids) {
+          var row = { author_id: sessionAccount.id, audience: aud, recipients: ids, body: body.slice(0, 2000) };
+          if (aud === "gruppe") { var g = (myGroups() || [])[0]; if (g && g.id) row.audience_id = String(g.id); }
+          if (ex.media_url) { row.media_url = ex.media_url; row.media_kind = ex.media_kind || "img"; }
+          if (ex.reply_to) row.reply_to = ex.reply_to;
+          return rest("go_aktuell_posts", { method: "POST", prefer: "return=minimal", body: row });
+        }).then(function () { return true; });
+      }
+
       function syncHeuteFilterOptions() {
         var heute = document.getElementById("heute-filter-select");
         if (!heute) return;
@@ -23055,9 +23146,16 @@
           },
           onMessage: function () {
             try { if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh(); } catch (eM) {}
+          },
+          /* Sprechblase: in der Bubble-Ansicht in den Bubble-Chat, sonst an den gewählten Kreis */
+          composeTarget: function () {
+            var view = heuteView();
+            if (view === "bubble") return null;
+            return { send: function (text, ex) { return sendKreisPost(view, text, ex); } };
           }
         }).then(function () { syncHeuteFilterOptions(); });
         GoBubbles.mountComposer();
+        bindHeuteSay();
       }
 
       /* Kraft-Tracking: Historie + Verlauf (kraft-tracking.js) */

@@ -2473,6 +2473,28 @@
      2) Meine Events von heute (Plan + eigene Events/FFC)
      3) Kommende (morgen zuerst, dann später; eigene vor fremden bei Gleichstand)
      4) Historie (Tagebuch+), neueste zuerst */
+  /* Nachrichten aus der Sprechblase (go-aktuell-posts.sql): stehen in der Ansicht ihres Kreises und unter Alles */
+  function loadKreisMsgs() {
+    if (!me()) { state.kreisMsgs = []; return Promise.resolve(); }
+    return rest("go_aktuell_posts?select=id,author_id,audience,body,media_url,media_kind,reply_to,created_at&order=created_at.desc&limit=150")
+      .then(function (rows) {
+        state.kreisMsgs = (rows || []).map(function (m) { m._kreis = true; return m; });
+        return ensurePeople(state.kreisMsgs.map(function (m) { return String(m.author_id); }));
+      })
+      .catch(function () { state.kreisMsgs = []; });
+  }
+  function kreisMsgsFor(view) {
+    return (state.kreisMsgs || []).filter(function (m) {
+      if (view === "alles") return true;
+      if (m.audience === view) return true;
+      /* Nachricht meines Coachs an seine Coachees steht bei mir unter Freunde */
+      return view === "team" && m.audience === "coach" && String(m.author_id) !== me();
+    });
+  }
+  function allMsgs() {
+    return (state.bubbleMsgs || []).concat(state.kreisMsgs || []);
+  }
+
   function loadBubbleMsgs() {
     if (state.filter !== "bubble" || !global.GoBubbles || !GoBubbles.messages) { state.bubbleMsgs = []; return Promise.resolve(); }
     return GoBubbles.messages().then(function (rows) {
@@ -2484,7 +2506,7 @@
   /* Antwort: zitierte Nachricht über dem Text */
   function bubbleReplyQuote(m) {
     if (!m.reply_to) return "";
-    var o = (state.bubbleMsgs || []).filter(function (x) { return String(x.id) === String(m.reply_to); })[0];
+    var o = allMsgs().filter(function (x) { return String(x.id) === String(m.reply_to); })[0];
     if (!o) return '<span class="acc-msg__quote">Nachricht nicht mehr da</span>';
     var who = String(o.author_id) === me() ? "Du" : String(personOf(String(o.author_id)).name || "?").split(" ")[0];
     var txt = o.body || (o.media_url ? (o.media_kind === "video" ? "Video" : "Foto") : "");
@@ -2496,7 +2518,7 @@
     var tm = 0, sx = 0, sy = 0, fired = false;
     function msgOf(el) {
       var id = el && el.getAttribute("data-msg-id");
-      return (state.bubbleMsgs || []).filter(function (x) { return String(x.id) === String(id); })[0] || null;
+      return allMsgs().filter(function (x) { return String(x.id) === String(id); })[0] || null;
     }
     function open(m) {
       if (!m || !global.GoDialog) return;
@@ -2848,6 +2870,11 @@
         return it._mine || inTeamFilter((it.ev && it.ev.user_id) || (it.item && it.item.user_id) || "", flags);
       });
     }
+    kreisMsgsFor(flags.view).forEach(function (m) {
+      var it = { kind: "bubble_msg", starts_at: m.created_at, _mine: String(m.author_id) === me(), msg: m };
+      if (dayKey(m.created_at) === today) myToday.push(it);
+      else history.push(it);
+    });
     myToday.sort(sortOwnFirst);
     upcoming.sort(function (a, b) {
       var c = String(a.starts_at).localeCompare(String(b.starts_at));
@@ -4939,9 +4966,11 @@
         : Promise.resolve(global.confirm("Nachricht löschen?"));
       ask.then(function (yes) {
         if (!yes) return;
-        rest("go_bubble_messages?id=eq." + encodeURIComponent(mid), { method: "DELETE", prefer: "return=minimal" })
+        var isKreis = (state.kreisMsgs || []).some(function (m) { return String(m.id) === String(mid); });
+        rest((isKreis ? "go_aktuell_posts" : "go_bubble_messages") + "?id=eq." + encodeURIComponent(mid), { method: "DELETE", prefer: "return=minimal" })
           .then(function () {
             state.bubbleMsgs = (state.bubbleMsgs || []).filter(function (m) { return String(m.id) !== String(mid); });
+            state.kreisMsgs = (state.kreisMsgs || []).filter(function (m) { return String(m.id) !== String(mid); });
             var art = document.querySelector('.acc-msg[data-msg-id="' + String(mid).replace(/"/g, "") + '"]');
             if (art) art.remove();
           })
@@ -5292,6 +5321,7 @@
       loadFfcEvents(),
       loadFfcPosts(),
       loadBubbleMsgs(),
+      loadKreisMsgs(),
       histReady
     ])
       .then(function () {
