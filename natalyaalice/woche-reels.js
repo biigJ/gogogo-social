@@ -1221,7 +1221,8 @@
     var ev = Object.assign({}, it.ev, { photo_url: null });
     if (plan) {
       ev.title = plan.title || ev.title;
-      if (plan.location) ev.location = plan.location;
+      /* Ort aus „Tage bearbeiten“ gilt für die ganze Serie, sonst der Ort aus dem Plan */
+      if (!ev.location && plan.location) ev.location = plan.location;
     }
     var usual = (state.seriesTime || {})[seriesKey(it.ev.title, it.ev.starts_at)];
     if (usual && usual !== displayTime(ev.starts_at)) ev.starts_at = timedStarts(dayKey(ev.starts_at), ("0" + usual).slice(-5)) || ev.starts_at;
@@ -3515,6 +3516,28 @@
     paintDaysEditor();
   }
 
+  function dayPlace(ev) {
+    var de = state.daysEdit;
+    if (de && de.place && Object.prototype.hasOwnProperty.call(de.place, ev.id)) return de.place[ev.id];
+    return ev.location || "";
+  }
+  function editDayPlace(id) {
+    var de = state.daysEdit;
+    if (!de || !global.GoDialog) return;
+    var ev = de.slots.filter(function (x) { return x && String(x.id) === String(id); })[0];
+    if (!ev) return;
+    GoDialog.prompt("Ort", dayPlace(ev), { ok: "Übernehmen", cancel: "Abbrechen" }).then(function (v) {
+      if (v === null || v === undefined) return;
+      de.place = de.place || {};
+      de.place[ev.id] = String(v).trim().slice(0, 80);
+      var btn = document.querySelector('[data-wr-dayplace="' + String(id).replace(/"/g, "") + '"]');
+      if (btn) {
+        btn.textContent = de.place[ev.id] || "Ort";
+        btn.classList.toggle("is-empty", !de.place[ev.id]);
+      }
+    });
+  }
+
   function paintDaysEditor() {
     var de = state.daysEdit;
     if (!de) return;
@@ -3533,7 +3556,9 @@
       var vis = de.vis[ev.id];
       /* Zeile 1: Wochentag + Name. Zeile 2: Uhrzeit, zeigen/privat (feste Breite), Bubble, Media. Griff über die volle Höhe */
       return '<div class="wr-dayrow" data-wr-dayslot="' + i + '">' +
-        '<div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " + esc(ev.title || "Training") + "</span>" +
+        '<div class="wr-dayrow__mid"><span class="wr-dayrow__title wr-dayrow__title--place"><b>' + label + "</b>" +
+        '<span class="wr-dt-name">' + esc(ev.title || "Training") + "</span>" +
+        '<button type="button" class="wr-dt-place' + (dayPlace(ev) ? "" : " is-empty") + '" data-wr-dayplace="' + esc(ev.id) + '">' + esc(dayPlace(ev) || "Ort") + "</button></span>" +
         '<div class="wr-dayrow__ctl"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
         opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
         /* Sichtbarkeit und Bubble in einem Dropdown wie der Filter in Aktuell */
@@ -3610,6 +3635,8 @@
         bb.setAttribute("aria-pressed", state.daysEdit.bub[bid] ? "true" : "false");
         return;
       }
+      var pl = e.target.closest && e.target.closest("[data-wr-dayplace]");
+      if (pl) { var pid = pl.getAttribute("data-wr-dayplace"); setTimeout(function () { editDayPlace(pid); }, 0); return; }
       var mb = e.target.closest && e.target.closest("[data-wr-daymedia]");
       if (mb) { var mid = mb.getAttribute("data-wr-daymedia"); setTimeout(function () { openMediaSheet(mid); }, 0); }
     });
@@ -4056,13 +4083,16 @@
       var grp = vis === "gruppe" && host.myGroups ? (host.myGroups() || [])[0] : null;
       /* auch wenn diese Woche schon passt: kommende Wochen angleichen (Tag, Uhrzeit, Sichtbarkeit, Bubble).
          Circle teilt einzelne Termine in der Zirkel-App, deshalb nicht für die Serie. */
+      var placeChanged = !!(de.place && Object.prototype.hasOwnProperty.call(de.place, ev.id) && (de.place[ev.id] || "") !== (ev.location || ""));
       if (vis !== "circle") {
         var serBody = { visibility: vis, bubble_id: wantBub && bubId ? bubId : wantBub ? ev.bubble_id || null : null };
+        if (placeChanged) serBody.location = de.place[ev.id] || null;
         if (grp) serBody.group_id = grp.id;
         jobs = jobs.concat(seriesJobs(future, ev, iso, untimed, hhmm, serBody));
       }
-      if (sameDay && (ev.visibility || "team") === vis && !bubChanged && !(grp && String(ev.group_id || "") !== String(grp.id))) return;
+      if (sameDay && !placeChanged && (ev.visibility || "team") === vis && !bubChanged && !(grp && String(ev.group_id || "") !== String(grp.id))) return;
       var body = { starts_at: starts, visibility: vis };
+      if (placeChanged) body.location = de.place[ev.id] || null;
       /* neue Uhrzeit → Herz-Meldung für Freunde (go-events-time-set.sql) */
       if (!untimed && !(displayTime(ev.starts_at) && formatTime(ev.starts_at) === hhmm)) body.time_set_at = new Date().toISOString();
       /* Durch eine Alternative ersetzte Einheit auf einen anderen Tag gelegt: dort wieder geplant */
@@ -6016,31 +6046,7 @@
         closeSheet();
         return;
       }
-      /* Kraft-/Ausdauer-Event aus einem Kurs antippen → Workout-Ansicht */
-      if (!state.editMode && e.target && e.target.closest && e.target.closest(".wr-media") && !e.target.closest("button, a, input")) {
-        var slideW = e.target.closest(".wr-slide[data-event-id]");
-        var evW = slideW ? findOwnEvent(slideW.getAttribute("data-event-id")) : null;
-        if (!evW) {
-          var jid = slideW && slideW.getAttribute("data-event-id");
-          evW = (state.joined || []).filter(function (x) { return String(x.id) === String(jid); })[0] || null;
-        }
-        var wIso = evW && evW.starts_at ? new Date(evW.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }) : "";
-        /* Vergangen → gespeicherte Übungen (kraft-tracking.js) */
-        if (evW && (evW.category === "kraft" || evW.category === "ausdauer") && wIso && wIso < berlinToday() && global.GoKraftTracking) {
-          var meW = me();
-          GoKraftTracking.openDay({
-            people: String(evW.user_id || meW) === meW ? [meW] : [String(evW.user_id), meW],
-            iso: wIso,
-            title: evW.title || ""
-          });
-          return;
-        }
-        /* Woche: Antippen startet nichts, sondern legt Ort, Uhrzeit und Privatsphäre fest */
-        if (evW && findOwnEvent(evW.id) && evW.status !== "erledigt" && (!wIso || wIso >= berlinToday())) {
-          openEventSettings(evW.id);
-          return;
-        }
-      }
+      /* Kalender: Bild und Infos sind nur Anzeige. Uhrzeit und Ort ändert man über Stift → Tage bearbeiten. */
       if (
         state.editMode &&
         e.target &&
