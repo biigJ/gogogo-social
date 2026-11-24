@@ -74,7 +74,8 @@
     }
     function show() {
       clearTimeout(timer);
-      if (i >= items.length) { close(); return; }
+      /* Ende: nächste Person (opts.onEnd), sonst zurück */
+      if (i >= items.length) { close(); if (opts.onEnd) opts.onEnd(); return; }
       if (i < 0) i = 0;
       var it = items[i];
       wrap.innerHTML =
