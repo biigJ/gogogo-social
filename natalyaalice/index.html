@@ -5816,6 +5816,9 @@
     .go-tile__grip { position: absolute; z-index: 2; top: 0; right: 0; bottom: 0; width: 44px; display: grid; place-items: center; cursor: grab; touch-action: none;
       color: rgba(42,33,24,.5); background: rgba(243, 238, 228, 0.82); border-left: 1px solid rgba(42,33,24,.12); }
     .go-tile.is-drag { z-index: 5; box-shadow: 0 8px 24px rgba(20, 16, 12, .25); transition: none; }
+    /* Kacheln: kein Markieren/Kopieren-Menü beim Tippen oder Ziehen (iOS) */
+    .go-tiles, .go-tiles * { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .go-tile.is-park { transition: transform .18s ease-out; }
     .go-tiles .go-toc__add { border: 1px dashed rgba(42, 33, 24, 0.3) !important; padding: 14px 16px !important; text-align: left; }
     .plus-pick { position: fixed; inset: 0; z-index: 10045; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(20, 16, 12, 0.42); }
     .plus-pick__card { width: min(100%, 400px); max-height: 86vh; overflow-y: auto; box-sizing: border-box; background: #F3EEE4; color: #2A2118; border-radius: 22px; padding: 22px 18px 14px; }
@@ -20017,28 +20020,45 @@
           var tile = grip.closest(".go-tile");
           e.preventDefault();
           e.stopPropagation();
-          var startY = e.clientY, h = tile.offsetHeight + 10;
+          var startY = e.clientY, h = tile.offsetHeight + 10, done = false;
+          try { var sel = window.getSelection && window.getSelection(); if (sel) sel.removeAllRanges(); } catch (eS) {}
+          tile.classList.remove("is-park");
           tile.classList.add("is-drag");
           try { grip.setPointerCapture(e.pointerId); } catch (eC) {}
           function move(ev) {
+            if (done) return;
+            ev.preventDefault();
             var dy = ev.clientY - startY;
             var next = tile.nextElementSibling, prev = tile.previousElementSibling;
             /* nur innerhalb der eigenen Gruppe tauschen: Nicht aktive nie vor aktive */
             var on = tile.classList.contains("is-on");
             function same(t) { return t && t.classList.contains("go-tile") && t.classList.contains("is-on") === on; }
-            if (dy > h / 2 && same(next)) { nav.insertBefore(next, tile); startY += h; dy -= h; }
-            else if (dy < -h / 2 && same(prev)) { nav.insertBefore(tile, prev); startY -= h; dy += h; }
+            /* schnelles Ziehen über mehrere Kacheln: so oft tauschen wie nötig */
+            for (var guard = 0; guard < 20; guard++) {
+              next = tile.nextElementSibling; prev = tile.previousElementSibling;
+              if (dy > h / 2 && same(next)) { nav.insertBefore(next, tile); startY += h; dy -= h; }
+              else if (dy < -h / 2 && same(prev)) { nav.insertBefore(tile, prev); startY -= h; dy += h; }
+              else break;
+            }
             /* an der Gruppengrenze nicht weiter ziehen */
             if (dy > 0 && !same(next)) dy = Math.min(dy, 12);
             if (dy < 0 && !same(prev)) dy = Math.max(dy, -12);
             tile.style.transform = "translateY(" + dy + "px)";
           }
+          /* Loslassen, Abbruch oder verlorener Finger (iOS): Kachel springt immer in ihren Platz */
           function up() {
+            if (done) return;
+            done = true;
             grip.removeEventListener("pointermove", move);
             grip.removeEventListener("pointerup", up);
             grip.removeEventListener("pointercancel", up);
-            tile.style.transform = "";
+            grip.removeEventListener("lostpointercapture", up);
+            window.removeEventListener("pointerup", up, true);
+            window.removeEventListener("blur", up);
             tile.classList.remove("is-drag");
+            tile.classList.add("is-park");
+            tile.style.transform = "";
+            setTimeout(function () { tile.classList.remove("is-park"); }, 220);
             var keys = [].map.call(nav.querySelectorAll(".go-tile[data-key]"), function (t) { return t.getAttribute("data-key"); });
             plusStore("order", keys);
             /* Slides in derselben Reihenfolge (ohne Neuaufbau): TOC bleibt vorn */
@@ -20052,7 +20072,13 @@
           grip.addEventListener("pointermove", move);
           grip.addEventListener("pointerup", up);
           grip.addEventListener("pointercancel", up);
+          grip.addEventListener("lostpointercapture", up);
+          window.addEventListener("pointerup", up, true);
+          window.addEventListener("blur", up);
         });
+        /* Langes Drücken öffnet kein Kopieren-Menü */
+        nav.addEventListener("selectstart", function (e) { if (e.target.closest && e.target.closest(".go-tile")) e.preventDefault(); });
+        nav.addEventListener("contextmenu", function (e) { if (e.target.closest && e.target.closest(".go-tile")) e.preventDefault(); });
       }
 
       /* Plus → Stempelkarte: nicht aktiv = Knopf „Aktivieren“; aktiv = die in Gruppen und Circles verknüpften Karten, mittig,
