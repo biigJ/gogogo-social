@@ -1333,6 +1333,12 @@
         (String(m.starts_at) === String(ev.starts_at) || String(m.title || "") === String(ev.title || ""));
     });
   }
+  /* Event einer meiner Gruppen (Gruppentraining): gilt für Mitglieder wie ein eigener Termin */
+  function isMyGroupEvent(ev) {
+    if (!ev || !ev.group_id || String(ev.user_id) === me() || !host || !host.myGroups) return false;
+    return (host.myGroups() || []).some(function (g) { return g && String(g.id) === String(ev.group_id); });
+  }
+
   function eventVisibleToMe(ev, flags) {
     if (!ev) return false;
     var uid = me();
@@ -1364,6 +1370,9 @@
     if (ev.status === "geplant") {
       /* Eigene Events von heute bleiben bis Mitternacht sichtbar, damit man sie nachträglich abschließen kann */
       if (mine && t <= week && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString())) return true;
+      /* Gruppentraining meiner Gruppe: heute bis Mitternacht und kommende Tage, auch unter „Nur ich“ */
+      if (isMyGroupEvent(ev) && vis !== "privat" && t <= week &&
+          (dayKey(ev.starts_at) === dayKey(new Date(now).toISOString()) || t >= now - 3600000)) return true;
       /* Kreise oben (todayAll): heutige Trainings der Freunde bis Mitternacht, auch wenn die Uhrzeit vorbei ist
          (Plan-Events ohne Uhrzeit stehen auf 12:00 UTC und fielen sonst ab 14 Uhr raus) */
       var todayKeep = flags.todayAll && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString());
@@ -2715,7 +2724,7 @@
           coveredFp[eventFingerprint(ev)] = true;
         }
       }
-      if (item._mine && dayKey(ev.starts_at) === today) myToday.push(item);
+      if ((item._mine || (item.kind === "event" && isMyGroupEvent(ev))) && dayKey(ev.starts_at) === today) myToday.push(item);
       else upcoming.push(item);
     });
 
