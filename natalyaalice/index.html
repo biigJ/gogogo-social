@@ -4572,6 +4572,12 @@
     }
     .heute-stories__row::-webkit-scrollbar { display: none; }
     .heute-stories__team { display: contents; }
+    .crew-story__online { display: none; }
+    .crew-story.is-online { position: relative; }
+    .crew-story.is-online .crew-story__online {
+      display: block; position: absolute; top: calc(var(--story-d, 64px) - 18px); left: calc(50% + var(--story-d, 64px) / 2 - 16px);
+      width: 14px; height: 14px; border-radius: 50%; background: #34C759; border: 2.5px solid #F3EEE4; box-sizing: border-box; z-index: 2;
+    }
     .crew-story {
       flex: none;
       width: var(--story-d, 68px);
@@ -7153,6 +7159,7 @@
       <button type="button" data-menu="apple_health">Apple Health verbinden</button>
       <button type="button" data-menu="garmin">Garmin verbinden</button>
       <button type="button" data-menu="darstellung">Darstellung</button>
+      <button type="button" data-menu="privatsphaere">Privatsphäre</button>
       <button type="button" data-menu="friends_view" class="view-toggle">Freunde</button>
       <button type="button" data-menu="bubbles_view" class="view-toggle">Kreise</button>
       <button type="button" data-menu="website">Website besuchen</button>
@@ -11265,6 +11272,10 @@
           try { localStorage.setItem(vKey, isWallet ? "list" : "wallet"); } catch (eFv2) {}
           paintViewToggles();
           try { renderTeam(); } catch (eRt) {}
+          return;
+        }
+        if (field === "privatsphaere") {
+          openPrivacySettings();
           return;
         }
         if (field === "darstellung") {
@@ -25281,6 +25292,15 @@
         ring.className = "crew-story__ring";
         ring.appendChild(personFace(person));
         item.appendChild(ring);
+        /* grüner Punkt rechts am Kreis, wenn online (paintOnline) */
+        if (person && person.id && !person.isSelf) {
+          item.setAttribute("data-online-id", String(person.id));
+          var led = document.createElement("span");
+          led.className = "crew-story__online";
+          led.setAttribute("aria-hidden", "true");
+          item.appendChild(led);
+          if (window.GoOnline && GoOnline.isOnline(person.id)) item.classList.add("is-online");
+        }
         var name = document.createElement("span");
         name.className = "crew-story__name";
         name.textContent = person.label || person.name || "Team";
@@ -27221,6 +27241,113 @@
         setInterval(fit, 700);
       })();
       /* Kalender-Dropdown: Breite = gewähltes Wort wie in Aktuell (Select wird bei jedem Render neu gebaut) */
+      /* Online-Status: Herzschlag jede Minute, solange die App sichtbar ist; beim Verlassen sofort zurückgesetzt.
+         Online = Herzschlag jünger als 2,5 Minuten. show_online false: kein Herzschlag gespeichert (go-online-status.sql) */
+      (function goOnline() {
+        if (!sessionMode || !sessionAccount || !sessionAccount.id) return;
+        var ONLINE_MS = 150000, seen = {}, beatTimer = 0;
+        function showsOnline() { return sessionAccount.show_online !== false; }
+        function beat(at) {
+          if (!showsOnline() && at !== null) return;
+          rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+            method: "PATCH", prefer: "return=minimal", body: { last_active_at: at === undefined ? new Date().toISOString() : at }
+          }).catch(function () {});
+        }
+        function paint() {
+          [].forEach.call(document.querySelectorAll("[data-online-id]"), function (el) {
+            el.classList.toggle("is-online", isOnline(el.getAttribute("data-online-id")));
+          });
+        }
+        function isOnline(id) {
+          var t = seen[String(id || "")];
+          return !!t && Date.now() - t < ONLINE_MS;
+        }
+        function load() {
+          var ids = [];
+          [].forEach.call(document.querySelectorAll("[data-online-id]"), function (el) {
+            var id = el.getAttribute("data-online-id");
+            if (/^[0-9a-f-]{36}$/i.test(id) && ids.indexOf(id) < 0) ids.push(id);
+          });
+          if (!ids.length) return;
+          rest("go_accounts?id=in.(" + ids.slice(0, 150).join(",") + ")&select=id,last_active_at,show_online")
+            .then(function (rows) {
+              (rows || []).forEach(function (r) {
+                seen[String(r.id)] = r.show_online === false || !r.last_active_at ? 0 : Date.parse(r.last_active_at);
+              });
+              paint();
+            })
+            .catch(function () {});
+        }
+        function tick() {
+          if (document.visibilityState !== "visible") return;
+          beat();
+          load();
+        }
+        document.addEventListener("visibilitychange", function () {
+          if (document.visibilityState === "visible") tick();
+          /* App verlassen: sofort offline (nicht erst nach 2,5 Minuten) */
+          else if (showsOnline()) beat(null);
+        });
+        window.addEventListener("pagehide", function () { if (showsOnline()) beat(null); });
+        beatTimer = setInterval(tick, 60000);
+        setTimeout(tick, 1500);
+        /* neu gezeichnete Profilkreise: Stand sofort übernehmen, neue Personen nachladen */
+        setInterval(function () {
+          if (document.visibilityState !== "visible") return;
+          var unknown = [].some.call(document.querySelectorAll("[data-online-id]"), function (el) { return !(el.getAttribute("data-online-id") in seen); });
+          if (unknown) load(); else paint();
+        }, 5000);
+        window.GoOnline = {
+          isOnline: isOnline,
+          refresh: load,
+          setVisible: function (on) {
+            sessionAccount.show_online = !!on;
+            if (on) beat(); else beat(null);
+          }
+        };
+      })();
+
+      /* Profil → Einstellungen → Privatsphäre: Online-Status, Auffindbarkeit über Orte, erledigte Events für Freunde */
+      function openPrivacySettings() {
+        if (!sessionMode || !sessionAccount || !window.GoDialog) return;
+        rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id) + "&select=show_online,places_findable,diary_visibility")
+          .catch(function () { return []; })
+          .then(function (rows) {
+            var r = (rows && rows[0]) || {};
+            var cur = {
+              online: r.show_online !== false,
+              orte: !!r.places_findable,
+              events: (r.diary_visibility || diaryVisibility) === "friends"
+            };
+            return GoDialog.pick("Privatsphäre", [
+              { value: "online", label: "Online-Status zeigen", checked: cur.online },
+              { value: "orte", label: "Über meine Orte auffindbar", checked: cur.orte },
+              { value: "events", label: "Erledigte Events für Freunde sichtbar", checked: cur.events }
+            ], { ok: "Speichern" }).then(function (picked) {
+              if (!picked) return;
+              var on = { online: picked.indexOf("online") >= 0, orte: picked.indexOf("orte") >= 0, events: picked.indexOf("events") >= 0 };
+              var body = {};
+              if (on.online !== cur.online) body.show_online = on.online;
+              if (on.orte !== cur.orte) body.places_findable = on.orte;
+              if (on.online !== cur.online && !on.online) body.last_active_at = null;
+              var jobs = [];
+              if (Object.keys(body).length) {
+                jobs.push(rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), { method: "PATCH", prefer: "return=minimal", body: body })
+                  .then(function () {
+                    if ("show_online" in body) { sessionAccount.show_online = on.online; if (window.GoOnline) GoOnline.setVisible(on.online); }
+                    if ("places_findable" in body) { sessionAccount.places_findable = on.orte; if (typeof profileOrte !== "undefined") { profileOrte.findable = on.orte; try { renderProfileOrte(); } catch (eR) {} } }
+                    if (window.GoAccountSession) GoAccountSession.save(sessionAccount);
+                  }));
+              }
+              /* nur bei Änderung: „mit Trainer“ bleibt, wenn der Haken nicht angefasst wurde */
+              if (on.events !== cur.events) saveVisibility(on.events ? "friends" : "private");
+              return Promise.all(jobs).catch(function () {
+                gogogoToast("Ging nicht (go-online-status.sql?)");
+              });
+            });
+          });
+      }
+
       (function fitKalenderFilter() {
         var cv = document.createElement("canvas").getContext("2d");
         function fit() {
