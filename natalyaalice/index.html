@@ -2020,6 +2020,10 @@
       flex: 1; overflow-y: auto; scroll-snap-type: y mandatory;
       height: 100%; -webkit-overflow-scrolling: touch;
     }
+    .wr-dwrap {
+      position: relative; height: 100%; min-height: 100%;
+      scroll-snap-align: start; scroll-snap-stop: always;
+    }
     .wr-day {
       position: relative; height: 100%; min-height: 100%;
       scroll-snap-align: start; scroll-snap-stop: always;
@@ -2150,6 +2154,25 @@
     .wr-friend-row--group { cursor: pointer; font-weight: 600; }
     .wr-friend-row__ph { width: 34px; height: 34px; flex: none; border-radius: 50%; display: grid; place-items: center; background: #2A2118; color: #F6F1E8; font: 700 15px/1 Inter, sans-serif; }
     .wr-act__n { font-size: 11px; font-weight: 700; min-height: 12px; }
+    /* Kalender: Wochentage rechts, Zukunft oben, aktueller Tag gefüllt */
+    .wr-dsqs {
+      position: absolute; right: 17px; bottom: calc(var(--wr-progress-h) + 10px); z-index: 4;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .wr-dsq {
+      width: 30px; height: 30px; padding: 0; box-sizing: border-box;
+      border: 1.5px solid rgba(255,255,255,.85); border-radius: 6px;
+      background: rgba(0,0,0,.18); color: #fff; cursor: pointer;
+      font: 700 11px/1 Inter, system-ui, sans-serif;
+      display: grid; place-items: center;
+      text-shadow: 0 1px 3px rgba(0,0,0,.4);
+      position: relative;
+    }
+    .wr-dsq::before { content: ""; position: absolute; inset: -7px -8px; }
+    .wr-dsq.is-on { background: #fff; color: #111; border-color: #fff; text-shadow: none; }
+    .woche-reels.is-light-day .wr-dsq { border-color: #111; color: #111; background: rgba(255,255,255,.4); text-shadow: none; }
+    .woche-reels.is-light-day .wr-dsq.is-on { background: #111; color: #fff; }
+    .woche-reels.is-edit .wr-dsqs { display: none; }
     .wr-dots {
       position: absolute; top: calc(var(--wr-top-h) + 8px); left: 0; right: 0; z-index: 4;
       display: flex; justify-content: center; gap: 5px; pointer-events: none;
@@ -8711,7 +8734,7 @@
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-145"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-3"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-91"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-92"></script>
   <script src="/natalyaalice/support.js?v=support-24"></script>
   <script>
     (function () {
@@ -19432,7 +19455,7 @@
       /* Neue Konten (≤ 14 Tage): beim ersten Öffnen von Aktuell, Woche und Team je ein kurzer Hinweis */
       var INTRO_TEXT = {
         heute: { title: "Aktuell", text: "Hier siehst Du Deine Events von heute, darüber im Stapel die nächsten Tage und darunter, was Du schon erledigt hast. Tipp auf ein Event, um es abzuhaken, ein Foto zu posten oder eine Alternative einzutragen. Oben stellst Du ein, ob Du nur Dich, Dein Team oder alles siehst." },
-        woche: { title: "Kalender", text: "Hier liegt Dein Wochenplan Tag für Tag, zur Seite wischen blättert durch die Tage. Über den Stift oben rechts wählst oder änderst Du den Plan, verschiebst Tage, setzt Uhrzeiten und legst Zirkeltrainings an. Mit privat oder zeigen entscheidest Du, ob Deine Freunde ein Event sehen." },
+        woche: { title: "Kalender", text: "Hier liegt Dein Wochenplan Tag für Tag. Nach unten wischen bringt den nächsten Tag, die Quadrate rechts zeigen, wo Du bist. Über den Stift oben rechts wählst oder änderst Du den Plan, verschiebst Tage, legst Zirkeltrainings an, lädst ein oder exportierst den Kalender. Mit privat oder zeigen entscheidest Du, ob Deine Freunde ein Event sehen." },
         team: { title: "Community", text: "Hier findest Du Deine Freunde, Deinen Circle und Deinen Coach. Mit dem Haken wählst Du bis zu 5 Freunde, mit denen Du Deine täglichen Events teilst. Neue Freunde findest Du über Nickname, ID, Ort oder QR-Code." }
       };
       var introTimer = null;
