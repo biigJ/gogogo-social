@@ -817,7 +817,8 @@
     /* bubble_id erst nach go-bubbles.sql vorhanden; group_id für Gruppen-Events (Gruppenname statt Vorname) */
     /* feed_hidden: „Speichern ohne Posting“ (go-events-feed-hidden.sql) */
     /* feed_compact: vergangenes Event verkleinert (go-events-feed-compact.sql) */
-    return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact" + range)
+    return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact,photos" + range)
+      .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id" + range); })
@@ -2414,7 +2415,7 @@
         '"',
       category: ev.category,
       photo: ev.photo_url || "",
-      extraPhotos: (state.extraPhotos || {})[String(ev.id)] || null,
+      extraPhotos: eventExtraPhotos(ev),
       courseId: ev.course_id || "",
       enrollmentId: ev.enrollment_id || "",
       emoji: emoji,
@@ -3756,7 +3757,9 @@
   function readDonePhoto() {
     var input = $("acc-done-photo");
     if (!input || !input.files || !input.files[0]) return Promise.resolve("");
-    var file = input.files[0];
+    return fileToPhotoUrl(input.files[0]);
+  }
+  function fileToPhotoUrl(file) {
     /* iPhone-Fotos (oft > 2,5 MB) werden unten auf max. 1280 px verkleinert; nur echte Ausreißer ablehnen */
     if (file.size > 25 * 1024 * 1024) {
       if (host.toast) host.toast("Foto zu groß (max. 25 MB).");
@@ -4979,6 +4982,50 @@
     return out;
   }
   /* Sichtbarkeit eines eigenen Events über die drei Punkte am Bild */
+  /* weitere Fotos am Event: eigene (photos) zuerst, dann Tagebuch-Fotos desselben Tages */
+  function eventExtraPhotos(ev) {
+    var out = [];
+    (ev.photos || []).concat((state.extraPhotos || {})[String(ev.id)] || []).forEach(function (u) {
+      if (u && u !== ev.photo_url && out.indexOf(u) < 0) out.push(u);
+    });
+    return out.length ? out : null;
+  }
+  var MAX_EVENT_PHOTOS = 5;
+  function eventPhotoCount(ev) { return (ev.photo_url ? 1 : 0) + (ev.photos || []).length; }
+  /* Foto nachträglich hinzufügen (bis 5): erstes wird Titelbild, weitere seitlich wischen */
+  function addEventPhoto(ev) {
+    var inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    inp.style.display = "none";
+    document.body.appendChild(inp);
+    inp.addEventListener("change", function () {
+      var f = inp.files && inp.files[0];
+      inp.remove();
+      if (!f) return;
+      fileToPhotoUrl(f).then(function (url) {
+        if (!url) return;
+        if (eventPhotoCount(ev) >= MAX_EVENT_PHOTOS) { if (host.toast) host.toast("Höchstens 5 Fotos."); return; }
+        var body = ev.photo_url ? { photos: (ev.photos || []).concat([url]) } : { photo_url: url };
+        return rest("events?id=eq." + encodeURIComponent(ev.id), { method: "PATCH", prefer: "return=minimal", body: body })
+          .then(function () { Object.keys(body).forEach(function (k) { ev[k] = body[k]; }); render(); });
+      }).catch(function () { if (host.toast) host.toast("Ging nicht (go-events-photos.sql?)"); });
+    });
+    inp.click();
+  }
+  /* Versehentlich beendet: zurück auf geplant (nur heute) */
+  function reopenEvent(ev) {
+    var body = { status: "geplant", feed_hidden: false };
+    rest("events?id=eq." + encodeURIComponent(ev.id), { method: "PATCH", prefer: "return=minimal", body: body })
+      .catch(function () { delete body.feed_hidden; return rest("events?id=eq." + encodeURIComponent(ev.id), { method: "PATCH", prefer: "return=minimal", body: body }); })
+      .then(function () {
+        Object.keys(body).forEach(function (k) { ev[k] = body[k]; });
+        if (global.GoTama) GoTama.invalidate();
+        return refresh();
+      })
+      .catch(function () { if (host.toast) host.toast("Ging gerade nicht"); });
+  }
+
   /* Vergangenes Event verkleinern/vergrößern: gilt für alle, die es sehen */
   function setCompact(ev, on) {
     state.walletOpen = "";
@@ -4998,9 +5045,15 @@
     var vis = normalizeVisibility(ev.visibility || "team");
     var cur = vis === "privat" ? "privat" : vis === "bubble" ? "bubble" : (bid && String(ev.bubble_id || "") === bid ? "alles" : "team");
     var past = ev.status === "erledigt";
-    GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, extra: "Löschen", extra2: past ? (ev.feed_compact ? "Vergrößern" : "Verkleinern") : "" }).then(function (v) {
+    var acts = [];
+    if (past && eventPhotoCount(ev) < MAX_EVENT_PHOTOS) acts.push({ label: "Foto hinzufügen", value: "__photo" });
+    if (past && evDayIso(ev) === todayIso()) acts.push({ label: "Training wieder aufnehmen", value: "__reopen" });
+    if (past) acts.push({ label: ev.feed_compact ? "Vergrößern" : "Verkleinern", value: "__compact" });
+    GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, extra: "Löschen", actions: acts }).then(function (v) {
       if (v === "__extra") { removeEvent(id, "delete"); return; }
-      if (v === "__extra2") { setCompact(ev, !ev.feed_compact); return; }
+      if (v === "__compact") { setCompact(ev, !ev.feed_compact); return; }
+      if (v === "__photo") { addEventPhoto(ev); return; }
+      if (v === "__reopen") { reopenEvent(ev); return; }
       if (!v || v === cur) return;
       var pick = list.filter(function (x) { return x.value === v; })[0] || {};
       var body = v === "alles" ? { visibility: "team", bubble_id: bid }
