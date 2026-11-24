@@ -5197,8 +5197,19 @@
     .stamp-mini__count { font-size: 13px; font-weight: 700; letter-spacing: .06em; }
     .stamp-mini__grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 10px 0; justify-items: center; }
     .stamp-mini__slot { width: min(100%, 30px); aspect-ratio: 1; border-radius: 50%; border: 1.5px solid rgba(246,241,232,.55); box-sizing: border-box; }
-    .stamp-mini__slot.is-filled { background: #F6F1E8; border-color: #F6F1E8; box-shadow: inset 0 0 0 4px #C7413B; }
+    /* gestempelt = Punkt komplett dunkel gefüllt */
+    .stamp-mini__slot.is-filled { background: #2A2118; border-color: #2A2118; box-shadow: none; }
     .stamp-mini__foot { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .9; }
+    .stamp-mini__cta { text-align: center; font-size: 15px; font-weight: 700; letter-spacing: .01em; margin: -2px 0 6px; }
+    /* Stempelfeld in den Kreisen (Gruppe in der Challenge, Circle, Coach): nur die 12 Punkte */
+    .kreis-stamps { width: 100%; margin: 10px 0 0; }
+    .kreis-stamps__head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+    .kreis-stamps__head span:first-child { opacity: .65; }
+    .kreis-stamps__grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; padding: 8px 0 2px; justify-items: center; }
+    .kreis-stamps__slot { width: min(100%, 30px); aspect-ratio: 1; border-radius: 50%; border: 1.5px solid #2A2118; box-sizing: border-box; }
+    .kreis-stamps__slot.is-filled { background: #2A2118; }
+    .kreis-stampbox { margin: 14px 0 0; padding: 12px 14px; border: 1.5px solid #2A2118; border-radius: 14px; box-sizing: border-box; }
+    .kreis-stampbox .kreis-stamps { margin: 0; }
     .team-slide__cta.is-locked { opacity: .4; }
     .go-slide__art img {
       width: 100%;
@@ -6021,9 +6032,9 @@
       box-sizing: border-box;
     }
     .stamp-pass__slot.is-filled {
-      background: #F6F1E8;
-      border-color: #F6F1E8;
-      box-shadow: inset 0 0 0 4px #C7413B;
+      background: #2A2118;
+      border-color: #2A2118;
+      box-shadow: none;
     }
     .stamp-pass__meta {
       display: grid;
@@ -18091,6 +18102,43 @@
         });
       }
       /* Seite über der App (Pill bleibt sichtbar), Zurück oben links */
+      /* Stempelfeld (12 Punkte) für einen Kreis: main = gogogo-Karte, group/circle = verknüpfte Karte */
+      function kreisStampsEl() {
+        var box = document.createElement("div");
+        box.className = "kreis-stamps";
+        box.innerHTML = '<div class="kreis-stamps__head"><span>Stempelkarte</span><span class="kreis-stamps__n">0 / 12</span></div><div class="kreis-stamps__grid"></div>';
+        paintKreisStamps(box, 0);
+        return box;
+      }
+      function paintKreisStamps(box, n) {
+        n = Math.max(0, Math.min(12, Number(n) || 0));
+        box.querySelector(".kreis-stamps__n").textContent = n + " / 12";
+        var g = box.querySelector(".kreis-stamps__grid");
+        var html = "";
+        for (var i = 0; i < 12; i++) html += '<span class="kreis-stamps__slot' + (i < n ? " is-filled" : "") + '"></span>';
+        g.innerHTML = html;
+      }
+      function myStampCount(kind, ref) {
+        if (kind === "main") {
+          var ord = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
+          return Promise.resolve(Number((ord && ord.meta && ord.meta.stamps) || 0) || 0);
+        }
+        if (!sessionAccount || !ref) return Promise.resolve(0);
+        return rest("go_stamp_links?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&kind=eq." + kind +
+          "&ref=eq." + encodeURIComponent(String(ref)) + "&status=eq.linked&select=stamps&limit=1")
+          .then(function (rows) { return Number((rows && rows[0] && rows[0].stamps) || 0) || 0; })
+          .catch(function () { return 0; });
+      }
+      function appendKreisStampBox(parent, kind, ref) {
+        if (!parent) return;
+        var wrap = document.createElement("div");
+        wrap.className = "kreis-stampbox";
+        var el = kreisStampsEl();
+        wrap.appendChild(el);
+        parent.appendChild(wrap);
+        myStampCount(kind, ref).then(function (n) { paintKreisStamps(el, n); });
+      }
+
       function openKreisPage(slide, title, restoreTo) {
         if (!slide) return;
         closeKreisPage();
@@ -18172,7 +18220,10 @@
         var card = zirkelCard();
         if (!card) return;
         var g = (cst().groups || []).filter(function (x) { return String(x.group_id) === String(gid); })[0];
-        var go = function () { openKreisPage(card, g ? String(g.name || "Circle") : "Zirkeltraining", zirkelHolder()); };
+        var go = function () {
+          openKreisPage(card, g ? String(g.name || "Circle") : "Zirkeltraining", zirkelHolder());
+          if (gid) appendKreisStampBox(document.querySelector(".kreis-page .kreis-page__body"), "circle", gid);
+        };
         if (gid && typeof selectCircle === "function") Promise.resolve(selectCircle(gid)).then(go, go);
         else go();
       }
@@ -18213,7 +18264,10 @@
       function openKreis(kind, id) {
         var st = kreiseState || {};
         if (kind === "group") openKreisPage(st.groupSlide, (st.group && st.group.name) || "Meine Gruppe");
-        else if (kind === "coach") openKreisPage(st.coachSlide, "Mein Coach");
+        else if (kind === "coach") {
+          openKreisPage(st.coachSlide, "Mein Coach");
+          appendKreisStampBox(document.querySelector(".kreis-page .kreis-page__body"), "main");
+        }
         else if (kind === "circle") openCirclePage(id);
       }
 
@@ -19829,9 +19883,10 @@
             var stampOrd = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
             var stampN = 0;
             try { stampN = Math.max(0, Math.min(12, Number((stampOrd && stampOrd.meta && stampOrd.meta.stamps) || 0) || 0)); } catch (eSn) {}
-            var mini = '<div class="stamp-mini"><div class="stamp-mini__top"><span class="stamp-mini__brand">gogogo</span><span class="stamp-mini__count">' + stampN + ' / 12</span></div><div class="stamp-mini__grid">';
+            var stampOwned = !!(window.GoSupport && ((GoSupport.activeOrderFor && GoSupport.activeOrderFor("stempelkarte")) || (GoSupport.offerOwned && GoSupport.offerOwned("stempelkarte"))));
+            var mini = '<div class="stamp-mini"><div class="stamp-mini__cta">' + (stampOwned ? "Stempelkarte anzeigen" : "Stempelkarte buchen") + '</div><div class="stamp-mini__top"><span class="stamp-mini__brand">gogogo</span><span class="stamp-mini__count">' + stampN + ' / 12</span></div><div class="stamp-mini__grid">';
             for (var si = 0; si < 12; si++) mini += '<span class="stamp-mini__slot' + (si < stampN ? " is-filled" : "") + '"></span>';
-            art.innerHTML = mini + '</div><div class="stamp-mini__foot">Stempelkarte</div></div>';
+            art.innerHTML = mini + "</div></div>";
             /* Tipp auf die Karte: gebucht → Karte zeigen, sonst Buchen */
             art.removeAttribute("aria-hidden");
             art.style.cursor = "pointer";
@@ -19936,7 +19991,8 @@
                 });
             });
           }
-          card.appendChild(cta);
+          /* Stempelkarte: Tipp aufs Bild öffnet bzw. bucht, kein Button darunter */
+          if (offer.key !== "stempelkarte") card.appendChild(cta);
           if (isZirkel) {
             /* Circle = FFC-Gruppe: hier beitreten oder gründen (nicht mehr unter Team → Meine Gruppe) */
             var circleBtn = document.createElement("button");
@@ -25827,12 +25883,10 @@
             gl.textContent = ch.goal;
             line.appendChild(gl);
           }
-          if (ch.link_stamps) {
-            var st = document.createElement("span");
-            st.className = "team-challenge__stamps";
-            st.textContent = "Stempelkarten verknüpft";
-            line.appendChild(st);
-          }
+          /* Stempelfeld der Gruppe direkt im Challenge-Kasten */
+          var stEl = kreisStampsEl();
+          line.appendChild(stEl);
+          myStampCount("group", group.id).then(function (n) { paintKreisStamps(stEl, n); });
           if (owner) {
             var end = document.createElement("button");
             end.type = "button";
