@@ -1358,7 +1358,7 @@
       }
       if (!flags.showOthersUpcoming) return false;
       /* Kommende Events: „zeigen“ am Event reicht (Historie teilen gilt nur für Vergangenes) */
-      if (coachSees) return true;
+      if (coachSees) return !flags.groupOnly || inGroupFilter(ev.user_id, flags);
       if (!inTeamFilter(ev.user_id, flags)) return false;
       if (!(vis === "team" || vis === "gruppe")) return false;
       return inGroupFilter(ev.user_id, flags);
@@ -1367,7 +1367,7 @@
       /* ohne Posting gespeichert: auch im eigenen Verlauf nicht zeigen */
       if (ev.feed_hidden) return false;
       if (mine) return !!flags.showOwnHistory;
-      if (coachSees && flags.showFriendsHistory) return true;
+      if (coachSees && flags.showFriendsHistory) return !flags.groupOnly || inGroupFilter(ev.user_id, flags);
       if (!flags.showFriendsHistory || !(vis === "team" || vis === "gruppe")) return false;
       /* Profilreihe (todayAll): heute erledigtes Event ist die Story des Tages, gilt ohne „Historie teilen“ */
       var todayStory = flags.todayAll && dayKey(ev.starts_at) >= (flags.storyFrom || dayKey(new Date(now).toISOString()));
@@ -2889,6 +2889,23 @@
       history = history.filter(function (it) {
         return it._mine || inTeamFilter((it.ev && it.ev.user_id) || (it.item && it.item.user_id) || "", flags);
       });
+    }
+    /* Kreis-Ansicht: zum Schluss für alle Karten prüfen, ob der Urheber im Kreis ist
+       (vorher rutschten Coachees, Einladungen und Zusagen in Gruppe/Freunde durch) */
+    if (flags.groupOnly || flags.coachOnly || flags.teamOnly) {
+      var inKreis = function (it) {
+        if (it._mine) return true;
+        if (it.kind === "ffc") return !!(it.ev && (it.ev.is_mine || it.ev.my_going === true)) && !flags.groupOnly && !flags.coachOnly;
+        if (it.kind === "ffc_post") return !flags.groupOnly && !flags.coachOnly;
+        var uid = String((it.ev && it.ev.user_id) || (it.item && it.item.user_id) || (it.inv && it.inv.from_id) || "");
+        if (!uid || uid === me()) return true;
+        if (flags.groupOnly) return !!groupMemberIdSet()[uid];
+        if (flags.coachOnly) return isMyCoachee(uid);
+        return inTeamFilter(uid, flags);
+      };
+      myToday = myToday.filter(inKreis);
+      upcoming = upcoming.filter(inKreis);
+      history = history.filter(inKreis);
     }
     kreisMsgsFor(flags.view).forEach(function (m) {
       var it = { kind: "bubble_msg", starts_at: m.created_at, _mine: String(m.author_id) === me(), msg: m };
