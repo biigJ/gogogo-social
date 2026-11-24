@@ -5049,43 +5049,68 @@
       });
       return;
     }
-    /* wie das Dropdown in Aktuell: Ich · Community · Meine Bubble · Alles
-       Alles = Community + Bubble (visibility team mit bubble_id) */
+    /* Auswahl wie der Filter oben in Aktuell: Nur ich, Freunde, Gruppe, jeder Circle, Bubble, Alles (+ Mein Coach) */
     var bid = host.bubbleId ? String(host.bubbleId() || "") : "";
-    var list = [{ value: "privat", label: "nur ich" }, { value: "team", label: "Community" }];
-    if (bid) list.push({ value: "bubble", label: "Bubble" }, { value: "alles", label: "alle" });
+    var grp = host.myGroups ? (host.myGroups() || [])[0] || null : null;
+    var list = [];
+    var fsel = $("heute-filter-select");
+    [].forEach.call(fsel ? fsel.options : [], function (o) {
+      var v = o.value;
+      if (v === "coach") return; /* Coachees ist eine Ansicht, keine Sichtbarkeit */
+      if (v === "bubble" && !bid) return;
+      if (v === "gruppe" && !grp) return;
+      list.push({ value: v, label: String(o.textContent || v) });
+    });
+    if (!list.length) list = [{ value: "ich", label: "Nur ich" }, { value: "team", label: "Freunde" }, { value: "alles", label: "Alles" }];
+    var trainer = host.sessionAccount && host.sessionAccount.trainer_id;
+    if (trainer) list.splice(1, 0, { value: "coach", label: "Mein Coach" });
     var vis = normalizeVisibility(ev.visibility || "team");
-    var cur = vis === "privat" ? "privat" : vis === "bubble" ? "bubble" : (bid && String(ev.bubble_id || "") === bid ? "alles" : "team");
+    var cur = vis === "privat" ? "ich" : vis === "coach" ? "coach" : vis === "gruppe" ? "gruppe" : vis === "bubble" ? "bubble"
+      : vis === "circle" ? "circle:" + String(ev.circle_id || "") : (bid && String(ev.bubble_id || "") === bid ? "alles" : "team");
+    if (!list.some(function (x) { return x.value === cur; })) {
+      if (/^circle:/.test(cur)) list.push({ value: cur, label: "Circle" });
+      else if (cur === "coach") list.push({ value: "coach", label: "Mein Coach" });
+      else if (cur === "gruppe") list.push({ value: "gruppe", label: "Gruppe" });
+      else cur = "team";
+    }
     var past = ev.status === "erledigt";
     var acts = [];
     if (past && eventPhotoCount(ev) < MAX_EVENT_PHOTOS) acts.push({ label: "Foto hinzufügen", value: "__photo" });
     if (past && evDayIso(ev) === todayIso()) acts.push({ label: "Training wieder aufnehmen", value: "__reopen" });
     if (past) acts.push({ label: compactPast() ? "Vergrößern" : "Verkleinern", value: "__compact" });
-    GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, extra: "Löschen", actions: acts }).then(function (v) {
+    GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, select: true, extra: "Löschen", actions: acts }).then(function (v) {
       if (v === "__extra") { removeEvent(id, "delete"); return; }
       if (v === "__compact") { setCompact(!compactPast()); return; }
       if (v === "__photo") { addEventPhoto(ev); return; }
       if (v === "__reopen") { reopenEvent(ev); return; }
       if (!v || v === cur) return;
       var pick = list.filter(function (x) { return x.value === v; })[0] || {};
-      var body = v === "alles" ? { visibility: "team", bubble_id: bid }
+      var circleGid = /^circle:/.test(v) ? v.slice(7) : "";
+      var body = v === "alles" ? { visibility: "team", bubble_id: bid || null }
         : v === "bubble" ? { visibility: "bubble", bubble_id: bid }
-        : { visibility: v, bubble_id: null };
+        : v === "ich" ? { visibility: "privat", bubble_id: null }
+        : v === "gruppe" ? { visibility: "gruppe", group_id: grp ? grp.id : ev.group_id, bubble_id: null }
+        : circleGid ? { visibility: "circle", circle_id: circleGid, bubble_id: null }
+        : { visibility: v === "coach" ? "coach" : "team", bubble_id: null };
+      /* Circle verlassen: Zuordnung lösen */
+      if (!circleGid && ev.circle_id) body.circle_id = null;
       function save(b) { return rest("events?id=eq." + encodeURIComponent(id), { method: "PATCH", prefer: "return=minimal", body: b }); }
       save(body)
         .catch(function (err) {
           /* ohne go-bubbles.sql gibt es bubble_id nicht: nur Sichtbarkeit setzen */
-          if (v === "privat" || v === "team") { var b2 = { visibility: v }; body = b2; return save(b2); }
+          if (v === "ich" || v === "team" || v === "coach" || v === "gruppe") { var b2 = { visibility: body.visibility }; if (body.group_id) b2.group_id = body.group_id; body = b2; return save(b2); }
           throw err;
         })
         .then(function () {
           Object.keys(body).forEach(function (k) { ev[k] = body[k]; });
           if (host.toast) host.toast("Sichtbar: " + (pick.label || v));
+          /* Circle: wie in „Tage bearbeiten“ den Termin im Circle der Zirkel-App teilen */
+          if (circleGid && global.WocheReels && WocheReels.shareToCircle) { try { WocheReels.shareToCircle(id, circleGid); } catch (eC) {} }
           if (global.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
           render();
         })
         .catch(function () {
-          if (host.toast) host.toast(v === "bubble" || v === "alles" ? "Ging nicht (go-bubbles.sql?)" : "Ändern ging gerade nicht");
+          if (host.toast) host.toast(v === "bubble" || v === "alles" ? "Ging nicht (go-bubbles.sql?)" : circleGid ? "Ging nicht (go-circle-events.sql?)" : v === "coach" ? "Ging nicht (go-visibility-coach.sql?)" : "Ändern ging gerade nicht");
         });
     });
   }

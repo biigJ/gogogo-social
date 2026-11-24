@@ -51,6 +51,9 @@
     ".god__center{display:flex;justify-content:center;margin:0 0 14px}" +
     ".god__vis{min-width:96px;min-height:34px;padding:0 16px;border-radius:999px;border:1px solid rgba(42,33,24,.3);background:transparent;color:#2A2118;font:600 14px Inter,system-ui,sans-serif;cursor:pointer}" +
     ".god__vis.is-on{background:#2A2118;border-color:#2A2118;color:#F6F1E8}" +
+    /* Auswahl wie das Aktuell-Dropdown: Pille mit Pfeil, Liste beim Antippen */
+    "select.god__vis{-webkit-appearance:none;appearance:none;min-width:0;max-width:62vw;padding:0 34px 0 16px;text-overflow:ellipsis;background:transparent url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%232A2118' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\") no-repeat right 12px center/12px 12px}" +
+    "select.god__vis.is-on{background:#2A2118 url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24'%3E%3Cpath d='M6 9l6 6 6-6' fill='none' stroke='%23F6F1E8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\") no-repeat right 12px center/12px 12px}" +
     ".god__planrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:center;margin:0 0 12px}" +
     ".god__planrow .god__wheel{margin:0}" +
     ".god__wheel--sm{height:132px;padding:44px 0}" +
@@ -455,12 +458,29 @@
       var vi = Math.max(0, list.map(function (x) { return x.value; }).indexOf(opts.vis || "team"));
       var r1 = document.createElement("div");
       r1.className = "god__sheet-row";
-      var pill = document.createElement("button");
-      pill.type = "button";
-      pill.className = "god__vis";
-      function paintPill() { pill.textContent = list[vi].label; pill.classList.toggle("is-on", list[vi].value !== "privat"); }
-      paintPill();
-      pill.addEventListener("click", function () { vi = (vi + 1) % list.length; paintPill(); });
+      var pill;
+      /* opts.select: Dropdown (wie der Filter in Aktuell) statt Durchtippen */
+      if (opts.select) {
+        pill = document.createElement("select");
+        pill.className = "god__vis";
+        pill.setAttribute("aria-label", "Sichtbarkeit");
+        list.forEach(function (x, i) {
+          var o = document.createElement("option");
+          o.value = String(i);
+          o.textContent = x.label;
+          pill.appendChild(o);
+        });
+        pill.value = String(vi);
+        pill.addEventListener("change", function () { vi = Number(pill.value) || 0; pill.classList.toggle("is-on", list[vi].value !== "privat" && list[vi].value !== "ich"); });
+        pill.classList.toggle("is-on", list[vi].value !== "privat" && list[vi].value !== "ich");
+      } else {
+        pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = "god__vis";
+        var paintPill = function () { pill.textContent = list[vi].label; pill.classList.toggle("is-on", list[vi].value !== "privat"); };
+        paintPill();
+        pill.addEventListener("click", function () { vi = (vi + 1) % list.length; paintPill(); });
+      }
       var ok = document.createElement("button");
       ok.type = "button";
       ok.className = "god__btn god__sheet-ok";
