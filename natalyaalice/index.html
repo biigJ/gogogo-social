@@ -1494,6 +1494,8 @@
     .is-bubbles .gbub-rows[hidden], .is-bubbles .friend-list__hint[hidden] { display: none !important; }
     .is-bubbles .gbub-rows { display: flex; flex-direction: column; gap: 14px; }
     .is-bubbles .kreise-rows:not(:empty) { margin-bottom: 14px; }
+    /* + gibt es einmal oben in Kreise (Hinzufügen), nicht nochmal bei den Bubbles */
+    .is-bubbles .gbub-rows:not(.kreise-rows) [data-gbub-add] { display: none !important; }
     .kreis-row .gbub-row__ico.is-plain { color: #2A2118; filter: none; }
     .kreis-row .kreis-row__pen { margin-left: auto; flex: none; }
     .kreis-page { position: fixed; inset: 0; z-index: 70; background: #F3EEE4; display: flex; flex-direction: column; }
@@ -17854,7 +17856,10 @@
       function paintKreiseRows(el) {
         var st = kreiseState || {};
         var me = String((sessionAccount && sessionAccount.id) || "");
-        var html = "";
+        /* Kreis mit +: Gruppe, Circle, Coach oder Bubble hinzufügen (Dialog, dann der bekannte Ablauf) */
+        var html = '<button type="button" class="friend-list__row friend-list__add" data-kreis-add>' +
+          '<span class="friend-list__plus" aria-hidden="true">+</span>' +
+          '<span class="friend-list__text"><span class="friend-list__name">Hinzufügen</span></span></button>';
         if (st.group) {
           html += kreisRowHtml("group", st.group.photo_url || "/assets/gogogo/gogogo-Gruppe-small.jpg", st.group.name || "Meine Gruppe",
             String(st.group.owner || "") === me);
@@ -17869,6 +17874,7 @@
         if (el._kreiseBound) return;
         el._kreiseBound = true;
         el.addEventListener("click", function (e) {
+          if (e.target.closest("[data-kreis-add]")) { addKreis(); return; }
           var row = e.target.closest("[data-kreis]");
           if (!row) return;
           openKreis(row.getAttribute("data-kreis"), row.getAttribute("data-kreis-id"));
@@ -17932,6 +17938,30 @@
         var go = function () { openKreisPage(card, g ? String(g.name || "Circle") : "Zirkeltraining", zirkelHolder()); };
         if (gid && typeof selectCircle === "function") Promise.resolve(selectCircle(gid)).then(go, go);
         else go();
+      }
+      function addKreis() {
+        if (!window.GoDialog) return;
+        GoDialog.choose("Hinzufügen:", [
+          { label: "Gruppe", value: "group" },
+          { label: "Circle", value: "circle" },
+          { label: "Coach", value: "coach" },
+          { label: "Bubble", value: "bubble" }
+        ], { center: true }).then(function (v) {
+          if (!v) return;
+          /* erst nach dem Dialog öffnen, sonst schließt derselbe Tipp die neue Seite */
+          setTimeout(function () {
+            if (v === "group") openKreis("group");
+            else if (v === "coach") openKreis("coach");
+            else if (v === "circle") {
+              /* eingeloggt: Circle beitreten bzw. verwalten wie bisher; sonst Zirkel-Seite mit Anmeldung */
+              var logged = !!(window.FFC && FFC.user && FFC.user());
+              if (logged && typeof openCircleJoin === "function") openCircleJoin({ coach: typeof isCoachAny === "function" ? isCoachAny() : true });
+              else openCirclePage(null);
+            } else if (v === "bubble" && window.GoBubbles && GoBubbles.openCreate) {
+              GoBubbles.openCreate(function () { if (typeof renderTeam === "function") renderTeam(); });
+            }
+          }, 60);
+        });
       }
       function openKreis(kind, id) {
         var st = kreiseState || {};
@@ -18193,7 +18223,7 @@
           bubList.className = "gbub-rows";
           var bubHint = document.createElement("p");
           bubHint.className = "friend-list__hint";
-          bubHint.textContent = "Deine Gruppe, Dein Coach und Deine Bubble an einem Ort.";
+          bubHint.textContent = "Deine Gruppe, Deine Circles, Dein Coach und Deine Bubble an einem Ort.";
           /* Zeilen für Gruppe und Coach (paintKreiseRows), darunter die Bubbles */
           kreiseRows = document.createElement("div");
           kreiseRows.className = "gbub-rows kreise-rows";
