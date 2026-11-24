@@ -21,11 +21,31 @@
     {
       key: "news:2026-11-19-uhrzeit",
       at: "2026-11-19T12:00:01Z",
-      text: "Freunde einladen geht, sobald Dein Training eine Uhrzeit hat. Die setzt Du unter Woche → Stift → Tage bearbeiten."
+      text: "Freunde einladen geht, sobald Dein Training eine Uhrzeit hat. Die setzt Du unter Kalender → Stift → Tage bearbeiten."
+    },
+    {
+      key: "news:2026-11-24-kalender",
+      at: "2026-11-24T12:00:00Z",
+      text: "Woche heißt jetzt Kalender und zeigt Deine wiederkehrenden Trainings. Was Du an einem einzelnen Tag änderst, siehst Du in Aktuell."
+    },
+    {
+      key: "news:2026-11-24-tamagotchi",
+      at: "2026-11-24T12:00:01Z",
+      text: "Das Tamagotchi ist jetzt zuerst aus. Einschalten kannst Du es oben links in Aktuell. Dort steht auch, was die Farben und die Zahl bedeuten."
+    },
+    {
+      key: "news:2026-11-24-event-menue",
+      at: "2026-11-24T12:00:02Z",
+      text: "Unter ••• an einem erledigten Training kannst Du jetzt bis zu 5 Fotos hinzufügen, ein aus Versehen beendetes Training wieder aufnehmen und vergangene Trainings verkleinern."
+    },
+    {
+      key: "news:2026-11-24-online",
+      at: "2026-11-24T12:00:03Z",
+      text: "Ein grüner Punkt am Profilkreis heißt: Die Person hat gogogo gerade offen. Unter Profil → Einstellungen → Privatsphäre schaltest Du das für Dich aus, ebenso die Suche über Orte und erledigte Events für Freunde."
     }
   ];
 
-  var PLANS_TEXT = "Es gibt neue Trainingspläne. Du findest sie unter Woche → Stift → Wochenplan ändern.";
+  var PLANS_TEXT = "Es gibt neue Trainingspläne. Du findest sie unter Kalender → Stift → Wochenplan ändern.";
 
   var host = null;
   var busy = false;
