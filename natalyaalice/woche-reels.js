@@ -3373,7 +3373,7 @@
       st.mine.filter(function (e) { return dayKey(e.starts_at) === iso; }).forEach(function (e) {
         var inGroup = String(e.group_id || "") === gid && e.visibility === "gruppe";
         var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
-        html += '<div class="wr-dayrow wr-zrec-row' + (inGroup ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
+        html += '<div class="wr-dayrow wr-zrec-row wr-ga-row' + (inGroup ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
           (inGroup ? "👥 " : "") + esc(e.title || "Training") + esc(tm) + "</span>" +
           (inGroup ? '<span class="wr-dayrow__tag">in der Gruppe</span>' : "") + "</div>" +
           (inGroup
@@ -3385,7 +3385,7 @@
         var on = !!st.going[String(e.id)];
         var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
         var who = String(personOf(e.user_id).name || "").split(" ")[0];
-        html += '<div class="wr-dayrow wr-zrec-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
+        html += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
           "👥 " + esc(e.title || "Training") + esc(tm) + "</span>" +
           '<span class="wr-dayrow__tag">von ' + esc(who || "Gruppe") + (on ? " · Du bist dabei" : "") + "</span></div>" +
           '<button type="button" class="wr-pill-btn' + (on ? "" : " wr-pill-btn--dark") + ' wr-ga-rsvp" data-ga-' + (on ? "no" : "yes") + '="' + esc(e.id) + '">' + (on ? "Absagen" : "Zusagen") + "</button></div>";
@@ -3402,6 +3402,22 @@
     );
     bindGroupSheet();
   }
+  /* Vor + / −: Einheit aus dem Wochenplan zeigen (Tag, Uhrzeit, Übungen), dann bestätigen */
+  function confirmGroupAssign(kind, id, btn) {
+    var st = state.ga;
+    var ev = st && st.mine.filter(function (e) { return String(e.id) === id; })[0];
+    if (!ev || !global.GoDialog) return groupAssignDo(kind, id, btn);
+    var wd = formatWeekday(dayKey(ev.starts_at));
+    var tm = displayTime(ev.starts_at) ? " um " + formatTime(ev.starts_at) : "";
+    var head = (ev.title || "Training");
+    var job = host && host.exercisesForEvent && ev.category !== "zirkel" ? Promise.resolve(host.exercisesForEvent(ev)).catch(function () { return []; }) : Promise.resolve([]);
+    job.then(function (names) {
+      var body = "Jeden " + wd + tm + (kind === "add" ? " mit " + (st.group.name || "Deiner Gruppe") + " teilen." : " nicht mehr mit " + (st.group.name || "Deiner Gruppe") + " teilen.") +
+        ((names || []).length ? "\n\n" + names.slice(0, 10).map(function (n) { return "· " + n; }).join("\n") + (names.length > 10 ? "\n· + " + (names.length - 10) + " weitere" : "") : "");
+      return GoDialog.confirm(head, { body: body, ok: kind === "add" ? "Zuordnen" : "Herausnehmen", cancel: "Abbrechen", row: true });
+    }).then(function (yes) { if (yes) groupAssignDo(kind, id, btn); });
+  }
+
   function groupAssignDo(kind, id, btn) {
     var st = state.ga;
     if (!st) return;
@@ -3467,7 +3483,8 @@
       if (ga) {
         e.stopPropagation();
         var kindGa = ga.hasAttribute("data-ga-add") ? "add" : ga.hasAttribute("data-ga-rm") ? "rm" : ga.hasAttribute("data-ga-yes") ? "yes" : "no";
-        groupAssignDo(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
+        if (kindGa === "add" || kindGa === "rm") confirmGroupAssign(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
+        else groupAssignDo(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
         return;
       }
       var add = e.target.closest("[data-wr-gextra-add]");
