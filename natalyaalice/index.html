@@ -1546,6 +1546,17 @@
     .wr-dayrow__pick select:focus { outline: none; }
     .wr-dayrow__bub svg { width: 16px; height: 16px; }
     .heute-info { display: none; }
+    /* Tamagotchi-Icon statt „Info“; aus: quer durchgestrichen */
+    .heute-info .tama-ico { display: block; }
+    .heute-info .tama-ico__txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .heute-info .tama-ico__off { display: none; }
+    body.tama-off .heute-info .tama-ico__off { display: inline; }
+    body[data-heute="bubble"] .heute-info .tama-ico { display: none; }
+    /* Tamagotchi aus: keine Zählung, keine Ampel-Ränder, Puls in Story-Rosa (B/W: transparentes Weiß) */
+    body.tama-off .tama-badge { display: none !important; }
+    body.tama-off .crew-story[class*="tama-"] .crew-story__ring { outline: 0 !important; }
+    body.tama-off .crew-story { --tama: #D62976 !important; }
+    html[data-go-theme="bw"] body.tama-off .crew-story { --tama: rgba(255,255,255,.7) !important; }
     body.is-session[data-shell="heute"] .heute-info {
       display: grid; place-items: center; position: absolute; left: 12px;
       top: calc(max(6px, env(safe-area-inset-top, 0px)) + var(--heute-filter-line) - 4.5px);
@@ -7368,7 +7379,7 @@
       <img id="photo-img" alt="" hidden />
     </div>
     <div class="heute-filter-row shell-heute">
-      <button type="button" class="heute-info" id="heute-info">Info</button>
+      <button type="button" class="heute-info" id="heute-info" aria-label="Tamagotchi"><svg class="tama-ico" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8c4.3 0 7.2 3.6 7.2 8.6 0 5.6-3.1 9.8-7.2 9.8s-7.2-4.2-7.2-9.8c0-5 2.9-8.6 7.2-8.6z"/><rect x="8.2" y="7.4" width="7.6" height="6" rx="1.4"/><circle cx="9.3" cy="16.9" r=".9"/><circle cx="12" cy="17.6" r=".9"/><circle cx="14.7" cy="16.9" r=".9"/><path class="tama-ico__off" d="M3.5 21.5 20.5 2.5" stroke-width="2"/></svg><span class="tama-ico__txt">Info</span></button>
       <label class="heute-filter-pick">
         <select id="heute-filter-select" aria-label="Heute filtern">
           <option value="ich">Nur Ich</option>
@@ -26657,11 +26668,29 @@
       (function bindHeuteInfo() {
         var btn = document.getElementById("heute-info");
         if (!btn) return;
+        /* Tamagotchi aus (je Gerät und Konto): keine Zählung, keine Ampel, Puls nur in Story-Rosa */
+        function tamaKey() { return "gogogo_tama_off_" + String((sessionAccount && sessionAccount.id) || ""); }
+        function tamaOff() { try { return localStorage.getItem(tamaKey()) === "1"; } catch (e) { return false; } }
+        function applyTama() {
+          var off = tamaOff();
+          document.body.classList.toggle("tama-off", off);
+          btn.setAttribute("aria-label", off ? "Tamagotchi ist aus" : "Tamagotchi ist an");
+        }
+        applyTama();
+        document.addEventListener("go:aktuell-ready", applyTama);
         btn.addEventListener("click", function () {
           /* Im Bubble-Chat: oben links das Wiki der Bubble */
           if (document.body.dataset.heute === "bubble" && window.GoBubbles) { GoBubbles.openWiki(); return; }
           if (!window.GoDialog) return;
-          GoDialog.note("Halte Deinen Ring auf Grün, indem Du keinen Tag auslässt. Einfach, denn Du kannst eine einfache Alternative loggen oder einmal schieben und es ist in Ordnung. Der Count bedeutet, wie viele Tage Du lückenlos abgehakt hast. Es geht hier nicht ums Abhaken, sondern darum, Deinem Alltag einen Fokus auf Bewegung zu geben. Jeder in seiner Kapazität! Viel Spaß bei Deiner Reise, Dich immer und immer mehr zu bewegen.");
+          var off = tamaOff();
+          GoDialog.choose("Tamagotchi", [
+            { label: off ? "Einschalten" : "Ausschalten", value: "toggle" },
+            { info: "Halte Deinen Ring auf Grün, indem Du keinen Tag auslässt. Einfach, denn Du kannst eine einfache Alternative loggen oder einmal schieben und es ist in Ordnung. Der Count bedeutet, wie viele Tage Du lückenlos abgehakt hast. Es geht hier nicht ums Abhaken, sondern darum, Deinem Alltag einen Fokus auf Bewegung zu geben. Jeder in seiner Kapazität! Viel Spaß bei Deiner Reise, Dich immer und immer mehr zu bewegen." }
+          ], { center: true, cancel: "Schließen" }).then(function (v) {
+            if (v !== "toggle") return;
+            try { localStorage.setItem(tamaKey(), off ? "0" : "1"); } catch (eT) {}
+            applyTama();
+          });
         });
       })();
       /* Dropdown: Breite = gewähltes Wort, damit Wort + Pfeil mittig stehen und der Pfeil immer gleich nah ist */
