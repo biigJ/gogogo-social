@@ -27188,7 +27188,8 @@
         if (!btn) return;
         /* Tamagotchi aus (je Gerät und Konto): keine Zählung, keine Ampel, Puls nur in Story-Rosa */
         function tamaKey() { return "gogogo_tama_off_" + String((sessionAccount && sessionAccount.id) || ""); }
-        function tamaOff() { try { return localStorage.getItem(tamaKey()) === "1"; } catch (e) { return false; } }
+        /* Standard aus: erst nach bewusstem Einschalten (gemerkt als "0") zählt und färbt das Tamagotchi */
+        function tamaOff() { try { return localStorage.getItem(tamaKey()) !== "0"; } catch (e) { return true; } }
         function applyTama() {
           var off = tamaOff();
           document.body.classList.toggle("tama-off", off);
@@ -27205,11 +27206,15 @@
             var cards = document.querySelectorAll(".god .god__card");
             var card = cards[cards.length - 1];
             var first = card && card.querySelector(".god__btn");
-            if (first) first.style.marginTop = "16px"; /* Abstand 4px → 16px (um 12px tiefer) */
+            if (first) first.style.marginTop = "8px";
           });
           GoDialog.choose("Tamagotchi", [
-            { label: off ? "Einschalten" : "Ausschalten", value: "toggle" },
-            { info: "Halte Deinen Ring auf Grün, indem Du keinen Tag auslässt. Einfach, denn Du kannst eine einfache Alternative loggen oder einmal schieben und es ist in Ordnung. Der Count bedeutet, wie viele Tage Du lückenlos abgehakt hast. Es geht hier nicht ums Abhaken, sondern darum, Deinem Alltag einen Fokus auf Bewegung zu geben. Jeder in seiner Kapazität! Viel Spaß bei Deiner Reise, Dich immer und immer mehr zu bewegen." }
+            { info: "Dein Profilkreis zeigt, wie gut Du dranbleibst." },
+            { info: "Grün: alles abgehakt. Gelb, Orange, Rot: ein, zwei, drei Tage mit offenem oder ausgefallenem Training. Jeder abgehakte Tag holt eine Stufe zurück." },
+            { info: "Die Zahl: Tage am Stück abgehakt. Tage ohne Training zählen nicht und unterbrechen nicht." },
+            { info: "Eine kurze Alternative zählt wie Training. Einmal schieben kostet keine Farbe, die Zahl beginnt dann aber neu." },
+            { info: "Die Farben siehst Du auch bei Deinen Freunden." },
+            { label: off ? "Einschalten" : "Ausschalten", value: "toggle" }
           ], { center: true, cancel: "Schließen" }).then(function (v) {
             if (v !== "toggle") return;
             try { localStorage.setItem(tamaKey(), off ? "0" : "1"); } catch (eT) {}
