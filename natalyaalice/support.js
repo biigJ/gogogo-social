@@ -559,7 +559,10 @@
 
   function offerOwned(type) {
     if (type === "zirkel" && global.FFC && FFC.user && FFC.user()) return true;
-    if (type === "uebungen") return true; /* frei für alle, keine Buchung */
+    /* Videos: gratis, aber erst nach „Aktivieren“ (je Konto auf diesem Gerät) */
+    if (type === "uebungen") {
+      try { return !!me() && localStorage.getItem("gogogo_uebungen_on_" + me()) === "1"; } catch (eU) { return false; }
+    }
     if (type === "kraft_tracking") {
       try {
         if (me() && localStorage.getItem(trackingKey()) === "1") return true;
@@ -640,6 +643,10 @@
 
   function bookOffer(key, opts) {
     key = String(key || "");
+    if (key === "uebungen") {
+      try { localStorage.setItem("gogogo_uebungen_on_" + me(), "1"); } catch (eU) {}
+      return Promise.resolve(null);
+    }
     if (key === "routine") {
       return bookStaticOffer("routine").then(function () {
         return bookRoutine();
@@ -934,6 +941,10 @@
     cancelAllOrdersForUser: cancelAllOrdersForUser,
     /* Plus-Punkt deaktivieren: Buchung zurück auf „angefragt“ (Stempel bleiben in meta), Aktivieren holt sie wieder */
     cancelOffer: function (type) {
+      if (type === "uebungen") {
+        try { localStorage.removeItem("gogogo_uebungen_on_" + me()); } catch (eU) {}
+        return Promise.resolve();
+      }
       var list = state.orders.filter(function (o) {
         var p = o.support_products || o.product || {};
         return (o.status === "aktiv" || o.status === "freigeschaltet") && String(p.type) === String(type);

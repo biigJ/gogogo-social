@@ -5778,6 +5778,7 @@
     .go-stampplus__list { display: flex; flex-direction: column; gap: 18px; align-items: stretch; }
     .go-stampplus__list .kreis-stamps { margin: 0; }
     .go-stampplus__empty { margin: 0; text-align: center; font-size: 14px; opacity: .7; }
+    .go-slide--pins .go-slide__art, .go-slide--pins .go-slide__copy, .go-slide--pins .go-slide__title { display: none !important; }
     .go-tiles { display: flex; flex-direction: column; gap: 10px; padding: 8px 0 24px; width: 100%; }
     .go-tile { position: relative; height: 104px; flex: none; overflow: hidden; border: 0; border-radius: 0; background: #F3EEE4; cursor: pointer; touch-action: pan-y; }
     .go-tile__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .3; pointer-events: none; }
@@ -8908,7 +8909,7 @@
   <script src="/natalyaalice/tamagotchi.js?v=tama-8"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-14"></script>
   <script src="/natalyaalice/ffc-points.js?v=ffp-2"></script>
-  <script src="/natalyaalice/exercise-links.js?v=gxl-4"></script>
+  <script src="/natalyaalice/exercise-links.js?v=gxl-6"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-44"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-4"></script>
@@ -8918,10 +8919,10 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-162"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-163"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-105"></script>
-  <script src="/natalyaalice/support.js?v=support-27"></script>
+  <script src="/natalyaalice/support.js?v=support-28"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -19741,7 +19742,16 @@
         GoExLinks.init({
           rest: rest,
           me: function () { return sessionAccount ? sessionAccount.id : ""; },
-          toast: function (m) { gogogoToast(m); }
+          toast: function (m) { gogogoToast(m); },
+          /* Voreinstellung: Übungen der eigenen Events dieser Woche (heute bis in 6 Tagen) */
+          planNames: function () {
+            var mine = (window.HeuteAccountability && HeuteAccountability.myWeekEvents ? HeuteAccountability.myWeekEvents() : [])
+              .filter(function (e) { return e.category !== "zirkel"; });
+            return Promise.all(mine.map(function (ev) {
+              var load = loadEventSession(ev);
+              return load ? load.then(function (rows) { return exercisesFromSession(rows && rows[0]).map(function (x) { return x.name; }); }).catch(function () { return []; }) : [];
+            })).then(function (lists) { return [].concat.apply([], lists); });
+          }
         });
         GoExLinks.mount(panel);
       }
@@ -20144,7 +20154,7 @@
                 if (ownedNow) btn.setAttribute("aria-disabled", "true");
                 else btn.removeAttribute("aria-disabled");
                 if (of.key === "kraft_tracking" && ownedNow) mountKraftTracking(existing[ei]);
-                if (of.key === "uebungen") mountExLinks(existing[ei]);
+                if (of.key === "uebungen" && ownedNow) mountExLinks(existing[ei]);
                 if (isZ && ffcLoggedNow) {
                   var lbKeep = existing[ei].querySelector("#go-zirkel-board");
                   var recKeep = existing[ei].querySelector("#go-zirkel-records");
@@ -20475,8 +20485,14 @@
           }
           if (offer.key === "kraft_tracking" && owned) mountKraftTracking(card);
           if (offer.key === "uebungen") {
-            cta.hidden = true; cta.style.display = "none"; /* frei für alle, kein Buchen */
-            mountExLinks(card);
+            /* Videos: nicht aktiv = Bild, Text, „Aktivieren“; aktiv = nur das Raster (ohne Bild und Text oben) */
+            if (owned) {
+              cta.hidden = true; cta.style.display = "none";
+              card.classList.add("go-slide--pins");
+              mountExLinks(card);
+            } else {
+              cta.textContent = "Aktivieren";
+            }
           }
           if (offer.key === "stempelkarte" && owned) {
             var showStamp = document.createElement("button");
