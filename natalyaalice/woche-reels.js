@@ -1145,7 +1145,8 @@
     if (isNaN(d.getTime())) return "";
     var wd = "";
     try { wd = d.toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }); } catch (e) { wd = String(d.getDay()); }
-    return String(title || "").trim().toLowerCase() + "|" + wd + "|" + formatTime(ts);
+    /* ohne Uhrzeit: ein einzeln verschobener Start („Start verschoben“) bleibt Teil der Serie */
+    return String(title || "").trim().toLowerCase() + "|" + wd;
   }
   function loadSeriesKeys() {
     var id = me();

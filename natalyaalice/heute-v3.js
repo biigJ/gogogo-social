@@ -163,6 +163,9 @@
 
   /* Neues in der Bubble (Nachricht oder Event eines anderen) → roter Punkt am Herz, egal welcher Filter.
      Gesehen, sobald man auf Bubble schaltet oder die Meldung am Herz öffnet. */
+  function kreisSeenKey() { return "gogogo_kreis_seen_" + me(); }
+  function kreisSeen() { try { return localStorage.getItem(kreisSeenKey()) || ""; } catch (e) { return ""; } }
+  function markKreisSeen() { try { localStorage.setItem(kreisSeenKey(), new Date().toISOString()); } catch (e) {} }
   function bubbleSeenKey() { return "gogogo_bubble_seen_" + me(); }
   function bubbleSeen() { try { return localStorage.getItem(bubbleSeenKey()) || ""; } catch (e) { return ""; } }
   function markBubbleSeen() {
@@ -202,7 +205,10 @@
       /* Freunde haben eine Uhrzeit eingetragen (go-events-time-set.sql); privat filtert die RLS */
       rest("events?user_id=neq." + uid + "&status=eq.geplant&time_set_at=gte." + sinceQ +
         "&starts_at=gte." + encodeURIComponent(new Date(Date.now() - 3 * 3600000).toISOString()) +
-        "&select=id,user_id,title,starts_at,time_set_at,visibility&order=time_set_at.desc&limit=30").catch(function () { return []; })
+        "&select=id,user_id,title,starts_at,time_set_at,visibility&order=time_set_at.desc&limit=30").catch(function () { return []; }),
+      /* Nachrichten an mich aus der Sprechblase oder „Start verschoben“ (go-aktuell-posts.sql) */
+      rest("go_aktuell_posts?author_id=neq." + uid + "&created_at=gte." + sinceQ +
+        "&select=id,author_id,audience,audience_id,body,created_at&order=created_at.desc&limit=20").catch(function () { return []; })
     ];
     var ST = { accepted: "angenommen", declined: "abgelehnt", withdrawn: "zurückgezogen" };
     return Promise.all(jobs).then(function (r) {
@@ -255,6 +261,16 @@
         out.push({ kind: "traintime", created_at: e.time_set_at, user_id: e.user_id, past: false,
           labelFn: function () { return first(e.user_id) + " trainiert " + trainDayLabel(e.starts_at) + " um " + timeLabel(e.starts_at) + ": " + (e.title || "Training"); },
           open: function () { openReplyEvent(e.id); } });
+      });
+      var kSeen = kreisSeen();
+      (r[7] || []).forEach(function (m) {
+        out.push({ kind: "kreismsg", created_at: m.created_at, author_id: m.author_id, past: String(m.created_at) <= kSeen,
+          labelFn: function () { return first(m.author_id) + ": " + String(m.body || "Foto").slice(0, 100); },
+          open: function () {
+            markKreisSeen();
+            saveFilter("alles");
+            refresh();
+          } });
       });
       restMsgs.forEach(function (m) {
         out.push({ kind: "msg", created_at: m.created_at, past: true, label: String(m.body || "Mitteilung").slice(0, 120),
@@ -4706,8 +4722,11 @@
       choices.push({ label: "Alternative", value: "alt" });
       choices.push({ label: "Schieben auf morgen", value: "move" });
     }
+    /* eigenes Event mit Uhrzeit: Start verschiebt sich (nur dieser Termin) */
+    if (String(ev.user_id) === me() && hasTime(ev) && /^[0-9a-f-]{36}$/i.test(String(ev.id))) choices.push({ label: "Start verschoben", value: "late" });
     if (!choices.length) return;
     GoDialog.choose(String(ev.title || "Training"), choices).then(function (v) {
+      if (v === "late") return delayStart(ev);
       if (v === "start") return startEvent(ev);
       if (v === "alt") return alternativeFor(ev);
       if (v === "move") return moveToTomorrow(ev);
@@ -4931,6 +4950,65 @@
     if (!modal) return;
     openDoneModal("draft", { title: title || "Erledigt", placeholder: "Wie war es? (optional)" });
     setDoneVis(normalizeVisibility(payload.visibility || "team"));
+  }
+
+  /* Start verschoben: Rad in 15-Minuten-Schritten, neue Zeit nur an diesem Event (keine Serie),
+     Nachricht an Zusagen und Eingeladene (go_aktuell_posts, go-aktuell-posts.sql) */
+  function berlinIsoAt(dayIso, hhmm) {
+    var m = /^(\d{1,2}):(\d{2})$/.exec(String(hhmm || ""));
+    if (!m) return null;
+    var guess = new Date(dayIso + "T" + (m[1].length < 2 ? "0" : "") + m[1] + ":" + m[2] + ":00Z");
+    /* Versatz Berlin ↔ UTC an diesem Tag */
+    var parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(guess);
+    var bh = Number(parts.filter(function (x) { return x.type === "hour"; })[0].value);
+    var bm = Number(parts.filter(function (x) { return x.type === "minute"; })[0].value);
+    var diff = (bh * 60 + bm) - (guess.getUTCHours() * 60 + guess.getUTCMinutes());
+    if (diff > 720) diff -= 1440;
+    if (diff < -720) diff += 1440;
+    return new Date(guess.getTime() - diff * 60000).toISOString();
+  }
+  function delayStart(ev) {
+    var old = timeLabel(ev.starts_at);
+    var p = old.split(":");
+    var base = Number(p[0]) * 60 + Number(p[1]);
+    var times = [];
+    for (var mm = base + 15; mm <= 23 * 60 + 45; mm += 15) {
+      times.push(Math.floor(mm / 60) + ":" + ("0" + (mm % 60)).slice(-2));
+    }
+    if (!times.length) return GoDialog.alert("Später geht heute nicht mehr.");
+    return GoDialog.time("Startzeit verschoben?", { times: times, ok: "Senden", cancel: "Abbrechen", sub: "Bisher " + old + " Uhr" }).then(function (t) {
+      if (!t) return;
+      var iso = berlinIsoAt(evDayIso(ev), t);
+      if (!iso) return;
+      var eid = String(ev.id);
+      var who = (state.rsvps[eid] || []).map(String);
+      var inv = rest("go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&event_id=eq." + encodeURIComponent(eid) +
+        "&status=in.(pending,accepted)&select=to_id").catch(function () { return []; });
+      return rest("events?id=eq." + encodeURIComponent(eid), { method: "PATCH", prefer: "return=minimal", body: { starts_at: iso } })
+        .then(function () {
+          ev.starts_at = iso;
+          return inv;
+        })
+        .then(function (rows) {
+          (rows || []).forEach(function (r) { if (r && r.to_id) who.push(String(r.to_id)); });
+          var seen = {};
+          who = who.filter(function (id) { if (!id || id === me() || seen[id]) return false; seen[id] = true; return true; });
+          if (!who.length) return 0;
+          return rest("go_aktuell_posts", {
+            method: "POST", prefer: "return=minimal",
+            body: { author_id: me(), audience: "team", audience_id: eid, recipients: who,
+              body: "Start verschoben: " + (ev.title || "Training") + " heute um " + t + " statt " + old + " Uhr." }
+          }).then(function () { return who.length; }, function () { return -1; });
+        })
+        .then(function (n) {
+          try { if (global.WocheReels && WocheReels.refresh) WocheReels.refresh(); } catch (e2) {}
+          Promise.resolve().then(refresh).catch(function () {});
+          if (host.toast) host.toast(n > 0 ? "Neue Startzeit " + t + ", " + n + (n === 1 ? " Teilnehmer" : " Teilnehmer") + " informiert"
+            : n < 0 ? "Neue Startzeit " + t + ". Nachricht ging nicht (go-aktuell-posts.sql?)" : "Neue Startzeit " + t);
+        }, function () {
+          if (host.toast) host.toast("Verschieben ging nicht.");
+        });
+    });
   }
 
   function moveToTomorrow(ev) {
