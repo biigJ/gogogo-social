@@ -3333,8 +3333,7 @@
     var g = groupOfMine();
     if (!el || !g) return;
     state.gaTarget = el;
-    var days = [];
-    for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
+    var days = gaWeekDays();
     state.ga = { group: g, days: days, mine: [], others: [], going: {} };
     if (!el.innerHTML) el.innerHTML = '<p class="wr-sheet-hint">Lädt …</p>';
     if (!el._gaBound) {
@@ -3347,8 +3346,7 @@
     state.gaTarget = null;
     var g = groupOfMine();
     if (!g) { if (host.toast) host.toast("Du bist in keiner Gruppe"); return; }
-    var days = [];
-    for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
+    var days = gaWeekDays();
     state.ga = { group: g, days: days, mine: [], others: [], going: {} };
     openSheet('<p class="wr-sheet-title">Events zuordnen</p><p class="wr-sheet-hint">Lädt …</p>');
     loadGroupAssign().then(paintGroupAssign, function () {
@@ -3356,10 +3354,26 @@
         '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button></div>');
     });
   }
+  /* Gruppe: allgemeine Woche Mo bis So. Geladen werden die nächsten 7 Tage (jeder Wochentag einmal), angezeigt nach Wochentag sortiert */
+  function gaWeekDays() {
+    var t = berlinToday();
+    var days = [];
+    for (var i = 0; i < 7; i++) days.push(addDays(t, i));
+    return days.sort(function (a, b) {
+      return ((new Date(a + "T12:00:00").getDay() + 6) % 7) - ((new Date(b + "T12:00:00").getDay() + 6) % 7);
+    });
+  }
+  /* übliche Uhrzeit der Serie statt der Uhrzeit dieses einen Termins */
+  function gaTime(e) {
+    var usual = (state.seriesTime || {})[seriesKey(e.title, e.starts_at)];
+    if (usual) return " · " + usual;
+    return displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
+  }
   function loadGroupAssign() {
     var st = state.ga;
-    var from = st.days[0] + "T00:00:00" + berlinOffsetSuffix(st.days[0]);
-    var to = addDays(st.days[6], 1) + "T00:00:00" + berlinOffsetSuffix(st.days[6]);
+    var sorted = st.days.slice().sort();
+    var from = sorted[0] + "T00:00:00" + berlinOffsetSuffix(sorted[0]);
+    var to = addDays(sorted[6], 1) + "T00:00:00" + berlinOffsetSuffix(sorted[6]);
     var range = "&starts_at=gte." + encodeURIComponent(from) + "&starts_at=lt." + encodeURIComponent(to);
     var sel = "&select=id,user_id,title,category,starts_at,visibility,group_id,status,item_type,enrollment_id,course_id,location&order=starts_at.asc&limit=80";
     return Promise.all([
@@ -3384,15 +3398,15 @@
     var gid = String(st.group.id);
     var rows = st.days.map(function (iso) {
       var d = new Date(iso + "T12:00:00");
-      var label = DAYS_DE[d.getDay()] + " " + d.getDate() + ".";
+      var label = DAYS_DE[d.getDay()];
       var html = "";
       var k = 0;
       st.mine.filter(function (e) { return dayKey(e.starts_at) === iso; }).forEach(function (e) {
         /* in der Gruppe = group_id gesetzt (Sichtbarkeit kann beim Abhaken auf Community stehen) */
         var inGroup = String(e.group_id || "") === gid && e.visibility !== "privat";
-        var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
+        var tm = gaTime(e);
         html += '<div class="wr-dayrow wr-zrec-row wr-ga-row' + (inGroup ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
-          (e.status === "erledigt" ? "✓ " : "") + esc(e.title || "Training") + esc(tm) + "</span>" +
+          esc(e.title || "Training") + esc(tm) + "</span>" +
           /* zweite Zeile: Ort (zugeordnet heißt nicht „nur in der Gruppe sichtbar“) */
           (e.location ? '<span class="wr-dayrow__tag">' + esc(e.location) + "</span>" : "") + "</div>" +
           (inGroup
@@ -3402,7 +3416,7 @@
       });
       st.others.filter(function (e) { return dayKey(e.starts_at) === iso; }).forEach(function (e) {
         var on = !!st.going[String(e.id)];
-        var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
+        var tm = gaTime(e);
         var who = String(personOf(e.user_id).name || "").split(" ")[0];
         html += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
           esc(e.title || "Training") + esc(tm) + "</span>" +
@@ -3412,8 +3426,7 @@
       if (!k) html = '<div class="wr-dayrow wr-zrec-row is-empty"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + '</b> <span class="wr-dayrow__free">frei</span></span></div><span></span></div>';
       return html;
     }).join("");
-    var hint = '<p class="wr-sheet-hint">Mit + teilst Du ein Event aus Deinem Wochenplan mit ' + esc(st.group.name || "Deiner Gruppe") +
-      ", mit − nimmst Du es heraus (jede Woche). Events der anderen sagst Du zu oder ab.</p>";
+    var hint = '<button type="button" class="wr-ga-info" data-ga-info="1">Info</button>';
     if (state.gaTarget) {
       state.gaTarget.innerHTML = hint + '<div class="wr-days wr-days--all">' + rows + "</div>";
       return;
@@ -3500,6 +3513,12 @@
   }
 
   function groupAssignClick(e) {
+    if (e.target.closest && e.target.closest("[data-ga-info]")) {
+      e.stopPropagation();
+      var msg = "Mit + teilst Du das Event aus Deinem Wochenplan mit der Gruppe und mit − entfernst Du es. Wenn Du hier Events von anderen Gruppenmitgliedern zusagst, erscheint das Event regelmäßig an dem Wochentag mit der Uhrzeit.";
+      if (global.GoDialog) GoDialog.alert(msg); else if (host.toast) host.toast(msg);
+      return true;
+    }
     var ga = e.target.closest && e.target.closest("[data-ga-add],[data-ga-rm],[data-ga-yes],[data-ga-no]");
     if (!ga) return false;
     e.stopPropagation();
