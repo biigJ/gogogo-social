@@ -27,6 +27,7 @@
     ".god__sheet-row+.god__sheet-row{border-top:1px solid rgba(42,33,24,.12)}" +
     ".god__sheet-row .god__vis{margin:0}" +
     ".god__sheet-ok{width:auto;min-height:44px;margin:0;padding:0 22px}" +
+    ".god__sheet-act{border:0;background:none;color:inherit;font:inherit;font-size:16px;font-weight:600;justify-content:flex-start;cursor:pointer;padding:0}" +
     ".god__sheet-danger{border:0;background:none;color:#C7413B;font:inherit;font-size:16px;font-weight:600;justify-content:flex-start;cursor:pointer;padding:0}" +
     ".god__list{max-height:46vh;overflow-y:auto;margin:0 0 14px;display:grid;gap:6px}" +
     ".god__pick{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:12px;background:#fff;font-size:16px;cursor:pointer}" +
@@ -468,6 +469,15 @@
       r1.appendChild(pill);
       r1.appendChild(ok);
       card.appendChild(r1);
+      /* optional eine zweite Aktion über Löschen (z. B. Verkleinern) → "__extra2" */
+      if (opts.extra2) {
+        var r3 = document.createElement("button");
+        r3.type = "button";
+        r3.className = "god__sheet-row god__sheet-act";
+        r3.textContent = opts.extra2;
+        r3.addEventListener("click", function () { close("__extra2"); });
+        card.appendChild(r3);
+      }
       var r2 = document.createElement("button");
       r2.type = "button";
       r2.className = "god__sheet-row god__sheet-danger";

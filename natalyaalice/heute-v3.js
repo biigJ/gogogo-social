@@ -816,7 +816,9 @@
     var range = "&starts_at=gte." + encodeURIComponent(fromIso) + "&starts_at=lte." + encodeURIComponent(toIso) + "&order=starts_at.desc&limit=500";
     /* bubble_id erst nach go-bubbles.sql vorhanden; group_id für Gruppen-Events (Gruppenname statt Vorname) */
     /* feed_hidden: „Speichern ohne Posting“ (go-events-feed-hidden.sql) */
-    return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id" + range)
+    /* feed_compact: vergangenes Event verkleinert (go-events-feed-compact.sql) */
+    return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact" + range)
+      .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id" + range); })
@@ -1417,8 +1419,8 @@
       return inGroupFilter(ev.user_id, flags);
     }
     if (ev.status === "erledigt") {
-      /* ohne Posting gespeichert: auch im eigenen Verlauf nicht zeigen */
-      if (ev.feed_hidden) return false;
+      /* ohne Posting gespeichert: nur die Besitzerin sieht es (Aktuell, Story, Verlauf) */
+      if (ev.feed_hidden && !mine) return false;
       if (mine) return !!flags.showOwnHistory;
       if (coachSees && flags.showFriendsHistory) return !flags.groupOnly || inGroupFilter(ev.user_id, flags);
       if (!flags.showFriendsHistory || !(vis === "team" || vis === "gruppe")) return false;
@@ -2400,8 +2402,10 @@
         });
     return renderCardShell({
       /* zugesagt (Einladung angenommen oder Herz) → dicker Rahmen */
-      extraClass: !mine && (acceptedInv || iAmGoing(ev.id)) ? "is-going"
-        : mine && upcoming && day >= todayIso() ? "is-mine-next" : "",
+      extraClass: (!mine && (acceptedInv || iAmGoing(ev.id)) ? "is-going"
+        : mine && upcoming && day >= todayIso() ? "is-mine-next" : "")
+        /* verkleinert (Besitzer über •••, gilt für alle): Höhe wie Wallet-Karte, Tipp klappt auf */
+        + (ev.status === "erledigt" && ev.feed_compact ? " is-wallet is-shrunk" : ""),
       attrs:
         ' data-post-id="' +
         esc(ev.id) +
@@ -4975,6 +4979,14 @@
     return out;
   }
   /* Sichtbarkeit eines eigenen Events über die drei Punkte am Bild */
+  /* Vergangenes Event verkleinern/vergrößern: gilt für alle, die es sehen */
+  function setCompact(ev, on) {
+    state.walletOpen = "";
+    rest("events?id=eq." + encodeURIComponent(ev.id), { method: "PATCH", prefer: "return=minimal", body: { feed_compact: on } })
+      .then(function () { ev.feed_compact = on; render(); })
+      .catch(function () { if (host.toast) host.toast("Ging nicht (go-events-feed-compact.sql?)"); });
+  }
+
   function changeEventVisibility(id) {
     var ev = (state.events || []).filter(function (x) { return String(x.id) === String(id); })[0];
     if (!ev || !global.GoDialog || !GoDialog.vis) return;
@@ -4985,8 +4997,10 @@
     if (bid) list.push({ value: "bubble", label: "Bubble" }, { value: "alles", label: "alle" });
     var vis = normalizeVisibility(ev.visibility || "team");
     var cur = vis === "privat" ? "privat" : vis === "bubble" ? "bubble" : (bid && String(ev.bubble_id || "") === bid ? "alles" : "team");
-    GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, extra: "Löschen" }).then(function (v) {
+    var past = ev.status === "erledigt";
+    GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, extra: "Löschen", extra2: past ? (ev.feed_compact ? "Vergrößern" : "Verkleinern") : "" }).then(function (v) {
       if (v === "__extra") { removeEvent(id, "delete"); return; }
+      if (v === "__extra2") { setCompact(ev, !ev.feed_compact); return; }
       if (!v || v === cur) return;
       var pick = list.filter(function (x) { return x.value === v; })[0] || {};
       var body = v === "alles" ? { visibility: "team", bubble_id: bid }
