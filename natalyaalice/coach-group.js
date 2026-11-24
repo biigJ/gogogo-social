@@ -1,10 +1,12 @@
-/* coach-group.js — Coach-Gruppe: Coach und seine Kunden (go-coach-gruppe.sql)
+/* coach-group.js — Coach-Gruppe: Coach und seine Coachees (go-coach-gruppe.sql)
  *
  *   GoCoachGroup.init({ rest, me(), myName(), toast(msg), openProfile(person), onChange() })
  *   GoCoachGroup.render(el, { mode: "coach" | "client", coach: { id, name, photo_url } })
  *
- * Coach:  Kunden (alle, „offen“ markiert), Woche Mo bis So; Tag antippen (+) → Event anlegen und Kunden einladen.
- * Kunde:  Haken „offen für Gruppentraining“, andere Kunden mit Haken, Woche mit den Einladungen des Coaches (Zusagen/Absagen).
+ * Coach:    Coachees (alle, „offen“ markiert) mit Coach-Stempelkarte (Stempel, übrig, „bar bezahlt“ → neue Karte),
+ *           Woche Mo bis So; + → Event anlegen und Coachees einladen; heutiges Event → QR zum Stempeln.
+ * Coachee:  Haken „offen für Gruppentraining“, andere Coachees mit Haken, Woche mit den Einladungen des Coaches.
+ * Stempelkarte des Coaches: go-coach-stempelkarte.sql (go_stamp_links kind 'coach').
  * Einladungen laufen über go_workout_invites (Herz in Aktuell, Annehmen = Zusage im Event).
  */
 (function (global) {
@@ -30,6 +32,15 @@
     ".gcg__wk button{width:40px;height:40px;border:0;background:none;font-size:22px;color:#2A2118;cursor:pointer}" +
     ".gcg__wk button[disabled]{opacity:.25;cursor:default}" +
     ".gcg .wr-dayrow.is-past{opacity:.45}" +
+    ".gcg .wr-dayrow.is-closed{background:#E4DDD0;border-color:#E4DDD0;border-style:solid}" +
+    ".gcg__ce{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;align-items:start;padding:12px 0;border-bottom:1px solid rgba(42,33,24,.12)}" +
+    ".gcg__ce .gcg__face{width:52px}" +
+    ".gcg__ce b{display:block;font-size:15px;margin:2px 0 6px}" +
+    ".gcg__stamps{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;max-width:300px}" +
+    ".gcg__stamps i{aspect-ratio:1;border-radius:50%;border:1.5px solid #2F5D50;box-sizing:border-box}" +
+    ".gcg__stamps i.is-on{background:#2F5D50}" +
+    ".gcg__cefoot{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;margin-top:6px;font-size:13px;color:rgba(42,33,24,.7)}" +
+    ".gcg__link{border:0;background:none;padding:0;font:inherit;font-size:14px;font-weight:600;color:#2A2118;text-decoration:underline;text-underline-offset:3px;cursor:pointer}" +
     ".gcg__plus{width:32px;height:32px;border-radius:50%;border:1.5px solid rgba(42,33,24,.35);background:transparent;color:#2A2118;font:400 20px/1 Inter,sans-serif;cursor:pointer;align-self:center}";
 
   function ensureCss() {
@@ -77,6 +88,7 @@
     var coach = encodeURIComponent(s.coach.id);
     var jobs = [host.rest("rpc/go_coach_group_members", { method: "POST", body: { p_coach: s.coach.id } }).catch(function () { return null; })];
     if (s.mode === "coach") {
+      jobs.push(host.rest("rpc/go_coach_cards", { method: "POST", body: { p_coach: s.coach.id } }).catch(function () { return []; }));
       jobs.push(host.rest("events?user_id=eq." + encodeURIComponent(me()) + "&coach_group=eq.true&status=neq.ausgefallen&starts_at=gte." + encodeURIComponent(from) +
         "&starts_at=lt." + encodeURIComponent(to) + "&select=id,title,starts_at,location,status&order=starts_at.asc&limit=60").catch(function () { return []; }));
     } else {
@@ -85,12 +97,30 @@
         .catch(function () { return []; }));
       jobs.push(host.rest("go_coach_group_open?account_id=eq." + encodeURIComponent(me()) + "&select=is_open,coach_id").catch(function () { return []; }));
     }
+    /* Kalender des Coaches (PT-Kalender): gesperrte Tage, Feiertage, verfügbare Zeiten, belegte Stunden */
+    var cal = Promise.all([
+      host.rest("go_coach_hours?coach_id=eq." + coach + "&select=mode,hours").catch(function () { return []; }),
+      host.rest("go_coach_blocked_days?coach_id=eq." + coach + "&day=gte." + days[0] + "&day=lte." + days[6] + "&select=day").catch(function () { return []; }),
+      host.rest("rpc/go_coach_busy", { method: "POST", body: { p_coach: s.coach.id, p_from: from, p_to: to } }).catch(function () { return []; })
+    ]).then(function (c) {
+      s.hours = (c[0] || [])[0] || null;
+      s.blocked = {};
+      (c[1] || []).forEach(function (b) { s.blocked[String(b.day).slice(0, 10)] = true; });
+      s.busy = {};
+      (c[2] || []).forEach(function (b) {
+        var d = berlinDay(b.starts_at), h = Number(new Date(b.starts_at).toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: "Europe/Berlin" }));
+        (s.busy[d] = s.busy[d] || {})[h] = b.kind || true;
+      });
+    });
+    jobs.push(cal);
     return Promise.all(jobs).then(function (r) {
       s.days = days;
       s.membersOk = r[0] !== null;
       s.members = r[0] || [];
       if (s.mode === "coach") {
-        s.events = r[1] || [];
+        s.cards = {};
+        (r[1] || []).forEach(function (c) { s.cards[String(c.account_id)] = c; });
+        s.events = r[2] || [];
         if (!s.events.length) { s.inv = []; return; }
         return host.rest("go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&event_id=in.(" + s.events.map(function (e) { return e.id; }).join(",") + ")&select=event_id,to_id,status")
           .catch(function () { return []; }).then(function (inv) { s.inv = inv || []; });
@@ -107,6 +137,64 @@
     return '<button type="button" class="gcg__face' + (open ? " is-open" : "") + '" data-gcg-person="' + esc(p.id) + '" aria-label="' + esc(p.name || "") + (open ? ", offen für Gruppentraining" : "") + '">' +
       '<span class="gcg__img"' + img + ">" + (p.photo_url ? "" : esc(String(p.name || "?").slice(0, 1))) + "</span><em>" + esc(first(p.nickname ? p.name : p.name) || "?") + "</em></button>";
   }
+  var FROM_H = 7, TO_H = 21;
+  function holiday(s, iso) {
+    if (s.hours && s.hours.hours && s.hours.hours.holidays === false) return "";
+    var P = global.GoPtCal && GoPtCal._holidays;
+    return P ? P(Number(iso.slice(0, 4)))[iso] || "" : "";
+  }
+  function range(s, iso) {
+    var h = s.hours;
+    if (!h) return [FROM_H, TO_H];
+    if (h.mode === "weekday") {
+      var r = ((h.hours || {}).days || {})[String(dow(iso))];
+      return r && r.length === 2 ? r : null;
+    }
+    var d = (h.hours || {}).daily;
+    return d && d.length === 2 ? d : [FROM_H, TO_H];
+  }
+  /* freie Stunden des Coaches an einem Tag (ohne eigene Gruppen-Events mitzuzählen ist nicht nötig: die belegen die Stunde) */
+  function freeHours(s, iso) {
+    if (s.blocked && s.blocked[iso]) return [];
+    if (holiday(s, iso)) return [];
+    var r = range(s, iso);
+    if (!r) return [];
+    var out = [], b = (s.busy || {})[iso] || {};
+    for (var h = Math.max(FROM_H, r[0]); h < Math.min(TO_H, r[1]); h++) if (!b[h]) out.push(h);
+    return out;
+  }
+  function spans(hours) {
+    var out = [], st = null, prev = null;
+    hours.forEach(function (h) {
+      if (st == null) st = h;
+      else if (h !== prev + 1) { out.push(st + "–" + (prev + 1)); st = h; }
+      prev = h;
+    });
+    if (st != null) out.push(st + "–" + (prev + 1));
+    return out;
+  }
+  function dayState(s, iso) {
+    var hol = holiday(s, iso);
+    if (hol) return { closed: true, label: hol };
+    if (s.blocked && s.blocked[iso]) return { closed: true, label: "gesperrt" };
+    var fh = freeHours(s, iso);
+    if (!fh.length) return { closed: true, label: range(s, iso) ? "ausgebucht" : "nicht verfügbar" };
+    return { closed: false, free: fh, label: "frei " + spans(fh).join(" · ") + " Uhr" };
+  }
+  function cardOf(s, id) { return (s.cards || {})[String(id)] || { stamps: 0, card_no: 1, paid_at: null }; }
+  function coacheeRow(s, p) {
+    var c = cardOf(s, p.id);
+    var n = Math.max(0, Math.min(12, Number(c.stamps) || 0));
+    var dots = "";
+    for (var i = 0; i < 12; i++) dots += '<i class="' + (i < n ? "is-on" : "") + '"></i>';
+    var paid = c.paid_at ? new Date(c.paid_at).toLocaleDateString("de-DE", { day: "numeric", month: "numeric", timeZone: "Europe/Berlin" }) : "";
+    return '<div class="gcg__ce">' + faceHtml(p, p.is_open).replace("<em>", '<em hidden>') +
+      "<div><b>" + esc(p.name || "?") + "</b>" +
+      '<div class="gcg__stamps" aria-label="' + n + ' von 12 Stempeln">' + dots + "</div>" +
+      '<div class="gcg__cefoot"><button type="button" class="gcg__link" data-gcg-card="' + esc(p.id) + '">Anzeigen</button>' +
+      "<span>" + n + " / 12 · " + (12 - n) + " übrig" + (c.card_no > 1 ? " · Karte " + c.card_no : "") + (paid ? " · bezahlt " + paid : "") + "</span>" +
+      '<button type="button" class="gcg__link" data-gcg-paid="' + esc(p.id) + '">Bar bezahlt</button></div></div></div>';
+  }
   function paint(s) {
     var el = s.el;
     var t = todayIso();
@@ -114,19 +202,19 @@
     if (s.mode === "client") {
       html += '<label class="gcg__open"><input type="checkbox" data-gcg-open' + (s.open ? " checked" : "") + ">Offen für Gruppentraining</label>";
       html += '<p class="gcg__empty" style="margin-top:6px">' + (s.open
-        ? "Die anderen Kunden von " + esc(first(s.coach.name) || "Deinem Coach") + " mit Haken sehen Dich, Du siehst sie."
-        : "Mit Haken sehen Dich die anderen Kunden mit Haken, und Du siehst sie.") + "</p>";
+        ? "Die anderen Coachees von " + esc(first(s.coach.name) || "Deinem Coach") + " mit Haken sehen Dich, Du siehst sie."
+        : "Mit Haken sehen Dich die anderen Coachees mit Haken, und Du siehst sie.") + "</p>";
       if (s.open) {
         html += '<p class="gcg__h">Offen für Gruppentraining</p>';
         html += s.members.length ? '<div class="gcg__faces">' + s.members.map(function (p) { return faceHtml(p, true); }).join("") + "</div>"
           : '<p class="gcg__empty">Noch niemand außer Dir.</p>';
       }
     } else {
-      html += '<p class="gcg__h">Kunden</p>';
+      html += '<p class="gcg__h">Coachees</p>';
       html += !s.membersOk ? '<p class="gcg__empty">Braucht go-coach-gruppe.sql in Supabase.</p>'
-        : s.members.length ? '<div class="gcg__faces">' + s.members.map(function (p) { return faceHtml(p, p.is_open); }).join("") + "</div>" +
-          '<p class="gcg__empty">Grüner Punkt: offen für Gruppentraining.</p>'
-        : '<p class="gcg__empty">Noch keine Kunden. Kunden wählen Dich unter Kreise → Hinzufügen → Coach.</p>';
+        : s.members.length ? s.members.map(function (p) { return coacheeRow(s, p); }).join("") +
+          '<p class="gcg__empty">Grüner Punkt: offen für Gruppentraining. Gestempelt wird per QR beim gemeinsamen Training.</p>'
+        : '<p class="gcg__empty">Noch keine Coachees. Coachees wählen Dich unter Kreise → Hinzufügen → Coach.</p>';
     }
     var d0 = new Date(s.days[0] + "T12:00:00Z"), d6 = new Date(s.days[6] + "T12:00:00Z");
     html += '<p class="gcg__h">Gruppentraining</p>' +
@@ -151,14 +239,22 @@
           out += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-zirkel is-group' + (past ? " is-past" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
             esc(x.events.title || "Gruppentraining") + " · " + esc(berlinTime(x.events.starts_at)) + '</span><span class="wr-dayrow__tag">' +
             esc([x.events.location, "von " + (first(s.coach.name) || "Coach"), on ? "Du bist dabei" : ""].filter(Boolean).join(" · ")) + "</span></div>" +
-            (past ? "<span></span>" : '<button type="button" class="wr-pill-btn' + (on ? "" : " wr-pill-btn--dark") + ' wr-ga-rsvp" data-gcg-' + (on ? "no" : "yes") + '="' + esc(x.id) + '">' + (on ? "Absagen" : "Zusagen") + "</button>") + "</div>";
+            (past ? "<span></span>" : on && iso === t ? '<button type="button" class="wr-pill-btn wr-pill-btn--dark wr-ga-rsvp" data-gcg-qr="' + esc(x.event_id) + '">QR</button>'
+              : '<button type="button" class="wr-pill-btn' + (on ? "" : " wr-pill-btn--dark") + ' wr-ga-rsvp" data-gcg-' + (on ? "no" : "yes") + '="' + esc(x.id) + '">' + (on ? "Absagen" : "Zusagen") + "</button>") + "</div>";
         });
       }
+      /* Zustand aus dem PT-Kalender des Coaches: gesperrt, Feiertag, ausgebucht oder freie Stunden */
+      var ds = dayState(s, iso);
+      var stateTxt = s.mode === "coach" || ds.closed ? ds.label : "";
+      var canAdd = s.mode === "coach" && !past && !ds.closed;
       if (!k) {
-        out = '<div class="wr-dayrow wr-zrec-row is-empty' + (past ? " is-past" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + '</b> <span class="wr-dayrow__free">frei</span></span></div>' +
-          (s.mode === "coach" && !past ? '<button type="button" class="gcg__plus" data-gcg-add="' + iso + '" aria-label="Event am ' + DAYS_LONG[dow(iso)] + ' anlegen">+</button>' : "<span></span>") + "</div>";
+        out = '<div class="wr-dayrow wr-zrec-row is-empty' + (past ? " is-past" : "") + (ds.closed ? " is-closed" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + '</b> <span class="wr-dayrow__free">' + esc(stateTxt || "frei") + "</span></span></div>" +
+          (canAdd ? '<button type="button" class="gcg__plus" data-gcg-add="' + iso + '" aria-label="Event am ' + DAYS_LONG[dow(iso)] + ' anlegen">+</button>' : "<span></span>") + "</div>";
       } else if (s.mode === "coach" && !past) {
-        out += '<div class="wr-dayrow wr-zrec-row is-empty"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b></b> <span class="wr-dayrow__free">weiteres Event</span></span></div><button type="button" class="gcg__plus" data-gcg-add="' + iso + '" aria-label="Weiteres Event anlegen">+</button></div>';
+        out += '<div class="wr-dayrow wr-zrec-row is-empty' + (ds.closed ? " is-closed" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b></b> <span class="wr-dayrow__free">' + esc(ds.closed ? ds.label : "weiteres Event · " + ds.label) + "</span></span></div>" +
+          (canAdd ? '<button type="button" class="gcg__plus" data-gcg-add="' + iso + '" aria-label="Weiteres Event anlegen">+</button>' : "<span></span>") + "</div>";
+      } else if (ds.closed) {
+        out += '<div class="wr-dayrow wr-zrec-row is-empty is-closed"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b></b> <span class="wr-dayrow__free">' + esc(ds.label) + "</span></span></div><span></span></div>";
       }
       return out;
     }).join("");
@@ -175,7 +271,7 @@
     var list = s.members.filter(function (p) { return (already || []).indexOf(String(p.id)) < 0; })
       .sort(function (a, b) { return (b.is_open ? 1 : 0) - (a.is_open ? 1 : 0); })
       .map(function (p) { return { value: String(p.id), label: (p.name || "?") + (p.is_open ? " · offen" : "") }; });
-    return GoDialog.pick(title, list, { ok: "Einladen", empty: "Keine weiteren Kunden." });
+    return GoDialog.pick(title, list, { ok: "Einladen", empty: "Keine weiteren Coachees." });
   }
   function sendInvites(s, ev, ids) {
     if (!ids || !ids.length) return Promise.resolve();
@@ -187,14 +283,20 @@
     return host.rest("go_workout_invites", { method: "POST", prefer: "return=minimal", body: rows });
   }
   function addEvent(s, iso) {
-    if (!s.members.length) { GoDialog.alert("Noch keine Kunden. Kunden wählen Dich unter Kreise → Hinzufügen → Coach."); return; }
+    if (!s.members.length) { GoDialog.alert("Noch keine Coachees. Coachees wählen Dich unter Kreise → Hinzufügen → Coach."); return; }
     var ev = { title: "", time: "" };
     GoDialog.prompt("Gruppentraining am " + shortDay(iso), "Gruppentraining", { ok: "Weiter" })
       .then(function (title) {
         title = String(title || "").trim();
         if (!title) return null;
         ev.title = title.slice(0, 60);
-        return GoDialog.time("Uhrzeit", { ok: "Weiter", cancel: "Abbrechen", initial: "18:00" });
+        /* nur Stunden, die im Coach-Kalender frei sind (verfügbar, nicht gesperrt, nicht belegt) */
+        var fh = freeHours(s, iso);
+        if (!fh.length) { GoDialog.alert("An diesem Tag ist in Deinem Kalender nichts frei."); return null; }
+        var times = [];
+        fh.forEach(function (h) { times.push(h + ":00"); times.push(h + ":30"); });
+        var pre = fh.indexOf(18) >= 0 ? "18:00" : times[0];
+        return GoDialog.time("Uhrzeit", { ok: "Weiter", cancel: "Abbrechen", times: times, initial: pre, sub: "Freie Stunden aus Deinem Kalender" });
       })
       .then(function (tm) {
         if (!tm) return null;
@@ -227,9 +329,11 @@
     s.members.forEach(function (p) { byId[String(p.id)] = first(p.name); });
     var info = inv.map(function (x) { return (byId[String(x.to_id)] || "?") + ": " + ({ accepted: "dabei", declined: "abgesagt", pending: "offen", maybe: "vielleicht" }[x.status] || x.status); });
     var items = info.map(function (t) { return { info: t }; });
+    if (berlinDay(ev.starts_at) === todayIso() && host.openStampForEvent) items.push({ label: "QR-Code zum Stempeln", value: "qr" });
     if (berlinDay(ev.starts_at) >= todayIso()) items.push({ label: "Weitere einladen", value: "more" });
     items.push({ label: "Event löschen", value: "del" });
     GoDialog.choose((ev.title || "Gruppentraining") + " · " + shortDay(berlinDay(ev.starts_at)) + " " + berlinTime(ev.starts_at), items, { center: true }).then(function (v) {
+      if (v === "qr") { host.openStampForEvent(ev.id, null); return; }
       if (v === "more") {
         pickCoachees(s, "Wen noch einladen?", inv.map(function (x) { return String(x.to_id); })).then(function (ids) {
           if (!ids || !ids.length) return;
@@ -247,6 +351,22 @@
         });
       }
     });
+  }
+  function showCard(s, id) {
+    var p = s.members.filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!p || !host.openStampPreview) return;
+    host.openStampPreview({ kind: "coach", name: "Coach " + (first(s.coach.name) || ""), stamps: cardOf(s, id).stamps }, p);
+  }
+  function markPaid(s, id) {
+    var p = s.members.filter(function (x) { return String(x.id) === String(id); })[0] || {};
+    var c = cardOf(s, id);
+    GoDialog.confirm(first(p.name) + " hat bar bezahlt?", { body: "Eine neue Karte startet mit 0 Stempeln. Die alte Karte hatte " + (Number(c.stamps) || 0) + " von 12.", ok: "Neue Karte", cancel: "Abbrechen" })
+      .then(function (yes) {
+        if (!yes) return;
+        host.rest("rpc/go_coach_card_paid", { method: "POST", body: { p_coachee: id } })
+          .then(function () { if (host.toast) host.toast("Neue Karte für " + first(p.name)); return refresh(s); })
+          .catch(function () { GoDialog.alert("Ging nicht (go-coach-stempelkarte.sql ausgeführt?)"); });
+      });
   }
   function answer(s, inviteId, yes) {
     var job = host.rest("rpc/" + (yes ? "go_accept_invite" : "go_decline_invite"), { method: "POST", body: { p_invite_id: inviteId } });
@@ -279,6 +399,12 @@
       GoDialog.confirm("Absagen?", { ok: "Absagen", cancel: "Abbrechen" }).then(function (ok) { if (ok) answer(s, n.getAttribute("data-gcg-no"), false); });
       return;
     }
+    var cd = t.closest("[data-gcg-card]");
+    if (cd) { showCard(s, cd.getAttribute("data-gcg-card")); return; }
+    var pd = t.closest("[data-gcg-paid]");
+    if (pd) { markPaid(s, pd.getAttribute("data-gcg-paid")); return; }
+    var qr = t.closest("[data-gcg-qr]");
+    if (qr && host.openStampForEvent) { host.openStampForEvent(qr.getAttribute("data-gcg-qr"), { kind: "coach", ref: String(s.coach.id) }); return; }
     var ev = t.closest("[data-gcg-ev]");
     if (ev) { eventMenu(s, ev.getAttribute("data-gcg-ev")); return; }
     var p = t.closest("[data-gcg-person]");

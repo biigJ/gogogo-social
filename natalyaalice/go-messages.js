@@ -66,7 +66,7 @@
     {
       key: "news:2026-11-24-coach-gruppe",
       at: "2026-11-24T23:30:00Z",
-      text: "Neu unter Community → Kreise: Coaches haben „Meine Kunden“ und laden dort zum Gruppentraining ein. Als Kunde setzt Du unter „Coach“ den Haken „Offen für Gruppentraining“ und siehst die Einladungen Deines Coaches."
+      text: "Neu unter Community → Kreise: Coaches haben „Meine Coachees“ und laden dort zum Gruppentraining ein. Als Coachee setzt Du unter „Coach“ den Haken „Offen für Gruppentraining“ und siehst die Einladungen Deines Coaches."
     }
   ];
 
