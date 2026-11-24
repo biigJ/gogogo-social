@@ -80,6 +80,8 @@
       extra:
         "input:not([type=checkbox]):not([type=radio]):not([type=range]),select:not(#heute-filter-select),textarea,.gpl__select,.god__input{background-color:#000 !important;color:#fff !important;border-color:rgba(255,255,255,.7) !important}" +
         "#heute-filter-select{color:#fff !important}" +
+        /* Wochenauswahl liegt auf dem Foto: kein schwarzer Kasten */
+        "select[data-wr-week-select]:not(#_){background-color:transparent !important;border-color:transparent !important;color:#fff !important}" +
         "input::placeholder,textarea::placeholder{color:rgba(255,255,255,.55) !important}" +
         ".cp-seg button{color:#fff !important;border-color:#fff !important;background:transparent !important}" +
         ".cp-seg button.is-on{background:#fff !important;color:#000 !important}" +
