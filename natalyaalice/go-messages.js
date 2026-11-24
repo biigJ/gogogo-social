@@ -51,7 +51,7 @@
     {
       key: "news:2026-11-24-plus-kacheln",
       at: "2026-11-24T16:50:00Z",
-      text: "Plus zeigt Deine Plus-Punkte jetzt als Kacheln. Am Griff rechts sortierst Du sie, Aktiviertes rutscht nach oben."
+      text: "Plus zeigt Deine Plus-Punkte jetzt als Kacheln. Tippen öffnet den Inhalt, „Plus“ unten bringt Dich zurück. Am Griff rechts sortierst Du sie, Aktiviertes rutscht nach oben."
     }
   ];
 
