@@ -25,7 +25,9 @@
       ".gstory__bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}" +
       ".gstory::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,0) 28%,rgba(0,0,0,0) 45%,rgba(0,0,0,.75))}" +
       ".gstory__top{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) + 12px);left:16px;right:8px;display:flex;justify-content:space-between;align-items:center;font:700 15px Inter,sans-serif}" +
-      ".gstory__top button{border:0;background:transparent;color:#fff;font-size:32px;width:44px;height:44px;cursor:pointer}" +
+      /* X groß, Trefferfläche ringsum 18px größer (Pseudo-Element zählt zum Button) */
+      ".gstory__top button{position:relative;border:0;background:transparent;color:#fff;display:grid;place-items:center;width:60px;height:60px;margin:-6px -4px 0 0;padding:0;cursor:pointer;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))}" +
+      ".gstory__top button::before{content:'';position:absolute;inset:-18px -8px -18px -18px}" +
       ".gstory__txt{position:absolute;z-index:2;left:22px;right:22px;bottom:calc(env(safe-area-inset-bottom,0px) + 40px)}" +
       ".gstory .gstory__txt h3{margin:4px 0 8px !important;font-family:'Playfair Display',Georgia,serif !important;font-size:32px !important;font-weight:600 !important;line-height:1.1 !important;color:#fff !important;cursor:pointer}" +
       ".gstory__txt p{margin:0;font:600 16px/1.4 Inter,sans-serif}" +
@@ -80,7 +82,7 @@
       var it = items[i];
       wrap.innerHTML =
         (it.bg ? '<img class="gstory__bg" src="' + esc(it.bg) + '" alt="" />' : "") +
-        '<div class="gstory__top"><span>' + esc(opts.title || "") + '</span><button type="button" data-gstory-close aria-label="Schließen">×</button></div>' +
+        '<div class="gstory__top"><span>' + esc(opts.title || "") + '</span><button type="button" data-gstory-close aria-label="Schließen"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg></button></div>' +
         '<div class="gstory__txt">' +
         (it.who ? '<p class="gstory__who">' + esc(it.who) + "</p>" : "") +
         '<h3 data-gstory-open="1">' + esc(it.title || "Training") + "</h3>" +
