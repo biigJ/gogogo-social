@@ -5766,6 +5766,26 @@
     .go-toc__item:last-child { border-bottom: 1px solid rgba(42, 33, 24, 0.14); }
     /* Plus: „+ mehr Plus-Punkte“ im Stil des Inhaltsverzeichnisses, ohne Linie */
     .go-toc .go-toc__item.go-toc__add, .go-toc .go-toc__item.go-toc__add:last-child { border-bottom: 0; color: rgba(42, 33, 24, 0.55); }
+    /* Plus-Übersicht als Kacheln (Höhe wie zusammengeschobene Events in Aktuell), eckig, 1px Linie, Griff rechts zum Sortieren */
+    .go-tiles { display: flex; flex-direction: column; gap: 10px; padding: 8px 0 24px; width: 100%; }
+    .go-tile { position: relative; height: 104px; flex: none; overflow: hidden; border: 1px solid rgba(42, 33, 24, 0.22); border-radius: 0; background: #F3EEE4; cursor: pointer; touch-action: pan-x pan-y; }
+    .go-tile__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .3; pointer-events: none; }
+    .go-tile.is-on .go-tile__img { opacity: 1; }
+    .go-tile.is-on::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.5), rgba(0,0,0,.1) 70%); pointer-events: none; }
+    .go-tile__name { position: absolute; z-index: 1; left: 16px; right: 52px; top: 50%; transform: translateY(-50%); margin-top: 8px; color: #2A2118;
+      font-family: "Playfair Display", Georgia, serif !important; font-size: var(--t-l, 24px) !important; font-weight: 600 !important; line-height: 1.15 !important;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+    .go-tile.is-on .go-tile__name { color: #fff; }
+    body.is-session .go-tiles .go-tile .go-tile__name { font-family: "Playfair Display", Georgia, serif !important; font-size: var(--t-l, 24px) !important; font-weight: 600 !important; }
+    body.is-session .go-tiles .go-tile .go-tile__pill { font: 600 12px/1.3 Inter, system-ui, sans-serif !important; }
+    .go-tile__pill { position: absolute; z-index: 1; top: 8px; left: 10px; padding: 3px 10px; border-radius: 999px; background: rgba(42, 33, 24, 0.14); color: #2A2118;
+      font: 600 12px/1.3 Inter, system-ui, sans-serif !important; letter-spacing: .02em; pointer-events: none; }
+    .go-tile.is-on .go-tile__pill { background: #C7413B; color: #fff; }
+    .go-tile__grip { position: absolute; z-index: 2; top: 0; right: 0; bottom: 0; width: 40px; cursor: grab; touch-action: none;
+      background: radial-gradient(circle, rgba(42,33,24,.45) 1.4px, transparent 1.6px) 0 0 / 8px 8px, rgba(243, 238, 228, 0.82);
+      border-left: 1px solid rgba(42, 33, 24, 0.22); }
+    .go-tile.is-drag { z-index: 5; box-shadow: 0 8px 24px rgba(20, 16, 12, .25); transition: none; }
+    .go-tiles .go-toc__add { border: 1px dashed rgba(42, 33, 24, 0.3) !important; padding: 14px 16px !important; text-align: left; }
     .plus-pick { position: fixed; inset: 0; z-index: 10045; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(20, 16, 12, 0.42); }
     .plus-pick__card { width: min(100%, 400px); max-height: 86vh; overflow-y: auto; box-sizing: border-box; background: #F3EEE4; color: #2A2118; border-radius: 22px; padding: 22px 18px 14px; }
     .plus-pick__card h2 { margin: 0 0 12px; font: 600 24px/1.2 'Playfair Display', Georgia, serif; text-align: center; }
@@ -8851,7 +8871,7 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-44"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-26"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-5"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-6"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-4"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
@@ -19783,6 +19803,94 @@
       }
       setTimeout(maybeShowIntro, 2500);
 
+      /* Plus-Kacheln: aktiv = gebucht (Zirkel: FFC-Login, Coach: schon Trainer). Reihenfolge je Konto gemerkt; neu Aktiviertes rutscht nach oben */
+      function plusOfferOwned(offer) {
+        var owned = window.GoSupport && GoSupport.offerOwned ? GoSupport.offerOwned(offer.type || offer.key) : false;
+        if ((offer.key === "zirkel" || offer.type === "zirkel") && window.FFC && FFC.user && FFC.user()) owned = true;
+        if (offer.key === "coach_offer" && !!(sessionIsTrainer || (sessionAccount && sessionAccount.is_trainer))) owned = true;
+        return !!owned;
+      }
+      function plusStore(name, val) {
+        var k = "gogogo_plus_" + name + "_" + String((sessionAccount && sessionAccount.id) || "");
+        try {
+          if (val === undefined) { var raw = JSON.parse(localStorage.getItem(k) || "null"); return Array.isArray(raw) ? raw : null; }
+          localStorage.setItem(k, JSON.stringify(val));
+        } catch (eS) {}
+        return null;
+      }
+      function sortPlusOffers(list) {
+        var order = plusStore("order") || [];
+        var seen = plusStore("active_seen");
+        var active = list.filter(plusOfferOwned).map(function (o) { return o.key; });
+        /* frisch aktiviert (nicht im letzten Stand): nach ganz oben */
+        if (seen) {
+          active.filter(function (k) { return seen.indexOf(k) < 0; }).reverse().forEach(function (k) {
+            order = [k].concat(order.filter(function (x) { return x !== k; }));
+          });
+        } else {
+          order = active.concat(order.filter(function (x) { return active.indexOf(x) < 0; }));
+        }
+        plusStore("active_seen", active);
+        var base = list.map(function (o) { return o.key; });
+        list = list.slice().sort(function (a, b) {
+          var ia = order.indexOf(a.key), ib = order.indexOf(b.key);
+          if (ia < 0) ia = 1000 + base.indexOf(a.key);
+          if (ib < 0) ib = 1000 + base.indexOf(b.key);
+          return ia - ib;
+        });
+        plusStore("order", list.map(function (o) { return o.key; }));
+        return list;
+      }
+      function paintPlusTileStates(rail) {
+        [].forEach.call(rail.querySelectorAll(".go-tile[data-key]"), function (t) {
+          var o = t._offer;
+          if (!o) return;
+          var on = plusOfferOwned(o);
+          t.classList.toggle("is-on", on);
+          var pill = t.querySelector(".go-tile__pill");
+          if (pill) pill.textContent = on ? "Aktiv" : "Aktivieren";
+        });
+      }
+      /* Griff rechts: Kachel ziehen; beim Überqueren der Nachbar-Mitte tauschen. Danach Reihenfolge speichern, Slides in der Reihe nachziehen */
+      function bindPlusTileDrag(nav, rail) {
+        nav.addEventListener("pointerdown", function (e) {
+          var grip = e.target.closest && e.target.closest(".go-tile__grip");
+          if (!grip) return;
+          var tile = grip.closest(".go-tile");
+          e.preventDefault();
+          e.stopPropagation();
+          var startY = e.clientY, h = tile.offsetHeight + 10;
+          tile.classList.add("is-drag");
+          try { grip.setPointerCapture(e.pointerId); } catch (eC) {}
+          function move(ev) {
+            var dy = ev.clientY - startY;
+            var next = tile.nextElementSibling, prev = tile.previousElementSibling;
+            if (dy > h / 2 && next && next.classList.contains("go-tile")) { nav.insertBefore(next, tile); startY += h; dy -= h; }
+            else if (dy < -h / 2 && prev && prev.classList.contains("go-tile")) { nav.insertBefore(tile, prev); startY -= h; dy += h; }
+            tile.style.transform = "translateY(" + dy + "px)";
+          }
+          function up() {
+            grip.removeEventListener("pointermove", move);
+            grip.removeEventListener("pointerup", up);
+            grip.removeEventListener("pointercancel", up);
+            tile.style.transform = "";
+            tile.classList.remove("is-drag");
+            var keys = [].map.call(nav.querySelectorAll(".go-tile[data-key]"), function (t) { return t.getAttribute("data-key"); });
+            plusStore("order", keys);
+            /* Slides in derselben Reihenfolge (ohne Neuaufbau): TOC bleibt vorn */
+            keys.forEach(function (k) {
+              var sl = rail.querySelector(':scope > .go-slide[data-offer="' + k + '"]');
+              if (sl) rail.appendChild(sl);
+            });
+            sizeGoRailSlides(rail);
+            syncRailNav(rail, document.getElementById("go-rail-nav"));
+          }
+          grip.addEventListener("pointermove", move);
+          grip.addEventListener("pointerup", up);
+          grip.addEventListener("pointercancel", up);
+        });
+      }
+
       function paintGoRail(force) {
         var rail = document.getElementById("go-rail");
         if (!rail) return;
@@ -19867,6 +19975,7 @@
           var ownedPick = window.GoSupport && GoSupport.offerOwned ? GoSupport.offerOwned(o.type || o.key) : false;
           return !!ownedPick;
         });
+        offers = sortPlusOffers(offers);
         var sectionOffers = [
           { key: "toc", type: "toc", title: "Plus" }
         ].concat(offers);
@@ -19932,6 +20041,7 @@
                   if (zLb && zRec) mountGoZirkelPanels(zLb, zRec);
                 }
               }
+              paintPlusTileStates(rail);
               sizeGoRailSlides(rail);
               bindGoRailHardSnap(rail);
               syncHScrollDock();
@@ -19963,18 +20073,39 @@
           card.dataset.offer = offer.key;
           if (offer.key === "toc") {
             var tocNav = document.createElement("nav");
-            tocNav.className = "go-toc";
+            tocNav.className = "go-toc go-tiles";
             tocNav.setAttribute("aria-label", "Plus Abschnitte");
             offers.forEach(function (item) {
-              var link = document.createElement("button");
-              link.type = "button";
-              link.className = "go-toc__item";
-              link.textContent = item.title;
-              link.addEventListener("click", function () {
+              var tile = document.createElement("div");
+              tile.className = "go-tile";
+              tile.setAttribute("role", "button");
+              tile.tabIndex = 0;
+              tile.setAttribute("data-key", item.key);
+              tile._offer = item;
+              var timg = document.createElement("img");
+              timg.className = "go-tile__img";
+              timg.alt = "";
+              timg.loading = "lazy";
+              timg.src = IMG[item.type] || IMG[item.key] || IMG.routine;
+              tile.appendChild(timg);
+              var pill = document.createElement("span");
+              pill.className = "go-tile__pill";
+              tile.appendChild(pill);
+              var nm = document.createElement("span");
+              nm.className = "go-tile__name";
+              nm.textContent = item.title;
+              tile.appendChild(nm);
+              var grip = document.createElement("span");
+              grip.className = "go-tile__grip";
+              grip.setAttribute("aria-label", "Verschieben");
+              tile.appendChild(grip);
+              tile.addEventListener("click", function (ev) {
+                if (ev.target.closest && ev.target.closest(".go-tile__grip")) return;
                 jumpToGoOffer(item.key);
               });
-              tocNav.appendChild(link);
+              tocNav.appendChild(tile);
             });
+            bindPlusTileDrag(tocNav, rail);
             /* Nur wenn es noch Plus-Punkte zum Hinzufügen gibt */
             if (offers.length < allOffers.length) {
               var addFeat = document.createElement("button");
@@ -19987,6 +20118,7 @@
             card.appendChild(tocNav);
             wrapGoSlideBody(card);
             rail.appendChild(card);
+            paintPlusTileStates(rail);
             return;
           }
           var head = document.createElement("h2");

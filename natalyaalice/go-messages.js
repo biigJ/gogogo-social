@@ -47,6 +47,11 @@
       key: "news:2026-11-24-story-weiter",
       at: "2026-11-24T16:30:00Z",
       text: "Stories laufen jetzt durch: Tippen zeigt die nächste Story, danach die der nächsten Person. Am Ende bist Du wieder in Aktuell."
+    },
+    {
+      key: "news:2026-11-24-plus-kacheln",
+      at: "2026-11-24T16:50:00Z",
+      text: "Plus zeigt Deine Plus-Punkte jetzt als Kacheln. Am Griff rechts sortierst Du sie, Aktiviertes rutscht nach oben."
     }
   ];
 
