@@ -25314,6 +25314,9 @@
         if (!box) return;
         if (!sessionMode || !sessionAccount) return;
         ensureTrainingPresencePoll();
+        /* Alter Stand: bleibt erhalten, wenn das Ergebnis gleich ist (sonst blitzen die Fotos bei jedem Neuzeichnen) */
+        var crewOldHtml = box.innerHTML;
+        var crewOldNodes = Array.prototype.slice.call(box.childNodes);
         box.textContent = "";
         var stories = ffcStoryList();
         var byNick = {};
@@ -25513,6 +25516,30 @@
           box.appendChild(el);
         });
         flushSeenBub();
+        if (crewOldNodes.length && box.innerHTML === crewOldHtml) {
+          /* nichts geändert: alte Kreise (geladene Fotos, laufender Puls) zurück */
+          box.textContent = "";
+          crewOldNodes.forEach(function (n) { box.appendChild(n); });
+        } else if (crewOldNodes.length) {
+          /* geändert: bereits geladene Fotos weiterverwenden, damit sie nicht neu laden */
+          var crewImgs = {};
+          crewOldNodes.forEach(function (n) {
+            if (!n.querySelectorAll) return;
+            Array.prototype.forEach.call(n.querySelectorAll("img"), function (im) {
+              var k = im.getAttribute("src") || "";
+              if (k) (crewImgs[k] = crewImgs[k] || []).push(im);
+            });
+          });
+          Array.prototype.forEach.call(box.querySelectorAll("img"), function (im) {
+            var k = im.getAttribute("src") || "";
+            var pool = crewImgs[k];
+            if (!pool || !pool.length) return;
+            var old = pool.shift();
+            old.className = im.className;
+            old.alt = im.alt;
+            im.parentNode.replaceChild(old, im);
+          });
+        }
         /* Alle: dazu die Mitglieder meiner Bubble (gleiche Kreise), zuletzt aktiv zuerst */
         /* Kein „Freund hinzufügen“-Kreis mehr in der Reihe: das geht in Community → Freunde */
         paintStoriesVisibility();
