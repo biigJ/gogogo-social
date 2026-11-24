@@ -57,6 +57,11 @@
       key: "news:2026-11-24-pt-kalender",
       at: "2026-11-24T20:00:00Z",
       text: "Personal Training buchst Du jetzt direkt im Kalender Deines Coaches: Team → Mein Coach → Personal Training. Coaches finden ihren Kalender unter Plus → Ich als Coach → PT-Kalender."
+    },
+    {
+      key: "news:2026-11-24-sichtbarkeit",
+      at: "2026-11-24T22:00:00Z",
+      text: "Wer Dein Event sieht, wählst Du jetzt über die drei Punkte am Event aus derselben Liste wie den Filter oben in Aktuell: Nur ich, Freunde, Gruppe, Circle, Bubble oder Alles."
     }
   ];
 
