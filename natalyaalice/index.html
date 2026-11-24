@@ -18296,7 +18296,12 @@
             if (bubWalletOn) {
               /* Karten: erst Gruppe, Circles, Coach (wie die Liste), dann die Bubbles */
               GoBubbles.wallet(function (items, fill, open) {
-                paintFriendWallet(bubWallet, kreiseWalletItems().concat(items), {}, {
+                var all = kreiseWalletItems().concat(items);
+                /* gleiche Karten: nicht neu zeichnen, sonst blitzen die Fotos (mehrere Aufrufe beim Laden) */
+                var sig = all.map(function (x) { return [x.id, x.photo_url || "", x.name || "", x._about || x.description || ""].join("~"); }).join("|");
+                if (bubWallet._sig === sig && bubWallet.querySelector(".fw-card")) return;
+                bubWallet._sig = sig;
+                paintFriendWallet(bubWallet, all, {}, {
                   fill: function (card, p) { if (p._kreis) fillKreisCard(card, p); else fill(card, p); },
                   open: function (p) { if (p._kreis) openKreis(p._kreis.kind, p._kreis.id); else open(p); }
                 });
