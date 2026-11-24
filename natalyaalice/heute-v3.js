@@ -6231,6 +6231,11 @@
     todayCardFor: todayCardFor,
     todayEventsFor: todayEventsFor,
     storyEventsFor: storyEventsFor,
+    /* Story: geloggte Übungen eines erledigten Events als <li>-Liste (wie auf der Karte in Aktuell); Zirkel zeigt sein Tracking-Bild */
+    storyExercisesHtml: function (ev) {
+      if (!ev || ev.status !== "erledigt" || ev.category === "zirkel" || !global.GoKraftTracking || !GoKraftTracking.dayExercises) return Promise.resolve("");
+      return GoKraftTracking.dayExercises(String(ev.user_id), dayKey(ev.starts_at)).then(accExItems).catch(function () { return ""; });
+    },
     /* Herz neu prüfen (z. B. nach Bestätigen einer Anfrage) */
     refreshHeart: function () { state.repliesAt = 0; return checkReplies(); }
   };
