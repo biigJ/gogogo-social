@@ -5488,7 +5488,9 @@
     body.is-session #plan-team .team-challenge .team-challenge__name, .team-challenge__name { font-family: "Playfair Display", Georgia, serif !important; font-size: 22px !important; font-weight: 600 !important; }
     .team-challenge__goal { width: 100%; margin: 2px 0 0; font-size: 15px; line-height: 1.4; }
     .team-challenge__stamps { font-size: 13px; opacity: .7; }
-    .team-challenge__end { margin-left: auto; border: 0; background: transparent; color: #C7413B; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .team-challenge__row { display: flex; justify-content: space-between; align-items: baseline; width: 100%; margin-top: 4px; }
+    .team-challenge__show { border: 0; background: transparent; color: #2A2118; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; }
+    .team-challenge__end { margin-left: auto; padding: 0; border: 0; background: transparent; color: #C7413B; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
     /* Stempelkarten-Stapel: Karten dahinter angedeutet, Punkte zeigen, welche oben liegt */
     .stamp-pass.has-stack { box-shadow: 0 -9px 0 -4px rgba(246,241,232,.55), 0 -18px 0 -8px rgba(246,241,232,.3); cursor: pointer; }
     .stamp-pass__stackdots { display: flex; justify-content: center; gap: 6px; margin: 6px 0 0; }
@@ -26405,6 +26407,19 @@
           var stEl = kreisStampsEl();
           line.appendChild(stEl);
           myStampCount("group", group.id).then(function (n) { paintKreisStamps(stEl, n); });
+          /* Zeile unter den Stempeln: links „Anzeigen“ (Stempelkarte der Gruppe mittig), rechts „Beenden“ (nur Besitzer) */
+          var actRow = document.createElement("div");
+          actRow.className = "team-challenge__row";
+          var show = document.createElement("button");
+          show.type = "button";
+          show.className = "team-challenge__show";
+          show.textContent = "Anzeigen";
+          show.addEventListener("click", function () {
+            var ord = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
+            openStampCardModal(ord, { only: { kind: "group", ref: String(group.id) } });
+          });
+          actRow.appendChild(show);
+          line.appendChild(actRow);
           if (owner) {
             var end = document.createElement("button");
             end.type = "button";
@@ -26418,7 +26433,7 @@
                   .catch(function () { gogogoToast("Beenden ging nicht"); });
               });
             });
-            line.appendChild(end);
+            actRow.appendChild(end);
           }
         }
         var gKey = String(group.id);
