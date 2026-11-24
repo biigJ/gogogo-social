@@ -3702,6 +3702,8 @@
       }
       if (sameDay && (ev.visibility || "team") === vis && !bubChanged && !(grp && String(ev.group_id || "") !== String(grp.id))) return;
       var body = { starts_at: starts, visibility: vis };
+      /* neue Uhrzeit → Herz-Meldung für Freunde (go-events-time-set.sql) */
+      if (!untimed && !(displayTime(ev.starts_at) && formatTime(ev.starts_at) === hhmm)) body.time_set_at = new Date().toISOString();
       /* Durch eine Alternative ersetzte Einheit auf einen anderen Tag gelegt: dort wieder geplant */
       if (ev.status === "ausgefallen" && dayKey(ev.starts_at) !== iso) body.status = "geplant";
       if (bubChanged) body.bubble_id = wantBub ? bubId : null;
