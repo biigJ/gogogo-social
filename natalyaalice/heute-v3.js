@@ -2928,7 +2928,12 @@
       if (dayKey(m.created_at) === today) myToday.push(it);
       else history.push(it);
     });
-    myToday.sort(sortOwnFirst);
+    /* Heute wie der ganze Feed: oben später, unten früher (Events nach Startzeit, Nachrichten nach Sendezeit) */
+    myToday.sort(function (a, b) {
+      var c = String(b.starts_at).localeCompare(String(a.starts_at));
+      if (c) return c;
+      return sortOwnFirst(a, b);
+    });
     upcoming.sort(function (a, b) {
       var c = String(a.starts_at).localeCompare(String(b.starts_at));
       if (c) return c;
