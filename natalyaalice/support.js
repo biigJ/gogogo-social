@@ -399,7 +399,7 @@
       title: "Ernährung",
       price: "gratis",
       description:
-        "Mach mit uns vier Wochen lang täglich einen Ernährungs Checkin. Protokolliere Mahlzeiten per Spracherkennung. Jeden Tag mit Erinnerung und zwei- bis dreimal Feedback, direkt und menschlich."
+        "Mach mit uns vier Wochen lang täglich einen Ernährungs Checkin. Protokolliere Mahlzeiten per Spracherkennung. Jeden Tag mit Erinnerung und zwei- bis dreimal pro Woche Feedback, direkt und menschlich."
     },
     {
       key: "uebungen",
@@ -407,7 +407,7 @@
       title: "Videos",
       price: "gratis",
       description:
-        "Kopier Links von Instagram oder YouTube hierher und such die Übung dazu aus der Liste. Wenn Dir eine Übung fehlt, sende das Video mit einem Namen ein. Wir geben die Übung frei."
+        "Kopier Links aus Instagram oder YouTube und verbinde sie mit den Übungen aus Deinem Wochenplan. So hast Du jederzeit Beispiele von Deinen Lieblingssportlern in der Tasche und musst keine Tracking App oder gespeicherte Links von YouTube nebenher aufhaben."
     },
     {
       key: "kraft_tracking",
