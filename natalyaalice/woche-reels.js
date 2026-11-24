@@ -3526,7 +3526,8 @@
     if (!de || !global.GoDialog) return;
     var ev = de.slots.filter(function (x) { return x && String(x.id) === String(id); })[0];
     if (!ev) return;
-    GoDialog.prompt("Ort", dayPlace(ev), { ok: "Übernehmen", cancel: "Abbrechen" }).then(function (v) {
+    /* Orte nur aus dem gemeinsamen Ortswähler (Karte), damit die Gruppe sie wiederfindet */
+    (GoDialog.place ? GoDialog.place("Ort", { rest: rest, accountId: me(), value: dayPlace(ev) }) : Promise.resolve(null)).then(function (v) {
       if (v === null || v === undefined) return;
       de.place = de.place || {};
       de.place[ev.id] = String(v).trim().slice(0, 80);

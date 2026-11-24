@@ -580,5 +580,25 @@
     });
   }
 
-  global.GoDialog = { alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg, plan: planDlg, done: doneDlg, vis: visDlg, form: formDlg };
+  /* Ort wählen: gemeinsamer Ortswähler mit Karte (place-picker.js). Gewählter Ort kommt in die gemeinsame Liste
+     und in „Meine Orte“ im Profil. opts: { rest, accountId, value } → Promise<"Name"|null> */
+  function placeDlg(msg, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg || "Ort");
+      var host = document.createElement("div");
+      host.className = "god__place";
+      card.appendChild(host);
+      var picker = global.GoPlacePicker ? GoPlacePicker.mount(host, { rest: opts.rest, accountId: opts.accountId, value: opts.value || "" }) : null;
+      button(card, opts.ok || "Übernehmen", "", function () {
+        var v = picker && picker.value();
+        if (!v || !v.name) { close(null); return; }
+        Promise.resolve(picker.remember()).then(function () { close(v.name); }, function () { close(v.name); });
+      });
+      button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(null); });
+      return null;
+    });
+  }
+
+  global.GoDialog = { place: placeDlg, alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg, plan: planDlg, done: doneDlg, vis: visDlg, form: formDlg };
 })(window);
