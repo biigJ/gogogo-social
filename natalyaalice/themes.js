@@ -110,7 +110,7 @@
         ".acc-msg:not(.is-mine){background:#000 !important;color:#fff !important;border:1px solid rgba(255,255,255,.35)}" +
         ".acc-msg:not(.is-mine) .acc-msg__who,.acc-msg:not(.is-mine) .acc-msg__txt{color:#fff !important}" +
         "#gbub-compose{background:#000 !important;box-shadow:0 0 0 1px rgba(255,255,255,.5) !important}" +
-        "#gbub-compose input[type=text]{background:transparent !important;border:0 !important;color:#fff !important}" +
+        "#gbub-compose .gbub-compose__inp:not(#_){background:transparent !important;border:0 !important;color:#fff !important}" +
         "#gbub-compose button[type=submit]{background:#fff !important;color:#000 !important}" +
         "#gbub-compose .gbub-compose__att{color:#fff !important}" +
         "#gbub-compose .gbub-compose__reply{background:#1A1A1A !important;color:#fff !important;border-left-color:#fff !important}"

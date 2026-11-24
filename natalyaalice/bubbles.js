@@ -218,7 +218,7 @@
     draft.reply = msg || null;
     paintDraft();
     var f = document.getElementById("gbub-compose");
-    var inp = f && f.querySelector("input[type=text]");
+    var inp = f && f.querySelector(".gbub-compose__inp");
     if (inp && msg) inp.focus();
   }
   function paintDraft() {
@@ -255,12 +255,40 @@
       '<div class="gbub-compose__reply" hidden><span></span><button type="button" data-gbub-noreply aria-label="Antwort abbrechen">×</button></div>' +
       '<div class="gbub-compose__row">' +
       '<span class="gbub-compose__prev" hidden></span>' +
-      '<input type="text" maxlength="2000" placeholder="Nachricht an die Bubble" enterkeyhint="send" />' +
+      '<textarea class="gbub-compose__inp" rows="1" maxlength="2000" placeholder="Nachricht an die Bubble" enterkeyhint="send" autocomplete="off"></textarea>' +
       '<label class="gbub-compose__att" aria-label="Foto oder Video anhängen"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8"/></svg>' +
       '<input type="file" accept="image/*,video/*" hidden /></label>' +
       '<button type="submit" aria-label="Senden"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l16-8-6 16-2.5-6.5L4 12z"/></svg></button>' +
       "</div>";
-    var inp = f.querySelector("input[type=text]");
+    var inp = f.querySelector(".gbub-compose__inp");
+    /* Zweizeilig, sobald der Text nicht mehr in eine Zeile passt; darüber scrollt das Feld */
+    function fit() {
+      inp.style.height = "auto";
+      var cs = getComputedStyle(inp);
+      var line = parseFloat(cs.lineHeight) || 22;
+      var max = line * 2 + 1;
+      inp.style.height = Math.min(inp.scrollHeight, max) + "px";
+      inp.style.overflowY = inp.scrollHeight > max ? "auto" : "hidden";
+    }
+    /* Senden-Taste der Tastatur: iOS und Android liefern einen Zeilenumbruch (Android-IMEs oft ohne keydown „Enter“) */
+    inp.addEventListener("input", function (e) {
+      var t = e && e.inputType;
+      if (t === "insertLineBreak" || t === "insertParagraph" || (!t && /\n/.test(inp.value))) {
+        inp.value = inp.value.replace(/\r?\n/g, "");
+        fit();
+        if (f.requestSubmit) f.requestSubmit(); else f.dispatchEvent(new Event("submit", { cancelable: true }));
+        return;
+      }
+      if (/\n/.test(inp.value)) inp.value = inp.value.replace(/\r?\n/g, " ");
+      fit();
+    });
+    inp.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        if (f.requestSubmit) f.requestSubmit(); else f.dispatchEvent(new Event("submit", { cancelable: true }));
+      }
+    });
+    f.__fit = fit;
     /* beim Schreiben die Pill unten ausblenden */
     inp.addEventListener("focus", function () { document.body.classList.add("gbub-typing"); });
     inp.addEventListener("blur", function () { setTimeout(function () { if (document.activeElement !== inp) document.body.classList.remove("gbub-typing"); }, 150); });
@@ -294,6 +322,7 @@
         return tgt && tgt.send ? tgt.send(t, ex) : post(t, ex);
       }).then(function () {
         inp.value = "";
+        fit();
         draft.media = null;
         draft.reply = null;
         paintDraft();
@@ -839,8 +868,9 @@
       "body[data-shell=heute][data-heute=bubble] .gbub-compose,body[data-shell=heute].go-say-open .gbub-compose{display:flex}" +
       "body.wr-sheet-open .gbub-compose,body.ffc-open .gbub-compose{display:none !important}" +
       ".gbub-compose{flex-direction:column;align-items:stretch;border-radius:24px}" +
-      ".gbub-compose__row{display:flex;align-items:center;gap:6px;min-width:0}" +
-      ".gbub-compose input[type=text]{flex:1;min-width:0;border:0;outline:0;background:transparent;font:500 16px Inter,sans-serif;color:#1D1630}" +
+      ".gbub-compose__row{display:flex;align-items:flex-end;gap:6px;min-width:0}" +
+      ".gbub-compose__row .gbub-compose__inp{margin:8px 0 10px}" +
+      ".gbub-compose .gbub-compose__inp{flex:1;min-width:0;border:0;outline:0;background:transparent;font:500 16px/22px Inter,sans-serif;color:#1D1630;resize:none;height:22px;padding:0;margin:0;overflow-y:hidden;-webkit-appearance:none;appearance:none;border-radius:0;align-self:center;display:block}" +
       ".gbub-compose button[type=submit]{flex:none;width:42px;height:42px;border-radius:50%;border:0;background:#1D1630;color:#fff;display:flex;align-items:center;justify-content:center}" +
       ".gbub-compose.is-busy button[type=submit]{opacity:.5}" +
       ".gbub-compose__att{flex:none;width:38px;height:42px;display:grid;place-items:center;color:#1D1630;cursor:pointer}" +
@@ -905,7 +935,7 @@
     /* Platzhalter der Eingabe (Sprechblase: „Nachricht an …“) */
     setPlaceholder: function (txt) {
       var f = document.getElementById("gbub-compose");
-      var inp = f && f.querySelector("input[type=text]");
+      var inp = f && f.querySelector(".gbub-compose__inp");
       if (inp) inp.placeholder = txt || "Nachricht an die Bubble";
     },
     report: report,
