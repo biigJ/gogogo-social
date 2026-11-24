@@ -1506,6 +1506,8 @@
     .kreis-page__bar h2 { margin: 0; text-align: center; font: 600 22px/1.2 "Playfair Display", Georgia, serif; color: #2A2118; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .kreis-page__body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 20px calc(110px + env(safe-area-inset-bottom)); }
     .kreis-page .go-circle-name { display: none !important; }
+    /* Verwalten liegt am Stift der Circle-Zeile */
+    .kreis-page .is-circle-manage { display: none !important; }
     /* Seitentitel nennt den Circle schon; „Ich bin dabei“ ist auf der eigenen Circle-Seite klar */
     .kreis-page .go-slide[data-offer="zirkel"] .go-slide__title,
     .kreis-page .go-slide[data-offer="zirkel"] .go-slide__cta.is-owned { display: none !important; }
@@ -8692,7 +8694,7 @@
   <script src="/natalyaalice/kraft-tracking.js?v=kt-3"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-5"></script>
   <script src="/natalyaalice/go-story.js?v=gst-2"></script>
-  <script src="/natalyaalice/bubbles.js?v=bub-12"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-13"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-5"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-8"></script>
   <script src="/natalyaalice/plan-picker.js?v=gpl-14"></script>
@@ -17913,7 +17915,7 @@
         }
         html += circleRowsHtml();
         if (st.coach) {
-          html += kreisRowHtml("coach", st.coach.photo_url || "", "Coach " + String(st.coach.name || "").split(" ")[0], false);
+          html += kreisRowHtml("coach", st.coach.photo_url || "", "Coach " + String(st.coach.name || "").split(" ")[0], true);
         }
         if (el._kreiseHtml === html) return;
         el._kreiseHtml = html;
@@ -17922,6 +17924,14 @@
         el._kreiseBound = true;
         el.addEventListener("click", function (e) {
           if (e.target.closest("[data-kreis-add]")) { addKreis(); return; }
+          /* Stift: Bearbeiten direkt (Gruppe anpassen, Coach ändern, Circle verwalten) */
+          var pen = e.target.closest("[data-kreis-pen]");
+          if (pen) {
+            e.stopPropagation();
+            var prow = pen.closest("[data-kreis]");
+            editKreis(pen.getAttribute("data-kreis-pen"), prow && prow.getAttribute("data-kreis-id"));
+            return;
+          }
           var row = e.target.closest("[data-kreis]");
           if (!row) return;
           openKreis(row.getAttribute("data-kreis"), row.getAttribute("data-kreis-id"));
@@ -18000,7 +18010,7 @@
         var gs = (cst().groups || []);
         var def = "/assets/gogogo/gogogo-Zirkeltraining.jpg";
         return gs.map(function (g) {
-          return kreisRowHtml("circle", circlePhoto(g) || def, String(g.name || "Circle"), false)
+          return kreisRowHtml("circle", circlePhoto(g) || def, String(g.name || "Circle"), typeof circleCanManage === "function" && circleCanManage(g))
             .replace('data-kreis="circle"', 'data-kreis="circle" data-kreis-id="' + escapeHtml(String(g.group_id)) + '"');
         }).join("");
       }
@@ -18012,6 +18022,16 @@
         var go = function () { openKreisPage(card, g ? String(g.name || "Circle") : "Zirkeltraining", zirkelHolder()); };
         if (gid && typeof selectCircle === "function") Promise.resolve(selectCircle(gid)).then(go, go);
         else go();
+      }
+      function editKreis(kind, id) {
+        var st = kreiseState || {};
+        if (kind === "group" && st.group) openGroupEditModal(st.group);
+        else if (kind === "coach") openTeamSearch("trainer");
+        else if (kind === "circle") {
+          var go = function () { openCircleJoin({ coach: true }); };
+          if (id && typeof selectCircle === "function") Promise.resolve(selectCircle(id)).then(go, go);
+          else go();
+        }
       }
       function addKreis() {
         if (!window.GoDialog) return;
@@ -18403,14 +18423,7 @@
           });
           art.appendChild(file);
           slide.appendChild(art);
-          var editBtn = document.createElement("button");
-          editBtn.type = "button";
-          editBtn.className = "team-slide__cta is-solid";
-          editBtn.textContent = "Gruppe anpassen";
-          editBtn.addEventListener("click", function () {
-            openGroupEditModal(group);
-          });
-          slide.appendChild(editBtn);
+          /* „Gruppe anpassen“ liegt jetzt am Stift der Zeile in Kreise (nur Ersteller) */
           var nameRow = document.createElement("div");
           nameRow.className = "team-slide__group-name-row";
           var nameEl = document.createElement("h3");
@@ -18673,8 +18686,7 @@
           wa.addEventListener("click", function () { openQuickWa(); });
           nameRow.appendChild(wa);
         }
-        pick.style.marginLeft = "auto";
-        nameRow.appendChild(pick);
+        /* Coach ändern: Stift der Zeile in Kreise */
         /* ohne Coach kein Name/Text darunter: der Button reicht */
         if (trainer) coachSlide.appendChild(nameRow);
         var about = document.createElement("p");
@@ -19780,6 +19792,7 @@
             /* Circles gründen und verwalten nur Coaches; alle anderen treten bei */
             var circleCoach = typeof isCoachAny === "function" ? isCoachAny() : true;
             circleBtn.textContent = circleCoach ? "Deinen Circle verwalten" : "Circle beitreten";
+            if (circleCoach) circleBtn.classList.add("is-circle-manage");
             /* Name des Circles zwischen „Ich bin dabei“ und dem Circle-Knopf; Coaches mit blauem c wählen hier per Dreh-Auswahl */
             var circleHead = document.createElement("div");
             circleHead.className = "go-circle-name";
