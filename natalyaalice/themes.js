@@ -81,6 +81,8 @@
         "input:not([type=checkbox]):not([type=radio]):not([type=range]),select:not(#heute-filter-select),textarea,.gpl__select,.god__input{background-color:#000 !important;color:#fff !important;border-color:rgba(255,255,255,.7) !important}" +
         "#heute-filter-select{color:#fff !important}" +
         /* Wochenauswahl liegt auf dem Foto: kein schwarzer Kasten */
+        /* Fortschrittsleiste Kalender: weiß */
+        ".woche-reels .wr-seg:not(#_){background:rgba(255,255,255,.3) !important}.woche-reels .wr-seg.is-on:not(#_),.woche-reels .wr-seg.is-done:not(#_){background:#fff !important}" +
         "select[data-wr-week-select]:not(#_){background-color:transparent !important;border-color:transparent !important;color:#fff !important}" +
         "input::placeholder,textarea::placeholder{color:rgba(255,255,255,.55) !important}" +
         ".cp-seg button{color:#fff !important;border-color:#fff !important;background:transparent !important}" +
