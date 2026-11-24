@@ -5301,6 +5301,8 @@
     .kreis-stamps__slot.is-filled { background: #2A2118; }
     .kreis-stampbox { margin: 14px 0 0; padding: 12px 14px; border: 1.5px solid #2A2118; border-radius: 14px; box-sizing: border-box; }
     .kreis-stampbox .kreis-stamps { margin: 0; }
+    .kreis-stamps__foot { display: flex; justify-content: flex-start; padding-top: 6px; }
+    .kreis-stamps__show { border: 0; background: transparent; color: #2A2118; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; text-decoration: underline; text-underline-offset: 3px; }
     .team-slide__cta.is-locked { opacity: .4; }
     .go-slide__art img {
       width: 100%;
@@ -8950,7 +8952,7 @@
   <script src="/natalyaalice/woche-reels.js?v=woche-107"></script>
   <script src="/natalyaalice/support.js?v=support-34"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
-  <script src="/natalyaalice/coach-group.js?v=gcg-1"></script>
+  <script src="/natalyaalice/coach-group.js?v=gcg-2"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -15755,6 +15757,8 @@
         modal.hidden = false;
         modal.removeAttribute("hidden");
         modal.style.display = "grid";
+        var qrBox = modal.querySelector(".stamp-pass__qr");
+        if (qrBox) qrBox.style.visibility = "";
         var pen = document.getElementById("stamp-card-pen");
         if (pen) pen.hidden = !opts.fromPlus;
         loadStampStack(stamps, opts.only || null, !!opts.linkedOnly);
@@ -15765,7 +15769,7 @@
       }
 
       /* Verknüpfte Stempelkarten (Gruppe, Circle) als Stapel: Tipp auf die Karte wechselt, Überschrift = Name */
-      var STAMP_COLORS = { main: "#C7413B", group: "#2A2118", circle: "#E0642C" };
+      var STAMP_COLORS = { main: "#C7413B", group: "#2A2118", circle: "#E0642C", coach: "#2F5D50" };
       function paintStampFace(card) {
         var pass = document.querySelector("#stamp-card-modal .stamp-pass");
         var brand = document.getElementById("stamp-card-brand");
@@ -15794,11 +15798,33 @@
       /* Event antippen: nur die Karte, die zum Event passt (Zirkel → Circle-Karte, Gruppen-Event → Gruppen-Karte, sonst gogogo) */
       function stampKindForEvent(ev) {
         if (!ev) return null;
+        /* Event meines Coaches (Gruppentraining, PT): Coach-Karte (go-coach-stempelkarte.sql) */
+        var myCoach = sessionAccount && sessionAccount.trainer_id ? String(sessionAccount.trainer_id) : "";
+        if (myCoach && String(ev.user_id || "") === myCoach) return { kind: "coach", ref: myCoach };
         if (ev.group_id) return { kind: "group", ref: String(ev.group_id) };
         if (ev.circle_id || ev.category === "zirkel" || ev.visibility === "circle" || /zirkel/i.test(String(ev.title || ""))) {
           return { kind: "circle", ref: ev.circle_id ? String(ev.circle_id) : "" };
         }
         return { kind: "main" };
+      }
+      function openStampPreview(card, person) {
+        openStampCardModal({ meta: { stamps: card.stamps } }, { only: { kind: "main" } });
+        var modal = document.getElementById("stamp-card-modal");
+        if (!modal) return;
+        modal._stack = [card];
+        modal._stackAt = 0;
+        paintStampFace(card);
+        var nm = document.getElementById("stamp-card-member");
+        var nk = document.getElementById("stamp-card-nick");
+        if (nm) nm.textContent = (person && person.name) || "";
+        if (nk) nk.textContent = person && person.nickname ? "@" + String(person.nickname).replace(/^@/, "") : "—";
+        var qrBox = modal.querySelector(".stamp-pass__qr");
+        if (qrBox) qrBox.style.visibility = "hidden";
+      }
+      /* Eigene Karte zeigen (Anzeigen unter einem Stempelfeld): passende Karte wie gewohnt */
+      function openOwnStampCard(kind, ref) {
+        var ord = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
+        openStampCardModal(ord || { meta: { stamps: 0 } }, { only: kind && kind !== "main" ? { kind: kind, ref: ref ? String(ref) : "" } : { kind: "main" } });
       }
       function loadStampStack(mainStamps, only, linkedOnly) {
         var modal = document.getElementById("stamp-card-modal");
@@ -15829,7 +15855,7 @@
             }
             if (!rows || !rows.length || modal.hidden) return;
             /* aus Plus: nur die in Gruppen und Circles verknüpften Karten, ohne die allgemeine gogogo-Karte */
-            var linked = rows.filter(function (r) { return r.kind === "group" || r.kind === "circle"; });
+            var linked = rows.filter(function (r) { return r.kind === "group" || r.kind === "circle" || r.kind === "coach"; });
             if (linkedOnly && linked.length) {
               modal._stack = linked.map(function (r) { return { kind: r.kind, name: r.name, stamps: r.stamps }; });
               modal._stackAt = 0;
@@ -18348,8 +18374,8 @@
         if (st.coach) {
           html += kreisRowHtml("coach", st.coach.photo_url || "", "Coach " + String(st.coach.name || "").split(" ")[0], true);
         }
-        /* Coach: Gruppe mit seinen Kunden (coach-group.js) */
-        if (sessionIsTrainer) html += kreisRowHtml("coachgroup", "", "Meine Kunden", false);
+        /* Coach: Gruppe mit seinen Coachees (coach-group.js) */
+        if (sessionIsTrainer) html += kreisRowHtml("coachgroup", "", "Meine Coachees", false);
         if (el._kreiseHtml === html) return;
         el._kreiseHtml = html;
         el.innerHTML = html;
@@ -18372,10 +18398,15 @@
       }
       /* Seite über der App (Pill bleibt sichtbar), Zurück oben links */
       /* Stempelfeld (12 Punkte) für einen Kreis: main = gogogo-Karte, group/circle = verknüpfte Karte */
-      function kreisStampsEl() {
+      function kreisStampsEl(kind, ref) {
         var box = document.createElement("div");
         box.className = "kreis-stamps";
-        box.innerHTML = '<div class="kreis-stamps__head"><span>Stempelkarte</span><span class="kreis-stamps__n">0 / 12</span></div><div class="kreis-stamps__grid"></div>';
+        box.innerHTML = '<div class="kreis-stamps__head"><span>Stempelkarte</span><span class="kreis-stamps__n">0 / 12</span></div><div class="kreis-stamps__grid"></div>' +
+          '<div class="kreis-stamps__foot"><button type="button" class="kreis-stamps__show">Anzeigen</button></div>';
+        box.querySelector(".kreis-stamps__show").addEventListener("click", function (e) {
+          e.stopPropagation();
+          openOwnStampCard(kind || "main", ref);
+        });
         paintKreisStamps(box, 0);
         return box;
       }
@@ -18402,7 +18433,7 @@
         if (!parent) return;
         var wrap = document.createElement("div");
         wrap.className = "kreis-stampbox";
-        var el = kreisStampsEl();
+        var el = kreisStampsEl(kind, ref);
         wrap.appendChild(el);
         parent.appendChild(wrap);
         myStampCount(kind, ref).then(function (n) { paintKreisStamps(el, n); });
@@ -18443,8 +18474,8 @@
         });
         if (st.coach) out.push({ id: "k:coach", name: String(st.coach.name || "Coach").split(" ")[0], photo_url: st.coach.photo_url || "",
           _kreis: { kind: "coach" }, _tag: "Mein Coach", _about: "" });
-        if (sessionIsTrainer) out.push({ id: "k:coachgroup", name: "Meine Kunden", photo_url: (sessionAccount && sessionAccount.photo_url) || "",
-          _kreis: { kind: "coachgroup" }, _tag: "Coach-Gruppe", _about: "Gruppentraining mit Deinen Kunden" });
+        if (sessionIsTrainer) out.push({ id: "k:coachgroup", name: "Meine Coachees", photo_url: (sessionAccount && sessionAccount.photo_url) || "",
+          _kreis: { kind: "coachgroup" }, _tag: "Coach-Gruppe", _about: "Gruppentraining mit Deinen Coachees" });
         return out;
       }
       function fillKreisCard(card, p) {
@@ -18544,6 +18575,12 @@
             myName: function () { return personName(); },
             toast: function (msg) { gogogoToast(msg); },
             openProfile: function (p) { openProfile(p); },
+            openStampPreview: function (card, person) { openStampPreview(card, person); },
+            openOwnStampCard: function (kind, ref) { openOwnStampCard(kind, ref); },
+            openStampForEvent: function (evId, only) {
+              var ord = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
+              openStampCardModal(ord || { meta: { stamps: 0 } }, { eventId: evId, only: only || { kind: "main" } });
+            },
             onChange: function () {
               if (window.HeuteAccountability && HeuteAccountability.refresh) { try { HeuteAccountability.refresh(); } catch (eR) {} }
               if (window.HeuteAccountability && HeuteAccountability.refreshHeart) HeuteAccountability.refreshHeart();
@@ -18558,16 +18595,16 @@
         else if (kind === "coach") {
           openKreisPage(st.coachSlide, "Mein Coach");
           var cBody = document.querySelector(".kreis-page .kreis-page__body");
-          appendKreisStampBox(cBody, "main");
-          /* Coach-Gruppe aus Kundensicht: Haken „offen“, andere mit Haken, Einladungen der Woche */
+          appendKreisStampBox(cBody, "coach", st.coach && st.coach.id);
+          /* Coach-Gruppe aus Sicht des Coachees: Haken „offen“, andere mit Haken, Einladungen der Woche */
           if (st.coach && st.coach.id && coachGroupReady()) GoCoachGroup.render(cBody, { mode: "client", coach: st.coach });
         }
         else if (kind === "coachgroup" && sessionAccount && coachGroupReady()) {
           var cgSlide = document.createElement("article");
           cgSlide.className = "team-slide is-scroll";
-          cgSlide.dataset.title = "Meine Kunden";
+          cgSlide.dataset.title = "Meine Coachees";
           GoCoachGroup.render(cgSlide, { mode: "coach", coach: { id: sessionAccount.id, name: personName(), photo_url: sessionAccount.photo_url || "" } });
-          openKreisPage(cgSlide, "Meine Kunden");
+          openKreisPage(cgSlide, "Meine Coachees");
         }
         else if (kind === "circle") openCirclePage(id);
       }
@@ -20156,14 +20193,14 @@
           rest("go_stamp_links?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&status=eq.linked&select=id,kind,ref,name,stamps&order=created_at.asc")
             .catch(function () { return []; })
             .then(function (rows) {
-              rows = (rows || []).filter(function (r) { return r.kind === "group" || r.kind === "circle"; });
+              rows = (rows || []).filter(function (r) { return r.kind === "group" || r.kind === "circle" || r.kind === "coach"; });
               if (!rows.length) {
-                list.innerHTML = '<p class="go-stampplus__empty">Noch keine Stempelkarte in Deinen Gruppen oder Circles aktiv.</p>';
+                list.innerHTML = '<p class="go-stampplus__empty">Noch keine Stempelkarte in Deinen Gruppen, Circles oder bei Deinem Coach aktiv.</p>';
                 return;
               }
               rows.forEach(function (r) {
-                var el = kreisStampsEl();
-                el.querySelector(".kreis-stamps__head span").textContent = r.name || (r.kind === "group" ? "Gruppe" : "Circle");
+                var el = kreisStampsEl(r.kind, r.ref);
+                el.querySelector(".kreis-stamps__head span").textContent = r.name || (r.kind === "group" ? "Gruppe" : r.kind === "coach" ? "Coach" : "Circle");
                 paintKreisStamps(el, r.stamps);
                 list.appendChild(el);
               });
