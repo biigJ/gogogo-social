@@ -1827,7 +1827,8 @@
       position: absolute; top: 0; left: 0; right: 0; z-index: 8;
       display: flex; flex-direction: column; align-items: stretch; gap: 0;
       padding: 0 12px 10px;
-      padding-top: calc(var(--wr-safe-top) + 24px);
+      /* Dropdown auf exakt derselben Höhe wie in Aktuell (gemessen: Aktuell max(6px, safe) + 14px Zeile) */
+      padding-top: calc(max(6px, env(safe-area-inset-top, 0px)) + 2px);
       background: transparent;
       pointer-events: none;
     }
@@ -1894,6 +1895,12 @@
     .wr-week-pick select option { color: #2A2118; }
     .wr-week-pick .wr-week-label__chev { position: absolute; right: 0; width: .7em; height: .7em; font-size: calc(var(--t-m, 17px) * 1.3); pointer-events: none; }
     .wr-week-pick select:disabled { opacity: .4; }
+    /* wie Aktuell: gleiche Größe und Stärke (gegen globale Typo-Regel), Breite = gewähltes Wort (fitKalenderFilter), Pfeil direkt am Wort */
+    body.is-session .wr-week-pick select[data-wr-week-select] {
+      font-size: calc(var(--t-m) * 1.3) !important; font-weight: 700 !important; line-height: 1.2 !important;
+      padding: 4px 0.82em 4px 0 !important;
+    }
+    body.is-session .wr-week-pick .wr-week-label__chev { width: .65em; height: .65em; font-size: calc(var(--t-m) * 1.3); }
     .woche-reels.is-light-day .wr-week-pick { color: #111; }
     .woche-reels.is-photo-day .wr-week-pick { color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,.6)); }
     .woche-reels.is-dark-day .wr-week-pick { color: #fff; }
@@ -27212,6 +27219,25 @@
         if (document.fonts && document.fonts.ready) document.fonts.ready.then(window.GoFitHeuteFilter);
         /* Wert wird auch per Code gesetzt (Filter laden, Shellwechsel): leicht nachziehen */
         setInterval(fit, 700);
+      })();
+      /* Kalender-Dropdown: Breite = gewähltes Wort wie in Aktuell (Select wird bei jedem Render neu gebaut) */
+      (function fitKalenderFilter() {
+        var cv = document.createElement("canvas").getContext("2d");
+        function fit() {
+          var sel = document.querySelector("select[data-wr-week-select]");
+          if (!sel || !sel.offsetParent) return;
+          var opt = sel.options[sel.selectedIndex];
+          if (!opt) return;
+          var cs = getComputedStyle(sel);
+          var key = opt.text + "|" + cs.font;
+          if (sel._fitKey === key) return;
+          sel._fitKey = key;
+          cv.font = cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
+          sel.style.width = Math.ceil(cv.measureText(opt.text).width + parseFloat(cs.paddingRight || 0) + parseFloat(cs.paddingLeft || 0) + 2) + "px";
+        }
+        document.addEventListener("change", function (e) { if (e.target && e.target.matches && e.target.matches("select[data-wr-week-select]")) { e.target._fitKey = ""; fit(); } }, true);
+        if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+        setInterval(fit, 400);
       })();
       (function bindHeuteRefresh() {
         var btn = document.getElementById("heute-refresh");
