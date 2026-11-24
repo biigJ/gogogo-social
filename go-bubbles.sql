@@ -35,12 +35,9 @@ create index if not exists events_bubble_idx on events (bubble_id) where bubble_
 
 -- Start-Bubbles
 insert into go_bubbles (name, description, color, sort) values
-  ('HYROX', 'Laufen, Sled, Wall Balls: gemeinsam fit für den nächsten Wettkampf.', '#FFD84D', 10),
-  ('Sprinten', 'Kurze Läufe, volle Geschwindigkeit. Technik, Starts, Intervalle.', '#FF7A59', 20),
-  ('Schwimmen', 'Bahnen ziehen, Technik verbessern, zusammen ins Wasser.', '#5EC8F2', 30),
-  ('Spaziergänge', 'Raus an die Luft: gehen, reden, Schritte sammeln.', '#9BD49B', 40),
-  ('Calisthenics', 'Training mit dem eigenen Körpergewicht: Klimmzüge, Dips, Handstand.', '#C9A7F5', 50)
+  ('HYROX', 'Laufen, Sled, Wall Balls: gemeinsam fit für den nächsten Wettkampf.', '#FFD84D', 10)
 on conflict do nothing;
+-- Sprinten, Schwimmen, Spaziergänge, Calisthenics: entfernt (go-bubbles-nur-hyrox.sql)
 
 alter table go_bubbles enable row level security;
 drop policy if exists "go_bubbles_select" on go_bubbles;

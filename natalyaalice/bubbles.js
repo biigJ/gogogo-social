@@ -648,7 +648,8 @@
   /* Kreis-Ansicht: Kreis (Foto oder Farbe mit Seifenblase) links, Name rechts; eigene Bubble mit Pillen */
   function cardHtml(b, isMine) {
     return '<div class="gbub-row' + (isMine ? " is-mine" : "") + '" data-gbub="' + esc(b.id) + '" role="button" tabindex="0">' +
-      '<span class="gbub-row__img" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' + (b.photo_url ? '<img src="' + esc(b.photo_url) + '" alt="" decoding="sync" />' : SOAP_SVG) + "</span>" +
+      /* Regel: auf jedem Bubble-Foto liegt mittig das Seifenblasen-Icon (wie bei Gruppe, Circle, Coach in Kreise) */
+      '<span class="gbub-row__img" style="--gbub:' + esc(b.color || "#E9E1D2") + '">' + (b.photo_url ? '<img src="' + esc(b.photo_url) + '" alt="" decoding="sync" /><span class="gbub-row__ico">' + SOAP_SVG + "</span>" : SOAP_SVG) + "</span>" +
       '<span class="gbub-row__txt">' +
       (isMine ? '<span class="gbub-row__pills"><span class="gbub-card__me">Meine Bubble</span><button type="button" class="gbub-card__me is-leave" data-gbub-leave="' + esc(b.id) + '">Verlassen</button></span>' : "") +
       '<span class="gbub-row__name">' + esc(b.name) + "</span></span></div>";
@@ -764,6 +765,8 @@
       ".gbub-row__img{flex:none;width:72px;height:72px;border-radius:50%;overflow:hidden;background:var(--gbub);display:flex;align-items:center;justify-content:center}" +
       ".gbub-row__img img{width:100%;height:100%;object-fit:cover;display:block}" +
       ".gbub-row__img svg{width:34px;height:34px}" +
+      ".gbub-row__img{position:relative}" +
+      ".gbub-row__ico{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.55))}" +
       ".gbub-row__txt{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:6px}" +
       ".gbub-row__pills{display:flex;gap:6px}" +
       ".gbub-row__pills .gbub-card__me{position:static;border:0;cursor:pointer}" +
