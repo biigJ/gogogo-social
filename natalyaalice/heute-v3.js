@@ -5588,8 +5588,8 @@
       "&starts_at=lt." + encodeURIComponent(to) + "&select=id,title,category,item_type,travel_auto,starts_at,visibility&order=starts_at.asc&limit=10")
       .then(function (rows) {
         var ev = (rows || []).filter(function (e) {
-          /* „Nur Ich“: niemand sieht die Uhrzeit, also keine Frage beim Öffnen */
-          return e && !hasTime(e) && !e.travel_auto && e.category !== "zirkel" && e.visibility !== "privat" &&
+          /* auch bei „Nur Ich“ fragen: die Uhrzeit hilft beim eigenen Planen */
+          return e && !hasTime(e) && !e.travel_auto && e.category !== "zirkel" &&
             e.item_type !== "support_session" && e.item_type !== "hotel_workout";
         })[0];
         if (!ev) return;
@@ -5597,9 +5597,12 @@
         try { if (localStorage.getItem(key)) return; } catch (eLs0) { if (state[key]) return; }
         /* Liegt schon ein anderer Dialog offen (Einladung, Anfrage): warten, bis er zu ist */
         return new Promise(function (res) {
-          var tries = 0;
+          /* zweimal hintereinander frei (1,5 s Abstand), sonst landet sie mit einem
+             gleichzeitig aufgehenden Dialog (Einladung) übereinander */
+          var tries = 0, free = 0;
           (function wait() {
-            if (!document.querySelector(".god") && !document.hidden) return res(true);
+            free = !document.querySelector(".god") && !document.hidden ? free + 1 : 0;
+            if (free >= 2) return res(true);
             if (++tries > 80) return res(false);
             setTimeout(wait, 1500);
           })();
@@ -5607,7 +5610,10 @@
           if (!free) return;
           try { localStorage.setItem(key, "1"); } catch (eLs) { state[key] = 1; }
           return GoDialog.time(slot === "morgen" ? "Wann trainierst Du heute?" : "Wann trainierst Du morgen?", {
-          sub: ev.title || "Training",
+          /* Nur Ich / Nur Coach: Hinweis, dass andere die Uhrzeit erst mit Community sehen */
+          sub: (ev.title || "Training") + (ev.visibility === "privat" || ev.visibility === "coach"
+            ? " · Steht auf „" + (ev.visibility === "coach" ? "Nur Coach" : "Nur Ich") + "“. Stell es in Woche → Tage bearbeiten auf Community, damit andere sehen, wann Du trainierst, und sich bei Dir melden können."
+            : ""),
           ok: "Eintragen",
           cancel: "Später",
           initial: "18:00"
