@@ -302,10 +302,17 @@
 
     return {
       value: function () { return current; },
-      /* Neuen Ort in die gemeinsame Liste aufnehmen */
+      /* Neuen Ort in die gemeinsame Liste aufnehmen. Jeder Ort, der an einem Event steht,
+         kommt außerdem in „Meine Orte“ im Profil und bleibt dort, bis man ihn im Profil entfernt. */
       remember: function () {
         if (!current || !current.name) return Promise.resolve();
-        if (current.id || knownPlace(current)) return Promise.resolve();
+        var keepProfile = opts.accountId && !opts.noFav ? dataReady.then(function () {
+          if (isFav(current.name) || favs.length >= 12) return;
+          favs.push(current.name);
+          saveFavs();
+          if (favBtn) paintFav();
+        }).catch(function () {}) : Promise.resolve();
+        if (current.id || knownPlace(current)) return keepProfile;
         var body = {
           name: current.name,
           lat: current.lat != null ? current.lat : null,
@@ -320,7 +327,8 @@
           body: body
         })
           .then(function () { if (places) places.push(body); })
-          .catch(function () {});
+          .catch(function () {})
+          .then(function () { return keepProfile; });
       }
     };
   }
