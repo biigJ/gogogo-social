@@ -5783,6 +5783,18 @@
     #go-rail-nav .rail-nav__gear[hidden] { display: none; }
     #go-rail-nav .rail-nav__gear svg { width: 24px; height: 24px; }
     #go-rail-nav .rail-nav__next { grid-column: 3; grid-row: 1; }
+    .go-ndays { margin: 16px 0 0; text-align: left; }
+    .go-nday { border-top: 1px solid rgba(42,33,24,.14); }
+    .go-nday:last-child { border-bottom: 1px solid rgba(42,33,24,.14); }
+    .go-nday summary { list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 13px 2px; cursor: pointer; font-weight: 600; }
+    .go-nday summary::-webkit-details-marker { display: none; }
+    .go-nday__kcal { font-weight: 500; opacity: .7; font-variant-numeric: tabular-nums; }
+    .go-nday__meal { margin: 0 2px 10px; }
+    .go-nday__meal h4 { margin: 0 0 2px; font-family: Inter, system-ui, sans-serif !important; font-size: 12px !important; font-weight: 700 !important; letter-spacing: .04em; text-transform: uppercase; opacity: .65; }
+    .go-nday__meal ul { margin: 0; padding: 0 0 0 16px; }
+    .go-nday__meal li { font-size: 14px; line-height: 1.4; }
+    .go-nday__mac { margin: 4px 2px 14px; font-size: 13px; font-weight: 600; }
+    .go-ndays__empty { margin: 8px 0; font-size: 14px; opacity: .7; text-align: center; }
     .go-tiles { display: flex; flex-direction: column; gap: 10px; padding: 8px 0 24px; width: 100%; }
     .go-tile { position: relative; height: 104px; flex: none; overflow: hidden; border: 0; border-radius: 0; background: #F3EEE4; cursor: pointer; touch-action: pan-y; }
     .go-tile__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: .3; pointer-events: none; }
@@ -8126,7 +8138,7 @@
   <div class="sand-modal" id="nutrition-book-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="nutrition-book-title">
       <h2 class="ask" id="nutrition-book-title">Ernährung</h2>
-      <p class="team-msg">Mach mit uns vier Wochen lang täglich einen Ernährungs Checkin. Protokolliere Mahlzeiten per Spracherkennung. Jeden Tag mit Erinnerung und zwei- bis dreimal Feedback, direkt und menschlich. Gratis und sofort aktiv.</p>
+      <p class="team-msg">Mach mit uns vier Wochen lang täglich einen Ernährungs Checkin. Protokolliere Mahlzeiten per Spracherkennung. Jeden Tag mit Erinnerung und zwei- bis dreimal pro Woche Feedback, direkt und menschlich. Gratis und sofort aktiv.</p>
       <button type="button" id="nutrition-book-pay">Aktivieren</button>
       <button type="button" class="sand-quiet" id="nutrition-book-track">Tracking öffnen</button>
       <button type="button" class="sand-quiet" id="nutrition-book-cancel">Abbrechen</button>
@@ -8929,7 +8941,7 @@
   <script src="/natalyaalice/heute-v3.js?v=feed-163"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-105"></script>
-  <script src="/natalyaalice/support.js?v=support-30"></script>
+  <script src="/natalyaalice/support.js?v=support-32"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -17276,10 +17288,49 @@
         });
         writeNutritionLog(nutritionLogDay, rows);
         if (window.GoSupport && GoSupport.saveNutritionLog) {
-          GoSupport.saveNutritionLog(meal + ": " + text).catch(function () {});
+          GoSupport.saveNutritionLog(meal + ": " + text).then(paintNutritionDays).catch(function () {});
         }
         if (textEl) textEl.value = "";
         paintNutritionModal();
+      }
+
+      /* Plus → Ernährung (gebucht): getrackte Tage, aufklappbar nach Mahlzeiten, darunter Makros (geschätzt wie im Dialog).
+         Quelle: activity_log nutrition_log (geräteübergreifend), Text „Mahlzeit: Lebensmittel“ */
+      var NUTRI_MEALS = ["Frühstück", "Vormittag", "Pre-Workout", "Post-Workout", "Nachmittag", "Abendessen", "Abend-Snack"];
+      function paintNutritionDays(el) {
+        var box = (el && el.nodeType ? el : null) || document.getElementById("go-nutrition-days");
+        if (!box || !sessionAccount) return;
+        rest("activity_log?user_id=eq." + encodeURIComponent(sessionAccount.id) + "&type=eq.nutrition_log&select=created_at,meta&order=created_at.asc&limit=1000")
+          .catch(function () { return []; })
+          .then(function (rows) {
+            var days = {};
+            (rows || []).forEach(function (r) {
+              var m = r.meta || {};
+              var txt = String(m.text || "").trim();
+              if (!txt) return;
+              var day = m.day || new Date(r.created_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+              var meal = "", food = txt;
+              var hit = txt.match(/^([^:]{2,20}):\s*(.*)$/);
+              if (hit && NUTRI_MEALS.indexOf(hit[1].trim()) >= 0) { meal = hit[1].trim(); food = hit[2]; }
+              (days[day] || (days[day] = [])).push({ meal: meal || "Ohne Mahlzeit", food: food, mac: estimateMacros(food, meal) });
+            });
+            var keys = Object.keys(days).sort().reverse();
+            if (!keys.length) { box.innerHTML = '<p class="go-ndays__empty">Noch keine getrackten Tage.</p>'; return; }
+            function n(x) { return Math.round(x).toLocaleString("de-DE"); }
+            box.innerHTML = keys.map(function (day) {
+              var list = days[day];
+              var tot = list.reduce(function (a, x) { a.kcal += x.mac.kcal; a.protein += x.mac.protein; a.carbs += x.mac.carbs; a.fat += x.mac.fat; return a; }, { kcal: 0, protein: 0, carbs: 0, fat: 0 });
+              var d = new Date(day + "T12:00:00");
+              var label = d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" }).replace(",", "");
+              var meals = NUTRI_MEALS.concat(["Ohne Mahlzeit"]).filter(function (ml) { return list.some(function (x) { return x.meal === ml; }); });
+              return '<details class="go-nday"><summary><span>' + escapeHtml(label) + '</span><span class="go-nday__kcal">ca. ' + n(tot.kcal) + " kcal</span></summary>" +
+                meals.map(function (ml) {
+                  return '<div class="go-nday__meal"><h4>' + escapeHtml(ml) + "</h4><ul>" +
+                    list.filter(function (x) { return x.meal === ml; }).map(function (x) { return "<li>" + escapeHtml(x.food) + "</li>"; }).join("") + "</ul></div>";
+                }).join("") +
+                '<p class="go-nday__mac">Eiweiß ' + n(tot.protein) + " g · Kohlenhydrate " + n(tot.carbs) + " g · Fett " + n(tot.fat) + " g · " + n(tot.kcal) + " kcal (geschätzt)</p></details>";
+            }).join("");
+          });
       }
 
       window.openNutritionLogModal = openNutritionLogModal;
@@ -20120,7 +20171,7 @@
                   key: "ernaehrung",
                   type: "ernaehrung",
                   title: "Ernährung",
-                  description: "Mach mit uns vier Wochen lang täglich einen Ernährungs Checkin. Protokolliere Mahlzeiten per Spracherkennung. Jeden Tag mit Erinnerung und zwei- bis dreimal Feedback, direkt und menschlich."
+                  description: "Mach mit uns vier Wochen lang täglich einen Ernährungs Checkin. Protokolliere Mahlzeiten per Spracherkennung. Jeden Tag mit Erinnerung und zwei- bis dreimal pro Woche Feedback, direkt und menschlich."
                 },
                 {
                   key: "coach_offer",
@@ -20181,7 +20232,7 @@
                 if (ownedNow) {
                   btn.textContent = coachSelf ? "Registriert" : isZ ? "Ich bin dabei" : "Gebucht";
                 } else {
-                  btn.textContent = of.key === "coach_offer" ? "Registrierung" : isZ ? "Beitreten" : "Buchen";
+                  btn.textContent = of.key === "coach_offer" ? "Registrierung" : isZ ? "Beitreten" : of.key === "uebungen" ? "Aktivieren" : "Buchen";
                 }
                 btn.disabled = !!ownedNow;
                 btn.classList.toggle("is-owned", !!ownedNow);
@@ -20505,17 +20556,22 @@
             }
           }
           if (offer.key === "ernaehrung" && owned) {
+            /* gebucht: ohne Titel, Bild, Text und „Gebucht“; oben „Ernährung tracken“, darunter die getrackten Tage */
+            cta.hidden = true; cta.style.display = "none";
+            card.classList.add("go-slide--pins");
             var track = document.createElement("button");
             track.type = "button";
             track.className = "go-slide__cta";
-            track.style.marginTop = "12px";
-            track.style.background = "transparent";
-            track.style.color = themeColor("#2A2118");
             track.textContent = "Ernährung tracken";
             track.addEventListener("click", function () {
               openNutritionLogModal({ day: Log.berlinToday() });
             });
             card.appendChild(track);
+            var nDays = document.createElement("div");
+            nDays.className = "go-ndays";
+            nDays.id = "go-nutrition-days";
+            card.appendChild(nDays);
+            paintNutritionDays(nDays);
           }
           if (offer.key === "kraft_tracking" && owned) {
             /* aktiv: nur das Tracking, ohne Titel, Bild, Text und „Gebucht“ */
