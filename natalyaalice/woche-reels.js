@@ -514,7 +514,9 @@
     }
     /* bubble_id erst nach go-bubbles.sql vorhanden */
     /* circle_id: Bild des richtigen Circles (go-covers.js) */
-    return query(richSelect + ",bubble_id,circle_id")
+    /* moved_days: einzeln verschobener Wochenplan-Termin steht im Kalender an seinem Serientag (go_events_track_move) */
+    return query(richSelect + ",bubble_id,circle_id,moved_days")
+      .catch(function () { return query(richSelect + ",bubble_id,circle_id"); })
       .catch(function () { return query(richSelect + ",bubble_id"); })
       .catch(function () { return query(richSelect); })
       .catch(function () {
@@ -1167,7 +1169,7 @@
       "events?user_id=eq." + encodeURIComponent(id) + "&status=neq.ausgefallen" +
         "&starts_at=gte." + encodeURIComponent(start + "T00:00:00+01:00") +
         "&starts_at=lt." + encodeURIComponent(end + "T00:00:00+01:00") +
-        "&select=title,starts_at,location&order=starts_at.asc&limit=1000"
+        "&select=title,starts_at,location,status,enrollment_id,moved_days&order=starts_at.asc&limit=1000"
     ).then(function (rows) {
       var weeks = {};
       var times = {};
@@ -1176,11 +1178,14 @@
       var locsAll = {};
       var today = berlinToday();
       (rows || []).forEach(function (r) {
-        var k = seriesKey(r.title, r.starts_at);
+        /* einzeln verschoben: zählt zum Serientag */
+        var k = seriesKey(r.title, seriesDayOf(r) + "T12:00:00Z");
         if (!k) return;
         (weeks[k] = weeks[k] || {})[dayKey(r.starts_at)] = true;
         /* Serienwert aus den kommenden Terminen (ohne heute und Vergangenheit), sonst aus allen */
         var later = dayKey(r.starts_at) > today;
+        /* erledigt: Uhrzeit ist die des Beendens (z. B. 17:21), zählt nicht für die Serie; verschobene Einzeltermine auch nicht */
+        if (r.status === "erledigt" || seriesDayOf(r) !== dayKey(r.starts_at)) { return; }
         var t = displayTime(r.starts_at);
         var l0 = String(r.location || "");
         [[timesAll, locsAll], later ? [times, locs] : null].forEach(function (pair) {
@@ -1251,9 +1256,11 @@
       /* Ort aus „Tage bearbeiten“ gilt für die ganze Serie, sonst der Ort aus dem Plan */
       if (!ev.location && plan.location) ev.location = plan.location;
     }
-    var skG = seriesKey(it.ev.title, it.ev.starts_at);
+    var sd = seriesDayOf(it.ev);
+    var skG = seriesKey(it.ev.title, sd + "T12:00:00Z");
     var usual = (state.seriesTime || {})[skG];
-    if (usual && usual !== displayTime(ev.starts_at)) ev.starts_at = timedStarts(dayKey(ev.starts_at), ("0" + usual).slice(-5)) || ev.starts_at;
+    if (usual && (usual !== displayTime(ev.starts_at) || sd !== dayKey(ev.starts_at))) ev.starts_at = timedStarts(sd, ("0" + usual).slice(-5)) || ev.starts_at;
+    else if (sd !== dayKey(ev.starts_at)) ev.starts_at = displayTime(ev.starts_at) ? timedStarts(sd, formatTime(ev.starts_at)) : sd + "T12:00:00Z";
     /* Ort wie in „Tage bearbeiten“ (Serie), nicht die Änderung an diesem einen Tag aus Aktuell */
     var usualPlace = (state.seriesPlace || {})[skG];
     if (usualPlace) ev.location = usualPlace;
@@ -1285,7 +1292,9 @@
   function itemsForDayAll(iso) {
     var list = [];
     state.events.forEach(function (ev) {
-      if (dayKey(ev.starts_at) === iso && ev.status !== "ausgefallen") {
+      /* eigene Wochenplan-Termine an ihrem Serientag (verschoben in Aktuell bleibt im Kalender am alten Tag) */
+      var dEv = String(ev.user_id) === me() ? seriesDayOf(ev) : dayKey(ev.starts_at);
+      if (dEv === iso && ev.status !== "ausgefallen") {
         list.push({ kind: "event", starts_at: ev.starts_at, ev: ev });
       }
     });
@@ -3196,10 +3205,16 @@
   function isAltEvent(e) {
     return !!(e && (e.item_type === "alternative" || e.travel_auto || e.item_type === "hotel_workout"));
   }
+  /* Serientag eines Termins: Wochenplan-Termin, der in Aktuell auf einen anderen Tag verschoben wurde,
+     gehört im Kalender und in „Tage bearbeiten“ weiter an seinen ursprünglichen Tag (Kalender = globale Woche) */
+  function seriesDayOf(e) {
+    var md = e && e.enrollment_id && Array.isArray(e.moved_days) && e.moved_days.length ? String(e.moved_days[0]).slice(0, 10) : "";
+    return /^\d{4}-\d{2}-\d{2}$/.test(md) ? md : dayKey(e.starts_at);
+  }
   function normalDayEvents(iso) {
     return state.events.filter(function (e) {
       return e && String(e.user_id) === me() && e.item_type !== "support_session" && !isAltEvent(e) &&
-        dayKey(e.starts_at) === iso &&
+        seriesDayOf(e) === iso &&
         (e.status !== "ausgefallen" || !!(e.enrollment_id || e.course_id));
     }).sort(function (a, b) {
       var sa = a.status === "ausgefallen" ? 1 : 0, sb = b.status === "ausgefallen" ? 1 : 0;
@@ -3705,7 +3720,7 @@
     slots.forEach(function (ev) {
       if (!ev) return;
       /* Tage bearbeiten ist die globale Woche: Uhrzeit und Ort der Serie, nicht die Änderung an einem einzelnen Termin */
-      var sk = seriesKey(ev.title, ev.starts_at);
+      var sk = seriesKey(ev.title, seriesDayOf(ev) + "T12:00:00Z");
       var serT = (state.seriesTime || {})[sk];
       var serP = (state.seriesPlace || {})[sk];
       state.daysEdit.times[ev.id] = serT || (displayTime(ev.starts_at) ? formatTime(ev.starts_at) : NO_TIME);
@@ -4268,7 +4283,7 @@
   function weekdayOf(iso) { return new Date(iso + "T12:00:00").getDay(); }
   function seriesJobs(future, ev, iso, untimed, hhmm, body) {
     if (!ev.enrollment_id || !future.length) return [];
-    var fromWd = weekdayOf(dayKey(ev.starts_at));
+    var fromWd = weekdayOf(seriesDayOf(ev));
     /* Montag ist Wochenanfang: Sonntag → Montag heißt 6 Tage zurück */
     var shift = ((weekdayOf(iso) + 6) % 7) - ((fromWd + 6) % 7);
     var out = [];
@@ -4312,7 +4327,8 @@
       /* nur echte Änderungen hier schreiben: Uhrzeit wie beim Öffnen (Serie) lässt einen einzeln verschobenen Termin in Ruhe */
       var timeChanged = pick !== de.orig[ev.id];
       /* heutiger Termin gehört zu Aktuell: Tage bearbeiten ändert ihn nicht (Uhrzeit, Tag, Ort), nur die Serie ab nächster Woche */
-      var isToday = dayKey(ev.starts_at) === berlinToday();
+      /* heute oder einzeln verschoben (Aktuell): bleibt, wie es ist; nur die Serie ändert sich */
+      var isToday = dayKey(ev.starts_at) === berlinToday() || seriesDayOf(ev) !== dayKey(ev.starts_at);
       var sameDay = isToday || (dayKey(ev.starts_at) === iso && !timeChanged);
       var wantBub = !!(de.bub && de.bub[ev.id]) || vis === "bubble";
       var bubId = host.bubbleId ? host.bubbleId() : "";
