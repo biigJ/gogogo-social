@@ -3694,7 +3694,8 @@
     if (!de) return;
     var rows = de.days.map(function (iso, i) {
       var d = new Date(iso + "T12:00:00");
-      var label = DAYS_DE[d.getDay()] + " " + d.getDate() + ".";
+      /* nur der Wochentag: Tage bearbeiten gilt für die Serie, nicht für ein Datum */
+      var label = DAYS_DE[d.getDay()];
       var ev = de.slots[i];
       if (!ev) {
         var doneEv = de.done && de.done[i];
