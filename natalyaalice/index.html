@@ -8977,7 +8977,7 @@
   <script src="/natalyaalice/heute-v3.js?v=feed-170"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-109"></script>
-  <script src="/natalyaalice/support.js?v=support-34"></script>
+  <script src="/natalyaalice/support.js?v=support-35"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
   <script src="/natalyaalice/coach-group.js?v=gcg-3"></script>
   <script>
@@ -10488,6 +10488,9 @@
       }
 
       function saveRoutine(days, started) {
+        /* go_natalya_routine ist die eine Zeile der alten Natalya-Seite: eingeloggte Konten schreiben dort nicht hinein
+           (vorher überschrieb jeder Routine-Start in gogogo Natalyas Startdatum) */
+        if (sessionMode) return Promise.resolve();
         return rest("go_natalya_routine?on_conflict=id", {
           method: "POST",
           prefer: "resolution=merge-duplicates,return=minimal",
@@ -10502,6 +10505,7 @@
       }
 
       function deleteRoutine() {
+        if (sessionMode) return Promise.resolve();
         return rest("go_natalya_routine?id=eq." + ROUTINE_ID, {
           method: "DELETE",
           prefer: "return=minimal"
@@ -14394,6 +14398,22 @@
             } catch (e) {
               return false;
             }
+          },
+          /* Plus → 12-Wochen-Routine → Zahnrad → Deaktivieren: aktiv ist sie über den Start im Profil (ohne Buchung),
+             daher Start im Profil und auf dem Gerät leeren (vorher blieb sie aktiv, nichts passierte) */
+          endRoutine: function () {
+            /* nicht deleteRoutine(): das ist die alte gemeinsame Zeile „natalya“ in go_natalya_routine */
+            return Promise.resolve().then(function () {
+              routineTouched = true;
+              writeStore(HOME_START, "");
+              persistChallenge("");
+              var about = sessionAccount && sessionAccount.about_me && typeof sessionAccount.about_me === "object" ? sessionAccount.about_me : null;
+              if (about && about.routine_started) {
+                about.routine_started = "";
+                rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), { method: "PATCH", prefer: "return=minimal", body: { about_me: about } }).catch(function () {});
+              }
+              if (typeof paintWelcome === "function") { try { paintWelcome(); } catch (eW) {} }
+            });
           },
           paintProfil: function () {
             if (typeof renderProfil === "function") renderProfil();

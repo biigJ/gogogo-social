@@ -950,6 +950,8 @@
       if (type === "kraft_tracking") {
         try { localStorage.removeItem(trackingKey()); } catch (eK) {}
       }
+      /* 12-Wochen-Routine ist oft ohne Buchung aktiv (Start im Profil): dort beenden */
+      var routineEnd = type === "routine" && host && host.endRoutine ? Promise.resolve(host.endRoutine()).catch(function () {}) : null;
       /* Ernährung: beim Aktivieren angelegte, noch nicht gespeicherte Karten (geplant) aus Aktuell entfernen */
       var cleanup = type === "ernaehrung" && me()
         ? rest("events?user_id=eq." + encodeURIComponent(me()) + "&item_type=eq.nutrition_log&status=eq.geplant", { method: "DELETE", prefer: "return=minimal" }).catch(function () {})
@@ -966,7 +968,7 @@
         return rest("support_orders?id=eq." + encodeURIComponent(o.id), {
           method: "PATCH", prefer: "return=minimal", body: { status: "angefragt", meta: meta }
         });
-      }).concat([cleanup])).then(function () {
+      }).concat([cleanup, routineEnd])).then(function () {
         if (host.paintProfil) host.paintProfil();
       });
     },
