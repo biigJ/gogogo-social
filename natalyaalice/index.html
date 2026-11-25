@@ -27344,7 +27344,8 @@
           btn.type = "button";
           btn.className = "team-slide__cta team-slide__cta--gevents team-slide__cta--challenge";
           btn.textContent = "Challenge hinzufügen";
-          btn.addEventListener("click", function () { openChallengeCreate(group); });
+          /* nach dem Anlegen direkt auf dieser (offenen) Seite zeigen; renderTeam baut nur die Seiten im Hintergrund neu */
+          btn.addEventListener("click", function () { openChallengeCreate(group, function (ch) { paint(ch); }); });
           slide.appendChild(btn);
         }
         var line = document.createElement("div");
@@ -27418,7 +27419,7 @@
           })
           .catch(function () {});
       }
-      function openChallengeCreate(group) {
+      function openChallengeCreate(group, onDone) {
         if (!window.GoDialog || !GoDialog.form) return;
         /* Challenges organisieren Coaches (Plus → Ich als Coach → Anmelden) */
         if (typeof isCoachAny === "function" && !isCoachAny()) {
@@ -27447,6 +27448,7 @@
             .then(function (res) {
               if (res && res.ok) {
                 groupChallengeCache[String(group.id)] = { ch: { id: res.id, name: name, goal: goal, link_stamps: !!r.checked }, at: Date.now() };
+                if (onDone) { try { onDone(groupChallengeCache[String(group.id)].ch); } catch (eD) {} }
                 gogogoToast(r.checked ? "Challenge steht. Deine Gruppe bestätigt die Stempelkarte unter dem Herz." : "Challenge steht.");
                 renderTeam();
                 return;
