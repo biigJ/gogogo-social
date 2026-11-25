@@ -2213,10 +2213,11 @@
     );
   }
 
-  /* Status unten links (symmetrisch zu den drei Punkten): erledigt, verspätet, dabei, bald, heute, morgen */
+  /* Status unten links (symmetrisch zu den drei Punkten): erledigt, dabei (gestartet, nicht abgeschlossen), verspätet, bald, heute, morgen */
   function statusOf(o) {
     if (!o) return "";
     if (o.done) return "erledigt";
+    if (o.started) return "dabei";
     if (!o.ts) return "";
     var t = new Date(o.ts).getTime();
     if (isNaN(t)) return "";
@@ -2224,7 +2225,6 @@
     if (day < today) return "";
     var timed = hasTime({ starts_at: o.ts });
     if (day === today && timed && t <= Date.now()) return "verspätet";
-    if (o.going) return "dabei";
     if (day === today) return timed && t - Date.now() <= 60 * 60000 ? "bald" : "heute";
     var tm = new Date(today + "T12:00:00Z"); tm.setUTCDate(tm.getUTCDate() + 1);
     if (day === tm.toISOString().slice(0, 10)) return "morgen";
@@ -2521,7 +2521,7 @@
       /* ••• : eigene Events immer, Freunde bei erledigten (Verkleinern) */
       visDots: (mine || ev.status === "erledigt") && /^[0-9a-f-]{36}$/i.test(String(ev.id)) ? String(ev.id) : "",
       /* laufender Zirkel hat eigene Pillen (Countdown/läuft) */
-      status: zirkelPillsHtml(ev) && ev.status !== "erledigt" ? "" : statusOf({ done: ev.status === "erledigt", ts: ev.starts_at, going: !mine && (acceptedInv || iAmGoing(ev.id)) }),
+      status: zirkelPillsHtml(ev) && ev.status !== "erledigt" ? "" : statusOf({ done: ev.status === "erledigt", ts: ev.starts_at, started: isStarted(ev) }),
       inviteIso: day,
       ownerId: String(ev.user_id || ""),
       canInvite: !mine
@@ -2562,7 +2562,7 @@
       title: "🔥 " + (ev.title || "Zirkeltraining"),
       place: ev.location || "",
       desc: "",
-      status: statusOf({ ts: ev.starts_at, going: !mine && going }),
+      status: statusOf({ ts: ev.starts_at }),
       postId: postId,
       inviteIso: dayKey(ev.starts_at),
       canInvite: mine ? canInviteOnDay(dayKey(ev.starts_at)) : false
@@ -3216,7 +3216,7 @@
       emoji: emojiFor(cat, label),
       author: authorHtml(personOf(me()), true),
       when: whenLine(at),
-      status: statusOf({ ts: at, going: true }),
+      status: statusOf({ ts: at }),
       title: (emojiFor(cat, label) + " " + label).trim(),
       place: (inv.place ? inv.place + " · " : "") + "mit " + String(owner.name || "Freund").split(" ")[0],
       actions:
@@ -4030,7 +4030,7 @@
           eventId = String(nev.id);
           modal.dataset.eventId = eventId;
           state.events.push(nev);
-          return markReplaced(draft.replace);
+          return markReplaced(draft.replace, nev);
         })
       : Promise.resolve();
     ready
@@ -5002,7 +5002,31 @@
     });
   }
 
+  /* „dabei“: Event gestartet und noch nicht abgeschlossen. Eigene Starts merkt sich das Gerät (je Tag),
+     bei anderen zählt „trainiert gerade“ (go_training_presence) für ihr heutiges Event. */
+  function startedKey() { return "gogogo_started_" + me() + "_" + todayIso(); }
+  function startedMap() { try { return JSON.parse(localStorage.getItem(startedKey()) || "{}") || {}; } catch (e) { return {}; } }
+  function markStarted(ev) {
+    if (!ev || !ev.id) return;
+    var m = startedMap();
+    m[String(ev.id)] = Date.now();
+    try { localStorage.setItem(startedKey(), JSON.stringify(m)); } catch (e) {}
+    if (host.trainingActive) { try { host.trainingActive(ev.title || "Training"); } catch (e2) {} }
+  }
+  function isStarted(ev) {
+    if (!ev || ev.status === "erledigt" || dayKey(ev.starts_at) !== todayIso()) return false;
+    if (String(ev.user_id) === me() && startedMap()[String(ev.id)]) return true;
+    var pr = host.presenceOf ? host.presenceOf(String(ev.user_id)) : null;
+    if (!pr || pr.status !== "active") return false;
+    var open = (state.events || []).filter(function (e) {
+      return e && String(e.user_id) === String(ev.user_id) && e.status === "geplant" && dayKey(e.starts_at) === todayIso();
+    });
+    var lab = String(pr.workout_label || "").toLowerCase();
+    return open.length === 1 || (!!lab && lab === String(ev.title || "").toLowerCase());
+  }
+
   function startEvent(ev) {
+    markStarted(ev);
     if (ev.category === "zirkel") {
       var z = global.GoZirkelSetup && GoZirkelSetup.parse ? GoZirkelSetup.parse(ev.note) : {};
       if (host.openZirkel) host.openZirkel(Object.assign({}, z || {}, {
@@ -5075,7 +5099,7 @@
           if (host.openZirkel) host.openZirkel({
             onSaved: function () {
               return createUnplannedEvent({ category: "zirkel", course_id: cid, title: "Zirkeltraining", status: "erledigt" })
-                .then(function () { return markReplaced(replace); })
+                .then(function (nev) { return markReplaced(replace, nev); })
                 .then(function () { if (global.GoTama) GoTama.invalidate(); return refresh(); })
                 .catch(function () {});
             }
@@ -5272,14 +5296,14 @@
         var off = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", timeZoneName: "longOffset" }).format(new Date(day + "T12:00:00Z")).match(/GMT([+-]\d{2}):?(\d{2})?/);
         p.starts_at = day + "T" + hh + ":00" + (off ? off[1] + ":" + (off[2] || "00") : "+01:00");
         return createUnplannedEvent(p)
-          .then(function () { return markReplaced(replace); })
+          .then(function (nev) { return markReplaced(replace, nev); })
           .then(function () { if (global.GoTama) GoTama.invalidate(); return refresh(); })
           .then(function () { if (host.toast) host.toast(unit.title + " um " + r.time + " eingetragen"); })
           .catch(function () { if (host.toast) host.toast("Eintragen ging nicht"); });
       }
       if (kind === "kraft" || kind === "ausdauer") {
         return createUnplannedEvent(p).then(function (nev) {
-          return markReplaced(replace).then(function () { return refresh(); }).then(function () {
+          return markReplaced(replace, nev).then(function () { return refresh(); }).then(function () {
             if (kind === "kraft" && host.openEventWorkout) { host.openEventWorkout(nev); return; }
             if (kind === "ausdauer" && global.GoTimer) { GoTimer.start({ id: nev.id, title: nev.title || "Ausdauer", minutes: 30 }); return; }
             openDoneModal(nev.id, { title: "Schreib, wie es war", placeholder: "Wie war es?" });
@@ -5296,15 +5320,24 @@
           if (d.text) p.note = d.text.slice(0, 500);
           if (url) p.photo_url = url;
           return createUnplannedEvent(p);
-        }).then(function () { return markReplaced(replace); })
+        }).then(function (nev) { return markReplaced(replace, nev); })
           .then(function () { if (global.GoTama) GoTama.invalidate(); return refresh(); })
           .catch(function () { if (host.toast) host.toast("Speichern ging nicht"); });
       });
     });
   }
 
-  function markReplaced(replace) {
+  /* „Statt …“: geplantes Event fällt aus. Unter der Alternative steht dann ein Kommentar, was statt was gemacht wird. */
+  function markReplaced(replace, nev) {
     if (!replace) return Promise.resolve();
+    var old = evById(replace);
+    if (old && nev && nev.id) {
+      var first = String(personOf(me()).name || "Ich").split(" ")[0];
+      var at = function (e) { return hasTime(e) ? " um " + timeLabel(e.starts_at) + " Uhr" : ""; };
+      var txt = "Anstatt " + (old.title || "Training") + at(old) + " macht " + first + " nun eine Alternative „" + (nev.title || "Training") + "“" +
+        at(nev.starts_at ? nev : { starts_at: new Date().toISOString() }) + ".";
+      rest("event_comments", { method: "POST", prefer: "return=minimal", body: { event_id: nev.id, account_id: me(), text: txt } }).catch(function () {});
+    }
     return rest("events?id=eq." + encodeURIComponent(replace) + "&status=eq.geplant", {
       method: "PATCH", prefer: "return=minimal", body: { status: "ausgefallen" }
     }).catch(function () {});
