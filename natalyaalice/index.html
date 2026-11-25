@@ -2002,10 +2002,19 @@
     .wr-btnrow .wr-sheet-cancel { border: 1.5px solid #2A2118; border-radius: 999px; background: transparent; color: #2A2118; font-weight: 600; }
     .wr-mini-wheel { height: 36px; width: 72px; overflow-y: auto; scroll-snap-type: y mandatory; border-radius: 8px; background: #fff; border: 1px solid rgba(42,33,24,.15); scrollbar-width: none; touch-action: pan-y; }
     .wr-mini-wheel::-webkit-scrollbar { display: none; }
+    /* Drehrad erkennbar: kleine Pfeile rechts; angetippt klappt es auf drei Zeilen auf (gleiche Scroll-Position, Zeile bleibt gleich hoch) */
+    .wr-mini-wrap { position: relative; display: inline-block; flex: none; width: 62px; height: 36px; }
+    .wr-mini-wrap::after { content: ""; position: absolute; right: 5px; top: 50%; width: 6px; height: 14px; margin-top: -7px; pointer-events: none; z-index: 4; opacity: .45;
+      background: no-repeat center/6px 14px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 14'%3E%3Cpath d='M0 5l3-4 3 4M0 9l3 4 3-4' fill='none' stroke='%232A2118' stroke-width='1.3'/%3E%3C/svg%3E"); }
+    .wr-mini-wrap .wr-mini-wheel { position: absolute; left: 0; right: 0; top: 0; width: auto !important; box-sizing: content-box; padding-right: 8px; }
+    .wr-mini-wrap.is-open .wr-mini-wheel { top: -36px; height: 36px; padding: 36px 8px 36px 0; z-index: 5; box-shadow: 0 6px 18px rgba(0,0,0,.18);
+      -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,.35), #000 35%, #000 65%, rgba(0,0,0,.35)); mask-image: linear-gradient(180deg, rgba(0,0,0,.35), #000 35%, #000 65%, rgba(0,0,0,.35)); }
+    .wr-mini-wrap.is-open::after { display: none; }
     .wr-mini-opt { display: flex; align-items: center; justify-content: center; height: 36px; line-height: 1; text-align: center; scroll-snap-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
     /* Tage bearbeiten: alle 7 Tage auf einmal sichtbar, Dialog sitzt eine Zeile höher */
     .wr-days.wr-days--all { max-height: none; overflow: visible; }
-    body.wr-sheet-open .wr-sheet__card.wr-sheet__card--days { max-height: 94dvh; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+    /* oben frei unter der Statusleiste und dem iOS-Verlauf (Glas), sonst verschwimmt die Überschrift */
+    body.wr-sheet-open .wr-sheet__card.wr-sheet__card--days { max-height: calc(100dvh - env(safe-area-inset-top, 0px) - var(--ios-glass-clear, 0px) - 28px); padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
     .wr-sheet__card--days .wr-sheet-hint { margin-bottom: 6px; }
     .wr-zrec-mode { margin: 4px auto 0; }
     .wr-saved { position: fixed; left: 50%; top: 42%; z-index: 10070; transform: translate(-50%, -50%) scale(.96); padding: 16px 28px; border-radius: 18px; background: rgba(17,17,17,.88); color: #fff; font: 600 17px/1.2 Inter, system-ui, sans-serif; opacity: 0; pointer-events: none; transition: opacity 220ms ease, transform 220ms ease; }
@@ -2423,7 +2432,7 @@
     /* Dialog liegt über der Bottom-Pill, Speichern immer erreichbar */
     body.wr-sheet-open .wr-sheet { position: fixed; z-index: 200; }
     body.wr-sheet-open .app-pill { visibility: hidden; }
-    body.wr-sheet-open .wr-sheet__card { max-height: 88dvh; padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+    body.wr-sheet-open .wr-sheet__card { max-height: min(88dvh, calc(100dvh - env(safe-area-inset-top, 0px) - var(--ios-glass-clear, 0px) - 28px)); padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
     .wr-sheet__card {
       width: min(100%, 480px); max-height: 78%; overflow: auto;
       background: #F3EEE4; color: #2A2118; border-radius: 18px 18px 0 0;
@@ -7888,7 +7897,7 @@
   </div>
   <div class="sand-modal" id="ausdauer-modal" hidden>
     <div class="sand-card" role="dialog" aria-modal="true" aria-labelledby="ausdauer-title">
-      <h2 class="ask" id="ausdauer-title">Welche Einheit?</h2>
+      <h2 class="ask" id="ausdauer-title">Welches Event?</h2>
       <div id="ausdauer-pick"></div>
     </div>
   </div>
@@ -8973,7 +8982,7 @@
   <script src="/account/kraft-catalog.js"></script>
   <script src="/natalyaalice/log.js?v=log-2"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-4"></script>
-  <script src="/natalyaalice/exercise-media.js?v=gxm-6"></script>
+  <script src="/natalyaalice/exercise-media.js?v=gxm-7"></script>
   <script src="/natalyaalice/go-story.js?v=gst-9"></script>
   <script src="/natalyaalice/bubbles.js?v=bub-17"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-5"></script>
@@ -8988,14 +8997,14 @@
   <script src="/natalyaalice/coach-reviews.js?v=gcr-6"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-31"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-20"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-21"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-180"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-181"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-114"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-115"></script>
   <script src="/natalyaalice/support.js?v=support-36"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
   <script src="/natalyaalice/coach-group.js?v=gcg-4"></script>
@@ -9440,8 +9449,8 @@
             }
           }
 
-          /* Übungsvideo (exercise-media.js), ganz rechts */
-          if (window.GoExMedia && GoExMedia.urlFor(ex.name)) {
+          /* Übungsvideo (exercise-media.js), ganz rechts; ohne Video öffnet das Icon „Link einfügen“ */
+          if (window.GoExMedia && ex.name) {
             itemTools(item).appendChild(GoExMedia.button(ex.name));
           }
           var toolCount = item.querySelectorAll(".item-tools > button").length;
@@ -11612,7 +11621,7 @@
         var box = document.getElementById("ausdauer-pick");
         var title = document.getElementById("ausdauer-title");
         if (!modal || !box) return;
-        if (title) title.textContent = "Welche Einheit?";
+        if (title) title.textContent = "Welches Event?";
         box.textContent = "";
         choices.forEach(function (choice) {
           var button = document.createElement("button");
@@ -16016,7 +16025,7 @@
         ["Was gogogo ist", "Erinnerst du dich an Vereinstraining? Dienstag 18 Uhr, feste Leute, ein Trainer, der wusste, was zu tun ist. Niemand musste überlegen, ob er heute trainiert. Genau diesen Rahmen baut gogogo zurück, für Erwachsene mit vollem Leben."],
         ["Für wen", "Unsere Nutzer leisten viel: im Job, in der Familie, im Alltag. Beim Thema Bewegung sind sie überfordert. Zu viele Apps, zu viele Pläne, zu viele Meinungen auf YouTube. Jeden Tag neu zu entscheiden kostet Kraft, und am Ende gewinnt meist der Alltag. Sie brauchen kein weiteres Wissen. Sie brauchen jemanden, der für sie entscheidet, und Leute, die merken, wenn sie fehlen."],
         ["Was gogogo ausmacht", "1. Eine Woche mit System\nJede Woche hat 7 aktive Tage. Davon sind mindestens 2 Trainings, die übrigen Tage mindestens aktive Tagesimpulse. Wir wollen die Menschen aber dazu ermutigen, auch weitere Trainings Schritt für Schritt in die Woche zu integrieren: mindestens einen langen Lauf oder Ähnliches und bestenfalls ein Zirkeltraining. Für mehr Ambitionen erweitert sich der Kurs zu mehr Krafttraining, meist funktional und teilweise mit mehr Ausdauertraining. Kein Tag bleibt leer, und kein Tag muss neu verhandelt werden. Die Trainings stammen aus erprobten Kursen, die du für deine Coachees auswählst und Schritt für Schritt anpasst. Der Nutzer öffnet die App und weiß, was heute dran ist.\n\n2. Ein Team, das mitzieht\nJeder Nutzer hat ein Team aus Freunden und seinem Coach. Wer zusagt, ist für alle sichtbar. Wer fehlt, fällt auf. Kommentare, gemeinsame Termine und Stempel für gemeinsames Training sorgen dafür, dass Dranbleiben leichter ist als Absagen."],
-        ["Deine Aufgabe als Coach", "Erstgespräch: Verstehe, wo jemand steht und was in seinem Alltag realistisch ist. Frag nach Zeitfenstern, nicht nach Zielen in Kilo.\nWoche aufsetzen: Wähle einen passenden Kurs, verteile die Trainings auf feste Tage, plane die Erholungstage mit. Danach steht die Woche, und dein Coachee muss nichts mehr entscheiden.\nAnpassen statt neu bauen: Ändere einzelne Einheiten, wenn etwas nicht passt. Ein neuer Plan von Grund auf ist fast nie nötig.\nPräsent sein: Schau täglich in Aktuell. Kommentiere, was geschafft wurde. Melde dich, wenn jemand zwei Tage nichts geloggt hat, kurz und persönlich.\nTermine halten: Bestätige Web-Calls und Personal Trainings zeitnah in Meine Coachees.\nErnährung begleiten: Wenn dein Coachee Ernährung gebucht hat, lies seine Abend-Logs und gib einen Hinweis pro Woche, nicht täglich zehn."],
+        ["Deine Aufgabe als Coach", "Erstgespräch: Verstehe, wo jemand steht und was in seinem Alltag realistisch ist. Frag nach Zeitfenstern, nicht nach Zielen in Kilo.\nWoche aufsetzen: Wähle einen passenden Kurs, verteile die Trainings auf feste Tage, plane die Erholungstage mit. Danach steht die Woche, und dein Coachee muss nichts mehr entscheiden.\nAnpassen statt neu bauen: Ändere einzelne Events, wenn etwas nicht passt. Ein neuer Plan von Grund auf ist fast nie nötig.\nPräsent sein: Schau täglich in Aktuell. Kommentiere, was geschafft wurde. Melde dich, wenn jemand zwei Tage nichts geloggt hat, kurz und persönlich.\nTermine halten: Bestätige Web-Calls und Personal Trainings zeitnah in Meine Coachees.\nErnährung begleiten: Wenn dein Coachee Ernährung gebucht hat, lies seine Abend-Logs und gib einen Hinweis pro Woche, nicht täglich zehn."],
         ["Was du vermeidest", "Informationsflut. Ein klarer Satz hilft mehr als ein Fachartikel.\nDruck über Zahlen und Ergebnisse. Wir messen Regelmäßigkeit.\nSpontane Komplettumbauten. Stabilität ist das Produkt."],
         ["Woran du merkst, dass es funktioniert", "Dein Coachee plant nicht mehr, er macht einfach. Er sagt Termine zu, bevor du fragst. Und nach 12 Wochen will er die nächste Runde."],
         ["Bau Deine Community", "Lern Deine Coachees vor Ort kennen, vernetz Dich auf WhatsApp, nutz gogogo, um eine Gruppe aufzubauen. Biete Gruppentrainings an, sodass auch Menschen, die kein Personal Training nutzen wollen, in den Genuss Deiner Präsenz und Aura kommen. Auf Social Media stellst Du die Kurse vor und Deine persönlichen Tipps. gogogo ist eine Basis für Dein Wirken. Und andersherum.\n\nBitte auch gerne Deine Coachees, etwas zu Deiner Persönlichkeit zu schreiben. Das können sie hier machen und per Cross-Posting teilen.\n\nWeil gogogo ein Sammelbecken von Menschen mit Herausforderungen und Wünschen ist, wirst Du immer wieder neue Menschen kennenlernen. Mit anderen Coaches ist es ein Miteinander, keine Konkurrenz. Es gibt so viele Menschen, die Deine Expertise benötigen. Also: Teilen im Geiste von gogogo!"]
@@ -24411,7 +24420,7 @@
           var ses = rows && rows[0];
           var exercises = exercisesFromSession(ses);
           if (!exercises.length) {
-            gogogoToast("Für diese Einheit sind noch keine Übungen hinterlegt");
+            gogogoToast("Für dieses Event sind noch keine Übungen hinterlegt");
             return;
           }
           var iso = new Date(ev.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
@@ -24468,6 +24477,7 @@
         GoExMedia.init({
           rest: rest,
           me: function () { return sessionAccount ? String(sessionAccount.id) : ""; },
+          toast: function (msg) { try { gogogoToast(msg); } catch (eT) {} },
           storage: { url: SUPABASE_URL, key: SUPABASE_KEY }
         }).then(function () {
           try { if (listEl && listEl.children.length) renderList(); } catch (eGx) {}
