@@ -7071,7 +7071,7 @@
       padding: 0 12px;
     }
   </style>
-  <script src="/natalyaalice/themes.js?v=thm-16"></script>
+  <script src="/natalyaalice/themes.js?v=thm-17"></script>
 </head>
 <body class="is-home">
   <div class="go-boot" id="go-boot" role="status" aria-live="polite">
@@ -8952,8 +8952,8 @@
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-46"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-4"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-27"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-11"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-28"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-12"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
@@ -8963,7 +8963,7 @@
   <script src="/natalyaalice/woche-reels.js?v=woche-107"></script>
   <script src="/natalyaalice/support.js?v=support-34"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
-  <script src="/natalyaalice/coach-group.js?v=gcg-2"></script>
+  <script src="/natalyaalice/coach-group.js?v=gcg-3"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -16029,7 +16029,14 @@
         b.title = "Verifizierter Coach";
         /* „c“ als Bogen um den Mittelpunkt des Punkts (Schrift-Glyphe sitzt je nach Font zu tief) */
         b.innerHTML = '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.1 6.6A4.6 4.6 0 1 0 13.1 13.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>';
-        el.appendChild(b);
+        /* direkt hinter den Namen (erster Textknoten), nicht ans Ende: sonst landet es nach dem @Nickname in eigener Zeile */
+        var nameNode = null;
+        for (var ni = 0; ni < el.childNodes.length; ni++) {
+          var cn = el.childNodes[ni];
+          if (cn.nodeType === 3 && cn.nodeValue.trim()) { nameNode = cn; break; }
+        }
+        if (nameNode) el.insertBefore(b, nameNode.nextSibling);
+        else el.appendChild(b);
       }
       function applyVcAll() {
         document.querySelectorAll("[data-vc-id]").forEach(function (el) { addVc(el, el.getAttribute("data-vc-id")); });
@@ -26582,6 +26589,9 @@
           }
           /* Stempelfeld der Gruppe direkt im Challenge-Kasten */
           var stEl = kreisStampsEl();
+          /* „Anzeigen“ steht unten in der Challenge-Zeile (Gruppenkarte); das zweite im Stempelfeld öffnete die gogogo-Karte */
+          var stFoot = stEl.querySelector(".kreis-stamps__foot");
+          if (stFoot) stFoot.remove();
           line.appendChild(stEl);
           myStampCount("group", group.id).then(function (n) { paintKreisStamps(stEl, n); });
           /* Zeile unter den Stempeln: links „Anzeigen“ (Stempelkarte der Gruppe mittig), rechts „Beenden“ (nur Besitzer) */

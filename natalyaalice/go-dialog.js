@@ -221,7 +221,9 @@
           card.appendChild(inf);
           return;
         }
-        button(card, c.label, "god__btn--choice", function () { close(c.value); });
+        var cb = button(card, c.label, "god__btn--choice", function () { close(c.value); });
+        /* c.font: eigene Schrift für den Eintrag (z. B. Darstellung: Name in der Theme-Schrift) */
+        if (c.font) cb.style.setProperty("font", c.font, "important");
       });
       button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(null); });
       return null;

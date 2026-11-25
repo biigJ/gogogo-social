@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-artmag",
+      at: "2026-11-25T10:00:00Z",
+      text: "Neue Darstellung „Art Magazin“: Serifen, Schwarz und Weiß, Bilder ohne Farbe drumherum. Zu finden unter Profil → Einstellungen → Darstellung."
+    },
+    {
       key: "news:2026-11-19-ring",
       at: "2026-11-19T12:00:00Z",
       text: "Neu in gogogo: Der Ring um Dein Profilbild wechselt jetzt immer nur um eine Farbstufe, und die Zahl daran zeigt, wie viele Tage Du am Stück abgehakt hast. Mehr dazu unter „Info“ oben links in Aktuell."

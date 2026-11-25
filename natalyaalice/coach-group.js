@@ -210,7 +210,6 @@
           : '<p class="gcg__empty">Noch niemand außer Dir.</p>';
       }
     } else {
-      html += '<p class="gcg__h">Coachees</p>';
       html += !s.membersOk ? '<p class="gcg__empty">Braucht go-coach-gruppe.sql in Supabase.</p>'
         : s.members.length ? s.members.map(function (p) { return coacheeRow(s, p); }).join("") +
           '<p class="gcg__empty">Grüner Punkt: offen für Gruppentraining. Gestempelt wird per QR beim gemeinsamen Training.</p>'
