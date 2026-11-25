@@ -1249,8 +1249,12 @@
       /* Ort aus „Tage bearbeiten“ gilt für die ganze Serie, sonst der Ort aus dem Plan */
       if (!ev.location && plan.location) ev.location = plan.location;
     }
-    var usual = (state.seriesTime || {})[seriesKey(it.ev.title, it.ev.starts_at)];
+    var skG = seriesKey(it.ev.title, it.ev.starts_at);
+    var usual = (state.seriesTime || {})[skG];
     if (usual && usual !== displayTime(ev.starts_at)) ev.starts_at = timedStarts(dayKey(ev.starts_at), ("0" + usual).slice(-5)) || ev.starts_at;
+    /* Ort wie in „Tage bearbeiten“ (Serie), nicht die Änderung an diesem einen Tag aus Aktuell */
+    var usualPlace = (state.seriesPlace || {})[skG];
+    if (usualPlace) ev.location = usualPlace;
     return Object.assign({}, it, { ev: ev, starts_at: ev.starts_at });
   }
   function itemsForDay(iso) {
