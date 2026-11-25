@@ -103,6 +103,12 @@
         ".friend-list__feed{border-color:#fff !important}.friend-list__feed.is-on{background:#fff !important;color:#000 !important;border-color:#fff !important}" +
         ".wr-mini-wheel,.cp-wheel,.gtm__wheel{background:#000 !important;border-color:#fff !important}" +
         ".wr-mini-opt,.cp-wheel__opt,.gtm__opt{color:#fff !important}" +
+        /* Ort-Feld in Tage bearbeiten wie das Uhrzeitrad (weißes Feld mit heller Schrift war unlesbar) */
+        ".wr-dt-box{background:#000 !important;border-color:#fff !important;color:#fff !important}.wr-dt-box.is-empty{color:rgba(255,255,255,.55) !important}" +
+        /* alte Dialoge (Workout fertig, Neustart, …): dunkle Karte, also helle Schrift */
+        ".modal-card,.modal-card h2,.modal-card p{color:#fff !important}" +
+        ".modal-card .quiet{color:#fff !important;border-color:rgba(255,255,255,.6) !important;background:transparent !important}" +
+        ".modal-card .primary{background:#fff !important;color:#000 !important}" +
         "#plan-settings>button,#plan-settings>a,.plan-backbar h2{color:#fff !important}" +
         ".profile-back,.profile-pencil{color:#fff !important;border-color:#fff !important}" +
         ".gpl__row,.gpl__vday,.gpl__day,.gpp__row,.gpp__fav{background:#000 !important;color:#fff !important;border-color:rgba(255,255,255,.5) !important}" +
