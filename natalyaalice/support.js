@@ -17,7 +17,8 @@
     routine: "/assets/gogogo/gogogo-12wochen-routine.jpg",
     zirkel: "/assets/gogogo/gogogo-Zirkeltraining.jpg",
     kraft_tracking: "/assets/gogogo/Jelena-Pullups-1600.webp",
-    uebungen: "/assets/gogogo/gogogo-upperbody-Video-Poster-1600.webp"
+    uebungen: "/assets/gogogo/gogogo-upperbody-Video-Poster-1600.webp",
+    orte: "https://agpysewcsakdpmpftndp.supabase.co/storage/v1/object/public/go-covers/places/69f5f314-c03e-4e90-aa18-64b65303bcb9.jpg"
   };
 
   function esc(s) {
@@ -353,6 +354,7 @@
     ernaehrung: "Ernährung",
     kraft_tracking: "Kraft-Tracking",
     uebungen: "Videos",
+    orte: "Orte",
     web_call: "Initialgespräch",
     coach_offer: "Ich als Coach",
     stempelkarte: "Stempelkarte",
@@ -408,6 +410,14 @@
       price: "gratis",
       description:
         "Kopier Links aus Instagram oder YouTube und verbinde sie mit den Übungen aus Deinem Wochenplan. So hast Du jederzeit Beispiele von Deinen Lieblingssportlern in der Tasche und musst keine Tracking App oder gespeicherte Links von YouTube nebenher aufhaben."
+    },
+    {
+      key: "orte",
+      type: "orte",
+      title: "Orte",
+      price: "gratis",
+      description:
+        "Alle Trainingsorte der Community mit Foto. Deine Orte und die aus Deinem Wochenplan stehen vorn, neue legst Du über die Karte an."
     },
     {
       key: "kraft_tracking",

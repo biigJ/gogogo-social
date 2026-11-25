@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-plus-orte",
+      at: "2026-11-25T17:40:00Z",
+      text: "Neu unter Plus: Orte. Alle Trainingsorte mit Foto, Deine Orte mit ☆ merken, neue über „Neu“ anlegen, auf der Karte suchen."
+    },
+    {
       key: "news:2026-11-25-card-status",
       at: "2026-11-25T15:50:00Z",
       text: "Aktuell: Unten links auf jeder Karte steht jetzt der Status, also erledigt, verspätet, dabei, bald, heute oder morgen."
