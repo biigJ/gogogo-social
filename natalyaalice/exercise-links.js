@@ -117,16 +117,26 @@
   var PLAN = "Mein Wochenplan";
   var savedFirst = "";
   var planNames = null;
+  var autoAlle = false;
+  var mountedEl = null;
+  /* Leere Liste nicht merken: beim Start sind die Events aus Aktuell oft noch nicht geladen */
   function loadPlan() {
-    if (planNames) return Promise.resolve(planNames);
+    if (planNames && planNames.length) return Promise.resolve(planNames);
     if (!host.planNames) { planNames = []; return Promise.resolve(planNames); }
     return Promise.resolve(host.planNames()).catch(function () { return []; }).then(function (list) {
       var seen = {};
       planNames = (list || []).filter(function (n) { var k = GoExMedia.key(n); if (!n || seen[k]) return false; seen[k] = 1; return true; });
-      /* ohne Wochenplan-Übungen: alle zeigen */
-      if (!planNames.length && label === PLAN) label = "Alle";
+      /* ohne Wochenplan-Übungen: alle zeigen; kommen sie später, wieder auf Mein Wochenplan */
+      if (!planNames.length && label === PLAN) { label = "Alle"; autoAlle = true; }
+      else if (planNames.length && autoAlle) { label = PLAN; autoAlle = false; }
       return planNames;
     });
+  }
+  /* Aktuell hat die Events geladen (oder sie haben sich geändert): Wochenplan-Übungen neu holen */
+  function refreshPlan() {
+    if (!host || !mountedEl) return Promise.resolve();
+    planNames = null;
+    return loadPlan().then(function () { if (mountedEl && names) paint(mountedEl); }).catch(function () {});
   }
 
   /* Kachel: Vorschaubild (YouTube) oder Übungsfoto, Name unten; ohne Video kurz und hell */
@@ -181,7 +191,7 @@
     var exact = q && (names || []).some(function (n) { return n.toLowerCase() === q.toLowerCase(); });
     box.innerHTML = (list.length
       ? '<div class="gxl__grid">' + list.map(function (n) { return pinHtml(n, picking); }).join("") + "</div>"
-      : '<p class="gxl__empty">Keine Übung gefunden.</p>') +
+      : '<p class="gxl__empty">' + (label === PLAN && !q && !(planNames && planNames.length) ? "Dein Wochenplan hat diese Woche keine Übungen." : "Keine Übung gefunden.") + "</p>") +
       (q.length >= 2 && !exact
         ? '<div class="gxl__submit"><p>„' + esc(q) + '“ fehlt? ' + (picking ? "Sende das Video mit diesem Namen ein." : "Link oben einfügen, dann einreichen.") + "</p>" +
           '<button type="button" data-gxl-submit' + (picking ? "" : " disabled") + ">Mit Video einreichen</button></div>"
@@ -252,6 +262,15 @@
       });
       el.querySelector("[data-gxl-new]").addEventListener("input", function () { paint(el); });
       el.addEventListener("click", function (e) { onClick(el, e); });
+    }
+    mountedEl = el;
+    /* Videos sichtbar und Mein Wochenplan noch leer: neu holen (Events aus Aktuell sind dann meist da) */
+    if (!el._gxlIo && global.IntersectionObserver) {
+      el._gxlIo = new IntersectionObserver(function (ents) {
+        if (!ents.some(function (x) { return x.isIntersecting; })) return;
+        if (!(planNames && planNames.length) || autoAlle) refreshPlan();
+      }, { threshold: 0 });
+      el._gxlIo.observe(el);
     }
     Promise.all([GoExMedia.ready(), loadNames(), loadMyStars(), loadPlan()]).then(function () { paint(el); })
       .catch(function () { el.querySelector("[data-gxl-list]").innerHTML = '<p class="gxl__empty">Übungen konnten nicht geladen werden.</p>'; });
@@ -326,6 +345,8 @@
     if (chip) {
       var l = chip.getAttribute("data-gxl-label");
       label = l;
+      autoAlle = false;
+      if (l === PLAN && !(planNames && planNames.length)) { loadPlan().then(function () { label = PLAN; paint(el); }); return; }
       paint(el);
       return;
     }
@@ -338,6 +359,7 @@
 
   global.GoExLinks = {
     init: function (h) { host = h; },
-    mount: mount
+    mount: mount,
+    refreshPlan: refreshPlan
   };
 })(window);
