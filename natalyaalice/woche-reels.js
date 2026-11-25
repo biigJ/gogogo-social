@@ -3391,7 +3391,7 @@
       el.addEventListener("click", function (e) {
         /* Klick auf dieser Seite: ihren Zustand aktiv setzen */
         if (el._ga) { state.ga = el._ga; state.gaTarget = el; }
-        groupAssignClick(e);
+        groupAssignClick(e, el._ga, el);
       });
     }
     loadGroupAssign(st).then(function () { paintGroupAssign(st, el); }, function () { el.innerHTML = '<p class="wr-sheet-hint">Laden ging gerade nicht.</p>'; });
@@ -3534,10 +3534,10 @@
     var g = (host && host.myGroups ? host.myGroups() || [] : []).filter(function (x) { return x && String(x.id) === String(gid); })[0];
     return g ? g.name || "einer anderen Gruppe" : "einer anderen Gruppe";
   }
-  function confirmGroupAssign(kind, id, btn) {
-    var st = state.ga;
+  function confirmGroupAssign(kind, id, btn, stArg, tgtArg) {
+    var st = stArg || state.ga;
     var ev = st && st.mine.filter(function (e) { return String(e.id) === id; })[0];
-    if (!ev || !global.GoDialog) return groupAssignDo(kind, id, btn);
+    if (!ev || !global.GoDialog) return groupAssignDo(kind, id, btn, st, tgtArg);
     var wd = formatWeekday(dayKey(ev.starts_at));
     var tm = displayTime(ev.starts_at) ? " um " + formatTime(ev.starts_at) : "";
     var head = (ev.title || "Training");
@@ -3548,12 +3548,12 @@
       var body = "Jeden " + wd + tm + (kind === "add" ? " mit " + (st.group.name || "Deiner Gruppe") + " teilen." + other : " nicht mehr mit " + (st.group.name || "Deiner Gruppe") + " teilen.") +
         ((names || []).length ? "\n\n" + names.slice(0, 10).map(function (n) { return "· " + n; }).join("\n") + (names.length > 10 ? "\n· + " + (names.length - 10) + " weitere" : "") : "");
       return GoDialog.confirm(head, { body: body, ok: kind === "add" ? "Zuordnen" : "Herausnehmen", cancel: "Abbrechen", row: true });
-    }).then(function (yes) { if (yes) groupAssignDo(kind, id, btn); });
+    }).then(function (yes) { if (yes) groupAssignDo(kind, id, btn, st, tgtArg); });
   }
 
-  function groupAssignDo(kind, id, btn) {
-    var st = state.ga;
-    var tgt = state.gaTarget;
+  function groupAssignDo(kind, id, btn, stArg, tgtArg) {
+    var st = stArg || state.ga;
+    var tgt = stArg ? tgtArg : state.gaTarget;
     if (!st) return;
     if (btn) btn.disabled = true;
     var gid = String(st.group.id);
@@ -3585,8 +3585,8 @@
       /* Serie des Mitglieds: gleicher Titel, Wochentag und Uhrzeit ab diesem Termin */
       job = rest("events?user_id=eq." + encodeURIComponent(oe.user_id) + "&group_id=eq." + encodeURIComponent(gid) +
         "&title=eq." + encodeURIComponent(oe.title || "") + "&status=eq.geplant&starts_at=gte." + encodeURIComponent(oe.starts_at) +
-        "&select=id,starts_at&order=starts_at.asc&limit=40").catch(function () { return []; }).then(function (rows) {
-        var ids = (rows || []).filter(function (r) { return sameSlot(r.starts_at, oe.starts_at); }).map(function (r) { return String(r.id); }).slice(0, 12);
+        "&select=id,starts_at&order=starts_at.asc&limit=400").catch(function () { return []; }).then(function (rows) {
+        var ids = (rows || []).filter(function (r) { return sameSlot(r.starts_at, oe.starts_at); }).map(function (r) { return String(r.id); });
         if (ids.indexOf(id) < 0) ids.unshift(id);
         if (kind === "yes") {
           return rest("event_rsvps?on_conflict=event_id,user_id", {
@@ -3611,20 +3611,22 @@
   }
 
   /* Event eines Mitglieds: + = Teilnahme bestätigen (ganze Serie), − = absagen */
-  function confirmGroupRsvp(kind, id, btn) {
-    var st = state.ga;
+  function confirmGroupRsvp(kind, id, btn, stArg, tgtArg) {
+    var st = stArg || state.ga;
     var ev = st && st.others.filter(function (e) { return String(e.id) === id; })[0];
-    if (!ev || !global.GoDialog) return groupAssignDo(kind, id, btn);
+    if (!ev || !global.GoDialog) return groupAssignDo(kind, id, btn, st, tgtArg);
     var who = String(personOf(ev.user_id).name || "").split(" ")[0];
     var tm = displayTime(ev.starts_at) ? " um " + formatTime(ev.starts_at) : "";
     var body = kind === "yes"
       ? "Jeden " + formatWeekday(dayKey(ev.starts_at)) + tm + " mit " + (who || "der Gruppe") + ". Du stehst dann bei " + (who || "ihm") + " im Event, in Aktuell als Gruppen-Event und im Kalender neben Deinem Wochenplan."
       : "Du bist dann nicht mehr dabei. Dein Wochenplan bleibt.";
     GoDialog.confirm(ev.title || "Training", { body: body, ok: kind === "yes" ? "Teilnehmen" : "Absagen", cancel: "Abbrechen", row: true })
-      .then(function (yes) { if (yes) groupAssignDo(kind, id, btn); });
+      .then(function (yes) { if (yes) groupAssignDo(kind, id, btn, st, tgtArg); });
   }
 
-  function groupAssignClick(e) {
+  /* st/tgt: Zustand der Seite, auf der getippt wurde. Wird bis zum Speichern durchgereicht,
+     denn während der Rückfrage zeichnet die App die erste Gruppe neu und setzte state.ga um. */
+  function groupAssignClick(e, stArg, tgtArg) {
     if (e.target.closest && e.target.closest("[data-ga-info]")) {
       e.stopPropagation();
       var msg = "Hier stehen Deine Events aus dem Wochenplan. Mit + teilst Du eins mit der Gruppe, mit − nimmst Du sie heraus. Events anderer Mitglieder siehst Du, sobald sie sie geteilt haben. Mit + nimmst Du teil: Das Event steht dann jede Woche an dem Tag in Deinem Kalender, neben Deinem Wochenplan.";
@@ -3635,8 +3637,9 @@
     if (!ga) return false;
     e.stopPropagation();
     var kindGa = ga.hasAttribute("data-ga-add") ? "add" : ga.hasAttribute("data-ga-rm") ? "rm" : ga.hasAttribute("data-ga-yes") ? "yes" : "no";
-    if (kindGa === "add" || kindGa === "rm") confirmGroupAssign(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
-    else confirmGroupRsvp(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
+    var stC = stArg || state.ga, tgtC = stArg ? tgtArg : state.gaTarget;
+    if (kindGa === "add" || kindGa === "rm") confirmGroupAssign(kindGa, ga.getAttribute("data-ga-" + kindGa), ga, stC, tgtC);
+    else confirmGroupRsvp(kindGa, ga.getAttribute("data-ga-" + kindGa), ga, stC, tgtC);
     return true;
   }
 
@@ -5458,17 +5461,18 @@
   }
 
   /* Serie eines eigenen Events: gleicher Titel, Wochentag und Uhrzeit ab diesem Termin, höchstens 12 Wochen */
-  function ownSeries(ev) {
+  function ownSeries(ev, max) {
     if (!ev || !ev.starts_at || !/^[0-9a-f-]{36}$/i.test(String(ev.id || ""))) return Promise.resolve(ev ? [ev] : []);
     return rest(
       "events?user_id=eq." + encodeURIComponent(me()) + "&title=eq." + encodeURIComponent(ev.title || "") +
-        "&starts_at=gte." + encodeURIComponent(ev.starts_at) + "&status=eq.geplant&select=id,starts_at,title&order=starts_at.asc&limit=40"
+        "&starts_at=gte." + encodeURIComponent(ev.starts_at) + "&status=eq.geplant&select=id,starts_at,title&order=starts_at.asc&limit=400"
     ).then(function (rows) {
       var wd = new Date(ev.starts_at).getDay();
       var hhmm = formatTime(ev.starts_at);
       var list = (rows || []).filter(function (r) {
         return new Date(r.starts_at).getDay() === wd && formatTime(r.starts_at) === hhmm;
-      }).slice(0, 12);
+      });  /* Gruppe: ganze Serie (Serien laufen ohne Ende, go-series-endless.sql); Circle teilt höchstens max Termine in der Zirkel-App */
+      if (max) list = list.slice(0, max);
       if (!list.some(function (r) { return String(r.id) === String(ev.id); })) list.unshift(ev);
       return list;
     }).catch(function () { return [ev]; });
@@ -5494,7 +5498,7 @@
           var g = groups.filter(function (x) { return String(x.group_id) === gid; })[0] || { name: "Circle" };
           var existing = (FFC.events ? FFC.events() || [] : []).filter(function (e) { return e.is_mine; })
             .map(function (e) { return new Date(e.starts_at).getTime(); });
-          return Promise.all([ownSeries(ev), Promise.resolve(FFC.weeklyPoints ? FFC.weeklyPoints(Number(gid)) : [])]).then(function (r) {
+          return Promise.all([ownSeries(ev, 12), Promise.resolve(FFC.weeklyPoints ? FFC.weeklyPoints(Number(gid)) : [])]).then(function (r) {
             var ids = (r[1] || []).filter(function (x) { return !x.is_me; }).map(function (x) { return x.user_id; });
             var dates = (r[0] || []).filter(function (x) {
               var t = new Date(x.starts_at).getTime();
