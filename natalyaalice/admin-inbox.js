@@ -591,14 +591,19 @@
     function linkFor(kind, ref) { return links.filter(function (l) { return l.kind === kind && String(l.ref) === String(ref); })[0]; }
     function one(kind, label, g) {
       var l = linkFor(kind, g.id);
-      out.push(label + " " + (g.name || "") + ": " + (!l ? "inaktiv" : l.status === "pending" ? "angefragt" : stampTxt(l.stamps)));
+      out.push("Stempelkarte " + label + " " + (g.name || "") + ": " + (!l ? "inaktiv" : l.status === "pending" ? "angefragt" : stampTxt(l.stamps)));
     }
     (x.groups || []).forEach(function (g) { one("group", "Gruppe", g); });
     (x.circles || []).forEach(function (g) { one("circle", "Circle", g); });
     /* verknüpfte Karten von Circles/Gruppen, in denen die Person nicht (mehr) ist */
     links.forEach(function (l) {
       var known = (l.kind === "group" ? x.groups : x.circles || []).some(function (g) { return String(g.id) === String(l.ref); });
-      if (!known) out.push((l.kind === "group" ? "Gruppe " : "Circle ") + (l.name || "") + ": " + (l.status === "pending" ? "angefragt" : stampTxt(l.stamps)));
+      if (l.kind === "coach") {
+        /* Coach-Karte (go_stamp_links kind coach, Name „Coach Stefan“): nicht als Circle beschriften */
+        out.push("Stempelkarte bei " + (l.name || "Coach") + ": " + (l.status === "pending" ? "angefragt" : stampTxt(l.stamps)));
+        return;
+      }
+      if (!known) out.push("Stempelkarte " + (l.kind === "group" ? "Gruppe " : "Circle ") + (l.name || "") + ": " + (l.status === "pending" ? "angefragt" : stampTxt(l.stamps)));
     });
     return out;
   }

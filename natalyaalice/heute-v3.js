@@ -2213,7 +2213,7 @@
     );
   }
 
-  /* Status unten links (symmetrisch zu den drei Punkten): erledigt, dabei (gestartet, nicht abgeschlossen), verspätet, bald, heute, morgen */
+  /* Status unten links (symmetrisch zu den drei Punkten): erledigt, dabei (gestartet, nicht abgeschlossen), verspätet, gleich (unter 30 min), bald (unter 1 h), heute, morgen */
   function statusOf(o) {
     if (!o) return "";
     if (o.done) return "erledigt";
@@ -2225,7 +2225,7 @@
     if (day < today) return "";
     var timed = hasTime({ starts_at: o.ts });
     if (day === today && timed && t <= Date.now()) return "verspätet";
-    if (day === today) return timed && t - Date.now() <= 60 * 60000 ? "bald" : "heute";
+    if (day === today) return !timed ? "heute" : t - Date.now() <= 30 * 60000 ? "gleich" : t - Date.now() <= 60 * 60000 ? "bald" : "heute";
     var tm = new Date(today + "T12:00:00Z"); tm.setUTCDate(tm.getUTCDate() + 1);
     if (day === tm.toISOString().slice(0, 10)) return "morgen";
     return "";
