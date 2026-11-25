@@ -2698,7 +2698,7 @@
     var names = z.friends.map(function (id) { return String(personOf(id).name || "").split(" ")[0]; }).filter(Boolean);
     openSheet(
       '<p class="wr-sheet-title">Jeden ' + WD_NAME[z.wd] + "</p>" +
-      '<p class="wr-sheet-hint">Zirkeltraining für die nächsten ' + ZREC_WEEKS + " Wochen.</p>" +
+      '<p class="wr-sheet-hint">Zirkeltraining jede Woche, ohne Ende.</p>' +
       '<div class="wr-zrec-acts">' +
       '<button type="button" class="wr-pill-btn" data-wr-zrec="circle">' + (z.circle ? "Circle: " + esc(z.circle.name) : "Circle hinzufügen") + "</button>" +
       '<button type="button" class="wr-pill-btn" data-wr-zrec="friends">' + (names.length ? "Freunde: " + esc(names.join(", ")) : "Freunde hinzufügen") + "</button>" +

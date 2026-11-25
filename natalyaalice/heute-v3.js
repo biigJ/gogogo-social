@@ -6436,8 +6436,9 @@
       if (gone(ev)) return;
       var uid = String(ev.user_id);
       var p = personOf(uid);
-      var a = out[uid] || (out[uid] = { id: uid, name: p.name, photo: p.photo, training: true, done: false, photoEventId: "" });
-      if (ev.status === "erledigt") a.done = true;
+      var a = out[uid] || (out[uid] = { id: uid, name: p.name, photo: p.photo, training: true, done: false, photoEventId: "", status: "" });
+      /* Status wie die Pille auf der Karte in Aktuell; bei mehreren Events zählt das dringendste */
+      a.status = pickStatus(a.status, statusOf({ done: ev.status === "erledigt", ts: ev.starts_at, started: isStarted(ev) }));
       if (ev.photo_url && !a.photoEventId) a.photoEventId = String(ev.id);
     });
     /* Wer bei einem heutigen Event zugesagt hat (Gruppe, Winken/Herz, Circle): pulsiert auch.
@@ -6449,10 +6450,20 @@
         uid = String(uid || "");
         if (!uid || out[uid]) return;
         var p = personOf(uid);
-        out[uid] = { id: uid, name: p.name, photo: p.photo, training: true, done: false, photoEventId: "", group: !!ev.group_id };
+        var pr = host.presenceOf ? host.presenceOf(uid) : null;
+        out[uid] = { id: uid, name: p.name, photo: p.photo, training: true, done: false, photoEventId: "", group: !!ev.group_id,
+          status: statusOf({ done: ev.status === "erledigt", ts: ev.starts_at, started: !!(pr && pr.status === "active") }) };
       });
     });
+    Object.keys(out).forEach(function (uid) { out[uid].done = out[uid].status === "erledigt"; });
     return out;
+  }
+  /* dringendster Status zuerst: dabei, verspätet, gleich, bald, heute, erledigt */
+  var STATUS_RANK = { "dabei": 1, "verspätet": 2, "gleich": 3, "bald": 4, "heute": 5, "erledigt": 6 };
+  function pickStatus(a, b) {
+    if (!a) return b || "";
+    if (!b) return a;
+    return (STATUS_RANK[b] || 9) < (STATUS_RANK[a] || 9) ? b : a;
   }
 
   function focusEvent(id) {
