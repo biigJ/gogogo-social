@@ -16,7 +16,7 @@
 
   /* Rollen der Original-Palette → Ersatz je Theme */
   var THEMES = {
-    original: { label: "Original" },
+    original: { label: "Subtle Scheme" },
     gta: {
       label: "GTA",
       fonts: "family=Oswald:wght@500;600;700&family=Rubik:wght@400;500;600",
@@ -164,7 +164,7 @@
       cta: { bg: "#FFD700", ink: "#2A2A2A" },
       extra: ".app-pill nav{background:#FF6F61 !important;color:#2A2A2A}.app-pill .pill-dot{background:#2A2A2A !important}" +
         /* Headlines (Plus, Profil, Woche) und Eventnamen: Inter Tight Black */
-        "html[data-go-theme=postmodern] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=postmodern] body .profile-name:not(#_):not(#__),html[data-go-theme=postmodern] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=postmodern] body .team-slide__head:not(#_):not(#__),html[data-go-theme=postmodern] body .page-head-title:not(#_):not(#__),html[data-go-theme=postmodern] body .quit-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-day-label:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-sheet-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-dayrow__title:not(#_):not(#__),html[data-go-theme=postmodern] body .acc-card__title:not(#_):not(#__),html[data-go-theme=postmodern] body .go-card__title:not(#_):not(#__),html[data-go-theme=postmodern] body #heute-filter-select:not(#_)" +
+        "html[data-go-theme=postmodern] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=postmodern] body .profile-name:not(#_):not(#__),html[data-go-theme=postmodern] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=postmodern] body .team-slide__head:not(#_):not(#__),html[data-go-theme=postmodern] body .page-head-title:not(#_):not(#__),html[data-go-theme=postmodern] body .quit-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-day-label:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-sheet-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-dayrow__title:not(#_):not(#__),html[data-go-theme=postmodern] body .acc-card__title:not(#_):not(#__),html[data-go-theme=postmodern] body .go-card__title:not(#_):not(#__),html[data-go-theme=postmodern] body .gstory__txt h3:not(#_):not(#__),html[data-go-theme=postmodern] body .gbub-story__txt h3:not(#_):not(#__),html[data-go-theme=postmodern] body #heute-filter-select:not(#_)" +
         "{font-family:'Inter Tight',system-ui,sans-serif !important;font-weight:900 !important;letter-spacing:-.015em}"
     }
   };
