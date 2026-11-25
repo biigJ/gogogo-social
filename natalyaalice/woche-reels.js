@@ -1486,7 +1486,6 @@
       '<p class="wr-empty-title">Kein festes Training</p>' +
       '<div class="wr-empty-btns">' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-pick-plan="1">Wochenplan ändern</button>' +
-      '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zrec="1">Zirkeltraining jede Woche</button>' +
       "</div></div></div></div>"
     );
   }
