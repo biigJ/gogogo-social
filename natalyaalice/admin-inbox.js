@@ -1033,34 +1033,142 @@
   }
   /* Wochenplan setzen oder entfernen (z. B. wenn der Coach jemanden aus seinen Coachees genommen hat) */
   var WD = [[1, "Mo"], [2, "Di"], [3, "Mi"], [4, "Do"], [5, "Fr"], [6, "Sa"], [0, "So"]];
-  function userPlan(id) {
-    var x = extrasOf(id) || {};
-    var cur = x.plan || null;
+  var WK_DAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  var WK_VIS = { privat: "privat", team: "Team", gruppe: "Gruppe", circle: "Circle", coach: "Coach", bubble: "Bubble" };
+  function wkCss() {
+    if (document.getElementById("ga-wk-css")) return;
+    var c = document.createElement("style");
+    c.id = "ga-wk-css";
+    c.textContent =
+      ".ga-wk{position:fixed;inset:0;z-index:10040;display:flex;flex-direction:column;overflow-y:auto;box-sizing:border-box;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px calc(env(safe-area-inset-bottom,0px) + 20px);font-family:Inter,system-ui,sans-serif}" +
+      ".ga-wk__bar{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;gap:8px;margin:0 0 4px}" +
+      ".ga-wk__bar h2{margin:0;text-align:center;font-size:20px;line-height:1.2;overflow-wrap:anywhere}" +
+      ".ga-wk__sub{margin:0 0 14px;text-align:center;font-size:14px;opacity:.65}" +
+      ".ga-wk .wr-days{max-height:none;overflow:visible}" +
+      ".ga-wk .wr-mini-wheel{display:grid;place-items:center;height:36px;padding:0;overflow:hidden;font-variant-numeric:tabular-nums}" +
+      ".ga-wk__btn{width:40px;height:40px;display:grid;place-items:center;border:1.5px solid currentColor;border-radius:50%;background:transparent;color:inherit;cursor:pointer;padding:0}" +
+      ".ga-wk__q{display:block;width:100%;box-sizing:border-box;min-height:46px;margin:0 0 12px;padding:0 16px;border-radius:999px;border:1.5px solid rgba(42,33,24,.3);background:transparent;font:inherit;font-size:16px;color:inherit}" +
+      ".ga-wk__list{display:flex;flex-direction:column}" +
+      ".ga-wk__opt{display:block;width:100%;padding:14px 4px;border:0;border-bottom:1px solid rgba(42,33,24,.12);background:none;color:inherit;font:inherit;font-size:16px;text-align:left;cursor:pointer}" +
+      ".ga-wk__opt.is-cur{font-weight:700}.ga-wk__opt.is-del{color:#C7413B}" +
+      ".ga-wk__empty{margin:18px 0;text-align:center;opacity:.6}";
+    document.head.appendChild(c);
+  }
+  function wkBg() {
+    var r = (st && st.root) || document.querySelector(".ga-root");
+    var bg = r ? getComputedStyle(r).backgroundColor : "";
+    if (!bg || bg === "rgba(0, 0, 0, 0)" || bg === "transparent") bg = getComputedStyle(document.body).backgroundColor || "#F3EEE4";
+    return bg;
+  }
+  /* Admin → Nutzer → Wochenplan: die nächsten 7 Tage wie „Tage bearbeiten“ beim Nutzer (nur Anzeige),
+     oben der Name des Plans, Stift → Plan aus der Liste wählen (Suche) → Tage → speichern (go-admin-user-week.sql) */
+  function userWeek(id) {
+    wkCss();
     var a = (st.accounts || []).filter(function (q) { return String(q.account_id) === String(id); })[0] || {};
     var first = String(a.name || "Nutzer").split(" ")[0];
-    /* nur Wochenpläne (mehrere Tage), keine Einzel-Events */
-    host.rest("courses?is_active=eq.true&sessions_per_week=gt.1&deleted_at=is.null&or=(private_for.is.null,private_for.eq." + encodeURIComponent(id) + ")&select=id,title&order=title.asc&limit=200")
-      .catch(function () { return host.rest("courses?is_active=eq.true&sessions_per_week=gt.1&select=id,title&order=title.asc&limit=200"); })
-      .then(function (rows) {
-        var items = (rows || []).filter(function (c) { return c && c.id && !/^zirkeltraining$/i.test(String(c.title || "")); })
-          .map(function (c) { return { label: String(c.title || "Plan") + (cur && String(cur.course_id) === String(c.id) ? " ✓" : ""), value: String(c.id) }; });
-        if (cur) items.unshift({ label: "Wochenplan entfernen", value: "none" });
-        return GoDialog.choose("Wochenplan für " + first, items, { center: true, sub: cur ? "Aktuell: " + cur.title : "Noch kein Wochenplan", cancel: "Abbrechen" });
-      })
-      .then(function (v) {
-        if (!v) return;
-        if (v === "none") {
-          return GoDialog.confirm("Wochenplan „" + cur.title + "“ bei " + first + " entfernen? Künftige Plan-Termine fallen weg.", { ok: "Entfernen", cancel: "Abbrechen", row: true })
-            .then(function (ok) { if (ok) return savePlan(id, null, null); });
+    var box = document.createElement("div");
+    box.className = "ga-wk";
+    box.style.background = wkBg();
+    document.body.appendChild(box);
+    var BACK = '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var rows = null, title = null;
+    function cur() { var x = extrasOf(id) || {}; return x.plan || null; }
+    function paintWeek() {
+      var c = cur();
+      var t = title !== null ? title : (c && c.title) || "";
+      var html = '<div class="ga-wk__bar"><button type="button" class="ga-wk__btn" data-wk-close aria-label="Zurück">' + BACK + "</button>" +
+        "<h2>" + esc(t || "Kein Wochenplan") + '</h2><button type="button" class="ga-wk__btn" data-wk-pen aria-label="Wochenplan ändern">' + PEN + "</button></div>" +
+        '<p class="ga-wk__sub">' + esc(first) + " · Tage</p>";
+      if (rows === null) { box.innerHTML = html + '<p class="ga-wk__empty">Lädt …</p>'; return; }
+      var today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+      var days = [];
+      for (var i = 0; i < 7; i++) { var d0 = new Date(today + "T12:00:00"); d0.setDate(d0.getDate() + i); days.push(d0.toLocaleDateString("en-CA")); }
+      var dayOf = function (ts) { return new Date(ts).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }); };
+      var timed = function (ts) { var d = new Date(ts); return !(d.getUTCHours() === 12 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0); };
+      html += '<div class="wr-days wr-days--all">' + days.map(function (iso) {
+        var dd = new Date(iso + "T12:00:00");
+        var label = WK_DAYS[dd.getDay()] + " " + dd.getDate() + ".";
+        /* wie beim Nutzer: Einheit aus dem Wochenplan, keine Alternativen, Reise oder Coaching-Termine */
+        var list = rows.filter(function (e) {
+          return dayOf(e.starts_at) === iso && e.item_type !== "support_session" && e.item_type !== "alternative" && e.item_type !== "hotel_workout";
+        }).sort(function (x, y) { return (x.enrollment_id || x.course_id ? 0 : 1) - (y.enrollment_id || y.course_id ? 0 : 1); });
+        var ev = list.filter(function (e) { return e.status !== "erledigt"; })[0];
+        var done = !ev && list.filter(function (e) { return e.status === "erledigt"; })[0];
+        if (!ev) {
+          return '<div class="wr-dayrow is-empty' + (done ? " is-done" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " +
+            (done ? "✓ " + esc(done.title || "Training") : '<span class="wr-dayrow__free">frei</span>') + "</span></div><span></span></div>";
         }
-        var days = (cur && cur.weekdays) || [];
-        return GoDialog.pick("An welchen Tagen?", WD.map(function (d) { return { label: d[1], value: String(d[0]), checked: days.indexOf(d[0]) >= 0 }; }), { ok: "Speichern", cancel: "Abbrechen" })
-          .then(function (picked) {
-            if (!picked) return;
-            if (!picked.length) { GoDialog.alert("Wähle mindestens einen Tag."); return; }
-            return savePlan(id, v, picked.map(Number));
-          });
-      });
+        var tm = timed(ev.starts_at) ? new Date(ev.starts_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }) : "–:–";
+        return '<div class="wr-dayrow"><div class="wr-dayrow__mid"><span class="wr-dayrow__title wr-dayrow__title--place"><b>' + label + "</b>" +
+          '<span class="wr-dt-name">' + esc(ev.title || "Training") + "</span>" +
+          (ev.location ? '<span class="wr-dt-place">' + esc(ev.location) + "</span>" : "") + "</span>" +
+          '<div class="wr-dayrow__ctl"><span class="wr-mini-wheel wr-cev-time">' + esc(tm) + "</span>" +
+          '<span class="wr-dayrow__vis">' + esc(WK_VIS[ev.visibility] || ev.visibility || "Team") + "</span></div></div><span></span></div>";
+      }).join("") + "</div>";
+      box.innerHTML = html;
+    }
+    function load() {
+      rows = null;
+      paintWeek();
+      return host.rest("rpc/go_admin_user_week", { method: "POST", body: { p_account: id } })
+        .then(function (r) { rows = r || []; paintWeek(); })
+        .catch(function () { rows = []; paintWeek(); box.insertAdjacentHTML("beforeend", '<p class="ga-wk__empty">Das braucht go-admin-user-week.sql in Supabase.</p>'); });
+    }
+    /* Plan wählen: ganze Liste, oben Suche (filtert beim Tippen) */
+    function paintPick(courses) {
+      var c = cur();
+      box.innerHTML = '<div class="ga-wk__bar"><button type="button" class="ga-wk__btn" data-wk-back aria-label="Zurück">' + BACK + "</button>" +
+        "<h2>Wochenplan für " + esc(first) + "</h2><span></span></div>" +
+        '<input type="search" class="ga-wk__q" placeholder="Name des Wochenplans" autocomplete="off" enterkeyhint="search" aria-label="Wochenplan suchen" />' +
+        '<div class="ga-wk__list"></div>';
+      var q = box.querySelector(".ga-wk__q"), lst = box.querySelector(".ga-wk__list");
+      function fill() {
+        var term = String(q.value || "").trim().toLowerCase();
+        var hit = courses.filter(function (x) { return !term || String(x.title || "").toLowerCase().indexOf(term) >= 0; });
+        lst.innerHTML = hit.map(function (x) {
+          var on = c && String(c.course_id) === String(x.id);
+          return '<button type="button" class="ga-wk__opt' + (on ? " is-cur" : "") + '" data-wk-course="' + esc(x.id) + '">' + esc(x.title || "Plan") + (on ? " ✓" : "") + "</button>";
+        }).join("") + (hit.length ? "" : '<p class="ga-wk__empty">Kein Wochenplan mit diesem Namen.</p>') +
+          (c && !term ? '<button type="button" class="ga-wk__opt is-del" data-wk-course="none">Wochenplan entfernen</button>' : "");
+      }
+      q.addEventListener("input", fill);
+      fill();
+      try { q.focus(); } catch (eF) {}
+      box._courses = courses;
+    }
+    function openPick() {
+      box.innerHTML = '<p class="ga-wk__empty">Lädt …</p>';
+      host.rest("courses?is_active=eq.true&sessions_per_week=gt.1&deleted_at=is.null&or=(private_for.is.null,private_for.eq." + encodeURIComponent(id) + ")&select=id,title&order=title.asc&limit=500")
+        .catch(function () { return host.rest("courses?is_active=eq.true&sessions_per_week=gt.1&select=id,title&order=title.asc&limit=500"); })
+        .then(function (r) {
+          paintPick((r || []).filter(function (x) { return x && x.id && !/^zirkeltraining$/i.test(String(x.title || "")); }));
+        })
+        .catch(function () { paintWeek(); });
+    }
+    function choose(v) {
+      var c = cur();
+      if (v === "none") {
+        return GoDialog.confirm("Wochenplan „" + c.title + "“ bei " + first + " entfernen? Künftige Plan-Termine fallen weg.", { ok: "Entfernen", cancel: "Abbrechen", row: true })
+          .then(function (ok) { if (!ok) return; return savePlan(id, null, null).then(function () { title = ""; return load(); }); });
+      }
+      var course = (box._courses || []).filter(function (x) { return String(x.id) === String(v); })[0] || {};
+      var days = (c && c.weekdays) || [];
+      return GoDialog.pick("An welchen Tagen?", WD.map(function (d) { return { label: d[1], value: String(d[0]), checked: days.indexOf(d[0]) >= 0 }; }), { ok: "Speichern", cancel: "Abbrechen" })
+        .then(function (picked) {
+          if (!picked) return;
+          if (!picked.length) { GoDialog.alert("Wähle mindestens einen Tag."); return; }
+          return savePlan(id, v, picked.map(Number)).then(function () { title = course.title || ""; return load(); });
+        });
+    }
+    box.addEventListener("click", function (e) {
+      var t = e.target.closest && e.target.closest("[data-wk-close],[data-wk-back],[data-wk-pen],[data-wk-course]");
+      if (!t) return;
+      if (t.hasAttribute("data-wk-close")) { box.remove(); return; }
+      if (t.hasAttribute("data-wk-back")) { paintWeek(); return; }
+      if (t.hasAttribute("data-wk-pen")) { openPick(); return; }
+      choose(t.getAttribute("data-wk-course"));
+    });
+    load();
   }
   function savePlan(id, course, days) {
     return host.rest("rpc/go_admin_set_plan", { method: "POST", body: { p_account: id, p_course: course, p_weekdays: days } })
@@ -2391,7 +2499,7 @@
     if (t.hasAttribute("data-ga-qr")) { openQr(t.getAttribute("data-ga-qr")); return; }
     if (t.hasAttribute("data-ga-user")) { userMenu(t.getAttribute("data-ga-user")); return; }
     if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
-    if (t.hasAttribute("data-ga-plan")) { userPlan(t.getAttribute("data-ga-plan")); return; }
+    if (t.hasAttribute("data-ga-plan")) { userWeek(t.getAttribute("data-ga-plan")); return; }
     if (t.hasAttribute("data-ga-rec")) { openRec(t.getAttribute("data-ga-rec")); return; }
     if (t.getAttribute("data-ga-uf") === "reset") { st.uf = {}; ufSave(); paint(); return; }
     if (t.hasAttribute("data-ga-us")) { onUserSort(t); return; }
