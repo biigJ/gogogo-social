@@ -63,11 +63,12 @@
     },
     bw: {
       label: "B/W",
-      head: "600 'Bodoni Moda',serif",
-      fonts: "family=Bodoni+Moda:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600",
-      display: "Bodoni Moda",
-      body: "IBM Plex Sans",
-      serif: "Bodoni Moda",
+      /* Schrift wie Neutral Sans (kommerziell): Geist, Text und Listen fein (300), Titel Regular eng gesetzt */
+      head: "400 Geist,sans-serif",
+      fonts: "family=Geist:wght@300;400;500;600",
+      display: "Geist",
+      body: "Geist",
+      serif: "Geist",
       dark: true,
       /* Umgedreht: schwarzer Grund, weiße Schrift */
       hex: {
@@ -121,6 +122,10 @@
         "#gbub-compose button[type=submit]{background:#fff !important;color:#000 !important}" +
         "#gbub-compose .gbub-compose__att{color:#fff !important}" +
         "#gbub-compose .gbub-compose__reply{background:#1A1A1A !important;color:#fff !important;border-left-color:#fff !important}" +
+        /* Neutral-Sans-Look: Text fein, Titel Regular, eng */
+        "p,li,li span,.acc-card__when,.acc-card__place,.acc-msg__txt,.gbub-row__name,.friend-list__name,.gcg__ce b{font-weight:300 !important}" +
+        "html[data-go-theme=bw] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=bw] body .profile-name:not(#_):not(#__),html[data-go-theme=bw] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=bw] body .team-slide__head:not(#_):not(#__),html[data-go-theme=bw] body .page-head-title:not(#_):not(#__),html[data-go-theme=bw] body .quit-title:not(#_):not(#__),html[data-go-theme=bw] body .wr-day-label:not(#_):not(#__),html[data-go-theme=bw] body .wr-title:not(#_):not(#__),html[data-go-theme=bw] body .wr-sheet-title:not(#_):not(#__),html[data-go-theme=bw] body .wr-dayrow__title:not(#_):not(#__),html[data-go-theme=bw] body .acc-card__title:not(#_):not(#__),html[data-go-theme=bw] body .go-card__title:not(#_):not(#__),html[data-go-theme=bw] body .gstory__txt h3:not(#_):not(#__),html[data-go-theme=bw] body .gbub-story__txt h3:not(#_):not(#__),html[data-go-theme=bw] body #heute-filter-select:not(#_),html[data-go-theme=bw] body select[data-wr-week-select]:not(#_)" +
+        "{font-family:Geist,system-ui,sans-serif !important;font-weight:400 !important;letter-spacing:-.025em}" +
         /* Meine Coachees: Stempel weiß umrandet, innen schwarz (gestempelt weiß) */
         ".gcg__stamps i:not(#_){border-color:#fff !important;background:#000 !important}.gcg__stamps i.is-on:not(#_){background:#fff !important}" +
         ".gcg__face span.gcg__img{background-color:#000 !important;color:#fff;box-shadow:inset 0 0 0 1.5px #fff}"
@@ -427,7 +432,7 @@
     if (!pickerFonts) {
       pickerFonts = document.createElement("link");
       pickerFonts.rel = "stylesheet";
-      pickerFonts.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Oswald:wght@600&family=Jost:wght@600&family=Bodoni+Moda:wght@600&family=Inter+Tight:wght@900&family=Monoton&family=Newsreader:wght@500&display=swap";
+      pickerFonts.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Oswald:wght@600&family=Jost:wght@600&family=Geist:wght@400&family=Inter+Tight:wght@900&family=Monoton&family=Newsreader:wght@500&display=swap";
       document.head.appendChild(pickerFonts);
     }
     var opts = ORDER.map(function (id) {
