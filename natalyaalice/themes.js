@@ -41,20 +41,23 @@
       display: "Jost",
       body: "Jost",
       serif: "Jost",
-      /* Weiß, Dessau-Rot für graue Flächen, Rot-Akzente → Blau (Stempelkarte bleibt blau), CTAs Orange-Gelb */
+      /* Palette: Outer Reef #236192 (Akzent, Stempelkarte), Rusted Ember #E1523E (Signal statt Grün),
+         Golden Coin #FBD872 (Buttons), Montezuma Hills #A7B2A3 (graue Flächen), Zeus #373A36 (Schrift).
+         Kontraste: Zeus auf Weiß 11:1, Weiß auf Outer Reef 6,4:1, Zeus auf Golden Coin 8,7:1 */
       hex: {
-        "2E9E5B": "F5A400", C7413B: "1E4FA3", A5332E: "163C7E", F7F5F0: "FFFFFF",
-        F6F1E8: "FFFFFF", F3EEE4: "FFFFFF", EDE6DA: "C8102E", E4DDD0: "C8102E",
-        E8E2D6: "C8102E", D8D0C4: "A50D26", ECECEB: "C8102E",
-        "2A2118": "111111", "1A1510": "000000", "6B6358": "555555"
+        "2E9E5B": "E1523E", C7413B: "236192", A5332E: "1B4A70", F7F5F0: "FFFFFF",
+        F6F1E8: "FFFFFF", F3EEE4: "F4F6F3", EDE6DA: "D3D9D1", E4DDD0: "A7B2A3",
+        E8E2D6: "D3D9D1", D8D0C4: "A7B2A3", ECECEB: "D3D9D1",
+        "2A2118": "373A36", "1A1510": "23251F", "6B6358": "5E665C"
       },
       rgb: {
-        "199,65,59": "30,79,163", "165,51,46": "22,60,126", "247,245,240": "255,255,255",
-        "246,241,232": "255,255,255", "243,238,228": "255,255,255",
-        "42,33,24": "17,17,17", "20,16,12": "0,0,0", "52,34,32": "17,17,17"
+        "199,65,59": "35,97,146", "165,51,46": "27,74,112", "247,245,240": "255,255,255",
+        "246,241,232": "255,255,255", "243,238,228": "244,246,243",
+        "42,33,24": "55,58,54", "20,16,12": "35,37,31", "52,34,32": "55,58,54"
       },
-      cta: { bg: "#F5A400", ink: "#111111" },
-      extra: ".app-pill nav{color:#fff}"
+      cta: { bg: "#FBD872", ink: "#373A36" },
+      /* Leiste unten: Outer Reef mit weißer Schrift */
+      extra: ".app-pill nav{background:#236192 !important;color:#fff}.app-pill .pill-dot{background:#E1523E !important}"
     },
     bw: {
       label: "B/W",
