@@ -138,8 +138,12 @@
     /* Pillen rechts als eigene Spalte: zweite Zeile (Gruppen) unter der ersten, Text links schrumpft statt zu überlappen */
     ".ga-pillbox{flex:none;align-self:center;display:flex;flex-direction:column;align-items:flex-start;gap:6px}" +
     ".ga-pillbox .ga-pills{align-self:flex-start}" +
+    ".ga-pillgrid{flex:none;align-self:center;display:grid;grid-template-columns:repeat(3,116px);grid-auto-rows:34px;gap:6px}" +
+    ".ga-pillgrid .ga-pill{width:100%;min-width:0;min-height:34px;padding:0 8px;overflow:hidden;text-overflow:ellipsis}" +
     "@media (max-width:600px){.ga-item:has(.ga-pills){flex-wrap:wrap}.ga-item:has(.ga-pills) .ga-copy{flex:1 1 calc(100% - 85px)}.ga-item .ga-pills{margin-left:73px}" +
-    ".ga-item .ga-pillbox{margin-left:73px}.ga-item .ga-pillbox .ga-pills{margin-left:0}}" +
+    ".ga-item .ga-pillbox{margin-left:73px}.ga-item .ga-pillbox .ga-pills{margin-left:0}" +
+    ".ga-item:has(.ga-pillgrid){flex-wrap:wrap}.ga-item:has(.ga-pillgrid) .ga-copy{flex:1 1 calc(100% - 85px)}" +
+    ".ga-item .ga-pillgrid{margin-left:73px;flex:1 1 calc(100% - 73px);grid-template-columns:repeat(3,minmax(0,1fr))}}" +
     ".ga-rec .go-rec-detail__pts{text-align:center;font:600 28px/1.2 'Playfair Display',Georgia,serif;margin-top:4px}" +
     ".ga-rec .go-rec-detail__meta{text-align:center;font-size:13px;margin-bottom:6px}" +
     /* Dreh-Knöpfe: Tippen schaltet zum nächsten Wert */
@@ -664,6 +668,12 @@
       : ci.is_admin ? '<button type="button" class="ga-pill is-admin" data-ga-admin="' + esc(id) + '">Admin</button>' : "";
     return adm ? '<span class="ga-rolestack">' + base + adm + "</span>" : base;
   }
+  /* Rolle und Admin getrennt für das Pillen-Raster der Nutzerliste */
+  function roleParts(a) {
+    var html = rolePill(a);
+    var m = html.match(/^<span class="ga-rolestack">([\s\S]*?<\/button>)([\s\S]*)<\/span>$/);
+    return m ? { base: m[1], adm: m[2] } : { base: html, adm: "" };
+  }
   /* Nutzer-Filter: je Merkmal ein Dropdown (alle, Werte, ohne) */
   var UF = [["role", "Rolle"], ["login", "Login"], ["member", "Stempelkarte"], ["goal", "Ziel"], ["coach", "Coach"], ["place", "Ort"], ["plan", "Wochenplan"], ["circle", "Circle"], ["group", "Gruppe"], ["day", "Workout"]];
   /* feste Werte statt aus den Daten gesammelt; „Aktiv“: gogogo = Stempelkarte aktiv, Circle = aktive Circle-Karte */
@@ -909,9 +919,17 @@
         return '<div class="ga-item is-top' + (ci.paused_at ? " ga-paused" : "") + '"><button type="button" class="ga-rectbtn" data-ga-info="' + esc(id) + '" aria-label="Infos zu ' + esc(a.name || "") + '">' + rect + "</button>" +
           '<div class="ga-copy ga-rows"><div class="ga-r1">' + r1 + "</div>" +
           (r2 ? "<div>" + r2 + "</div>" : "") + "<div>" + r3 + "</div><div>" + r4 + "</div>" + (r5 ? "<div>" + r5 + "</div>" : "") + "</div>" +
-          '<span class="ga-pillbox"><span class="ga-pills">' + (nRec ? '<button type="button" class="ga-pill" data-ga-rec="' + esc(id) + '" aria-label="Circle-Aufzeichnungen">Circle</button>' : "") + rolePill(a) + '<button type="button" class="ga-pill" data-ga-qr="' + esc(id) + '">QR-Code</button>' + "</span>" +
-          /* darunter: wie viele Gruppen die Person gründen darf (go-group-limit.sql), Tipp wechselt 1 ↔ 5 */
-          '<span class="ga-pills"><button type="button" class="ga-pill' + (Number(ci.max_groups) >= 5 ? " is-fill" : "") + '" data-ga-mg="' + esc(id) + '">' + (Number(ci.max_groups) >= 5 ? "5 Gruppen" : "1 Gruppe") + "</button></span></span></div>";
+          (function () {
+            /* festes Raster, gleich für alle Zeilen: oben Circle · Rolle · QR-Code, unten Gruppen · Admin/Inhaber (leere Felder bleiben frei) */
+            var rp = roleParts(a);
+            return '<span class="ga-pillgrid">' +
+              (nRec ? '<button type="button" class="ga-pill" data-ga-rec="' + esc(id) + '" aria-label="Circle-Aufzeichnungen">Circle</button>' : "<span></span>") +
+              rp.base +
+              '<button type="button" class="ga-pill" data-ga-qr="' + esc(id) + '">QR-Code</button>' +
+              /* wie viele Gruppen die Person gründen darf (go-group-limit.sql), Tipp wechselt 1 ↔ 5 */
+              '<button type="button" class="ga-pill' + (Number(ci.max_groups) >= 5 ? " is-fill" : "") + '" data-ga-mg="' + esc(id) + '">' + (Number(ci.max_groups) >= 5 ? "5 Gruppen" : "1 Gruppe") + "</button>" +
+              (rp.adm || "<span></span>") + "<span></span></span>";
+          })() + "</div>";
       }).join("") + paintTrash();
   }
   /* Papierkorb (go-nutzer-papierkorb.sql): gelöschte Konten bleiben gespeichert, nur für Admins sichtbar */
