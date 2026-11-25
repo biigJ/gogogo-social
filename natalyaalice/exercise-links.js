@@ -34,6 +34,10 @@
     ".gxl__chip{flex:none;min-height:32px;padding:0 12px;border-radius:999px;border:1px solid rgba(42,33,24,.3);background:transparent;color:#2A2118;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}" +
     ".gxl__chip.is-on{background:#2A2118;color:#F6F1E8;border-color:#2A2118}" +
     ".gxl__search{display:block;width:100%;box-sizing:border-box;min-height:40px;padding:0 12px;border:1px solid rgba(42,33,24,.25);border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118;margin:0 0 10px}" +
+    ".gxl__qwrap{position:relative}.gxl__qwrap .gxl__search{padding-right:44px}" +
+    ".gxl__search::-webkit-search-cancel-button{-webkit-appearance:none;display:none}" +
+    ".gxl__qclear{position:absolute;right:6px;top:0;height:40px;width:36px;display:grid;place-items:center;padding:0;border:0;background:none;color:#2A2118;opacity:.6;cursor:pointer}" +
+    ".gxl__qclear[hidden]{display:none}" +
     ".gxl__grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}" +
     ".gxl__col{display:flex;flex-direction:column;min-width:0}" +
     ".gxl__pin{position:relative;display:block;width:100%;break-inside:avoid;margin:0 0 8px;border-radius:12px;overflow:hidden;background:#1c1814;cursor:pointer;aspect-ratio:9/16}" +
@@ -186,6 +190,8 @@
   }
   function paint(el) {
     var box = el.querySelector("[data-gxl-list]");
+    var qc = el.querySelector("[data-gxl-qclear]");
+    if (qc) qc.hidden = !String(((el.querySelector("[data-gxl-q]") || {}).value) || "").trim();
     var picking = !!pendingUrl(el);
     var q = String(query || "").trim();
     var planKeys = {};
@@ -277,7 +283,9 @@
         '<div class="gxl__chips">' + [PLAN, "Alle"].concat(LABELS).map(function (l) {
           return '<button type="button" class="gxl__chip" data-gxl-label="' + esc(l) + '">' + esc(l) + "</button>";
         }).join("") + "</div>" +
-        '<input type="search" class="gxl__search" placeholder="Übungsname" data-gxl-q />' +
+        '<div class="gxl__qwrap"><input type="search" class="gxl__search" placeholder="Übungsname" data-gxl-q />' +
+        '<button type="button" class="gxl__qclear" data-gxl-qclear hidden aria-label="Übungsname leeren">' +
+        '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 9l6 6M15 9l-6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button></div>' +
         '<div data-gxl-list></div>';
       el.querySelector("[data-gxl-q]").addEventListener("input", function () {
         query = this.value;
@@ -304,6 +312,14 @@
   }
 
   function onClick(el, e) {
+    /* x im Kreis: Übungsname leeren, alle Übungen des Filters wieder zeigen */
+    if (e.target.closest("[data-gxl-qclear]")) {
+      var qx = el.querySelector("[data-gxl-q]");
+      if (qx) qx.value = "";
+      query = "";
+      paint(el);
+      return;
+    }
     if (e.target.closest("[data-gxl-submit]")) {
       var nm = String(query || "").trim();
       var vid = pendingUrl(el);
