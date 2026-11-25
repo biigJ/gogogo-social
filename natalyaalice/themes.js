@@ -133,7 +133,9 @@
         ".kreis-row .gbub-row__img:not(#_){background:#000 !important;box-shadow:inset 0 0 0 1.5px #fff}.kreis-row .gbub-row__ico.is-plain:not(#_){color:#fff !important;filter:none}" +
         "html[data-go-theme=bw] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=bw] body .profile-name:not(#_):not(#__),html[data-go-theme=bw] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=bw] body .team-slide__head:not(#_):not(#__),html[data-go-theme=bw] body .page-head-title:not(#_):not(#__),html[data-go-theme=bw] body .quit-title:not(#_):not(#__),html[data-go-theme=bw] body .wr-day-label:not(#_):not(#__),html[data-go-theme=bw] body .wr-title:not(#_):not(#__),html[data-go-theme=bw] body .wr-sheet-title:not(#_):not(#__),html[data-go-theme=bw] body .wr-dayrow__title:not(#_):not(#__),html[data-go-theme=bw] body .acc-card__title:not(#_):not(#__),html[data-go-theme=bw] body .go-card__title:not(#_):not(#__),html[data-go-theme=bw] body .gstory__txt h3:not(#_):not(#__),html[data-go-theme=bw] body .gbub-story__txt h3:not(#_):not(#__),html[data-go-theme=bw] body #heute-filter-select:not(#_),html[data-go-theme=bw] body select[data-wr-week-select]:not(#_)" +
         "{font-family:Geist,system-ui,sans-serif !important;font-weight:400 !important;letter-spacing:-.025em}" +
-        /* Meine Coachees: Stempel weiß umrandet, innen schwarz (gestempelt weiß) */
+        /* Auswahllisten in Dialogen (z. B. Stationen): weiße Zeilen hatten weiße Schrift */
+        ".god__pick:not(#_){background:#000 !important;color:#fff !important;border:1px solid rgba(255,255,255,.35)}.god__pick input{accent-color:#fff}" +
+                /* Meine Coachees: Stempel weiß umrandet, innen schwarz (gestempelt weiß) */
         ".gcg__stamps i:not(#_){border-color:#fff !important;background:#000 !important}.gcg__stamps i.is-on:not(#_){background:#fff !important}" +
         ".gcg__face span.gcg__img{background-color:#000 !important;color:#fff;box-shadow:inset 0 0 0 1.5px #fff}"
     },
