@@ -3389,7 +3389,11 @@
       /* übliche Uhrzeiten der Serien laden, falls der Kalender noch nicht offen war (sonst zeigt die Gruppe die Uhrzeit eines einzelnen Termins) */
       state.seriesTime ? null : loadSeriesKeys()
     ]).then(function (r) {
-      st.mine = (r[0] || []).filter(function (e) { return e.item_type !== "support_session" && e.item_type !== "nutrition_log"; });
+      /* nur Einheiten aus dem Wochenplan (und eigene Zirkel-Serien): einzeln angelegte Events gehören nicht in die Gruppe */
+      st.mine = (r[0] || []).filter(function (e) {
+        if (e.item_type === "support_session" || e.item_type === "nutrition_log") return false;
+        return !!e.enrollment_id || e.category === "zirkel";
+      });
       st.others = r[1] || [];
       if (!st.others.length) return;
       return Promise.all([
@@ -3430,14 +3434,16 @@
         html += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
           esc(e.title || "Training") + esc(tm) + "</span>" +
           '<span class="wr-dayrow__tag">' + esc([e.location, "von " + (who || "Gruppe"), on ? "Du bist dabei" : ""].filter(Boolean).join(" · ")) + "</span></div>" +
-          '<button type="button" class="wr-pill-btn' + (on ? "" : " wr-pill-btn--dark") + ' wr-ga-rsvp" data-ga-' + (on ? "no" : "yes") + '="' + esc(e.id) + '">' + (on ? "Absagen" : "Zusagen") + "</button></div>";
+          (on
+            ? '<button type="button" class="wr-dayrow__minus" data-ga-no="' + esc(e.id) + '" aria-label="Teilnahme absagen">−</button>'
+            : '<button type="button" class="wr-dayrow__minus wr-dayrow__plus" data-ga-yes="' + esc(e.id) + '" aria-label="Teilnehmen">+</button>') + "</div>";
       });
       if (!k) html = '<div class="wr-dayrow wr-zrec-row is-empty"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + '</b> <span class="wr-dayrow__free">frei</span></span></div><span></span></div>';
       return html;
     }).join("");
     var hint = '<button type="button" class="wr-ga-info" data-ga-info="1">Info</button>';
     if (state.gaTarget) {
-      state.gaTarget.innerHTML = hint + '<div class="wr-days wr-days--all">' + rows + "</div>";
+      state.gaTarget.innerHTML = '<h3 class="wr-ga-head">Events der Gruppe</h3>' + hint + '<div class="wr-days wr-days--all">' + rows + "</div>";
       return;
     }
     openSheet(
@@ -3521,10 +3527,24 @@
     });
   }
 
+  /* Event eines Mitglieds: + = Teilnahme bestätigen (ganze Serie), − = absagen */
+  function confirmGroupRsvp(kind, id, btn) {
+    var st = state.ga;
+    var ev = st && st.others.filter(function (e) { return String(e.id) === id; })[0];
+    if (!ev || !global.GoDialog) return groupAssignDo(kind, id, btn);
+    var who = String(personOf(ev.user_id).name || "").split(" ")[0];
+    var tm = displayTime(ev.starts_at) ? " um " + formatTime(ev.starts_at) : "";
+    var body = kind === "yes"
+      ? "Jeden " + formatWeekday(dayKey(ev.starts_at)) + tm + " mit " + (who || "der Gruppe") + ". Du stehst dann bei " + (who || "ihm") + " im Event, in Aktuell als Gruppen-Event und im Kalender neben Deinem Wochenplan."
+      : "Du bist dann nicht mehr dabei. Dein Wochenplan bleibt.";
+    GoDialog.confirm(ev.title || "Training", { body: body, ok: kind === "yes" ? "Teilnehmen" : "Absagen", cancel: "Abbrechen", row: true })
+      .then(function (yes) { if (yes) groupAssignDo(kind, id, btn); });
+  }
+
   function groupAssignClick(e) {
     if (e.target.closest && e.target.closest("[data-ga-info]")) {
       e.stopPropagation();
-      var msg = "Mit + teilst Du das Event aus Deinem Wochenplan mit der Gruppe und mit − entfernst Du es. Wenn Du hier Events von anderen Gruppenmitgliedern zusagst, erscheint das Event regelmäßig an dem Wochentag mit der Uhrzeit.";
+      var msg = "Hier stehen Deine Einheiten aus dem Wochenplan. Mit + teilst Du eine mit der Gruppe, mit − nimmst Du sie heraus. Events anderer Mitglieder siehst Du, sobald sie sie geteilt haben. Mit + nimmst Du teil: Das Event steht dann jede Woche an dem Tag in Deinem Kalender, neben Deinem Wochenplan.";
       if (global.GoDialog) GoDialog.alert(msg); else if (host.toast) host.toast(msg);
       return true;
     }
@@ -3533,7 +3553,7 @@
     e.stopPropagation();
     var kindGa = ga.hasAttribute("data-ga-add") ? "add" : ga.hasAttribute("data-ga-rm") ? "rm" : ga.hasAttribute("data-ga-yes") ? "yes" : "no";
     if (kindGa === "add" || kindGa === "rm") confirmGroupAssign(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
-    else groupAssignDo(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
+    else confirmGroupRsvp(kindGa, ga.getAttribute("data-ga-" + kindGa), ga);
     return true;
   }
 
