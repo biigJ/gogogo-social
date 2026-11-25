@@ -7079,7 +7079,7 @@
       padding: 0 12px;
     }
   </style>
-  <script src="/natalyaalice/themes.js?v=thm-21"></script>
+  <script src="/natalyaalice/themes.js?v=thm-22"></script>
 </head>
 <body class="is-home">
   <div class="go-boot" id="go-boot" role="status" aria-live="polite">
@@ -22266,6 +22266,10 @@
         return new Date(guess.getTime() - (b - u)).toISOString();
       }
       /* Event erstellen: Tag, Uhrzeit, Runden (Drehräder), beim Gründer Ort aus den Circle-Orten */
+      /* Räder für Arbeit und Pause (m:ss) */
+      var CIRCLE_WORK = ["0:30", "0:45", "1:00", "1:30", "2:00", "2:30", "3:00", "3:30", "4:00", "4:30", "5:00", "6:00", "8:00", "10:00"];
+      var CIRCLE_REST = ["0:00", "0:10", "0:15", "0:20", "0:30", "0:45", "1:00", "1:30", "2:00", "3:00"];
+      function mmssSec(t) { var p = String(t || "").split(":"); return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0); }
       function createCircleEvent(g, asCircle, presetDay, onDone) {
         var dates = circleDates();
         var pick = { day: presetDay || null, time: null, rounds: 6, loc: "" };
@@ -22278,13 +22282,32 @@
           .then(function (t) {
             if (!t) return null;
             pick.time = String(t).padStart(5, "0");
+            /* Format: Single oder Double (in Hendriks Zirkel-App „Team“) */
+            return GoDialog.choose("Format", [
+              { label: "Single", value: "single" },
+              { label: "Double (im Team)", value: "double" }
+            ], { center: true, sub: "Double: zu zweit an einer Station, im Wechsel.", cancel: "Abbrechen" });
+          })
+          .then(function (mode) {
+            if (!mode) return null;
+            pick.mode = mode;
             var rs = [];
             for (var n = 3; n <= 12; n++) rs.push(n + " Runden");
-            return GoDialog.time("Runden", { times: rs, ok: "Weiter", cancel: "Abbrechen" });
+            return GoDialog.time("Runden", { times: rs, initial: "6 Runden", ok: "Weiter", cancel: "Abbrechen" });
           })
           .then(function (r) {
             if (!r) return null;
             pick.rounds = parseInt(r, 10) || 6;
+            return GoDialog.time("Arbeit je Station", { times: CIRCLE_WORK, initial: "4:00", ok: "Weiter", cancel: "Abbrechen" });
+          })
+          .then(function (wk) {
+            if (!wk) return null;
+            pick.workSec = mmssSec(wk) || 240;
+            return GoDialog.time("Pause", { times: CIRCLE_REST, initial: "0:30", ok: "Weiter", cancel: "Abbrechen" });
+          })
+          .then(function (ps) {
+            if (!ps) return null;
+            pick.restSec = mmssSec(ps);
             /* Stationen in der Reihenfolge an der Tafel: stehen dann auf dem PDF (circle-sheet.js) */
             return window.GoCircleSheet ? GoCircleSheet.pickStations("Stationen") : [];
           })
@@ -22302,7 +22325,7 @@
           .then(function (ok) {
             if (!ok) return;
             var w = circleWhere(g);
-            var note = window.GoZirkelSetup ? GoZirkelSetup.toNote({ mode: "single", rounds: pick.rounds, workSec: 240, restSec: 30, online: asCircle && w.online }, (pick.st || []).length ? "|st=" + pick.st.join(",") : "") : null;
+            var note = window.GoZirkelSetup ? GoZirkelSetup.toNote({ mode: pick.mode || "single", rounds: pick.rounds, workSec: pick.workSec || 240, restSec: pick.restSec == null ? 30 : pick.restSec, online: asCircle && w.online }, (pick.st || []).length ? "|st=" + pick.st.join(",") : "") : null;
             return rest("courses?title=eq.Zirkeltraining&select=id&limit=1").catch(function () { return []; }).then(function (rows) {
               var body = {
                 user_id: sessionAccount.id, category: "zirkel", course_id: rows && rows[0] ? rows[0].id : null,
@@ -29456,7 +29479,7 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/natalyaalice/hyrox-doubles.js?v=hxd-3"></script>
-  <script src="/natalyaalice/circle-sheet.js?v=cs-3"></script>
+  <script src="/natalyaalice/circle-sheet.js?v=cs-4"></script>
   <script src="/natalyaalice/ffc.js?v=ffc-dlg-21"></script>
 </body>
 </html>

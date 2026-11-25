@@ -190,13 +190,89 @@
   function pickStations(title, have) {
     if (!global.GoDialog) return Promise.resolve(null);
     have = have || [];
-    return global.GoDialog.pick(title || "Stationen", stationList().map(function (x) { return { label: x[1], value: x[0], checked: have.indexOf(x[0]) >= 0 }; }), { ok: "Übernehmen", cancel: "Abbrechen" })
-      .then(function (v) { return v && v.length ? v : null; });
+    return global.GoDialog.pick(title || "Stationen", stationList().map(function (x) { return { label: x[1], value: x[0], checked: have.indexOf(x[0]) >= 0 }; }), { ok: "Weiter", cancel: "Abbrechen" })
+      .then(function (v) {
+        if (!v || !v.length) return null;
+        /* Reihenfolge an der Tafel: Stationen am Griff hoch und runter schieben */
+        return v.length > 1 ? orderStations(v) : v;
+      });
+  }
+
+  /* Reihenfolge festlegen: Zeilen am Griff ziehen (Maus und Finger). Ergebnis: Schlüssel in neuer Reihenfolge, null = Abbrechen */
+  function orderStations(keys) {
+    var names = {};
+    stationList().forEach(function (x) { names[x[0]] = x[1]; });
+    var order = keys.slice();
+    return new Promise(function (resolve) {
+      var wrap = document.createElement("div");
+      wrap.className = "god";
+      wrap.innerHTML = '<div class="god__card" role="dialog" aria-modal="true"><p class="god__text">Reihenfolge an der Tafel</p>' +
+        '<p class="god__sub" style="margin:-4px 0 10px;font-size:14px;opacity:.7">Am Griff hoch oder runter schieben.</p>' +
+        '<div class="god__list gcs-order"></div></div>';
+      var card = wrap.firstChild;
+      var list = card.querySelector(".gcs-order");
+      var GRIP = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>';
+      function paint() {
+        list.innerHTML = order.map(function (k, i) {
+          return '<div class="god__pick gcs-row" data-k="' + k + '" style="justify-content:space-between;user-select:none;-webkit-user-select:none">' +
+            '<span><b style="display:inline-block;min-width:1.6em">' + (i + 1) + ".</b>" + (names[k] || k).replace(/</g, "&lt;") + "</span>" +
+            '<span class="gcs-grip" style="touch-action:none;cursor:grab;padding:8px 2px;display:grid;place-items:center">' + GRIP + "</span></div>";
+        }).join("");
+      }
+      paint();
+      var drag = null;
+      list.addEventListener("pointerdown", function (e) {
+        var g = e.target.closest && e.target.closest(".gcs-grip");
+        if (!g) return;
+        var row = g.closest(".gcs-row");
+        e.preventDefault();
+        drag = { row: row, y0: e.clientY, h: row.offsetHeight + 6 };
+        row.style.position = "relative";
+        row.style.zIndex = "2";
+        row.style.boxShadow = "0 6px 18px rgba(0,0,0,.25)";
+        try { g.setPointerCapture(e.pointerId); } catch (eC) {}
+      });
+      list.addEventListener("pointermove", function (e) {
+        if (!drag) return;
+        var dy = e.clientY - drag.y0;
+        drag.row.style.transform = "translateY(" + dy + "px)";
+        var rows = Array.prototype.slice.call(list.children);
+        var i = rows.indexOf(drag.row);
+        if (dy > drag.h / 2 && i < rows.length - 1) {
+          list.insertBefore(rows[i + 1], drag.row);
+          drag.y0 += drag.h;
+          drag.row.style.transform = "translateY(" + (e.clientY - drag.y0) + "px)";
+        } else if (dy < -drag.h / 2 && i > 0) {
+          list.insertBefore(drag.row, rows[i - 1]);
+          drag.y0 -= drag.h;
+          drag.row.style.transform = "translateY(" + (e.clientY - drag.y0) + "px)";
+        }
+      });
+      function drop() {
+        if (!drag) return;
+        drag = null;
+        order = Array.prototype.map.call(list.children, function (r) { return r.getAttribute("data-k"); });
+        paint();
+      }
+      list.addEventListener("pointerup", drop);
+      list.addEventListener("pointercancel", drop);
+      function btn(label, cls, val) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "god__btn" + (cls ? " " + cls : "");
+        b.textContent = label;
+        b.addEventListener("click", function () { wrap.remove(); resolve(val()); });
+        card.appendChild(b);
+      }
+      btn("Übernehmen", "", function () { return order.slice(); });
+      btn("Abbrechen", "god__btn--quiet", function () { return null; });
+      document.body.appendChild(wrap);
+    });
   }
   function noteStations(note) {
     var m = String(note || "").match(/(?:^|\|)st=([^|]*)/);
     return m && m[1] ? m[1].split(",").filter(Boolean) : [];
   }
 
-  global.GoCircleSheet = { pdf: pdf, plan: plan, pickStations: pickStations, labels: labels, noteStations: noteStations, stationList: stationList };
+  global.GoCircleSheet = { pdf: pdf, plan: plan, pickStations: pickStations, orderStations: orderStations, labels: labels, noteStations: noteStations, stationList: stationList };
 })(window);
