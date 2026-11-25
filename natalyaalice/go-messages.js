@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-circle-seite",
+      at: "2026-11-25T12:00:00Z",
+      text: "Circles unter Community → Kreise sind neu aufgebaut: Beschreibung, Mitglieder, Stempelkarte und die Zirkeltrainings der nächsten 7 Tage. Mit + übernimmst Du einen Termin in Deine Woche."
+    },
+    {
       key: "news:2026-11-25-coach-msg",
       at: "2026-11-25T11:00:00Z",
       text: "Unter Community → Mein Coach kannst Du Deinem Coach jetzt direkt eine Nachricht senden. Sie steht dann in Aktuell unter „Mein Coach“."
