@@ -5002,22 +5002,25 @@
     });
   }
 
-  /* „dabei“: Event gestartet und noch nicht abgeschlossen. Eigene Starts merkt sich das Gerät (je Tag),
-     bei anderen zählt „trainiert gerade“ (go_training_presence) für ihr heutiges Event. */
-  function startedKey() { return "gogogo_started_" + me() + "_" + todayIso(); }
-  function startedMap() { try { return JSON.parse(localStorage.getItem(startedKey()) || "{}") || {}; } catch (e) { return {}; } }
+  /* „dabei“: Event läuft gerade und ist noch nicht abgeschlossen. Nur echte Lebenszeichen zählen:
+     laufende Eieruhr zu genau diesem Event (ausdauer-timer.js) oder „trainiert gerade“ mit frischem Herzschlag
+     (go_training_presence, alle 45 s im Workout). Ein abgebrochener Start zählt nach 3 Minuten nicht mehr. */
   function markStarted(ev) {
     if (!ev || !ev.id) return;
-    var m = startedMap();
-    m[String(ev.id)] = Date.now();
-    try { localStorage.setItem(startedKey(), JSON.stringify(m)); } catch (e) {}
     if (host.trainingActive) { try { host.trainingActive(ev.title || "Training"); } catch (e2) {} }
   }
   function isStarted(ev) {
     if (!ev || ev.status === "erledigt" || dayKey(ev.starts_at) !== todayIso()) return false;
-    if (String(ev.user_id) === me() && startedMap()[String(ev.id)]) return true;
+    if (String(ev.user_id) === me()) {
+      try {
+        var t = JSON.parse(localStorage.getItem("gogogo_timer") || "null");
+        if (t && String(t.id) === String(ev.id)) return true;
+      } catch (e) {}
+    }
     var pr = host.presenceOf ? host.presenceOf(String(ev.user_id)) : null;
     if (!pr || pr.status !== "active") return false;
+    var beat = Date.parse(pr.updated_at || pr.started_at || "");
+    if (!beat || Date.now() - beat > 3 * 60000) return false;
     var open = (state.events || []).filter(function (e) {
       return e && String(e.user_id) === String(ev.user_id) && e.status === "geplant" && dayKey(e.starts_at) === todayIso();
     });
