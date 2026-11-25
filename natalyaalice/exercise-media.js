@@ -103,7 +103,9 @@
       host.rest("go_exercise_media?select=name_key,name,url&limit=2000").catch(function () { return []; }),
       /* Nutzer-Links mit Sternen (go-exercise-links.sql); fehlt die View, bleibt es bei gogogo-Links */
       /* approved_at erst nach go-exercise-media-review.sql; ohne Spalte gilt alles als freigegeben */
-      host.rest("go_exercise_links_ranked?select=id,name_key,name,url,added_by,added_by_name,stars,created_at,approved_at&limit=5000")
+      /* thumb_url: Startbild von Instagram (go-exercise-link-thumb.sql, Edge Function go-ig-thumb) */
+      host.rest("go_exercise_links_ranked?select=id,name_key,name,url,added_by,added_by_name,stars,created_at,approved_at,thumb_url&limit=5000")
+        .catch(function () { return host.rest("go_exercise_links_ranked?select=id,name_key,name,url,added_by,added_by_name,stars,created_at,approved_at&limit=5000"); })
         .catch(function () {
           return host.rest("go_exercise_links_ranked?select=id,name_key,name,url,added_by,added_by_name,stars,created_at&limit=5000")
             .then(function (rows) { return (rows || []).map(function (r) { r.approved_at = r.created_at || "x"; return r; }); });
@@ -211,8 +213,37 @@
     if (map[k]) out.push({ id: "", url: map[k], admin: true, stars: null, by: "gogogo" });
     userLinks.filter(function (l) { return l.name_key === k && l.url !== map[k]; })
       .sort(function (a, b) { return (b.stars || 0) - (a.stars || 0) || String(a.created_at).localeCompare(String(b.created_at)); })
-      .forEach(function (l) { out.push({ id: l.id, url: l.url, admin: false, stars: l.stars || 0, by: l.added_by_name || "", added_by: l.added_by }); });
+      .forEach(function (l) { out.push({ id: l.id, url: l.url, admin: false, stars: l.stars || 0, by: l.added_by_name || "", added_by: l.added_by, thumb: l.thumb_url || "" }); });
     return out;
+  }
+
+  /* Instagram hat kein festes Vorschaubild: die Edge Function holt das Startbild des Beitrags
+     und legt es dauerhaft in go-covers ab. Danach steht es am Link (thumb_url). */
+  var thumbAsked = {};
+  function makeThumb(id) {
+    var st = host && host.storage;
+    if (!st || !id || thumbAsked[id]) return Promise.resolve(null);
+    thumbAsked[id] = true;
+    return fetch(st.url + "/functions/v1/go-ig-thumb", {
+      method: "POST",
+      headers: { apikey: st.key, Authorization: "Bearer " + st.key, "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id })
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var url = j && j.thumb_url;
+        if (url) userLinks.forEach(function (l) { if (String(l.id) === String(id)) l.thumb_url = url; });
+        return url || null;
+      })
+      .catch(function () { return null; });
+  }
+  /* Instagram-Links ohne Bild (ältere oder fehlgeschlagene): ein paar je Laden nachholen */
+  function fillThumbs() {
+    var todo = userLinks.filter(function (l) {
+      var info = parse(l.url);
+      return l && l.id && !l.thumb_url && info && info.kind === "ig" && !thumbAsked[l.id];
+    }).slice(0, 4);
+    return Promise.all(todo.map(function (l) { return makeThumb(l.id); }))
+      .then(function (r) { return r.some(Boolean); });
   }
 
   /* Mehrere Einträge (Video + Foto): links/rechts wischen */
@@ -311,6 +342,8 @@
     reload: function () { loading = null; return load(); },
     set: function (name, url) { if (url) map[key(name)] = url; else delete map[key(name)]; },
     urlFor: urlFor,
+    makeThumb: makeThumb,
+    fillThumbs: fillThumbs,
     itemsFor: itemsFor,
     mine: function (name) { return mineFor(key(name)); },
     /* eigenes Foto (kind "img") oder eigener Video-Link (kind "video") zu einer Übung, neuester zuerst */

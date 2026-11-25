@@ -146,6 +146,7 @@
     for (var i = 0; i < links.length && !thumb; i++) {
       var info = GoExMedia.parse(links[i].url);
       if (info && info.thumb) thumb = info.thumb;
+      else if (links[i].thumb) thumb = links[i].thumb;
     }
     if (!thumb) thumb = photoOf[GoExMedia.key(name)] || "";
     var empty = !links.length;
@@ -221,9 +222,10 @@
     var url = pendingUrl(el);
     if (!url || !exName) return;
     if (btn) btn.disabled = true;
-    host.rest("go_exercise_links", { method: "POST", prefer: "return=minimal",
+    var newId = "";
+    host.rest("go_exercise_links", { method: "POST", prefer: "return=representation",
       body: { name_key: GoExMedia.key(exName), name: exName, url: url, added_by: host.me() } })
-      .then(function () { return GoExMedia.reload(); })
+      .then(function (rows) { newId = rows && rows[0] && rows[0].id ? String(rows[0].id) : ""; return GoExMedia.reload(); })
       .then(function () {
         el.querySelector("[data-gxl-new]").value = "";
         el.querySelector("[data-gxl-q]").value = "";
@@ -232,6 +234,11 @@
         if (btn) btn.disabled = false;
         paint(el);
         if (host.toast) host.toast("Gesichert");
+        /* Instagram: Startbild als Vorschau holen und Kachel neu zeichnen */
+        var info = GoExMedia.parse(url);
+        if (newId && info && info.kind === "ig" && GoExMedia.makeThumb) {
+          GoExMedia.makeThumb(newId).then(function (t) { if (t) paint(el); });
+        }
       })
       .catch(function (err) {
         if (btn) btn.disabled = false;
@@ -272,7 +279,11 @@
       }, { threshold: 0 });
       el._gxlIo.observe(el);
     }
-    Promise.all([GoExMedia.ready(), loadNames(), loadMyStars(), loadPlan()]).then(function () { paint(el); })
+    Promise.all([GoExMedia.ready(), loadNames(), loadMyStars(), loadPlan()]).then(function () {
+      paint(el);
+      /* fehlende Instagram-Vorschaubilder nachholen */
+      if (GoExMedia.fillThumbs) GoExMedia.fillThumbs().then(function (any) { if (any) paint(el); });
+    })
       .catch(function () { el.querySelector("[data-gxl-list]").innerHTML = '<p class="gxl__empty">Übungen konnten nicht geladen werden.</p>'; });
   }
 
