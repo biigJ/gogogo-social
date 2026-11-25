@@ -255,6 +255,8 @@
     if (ev.status === "erledigt" || iso !== berlinToday()) return "";
     var held = z.hold && !z.goAt;
     var target = z.goAt || new Date(ev.starts_at).getTime();
+    /* läuft schon: kein Anhalten mehr */
+    if (!held && target <= Date.now()) return "";
     /* Sofortstart: alle Teilnehmer starten zusammen, solange es noch nicht läuft */
     var now = held || target > Date.now() + 15000;
     return (
@@ -319,7 +321,13 @@
       var start = Number(el.getAttribute("data-wr-cd-start"));
       if (!isFinite(start)) return;
       var sec = Math.max(0, Math.floor((start - now) / 1000));
-      if (sec <= 0) { el.textContent = "läuft"; el.removeAttribute("data-wr-cd-start"); return; }
+      if (sec <= 0) {
+        el.textContent = "läuft"; el.removeAttribute("data-wr-cd-start");
+        /* Start erreicht: Anhalten/Sofortstart daneben verschwinden */
+        var box = el.closest(".wr-zrow") || el.parentNode;
+        if (box) [].forEach.call(box.querySelectorAll('[data-wr-zadmin="hold"],[data-wr-zadmin="now"],[data-acc-zadmin="hold"],[data-acc-zadmin="now"]'), function (b) { b.remove(); });
+        return;
+      }
       var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
       el.textContent = (h > 0 ? h + ":" : "") + (m < 10 ? "0" : "") + m + ":" + (x < 10 ? "0" : "") + x;
     });
@@ -1232,6 +1240,18 @@
     var list = itemsForDayAll(iso).filter(kalenderItem);
     var plan = globalPlanFor(iso);
     var hasPlan = list.some(function (it) { return it._fromPlan || isTravelAlt(it) || (it.ev && it.ev.enrollment_id); });
+    /* Durch „Alternative → Statt …“ ersetzter Plan-Termin (status ausgefallen): im Kalender bleibt die Einheit
+       aus dem Wochenplan stehen, die Änderung sieht man nur in Aktuell */
+    if (!hasPlan) {
+      var repl = state.events.filter(function (e) {
+        return e && e.status === "ausgefallen" && e.enrollment_id && !e.travel_auto && String(e.user_id) === me() && dayKey(e.starts_at) === iso;
+      })[0];
+      if (repl) {
+        list.push({ kind: "event", starts_at: repl.starts_at, ev: Object.assign({}, repl, { status: "geplant", _replaced: true }) });
+        list.sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
+        hasPlan = true;
+      }
+    }
     if (!hasPlan && plan && plan.title) {
       list.push({ kind: "event", starts_at: plan.starts_at, ev: plan, _fromPlan: true });
       list.sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
@@ -6267,9 +6287,9 @@
           if (host.toast) host.toast(zAct === "now" ? "Start für alle in 10 s" : zAct === "go" ? "Countdown läuft" : "Countdown angehalten");
           return refreshKeepDay(berlinToday());
         })
-        .catch(function () {
+        .catch(function (err) {
           t.disabled = false;
-          if (host.toast) host.toast("Hat nicht geklappt");
+          if (host.toast) host.toast(err && err.message === "running" ? "Läuft schon. Anhalten geht nur vor dem Start." : "Hat nicht geklappt");
         });
       });
       return;

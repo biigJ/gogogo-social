@@ -210,7 +210,10 @@
         "&select=id,user_id,title,starts_at,time_set_at,visibility&order=time_set_at.desc&limit=30").catch(function () { return []; }),
       /* Nachrichten an mich aus der Sprechblase oder „Start verschoben“ (go-aktuell-posts.sql) */
       rest("go_aktuell_posts?author_id=neq." + uid + "&created_at=gte." + sinceQ +
-        "&select=id,author_id,audience,audience_id,body,created_at&order=created_at.desc&limit=20").catch(function () { return []; })
+        "&select=id,author_id,audience,audience_id,body,created_at,to_id&order=created_at.desc&limit=20")
+        .catch(function () { return rest("go_aktuell_posts?author_id=neq." + uid + "&created_at=gte." + sinceQ +
+          "&select=id,author_id,audience,audience_id,body,created_at&order=created_at.desc&limit=20"); })
+        .catch(function () { return []; })
     ];
     var ST = { accepted: "angenommen", declined: "abgelehnt", withdrawn: "zurückgezogen" };
     return Promise.all(jobs).then(function (r) {
@@ -267,7 +270,7 @@
       var kSeen = kreisSeen();
       (r[7] || []).forEach(function (m) {
         out.push({ kind: "kreismsg", created_at: m.created_at, author_id: m.author_id, past: String(m.created_at) <= kSeen,
-          labelFn: function () { return first(m.author_id) + ": " + String(m.body || "Foto").slice(0, 100); },
+          labelFn: function () { return first(m.author_id) + (String(m.to_id || "") === me() ? " an Dich: " : ": ") + String(m.body || "Foto").slice(0, 100); },
           open: function () {
             markKreisSeen();
             saveFilter("alles");
@@ -1245,7 +1248,8 @@
       cd = '<span class="wr-zirkel-cd" data-wr-cd-start="' + target + '">' + (h ? h + ":" : "") +
         (m < 10 ? "0" : "") + m + ":" + (x < 10 ? "0" : "") + x + "</span>";
     } else cd = '<span class="wr-zirkel-cd">läuft</span>';
-    var admin = z && String(ev.user_id) === me()
+    /* Anhalten nur vor dem Start, danach läuft der Countdown durch */
+    var admin = z && String(ev.user_id) === me() && (held || target > Date.now())
       ? '<button type="button" class="go-online-cta go-online-cta--ghost" data-acc-zadmin="' + (held ? "go" : "hold") + '" data-id="' + esc(ev.id) + '">' +
         (held ? "Starten" : "Anhalten") + "</button>" +
         (held || target > Date.now() + 15000
@@ -4943,16 +4947,23 @@
     }
     var choices = [];
     if (today) choices.push({ label: ev.category === "zirkel" ? "Start: Zirkeltraining" : "Start", value: "start" });
-    /* eingetragene Alternative: nur noch starten, kein zweites Ausweichen */
-    if (ev.item_type !== "alternative") {
+    /* eingetragene Alternative: nur noch starten, kein zweites Ausweichen.
+       Circle-Event: kein Ausweichen/Schieben hier, „Statt“ würde es für alle absagen (verwaltet auf der Circle-Seite) */
+    if (ev.item_type !== "alternative" && !ev.circle_id) {
       choices.push({ label: "Alternative", value: "alt" });
       choices.push({ label: "Schieben auf morgen", value: "move" });
     }
-    /* eigenes Event mit Uhrzeit: Start verschiebt sich (nur dieser Termin) */
-    if (String(ev.user_id) === me() && hasTime(ev) && /^[0-9a-f-]{36}$/i.test(String(ev.id))) choices.push({ label: "Start verschoben", value: "late" });
+    /* eigenes Event: Startzeit und Ort ändern (nur dieser Termin), solange niemand sonst zugesagt hat */
+    var mineEv = String(ev.user_id) === me() && /^[0-9a-f-]{36}$/i.test(String(ev.id)) && !ev.circle_id;
+    var others = (state.rsvps[String(ev.id)] || []).filter(function (u) { return String(u) !== me(); }).length;
+    if (mineEv && !others) {
+      if (hasTime(ev)) choices.push({ label: "Startzeit ändern", value: "late" });
+      if (host.pickPlace) choices.push({ label: "Ort ändern", value: "place" });
+    }
     if (!choices.length) return;
     GoDialog.choose(String(ev.title || "Training"), choices).then(function (v) {
       if (v === "late") return delayStart(ev);
+      if (v === "place") return changePlace(ev);
       if (v === "start") return startEvent(ev);
       if (v === "alt") return alternativeFor(ev);
       if (v === "move") return moveToTomorrow(ev);
@@ -5298,11 +5309,15 @@
     var p = old.split(":");
     var base = Number(p[0]) * 60 + Number(p[1]);
     var times = [];
-    for (var mm = base + 15; mm <= 23 * 60 + 45; mm += 15) {
+    /* heute nur Zeiten ab jetzt, sonst ganzer Tag; 15-Minuten-Schritte */
+    var nowD = new Date(), from = 5 * 60;
+    if (evDayIso(ev) === todayIso()) from = Math.max(from, Math.ceil((nowD.getHours() * 60 + nowD.getMinutes()) / 15) * 15);
+    for (var mm = from; mm <= 23 * 60 + 45; mm += 15) {
+      if (mm === base) continue;
       times.push(Math.floor(mm / 60) + ":" + ("0" + (mm % 60)).slice(-2));
     }
-    if (!times.length) return GoDialog.alert("Später geht heute nicht mehr.");
-    return GoDialog.time("Startzeit verschoben?", { times: times, ok: "Senden", cancel: "Abbrechen", sub: "Bisher " + old + " Uhr" }).then(function (t) {
+    if (!times.length) return GoDialog.alert("Heute geht keine andere Zeit mehr.");
+    return GoDialog.time("Startzeit ändern", { times: times, ok: "Speichern", cancel: "Abbrechen", sub: "Bisher " + old + " Uhr" }).then(function (t) {
       if (!t) return;
       var iso = berlinIsoAt(evDayIso(ev), t);
       if (!iso) return;
@@ -5323,7 +5338,7 @@
           return rest("go_aktuell_posts", {
             method: "POST", prefer: "return=minimal",
             body: { author_id: me(), audience: "team", audience_id: eid, recipients: who,
-              body: "Start verschoben: " + (ev.title || "Training") + " heute um " + t + " statt " + old + " Uhr." }
+              body: "Neue Startzeit: " + (ev.title || "Training") + " um " + t + " statt " + old + " Uhr." }
           }).then(function () { return who.length; }, function () { return -1; });
         })
         .then(function (n) {
@@ -5332,7 +5347,38 @@
           if (host.toast) host.toast(n > 0 ? "Neue Startzeit " + t + ", " + n + (n === 1 ? " Teilnehmer" : " Teilnehmer") + " informiert"
             : n < 0 ? "Neue Startzeit " + t + ". Nachricht ging nicht (go-aktuell-posts.sql?)" : "Neue Startzeit " + t);
         }, function () {
-          if (host.toast) host.toast("Verschieben ging nicht.");
+          if (host.toast) host.toast("Ändern ging nicht.");
+        });
+    });
+  }
+
+  /* Ort ändern: nur dieser Termin; Eingeladene bekommen eine Nachricht */
+  function changePlace(ev) {
+    return host.pickPlace("Ort ändern").then(function (place) {
+      if (!place || place === ev.location) return;
+      var eid = String(ev.id), old = ev.location || "";
+      return rest("events?id=eq." + encodeURIComponent(eid), { method: "PATCH", prefer: "return=minimal", body: { location: place } })
+        .then(function () {
+          ev.location = place;
+          return rest("go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&event_id=eq." + encodeURIComponent(eid) +
+            "&status=in.(pending,accepted)&select=to_id").catch(function () { return []; });
+        })
+        .then(function (rows) {
+          var seen = {}, who = [];
+          (rows || []).forEach(function (r) { var id = r && String(r.to_id); if (id && id !== me() && !seen[id]) { seen[id] = true; who.push(id); } });
+          if (!who.length) return 0;
+          return rest("go_aktuell_posts", {
+            method: "POST", prefer: "return=minimal",
+            body: { author_id: me(), audience: "team", audience_id: eid, recipients: who,
+              body: "Neuer Ort: " + (ev.title || "Training") + " jetzt " + place + (old ? " statt " + old : "") + "." }
+          }).then(function () { return who.length; }, function () { return -1; });
+        })
+        .then(function (n) {
+          try { if (global.WocheReels && WocheReels.refresh) WocheReels.refresh(); } catch (e2) {}
+          Promise.resolve().then(refresh).catch(function () {});
+          if (host.toast) host.toast("Neuer Ort: " + place + (n > 0 ? ", " + n + " informiert" : ""));
+        }, function () {
+          if (host.toast) host.toast("Ändern ging nicht.");
         });
     });
   }
@@ -5447,8 +5493,9 @@
             if (host.toast) host.toast(zAct === "now" ? "Start für alle in 10 s" : zAct === "go" ? "Countdown läuft" : "Countdown angehalten");
             return refresh();
           })
-          .catch(function () {
+          .catch(function (err) {
             zAdmin.disabled = false;
+            if (err && err.message === "running") { if (host.toast) host.toast("Läuft schon. Anhalten geht nur vor dem Start."); return refresh(); }
             if (host.toast) host.toast("Hat nicht geklappt");
           });
       });
@@ -5848,9 +5895,27 @@
     ).catch(function () { return null; });
     var extra = host && host.heartNotices ? Promise.resolve(host.heartNotices()).catch(function () { return []; }) : Promise.resolve([]);
     var bub = moreHeartItems().catch(function () { return []; });
-    return Promise.all([replies, invites, extra, bub]).then(function (r) {
+    /* Kommentare anderer an meinen Events und an Events, zu denen ich zugesagt habe (letzte 7 Tage) */
+    var since7 = new Date(Date.now() - 7 * 86400000).toISOString();
+    var evIds = [];
+    (state.events || []).forEach(function (e) {
+      if (!e || !/^[0-9a-f-]{36}$/i.test(String(e.id)) || String(e.starts_at || "") < since7) return;
+      if (String(e.user_id) === me() || iAmGoing(e.id)) evIds.push(String(e.id));
+    });
+    var evc = evIds.length
+      ? rest("event_comments?event_id=in.(" + evIds.slice(0, 120).join(",") + ")&account_id=neq." + encodeURIComponent(me()) +
+          "&created_at=gte." + encodeURIComponent(since7) + "&select=id,event_id,account_id,text,created_at,reply_to_account&order=created_at.desc&limit=30")
+          .catch(function () { return []; })
+      : Promise.resolve([]);
+    return Promise.all([replies, invites, extra, bub, evc]).then(function (r) {
       var list = [];
-      (r[0] || []).forEach(function (x) { list.push(Object.assign({ kind: "reply" }, x)); });
+      var seenC = {};
+      (r[0] || []).forEach(function (x) { seenC[String(x.id)] = true; list.push(Object.assign({ kind: "reply" }, x)); });
+      (r[4] || []).forEach(function (x) {
+        if (!x || seenC[String(x.id)]) return;
+        seenC[String(x.id)] = true;
+        list.push(Object.assign({ kind: "evcomment" }, x));
+      });
       (r[1] || []).forEach(function (x) {
         var open = x.status === "pending" && String(x.workout_date || "") >= todayIso();
         list.push(Object.assign({ kind: "invite", past: !open }, x));
@@ -5869,14 +5934,47 @@
       list.forEach(function (x) {
         ["account_id", "from_id", "author_id", "user_id", "coach_id", "to_id"].forEach(function (k) { if (x[k]) pids.push(String(x[k])); });
       });
-      if (pids.length) return ensurePeople(pids).catch(function () {});
+      return (pids.length ? ensurePeople(pids).catch(function () {}) : Promise.resolve()).then(function () { msgPopup(list); });
     });
+  }
+
+  /* Beim Öffnen der App: „Neue Nachricht“, wenn mir jemand geschrieben hat (Kommentar an meinem Event,
+     Antwort auf meinen Kommentar, @Nachricht an mich). Einmal je Nachricht, nur einmal pro Start. */
+  function msgPopSeenKey() { return "gogogo_msgpop_seen_" + me(); }
+  function msgPopup(list) {
+    if (state.msgPopDone || !global.GoDialog || document.hidden) return;
+    state.msgPopDone = true;
+    var seen = "";
+    try { seen = localStorage.getItem(msgPopSeenKey()) || ""; } catch (e) {}
+    /* erstes Mal: nur Nachrichten der letzten 24 Stunden */
+    if (!seen) seen = new Date(Date.now() - 86400000).toISOString();
+    var fresh = (list || []).filter(function (x) {
+      return x && /^(reply|evcomment|kreismsg)$/.test(x.kind) && String(x.created_at || "") > seen;
+    });
+    if (!fresh.length) return;
+    try { localStorage.setItem(msgPopSeenKey(), String(fresh[0].created_at)); } catch (e2) {}
+    var x = fresh[0];
+    var body = heartLabel(x) + (fresh.length > 1 ? "\n\n+ " + (fresh.length - 1) + " weitere" : "");
+    setTimeout(function () {
+      if (document.querySelector(".god, .hl-wrap")) { try { localStorage.setItem(msgPopSeenKey(), seen); } catch (e3) {} state.msgPopDone = false; return; }
+      GoDialog.confirm("Neue Nachricht", { body: body, ok: "Ansehen", cancel: "Später" }).then(function (yes) {
+        if (!yes) return;
+        if (fresh.length > 1) { onReplyHeart(); return; }
+        try { localStorage.setItem(replySeenKey(), String(x.created_at)); } catch (e4) {}
+        paintReplyHeart();
+        if (typeof x.open === "function") x.open();
+        else if (x.event_id) openReplyEvent(x.event_id);
+      });
+    }, 1200);
   }
   function heartLabel(x) {
     if (x.label) return x.label;
     if (typeof x.labelFn === "function") return x.labelFn();
     var first = function (id) { return String(personOf(id).name || "Jemand").split(" ")[0]; };
-    if (x.kind === "reply") return first(x.account_id) + " hat auf Deinen Kommentar geantwortet";
+    var evTitle = function (id) { var e = evById(id); return e ? (e.title || "Training") : "Dein Event"; };
+    var snip = function (t) { t = String(t || "").trim(); return t ? ": " + (t.length > 80 ? t.slice(0, 80) + " …" : t) : ""; };
+    if (x.kind === "reply") return first(x.account_id) + " hat auf Deinen Kommentar geantwortet" + snip(x.text);
+    if (x.kind === "evcomment") return first(x.account_id) + " zu " + evTitle(x.event_id) + snip(x.text);
     if (x.kind === "invite") {
       var st2 = { accepted: "angenommen", declined: "abgesagt", maybe: "vielleicht", cancelled: "zurückgezogen", expired: "abgelaufen" }[x.status];
       return (st2 ? "Einladung von " + first(x.from_id) : first(x.from_id) + " lädt Dich ein") + (x.workout_label ? ": " + x.workout_label : "") + (st2 ? " · " + st2 : "");

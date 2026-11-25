@@ -14,6 +14,16 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-messages-heart",
+      at: "2026-11-25T15:00:00Z",
+      text: "Kommentare zu Deinen Events und @Nachrichten an Dich stehen jetzt im Herz oben rechts. Beim Öffnen der App siehst Du neue Nachrichten direkt."
+    },
+    {
+      key: "news:2026-11-25-event-time-place",
+      at: "2026-11-25T14:59:00Z",
+      text: "Aktuell, Kreis unter Deinem heutigen Event: Startzeit und Ort änderst Du dort, solange noch niemand zugesagt hat."
+    },
+    {
       key: "news:2026-11-25-circle-events",
       at: "2026-11-25T14:00:00Z",
       text: "Zirkeltrainings Deines Circles stehen jetzt in Aktuell, auch bevor Du zusagst. Mit „Bin dabei“ bist Du dabei, auch in der Zirkel-App."
