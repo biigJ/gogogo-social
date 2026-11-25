@@ -4207,6 +4207,8 @@
       })
       .then(function () {
         optimisticRsvpFaces(eventId, true);
+        /* Circle-Event: Winken wird zum Herz (zugesagt) */
+        if (evC && evC.circle_id) render();
         var evD = (state.events || []).filter(function (e) {
           return String(e.id) === String(eventId);
         })[0];
@@ -5402,6 +5404,14 @@
   function sendJoinRequest(id, btn) {
     var ev = evById(id);
     if (!ev || state.waved[String(id)]) return;
+    /* Circle-Event: Winken = direkt zusagen (go_join_circle_event), keine Anfrage an den Coach */
+    if (ev.circle_id && String(ev.user_id) !== me()) {
+      var whenC = new Date(ev.starts_at).toLocaleString("de-DE", { weekday: "short", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" }) + " Uhr";
+      ask("Dabei?\n\n" + (ev.title || "Zirkeltraining") + "\n" + whenC + (ev.location ? " · " + ev.location : ""), "Zusagen").then(function (yes) {
+        if (yes && !iAmGoing(id)) toggleRsvp(id);
+      });
+      return;
+    }
     /* vorher bestätigen: Einheit, Uhrzeit, Ort, mit wem */
     var owner = String(personOf(ev.user_id).name || "").split(" ")[0];
     var when = hasTime(ev)

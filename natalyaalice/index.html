@@ -8981,15 +8981,15 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-47"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-5"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-3"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-30"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-31"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-17"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-171"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-172"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-112"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-113"></script>
   <script src="/natalyaalice/support.js?v=support-35"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
   <script src="/natalyaalice/coach-group.js?v=gcg-3"></script>
@@ -18798,7 +18798,7 @@
         var owner = circleCanManage(g);
         var me = String((sessionAccount && sessionAccount.id) || "");
         if (!box.innerHTML) box.innerHTML = '<h3 class="wr-ga-head">Events des Circles</h3><p class="wr-sheet-hint">Lädt …</p>';
-        rest("rpc/go_circle_events", { method: "POST", body: { p_group: String(g.group_id), p_days: 7 } }).catch(function () { return []; }).then(function (evs) {
+        rest("rpc/go_circle_events", { method: "POST", body: { p_group: String(g.group_id), p_days: 7, p_past: true } }).catch(function () { return []; }).then(function (evs) {
           if (!box.isConnected) return;
           box._evs = evs || [];
           var days = [];
@@ -18807,6 +18807,21 @@
             days.push(x.toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }));
           }
           var dayOf = function (ts) { return new Date(ts).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }); };
+          /* achter Tag oben: Events, deren Start schon vorbei ist (ab gestern), zum Löschen */
+          var nowMs = Date.now();
+          var past = (evs || []).filter(function (e) { return new Date(e.starts_at).getTime() < nowMs; });
+          evs = (evs || []).filter(function (e) { return new Date(e.starts_at).getTime() >= nowMs; });
+          var pastHtml = past.map(function (e, k) {
+            var mine = String(e.user_id) === me;
+            var dd0 = new Date(e.starts_at);
+            var tm0 = dd0.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+            var day0 = dd0.toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }).replace(/\.$/, "") + " " + dd0.toLocaleDateString("de-DE", { day: "numeric", timeZone: "Europe/Berlin" }).replace(/\.$/, "") + ".";
+            return '<div class="wr-dayrow wr-dayrow--z wr-cev-row is-past"><div class="wr-dayrow__mid">' +
+              '<span class="wr-dayrow__title wr-dayrow__title--place"><b>' + escapeHtml(day0) + '</b><span class="wr-dt-name">' + escapeHtml(e.title || "Zirkeltraining") + "</span>" +
+              (e.location ? '<span class="wr-dt-place">' + escapeHtml(e.location) + "</span>" : "") + "</span>" +
+              '<div class="wr-dayrow__ctl"><span class="wr-mini-wheel wr-cev-time">' + escapeHtml(tm0) + '</span><span class="wr-dayrow__vis wr-cev-meta">vorbei</span></div></div>' +
+              (owner && mine ? '<button type="button" class="wr-dayrow__pen wr-cev-rsvp" data-cev-del="' + escapeHtml(e.id) + '" aria-label="Löschen">−</button>' : '<span class="wr-dayrow__pen"></span>') + "</div>";
+          }).join("");
           var rows = days.map(function (iso) {
             /* Aufbau wie Woche → Tage bearbeiten: „Fr 27.“ Name · Ort, darunter Uhrzeit und Format, rechts Stift bzw. + / − */
             var dd = new Date(iso + "T12:00:00");
@@ -18829,7 +18844,7 @@
                 ? (can ? '<button type="button" class="wr-dt-place" data-cev-place="' + escapeHtml(e.id) + '">' + escapeHtml(e.location) + "</button>" : '<span class="wr-dt-place">' + escapeHtml(e.location) + "</span>")
                 : (can ? '<button type="button" class="wr-dt-place is-empty" data-cev-place="' + escapeHtml(e.id) + '">Ort</button>' : "");
               html += '<div class="wr-dayrow wr-dayrow--z wr-cev-row' + (on && !mine ? " is-on" : "") + '"><div class="wr-dayrow__mid">' +
-                '<span class="wr-dayrow__title wr-dayrow__title--place"><b>' + escapeHtml(k ? "" : label) + '</b><span class="wr-dt-name">' + escapeHtml(e.title || "Zirkeltraining") + "</span>" + place + "</span>" +
+                '<span class="wr-dayrow__title wr-dayrow__title--place"><b>' + escapeHtml(label) + '</b><span class="wr-dt-name">' + escapeHtml(e.title || "Zirkeltraining") + "</span>" + place + "</span>" +
                 '<div class="wr-dayrow__ctl">' +
                 (can ? '<button type="button" class="wr-mini-wheel wr-cev-time" data-cev-time="' + escapeHtml(e.id) + '">' + escapeHtml(tm) + "</button>"
                   : '<span class="wr-mini-wheel wr-cev-time">' + escapeHtml(tm) + "</span>") +
@@ -18846,7 +18861,7 @@
           }).join("");
           box.innerHTML = '<h3 class="wr-ga-head">Events des Circles</h3>' +
             '<button type="button" class="wr-ga-info" data-cev-info="1">Info</button>' +
-            '<div class="wr-days wr-days--all">' + rows + "</div>";
+            '<div class="wr-days wr-days--all">' + pastHtml + rows + "</div>";
         });
         if (box._cevBound) return;
         box._cevBound = true;
@@ -18879,18 +18894,22 @@
           if (t.hasAttribute("data-cev-add")) {
             var addDay = t.getAttribute("data-cev-add");
             /* vorab: einmalig oder jede Woche */
-            GoDialog.choose("", [
-              { label: "Einmalig", value: "once" },
-              { label: "Wiederkehrend", value: "weekly" }
-            ], { center: true }).then(function (v) {
-              if (!v) return;
-              setTimeout(function () { createCircleEvent(g, true, addDay, again, v === "weekly" ? CIRCLE_REPEAT_WEEKS : 0); }, 0);
-            });
+            var askKind = function () {
+              GoDialog.choose("", [
+                { label: "Einmalig", value: "once" },
+                { label: "Wiederkehrend", value: "weekly" }
+              ], { center: true, cancel: "Zurück" }).then(function (v) {
+                if (!v) return;
+                /* Zurück im ersten Schritt führt wieder hierher */
+                setTimeout(function () { createCircleEvent(g, true, addDay, again, v === "weekly" ? CIRCLE_REPEAT_WEEKS : 0, askKind); }, 0);
+              });
+            };
+            askKind();
             return;
           }
           var id = t.getAttribute("data-cev-del") || t.getAttribute("data-cev-yes") || t.getAttribute("data-cev-no");
           if (t.hasAttribute("data-cev-yes")) {
-            GoDialog.confirm("Zirkeltraining übernehmen?", { body: "Der Termin steht dann in Deiner Woche und in Aktuell.", ok: "Übernehmen", cancel: "Abbrechen", row: true })
+            GoDialog.confirm("Zirkeltraining übernehmen?", { body: "Der Termin steht dann in Deiner Woche und in Aktuell.", ok: "Übernehmen", cancel: "Zurück", row: true })
               .then(function (yes) {
                 var ev0 = (box._evs || []).filter(function (x) { return String(x.id) === String(id); })[0] || { id: id, starts_at: new Date().toISOString() };
                 if (yes) joinCircleEvent(ev0, g).then(function () { circleFfcRespond(id, true, box); }).then(again);
@@ -18898,7 +18917,7 @@
             return;
           }
           if (t.hasAttribute("data-cev-no")) {
-            GoDialog.confirm("Absagen?", { ok: "Absagen", cancel: "Abbrechen", row: true }).then(function (yes) {
+            GoDialog.confirm("Absagen?", { ok: "Absagen", cancel: "Zurück", row: true }).then(function (yes) {
               if (!yes) return;
               rest("event_rsvps?event_id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(me), { method: "DELETE", prefer: "return=minimal" })
                 .then(function () { circleFfcRespond(id, false, box); })
@@ -18912,7 +18931,7 @@
             return;
           }
           if (t.hasAttribute("data-cev-del")) {
-            GoDialog.confirm("Termin entfernen?", { body: "Das Zirkeltraining wird gelöscht. Wer zugesagt hat, hat es dann nicht mehr in seiner Woche.", ok: "Entfernen", cancel: "Abbrechen", row: true }).then(function (yes) {
+            GoDialog.confirm("Termin entfernen?", { body: "Das Zirkeltraining wird gelöscht. Wer zugesagt hat, hat es dann nicht mehr in seiner Woche.", ok: "Entfernen", cancel: "Zurück", row: true }).then(function (yes) {
               if (!yes) return;
               var evDel = (box._evs || []).filter(function (x) { return String(x.id) === String(id); })[0];
               rest("events?id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(me), { method: "DELETE", prefer: "return=minimal" })
@@ -22401,6 +22420,7 @@
       var CIRCLE_WORK = ["0:30", "0:45", "1:00", "1:30", "2:00", "2:30", "3:00", "3:30", "4:00", "4:30", "5:00", "6:00", "8:00", "10:00"];
       var CIRCLE_REST = ["0:00", "0:10", "0:15", "0:20", "0:30", "0:45", "1:00", "1:30", "2:00", "3:00"];
       function mmssSec(t) { var p = String(t || "").split(":"); return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0); }
+      function secMmss(sec) { sec = Number(sec) || 0; return Math.floor(sec / 60) + ":" + ("0" + (sec % 60)).slice(-2); }
       /* Termin auch in der Zirkel-App (Hendriks create_event) mit allen Circle-Mitgliedern als Eingeladene.
          Format, Zeiten und Stationen kommen beim Start aus der gogogo-Notiz (Double = „Team“). */
       function circleFfcCopy(g, startsAt, location) {
@@ -22414,7 +22434,7 @@
       function circleEvTime(g, ev, done) {
         if (!ev) return;
         var cur = new Date(ev.starts_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
-        GoDialog.time("Uhrzeit", { initial: cur, ok: "Speichern", cancel: "Abbrechen" }).then(function (t) {
+        GoDialog.time("Uhrzeit", { initial: cur, ok: "Speichern", cancel: "Zurück", step: true }).then(function (t) {
           if (!t) return;
           var day = new Date(ev.starts_at).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
           var at = berlinAt(day, String(t).padStart(5, "0"));
@@ -22454,58 +22474,98 @@
         return Promise.all(twins.map(function (f) { return Promise.resolve(FFC.deleteEvent(f.id)).catch(function () {}); }));
       }
       var CIRCLE_REPEAT_WEEKS = 12;
-      function createCircleEvent(g, asCircle, presetDay, onDone, repeatWeeks) {
+      function createCircleEvent(g, asCircle, presetDay, onDone, repeatWeeks, onBack) {
         var dates = circleDates();
         var pick = { day: presetDay || null, time: null, rounds: 6, loc: "" };
-        (presetDay ? Promise.resolve("preset") : GoDialog.time(asCircle ? "Circle-Event: Tag" : "Eigenes Zirkeltraining: Tag", { times: dates.map(function (x) { return x.label; }), ok: "Weiter", cancel: "Abbrechen" }))
-          .then(function (lab) {
-            if (!lab) return null;
-            if (!presetDay) pick.day = (dates.filter(function (x) { return x.label === lab; })[0] || {}).iso;
-            return GoDialog.time("Uhrzeit", { ok: "Weiter", cancel: "Abbrechen" });
-          })
-          .then(function (t) {
-            if (!t) return null;
-            pick.time = String(t).padStart(5, "0");
-            /* Format: Single oder Double (in Hendriks Zirkel-App „Team“) */
-            return GoDialog.choose("Format", [
-              { label: "Single", value: "single" },
-              { label: "Double (im Team)", value: "double" }
-            ], { center: true, sub: "Double: zu zweit an einer Station, im Wechsel.", cancel: "Abbrechen" });
-          })
-          .then(function (mode) {
-            if (!mode) return null;
-            pick.mode = mode;
-            var rs = [];
-            for (var n = 3; n <= 12; n++) rs.push(n + " Runden");
-            return GoDialog.time("Runden", { times: rs, initial: "6 Runden", ok: "Weiter", cancel: "Abbrechen" });
-          })
-          .then(function (r) {
-            if (!r) return null;
-            pick.rounds = parseInt(r, 10) || 6;
-            return GoDialog.time("Arbeit je Station", { times: CIRCLE_WORK, initial: "4:00", ok: "Weiter", cancel: "Abbrechen" });
-          })
-          .then(function (wk) {
-            if (!wk) return null;
-            pick.workSec = mmssSec(wk) || 240;
-            return GoDialog.time("Pause", { times: CIRCLE_REST, initial: "0:30", ok: "Weiter", cancel: "Abbrechen" });
-          })
-          .then(function (ps) {
-            if (!ps) return null;
-            pick.restSec = mmssSec(ps);
-            /* Stationen in der Reihenfolge an der Tafel: stehen dann auf dem PDF (circle-sheet.js) */
-            return window.GoCircleSheet ? GoCircleSheet.pickStations("Stationen") : [];
-          })
-          .then(function (stK) {
-            if (!stK) return null;
-            pick.st = stK;
-            var w = circleWhere(g);
-            if (!asCircle || w.locs.length < 2) { pick.loc = asCircle ? w.locs[0] || "" : ""; return true; }
-            return GoDialog.choose("Ort", w.locs.map(function (l) { return { label: l, value: l }; })).then(function (l) {
-              if (!l) return null;
-              pick.loc = l;
+        /* Schritte nacheinander: Weiter geht vor, Zurück einen Schritt zurück (im ersten Schritt raus) */
+        var ST = { step: true, ok: "Weiter", cancel: "Zurück" };
+        var steps = [];
+        if (!presetDay) steps.push(function () {
+          var cur = (dates.filter(function (x) { return x.iso === pick.day; })[0] || {}).label;
+          return GoDialog.time(asCircle ? "Tag" : "Eigenes Zirkeltraining: Tag", Object.assign({ times: dates.map(function (x) { return x.label; }), initial: cur }, ST))
+            .then(function (lab) {
+              if (!lab) return null;
+              pick.day = (dates.filter(function (x) { return x.label === lab; })[0] || {}).iso;
               return true;
             });
-          })
+        });
+        steps.push(function () {
+          return GoDialog.time("Uhrzeit", Object.assign({ initial: pick.time ? pick.time.replace(/^0/, "") : "13:00" }, ST)).then(function (t) {
+            if (!t) return null;
+            var hh = String(t).padStart(5, "0");
+            /* Start in der Vergangenheit: gleich hier sagen, sonst steht ein Event, das schon vorbei ist */
+            if (new Date(berlinAt(pick.day, hh)).getTime() < Date.now()) {
+              return GoDialog.alert("Diese Uhrzeit ist heute schon vorbei.").then(function () { return "again"; });
+            }
+            pick.time = hh;
+            return true;
+          });
+        });
+        /* Format: Single oder Double (in Hendriks Zirkel-App „Team“) */
+        steps.push(function () {
+          return GoDialog.choose("Format", [
+            { label: "Single", value: "single" },
+            { label: "Double (im Team)", value: "double" }
+          ], { center: true, sub: "Double: zu zweit an einer Station, im Wechsel.", cancel: "Zurück" }).then(function (mode) {
+            if (!mode) return null;
+            pick.mode = mode;
+            return true;
+          });
+        });
+        steps.push(function () {
+          var rs = [];
+          for (var n = 3; n <= 12; n++) rs.push(n + " Runden");
+          return GoDialog.time("Runden", Object.assign({ times: rs, initial: pick.rounds + " Runden" }, ST)).then(function (r) {
+            if (!r) return null;
+            pick.rounds = parseInt(r, 10) || 6;
+            return true;
+          });
+        });
+        steps.push(function () {
+          return GoDialog.time("Arbeit je Station", Object.assign({ times: CIRCLE_WORK, initial: pick.workSec ? secMmss(pick.workSec) : "4:00" }, ST)).then(function (wk) {
+            if (!wk) return null;
+            pick.workSec = mmssSec(wk) || 240;
+            return true;
+          });
+        });
+        steps.push(function () {
+          return GoDialog.time("Pause", Object.assign({ times: CIRCLE_REST, initial: pick.restSec != null ? secMmss(pick.restSec) : "0:30" }, ST)).then(function (ps) {
+            if (!ps) return null;
+            pick.restSec = mmssSec(ps);
+            return true;
+          });
+        });
+        /* Stationen in der Reihenfolge an der Tafel (PDF, circle-sheet.js): so viele wie Runden */
+        steps.push(function () {
+          if (!window.GoCircleSheet) { pick.st = []; return Promise.resolve(true); }
+          return GoCircleSheet.pickStations("Stationen", pick.st || [], { need: pick.rounds, step: true, cancel: "Zurück" }).then(function (stK) {
+            if (!stK) return null;
+            pick.st = stK;
+            return true;
+          });
+        });
+        steps.push(function () {
+          var w = circleWhere(g);
+          if (!asCircle || w.locs.length < 2) { pick.loc = asCircle ? w.locs[0] || "" : ""; return Promise.resolve(true); }
+          return GoDialog.choose("Ort", w.locs.map(function (l) { return { label: l, value: l }; }), { center: true, cancel: "Zurück" }).then(function (l) {
+            if (!l) return null;
+            pick.loc = l;
+            return true;
+          });
+        });
+        function run(i) {
+          if (i < 0) { if (typeof onBack === "function") setTimeout(onBack, 0); return Promise.resolve(false); }
+          if (i >= steps.length) return Promise.resolve(true);
+          return steps[i]().then(function (r) {
+            if (r === "again") return run(i);
+            if (!r) {
+              /* Schritte ohne eigenen Dialog (Ort bei nur einem Ort) beim Zurückgehen überspringen */
+              return run(i - 1);
+            }
+            return run(i + 1);
+          });
+        }
+        run(0)
           .then(function (ok) {
             if (!ok) return;
             var w = circleWhere(g);
@@ -22528,7 +22588,11 @@
                 if (asCircle) return Promise.all(bodies.map(function (b) { return circleFfcCopy(g, b.starts_at, b.location); }));
               });
             }).then(function () {
-              gogogoToast(asCircle ? ((repeatWeeks || 0) > 1 ? "Gespeichert: jede Woche, " + repeatWeeks + " Wochen. " : "Circle-Event steht. ") + "Deine Mitglieder sehen es in Aktuell und in der Zirkel-App und können zusagen." : "Zirkeltraining ist in Deiner Woche.");
+              if (asCircle) {
+                GoDialog.alert((repeatWeeks || 0) > 1 ? "Circle-Events stehen: jede Woche, " + repeatWeeks + " Wochen." : "Circle-Event steht.", {
+                  body: "Die Mitglieder von " + (g.name || "Deinem Circle") + " sehen es in der Liste hier und als Event im Aktuell-Feed. Zusagen über + in der Liste oder über Winken im Feed."
+                });
+              } else gogogoToast("Zirkeltraining ist in Deiner Woche.");
               paintCircleEvents();
               if (typeof onDone === "function") onDone();
               if (window.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
@@ -29688,7 +29752,7 @@
   </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/natalyaalice/hyrox-doubles.js?v=hxd-3"></script>
-  <script src="/natalyaalice/circle-sheet.js?v=cs-4"></script>
+  <script src="/natalyaalice/circle-sheet.js?v=cs-5"></script>
   <script src="/natalyaalice/ffc.js?v=ffc-dlg-21"></script>
 </body>
 </html>

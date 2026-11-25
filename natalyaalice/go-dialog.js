@@ -62,7 +62,9 @@
     ".god__file{display:flex;align-items:center;justify-content:center;cursor:pointer}" +
     ".god__row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}" +
     ".god__check{margin:12px 0 16px;line-height:1.3;padding:10px 12px}" +
-    ".god__row2 .god__btn{margin:0}";
+    ".god__row2 .god__btn{margin:0}" +
+    ".god__btn.is-off{opacity:.55}" +
+    ".god__card .god__text.god__text--step{margin-bottom:14px !important}";
 
   function ensureCss() {
     if (document.getElementById("go-dialog-css")) return;
@@ -260,12 +262,35 @@
       } else {
         card.appendChild(list);
       }
-      button(card, opts.ok || "Weiter", "", function () {
-        close(Array.prototype.map.call(list.querySelectorAll("input:checked"), function (i) { return i.value; }));
+      if (opts.step) { var tP = card.querySelector(".god__text"); if (tP) tP.classList.add("is-center"); }
+      var okP = button(card, opts.ok || "Weiter", "", function () {
+        var vals = Array.prototype.map.call(list.querySelectorAll("input:checked"), function (i) { return i.value; });
+        if (opts.need && vals.length !== opts.need) return;
+        close(vals);
       });
-      button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(null); });
+      /* opts.need: genau so viele auswählen, sonst steht auf dem Knopf „6 Stationen auswählen“ */
+      function needPaint() {
+        if (!opts.need) return;
+        var n = list.querySelectorAll("input:checked").length;
+        var ok = n === opts.need;
+        okP.textContent = ok ? (opts.ok || "Weiter") : opts.need + " " + (opts.needLabel || "auswählen") + (n > opts.need ? " (" + (n - opts.need) + " zu viel)" : "");
+        okP.classList.toggle("is-off", !ok);
+        okP.setAttribute("aria-disabled", ok ? "false" : "true");
+      }
+      list.addEventListener("change", needPaint);
+      needPaint();
+      var noP = button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(null); });
+      if (opts.step) stepRow(card, okP, noP);
       return null;
     });
+  }
+  /* Weiter und Zurück nebeneinander (wie confirm mit row) */
+  function stepRow(card, okB, noB) {
+    var row = document.createElement("div");
+    row.className = "god__row2";
+    row.appendChild(okB);
+    row.appendChild(noB);
+    card.appendChild(row);
   }
 
   /* Nur Text, kein Titel, kein Button: Tippen auf die Karte oder daneben schließt. */
@@ -294,10 +319,13 @@
         sub.textContent = opts.sub;
         card.appendChild(sub);
       }
+      /* opts.step: Schritt in einer Abfolge: Überschrift mittig, Rad zeigt nur eine Zeile drüber und drunter,
+         Weiter und Zurück nebeneinander (Zurück liefert null) */
+      if (opts.step) { var tS = card.querySelector(".god__text"); if (tS) tS.classList.add("is-center", "god__text--step"); }
       var times = opts.times || [];
       if (!times.length) for (var h = 6; h <= 22; h++) { times.push(h + ":00"); times.push(h + ":30"); }
       var wheel = document.createElement("div");
-      wheel.className = "god__wheel";
+      wheel.className = "god__wheel" + (opts.step ? " god__wheel--sm" : "");
       times.forEach(function (t, i) {
         var b = document.createElement("button");
         b.type = "button";
@@ -328,12 +356,13 @@
           if (hit) requestAnimationFrame(function () { wheel.scrollTop = b.offsetTop - (wheel.clientHeight - b.offsetHeight) / 2; });
         });
       }
-      button(card, opts.ok || "Senden", "", function () {
+      var okT = button(card, opts.ok || "Senden", "", function () {
         var on = wheel.querySelector(".is-on");
         close(on ? on.textContent : null);
       });
       if (opts.alt) button(card, opts.alt, "god__btn--choice", function () { close("alt"); });
-      button(card, opts.cancel || "Später", "god__btn--quiet", function () { close(null); });
+      var noT = button(card, opts.cancel || "Später", "god__btn--quiet", function () { close(null); });
+      if (opts.step) stepRow(card, okT, noT);
       return null;
     });
   }
