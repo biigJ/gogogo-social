@@ -1224,6 +1224,7 @@
         Object.assign(f, readMatrix(!isUnit));
         if (!isUnit && state.newCols) {
           f.is_public = $("f-public").checked;
+          if (f.is_public) f.private_for = null;
           f.goals = [].map.call(document.querySelectorAll("[data-goal]:checked"), function (x) { return x.getAttribute("data-goal"); });
           f.preview_url = $("f-preview").value.trim() || null;
         }
@@ -1352,6 +1353,8 @@
         if (!f.title) { toast("Titel fehlt"); return; }
         /* Nutzer sehen nur, was auch im Katalog ist */
         if (f.is_public && !f.is_active) f.is_active = true;
+        /* öffentlich heißt: kein persönlicher Plan mehr (Nutzer-Auswahl blendet private_for aus) */
+        if (f.is_public) f.private_for = null;
         rest("courses?id=eq." + c.id, { method: "PATCH", body: f }).then(loadAll)
           .then(function () { setHeader(f.title); $("p-coaches").checked = f.is_active; toast("Gespeichert"); })
           .catch(function (err) { toast(err.message); });
