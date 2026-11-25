@@ -135,7 +135,11 @@
     /* Circle-Aufzeichnungen: Markup und Klassen der App (go-rec-wheel, go-rec-detail, go-rec-round) */
     ".ga-rec .ga-info__card{width:min(100%,520px)}" +
     ".ga-pills{flex:none;align-self:center;display:flex;gap:6px}" +
-    "@media (max-width:600px){.ga-item:has(.ga-pills){flex-wrap:wrap}.ga-item:has(.ga-pills) .ga-copy{flex:1 1 calc(100% - 85px)}.ga-item .ga-pills{margin-left:73px}}" +
+    /* Pillen rechts als eigene Spalte: zweite Zeile (Gruppen) unter der ersten, Text links schrumpft statt zu überlappen */
+    ".ga-pillbox{flex:none;align-self:center;display:flex;flex-direction:column;align-items:flex-start;gap:6px}" +
+    ".ga-pillbox .ga-pills{align-self:flex-start}" +
+    "@media (max-width:600px){.ga-item:has(.ga-pills){flex-wrap:wrap}.ga-item:has(.ga-pills) .ga-copy{flex:1 1 calc(100% - 85px)}.ga-item .ga-pills{margin-left:73px}" +
+    ".ga-item .ga-pillbox{margin-left:73px}.ga-item .ga-pillbox .ga-pills{margin-left:0}}" +
     ".ga-rec .go-rec-detail__pts{text-align:center;font:600 28px/1.2 'Playfair Display',Georgia,serif;margin-top:4px}" +
     ".ga-rec .go-rec-detail__meta{text-align:center;font-size:13px;margin-bottom:6px}" +
     /* Dreh-Knöpfe: Tippen schaltet zum nächsten Wert */
@@ -299,7 +303,8 @@
     if (!ids.length) return;
     var base = "go_accounts?id=in.(" + ids.join(",") + ")&select=";
     var more = ",serial_number,invite_code,phone,whatsapp_phone,about_me,training_goal,trainer_id,workout_places,photo_url";
-    host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at,seen_at,ffc_seen_at,is_admin,created_at" + more)
+    host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at,seen_at,ffc_seen_at,is_admin,created_at,max_groups" + more)
+      .catch(function () { return host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at,seen_at,ffc_seen_at,is_admin,created_at" + more); })
       .catch(function () { return host.rest(base + "id,nickname,coach_self_at,coach_verified_at,paused_at" + more); })
       .catch(function () { return host.rest(base + "id,nickname,coach_self_at,coach_verified_at" + more); })
       .catch(function () { return host.rest(base + "id,nickname"); })
@@ -632,6 +637,20 @@
     return v && typeof v === "object" ? v : {};
   }
   /* Pille rechts: Nutzer (leer) · Coach (schwarz: als Coach angemeldet, auch per „Ich als Coach“) · Zertifikat (blau: zertifizierter Coach) */
+  /* 1 Gruppe ↔ 5 Gruppen (go-group-limit.sql) */
+  function setMaxGroups(btn) {
+    var id = btn.getAttribute("data-ga-mg");
+    var ci = coachInfo(id);
+    var next = Number(ci.max_groups) >= 5 ? 1 : 5;
+    btn.disabled = true;
+    host.rest("rpc/go_admin_set_max_groups", { method: "POST", body: { p_account: id, p_n: next } })
+      .then(function () {
+        if (st && st.coachInfo && st.coachInfo[String(id)]) st.coachInfo[String(id)].max_groups = next;
+        paint();
+        if (host.toast) host.toast(next === 5 ? "Darf jetzt bis zu 5 Gruppen gründen" : "Darf 1 Gruppe gründen");
+      })
+      .catch(function () { btn.disabled = false; GoDialog.alert("Ging nicht. Ist go-group-limit.sql in Supabase ausgeführt?"); });
+  }
   function rolePill(a) {
     var id = String(a.account_id);
     var ci = coachInfo(id);
@@ -890,7 +909,9 @@
         return '<div class="ga-item is-top' + (ci.paused_at ? " ga-paused" : "") + '"><button type="button" class="ga-rectbtn" data-ga-info="' + esc(id) + '" aria-label="Infos zu ' + esc(a.name || "") + '">' + rect + "</button>" +
           '<div class="ga-copy ga-rows"><div class="ga-r1">' + r1 + "</div>" +
           (r2 ? "<div>" + r2 + "</div>" : "") + "<div>" + r3 + "</div><div>" + r4 + "</div>" + (r5 ? "<div>" + r5 + "</div>" : "") + "</div>" +
-          '<span class="ga-pills">' + (nRec ? '<button type="button" class="ga-pill" data-ga-rec="' + esc(id) + '" aria-label="Circle-Aufzeichnungen">Circle</button>' : "") + rolePill(a) + '<button type="button" class="ga-pill" data-ga-qr="' + esc(id) + '">QR-Code</button>' + "</span></div>";
+          '<span class="ga-pillbox"><span class="ga-pills">' + (nRec ? '<button type="button" class="ga-pill" data-ga-rec="' + esc(id) + '" aria-label="Circle-Aufzeichnungen">Circle</button>' : "") + rolePill(a) + '<button type="button" class="ga-pill" data-ga-qr="' + esc(id) + '">QR-Code</button>' + "</span>" +
+          /* darunter: wie viele Gruppen die Person gründen darf (go-group-limit.sql), Tipp wechselt 1 ↔ 5 */
+          '<span class="ga-pills"><button type="button" class="ga-pill' + (Number(ci.max_groups) >= 5 ? " is-fill" : "") + '" data-ga-mg="' + esc(id) + '">' + (Number(ci.max_groups) >= 5 ? "5 Gruppen" : "1 Gruppe") + "</button></span></span></div>";
       }).join("") + paintTrash();
   }
   /* Papierkorb (go-nutzer-papierkorb.sql): gelöschte Konten bleiben gespeichert, nur für Admins sichtbar */
@@ -2601,7 +2622,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-gpl],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall],[data-ga-us],[data-ga-ts],[data-ga-trash]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-gpl],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall],[data-ga-us],[data-ga-ts],[data-ga-trash],[data-ga-mg]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -2617,6 +2638,7 @@
       return;
     }
     if (t.hasAttribute("data-ga-qr")) { openQr(t.getAttribute("data-ga-qr")); return; }
+    if (t.hasAttribute("data-ga-mg")) { setMaxGroups(t); return; }
     if (t.hasAttribute("data-ga-user")) { userMenu(t.getAttribute("data-ga-user")); return; }
     if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
     if (t.hasAttribute("data-ga-plan")) { userWeek(t.getAttribute("data-ga-plan")); return; }

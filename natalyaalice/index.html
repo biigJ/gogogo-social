@@ -9015,7 +9015,7 @@
   <script src="/natalyaalice/exercise-links.js?v=gxl-13"></script>
   <script src="/natalyaalice/orte.js?v=gor-2"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-52"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-53"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-6"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-31"></script>
@@ -9026,7 +9026,7 @@
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-184"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-119"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-120"></script>
   <script src="/natalyaalice/support.js?v=support-36"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
   <script src="/natalyaalice/coach-group.js?v=gcg-5"></script>
@@ -18547,8 +18547,8 @@
         coach: '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M15.2 9.2a4 4 0 1 0 0 5.6"/></svg>'
       };
       var KREIS_PEN = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg>';
-      function kreisRowHtml(kind, photo, name, pen) {
-        return '<div class="gbub-row kreis-row" data-kreis="' + kind + '" role="button" tabindex="0">' +
+      function kreisRowHtml(kind, photo, name, pen, id) {
+        return '<div class="gbub-row kreis-row" data-kreis="' + kind + '"' + (id ? ' data-kreis-id="' + escapeHtml(id) + '"' : "") + ' role="button" tabindex="0">' +
           '<span class="gbub-row__img" style="--gbub:#E9E1D2">' + (photo ? '<img src="' + escapeHtml(photo) + '" alt="" decoding="sync" />' : "") +
           '<span class="gbub-row__ico' + (photo ? "" : " is-plain") + '">' + KREIS_ICON[kind] + "</span></span>" +
           '<span class="gbub-row__txt"><span class="gbub-row__name">' + escapeHtml(name) + "</span></span>" +
@@ -18562,10 +18562,12 @@
         var html = '<button type="button" class="friend-list__row friend-list__add" data-kreis-add>' +
           '<span class="friend-list__plus" aria-hidden="true">+</span>' +
           '<span class="friend-list__text"><span class="friend-list__name">Hinzufügen</span></span></button>';
-        if (st.group) {
-          html += kreisRowHtml("group", st.group.photo_url || "/assets/gogogo/gogogo-Gruppe-small.jpg", st.group.name || "Meine Gruppe",
-            String(st.group.owner || "") === me);
-        }
+        /* jede eigene Gruppe eine Zeile (bis zu 5 mit Admin-Recht, go-group-limit.sql) */
+        (st.groups || (st.group ? [{ group: st.group }] : [])).forEach(function (x) {
+          var g = x.group;
+          html += kreisRowHtml("group", g.photo_url || "/assets/gogogo/gogogo-Gruppe-small.jpg", g.name || "Meine Gruppe",
+            String(g.owner || "") === me, g.id ? String(g.id) : "");
+        });
         html += circleRowsHtml();
         if (st.coach) {
           html += kreisRowHtml("coach", st.coach.photo_url || "", "Coach " + String(st.coach.name || "").split(" ")[0], true);
@@ -18663,8 +18665,11 @@
       function kreiseWalletItems() {
         var st = kreiseState || {};
         var out = [];
-        if (st.group) out.push({ id: "k:group", name: st.group.name || "Meine Gruppe", photo_url: st.group.photo_url || "/assets/gogogo/gogogo-Gruppe-small.jpg",
-          _kreis: { kind: "group" }, _tag: "Meine Gruppe", _about: st.group.description || "" });
+        (st.groups || (st.group ? [{ group: st.group }] : [])).forEach(function (x) {
+          var g = x.group;
+          out.push({ id: "k:group:" + (g.id || ""), name: g.name || "Meine Gruppe", photo_url: g.photo_url || "/assets/gogogo/gogogo-Gruppe-small.jpg",
+            _kreis: { kind: "group", id: g.id ? String(g.id) : "" }, _tag: "Meine Gruppe", _about: g.description || "" });
+        });
         (cst().groups || []).forEach(function (g) {
           out.push({ id: "k:circle:" + g.group_id, name: String(g.name || "Circle"), photo_url: circlePhoto(g) || "/assets/gogogo/gogogo-Zirkeltraining.jpg",
             _kreis: { kind: "circle", id: String(g.group_id) }, _tag: "Circle", _about: "Zirkeltraining" });
@@ -18994,7 +18999,7 @@
       }
       function editKreis(kind, id) {
         var st = kreiseState || {};
-        if (kind === "group" && st.group) openGroupEditModal(st.group);
+        if (kind === "group" && st.group) openGroupEditModal(kreisGroup(id).group || st.group);
         else if (kind === "coach") openTeamSearch("trainer");
         else if (kind === "circle") {
           var go = function () { openCircleJoin({ coach: true }); };
@@ -19013,7 +19018,14 @@
           if (!v) return;
           /* erst nach dem Dialog öffnen, sonst schließt derselbe Tipp die neue Seite */
           setTimeout(function () {
-            if (v === "group") openKreis("group");
+            if (v === "group") {
+              /* schon eine eigene Gruppe: weitere gründen, wenn erlaubt; sonst die Gruppe öffnen */
+              if (!ownedGroupCount()) { openKreis("group"); return; }
+              loadMaxGroups().then(function (max) {
+                if (ownedGroupCount() < max) openGoSub("group", "Gruppe erstellen");
+                else openKreis("group");
+              });
+            }
             else if (v === "coach") openKreis("coach");
             else if (v === "circle") {
               /* eingeloggt: Circle beitreten bzw. verwalten wie bisher; sonst Zirkel-Seite mit Anmeldung */
@@ -19051,9 +19063,31 @@
         }
         return true;
       }
+      /* Gruppe nach id (mehrere eigene Gruppen), sonst die erste */
+      function kreisGroup(id) {
+        var st = kreiseState || {};
+        var list = st.groups || [];
+        return (id && list.filter(function (x) { return x.group && String(x.group.id) === String(id); })[0]) || list[0] || { group: st.group, slide: st.groupSlide };
+      }
+      /* Darf ich noch eine Gruppe gründen? max_groups aus go_accounts (Admin vergibt 1 oder 5) */
+      function ownedGroupCount() {
+        var me = String((sessionAccount && sessionAccount.id) || "");
+        return ownGroups().filter(function (g) { return g && String(g.owner || "") === me; }).length;
+      }
+      function loadMaxGroups() {
+        if (!sessionAccount || !sessionAccount.id) return Promise.resolve(1);
+        return rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id) + "&select=max_groups")
+          .then(function (rows) { var n = Number(rows && rows[0] && rows[0].max_groups) || 1; sessionAccount.max_groups = n; return n; })
+          .catch(function () { return Number(sessionAccount.max_groups) || 1; });
+      }
       function openKreis(kind, id) {
         var st = kreiseState || {};
-        if (kind === "group") openKreisPage(st.groupSlide, (st.group && st.group.name) || "Meine Gruppe");
+        if (kind === "group") {
+          var kg = kreisGroup(id);
+          var gs = kg.slide || st.groupSlide;
+          openKreisPage(gs, (kg.group && kg.group.name) || (st.group && st.group.name) || "Meine Gruppe");
+          if (gs && gs._gaBox && window.WocheReels && WocheReels.renderGroupAssign) WocheReels.renderGroupAssign(gs._gaBox, gs._gaGid);
+        }
         else if (kind === "coach") {
           openKreisPage(st.coachSlide, "Mein Coach");
           var cBody = document.querySelector(".kreis-page .kreis-page__body");
@@ -19607,6 +19641,11 @@
         } else {
           groupHost = groupSlide(myGroup, "Meine Gruppe");
         }
+        /* weitere eigene Gruppen (Admin-Recht 5 Gruppen, go-group-limit.sql): je eine Seite */
+        var groupPages = myGroup ? [{ group: myGroup, slide: groupHost }] : [];
+        ownGroups().slice(1).forEach(function (g) {
+          groupPages.push({ group: g, slide: groupSlide(g, g.name || "Meine Gruppe") });
+        });
         /* FFC-Gruppe nicht mehr unter Meine Gruppe, sondern Plus → FFC → Circle beitreten */
         if (false && ffcGroup && groupHost) {
           var ffcPart = groupSlide(ffcGroup, "Friday Fitness Circle", true);
@@ -19787,8 +19826,8 @@
         }
         /* Kreise: Gruppe und Coach sind keine eigenen Reiter mehr, sondern Zeilen in Kreise (eigene Seite beim Tippen) */
         if (kreiseRows) {
-          [groupHost, coachSlide].forEach(function (sl) { if (sl && sl.parentNode === box) box.removeChild(sl); });
-          kreiseState = { group: myGroup, groupSlide: groupHost, coach: trainer, coachSlide: coachSlide };
+          [groupHost, coachSlide].concat(groupPages.map(function (x) { return x.slide; })).forEach(function (sl) { if (sl && sl.parentNode === box) box.removeChild(sl); });
+          kreiseState = { group: myGroup, groupSlide: groupHost, groups: groupPages, coach: trainer, coachSlide: coachSlide };
           paintKreiseRows(kreiseRows);
           var krEl = kreiseRows, krView = kreisePaintView;
           if (krView) krView();
@@ -21558,9 +21597,11 @@
           save.addEventListener("click", function () {
             var name = String(nameIn.value || "").trim();
             if (!name) { nameIn.focus(); return; }
-            var existing = ownGroups();
-            if (existing.length) {
-              try { GoDialog.alert("Du hast schon eine eigene Gruppe. Dazu kommt nur deine FFC-Gruppe."); } catch (eG) {}
+            save.disabled = true;
+            loadMaxGroups().then(function (max) {
+            save.disabled = false;
+            if (ownedGroupCount() >= max) {
+              try { GoDialog.alert(max > 1 ? "Du hast schon " + max + " eigene Gruppen. Mehr geht nicht." : "Du hast schon eine eigene Gruppe. Dazu kommt nur deine FFC-Gruppe."); } catch (eG) {}
               closeGoSub();
               renderTeam();
               return;
@@ -21608,6 +21649,14 @@
                   return FFC.createGroup(name, ids);
                 })
                 .catch(function () {});
+            }, function (err) {
+              /* Server-Grenze (go-group-limit.sql) */
+              if (/group_limit/.test(String((err && err.message) || ""))) {
+                try { GoDialog.alert("Mehr Gruppen geht mit Deinem Konto nicht."); } catch (eL) {}
+              } else {
+                try { GoDialog.alert("Gruppe speichern ging nicht."); } catch (eL2) {}
+              }
+            });
             });
           });
           form.appendChild(save);
@@ -27436,8 +27485,12 @@
         var box = document.createElement("div");
         box.className = "team-gassign";
         slide.appendChild(box);
+        slide._gaBox = box;
+        slide._gaGid = group && group.id ? String(group.id) : "";
         if (typeof installWocheReels === "function") installWocheReels(true);
-        if (window.WocheReels && WocheReels.renderGroupAssign) WocheReels.renderGroupAssign(box);
+        /* mehrere eigene Gruppen: Events zeichnet die Seite, die gerade offen ist (openKreis), sonst die erste */
+        var first = ownGroups()[0];
+        if ((!first || !group || String(first.id) === String(group.id)) && window.WocheReels && WocheReels.renderGroupAssign) WocheReels.renderGroupAssign(box, slide._gaGid);
       }
       var groupEventsCache = {};
 
