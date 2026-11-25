@@ -2633,6 +2633,8 @@
   function kreisMsgsFor(view) {
     return (state.kreisMsgs || []).filter(function (m) {
       if (view === "alles") return true;
+      /* „Nur ich“: auch Nachrichten an mich und meine Nachrichten an eine einzelne Person (@Name) */
+      if (view === "ich" && m.to_id && (String(m.to_id) === me() || String(m.author_id) === me())) return true;
       if (view.indexOf("circle:") === 0) return m.audience === "circle" && String(m.audience_id || "") === view.slice(7);
       if (m.audience === view) return true;
       /* Nachricht meines Coachs an seine Coachees steht bei mir unter Freunde */
