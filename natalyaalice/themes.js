@@ -65,7 +65,7 @@
       label: "B/W",
       /* Schrift wie Neutral Sans (kommerziell): Geist, Text und Listen fein (300), Titel Regular eng gesetzt */
       head: "400 Geist,sans-serif",
-      fonts: "family=Geist:wght@300;400;500;600",
+      fonts: "family=Geist:wght@200;300;400;500;600",
       display: "Geist",
       body: "Geist",
       serif: "Geist",
@@ -123,7 +123,9 @@
         "#gbub-compose .gbub-compose__att{color:#fff !important}" +
         "#gbub-compose .gbub-compose__reply{background:#1A1A1A !important;color:#fff !important;border-left-color:#fff !important}" +
         /* Neutral-Sans-Look: Text fein, Titel Regular, eng */
-        "p,li,li span,.acc-card__when,.acc-card__place,.acc-msg__txt,.gbub-row__name,.friend-list__name,.gcg__ce b{font-weight:300 !important}" +
+        "html[data-go-theme=bw] body p:not(#_):not(#__),html[data-go-theme=bw] body li:not(#_):not(#__),html[data-go-theme=bw] body li span:not(#_):not(#__),html[data-go-theme=bw] body .acc-card__when:not(#_):not(#__),html[data-go-theme=bw] body .acc-card__place:not(#_):not(#__),html[data-go-theme=bw] body .acc-msg__txt:not(#_):not(#__),html[data-go-theme=bw] body .gbub-row__name:not(#_):not(#__),html[data-go-theme=bw] body .friend-list__name:not(#_):not(#__),html[data-go-theme=bw] body .friend-list__meta:not(#_):not(#__),html[data-go-theme=bw] body .gcg__ce b:not(#_):not(#__),html[data-go-theme=bw] body .fw-tag:not(#_):not(#__),html[data-go-theme=bw] body .fw-card__text:not(#_):not(#__),html[data-go-theme=bw] body .team-slide__about:not(#_):not(#__),html[data-go-theme=bw] body .fw-card__about:not(#_):not(#__){font-weight:200 !important}" +
+        /* Kreise ohne Foto (z. B. Meine Coachees): schwarz gefüllt, weißer Rand, weißes Symbol mittig */
+        ".kreis-row .gbub-row__img:not(#_){background:#000 !important;box-shadow:inset 0 0 0 1.5px #fff}.kreis-row .gbub-row__ico.is-plain:not(#_){color:#fff !important;filter:none}" +
         "html[data-go-theme=bw] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=bw] body .profile-name:not(#_):not(#__),html[data-go-theme=bw] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=bw] body .team-slide__head:not(#_):not(#__),html[data-go-theme=bw] body .page-head-title:not(#_):not(#__),html[data-go-theme=bw] body .quit-title:not(#_):not(#__),html[data-go-theme=bw] body .wr-day-label:not(#_):not(#__),html[data-go-theme=bw] body .wr-title:not(#_):not(#__),html[data-go-theme=bw] body .wr-sheet-title:not(#_):not(#__),html[data-go-theme=bw] body .wr-dayrow__title:not(#_):not(#__),html[data-go-theme=bw] body .acc-card__title:not(#_):not(#__),html[data-go-theme=bw] body .go-card__title:not(#_):not(#__),html[data-go-theme=bw] body .gstory__txt h3:not(#_):not(#__),html[data-go-theme=bw] body .gbub-story__txt h3:not(#_):not(#__),html[data-go-theme=bw] body #heute-filter-select:not(#_),html[data-go-theme=bw] body select[data-wr-week-select]:not(#_)" +
         "{font-family:Geist,system-ui,sans-serif !important;font-weight:400 !important;letter-spacing:-.025em}" +
         /* Meine Coachees: Stempel weiß umrandet, innen schwarz (gestempelt weiß) */
