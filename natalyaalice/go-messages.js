@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-card-status",
+      at: "2026-11-25T15:50:00Z",
+      text: "Aktuell: Unten links auf jeder Karte steht jetzt der Status, also erledigt, verspätet, dabei, bald, heute oder morgen."
+    },
+    {
       key: "news:2026-11-25-review-edit",
       at: "2026-11-25T15:30:00Z",
       text: "Deine Coach-Bewertung kannst Du jetzt anpassen: Community → Mein Coach → „Bewertung anpassen“. Sterne und Text sind änderbar."
