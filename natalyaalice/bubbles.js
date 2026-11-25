@@ -530,7 +530,7 @@
   }
   function evCover(ev) {
     if (ev.photo_url) return ev.photo_url;
-    try { return global.GoCovers && GoCovers.url ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id) || "" : ""; } catch (e) { return ""; }
+    try { return global.GoCovers && GoCovers.url ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id, ev.circle_id) || "" : ""; } catch (e) { return ""; }
   }
   function openStory(evs, title, personOf, color, onItem) {
     if (global.GoStory && GoStory.open) {

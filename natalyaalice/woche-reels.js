@@ -513,7 +513,9 @@
       );
     }
     /* bubble_id erst nach go-bubbles.sql vorhanden */
-    return query(richSelect + ",bubble_id")
+    /* circle_id: Bild des richtigen Circles (go-covers.js) */
+    return query(richSelect + ",bubble_id,circle_id")
+      .catch(function () { return query(richSelect + ",bubble_id"); })
       .catch(function () { return query(richSelect); })
       .catch(function () {
         return query(baseSelect + ",courses(id,title)").catch(function () {
@@ -1624,7 +1626,7 @@
     var going = goingLine(ev);
     /* Coverbild statt Farbfläche (go-covers.js): Kursbild, sonst Bild der Kategorie */
     var nutritionTitle = /ernährung|ernaehrung/i.test(String(ev.title || ""));
-    var cover = !ev.photo_url && global.GoCovers ? GoCovers.url(ev.course_id, nutritionTitle ? "ernaehrung" : cat, ev.enrollment_id) : "";
+    var cover = !ev.photo_url && global.GoCovers ? GoCovers.url(ev.course_id, nutritionTitle ? "ernaehrung" : cat, ev.enrollment_id, ev.circle_id) : "";
     var isNutrition =
       String(ev.item_type || "") === "nutrition_log" ||
       /ernährung|ernaehrung/i.test(String(ev.title || ""));
@@ -3986,7 +3988,7 @@
       }).join("");
     }
     /* Name als Überschrift; Eventbild gilt nur für mich (alle gleichen Events), Übungen global (mit Freigabe) */
-    var cover = !photo && global.GoCovers ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id) : "";
+    var cover = !photo && global.GoCovers ? GoCovers.url(ev.course_id, ev.category || "kraft", ev.enrollment_id, ev.circle_id) : "";
     openSheet(
       '<p class="wr-sheet-title">' + esc(ev.title || "Training") + "</p>" +
       '<div class="wr-share-block">' +
@@ -5635,7 +5637,7 @@
         hasTime: !!displayTime(evC.starts_at),
         location: evC.location || "",
         photo: evC.photo_url || "",
-        cover: global.GoCovers ? GoCovers.url(evC.course_id, evC.category || "kraft", evC.enrollment_id) : "",
+        cover: global.GoCovers ? GoCovers.url(evC.course_id, evC.category || "kraft", evC.enrollment_id, evC.circle_id) : "",
         who: String(owner.name || "").split(" ")[0],
         whoPhoto: owner.photo || ""
       });
