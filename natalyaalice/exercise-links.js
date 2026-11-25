@@ -34,7 +34,8 @@
     ".gxl__chip{flex:none;min-height:32px;padding:0 12px;border-radius:999px;border:1px solid rgba(42,33,24,.3);background:transparent;color:#2A2118;font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}" +
     ".gxl__chip.is-on{background:#2A2118;color:#F6F1E8;border-color:#2A2118}" +
     ".gxl__search{display:block;width:100%;box-sizing:border-box;min-height:40px;padding:0 12px;border:1px solid rgba(42,33,24,.25);border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118;margin:0 0 10px}" +
-    ".gxl__grid{column-count:2;column-gap:8px}" +
+    ".gxl__grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:start}" +
+    ".gxl__col{display:flex;flex-direction:column;min-width:0}" +
     ".gxl__pin{position:relative;display:block;width:100%;break-inside:avoid;margin:0 0 8px;border-radius:12px;overflow:hidden;background:#1c1814;cursor:pointer;aspect-ratio:9/16}" +
     ".gxl__pin.is-empty{aspect-ratio:1/1;background:rgba(42,33,24,.08)}" +
     ".gxl__pin img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}" +
@@ -167,6 +168,17 @@
     return info && info.embed ? url : "";
   }
 
+  /* Zwei Spalten gleichmäßig füllen: jede Kachel kommt in die gerade kürzere Spalte
+     (Video/Foto hoch 16:9, ohne Medien quadratisch), so stehen die Videos links und rechts nebeneinander */
+  function gridHtml(list, picking) {
+    var cols = [[], []], h = [0, 0];
+    list.forEach(function (n) {
+      var c = h[0] <= h[1] ? 0 : 1;
+      cols[c].push(pinHtml(n, picking));
+      h[c] += GoExMedia.linksFor(n).length ? 16 / 9 : 1;
+    });
+    return '<div class="gxl__grid"><div class="gxl__col">' + cols[0].join("") + '</div><div class="gxl__col">' + cols[1].join("") + "</div></div>";
+  }
   function rankOf(name) {
     var links = GoExMedia.linksFor(name);
     if (links.some(function (l) { var x = GoExMedia.parse(l.url); return x && x.kind !== "img"; })) return 0;
@@ -195,7 +207,7 @@
     });
     var exact = q && (names || []).some(function (n) { return n.toLowerCase() === q.toLowerCase(); });
     box.innerHTML = (list.length
-      ? '<div class="gxl__grid">' + list.map(function (n) { return pinHtml(n, picking); }).join("") + "</div>"
+      ? gridHtml(list, picking)
       : '<p class="gxl__empty">' + (label === PLAN && !q && !(planNames && planNames.length) ? "Dein Wochenplan hat diese Woche keine Übungen." : "Keine Übung gefunden.") + "</p>") +
       (q.length >= 2 && !exact
         ? '<div class="gxl__submit"><p>„' + esc(q) + '“ fehlt? ' + (picking ? "Sende das Video mit diesem Namen ein." : "Link oben einfügen, dann einreichen.") + "</p>" +
