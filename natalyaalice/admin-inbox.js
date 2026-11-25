@@ -1416,6 +1416,72 @@
     inp.click();
   }
   /* Bild groß mit Stift (Circles und Gruppen) */
+  /* ---------- Orte (go-orte-plus.sql): Liste wie Circles, Namensänderungen der Nutzer freigeben ---------- */
+  function loadPlaces() {
+    st.places = "loading";
+    return host.rest("rpc/go_admin_places", { method: "POST", body: {} })
+      .then(function (r) { st.places = r || []; if (st.tab === "places") paint(); })
+      .catch(function () { st.places = "error"; if (st.tab === "places") paint(); });
+  }
+  function placeById(id) { return (Array.isArray(st.places) ? st.places : []).filter(function (p) { return String(p.id) === String(id); })[0]; }
+  function paintPlaces() {
+    var l = st.places;
+    if (l === "error") return '<p class="cp-hint">Liste nicht geladen. Ist go-orte-plus.sql in Supabase ausgeführt?</p>';
+    if (!l) { loadPlaces(); return '<p class="cp-hint">Lade…</p>'; }
+    if (l === "loading") return '<p class="cp-hint">Lade…</p>';
+    if (!l.length) return '<p class="cp-hint">Noch keine Orte.</p>';
+    /* offene Namensänderungen zuerst */
+    var list = l.slice().sort(function (a, b) {
+      return ((b.renames || []).length ? 1 : 0) - ((a.renames || []).length ? 1 : 0) || (b.events || 0) - (a.events || 0) || String(a.name).localeCompare(String(b.name), "de");
+    });
+    function btn(act, id, html, extra) { return '<button type="button" class="ga-link" data-gpl="' + act + '" data-pid="' + esc(id) + '"' + (extra || "") + ">" + html + "</button>"; }
+    return '<p class="cp-hint">Foto antippen: ändern. Name antippen: umbenennen (gilt dann auch in Events und bei „Meine Orte“).</p>' + list.map(function (p) {
+      var img = p.photo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Crect width='10' height='10' fill='%23E6DED0'/%3E%3C/svg%3E";
+      var ppl = (p.people || []).map(function (m) {
+        return '<button type="button" class="ga-link" data-gpl="person" data-pid="' + esc(m.id) + '">' + esc(String(m.name || "?").split(" ")[0]) + "</button>";
+      }).join(", ");
+      var ren = (p.renames || []).map(function (r) {
+        return '<div class="ga-r1"><b>Neuer Name: „' + esc(r.new_name) + "“</b> von " + esc(String(r.by || "?").split(" ")[0]) + " · " + esc(shortDay(r.at)) + " " +
+          btn("ok", p.id, "Freigeben", ' data-rid="' + esc(r.id) + '"') + " · " + btn("no", p.id, "Ablehnen", ' data-rid="' + esc(r.id) + '"') + "</div>";
+      }).join("");
+      var map = p.lat != null && p.lng != null
+        ? '<a class="ga-link" href="https://www.openstreetmap.org/?mlat=' + esc(p.lat) + "&mlon=" + esc(p.lng) + '#map=17/' + esc(p.lat) + "/" + esc(p.lng) + '" target="_blank" rel="noopener">Karte</a>' : "ohne Koordinaten";
+      return '<div class="ga-item is-top ga-circ"><button type="button" class="ga-rectbtn" data-gpl="photo" data-pid="' + esc(p.id) + '" aria-label="Foto"><img class="ga-cimg" src="' + esc(img) + '" alt="" /></button>' +
+        '<div class="ga-copy ga-rows"><div class="ga-r1">' + btn("rename", p.id, "<b>" + esc(p.name) + "</b>") + "</div>" + ren +
+        "<div>Events: " + esc(String(p.events || 0)) + (p.last ? " · zuletzt " + esc(shortDay(p.last)) : "") + "</div>" +
+        "<div>Meine Orte bei: " + (ppl || "–") + "</div>" +
+        "<div>" + map + (p.creator ? " · angelegt von " + esc(String(p.creator).split(" ")[0]) : "") + "</div>" +
+        (p.photo_credit ? '<div style="opacity:.6;font-size:12px">' + esc(p.photo_credit) + "</div>" : "") + "</div></div>";
+    }).join("");
+  }
+  function onPlace(t) {
+    var act = t.getAttribute("data-gpl"), id = t.getAttribute("data-pid"), rid = t.getAttribute("data-rid");
+    if (act === "person") { st.tab = "coaches"; paint(); openInfo(id); return; }
+    var p = placeById(id);
+    if (!p) return;
+    var done = function (msg) { if (host.toast) host.toast(msg); return loadPlaces(); };
+    var fail = function () { GoDialog.alert("Ging nicht. Ist go-orte-plus.sql in Supabase ausgeführt?"); };
+    if (act === "ok" || act === "no") {
+      host.rest("rpc/go_admin_rename_place", { method: "POST", body: { p_place: id, p_name: "", p_rename: rid, p_ok: act === "ok" } })
+        .then(function () { return done(act === "ok" ? "Name übernommen" : "Abgelehnt"); }).catch(fail);
+      return;
+    }
+    if (act === "rename") {
+      GoDialog.prompt("Name des Orts", p.name, { ok: "Speichern" }).then(function (v) {
+        v = String(v || "").trim();
+        if (!v || v === p.name) return;
+        return host.rest("rpc/go_admin_rename_place", { method: "POST", body: { p_place: id, p_name: v } })
+          .then(function () { return done("Umbenannt"); }).catch(fail);
+      });
+      return;
+    }
+    if (act === "photo") {
+      pickPhoto(function (url) {
+        host.rest("rpc/go_admin_place_photo", { method: "POST", body: { p_place: id, p_url: url, p_credit: "" } })
+          .then(function () { return done("Foto gespeichert"); }).catch(fail);
+      });
+    }
+  }
   function orgPhoto(kind, gid) {
     var c = orgById(kind, gid);
     if (!c) return;
@@ -1484,6 +1550,7 @@
       "Editor": ["Wochenpläne", "Events", "Übungen", "Videos"],
       "Social Media Links": ["Freigabe", "Liste"],
       "Circles": ["Liste", "Coach", "Teilnehmer", "Orte", "Foto"],
+      "Orte": ["Liste", "Namensänderungen", "Foto", "Personen"],
       "Gruppen": ["Liste", "Coach", "Teilnehmer", "Orte", "Foto"],
       "Tickets": ["Liste", "Formular"],
       "Datenbank": ["Tabellen", "Rechte", "Import", "Auswertung"]
@@ -1756,6 +1823,7 @@
     { id: "editor", label: "Editor" },
     { id: "ex", label: "Social Media Links" },
     { id: "circles", label: "Circles" },
+    { id: "places", label: "Orte" },
     { id: "groups", label: "Gruppen" },
     { id: "tickets", label: "Tickets" }
   ];
@@ -1783,7 +1851,7 @@
       return;
     }
     var fa = document.activeElement, fq = fa && fa.getAttribute ? fa.getAttribute("data-ga-q") : null, fpos = fq ? fa.selectionStart : 0;
-    st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : st.tab === "circles" ? paintOrgs("circle") : st.tab === "groups" ? paintOrgs("group") : st.tab === "tickets" ? paintTickets() : paintCoaches();
+    st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : st.tab === "circles" ? paintOrgs("circle") : st.tab === "places" ? paintPlaces() : st.tab === "groups" ? paintOrgs("group") : st.tab === "tickets" ? paintTickets() : paintCoaches();
     if (fq) {
       var back = st.body.querySelector('[data-ga-q="' + fq + '"]');
       if (back) { back.focus(); try { back.setSelectionRange(fpos, fpos); } catch (e) {} }
@@ -2489,7 +2557,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall],[data-ga-us],[data-ga-ts],[data-ga-trash]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-gpl],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall],[data-ga-us],[data-ga-ts],[data-ga-trash]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -2514,6 +2582,7 @@
     if (t.hasAttribute("data-ga-ts")) { onTicketSort(t); return; }
     if (t.hasAttribute("data-ga-trash")) { onTrash(t); return; }
     if (t.hasAttribute("data-ga-nfreset")) { st.nf[t.getAttribute("data-ga-nfreset")] = {}; paint(); return; }
+    if (t.hasAttribute("data-gpl")) { onPlace(t); return; }
     if (t.hasAttribute("data-gx")) {
       var gx = t.getAttribute("data-gx"), gk = t.getAttribute("data-gk"), gid = t.getAttribute("data-gid");
       if (gx === "coach") orgCoach(gk, gid);

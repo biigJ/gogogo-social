@@ -8982,20 +8982,21 @@
   <script src="/natalyaalice/plan-picker.js?v=gpl-15"></script>
   <script src="/natalyaalice/ffc-points.js?v=ffp-2"></script>
   <script src="/natalyaalice/exercise-links.js?v=gxl-13"></script>
+  <script src="/natalyaalice/orte.js?v=gor-1"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
-  <script src="/natalyaalice/admin-inbox.js?v=ga-49"></script>
+  <script src="/natalyaalice/admin-inbox.js?v=ga-50"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-6"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-31"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-19"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-20"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-178"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-180"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-114"></script>
-  <script src="/natalyaalice/support.js?v=support-35"></script>
+  <script src="/natalyaalice/support.js?v=support-36"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
   <script src="/natalyaalice/coach-group.js?v=gcg-4"></script>
   <script>
@@ -14355,7 +14356,7 @@
           toast: function (msg) { gogogoToast(msg); },
           openTravelPlanModal: openTravelPlanModal,
           openCalendar: function () { openGoCalendar(); },
-          addMyPlace: function (n) { return addMyPlace(n); }
+          addMyPlace: function (n) { return window.GoAddMyPlace ? window.GoAddMyPlace(n) : null; }
         };
         WocheReels.install(host);
         if (noShow) return;
@@ -19892,7 +19893,7 @@
           var gear = document.getElementById("go-rail-gear");
           var gk = slide ? String(slide.dataset.offer || "") : "";
           if (gear) {
-            gear.hidden = !gk || gk === "toc" || gk === "coach_offer" || gk === "zirkel" || !plusOfferOwned({ key: gk, type: gk });
+            gear.hidden = !gk || gk === "toc" || gk === "coach_offer" || gk === "zirkel" || gk === "orte" || !plusOfferOwned({ key: gk, type: gk });
             gear.dataset.offer = gk;
             gear.dataset.title = label;
           }
@@ -20380,13 +20381,64 @@
         GoExLinks.mount(panel);
       }
 
+      /* Plus → Orte (orte.js): Trainingsorte als Kacheln, eigene Orte, Namensänderung zur Freigabe */
+      function removeMyPlace(name) {
+        if (!sessionAccount || !sessionAccount.id) return Promise.resolve();
+        var raw = sessionAccount.workout_places;
+        if (typeof raw === "string") { try { raw = JSON.parse(raw); } catch (eR) { raw = []; } }
+        var low = String(name || "").toLowerCase();
+        var list = (Array.isArray(raw) ? raw : []).map(function (x) { return x && typeof x === "object" ? x.name : x; }).filter(Boolean).map(String)
+          .filter(function (x) { return x.toLowerCase() !== low; });
+        sessionAccount.workout_places = list;
+        return rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+          method: "PATCH", prefer: "return=minimal", body: { workout_places: list, workout_place: list[0] || "" }
+        }).catch(function () {});
+      }
+      function mountOrte(card) {
+        if (!window.GoOrte || !card) return;
+        var panel = card.querySelector("[data-gor-panel]");
+        if (!panel) {
+          panel = document.createElement("div");
+          panel.setAttribute("data-gor-panel", "1");
+          (card.querySelector(":scope > .go-slide__body") || card).appendChild(panel);
+        } else if (panel.dataset.gorReady) {
+          return;
+        }
+        GoOrte.init({
+          rest: rest,
+          me: function () { return sessionAccount ? sessionAccount.id : ""; },
+          toast: function (m) { gogogoToast(m); },
+          myPlaces: function () {
+            var raw = sessionAccount && sessionAccount.workout_places;
+            if (typeof raw === "string") { try { raw = JSON.parse(raw); } catch (eR) { raw = []; } }
+            return (Array.isArray(raw) ? raw : []).map(function (x) { return x && typeof x === "object" ? x.name : x; }).filter(Boolean).map(String);
+          },
+          weekEvents: function () { return window.HeuteAccountability && HeuteAccountability.myWeekEvents ? HeuteAccountability.myWeekEvents() : []; },
+          pickPlace: function (title) { return window.goPickPlace ? window.goPickPlace(title) : Promise.resolve(null); },
+          addMyPlace: function (n) { return window.GoAddMyPlace ? window.GoAddMyPlace(n) : null; },
+          removeMyPlace: removeMyPlace
+        });
+        GoOrte.mount(panel);
+      }
+
       /* Plus-Auswahl je Konto (dieses Gerät). null = alles zeigen (bestehende Konten), [] = nur Circle (neue Konten) */
       var plusNewAccount = null;
       function plusPickKey() { return "gogogo_plus_pick_" + String((sessionAccount && sessionAccount.id) || ""); }
       function loadPlusPick() {
         try {
           var raw = localStorage.getItem(plusPickKey());
-          if (raw) { var arr = JSON.parse(raw); if (Array.isArray(arr)) return arr; }
+          if (raw) {
+            var arr = JSON.parse(raw);
+            if (Array.isArray(arr)) {
+              /* neue Kachel „Orte“ (25.11.): einmal in die gespeicherte Auswahl aufnehmen */
+              if (arr.indexOf("orte") < 0 && !localStorage.getItem(plusPickKey() + "_orte")) {
+                arr.push("orte");
+                localStorage.setItem(plusPickKey(), JSON.stringify(arr));
+                localStorage.setItem(plusPickKey() + "_orte", "1");
+              }
+              return arr;
+            }
+          }
         } catch (eP) {}
         if (plusNewAccount === null) checkPlusNewAccount();
         return plusNewAccount ? [] : null;
@@ -20503,6 +20555,8 @@
         var owned = window.GoSupport && GoSupport.offerOwned ? GoSupport.offerOwned(offer.type || offer.key) : false;
         if ((offer.key === "zirkel" || offer.type === "zirkel") && window.FFC && FFC.user && FFC.user()) owned = true;
         if (offer.key === "coach_offer" && !!(sessionIsTrainer || (sessionAccount && sessionAccount.is_trainer))) owned = true;
+        /* Orte: gratis und ohne Aktivieren, Kachel zeigt „Aktiv“ */
+        if (offer.key === "orte") owned = true;
         return !!owned;
       }
       function plusStore(name, val) {
@@ -20515,7 +20569,7 @@
       }
       function sortPlusOffers(list) {
         /* Voreinstellung beim ersten Öffnen (Joscha 24.11.) */
-        var order = plusStore("order") || ["stempelkarte", "web_call", "uebungen", "coach_offer", "ernaehrung", "kraft_tracking", "routine"];
+        var order = plusStore("order") || ["stempelkarte", "web_call", "uebungen", "orte", "coach_offer", "ernaehrung", "kraft_tracking", "routine"];
         var seen = plusStore("active_seen");
         var active = list.filter(plusOfferOwned).map(function (o) { return o.key; });
         /* frisch aktiviert (nicht im letzten Stand): nach ganz oben */
@@ -20723,7 +20777,8 @@
           coach_offer: "/assets/gogogo/gogogo-Coach-small.jpg",
           stempelkarte: "/assets/gogogo/gogogo-Stempelkarte-Freunde.webp",
           kraft_tracking: "/assets/gogogo/Jelena-Pullups-1600.webp",
-          uebungen: "/assets/gogogo/gogogo-upperbody-Video-Poster-1600.webp"
+          uebungen: "/assets/gogogo/gogogo-upperbody-Video-Poster-1600.webp",
+          orte: "https://agpysewcsakdpmpftndp.supabase.co/storage/v1/object/public/go-covers/places/69f5f314-c03e-4e90-aa18-64b65303bcb9.jpg"
         };
         var offers =
           window.GoSupport && GoSupport.getOffers
@@ -20827,6 +20882,7 @@
                 else btn.removeAttribute("aria-disabled");
                 if (of.key === "kraft_tracking" && ownedNow) mountKraftTracking(existing[ei]);
                 if (of.key === "uebungen" && ownedNow) mountExLinks(existing[ei]);
+                if (of.key === "orte") mountOrte(existing[ei]);
                 if (isZ && ffcLoggedNow) {
                   var lbKeep = existing[ei].querySelector("#go-zirkel-board");
                   var recKeep = existing[ei].querySelector("#go-zirkel-records");
@@ -21161,6 +21217,12 @@
             cta.hidden = true; cta.style.display = "none";
             card.classList.add("go-slide--pins");
             mountKraftTracking(card);
+          }
+          if (offer.key === "orte") {
+            /* Orte: gleich das Raster (wie Videos aktiv), kein Buchen */
+            cta.hidden = true; cta.style.display = "none";
+            card.classList.add("go-slide--pins");
+            mountOrte(card);
           }
           if (offer.key === "uebungen") {
             /* Videos: nicht aktiv = Bild, Text, „Aktivieren“; aktiv = nur das Raster (ohne Bild und Text oben) */
@@ -22472,7 +22534,7 @@
           return v === "__other" ? pickPlace("Ort") : v;
         }).then(function (name) {
           if (!name) return;
-          addMyPlace(name);
+          if (window.GoAddMyPlace) window.GoAddMyPlace(name);
           rest("events?id=eq." + encodeURIComponent(ev.id) + "&user_id=eq." + encodeURIComponent(sessionAccount.id), { method: "PATCH", prefer: "return=minimal", body: { location: String(name).slice(0, 80) } })
             .then(function () {
               if (window.HeuteAccountability && HeuteAccountability.notifyChange)
