@@ -1,6 +1,6 @@
-/* themes.js — Darstellung: Original, GTA, Bauhaus, B/W
+/* themes.js — Darstellung: Original, GTA, Bauhaus, B/W, Postmodern, Terrakotta, Postpunk
  *
- *   GoThemes.current()        → "original" | "gta" | "bauhaus" | "bw" | "postmodern" | "terra"
+ *   GoThemes.current()        → "original" | "gta" | "bauhaus" | "bw" | "postmodern" | "terra" | "postpunk"
  *   GoThemes.apply(id)        → Theme setzen + merken (localStorage, pro Gerät)
  *   GoThemes.list()           → [{ id, label }]
  *   GoThemes.openPicker()     → Auswahl über GoDialog.choose
@@ -162,7 +162,42 @@
       extra: "body{font-weight:600}"
     }
   };
-  var ORDER = ["original", "gta", "bauhaus", "bw", "postmodern", "terra"];
+  /* Postpunk: dunkel wie B/W, Pink #FF4F9A / #FF78B4, Grün #00D68F / #00B894, Grund #121214.
+     Titel in Monoton (Streifenschrift im Stil der 70er-Glam-Plakate), Text in Syne.
+     Kontraste: Weiß auf #121214 18:1, Pink #FF4F9A auf #121214 6,3:1, #121214 auf Grün #00D68F 10:1 */
+  THEMES.postpunk = {
+    label: "Postpunk",
+    fonts: "family=Monoton&family=Syne:wght@400;500;600;700;800",
+    display: "Syne",
+    body: "Syne",
+    serif: "Syne",
+    dark: true,
+    hex: {
+      "2E9E5B": "00D68F",
+      C7413B: "FF4F9A", A5332E: "FF78B4", F7F5F0: "FFFFFF",
+      F6F1E8: "121214", F3EEE4: "0D0D0F", EDE6DA: "1C1C20", E4DDD0: "26262B",
+      E8E2D6: "1F1F23", D8D0C4: "33333A", ECECEB: "1F1F23",
+      "2A2118": "F4F4F5", "1A1510": "FFFFFF", "6B6358": "A1A1AA"
+    },
+    rgb: {
+      "199,65,59": "255,79,154", "165,51,46": "255,120,180", "247,245,240": "255,255,255",
+      "246,241,232": "18,18,20", "243,238,228": "13,13,15",
+      "42,33,24": "244,244,245", "52,34,32": "244,244,245", "20,16,12": "0,0,0"
+    },
+    cta: { bg: "#00D68F", ink: "#121214" },
+    /* Dunkle Flächen und Kontraste wie B/W, gefüllte Knöpfe in Pink statt Weiß */
+    extra: THEMES.bw.extra
+      .replace(/background:#fff !important;color:#000 !important/g, "background:#FF4F9A !important;color:#121214 !important")
+      .replace(/background-color:#000/g, "background-color:#121214")
+      .replace(/background:#000/g, "background:#121214")
+      .replace(/#0A0A0A/g, "#1C1C20") +
+      "html,body{background:#121214 !important}" +
+      ".app-pill .pill-dot{background:#FF4F9A !important}" +
+      /* Monoton (Streifenschrift) nur für kurze große Titel; alles andere Syne, gut lesbar */
+      "html[data-go-theme=postpunk] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=postpunk] body .profile-name:not(#_):not(#__),html[data-go-theme=postpunk] body .gob h2:not(#_):not(#__),html[data-go-theme=postpunk] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=postpunk] body h1:not(#_):not(#__),html[data-go-theme=postpunk] body #heute-filter-select:not(#_){font-family:Monoton,Syne,sans-serif !important;font-weight:400 !important;letter-spacing:.04em}" +
+      ".acc-card__title,.wr-title,.go-tile__name,.go-slide__title{font-family:Syne,sans-serif !important;font-weight:800 !important}"
+  };
+  var ORDER = ["original", "gta", "bauhaus", "bw", "postmodern", "terra", "postpunk"];
 
   var current = "original";
   var originals = new WeakMap(); // <style> → Originaltext
