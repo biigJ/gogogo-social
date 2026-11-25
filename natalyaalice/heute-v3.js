@@ -26,7 +26,7 @@
 
   var FILTER_KEY = "gogogo_heute_filter_v3";
   /* Ich ⊂ Team ⊂ Gruppe ⊂ Tagebuch ⊂ Alles — Gruppe nur wenn vorhanden */
-  var VIEW_LEVEL = { ich: 0, team: 1, gruppe: 1, coach: 1, tagebuch: 2, alles: 3, bubble: 3, circle: 3 };
+  var VIEW_LEVEL = { ich: 0, team: 1, gruppe: 1, coach: 1, mycoach: 1, tagebuch: 2, alles: 3, bubble: 3, circle: 3 };
 
   function viewFlags(view) {
     view = normalizeFilter(view) || "ich";
@@ -45,6 +45,8 @@
       bubbleOnly: view === "bubble",
       /* Coach = nur ich und meine Coachees (auch ihre privaten Events) */
       coachOnly: view === "coach",
+      /* Mein Coach = ich, mein Coach und unsere Nachrichten */
+      myCoachOnly: view === "mycoach",
       /* Circle = Zirkeltrainings: FFC-Events und -Posts, Zirkel-Events und mit dem Circle geteilte Events */
       circleOnly: base === "circle",
       showIncomingInvites: level >= 1,
@@ -110,7 +112,7 @@
     if (/^circle:[^,()\s]+$/.test(String(v || ""))) return String(v);
     /* Tagebuch gibt es im Dropdown nicht mehr → Alles */
     if (v === "tagebuch") return "alles";
-    if (["ich", "team", "gruppe", "circle", "alles", "bubble", "coach"].indexOf(v) >= 0) return v;
+    if (["ich", "team", "gruppe", "circle", "alles", "bubble", "coach", "mycoach"].indexOf(v) >= 0) return v;
     return "";
   }
 
@@ -2630,9 +2632,19 @@
       })
       .catch(function () { state.kreisMsgs = []; });
   }
+  function myCoachId() {
+    var a = host && host.sessionAccount;
+    return String((a && a.trainer_id) || "");
+  }
   function kreisMsgsFor(view) {
+    var coachId = myCoachId();
     return (state.kreisMsgs || []).filter(function (m) {
       if (view === "alles") return true;
+      /* Mein Coach: meine Nachrichten an ihn, seine an mich und an alle Coachees */
+      if (view === "mycoach") {
+        var au = String(m.author_id), to = String(m.to_id || "");
+        return !!coachId && ((au === me() && to === coachId) || (au === coachId && (to === me() || (!to && m.audience === "coach"))));
+      }
       /* „Nur ich“: auch Nachrichten an mich und meine Nachrichten an eine einzelne Person (@Name) */
       if (view === "ich" && m.to_id && (String(m.to_id) === me() || String(m.author_id) === me())) return true;
       if (view.indexOf("circle:") === 0) return m.audience === "circle" && String(m.audience_id || "") === view.slice(7);
@@ -3048,15 +3060,16 @@
     }
     /* Kreis-Ansicht: zum Schluss für alle Karten prüfen, ob der Urheber im Kreis ist
        (vorher rutschten Coachees, Einladungen und Zusagen in Gruppe/Freunde durch) */
-    if (flags.groupOnly || flags.coachOnly || flags.teamOnly) {
+    if (flags.groupOnly || flags.coachOnly || flags.teamOnly || flags.myCoachOnly) {
       var inKreis = function (it) {
         if (it._mine) return true;
-        if (it.kind === "ffc") return !!(it.ev && (it.ev.is_mine || it.ev.my_going === true)) && !flags.groupOnly && !flags.coachOnly;
-        if (it.kind === "ffc_post") return !flags.groupOnly && !flags.coachOnly;
+        if (it.kind === "ffc") return !!(it.ev && (it.ev.is_mine || it.ev.my_going === true)) && !flags.groupOnly && !flags.coachOnly && !flags.myCoachOnly;
+        if (it.kind === "ffc_post") return !flags.groupOnly && !flags.coachOnly && !flags.myCoachOnly;
         var uid = String((it.ev && it.ev.user_id) || (it.item && it.item.user_id) || (it.inv && it.inv.from_id) || "");
         if (!uid || uid === me()) return true;
         if (flags.groupOnly) return !!groupMemberIdSet()[uid];
         if (flags.coachOnly) return isMyCoachee(uid);
+        if (flags.myCoachOnly) return uid === myCoachId();
         return inTeamFilter(uid, flags);
       };
       myToday = myToday.filter(inKreis);

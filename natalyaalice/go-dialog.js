@@ -183,13 +183,16 @@
     opts = opts || {};
     return open(function (card, close) {
       text(card, msg);
-      var input = document.createElement("input");
+      /* opts.multiline: Textfeld für Nachrichten (Enter macht neue Zeile) */
+      var input = document.createElement(opts.multiline ? "textarea" : "input");
       input.className = "god__input";
-      input.type = opts.type === "number" ? "text" : opts.type || "text";
+      if (opts.multiline) { input.rows = 4; input.style.resize = "none"; input.style.minHeight = "110px"; }
+      else input.type = opts.type === "number" ? "text" : opts.type || "text";
       if (opts.type === "number") input.inputMode = "decimal";
+      if (opts.placeholder) input.placeholder = opts.placeholder;
       input.value = value == null ? "" : String(value);
       input.addEventListener("keydown", function (e) {
-        if (e.key === "Enter") close(input.value);
+        if (e.key === "Enter" && !opts.multiline) close(input.value);
       });
       card.appendChild(input);
       button(card, opts.ok || "Speichern", "", function () { close(input.value); });
