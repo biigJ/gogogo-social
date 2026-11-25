@@ -509,7 +509,8 @@
       body: st.weeks ? { p_user: st.userId, p_course: a.plan.id, p_weekdays: weekdays, p_weeks: st.weeks } : { p_user: st.userId, p_course: a.plan.id, p_weekdays: weekdays }
     }).then(function (res) {
       var r = res || {};
-      if (st.host.toast) st.host.toast((r.events || 0) + " Termine ab heute eingetragen");
+      /* Nutzer selbst: keine Meldung mit Zahlen (verwirrend), der Kalender zeigt den Plan. Coach: kurze Bestätigung */
+      if (st.mode === "coach" && st.host.toast) st.host.toast("Wochenplan eingetragen");
       var done = st.onDone;
       close();
       if (done) done(r);
