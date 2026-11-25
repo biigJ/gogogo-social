@@ -1252,7 +1252,8 @@
     if (!it || !it.ev || it._fromPlan || isTravelAlt(it) || !it.ev.enrollment_id) return it;
     var ev = Object.assign({}, it.ev, { photo_url: null });
     if (plan) {
-      ev.title = plan.title || ev.title;
+      /* Titel nicht mehr aus dem lokalen Wochenplan des Geräts: der Termin aus der Einschreibung ist maßgeblich
+         (Mimi: Indoor Bike hieß im Kalender „Oberkörpertraining“) */
       /* Ort aus „Tage bearbeiten“ gilt für die ganze Serie, sonst der Ort aus dem Plan */
       if (!ev.location && plan.location) ev.location = plan.location;
     }
