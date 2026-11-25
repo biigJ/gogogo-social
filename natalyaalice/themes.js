@@ -1,6 +1,6 @@
-/* themes.js — Darstellung: Original, GTA, Bauhaus, B/W, Postmodern, Terrakotta, Postpunk
+/* themes.js — Darstellung: Subtle Scheme (original), GTA, Bauhaus, B/W, Postmodern, Terrakotta, Postpunk, Art Magazin
  *
- *   GoThemes.current()        → "original" | "gta" | "bauhaus" | "bw" | "postmodern" | "terra" | "postpunk"
+ *   GoThemes.current()        → "original" | "gta" | "bauhaus" | "bw" | "postmodern" | "terra" | "postpunk" | "art"
  *   GoThemes.apply(id)        → Theme setzen + merken (localStorage, pro Gerät)
  *   GoThemes.list()           → [{ id, label }]
  *   GoThemes.openPicker()     → Auswahl über GoDialog.choose
@@ -16,9 +16,10 @@
 
   /* Rollen der Original-Palette → Ersatz je Theme */
   var THEMES = {
-    original: { label: "Subtle Scheme" },
+    original: { label: "Subtle Scheme", head: "600 'Playfair Display',Georgia,serif" },
     gta: {
       label: "GTA",
+      head: "600 Oswald,sans-serif",
       fonts: "family=Oswald:wght@500;600;700&family=Rubik:wght@400;500;600",
       display: "Oswald",
       body: "Rubik",
@@ -27,7 +28,7 @@
         "2E9E5B": "FFC400", C7413B: "E0187A", A5332E: "B0105E", F7F5F0: "FFF6FB",
         F6F1E8: "FFF0F5", F3EEE4: "FDE8F1", EDE6DA: "F9DDEB", E4DDD0: "F2CFE2",
         E8E2D6: "F6D7E8", D8D0C4: "E7BCD6", ECECEB: "F6E4EE",
-        "2A2118": "2B0B3F", "1A1510": "1A0628", "6B6358": "7A4E8C"
+        "2A2118": "2B0B3F", "1A1510": "1A0628", "6B6358": "7A4E8C", D93A3A: "E0187A"
       },
       rgb: {
         "199,65,59": "224,24,122", "165,51,46": "176,16,94", "247,245,240": "255,246,251",
@@ -37,6 +38,7 @@
     },
     bauhaus: {
       label: "Bauhaus",
+      head: "600 Jost,sans-serif",
       fonts: "family=Jost:wght@400;500;600;700",
       display: "Jost",
       body: "Jost",
@@ -48,7 +50,7 @@
         "2E9E5B": "E1523E", C7413B: "236192", A5332E: "1B4A70", F7F5F0: "FFFFFF",
         F6F1E8: "FFFFFF", F3EEE4: "F4F6F3", EDE6DA: "D3D9D1", E4DDD0: "A7B2A3",
         E8E2D6: "D3D9D1", D8D0C4: "A7B2A3", ECECEB: "D3D9D1",
-        "2A2118": "373A36", "1A1510": "23251F", "6B6358": "5E665C"
+        "2A2118": "373A36", "1A1510": "23251F", "6B6358": "5E665C", D93A3A: "E1523E"
       },
       rgb: {
         "199,65,59": "35,97,146", "165,51,46": "27,74,112", "247,245,240": "255,255,255",
@@ -61,6 +63,7 @@
     },
     bw: {
       label: "B/W",
+      head: "600 'Bodoni Moda',serif",
       fonts: "family=Bodoni+Moda:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600",
       display: "Bodoni Moda",
       body: "IBM Plex Sans",
@@ -117,12 +120,16 @@
         "#gbub-compose .gbub-compose__inp:not(#_){background:transparent !important;border:0 !important;color:#fff !important}" +
         "#gbub-compose button[type=submit]{background:#fff !important;color:#000 !important}" +
         "#gbub-compose .gbub-compose__att{color:#fff !important}" +
-        "#gbub-compose .gbub-compose__reply{background:#1A1A1A !important;color:#fff !important;border-left-color:#fff !important}"
+        "#gbub-compose .gbub-compose__reply{background:#1A1A1A !important;color:#fff !important;border-left-color:#fff !important}" +
+        /* Meine Coachees: Stempel weiß umrandet, innen schwarz (gestempelt weiß) */
+        ".gcg__stamps i:not(#_){border-color:#fff !important;background:#000 !important}.gcg__stamps i.is-on:not(#_){background:#fff !important}" +
+        ".gcg__face span.gcg__img{background-color:#000 !important;color:#fff;box-shadow:inset 0 0 0 1.5px #fff}"
     },
     /* Terrakotta: Olivgrau, Rost, Terrakotta, Blush, Taubenblau, Schiefer. Kontraste geprüft:
        Text #34362B auf Hell ≥ 10:1, Nebentext #5D646D ≥ 5:1, Weiß auf Rost 5,4:1 (Terrakotta nie als Texthintergrund) */
     terra: {
       label: "Terrakotta",
+      head: "600 'Playfair Display',Georgia,serif",
       display: "Space Grotesk",
       body: "Inter",
       serif: "Playfair Display",
@@ -131,7 +138,7 @@
         C7413B: "B04A2F", A5332E: "8E3A24", F7F5F0: "F7F2EF",
         F6F1E8: "F5EDE8", F3EEE4: "F3ECE7", EDE6DA: "DEC4B8", E4DDD0: "B6B8C1",
         E8E2D6: "E6DAD3", D8D0C4: "B6B8C1", ECECEB: "E4E5E9",
-        "2A2118": "34362B", "1A1510": "23241C", "6B6358": "5D646D"
+        "2A2118": "34362B", "1A1510": "23241C", "6B6358": "5D646D", D93A3A: "B04A2F"
       },
       rgb: {
         "199,65,59": "176,74,47", "165,51,46": "142,58,36", "247,245,240": "247,242,239",
@@ -142,6 +149,7 @@
     },
     postmodern: {
       label: "Postmodern",
+      head: "900 'Inter Tight',sans-serif",
       /* Schrift wie Raptor Text (kommerziell, nicht als Webfont frei): Inter Tight, Headlines Black eng gesetzt */
       fonts: "family=Inter+Tight:wght@400;500;600;700;900",
       display: "Inter Tight",
@@ -151,20 +159,25 @@
          Türkis #40E0D0 / #00CED1 (Signal, Flächen), Schrift #2A2A2A.
          Kontraste: #2A2A2A auf Weiß 14:1, Weiß auf #D10F79 5,2:1, #2A2A2A auf Gelb 11:1, #2A2A2A auf Koralle 5,8:1 */
       hex: {
-        "2E9E5B": "00CED1", C7413B: "FF1493", A5332E: "D10F79", F7F5F0: "FFFFFF",
-        F6F1E8: "FFF8F6", F3EEE4: "FFF1EE", EDE6DA: "D5F7F3", E4DDD0: "9EEDE5",
+        "2E9E5B": "00CED1", C7413B: "FF1493", A5332E: "D10F79", F7F5F0: "FFFFFF", D93A3A: "FF1493",
+        F6F1E8: "FFEDF3", F3EEE4: "FFE4EE", EDE6DA: "D5F7F3", E4DDD0: "9EEDE5",
         E8E2D6: "D5F7F3", D8D0C4: "40E0D0", ECECEB: "D5F7F3",
         "2A2118": "2A2A2A", "1A1510": "1A1A1A", "6B6358": "5C5C5C"
       },
       rgb: {
         "199,65,59": "255,20,147", "165,51,46": "209,15,121", "247,245,240": "255,255,255",
-        "246,241,232": "255,248,246", "243,238,228": "255,241,238",
+        "246,241,232": "255,237,243", "243,238,228": "255,228,238",
         "42,33,24": "42,42,42", "52,34,32": "42,42,42", "20,16,12": "26,26,26"
       },
       cta: { bg: "#FFD700", ink: "#2A2A2A" },
-      extra: ".app-pill nav{background:#FF6F61 !important;color:#2A2A2A}.app-pill .pill-dot{background:#2A2A2A !important}" +
+      /* Leiste Pink mit gelber Schrift, Tag-Leiste Woche hell Türkis, Kreise ohne Foto Pink, Rahmen der Event-Karten Koralle */
+      extra: ".app-pill nav{background:#FF1493 !important;color:#FFD700 !important}.app-pill nav *{color:#FFD700 !important}.app-pill .pill-dot{background:#FFD700 !important}" +
+        ".wr-dsq:not(#_){background:#D5F7F3 !important;color:#2A2A2A !important;border-color:#40E0D0 !important;text-shadow:none !important}" +
+        ".wr-dsq.is-on:not(#_){background:#40E0D0 !important;color:#2A2A2A !important;border-color:#40E0D0 !important}" +
+        ".kreis-row .gbub-row__img:not(#_){background:#FF1493 !important;color:#fff}" +
+        ".acc-card.is-going .acc-card__media::after{box-shadow:inset 0 0 0 9px #FF6F61 !important}.acc-card.is-mine-next .acc-card__media::after{box-shadow:inset 0 0 0 5px #FF6F61 !important}" +
         /* Headlines (Plus, Profil, Woche) und Eventnamen: Inter Tight Black */
-        "html[data-go-theme=postmodern] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=postmodern] body .profile-name:not(#_):not(#__),html[data-go-theme=postmodern] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=postmodern] body .team-slide__head:not(#_):not(#__),html[data-go-theme=postmodern] body .page-head-title:not(#_):not(#__),html[data-go-theme=postmodern] body .quit-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-day-label:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-sheet-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-dayrow__title:not(#_):not(#__),html[data-go-theme=postmodern] body .acc-card__title:not(#_):not(#__),html[data-go-theme=postmodern] body .go-card__title:not(#_):not(#__),html[data-go-theme=postmodern] body .gstory__txt h3:not(#_):not(#__),html[data-go-theme=postmodern] body .gbub-story__txt h3:not(#_):not(#__),html[data-go-theme=postmodern] body #heute-filter-select:not(#_)" +
+        "html[data-go-theme=postmodern] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=postmodern] body .profile-name:not(#_):not(#__),html[data-go-theme=postmodern] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=postmodern] body .team-slide__head:not(#_):not(#__),html[data-go-theme=postmodern] body .page-head-title:not(#_):not(#__),html[data-go-theme=postmodern] body .quit-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-day-label:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-sheet-title:not(#_):not(#__),html[data-go-theme=postmodern] body .wr-dayrow__title:not(#_):not(#__),html[data-go-theme=postmodern] body .acc-card__title:not(#_):not(#__),html[data-go-theme=postmodern] body .go-card__title:not(#_):not(#__),html[data-go-theme=postmodern] body .gstory__txt h3:not(#_):not(#__),html[data-go-theme=postmodern] body .gbub-story__txt h3:not(#_):not(#__),html[data-go-theme=postmodern] body #heute-filter-select:not(#_),html[data-go-theme=postmodern] body select[data-wr-week-select]:not(#_)" +
         "{font-family:'Inter Tight',system-ui,sans-serif !important;font-weight:900 !important;letter-spacing:-.015em}"
     }
   };
@@ -173,6 +186,7 @@
      Kontraste: Weiß auf #121214 18:1, Pink #FF4F9A auf #121214 6,3:1, #121214 auf Grün #00D68F 10:1 */
   THEMES.postpunk = {
     label: "Postpunk",
+    head: "400 Monoton,sans-serif",
     fonts: "family=Monoton&family=Syne:wght@400;500;600;700;800",
     display: "Syne",
     body: "Syne",
@@ -183,7 +197,7 @@
       C7413B: "FF4F9A", A5332E: "FF78B4", F7F5F0: "FFFFFF",
       F6F1E8: "121214", F3EEE4: "0D0D0F", EDE6DA: "1C1C20", E4DDD0: "26262B",
       E8E2D6: "1F1F23", D8D0C4: "33333A", ECECEB: "1F1F23",
-      "2A2118": "F4F4F5", "1A1510": "FFFFFF", "6B6358": "A1A1AA"
+      "2A2118": "F4F4F5", "1A1510": "FFFFFF", "6B6358": "A1A1AA", D93A3A: "FF4F9A"
     },
     rgb: {
       "199,65,59": "255,79,154", "165,51,46": "255,120,180", "247,245,240": "255,255,255",
@@ -200,10 +214,37 @@
       "html,body{background:#121214 !important}" +
       ".app-pill .pill-dot{background:#FF4F9A !important}" +
       /* Monoton (Streifenschrift) nur für kurze große Titel; alles andere Syne, gut lesbar */
-      "html[data-go-theme=postpunk] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=postpunk] body .profile-name:not(#_):not(#__),html[data-go-theme=postpunk] body .gob h2:not(#_):not(#__),html[data-go-theme=postpunk] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=postpunk] body h1:not(#_):not(#__),html[data-go-theme=postpunk] body #heute-filter-select:not(#_){font-family:Monoton,Syne,sans-serif !important;font-weight:400 !important;letter-spacing:.04em}" +
+      "html[data-go-theme=postpunk] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=postpunk] body .profile-name:not(#_):not(#__),html[data-go-theme=postpunk] body .gob h2:not(#_):not(#__),html[data-go-theme=postpunk] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=postpunk] body h1:not(#_):not(#__),html[data-go-theme=postpunk] body #heute-filter-select:not(#_),html[data-go-theme=postpunk] body select[data-wr-week-select]:not(#_){font-family:Monoton,Syne,sans-serif !important;font-weight:400 !important;letter-spacing:.04em}" +
       ".acc-card__title,.wr-title,.go-tile__name,.go-slide__title{font-family:Syne,sans-serif !important;font-weight:800 !important}"
   };
-  var ORDER = ["original", "gta", "bauhaus", "bw", "postmodern", "terra", "postpunk"];
+  /* Art Magazin: weiß, schwarz, Grautöne. Serifen (Newsreader) für Text und Titel, kleine Bedienelemente in Inter.
+     Keine Akzentfarbe, eckige Bilder: die Fotos tragen die Farbe. Kontrast #111 auf Weiß 18,9:1, #6B6B6B auf Weiß 5,3:1 */
+  THEMES.art = {
+    label: "Art Magazin",
+    head: "500 Newsreader,Georgia,serif",
+    fonts: "family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600;6..72,700",
+    display: "Newsreader",
+    body: "Newsreader",
+    serif: "Newsreader",
+    hex: {
+      "2E9E5B": "111111", C7413B: "111111", A5332E: "000000", F7F5F0: "FFFFFF", D93A3A: "111111",
+      F6F1E8: "FFFFFF", F3EEE4: "FFFFFF", EDE6DA: "F2F2F2", E4DDD0: "DDDDDD",
+      E8E2D6: "EEEEEE", D8D0C4: "CCCCCC", ECECEB: "F2F2F2",
+      "2A2118": "111111", "1A1510": "000000", "6B6358": "6B6B6B"
+    },
+    rgb: {
+      "199,65,59": "17,17,17", "165,51,46": "0,0,0", "247,245,240": "255,255,255",
+      "246,241,232": "255,255,255", "243,238,228": "255,255,255",
+      "42,33,24": "17,17,17", "52,34,32": "17,17,17", "20,16,12": "0,0,0"
+    },
+    cta: { bg: "#111111", ink: "#FFFFFF" },
+    extra: ".app-pill nav{background:#fff !important;color:#111 !important;box-shadow:0 0 0 1px #111 !important}.app-pill .pill-dot{background:#111 !important}" +
+      ".app-pill nav,.app-pill nav *,.wr-dsq,.go-tile__pill,.cp-pill,.gcr-pill{font-family:Inter,system-ui,sans-serif !important;letter-spacing:.03em}" +
+      ".acc-card__media,.acc-card.is-wallet,.acc-card.is-wallet .acc-card__media,.gxl__pin,.go-slide__art{border-radius:0 !important}" +
+      "html[data-go-theme=art] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=art] body .profile-name:not(#_):not(#__),html[data-go-theme=art] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=art] body .team-slide__head:not(#_):not(#__),html[data-go-theme=art] body .acc-card__title:not(#_):not(#__),html[data-go-theme=art] body .wr-day-label:not(#_):not(#__),html[data-go-theme=art] body .wr-title:not(#_):not(#__)" +
+      "{font-family:Newsreader,Georgia,serif !important;font-weight:500 !important;letter-spacing:-.005em}"
+  };
+  var ORDER = ["original", "gta", "bauhaus", "bw", "postmodern", "terra", "postpunk", "art"];
 
   var current = "original";
   var originals = new WeakMap(); // <style> → Originaltext
@@ -380,9 +421,17 @@
     });
   }
 
+  /* Auswahl: jeder Name in der Headline-Schrift seines Themes (Schriften dafür einmal nachladen) */
+  var pickerFonts = null;
   function openPicker() {
+    if (!pickerFonts) {
+      pickerFonts = document.createElement("link");
+      pickerFonts.rel = "stylesheet";
+      pickerFonts.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Oswald:wght@600&family=Jost:wght@600&family=Bodoni+Moda:wght@600&family=Inter+Tight:wght@900&family=Monoton&family=Newsreader:wght@500&display=swap";
+      document.head.appendChild(pickerFonts);
+    }
     var opts = ORDER.map(function (id) {
-      return { label: (id === current ? "✓ " : "") + THEMES[id].label, value: id };
+      return { label: (id === current ? "✓ " : "") + THEMES[id].label, value: id, font: String(THEMES[id].head || "").replace(/^(\d+) /, "$1 19px/1.2 ") };
     });
     if (!global.GoDialog || !global.GoDialog.choose) return Promise.resolve(null);
     return global.GoDialog.choose("Darstellung", opts).then(function (v) {
