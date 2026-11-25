@@ -13692,6 +13692,26 @@
       document.getElementById("start-modal").addEventListener("click", function (event) {
         if (event.target.id === "start-modal") event.currentTarget.hidden = true;
       });
+      /* Punkt am Haus: Story eines anderen (Erledigtes der letzten 24 h), die ich noch nicht geöffnet habe */
+      function storySeenMap() {
+        var m = readStore(storePrefix + "story_seen", {});
+        return m && typeof m === "object" ? m : {};
+      }
+      var crewStoryIds = [];
+      function hasNewStory() {
+        if (!sessionAccount || !crewStoryIds.length) return false;
+        var seen = storySeenMap();
+        return crewStoryIds.some(function (id) { return !seen[id]; });
+      }
+      function markStoriesSeen(ids) {
+        var seen = storySeenMap();
+        var cut = Date.now() - 3 * 86400000;
+        Object.keys(seen).forEach(function (k) { if (seen[k] < cut) delete seen[k]; });
+        (ids || []).forEach(function (id) { if (id) seen[String(id)] = Date.now(); });
+        writeStore(storePrefix + "story_seen", seen);
+        paintPill();
+      }
+
       function planHasInvite() {
         if (!sessionAccount) return false;
         var dots = dotsOf();
@@ -13798,11 +13818,12 @@
           var dot = btn.querySelector(".pill-dot");
           if (!dot) return;
           var tab = btn.getAttribute("data-shell");
-          var showDot = tab === "heute" && !!(planHasInvite() || diaryNote);
+          /* nur neue Story (Einladungen und Nachrichten stehen im Herz) */
+          var showDot = tab === "heute" && hasNewStory();
           dot.hidden = !showDot;
           if (showDot) {
-            dot.title = "Offene Einladung oder ungelesenes Tagebuch";
-            dot.setAttribute("aria-label", "Hinweis: offene Einladung oder Tagebuch");
+            dot.title = "Neue Story";
+            dot.setAttribute("aria-label", "Hinweis: neue Story");
           } else {
             dot.removeAttribute("title");
             dot.removeAttribute("aria-label");
@@ -26627,6 +26648,7 @@
         var evs = HeuteAccountability.storyEventsFor ? HeuteAccountability.storyEventsFor(person.id) : HeuteAccountability.todayEventsFor(person.id);
         var todayIsoS = Log.berlinToday();
         if (!evs.length) return false;
+        markStoriesSeen(evs.map(function (ev) { return ev.id; }));
         var first = person.isSelf ? "Du" : String(person.nickname || person.name || "").split(" ")[0];
         return GoStory.open(evs.map(function (ev) {
           var d = new Date(ev.starts_at);
@@ -26957,6 +26979,14 @@
           return (open || story) && mine;
         });
         crewActive = friends.length;
+        /* Punkt am Haus: nur Stories, die hier in der Reihe stehen */
+        crewStoryIds = [];
+        friends.forEach(function (entry) {
+          var sid = String(entry.person.id);
+          if (entry.person.isSelf || (sessionAccount && sid === String(sessionAccount.id)) || !recentStory(sid)) return;
+          HeuteAccountability.storyEventsFor(sid).forEach(function (ev) { if (ev.status === "erledigt") crewStoryIds.push(String(ev.id)); });
+        });
+        window.setTimeout(paintPill, 0);
         /* Gelesene Bubble-Kreise: hinter die aktiven Profile (trainiert gerade, heute dran, heute fertig) */
         function flushSeenBub() {
           (seenBub || []).forEach(function (el) { box.appendChild(el); });
