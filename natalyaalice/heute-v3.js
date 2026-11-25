@@ -3085,12 +3085,9 @@
           }
           return;
         }
-        history.push({
-          kind: "diary",
-          starts_at: d.starts_at,
-          _mine: String(d.user_id) === me(),
-          item: d
-        });
+        /* keine eigene Tagebuch-Karte mehr (alte Einträge ohne Event, oft nur „Training“ ohne Namen):
+           Quelle sind die Events; Fotos daraus hängen oben am erledigten Event desselben Tages */
+        return;
       });
     }
 
@@ -3491,8 +3488,12 @@
     });
     html += "</div>";
     html += '<div class="acc-feed-past" data-acc-zone="past">';
+    /* „Verkleinern“ gilt für alles Vergangene (auch Circle-Posts, Circle-Events), nicht nur erledigte Events */
+    var shrinkAll = compactPast();
     feed.history.forEach(function (item) {
-      html += renderFeedItem(item);
+      var hH = renderFeedItem(item);
+      if (shrinkAll && hH.indexOf("is-shrunk") < 0) hH = hH.replace('<article class="acc-card', '<article class="acc-card is-wallet is-shrunk');
+      html += hH;
     });
     html += "</div>";
     if (flags.bubbleOnly && global.GoBubbles && GoBubbles.paintStrip) {
