@@ -22,6 +22,8 @@
     var st = document.createElement("style");
     st.textContent =
       ".gstory{position:fixed;inset:0;z-index:10080;background:var(--gstory,#2A2118);color:#fff;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}" +
+      /* deckender Streifen unter der Statusleiste: iOS übernimmt dessen Farbe statt eines langen Verlaufs über dem Foto */
+      ".gstory__sb{position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--gstory,#2A2118);z-index:4;pointer-events:none}" +
       ".gstory__bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}" +
       ".gstory::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,0) 28%,rgba(0,0,0,0) 45%,rgba(0,0,0,.75))}" +
       ".gstory__top{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) + 12px);left:16px;right:8px;display:flex;justify-content:space-between;align-items:center;font:700 15px Inter,sans-serif}" +
@@ -87,6 +89,7 @@
       if (i < 0) i = 0;
       var it = items[i];
       wrap.innerHTML =
+        '<div class="gstory__sb" aria-hidden="true"></div>' +
         (it.bg ? '<img class="gstory__bg" src="' + esc(it.bg) + '" alt="" />' : "") +
         '<div class="gstory__top"><span>' + esc(opts.title || "") + '</span><button type="button" data-gstory-close aria-label="Schließen"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg></button></div>' +
         '<div class="gstory__txt">' +
