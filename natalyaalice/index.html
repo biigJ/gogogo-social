@@ -8961,7 +8961,7 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-46"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-29"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-13"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-14"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
@@ -18606,6 +18606,23 @@
       }
       /* Seite für genau einen Circle: Circle setzen, dann die Zirkel-Karte ohne Circle-Auswahl öffnen */
       function openCirclePage(gid) {
+        var gNew = gid ? (cst().groups || []).filter(function (x) { return String(x.group_id) === String(gid); })[0] : null;
+        /* eingeloggt mit Circle: eigene Seite wie Gruppe (Beschreibung, Mitglieder, Stempelkarte, Events 7 Tage) */
+        if (gNew && window.FFC && FFC.user && FFC.user()) {
+          var openNew = function () {
+            var slide = circleSlide(gNew);
+            openKreisPage(slide, String(gNew.name || "Circle"));
+            var body = document.querySelector(".kreis-page .kreis-page__body");
+            var evBox = slide.querySelector(".circle-evs-box");
+            appendKreisStampBox(slide, "circle", gid);
+            if (evBox) slide.appendChild(evBox);
+            paintCirclePageEvents(gNew, evBox);
+            if (body) body.scrollTop = 0;
+          };
+          if (typeof selectCircle === "function") Promise.resolve(selectCircle(gid)).then(openNew, openNew);
+          else openNew();
+          return;
+        }
         var card = zirkelCard();
         if (!card) return;
         var g = (cst().groups || []).filter(function (x) { return String(x.group_id) === String(gid); })[0];
@@ -18615,6 +18632,172 @@
         };
         if (gid && typeof selectCircle === "function") Promise.resolve(selectCircle(gid)).then(go, go);
         else go();
+      }
+      /* ---------- Circle-Seite (Kreise → Circle): wie Gruppe ---------- */
+      function circleSlide(g) {
+        var gid = String(g.group_id);
+        var owner = circleCanManage(g);
+        var slide = document.createElement("article");
+        slide.className = "team-slide is-scroll is-circle";
+        var art = document.createElement("div");
+        art.className = "team-slide__art";
+        var im = document.createElement("img");
+        im.alt = "";
+        im.src = circlePhoto(g) || "/assets/gogogo/gogogo-Zirkeltraining.jpg";
+        art.appendChild(im);
+        slide.appendChild(art);
+        var nameRow = document.createElement("div");
+        nameRow.className = "team-slide__group-name-row";
+        var nameEl = document.createElement("h3");
+        nameEl.className = "team-slide__group-name";
+        nameEl.textContent = String(g.name || "Circle");
+        nameRow.appendChild(nameEl);
+        slide.appendChild(nameRow);
+        /* Beschreibung: Coach des Circles schreibt sie (go-circle-about.sql) */
+        var about = document.createElement("p");
+        about.className = "team-slide__about";
+        var aboutText = String(((circleSettings(g) || {}).description) || "").trim();
+        about.textContent = aboutText;
+        slide.appendChild(about);
+        if (owner) {
+          var aboutBtn = document.createElement("button");
+          aboutBtn.type = "button";
+          aboutBtn.className = "wr-ga-info circle-about-edit";
+          aboutBtn.textContent = aboutText ? "Beschreibung ändern" : "Beschreibung hinzufügen";
+          aboutBtn.addEventListener("click", function () {
+            GoDialog.prompt("Beschreibung", aboutText, { multiline: true, ok: "Speichern", placeholder: "Wann, wo, wie trainiert ihr?" }).then(function (t) {
+              if (t === null || t === undefined) return;
+              t = String(t).trim().slice(0, 600);
+              rest("rpc/go_save_circle_about", { method: "POST", body: { p_group: gid, p_text: t } })
+                .then(function () {
+                  cst().settings[gid] = Object.assign({}, circleSettings(g) || { group_id: gid }, { description: t });
+                  aboutText = t;
+                  about.textContent = t;
+                  aboutBtn.textContent = t ? "Beschreibung ändern" : "Beschreibung hinzufügen";
+                })
+                .catch(function (err) {
+                  GoDialog.alert(/not_owner/.test(String((err && err.message) || "")) ? "Die Beschreibung schreibt der Coach des Circles." : "Speichern braucht go-circle-about.sql in Supabase.");
+                });
+            });
+          });
+          slide.appendChild(aboutBtn);
+        }
+        /* Mitglieder: Profilkreise aus dem Circle (ohne Kreis mit +) */
+        var members = document.createElement("div");
+        members.className = "team-slide__members";
+        slide.appendChild(members);
+        var paintMembers = function () {
+          var cm = (circleCrew.byGid || {})[gid] || {};
+          members.textContent = "";
+          Object.keys(cm).forEach(function (n) {
+            var m = cm[n];
+            var b = document.createElement("span");
+            b.className = "team-slide__member";
+            b.setAttribute("aria-label", m.nickname || n);
+            b.appendChild(personFace({ name: m.nickname || n, photo_url: m.avatar_url || "" }));
+            members.appendChild(b);
+          });
+        };
+        paintMembers();
+        Promise.resolve(loadCircleCrew()).then(paintMembers, paintMembers);
+        var evBox = document.createElement("div");
+        evBox.className = "circle-evs-box team-gassign";
+        slide.appendChild(evBox);
+        return slide;
+      }
+      /* Events des Circles ab heute 7 Tage, Design wie „Events der Gruppe“, mit Datum.
+         Mitglieder: + übernimmt in die Woche, − sagt ab. Coach: + Event (neuer Termin), − löscht den Termin. */
+      function paintCirclePageEvents(g, box) {
+        if (!box || !g) return;
+        var owner = circleCanManage(g);
+        var me = String((sessionAccount && sessionAccount.id) || "");
+        if (!box.innerHTML) box.innerHTML = '<h3 class="wr-ga-head">Events des Circles</h3><p class="wr-sheet-hint">Lädt …</p>';
+        rest("rpc/go_circle_events", { method: "POST", body: { p_group: String(g.group_id), p_days: 7 } }).catch(function () { return []; }).then(function (evs) {
+          if (!box.isConnected) return;
+          box._evs = evs || [];
+          var days = [];
+          for (var i = 0; i < 7; i++) {
+            var x = new Date(Date.now() + i * 86400000);
+            days.push(x.toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }));
+          }
+          var dayOf = function (ts) { return new Date(ts).toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" }); };
+          var rows = days.map(function (iso) {
+            var label = new Date(iso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "short", day: "numeric", month: "numeric" }).replace(/,/, "");
+            var list = (evs || []).filter(function (e) { return dayOf(e.starts_at) === iso; });
+            var html = "";
+            list.forEach(function (e, k) {
+              var mine = String(e.user_id) === me;
+              var on = mine || !!e.joined;
+              var tm = new Date(e.starts_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+              var meta = [e.location, circleMode(e), circleRounds(e) ? circleRounds(e) + " Runden" : ""].filter(Boolean).join(" · ");
+              var btn = owner && mine
+                ? '<button type="button" class="wr-dayrow__minus" data-cev-del="' + escapeHtml(e.id) + '" aria-label="Termin entfernen">−</button>'
+                : mine ? "<span></span>"
+                : on ? '<button type="button" class="wr-dayrow__minus" data-cev-no="' + escapeHtml(e.id) + '" aria-label="Absagen">−</button>'
+                : '<button type="button" class="wr-dayrow__minus wr-dayrow__plus" data-cev-yes="' + escapeHtml(e.id) + '" aria-label="Übernehmen">+</button>';
+              html += '<div class="wr-dayrow wr-zrec-row wr-ga-row' + (on ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k ? "" : escapeHtml(label)) + "</b> " +
+                escapeHtml(e.title || "Zirkeltraining") + " · " + escapeHtml(tm) + "</span>" +
+                (meta ? '<span class="wr-dayrow__tag">' + escapeHtml(meta) + "</span>" : "") + "</div>" + btn + "</div>";
+            });
+            if (!list.length) {
+              html = owner
+                ? '<button type="button" class="wr-dayrow wr-zrec-row wr-dayrow--add" data-cev-add="' + iso + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + escapeHtml(label) + '</b> <span class="wr-dayrow__free">+ Event</span></span></div><span></span></button>'
+                : '<div class="wr-dayrow wr-zrec-row is-empty"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + escapeHtml(label) + '</b> <span class="wr-dayrow__free">frei</span></span></div><span></span></div>';
+            }
+            return html;
+          }).join("");
+          box.innerHTML = '<h3 class="wr-ga-head">Events des Circles</h3>' +
+            '<button type="button" class="wr-ga-info" data-cev-info="1">Info</button>' +
+            '<div class="wr-days wr-days--all">' + rows + "</div>";
+        });
+        if (box._cevBound) return;
+        box._cevBound = true;
+        box.addEventListener("click", function (e) {
+          var t = e.target.closest && e.target.closest("[data-cev-info],[data-cev-add],[data-cev-del],[data-cev-yes],[data-cev-no]");
+          if (!t) return;
+          var again = function () { paintCirclePageEvents(g, box); };
+          if (t.hasAttribute("data-cev-info")) {
+            GoDialog.alert(owner
+              ? "Deine Zirkeltrainings der nächsten 7 Tage. Mit + Event legst Du einen Termin für den Circle an, mit − entfernst Du ihn. Mitglieder übernehmen Termine mit + in ihre Woche."
+              : "Die Zirkeltrainings des Circles der nächsten 7 Tage. Mit + übernimmst Du einen Termin in Deine Woche, mit − sagst Du ab. Termine legt der Coach des Circles an.");
+            return;
+          }
+          if (t.hasAttribute("data-cev-add")) { createCircleEvent(g, true, t.getAttribute("data-cev-add"), again); return; }
+          var id = t.getAttribute("data-cev-del") || t.getAttribute("data-cev-yes") || t.getAttribute("data-cev-no");
+          if (t.hasAttribute("data-cev-yes")) {
+            GoDialog.confirm("Zirkeltraining übernehmen?", { body: "Der Termin steht dann in Deiner Woche und in Aktuell.", ok: "Übernehmen", cancel: "Abbrechen", row: true })
+              .then(function (yes) {
+                var ev0 = (box._evs || []).filter(function (x) { return String(x.id) === String(id); })[0] || { id: id, starts_at: new Date().toISOString() };
+                if (yes) joinCircleEvent(ev0, g).then(again);
+              });
+            return;
+          }
+          if (t.hasAttribute("data-cev-no")) {
+            GoDialog.confirm("Absagen?", { ok: "Absagen", cancel: "Abbrechen", row: true }).then(function (yes) {
+              if (!yes) return;
+              rest("event_rsvps?event_id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(me), { method: "DELETE", prefer: "return=minimal" })
+                .then(function () {
+                  gogogoToast("Abgesagt");
+                  if (window.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
+                  again();
+                })
+                .catch(function () { gogogoToast("Ging gerade nicht"); });
+            });
+            return;
+          }
+          if (t.hasAttribute("data-cev-del")) {
+            GoDialog.confirm("Termin entfernen?", { body: "Das Zirkeltraining wird gelöscht. Wer zugesagt hat, hat es dann nicht mehr in seiner Woche.", ok: "Entfernen", cancel: "Abbrechen", row: true }).then(function (yes) {
+              if (!yes) return;
+              rest("events?id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(me), { method: "DELETE", prefer: "return=minimal" })
+                .then(function () {
+                  gogogoToast("Entfernt");
+                  if (window.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
+                  again();
+                })
+                .catch(function () { gogogoToast("Ging gerade nicht"); });
+            });
+          }
+        });
       }
       function editKreis(kind, id) {
         var st = kreiseState || {};
@@ -20705,7 +20888,9 @@
             circleEvBtn.type = "button";
             circleEvBtn.className = "go-slide__cta go-slide__cta--editor";
             circleEvBtn.textContent = "Individuelles Event erstellen";
-            circleEvBtn.hidden = !window.__goCircleName;
+            /* entfällt: Termine legt man unter Kreise → Circle in der Wochenliste an (Wunsch 25.11.) */
+            circleEvBtn.hidden = true;
+            circleEvBtn.style.display = "none";
             circleEvBtn.addEventListener("click", onCircleEventBtn);
             card.appendChild(circleEvBtn);
             var circleEvList = document.createElement("div");
@@ -21789,7 +21974,8 @@
           var ids = cst().groups.map(function (g) { return encodeURIComponent(String(g.group_id)); });
           if (!ids.length) { paintCircleHead(); applyCircleCover(); paintCircleEvents(); return; }
           var setQ = "go_circles?group_id=in.(" + ids.join(",") + ")&select=group_id,name,owner_id,locations,online";
-          var setJob = rest(setQ + ",created_at,started_in_app")
+          var setJob = rest(setQ + ",created_at,started_in_app,description")
+            .catch(function () { return rest(setQ + ",created_at,started_in_app"); })
             .catch(function () { return rest(setQ); })
             .catch(function () { return []; })
             .then(function (rows) { (rows || []).forEach(function (r) { if (r) cst().settings[String(r.group_id)] = r; }); });
@@ -21950,7 +22136,7 @@
         var ui = cst().ui;
         if (!ui || !ui.evList || !ui.evList.isConnected) return;
         var g = circleCurrent();
-        if (ui.evBtn) ui.evBtn.hidden = !g;
+        if (ui.evBtn) ui.evBtn.hidden = true;
         if (!g) { ui.evList.textContent = ""; return; }
         loadCircleEvents(g).then(function (evs) {
           if (circleCurrent() !== g) return;
@@ -22035,13 +22221,13 @@
         return new Date(guess.getTime() - (b - u)).toISOString();
       }
       /* Event erstellen: Tag, Uhrzeit, Runden (Drehräder), beim Gründer Ort aus den Circle-Orten */
-      function createCircleEvent(g, asCircle) {
+      function createCircleEvent(g, asCircle, presetDay, onDone) {
         var dates = circleDates();
-        var pick = { day: null, time: null, rounds: 6, loc: "" };
-        GoDialog.time(asCircle ? "Circle-Event: Tag" : "Eigenes Zirkeltraining: Tag", { times: dates.map(function (x) { return x.label; }), ok: "Weiter", cancel: "Abbrechen" })
+        var pick = { day: presetDay || null, time: null, rounds: 6, loc: "" };
+        (presetDay ? Promise.resolve("preset") : GoDialog.time(asCircle ? "Circle-Event: Tag" : "Eigenes Zirkeltraining: Tag", { times: dates.map(function (x) { return x.label; }), ok: "Weiter", cancel: "Abbrechen" }))
           .then(function (lab) {
             if (!lab) return null;
-            pick.day = (dates.filter(function (x) { return x.label === lab; })[0] || {}).iso;
+            if (!presetDay) pick.day = (dates.filter(function (x) { return x.label === lab; })[0] || {}).iso;
             return GoDialog.time("Uhrzeit", { ok: "Weiter", cancel: "Abbrechen" });
           })
           .then(function (t) {
@@ -22083,6 +22269,7 @@
             }).then(function () {
               gogogoToast(asCircle ? "Circle-Event steht. Deine Mitglieder sehen es am Herz." : "Zirkeltraining ist in Deiner Woche.");
               paintCircleEvents();
+              if (typeof onDone === "function") onDone();
               if (window.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
             }).catch(function (err) {
               var m = String((err && err.message) || "");
