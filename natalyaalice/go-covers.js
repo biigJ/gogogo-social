@@ -6,7 +6,8 @@
  *                                → Bild der Einzeleinheit, sonst Bild des Wochenplans
  *                                  (nur wenn das Event aus dieser Wochenplan-Einschreibung stammt),
  *                                  sonst Bild der Kategorie (Zirkel: Foto des eigenen Circles, falls gesetzt)
- *   GoCovers.setZirkel(url)      → Circle-Foto für Zirkel-Events (leer = globales Zirkel-Bild)
+ *   GoCovers.setZirkel(url)      → Circle-Foto für Zirkel-Events ohne circle_id (leer = globales Zirkel-Bild)
+ *   GoCovers.setCirclePhotos(map) → circle_id → Foto. Zirkel-Events mit circle_id zeigen immer das Foto IHRES Circles
  *
  * Ein eigenes Foto am Event (events.photo_url) hat immer Vorrang; das entscheidet der Aufrufer.
  */
@@ -23,7 +24,8 @@
   };
 
   var byCourse = {};
-  var zirkelCover = ""; // Foto des eigenen Circles (go_circle_photos), ersetzt das globale Zirkel-Bild
+  var zirkelCover = ""; // Foto des gerade gewählten Circles: nur für Zirkel-Events ohne circle_id
+  var circlePhotos = {}; // circle_id → Foto (go_circle_photos)
   var planOfEnroll = {}; // Einschreibung → Wochenplan
   var loading = null;
 
@@ -48,8 +50,10 @@
     return "";
   }
 
-  function url(courseId, cat, enrollmentId) {
-    /* Zirkel-Events zeigen das Foto des eigenen Circles vor dem Kursbild */
+  function url(courseId, cat, enrollmentId, circleId) {
+    /* Event eines Circles: immer das Foto genau dieses Circles, sonst das allgemeine Zirkel-Bild.
+       Vorher bekam jedes Zirkel-Event das Foto des gerade gewählten Circles (falscher Circle im Kalender). */
+    if (circleId) return circlePhotos[String(circleId)] || CAT.zirkel;
     if (String(cat || "") === "zirkel" && zirkelCover) return zirkelCover;
     if (courseId && byCourse[String(courseId)]) return byCourse[String(courseId)];
     return planImage(courseId, enrollmentId) || CAT[String(cat || "")] || CAT.kraft;
@@ -61,6 +65,7 @@
     onReady: function (fn) { (loading || Promise.resolve()).then(fn); },
     url: url,
     setZirkel: function (u) { zirkelCover = String(u || ""); },
+    setCirclePhotos: function (m) { circlePhotos = {}; Object.keys(m || {}).forEach(function (k) { if (m[k]) circlePhotos[String(k)] = String(m[k]); }); },
     count: function () { return Object.keys(byCourse).length; },
     hasCourseImage: function (courseId) { return !!(courseId && byCourse[String(courseId)]); }
   };

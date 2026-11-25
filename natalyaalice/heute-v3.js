@@ -1996,7 +1996,7 @@
         hasTime: hasTime(ev),
         location: ev.location || "",
         photo: ev.photo_url || "",
-        cover: global.GoCovers ? GoCovers.url(ev.course_id, /ernährung|ernaehrung/i.test(String(ev.title || "")) ? "ernaehrung" : ev.category, ev.enrollment_id) : "",
+        cover: global.GoCovers ? GoCovers.url(ev.course_id, /ernährung|ernaehrung/i.test(String(ev.title || "")) ? "ernaehrung" : ev.category, ev.enrollment_id, ev.circle_id) : "",
         who: String(owner.name || "").split(" ")[0],
         whoPhoto: owner.photo || ""
       });
@@ -2129,7 +2129,7 @@
   function coverFor(opts) {
     if (opts.photo || opts.plus || !global.GoCovers) return "";
     var cat = /ernährung|ernaehrung/i.test(String(opts.title || "")) ? "ernaehrung" : opts.category;
-    return GoCovers.url(opts.courseId, cat, opts.enrollmentId);
+    return GoCovers.url(opts.courseId, cat, opts.enrollmentId, opts.circleId);
   }
 
   /* Punkte unter der Foto-Galerie folgen dem Wischen */
@@ -2503,6 +2503,7 @@
       extraPhotos: eventExtraPhotos(ev),
       courseId: ev.course_id || "",
       enrollmentId: ev.enrollment_id || "",
+      circleId: ev.circle_id || "",
       emoji: emoji,
       actions: (tools || "") + (actions || ""),
       author: authorHtml(groupAuthor(ev, p) || p, true),
