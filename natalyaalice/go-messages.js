@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-circle-events",
+      at: "2026-11-25T14:00:00Z",
+      text: "Zirkeltrainings Deines Circles stehen jetzt in Aktuell, auch bevor Du zusagst. Mit „Bin dabei“ bist Du dabei, auch in der Zirkel-App."
+    },
+    {
       key: "news:2026-11-25-coach-details",
       at: "2026-11-25T13:00:00Z",
       text: "Unter Community → Mein Coach zeigt „Details & Auswahl“ Über mich, Sterne und Bewertungen. Wisch zur Seite, um andere Coaches mit blauem c anzusehen."

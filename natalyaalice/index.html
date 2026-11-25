@@ -8965,12 +8965,12 @@
   <script src="/natalyaalice/coach-reviews.js?v=gcr-4"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-1"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-29"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-15"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-16"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-169"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-170"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-109"></script>
   <script src="/natalyaalice/support.js?v=support-34"></script>
@@ -18791,7 +18791,7 @@
             GoDialog.confirm("Zirkeltraining übernehmen?", { body: "Der Termin steht dann in Deiner Woche und in Aktuell.", ok: "Übernehmen", cancel: "Abbrechen", row: true })
               .then(function (yes) {
                 var ev0 = (box._evs || []).filter(function (x) { return String(x.id) === String(id); })[0] || { id: id, starts_at: new Date().toISOString() };
-                if (yes) joinCircleEvent(ev0, g).then(again);
+                if (yes) joinCircleEvent(ev0, g).then(function () { circleFfcRespond(id, true, box); }).then(again);
               });
             return;
           }
@@ -18799,6 +18799,7 @@
             GoDialog.confirm("Absagen?", { ok: "Absagen", cancel: "Abbrechen", row: true }).then(function (yes) {
               if (!yes) return;
               rest("event_rsvps?event_id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(me), { method: "DELETE", prefer: "return=minimal" })
+                .then(function () { circleFfcRespond(id, false, box); })
                 .then(function () {
                   gogogoToast("Abgesagt");
                   if (window.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
@@ -18811,7 +18812,9 @@
           if (t.hasAttribute("data-cev-del")) {
             GoDialog.confirm("Termin entfernen?", { body: "Das Zirkeltraining wird gelöscht. Wer zugesagt hat, hat es dann nicht mehr in seiner Woche.", ok: "Entfernen", cancel: "Abbrechen", row: true }).then(function (yes) {
               if (!yes) return;
+              var evDel = (box._evs || []).filter(function (x) { return String(x.id) === String(id); })[0];
               rest("events?id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(me), { method: "DELETE", prefer: "return=minimal" })
+                .then(function () { if (evDel && evDel.circle_id) return circleFfcDelete(evDel.starts_at); })
                 .then(function () {
                   gogogoToast("Entfernt");
                   if (window.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
@@ -22292,6 +22295,28 @@
       var CIRCLE_WORK = ["0:30", "0:45", "1:00", "1:30", "2:00", "2:30", "3:00", "3:30", "4:00", "4:30", "5:00", "6:00", "8:00", "10:00"];
       var CIRCLE_REST = ["0:00", "0:10", "0:15", "0:20", "0:30", "0:45", "1:00", "1:30", "2:00", "3:00"];
       function mmssSec(t) { var p = String(t || "").split(":"); return (Number(p[0]) || 0) * 60 + (Number(p[1]) || 0); }
+      /* Termin auch in der Zirkel-App (Hendriks create_event) mit allen Circle-Mitgliedern als Eingeladene.
+         Format, Zeiten und Stationen kommen beim Start aus der gogogo-Notiz (Double = „Team“). */
+      function circleFfcCopy(g, startsAt, location) {
+        if (!window.FFC || !FFC.user || !FFC.user() || !FFC.createEvent) return Promise.resolve();
+        return Promise.resolve(FFC.weeklyPoints ? FFC.weeklyPoints(g.group_id) : []).catch(function () { return []; }).then(function (pts) {
+          var ids = (pts || []).filter(function (p) { return p && !p.is_me && p.user_id; }).map(function (p) { return p.user_id; });
+          return Promise.resolve(FFC.createEvent({ title: "Zirkeltraining · " + String(g.name || "Circle"), startsAt: startsAt, location: location || "", inviteeIds: ids }));
+        }).catch(function () {});
+      }
+      function circleFfcRespond(id, going, box) {
+        var ev = ((box && box._evs) || []).filter(function (x) { return String(x.id) === String(id); })[0];
+        if (!ev || !window.FFC || !FFC.events || !FFC.respondEvent) return;
+        var t = new Date(ev.starts_at).getTime();
+        var tw = (FFC.events() || []).filter(function (f) { return f && !f.is_mine && Math.abs(new Date(f.starts_at).getTime() - t) <= 30 * 60000; })[0];
+        if (tw) Promise.resolve(FFC.respondEvent(tw.id, going)).catch(function () {});
+      }
+      function circleFfcDelete(startsAt) {
+        if (!window.FFC || !FFC.events || !FFC.deleteEvent) return Promise.resolve();
+        var t = new Date(startsAt).getTime();
+        var twins = (FFC.events() || []).filter(function (f) { return f && f.is_mine && Math.abs(new Date(f.starts_at).getTime() - t) <= 30 * 60000; });
+        return Promise.all(twins.map(function (f) { return Promise.resolve(FFC.deleteEvent(f.id)).catch(function () {}); }));
+      }
       function createCircleEvent(g, asCircle, presetDay, onDone) {
         var dates = circleDates();
         var pick = { day: presetDay || null, time: null, rounds: 6, loc: "" };
@@ -22355,9 +22380,11 @@
                 visibility: asCircle ? "circle" : "team", is_unplanned: false, note: note, location: pick.loc || null
               };
               if (asCircle) body.circle_id = String(g.group_id);
-              return rest("events", { method: "POST", prefer: "return=minimal", body: body });
+              return rest("events", { method: "POST", prefer: "return=minimal", body: body }).then(function () {
+                if (asCircle) return circleFfcCopy(g, body.starts_at, body.location);
+              });
             }).then(function () {
-              gogogoToast(asCircle ? "Circle-Event steht. Deine Mitglieder sehen es am Herz." : "Zirkeltraining ist in Deiner Woche.");
+              gogogoToast(asCircle ? "Circle-Event steht. Deine Mitglieder sehen es in Aktuell und in der Zirkel-App und können zusagen." : "Zirkeltraining ist in Deiner Woche.");
               paintCircleEvents();
               if (typeof onDone === "function") onDone();
               if (window.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
@@ -27206,6 +27233,12 @@
             clearInvitesForDay: clearInvitesForDay,
             groupMemberIds: groupMemberIds,
             myCoachGroupIds: myCoachGroupIds,
+            /* meine Circles (Zirkel-App) für Circle-Events in Aktuell */
+            circleIds: function () {
+              var c = window.__goCircleState;
+              if (!c || !c.groups) return [];
+              return c.groups.map(function (g) { return String(g.group_id); }).concat(c.extraIds || []);
+            },
             /* Karte: Übungen der Einheit aus dem Katalog (wie im Kalender) */
             exercisesForEvent: function (ev) {
               var load = ev && ev.category !== "zirkel" && typeof loadEventSession === "function" ? loadEventSession(ev) : null;
