@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-coach-msg",
+      at: "2026-11-25T11:00:00Z",
+      text: "Unter Community → Mein Coach kannst Du Deinem Coach jetzt direkt eine Nachricht senden. Sie steht dann in Aktuell unter „Mein Coach“."
+    },
+    {
       key: "news:2026-11-25-artmag",
       at: "2026-11-25T10:00:00Z",
       text: "Neue Darstellung „Art Magazin“: Serifen, Schwarz und Weiß, Bilder ohne Farbe drumherum. Zu finden unter Profil → Einstellungen → Darstellung."

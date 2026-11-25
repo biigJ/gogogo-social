@@ -5241,6 +5241,12 @@
     .team-slide.is-coach .team-slide__coach-name + .team-slide__about {
       margin-top: 8px;
     }
+    /* Reihenfolge Mein Coach: Bild, Name, Termin buchen, Nachricht senden, Bewertung, Text */
+    .team-slide.is-coach .team-slide__art + .team-slide__coach-name { margin: 16px 0 0; }
+    .team-slide.is-coach .team-slide__coach-name + .team-slide__cta.is-pt { margin-top: 14px; }
+    .team-slide.is-coach .team-slide__cta.is-msg { margin-top: 10px; margin-bottom: 0; flex: none; }
+    .team-slide.is-coach .team-slide__cta.is-review + .team-slide__about,
+    .team-slide.is-coach .team-slide__cta.is-msg + .team-slide__about { margin-top: 20px; }
     /* Meine Gruppe: gleiche Abstände wie Mein Coach (Name → Text) */
     .team-slide__cta + .team-slide__group-name-row {
       margin-top: 36px;
@@ -8952,13 +8958,13 @@
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-46"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-4"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-28"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-12"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-29"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-13"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-167"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-168"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-107"></script>
   <script src="/natalyaalice/support.js?v=support-34"></script>
@@ -18056,6 +18062,15 @@
         var body = String(text || "").trim();
         if (!sessionAccount || (!body && !ex.media_url)) return Promise.resolve(false);
         var cGid = String(view).indexOf("circle:") === 0 ? String(view).slice(7) : "";
+        /* Mein Coach: nur an den eigenen Coach (Ansicht „Mein Coach“, Button unter Mein Coach) */
+        if (view === "mycoach") {
+          var tid = String(sessionAccount.trainer_id || "");
+          if (!tid) return Promise.resolve(false);
+          var crow = { author_id: sessionAccount.id, audience: "coach", recipients: [tid], to_id: tid, body: body.slice(0, 2000) };
+          if (ex.media_url) { crow.media_url = ex.media_url; crow.media_kind = ex.media_kind || "img"; }
+          if (ex.reply_to) crow.reply_to = ex.reply_to;
+          return rest("go_aktuell_posts", { method: "POST", prefer: "return=minimal", body: crow }).then(function () { return true; });
+        }
         var aud = cGid ? "circle" : ["ich", "team", "gruppe", "coach", "alles"].indexOf(view) >= 0 ? view : "alles";
         var mentionJob = /@/.test(body) && aud !== "ich" ? mentionPeople(view).then(function (pp) { return findMention(body, pp); }).catch(function () { return null; }) : Promise.resolve(null);
         return Promise.all([kreisRecipients(cGid ? view : aud), mentionJob]).then(function (r) {
@@ -18090,6 +18105,8 @@
         /* Coach: nur meine Coachees (auch private Events) */
         var hasCoachees = sessionIsTrainer && (teamPeople || []).some(function (p) { return p && !p.isSelf && String(p.trainer_id || "") === String(sessionAccount && sessionAccount.id); });
         if (hasCoachees) html += opt("coach", "Coachees");
+        var hasCoach = !!(sessionAccount && sessionAccount.trainer_id);
+        if (hasCoach) html += opt("mycoach", "Mein Coach");
         html += opt("alles", "Alles");
         if (heute.__optHtml !== html) {
           heute.innerHTML = html;
@@ -18097,6 +18114,7 @@
         }
         if (cur === "bubble" && !bub) cur = "alles";
         if (cur === "coach" && !hasCoachees) cur = "team";
+        if (cur === "mycoach" && !hasCoach) cur = "team";
         if (cur === "gruppe" && !grp) cur = "team";
         if (cur === "circle") cur = circles.length ? "circle:" + circles[0].group_id : "team";
         if (String(cur).indexOf("circle:") === 0 && !circles.some(function (g) { return "circle:" + g.group_id === cur; })) cur = "team";
@@ -19221,12 +19239,15 @@
         var coachArt = teamPortrait(trainer, trainer ? String(trainer.name || "?").slice(0, 1) : "", {});
         if (!(trainer && trainer.photo_url)) coachArt.classList.add("is-frame");
         coachSlide.appendChild(coachArt);
+        /* Name direkt unter dem Bild, dann Termin buchen, Nachricht senden */
+        var nameSlot = document.createElement("div");
+        coachSlide.appendChild(nameSlot);
         var ptCta = document.createElement("button");
         ptCta.type = "button";
         ptCta.className = "team-slide__cta is-solid is-pt";
         /* ohne Coach: direkt auswählen */
         var pendingCoach = !trainer && coachReqs.outgoing;
-        ptCta.textContent = trainer ? "Personal Training" : pendingCoach
+        ptCta.textContent = trainer ? "Termin buchen" : pendingCoach
           ? "Anfrage an " + String((pendingCoach.person && pendingCoach.person.name) || "Coach").split(" ")[0] + " offen"
           : "Coach auswählen";
         ptCta.addEventListener("click", function () {
@@ -19242,6 +19263,30 @@
           openPtCal({ mode: "client", coachId: trainer.id, coachName: String(trainer.name || "").split(" ")[0] });
         });
         coachSlide.appendChild(ptCta);
+        /* Nachricht senden: Dialog mittig, danach Aktuell mit Ansicht „Mein Coach“ */
+        if (trainer) {
+          var msgCta = document.createElement("button");
+          msgCta.type = "button";
+          msgCta.className = "team-slide__cta is-solid is-msg";
+          msgCta.textContent = "Nachricht senden";
+          msgCta.addEventListener("click", function () {
+            var first = String(trainer.name || "Coach").split(" ")[0];
+            GoDialog.prompt("Nachricht an " + first, "", { multiline: true, ok: "Senden", placeholder: "Deine Nachricht" }).then(function (txt) {
+              txt = String(txt || "").trim();
+              if (!txt) return;
+              sendKreisPost("mycoach", txt).then(function (ok) {
+                if (!ok) { gogogoToast("Senden ging nicht"); return; }
+                syncHeuteFilterOptions();
+                if (window.HeuteAccountability && HeuteAccountability.setFilter) HeuteAccountability.setFilter("mycoach");
+                var hs = document.getElementById("heute-filter-select");
+                if (hs) hs.value = "mycoach";
+                var pillBtn = document.querySelector('.app-pill [data-shell="heute"]');
+                if (pillBtn) pillBtn.click();
+              }).catch(function () { gogogoToast("Senden ging nicht"); });
+            });
+          });
+          coachSlide.appendChild(msgCta);
+        }
         /* Bewertung schreiben (coach-reviews.js) */
         if (trainer && window.GoCoachReviews) {
           var reviewCta = document.createElement("button");
@@ -19264,19 +19309,9 @@
         pick.setAttribute("aria-label", trainer ? "Trainer ändern" : "Trainer wählen");
         pick.innerHTML = PENCIL_ICON;
         pick.addEventListener("click", function () { openTeamSearch("trainer"); });
-        /* Name · WhatsApp direkt daneben · Stift rechtsbündig */
-        if (trainer) {
-          var wa = document.createElement("button");
-          wa.type = "button";
-          wa.className = "team-wa";
-          wa.setAttribute("aria-label", "Sofortnachricht an Trainer");
-          wa.innerHTML = WA_ICON;
-          wa.addEventListener("click", function () { openQuickWa(); });
-          nameRow.appendChild(wa);
-        }
-        /* Coach ändern: Stift der Zeile in Kreise */
-        /* ohne Coach kein Name/Text darunter: der Button reicht */
-        if (trainer) coachSlide.appendChild(nameRow);
+        /* ohne WhatsApp-Symbol (Nachricht senden darunter); ohne Coach kein Name: der Button reicht */
+        if (trainer) nameSlot.replaceWith(nameRow);
+        else nameSlot.remove();
         var about = document.createElement("p");
         about.className = "team-slide__about";
         var aboutText = "";
