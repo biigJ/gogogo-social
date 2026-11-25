@@ -3069,7 +3069,7 @@
         if (!uid || uid === me()) return true;
         if (flags.groupOnly) return !!groupMemberIdSet()[uid];
         if (flags.coachOnly) return isMyCoachee(uid);
-        if (flags.myCoachOnly) return uid === myCoachId();
+        if (flags.myCoachOnly) return uid === myCoachId() || (host.myCoachGroupIds ? host.myCoachGroupIds() : []).indexOf(uid) >= 0;
         return inTeamFilter(uid, flags);
       };
       myToday = myToday.filter(inKreis);
