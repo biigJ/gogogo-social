@@ -2,7 +2,7 @@
 // POST { id } (go_exercise_links.id). Holt das Startbild aus der öffentlichen Embed-Seite des Beitrags,
 // legt es dauerhaft in den Bucket go-covers (exlinks/<id>.jpg) und schreibt thumb_url an den Link.
 // Instagram-Bild-URLs laufen nach ein paar Tagen ab, deshalb die Kopie im eigenen Speicher.
-// Keine Nutzerdaten: setzt nur das Bild zum gespeicherten Link, deshalb ohne JWT-Prüfung (App nutzt Publishable Key).
+// Ohne JWT-Prüfung (App nutzt Publishable Key), aber nur für eingeloggte Nutzer: Header x-go-account-id muss ein Konto sein.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const CORS = {
@@ -36,6 +36,10 @@ Deno.serve(async (req) => {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: "id" }, 400);
 
   const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const me = String(req.headers.get("x-go-account-id") || "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(me)) return json({ error: "login" }, 401);
+  const { data: acc } = await db.from("go_accounts").select("id").eq("id", me).maybeSingle();
+  if (!acc) return json({ error: "login" }, 401);
   const { data: link, error } = await db.from("go_exercise_links").select("id,url,thumb_url").eq("id", id).maybeSingle();
   if (error || !link) return json({ error: "not_found" }, 404);
   if (link.thumb_url) return json({ thumb_url: link.thumb_url });
