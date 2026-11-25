@@ -6425,9 +6425,15 @@
     var flags = viewFlags("alles");
     flags.todayAll = true;
     var out = {};
+    /* Pulsieren nur, solange das Event in Aktuell steht: geplante Events anderer fallen dort eine Stunde nach Start raus */
+    var cutoff = Date.now() - 3600000;
+    var gone = function (ev) {
+      return ev.status === "geplant" && String(ev.user_id) !== me() && new Date(ev.starts_at).getTime() < cutoff;
+    };
     (state.events || []).forEach(function (ev) {
       if (!ev || dayKey(ev.starts_at) !== today || ev.status === "ausgefallen") return;
       if (!eventVisibleToMe(ev, flags)) return;
+      if (gone(ev)) return;
       var uid = String(ev.user_id);
       var p = personOf(uid);
       var a = out[uid] || (out[uid] = { id: uid, name: p.name, photo: p.photo, training: true, done: false, photoEventId: "" });
@@ -6438,6 +6444,7 @@
        Gruppenmitglieder ohne Zusage nicht mehr. */
     (state.events || []).forEach(function (ev) {
       if (!ev || dayKey(ev.starts_at) !== today || ev.status === "ausgefallen") return;
+      if (ev.status === "geplant" && String(ev.user_id) !== me() && new Date(ev.starts_at).getTime() < cutoff) return;
       (state.rsvps[String(ev.id)] || []).forEach(function (uid) {
         uid = String(uid || "");
         if (!uid || out[uid]) return;
