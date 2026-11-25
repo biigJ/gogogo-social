@@ -8964,7 +8964,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-168"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-169"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-107"></script>
   <script src="/natalyaalice/support.js?v=support-34"></script>
@@ -18009,6 +18009,28 @@
         var go = function () { return circleIdsFor(gid); };
         return circleNicks(gid).length ? go() : Promise.resolve(loadCircleCrew()).then(go, go);
       }
+      /* Ansicht „Mein Coach“: Coachees meines Coachs mit Haken „offen für Gruppentraining“ (go-coach-gruppe.sql, nur wenn ich selbst offen bin) */
+      var myCoachGroup = { coach: "", ids: [], people: {}, at: 0, loading: null };
+      function myCoachGroupIds() {
+        var tid = String((sessionAccount && sessionAccount.trainer_id) || "");
+        if (!tid) return [];
+        if (myCoachGroup.coach === tid && Date.now() - myCoachGroup.at < 120000) return myCoachGroup.ids;
+        if (!myCoachGroup.loading) {
+          myCoachGroup.loading = rest("rpc/go_coach_group_members", { method: "POST", body: { p_coach: tid } })
+            .then(function (rows) {
+              var ids = [], people = {};
+              (rows || []).forEach(function (r) { if (r && r.id && r.is_open) { ids.push(String(r.id)); people[String(r.id)] = r; } });
+              var changed = ids.join(",") !== myCoachGroup.ids.join(",") || myCoachGroup.coach !== tid;
+              myCoachGroup = { coach: tid, ids: ids, people: people, at: Date.now(), loading: null };
+              if (changed && heuteView() === "mycoach") {
+                paintHeuteCrew();
+                if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
+              }
+            })
+            .catch(function () { myCoachGroup.at = Date.now(); myCoachGroup.loading = null; });
+        }
+        return myCoachGroup.coach === tid ? myCoachGroup.ids : [];
+      }
       function kreisRecipients(view) {
         var mine = String(sessionAccount && sessionAccount.id);
         var team = (teamPeople || []).filter(function (p) { return p && !p.isSelf && p.id; }).map(function (p) { return String(p.id); });
@@ -26434,6 +26456,21 @@
             var pid = String(entry.person.id);
             return teamPeople.some(function (tp) { return tp && String(tp.id) === pid && String(tp.trainer_id || "") === String(sessionAccount.id); });
           });
+        } else if (crewView === "mycoach") {
+          /* Mein Coach: nur der Coach und Coachees mit Haken „offen für Gruppentraining“ */
+          var coachPid = String(sessionAccount.trainer_id || "");
+          var openIds = myCoachGroupIds();
+          var keep = function (pid) { return pid === coachPid || openIds.indexOf(pid) >= 0; };
+          friends = friends.filter(function (entry) { return keep(String(entry.person.id)); });
+          var shownMc = {};
+          friends.forEach(function (entry) { shownMc[String(entry.person.id)] = true; });
+          openIds.concat(coachPid ? [coachPid] : []).forEach(function (pid) {
+            if (!pid || shownMc[pid] || pid === String(sessionAccount.id)) return;
+            var tp = (teamPeople || []).filter(function (t) { return t && String(t.id) === pid; })[0] || myCoachGroup.people[pid];
+            if (!tp) return;
+            shownMc[pid] = true;
+            friends.push({ person: tp, story: null, presence: presenceFor(pid), today: act[pid] || null });
+          });
         } else if (crewView === "gruppe") {
           var gIds = groupMemberIds();
           gIds.forEach(function (gid) {
@@ -26894,6 +26931,7 @@
             },
             clearInvitesForDay: clearInvitesForDay,
             groupMemberIds: groupMemberIds,
+            myCoachGroupIds: myCoachGroupIds,
             /* Karte: Übungen der Einheit aus dem Katalog (wie im Kalender) */
             exercisesForEvent: function (ev) {
               var load = ev && ev.category !== "zirkel" && typeof loadEventSession === "function" ? loadEventSession(ev) : null;
