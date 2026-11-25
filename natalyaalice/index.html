@@ -6473,6 +6473,9 @@
     }
     /* Circle-Leaderboard und Aufzeichnungen ohne Kasten */
     .go-slide__ffc-plain { color: #2A2118; font-size: 15px; }
+    /* auf der Circle-Seite (Kreise → Circle): ohne Abstand der Plus-Karte */
+    .go-slide__ffc.is-in-circle { margin-top: 6px !important; }
+    .go-slide__ffc.is-in-circle h3 { margin: 28px 0 8px; font: 600 20px/1.2 'Playfair Display', Georgia, serif; }
     /* Datumsrad ohne helle Verlaufsbänder: ausblenden per Maske statt Farbe (Hintergrund bleibt der Slide) */
     .go-slide__ffc-plain .go-rec-wheel::before, .go-slide__ffc-plain .go-rec-wheel::after { display: none; }
     .go-slide__ffc-plain .go-rec-wheel__col { -webkit-mask-image: linear-gradient(transparent, #000 32%, #000 68%, transparent); mask-image: linear-gradient(transparent, #000 32%, #000 68%, transparent); }
@@ -18551,6 +18554,7 @@
         var old = document.querySelector(".kreis-page");
         /* Zirkel-Karte zurück in den Halter (sie bleibt die lebende Karte für Login und Leaderboard) */
         if (old && old._restoreTo && old._slide) old._restoreTo.appendChild(old._slide);
+        if (old && typeof old._onClose === "function") { try { old._onClose(); } catch (eC) {} }
         if (old) old.remove();
         document.body.classList.remove("kreis-open");
       }
@@ -18618,6 +18622,24 @@
             appendKreisStampBox(slide, "circle", gid);
             if (evBox) slide.appendChild(evBox);
             paintCirclePageEvents(gNew, evBox);
+            /* Ranking, Leaderboard und Aufzeichnungen: aus der (lebenden) Zirkel-Karte ausleihen, beim Schließen zurück */
+            var zc = zirkelCard();
+            var ffcPart = zc && zc.querySelector(".go-slide__ffc");
+            if (ffcPart) {
+              var home = ffcPart.parentNode, after = ffcPart.nextSibling;
+              var rh = document.createElement("h3");
+              rh.className = "wr-ga-head";
+              rh.textContent = "Ranking";
+              slide.appendChild(rh);
+              slide.appendChild(ffcPart);
+              ffcPart.classList.add("is-in-circle");
+              var page = document.querySelector(".kreis-page");
+              if (page) page._onClose = function () {
+                ffcPart.classList.remove("is-in-circle");
+                if (home) home.insertBefore(ffcPart, after && after.parentNode === home ? after : null);
+              };
+              if (window.__goZirkelLbReload) { try { window.__goZirkelLbReload(); } catch (eL) {} }
+            }
             if (body) body.scrollTop = 0;
           };
           if (typeof selectCircle === "function") Promise.resolve(selectCircle(gid)).then(openNew, openNew);
