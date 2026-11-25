@@ -4639,7 +4639,7 @@
         .join("") +
       "</div>" +
       daySquaresHtml(days) +
-      progressHtml() +
+      /* keine Fortschrittsleiste mehr: der Kalender zeigt die globale Woche, nicht die letzten 7 Tage */
       sheetHtml();
     /* Gleicher Inhalt wie zuletzt: DOM stehen lassen (sonst blitzt die Woche beim Öffnen,
        weil show() sofort zeichnet und refresh() danach mit denselben Daten noch einmal) */
