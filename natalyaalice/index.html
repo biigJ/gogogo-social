@@ -26467,13 +26467,15 @@
         if (!row || row.status !== "active") return false;
         var t = Date.parse(row.updated_at || row.started_at || "");
         if (!t) return false;
-        return (Date.now() - t) > 3 * 60 * 60 * 1000;
+        /* Herzschlag kommt alle 45 s aus dem Workout; nach 3 Minuten ohne gilt es als abgebrochen */
+        return (Date.now() - t) > 3 * 60 * 1000;
       }
 
       function presenceFor(id) {
         var row = trainingPresence[String(id || "")];
         if (!row) return null;
-        if (presenceStale(row)) return { status: "done", workout_label: row.workout_label, training_date: row.training_date };
+        /* abgebrochen (kein Herzschlag mehr): weder „trainiert gerade“ noch „heute trainiert“ */
+        if (presenceStale(row)) return null;
         return row;
       }
 
