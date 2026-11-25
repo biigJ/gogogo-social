@@ -4578,9 +4578,7 @@
         var items = hasPlan
           ? [{ label: "Wochenplan ändern", value: "plan" }, { label: "Tage bearbeiten", value: "days" }]
           : [{ label: "Wochenplan wählen", value: "plan" }];
-        items.push({ info: "Zirkeltraining am: " + (zDays.length ? zDays.join(", ") : "–") });
-        items.push({ label: "Zirkeltrainings eintragen", value: "zrec" });
-        items.push({ label: "Zirkeltrainings bearbeiten", value: "zedit" });
+        /* Zirkeltrainings legt man unter Kreise → Circle an (Wunsch 25.11.): hier ohne Überschrift, Namen und Zirkel-Einträge */
         /* Gruppen-Events ordnet man unter Community → Gruppe → „Events zuordnen“ zu */
         /* früher rechts am Bild: Einladen, Extern teilen, ics */
         var curIt = currentItem();
@@ -4590,10 +4588,7 @@
           items.push({ label: "Extern teilen", value: "plane" });
         }
         items.push({ label: "Kalender exportieren (ics)", value: "ics" });
-        GoDialog.choose("Deine Woche", items, {
-          center: true,
-          sub: planNames.length ? planNames.join(" · ") : "Kein Wochenplan"
-        }).then(function (v) {
+        GoDialog.choose("", items, { center: true }).then(function (v) {
           /* erst nach dem Dialog-Klick öffnen, sonst schließt derselbe Klick das neue Sheet wieder */
           setTimeout(function () {
             if (v === "plan") openPlanPicker();

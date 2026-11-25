@@ -68,6 +68,12 @@
     st.textContent = CSS;
     document.head.appendChild(st);
   }
+  function isDark(hex) {
+    var m = String(hex || "").match(/^#?([0-9a-f]{6})$/i);
+    if (!m) return false;
+    var n = parseInt(m[1], 16);
+    return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 < 0.4;
+  }
   function aboutOf(c) {
     var a = c && c.about_me;
     if (typeof a === "string") { try { a = JSON.parse(a); } catch (e) { return String(c.about_me || "").trim(); } }
@@ -144,7 +150,8 @@
         track.style.setProperty("--gcb-bg", bg);
         track.innerHTML = list.map(function (c, i) { return pageHtml(c, String(c.id) === mineId, i === 0); }).join("");
         var hand = track.querySelector("[data-gcb-hand]");
-        if (hand) hand.style.color = bg;
+        /* Hand in der Hintergrundfarbe; bei dunklen Darstellungen (B/W, Postpunk) weiß */
+        if (hand) hand.style.color = isDark(bg) ? "#FFFFFF" : bg;
         /* blaues c hinter den Namen */
         track.querySelectorAll("[data-gcb-name]").forEach(function (h) {
           var pg = h.closest("[data-gcb-id]");

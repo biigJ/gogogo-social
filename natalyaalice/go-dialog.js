@@ -102,6 +102,8 @@
   }
 
   function text(card, msg) {
+    /* ohne Überschrift (z. B. Woche → Stift): kein leerer Platz */
+    if (msg == null || String(msg) === "") return;
     var p = document.createElement("h2");
     p.className = "god__text";
     p.textContent = String(msg == null ? "" : msg);
