@@ -105,6 +105,14 @@
         ".wr-mini-opt,.cp-wheel__opt,.gtm__opt{color:#fff !important}" +
         /* Ort-Feld in Tage bearbeiten wie das Uhrzeitrad (weißes Feld mit heller Schrift war unlesbar) */
         ".wr-dt-box{background:#000 !important;border-color:#fff !important;color:#fff !important}.wr-dt-box.is-empty{color:rgba(255,255,255,.55) !important}" +
+        /* Admin: Konturknöpfe und Pillen mit fester #111-Schrift waren auf Schwarz unsichtbar → hell; gefüllte invertiert */
+        ".ga-root .ga-pill:not(.is-blue):not(.is-admin):not(.is-owner),.ga-root .ga-btn5,.ga-root .ga-usbtn,.ga-root .ga-tk__pill,.ga-root .ga-tk__pills select,.ga-root .ga-act:not(.is-blue){color:#fff !important;border-color:rgba(255,255,255,.7) !important;background:transparent !important}" +
+        /* Admin/Inhaber rot bzw. pink lassen (Rot würde sonst über die Farbtabelle weiß) */
+        ".ga-root .ga-pill.is-admin{background:#C7413B !important;border-color:#C7413B !important;color:#fff !important}" +
+        ".ga-root .ga-pill.is-fill,.ga-root .ga-btn5.is-dark,.ga-root .ga-usbtn.is-open,.ga-root .ga-tk__pill.is-admin,.ga-root .ga-tk__pills select.is-erledigt:not(#_),.ga-root .ga-act.is-on:not(.is-blue){background:#fff !important;color:#000 !important;border-color:#fff !important}" +
+        ".ga-root .ga-tk__pills select.is-arbeit:not(#_){background:#E8A33D !important;border-color:#E8A33D !important;color:#111 !important}" +
+        ".ga-root .ga-tk__meta b{color:#fff !important}" +
+        ".ga-root .ga-face,.ga-root .ga-rect{color:#111 !important}" +
         /* alte Dialoge (Workout fertig, Neustart, …): dunkle Karte, also helle Schrift */
         ".modal-card,.modal-card h2,.modal-card p{color:#fff !important}" +
         ".modal-card .quiet{color:#fff !important;border-color:rgba(255,255,255,.6) !important;background:transparent !important}" +
