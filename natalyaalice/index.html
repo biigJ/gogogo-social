@@ -6517,6 +6517,17 @@
     .wr-cev-row .wr-dayrow__pen svg { width: 18px; height: 18px; }
     .wr-cev-row .wr-cev-rsvp { font: 600 24px/1 Inter, sans-serif; }
     .wr-cev-row.is-empty { border-style: dashed; }
+    /* Tagespille mit Termin dunkel wie „Events der Gruppe“; + / − / Stift im Kreis rechts */
+    .wr-cev-row.wr-cev-filled { background: #2A2118; color: #F6F1E8; border-color: #2A2118; }
+    .wr-cev-filled .wr-cev-time { background: transparent; border-color: rgba(246,241,232,.4); color: #F6F1E8; }
+    .wr-cev-filled .wr-dayrow__vis { border-color: rgba(246,241,232,.4); color: #F6F1E8; }
+    .wr-cev-filled .wr-dt-place { color: #F6F1E8; }
+    .wr-days--all .wr-cev-row > .wr-dayrow__minus { align-self: center; margin: 0; flex: none; }
+    .wr-cev-row .wr-cev-penc { display: grid; place-items: center; padding: 0; }
+    .wr-cev-row .wr-cev-penc svg { width: 17px; height: 17px; }
+    .wr-cev-who { gap: 4px; }
+    .wr-cev-who .wr-zface { width: 24px; height: 24px; font-size: 11px; color: #2A2118; }
+    .wr-cev-whon { margin-left: 4px; font-size: 13px; font-weight: 600; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     .go-slide__ffc.is-in-circle h3 { margin: 28px 0 8px; font: 600 20px/1.2 'Playfair Display', Georgia, serif; }
     /* Datumsrad ohne helle Verlaufsbänder: ausblenden per Maske statt Farbe (Hintergrund bleibt der Slide) */
     .go-slide__ffc-plain .go-rec-wheel::before, .go-slide__ffc-plain .go-rec-wheel::after { display: none; }
@@ -9008,17 +9019,17 @@
   <script src="/natalyaalice/coach-reviews.js?v=gcr-6"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-31"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-22"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-23"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-181"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-117"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-118"></script>
   <script src="/natalyaalice/support.js?v=support-36"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
-  <script src="/natalyaalice/coach-group.js?v=gcg-4"></script>
+  <script src="/natalyaalice/coach-group.js?v=gcg-5"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -18843,11 +18854,11 @@
             var dd0 = new Date(e.starts_at);
             var tm0 = dd0.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
             var day0 = dd0.toLocaleDateString("de-DE", { weekday: "short", timeZone: "Europe/Berlin" }).replace(/\.$/, "") + " " + dd0.toLocaleDateString("de-DE", { day: "numeric", timeZone: "Europe/Berlin" }).replace(/\.$/, "") + ".";
-            return '<div class="wr-dayrow wr-dayrow--z wr-cev-row is-past"><div class="wr-dayrow__mid">' +
+            return '<div class="wr-dayrow wr-dayrow--z wr-cev-row wr-ga-row is-past"><div class="wr-dayrow__mid">' +
               '<span class="wr-dayrow__title wr-dayrow__title--place"><b>' + escapeHtml(day0) + '</b><span class="wr-dt-name">' + escapeHtml(e.title || "Zirkeltraining") + "</span>" +
               (e.location ? '<span class="wr-dt-place">' + escapeHtml(e.location) + "</span>" : "") + "</span>" +
               '<div class="wr-dayrow__ctl"><span class="wr-mini-wheel wr-cev-time">' + escapeHtml(tm0) + '</span><span class="wr-dayrow__vis wr-cev-meta">vorbei</span></div></div>' +
-              (owner && mine ? '<button type="button" class="wr-dayrow__pen wr-cev-rsvp" data-cev-del="' + escapeHtml(e.id) + '" aria-label="Löschen">−</button>' : '<span class="wr-dayrow__pen"></span>') + "</div>";
+              (owner && mine ? '<button type="button" class="wr-dayrow__minus" data-cev-del="' + escapeHtml(e.id) + '" aria-label="Löschen">−</button>' : "<span></span>") + "</div>";
           }).join("");
           var rows = days.map(function (iso) {
             /* Aufbau wie Woche → Tage bearbeiten: „Fr 27.“ Name · Ort, darunter Uhrzeit und Format, rechts Stift bzw. + / − */
@@ -18863,26 +18874,34 @@
               /* Uhrzeit, Ort, Entfernen nur, solange niemand sonst zugesagt hat (go-circle-events-rsvps.sql) */
               var taken = Number(e.rsvp_count || 0);
               var can = owner && mine && !taken;
+              /* rechts wie bei „Events der Gruppe“: Stift bzw. + / − im Kreis */
               var side = can
-                ? '<button type="button" class="wr-dayrow__pen" data-cev-pen="' + escapeHtml(e.id) + '" aria-label="Bearbeiten">' + KREIS_PEN + "</button>"
-                : mine ? '<span class="wr-dayrow__pen"></span>'
-                : '<button type="button" class="wr-dayrow__pen wr-cev-rsvp" data-cev-' + (on ? "no" : "yes") + '="' + escapeHtml(e.id) + '" aria-label="' + (on ? "Absagen" : "Übernehmen") + '">' + (on ? "−" : "+") + "</button>";
+                ? '<button type="button" class="wr-dayrow__minus wr-cev-penc" data-cev-pen="' + escapeHtml(e.id) + '" aria-label="Bearbeiten">' + KREIS_PEN + "</button>"
+                : mine ? "<span></span>"
+                : '<button type="button" class="wr-dayrow__minus' + (on ? "" : " wr-dayrow__plus") + '" data-cev-' + (on ? "no" : "yes") + '="' + escapeHtml(e.id) + '" aria-label="' + (on ? "Absagen" : "Übernehmen") + '">' + (on ? "−" : "+") + "</button>";
+              /* dritte Zeile: wer hat zugesagt (go-circle-events-who.sql) */
+              var who = (e.rsvps || []).map(function (p) {
+                return '<span class="wr-zface" title="' + escapeHtml(p.name || "") + '">' +
+                  (p.photo_url ? '<img src="' + escapeHtml(p.photo_url) + '" alt="" />' : escapeHtml(String(p.name || "?").slice(0, 1))) + "</span>";
+              }).join("");
+              var whoLine = '<div class="wr-dayrow__with wr-cev-who">' + (who
+                ? who + '<span class="wr-cev-whon">' + escapeHtml((e.rsvps || []).map(function (p) { return String(p.name || "").split(" ")[0]; }).filter(Boolean).join(", ")) + "</span>"
+                : '<span class="wr-cev-whon">' + (taken ? taken + " Zusage" + (taken > 1 ? "n" : "") : "Noch keine Zusage") + "</span>") + "</div>";
               var place = e.location
                 ? (can ? '<button type="button" class="wr-dt-place" data-cev-place="' + escapeHtml(e.id) + '">' + escapeHtml(e.location) + "</button>" : '<span class="wr-dt-place">' + escapeHtml(e.location) + "</span>")
                 : (can ? '<button type="button" class="wr-dt-place is-empty" data-cev-place="' + escapeHtml(e.id) + '">Ort</button>' : "");
-              html += '<div class="wr-dayrow wr-dayrow--z wr-cev-row' + (on && !mine ? " is-on" : "") + '"><div class="wr-dayrow__mid">' +
+              html += '<div class="wr-dayrow wr-dayrow--z wr-cev-row wr-ga-row wr-cev-filled' + (on && !mine ? " is-on" : "") + '"><div class="wr-dayrow__mid">' +
                 '<span class="wr-dayrow__title wr-dayrow__title--place"><b>' + escapeHtml(label) + '</b><span class="wr-dt-name">' + escapeHtml(e.title || "Zirkeltraining") + "</span>" + place + "</span>" +
                 '<div class="wr-dayrow__ctl">' +
                 (can ? '<button type="button" class="wr-mini-wheel wr-cev-time" data-cev-time="' + escapeHtml(e.id) + '">' + escapeHtml(tm) + "</button>"
                   : '<span class="wr-mini-wheel wr-cev-time">' + escapeHtml(tm) + "</span>") +
                 (meta ? '<span class="wr-dayrow__vis wr-cev-meta">' + escapeHtml(meta) + "</span>" : "") +
-                (on && !mine ? '<span class="wr-cev-in">dabei</span>' : "") +
-                (mine && taken ? '<span class="wr-cev-in">' + taken + " dabei</span>" : "") +
-                "</div></div>" + side + "</div>";
+                (on && !mine ? '<span class="wr-cev-in">Du bist dabei</span>' : "") +
+                "</div>" + whoLine + "</div>" + side + "</div>";
             });
             if (!list.length) {
-              html = '<div class="wr-dayrow wr-dayrow--z is-empty wr-cev-row"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + escapeHtml(label) + '</b> <span class="wr-dayrow__free">frei</span></span></div>' +
-                (owner ? '<button type="button" class="wr-dayrow__pen wr-cev-rsvp" data-cev-add="' + iso + '" aria-label="Zirkeltraining hinzufügen">+</button>' : '<span class="wr-dayrow__pen"></span>') + "</div>";
+              html = '<div class="wr-dayrow wr-dayrow--z is-empty wr-cev-row wr-ga-row"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + escapeHtml(label) + '</b> <span class="wr-dayrow__free">frei</span></span></div>' +
+                (owner ? '<button type="button" class="wr-dayrow__minus wr-dayrow__plus" data-cev-add="' + iso + '" aria-label="Zirkeltraining hinzufügen">+</button>' : "<span></span>") + "</div>";
             }
             return html;
           }).join("");

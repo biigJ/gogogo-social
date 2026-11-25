@@ -1170,14 +1170,25 @@
       var weeks = {};
       var times = {};
       var locs = {};
+      var timesAll = {};
+      var locsAll = {};
+      var today = berlinToday();
       (rows || []).forEach(function (r) {
         var k = seriesKey(r.title, r.starts_at);
         if (!k) return;
         (weeks[k] = weeks[k] || {})[dayKey(r.starts_at)] = true;
+        /* Serienwert aus den kommenden Terminen (ohne heute und Vergangenheit), sonst aus allen */
+        var later = dayKey(r.starts_at) > today;
         var t = displayTime(r.starts_at);
-        if (t) { var tk = times[k] = times[k] || {}; tk[t] = (tk[t] || 0) + 1; }
-        var lk = locs[k] = locs[k] || {}; var l0 = String(r.location || ""); lk[l0] = (lk[l0] || 0) + 1;
+        var l0 = String(r.location || "");
+        [[timesAll, locsAll], later ? [times, locs] : null].forEach(function (pair) {
+          if (!pair) return;
+          if (t) { var tk = pair[0][k] = pair[0][k] || {}; tk[t] = (tk[t] || 0) + 1; }
+          var lk = pair[1][k] = pair[1][k] || {}; lk[l0] = (lk[l0] || 0) + 1;
+        });
       });
+      Object.keys(timesAll).forEach(function (k) { if (!times[k]) times[k] = timesAll[k]; });
+      Object.keys(locsAll).forEach(function (k) { if (!locs[k]) locs[k] = locsAll[k]; });
       var out = {};
       var mode = {};
       var place = {};
@@ -3422,15 +3433,42 @@
         return !!e.enrollment_id || e.category === "zirkel";
       });
       st.others = r[1] || [];
-      if (!st.others.length) return;
-      return Promise.all([
+      /* Zusagen aller Events der Gruppe (dritte Zeile der Tagespille) */
+      st.who = {};
+      var allIds = st.mine.concat(st.others).map(function (e) { return e.id; });
+      var whoJob = !allIds.length ? null : rest("event_rsvps?event_id=in.(" + allIds.join(",") + ")&status=eq.zugesagt&select=event_id,user_id&order=created_at.asc")
+        .catch(function () { return []; })
+        .then(function (rows) {
+          var owner = {};
+          st.mine.concat(st.others).forEach(function (e) { owner[String(e.id)] = String(e.user_id); });
+          var ids = [];
+          (rows || []).forEach(function (x) {
+            var eid = String(x.event_id), uid = String(x.user_id);
+            if (!uid || uid === owner[eid]) return;
+            (st.who[eid] = st.who[eid] || []).push(uid);
+            ids.push(uid);
+          });
+          return ids.length ? ensurePeople(ids) : null;
+        });
+      if (!st.others.length) return whoJob;
+      return Promise.all([whoJob,
         rest("event_rsvps?user_id=eq." + encodeURIComponent(me()) + "&event_id=in.(" + st.others.map(function (e) { return e.id; }).join(",") + ")&select=event_id,status").catch(function () { return []; }),
         ensurePeople(st.others.map(function (e) { return e.user_id; }))
       ]).then(function (x) {
+        x = x.slice(1);
         st.going = {};
         (x[0] || []).forEach(function (y) { if (y && y.status === "zugesagt") st.going[String(y.event_id)] = true; });
       });
     });
+  }
+  /* dritte Zeile: Profilkreise und Vornamen der Zusagen */
+  function gaWho(st, e) {
+    var ids = (st.who || {})[String(e.id)] || [];
+    if (!ids.length) return '<div class="wr-dayrow__with wr-cev-who"><span class="wr-cev-whon">Noch keine Zusage</span></div>';
+    return '<div class="wr-dayrow__with wr-cev-who">' + ids.map(function (id) {
+      var p = personOf(id);
+      return '<span class="wr-zface" title="' + esc(p.name || "") + '">' + (p.photo ? '<img src="' + esc(p.photo) + '" alt="" />' : esc(String(p.name || "?").slice(0, 1))) + "</span>";
+    }).join("") + '<span class="wr-cev-whon">' + esc(ids.map(function (id) { return String(personOf(id).name || "").split(" ")[0]; }).filter(Boolean).join(", ")) + "</span></div>";
   }
   function paintGroupAssign() {
     var st = state.ga;
@@ -3448,7 +3486,7 @@
         html += '<div class="wr-dayrow wr-zrec-row wr-ga-row' + (inGroup ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++, label) + "</b> " +
           esc(e.title || "Training") + esc(tm) + "</span>" +
           /* zweite Zeile: Ort (zugeordnet heißt nicht „nur in der Gruppe sichtbar“) */
-          (e.location ? '<span class="wr-dayrow__tag">' + esc(e.location) + "</span>" : "") + "</div>" +
+          (e.location ? '<span class="wr-dayrow__tag">' + esc(e.location) + "</span>" : "") + (inGroup ? gaWho(st, e) : "") + "</div>" +
           (inGroup
             ? '<button type="button" class="wr-dayrow__minus" data-ga-rm="' + esc(e.id) + '" aria-label="Aus der Gruppe nehmen">−</button>'
             : '<button type="button" class="wr-dayrow__minus wr-dayrow__plus" data-ga-add="' + esc(e.id) + '" aria-label="Zur Gruppe hinzufügen">+</button>') +
@@ -3460,7 +3498,7 @@
         var who = String(personOf(e.user_id).name || "").split(" ")[0];
         html += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++, label) + "</b> " +
           esc(e.title || "Training") + esc(tm) + "</span>" +
-          '<span class="wr-dayrow__tag">' + esc([e.location, "von " + (who || "Gruppe"), on ? "Du bist dabei" : ""].filter(Boolean).join(" · ")) + "</span></div>" +
+          '<span class="wr-dayrow__tag">' + esc([e.location, "von " + (who || "Gruppe"), on ? "Du bist dabei" : ""].filter(Boolean).join(" · ")) + "</span>" + gaWho(st, e) + "</div>" +
           (on
             ? '<button type="button" class="wr-dayrow__minus" data-ga-no="' + esc(e.id) + '" aria-label="Teilnahme absagen">−</button>'
             : '<button type="button" class="wr-dayrow__minus wr-dayrow__plus" data-ga-yes="' + esc(e.id) + '" aria-label="Teilnehmen">+</button>') + "</div>";
@@ -4210,8 +4248,12 @@
     future.forEach(function (f) {
       if (String(f.enrollment_id) !== String(ev.enrollment_id) || String(f.title || "") !== String(ev.title || "")) return;
       if (weekdayOf(dayKey(f.starts_at)) !== fromWd || String(f.id) === String(ev.id)) return;
+      /* heute bleibt, wie es in Aktuell steht */
+      if (dayKey(f.starts_at) === berlinToday()) return;
       var d = addDays(dayKey(f.starts_at), shift);
-      var want = untimed ? d + "T12:00:00Z" : timedStarts(d, hhmm);
+      /* Uhrzeit nicht geändert (hhmm leer): jeder Termin behält seine Uhrzeit, nur der Tag wandert mit */
+      var own = displayTime(f.starts_at);
+      var want = untimed ? d + "T12:00:00Z" : hhmm ? timedStarts(d, hhmm) : own ? timedStarts(d, ("0" + own).slice(-5)) : d + "T12:00:00Z";
       var b = {};
       if (new Date(want).getTime() !== new Date(f.starts_at).getTime()) b.starts_at = want;
       Object.keys(body).forEach(function (k) {
@@ -4242,7 +4284,9 @@
       var vis = de.vis[ev.id] || "team";
       /* nur echte Änderungen hier schreiben: Uhrzeit wie beim Öffnen (Serie) lässt einen einzeln verschobenen Termin in Ruhe */
       var timeChanged = pick !== de.orig[ev.id];
-      var sameDay = dayKey(ev.starts_at) === iso && !timeChanged;
+      /* heutiger Termin gehört zu Aktuell: Tage bearbeiten ändert ihn nicht (Uhrzeit, Tag, Ort), nur die Serie ab nächster Woche */
+      var isToday = dayKey(ev.starts_at) === berlinToday();
+      var sameDay = isToday || (dayKey(ev.starts_at) === iso && !timeChanged);
       var wantBub = !!(de.bub && de.bub[ev.id]) || vis === "bubble";
       var bubId = host.bubbleId ? host.bubbleId() : "";
       var bubChanged = wantBub !== !!ev.bubble_id && (!!bubId || !wantBub);
@@ -4255,12 +4299,12 @@
         var serBody = { visibility: vis, bubble_id: wantBub && bubId ? bubId : wantBub ? ev.bubble_id || null : null };
         if (placeChanged) serBody.location = de.place[ev.id] || null;
         if (grp) serBody.group_id = grp.id;
-        jobs = jobs.concat(seriesJobs(future, ev, iso, untimed, hhmm, serBody));
+        jobs = jobs.concat(seriesJobs(future, ev, iso, untimed && timeChanged, timeChanged ? hhmm : "", serBody));
       }
       if (sameDay && !placeChanged && (ev.visibility || "team") === vis && !bubChanged && !(grp && String(ev.group_id || "") !== String(grp.id))) return;
       var body = { visibility: vis };
       if (!sameDay) body.starts_at = starts;
-      if (placeChanged) body.location = de.place[ev.id] || null;
+      if (placeChanged && !isToday) body.location = de.place[ev.id] || null;
       /* neue Uhrzeit → Herz-Meldung für Freunde (go-events-time-set.sql) */
       if (body.starts_at && !untimed && !(displayTime(ev.starts_at) && formatTime(ev.starts_at) === hhmm)) body.time_set_at = new Date().toISOString();
       /* Durch eine Alternative ersetzte Einheit auf einen anderen Tag gelegt: dort wieder geplant */
