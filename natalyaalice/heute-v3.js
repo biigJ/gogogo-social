@@ -3812,8 +3812,10 @@
     }
   }
 
-  function closeDoneModal() {
+  function closeDoneModal(e) {
     var modal = $("acc-done-modal");
+    /* Abbrechen im „Schreib, wie es war“ nach Start: nicht mehr „dabei“ */
+    if (e && modal && !modal.hidden && modal.dataset.eventId && modal.dataset.eventId !== "draft") unmarkStarted(modal.dataset.eventId);
     if (modal) modal.hidden = true;
     state.doneDraft = null;
     state.altReplace = null;
@@ -5002,25 +5004,33 @@
     });
   }
 
-  /* „dabei“: Event läuft gerade und ist noch nicht abgeschlossen. Nur echte Lebenszeichen zählen:
-     laufende Eieruhr zu genau diesem Event (ausdauer-timer.js) oder „trainiert gerade“ mit frischem Herzschlag
-     (go_training_presence, alle 45 s im Workout). Ein abgebrochener Start zählt nach 3 Minuten nicht mehr. */
+  /* „dabei“: Start getippt und nicht abgebrochen, bis das Event erledigt ist.
+     Eigene Starts merkt sich das Gerät (je Tag); andere sehen „trainiert gerade“ (go_training_presence).
+     Abbrechen (Eieruhr „Abbrechen“, „Schreib, wie es war“ → Abbrechen) nimmt es zurück. */
+  function startedKey() { return "gogogo_started_" + me() + "_" + todayIso(); }
+  function startedMap() { try { return JSON.parse(localStorage.getItem(startedKey()) || "{}") || {}; } catch (e) { return {}; } }
   function markStarted(ev) {
     if (!ev || !ev.id) return;
+    var m = startedMap();
+    m[String(ev.id)] = Date.now();
+    try { localStorage.setItem(startedKey(), JSON.stringify(m)); } catch (e) {}
     if (host.trainingActive) { try { host.trainingActive(ev.title || "Training"); } catch (e2) {} }
   }
+  function unmarkStarted(id) {
+    var m = startedMap();
+    if (!id || !m[String(id)]) return;
+    delete m[String(id)];
+    try { localStorage.setItem(startedKey(), JSON.stringify(m)); } catch (e) {}
+    if (host.trainingCancel) { try { host.trainingCancel(); } catch (e2) {} }
+    try { render(); } catch (e3) {}
+  }
+  /* Eieruhr abgebrochen (ausdauer-timer.js) */
+  document.addEventListener("go:start-cancel", function (e) { unmarkStarted(e && e.detail && e.detail.id); });
   function isStarted(ev) {
     if (!ev || ev.status === "erledigt" || dayKey(ev.starts_at) !== todayIso()) return false;
-    if (String(ev.user_id) === me()) {
-      try {
-        var t = JSON.parse(localStorage.getItem("gogogo_timer") || "null");
-        if (t && String(t.id) === String(ev.id)) return true;
-      } catch (e) {}
-    }
+    if (String(ev.user_id) === me()) return !!startedMap()[String(ev.id)];
     var pr = host.presenceOf ? host.presenceOf(String(ev.user_id)) : null;
     if (!pr || pr.status !== "active") return false;
-    var beat = Date.parse(pr.updated_at || pr.started_at || "");
-    if (!beat || Date.now() - beat > 3 * 60000) return false;
     var open = (state.events || []).filter(function (e) {
       return e && String(e.user_id) === String(ev.user_id) && e.status === "geplant" && dayKey(e.starts_at) === todayIso();
     });
