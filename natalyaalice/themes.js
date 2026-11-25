@@ -142,24 +142,30 @@
     },
     postmodern: {
       label: "Postmodern",
-      fonts: "family=Archivo+Black&family=Archivo:wght@500;600;700;800",
-      display: "Archivo Black",
-      body: "Archivo",
-      serif: "Archivo Black",
-      /* Memphis: knallige Neonfarben, fette Schrift, CTAs in Gold */
+      /* 80er-Magazin: Headlines in Abril Fatface (fette Didone wie Magazin-Cover), Text in Poppins (geometrisch wie ITC Avant Garde) */
+      fonts: "family=Abril+Fatface&family=Poppins:wght@400;500;600;700",
+      display: "Poppins",
+      body: "Poppins",
+      serif: "Abril Fatface",
+      /* Pop Clash: Pink #FF1493 (Akzent), Koralle #FF6F61 (Leiste), Gelb #FFD700 (Buttons),
+         Türkis #40E0D0 / #00CED1 (Signal, Flächen), Schrift #2A2A2A.
+         Kontraste: #2A2A2A auf Weiß 14:1, Weiß auf #D10F79 5,2:1, #2A2A2A auf Gelb 11:1, #2A2A2A auf Koralle 5,8:1 */
       hex: {
-        "2E9E5B": "B4FF39", C7413B: "FF2E93", A5332E: "D4007A", F7F5F0: "FFFFFF",
-        F6F1E8: "FFF9EC", F3EEE4: "FFF4DA", EDE6DA: "7DF9FF", E4DDD0: "B4FF39",
-        E8E2D6: "7DF9FF", D8D0C4: "B4FF39", ECECEB: "7DF9FF",
-        "2A2118": "1B0B3A", "1A1510": "0D0420", "6B6358": "5B3F8C"
+        "2E9E5B": "00CED1", C7413B: "FF1493", A5332E: "D10F79", F7F5F0: "FFFFFF",
+        F6F1E8: "FFF8F6", F3EEE4: "FFF1EE", EDE6DA: "D5F7F3", E4DDD0: "9EEDE5",
+        E8E2D6: "D5F7F3", D8D0C4: "40E0D0", ECECEB: "D5F7F3",
+        "2A2118": "2A2A2A", "1A1510": "1A1A1A", "6B6358": "5C5C5C"
       },
       rgb: {
-        "199,65,59": "255,46,147", "165,51,46": "212,0,122", "247,245,240": "255,255,255",
-        "246,241,232": "255,249,236", "243,238,228": "255,244,218",
-        "42,33,24": "27,11,58", "52,34,32": "27,11,58", "20,16,12": "13,4,32"
+        "199,65,59": "255,20,147", "165,51,46": "209,15,121", "247,245,240": "255,255,255",
+        "246,241,232": "255,248,246", "243,238,228": "255,241,238",
+        "42,33,24": "42,42,42", "52,34,32": "42,42,42", "20,16,12": "26,26,26"
       },
-      cta: { bg: "#E6B325", ink: "#1B0B3A" },
-      extra: "body{font-weight:600}"
+      cta: { bg: "#FFD700", ink: "#2A2A2A" },
+      extra: ".app-pill nav{background:#FF6F61 !important;color:#2A2A2A}.app-pill .pill-dot{background:#2A2A2A !important}" +
+        "html[data-go-theme=postmodern] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=postmodern] body .profile-name:not(#_):not(#__)," +
+        "html[data-go-theme=postmodern] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=postmodern] body #heute-filter-select:not(#_)" +
+        "{font-family:'Abril Fatface',Georgia,serif !important;font-weight:400 !important;letter-spacing:.01em}"
     }
   };
   /* Postpunk: dunkel wie B/W, Pink #FF4F9A / #FF78B4, Grün #00D68F / #00B894, Grund #121214.
