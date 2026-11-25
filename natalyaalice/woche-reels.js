@@ -3637,6 +3637,8 @@
       if (v === null || v === undefined) return;
       de.place = de.place || {};
       de.place[ev.id] = String(v).trim().slice(0, 80);
+      /* gewählter Ort steht dann auch unter meinen Orten im Profil */
+      if (de.place[ev.id] && host && host.addMyPlace) { try { host.addMyPlace(de.place[ev.id]); } catch (eP) {} }
       markDaysDirty();
       var btn = document.querySelector('[data-wr-dayplace="' + String(id).replace(/"/g, "") + '"]');
       if (btn) {
