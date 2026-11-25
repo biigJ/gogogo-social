@@ -234,7 +234,9 @@
       ".app-pill .pill-dot{background:#FF4F9A !important}" +
       /* Monoton (Streifenschrift) nur für kurze große Titel; alles andere Syne, gut lesbar */
       "html[data-go-theme=postpunk] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=postpunk] body .profile-name:not(#_):not(#__),html[data-go-theme=postpunk] body .gob h2:not(#_):not(#__),html[data-go-theme=postpunk] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=postpunk] body h1:not(#_):not(#__),html[data-go-theme=postpunk] body #heute-filter-select:not(#_),html[data-go-theme=postpunk] body select[data-wr-week-select]:not(#_){font-family:Monoton,Syne,sans-serif !important;font-weight:400 !important;letter-spacing:.04em}" +
-      ".acc-card__title,.wr-title,.go-tile__name,.go-slide__title{font-family:Syne,sans-serif !important;font-weight:800 !important}"
+      ".acc-card__title,.wr-title,.go-tile__name,.go-slide__title{font-family:Syne,sans-serif !important;font-weight:800 !important}" +
+      /* eckige Kacheln wie Art Magazin */
+      ".acc-card__media,.acc-card.is-wallet,.acc-card.is-wallet .acc-card__media,.gxl__pin,.go-slide__art{border-radius:0 !important}"
   };
   /* Art Magazin: weiß, schwarz, Grautöne. Serifen (Newsreader) für Text und Titel, kleine Bedienelemente in Inter.
      Keine Akzentfarbe, eckige Bilder: die Fotos tragen die Farbe. Kontrast #111 auf Weiß 18,9:1, #6B6B6B auf Weiß 5,3:1 */
