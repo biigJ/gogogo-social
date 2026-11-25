@@ -802,6 +802,30 @@
     return (state.invites || {})[String(eventId)] || null;
   }
 
+  /* Circle-Events meiner Circles (go_circle_events, Mitgliedschaft liegt in der Zirkel-App): auch ohne Zusage sichtbar,
+     damit alle Mitglieder mit „Bin dabei“ zusagen können. Schon geladene Events (eigene, zugesagte) bleiben, wie sie sind. */
+  function loadCircleEventsExtra() {
+    var ids = host && host.circleIds ? host.circleIds() || [] : [];
+    if (!ids.length) return Promise.resolve();
+    return Promise.all(ids.map(function (gid) {
+      return rest("rpc/go_circle_events", { method: "POST", body: { p_group: String(gid), p_days: 14 } }).catch(function () { return []; })
+        .then(function (rows) { return (rows || []).map(function (r) { r._gid = String(gid); return r; }); });
+    })).then(function (lists) {
+      var have = {};
+      (state.events || []).forEach(function (e) { have[String(e.id)] = true; });
+      lists.forEach(function (rows) {
+        rows.forEach(function (r) {
+          if (!r || !r.id || have[String(r.id)]) return;
+          have[String(r.id)] = true;
+          state.events.push({
+            id: r.id, user_id: r.user_id, title: r.title || "Zirkeltraining", starts_at: r.starts_at, note: r.note, location: r.location,
+            circle_id: r.circle_id || r._gid, category: "zirkel", visibility: "circle", status: "geplant", is_unplanned: false, _circleExtra: true
+          });
+        });
+      });
+    }).catch(function () {});
+  }
+
   function loadEvents() {
     var id = me();
     if (!id) {
@@ -1441,11 +1465,27 @@
     return { upcoming: upcoming, past: past, all: upcoming.concat(past) };
   }
 
+  /* Termin in der Zirkel-App, der zu einem gogogo-Circle-Event gehört (gleiche Zeit ± 30 Min.): nicht doppelt zeigen */
+  function ffcTwinOf(ev) {
+    if (!ev || !ev.circle_id) return null;
+    var t = new Date(ev.starts_at).getTime();
+    return (state.ffcEvents || []).filter(function (f) {
+      return f && f.starts_at && Math.abs(new Date(f.starts_at).getTime() - t) <= 30 * 60000;
+    })[0] || null;
+  }
+  function hasCircleTwin(f) {
+    var t = new Date(f.starts_at).getTime();
+    return (state.events || []).some(function (e) {
+      return e && e.circle_id && e.status !== "ausgefallen" && Math.abs(new Date(e.starts_at).getTime() - t) <= 30 * 60000;
+    });
+  }
+
   function filterFfcEvents(flags) {
     var now = Date.now();
     var week = now + 7 * 86400000;
     return (state.ffcEvents || []).filter(function (e) {
       if (!e || !e.starts_at) return false;
+      if (hasCircleTwin(e)) return false;
       var t = new Date(e.starts_at).getTime();
       if (t < now - 3600000 || t > week) return false;
       /* (a) selbst erstellt */
@@ -4128,6 +4168,8 @@
         { method: "DELETE", prefer: "return=minimal" }
       )
         .then(function () {
+          var tw = ffcTwinOf((state.events || []).filter(function (e) { return String(e.id) === String(eventId); })[0]);
+          if (tw && global.FFC && FFC.respondEvent) Promise.resolve(FFC.respondEvent(tw.id, false)).catch(function () {});
           return logActivity("rsvp_no", eventId);
         })
         .then(function () {
@@ -4141,12 +4183,19 @@
         });
       return;
     }
-    rest("event_rsvps?on_conflict=event_id,user_id", {
-      method: "POST",
-      prefer: "resolution=merge-duplicates,return=minimal",
-      body: { event_id: eventId, user_id: uid, status: "zugesagt" }
-    })
+    var evC = (state.events || []).filter(function (e) { return String(e.id) === String(eventId); })[0];
+    /* Circle-Event: Zusage über go_join_circle_event (Event ist vor der Zusage nur über den Circle sichtbar) */
+    (evC && evC.circle_id && String(evC.user_id) !== uid
+      ? rest("rpc/go_join_circle_event", { method: "POST", body: { p_event: eventId } })
+      : rest("event_rsvps?on_conflict=event_id,user_id", {
+        method: "POST",
+        prefer: "resolution=merge-duplicates,return=minimal",
+        body: { event_id: eventId, user_id: uid, status: "zugesagt" }
+      }))
       .then(function () {
+        /* Zirkel-App: beim verknüpften Termin ebenfalls zusagen */
+        var tw = ffcTwinOf(evC);
+        if (tw && !tw.is_mine && global.FFC && FFC.respondEvent) Promise.resolve(FFC.respondEvent(tw.id, true)).catch(function () {});
         return logActivity("rsvp_yes", eventId);
       })
       .then(function () {
@@ -5709,7 +5758,7 @@
       loadStreak(),
       loadEigenCourse(),
       loadEnrollments(),
-      loadEvents().then(loadMyInvites),
+      loadEvents().then(loadCircleEventsExtra).then(loadMyInvites),
       loadFfcEvents(),
       loadFfcPosts(),
       loadBubbleMsgs(),
