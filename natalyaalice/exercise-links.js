@@ -135,9 +135,11 @@
     }
     if (!thumb) thumb = photoOf[GoExMedia.key(name)] || "";
     var empty = !links.length;
+    /* Play-Symbol nur, wenn ein echtes Video dabei ist (Nutzerfotos sind Standbilder) */
+    var hasVideo = links.some(function (l) { var x = GoExMedia.parse(l.url); return x && x.kind !== "img"; });
     return '<div class="gxl__pin' + (empty ? " is-empty" : "") + '" data-gxl-ex="' + esc(name) + '"' + (empty ? "" : ' data-gxl-open="1"') + ">" +
       (thumb ? '<img src="' + esc(thumb) + '" alt="" loading="lazy" />' : "") +
-      (empty ? "" : '<span class="gxl__pinplay">' + GoExMedia.playIcon + "</span>") +
+      (hasVideo ? '<span class="gxl__pinplay">' + GoExMedia.playIcon + "</span>" : "") +
       (links.length > 1 ? '<span class="gxl__pinn">' + links.length + "</span>" : "") +
       (picking ? '<button type="button" class="gxl__pick" data-gxl-pick>Hierhin</button>' : "") +
       '<span class="gxl__pinname">' + esc(name) + "</span></div>";
