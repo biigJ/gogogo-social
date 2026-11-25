@@ -24,7 +24,10 @@
   /* Pinterest-Raster: zwei Spalten, Videos hochkant (9:16), Übungen ohne Video kürzer; wenig Text */
   var CSS =
     ".gxl{margin:6px 0 8px;text-align:left;color:#2A2118}" +
-    ".gxl__new{display:block;width:100%;box-sizing:border-box;min-height:44px;padding:0 12px;border:1.5px solid #2A2118;border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118;margin:0 0 4px}" +
+    ".gxl__newwrap{position:relative}" +
+    ".gxl__save{position:absolute;right:6px;top:6px;min-height:32px;padding:0 14px;border-radius:999px;border:0;background:#2A2118;color:#F6F1E8;font:inherit;font-size:13px;font-weight:700;cursor:pointer}" +
+    ".gxl__save[hidden]{display:none}" +
+    ".gxl__new{display:block;width:100%;box-sizing:border-box;min-height:44px;padding:0 90px 0 12px;border:1.5px solid #2A2118;border-radius:10px;background:#fff;font:inherit;font-size:15px;color:#2A2118;margin:0 0 4px}" +
     ".gxl__newhint{margin:0 0 8px;font-size:13px;font-weight:600;color:#2A2118;min-height:16px}" +
     ".gxl__chips{display:flex;flex-wrap:nowrap;gap:6px;margin:0 -2px 8px;overflow-x:auto;scrollbar-width:none;padding:0 2px}" +
     ".gxl__chips::-webkit-scrollbar{display:none}" +
@@ -112,6 +115,7 @@
   }
 
   var PLAN = "Mein Wochenplan";
+  var savedFirst = "";
   var planNames = null;
   function loadPlan() {
     if (planNames) return Promise.resolve(planNames);
@@ -164,8 +168,13 @@
       if (label && label !== "Alle" && label !== PLAN && (labelsOf[GoExMedia.key(n)] || []).indexOf(label) === -1) return false;
       return true;
     });
-    /* Videos zuerst (Bild vor Text), dann ohne Video */
+    /* Mein Wochenplan: alphabetisch; sonst Videos zuerst. Gerade gesicherte Übung steht ganz oben */
     list.sort(function (a, b) {
+      if (savedFirst) {
+        var fa = GoExMedia.key(a) === savedFirst ? 0 : 1, fb = GoExMedia.key(b) === savedFirst ? 0 : 1;
+        if (fa !== fb) return fa - fb;
+      }
+      if (label === PLAN && !q) return a.localeCompare(b, "de");
       var va = GoExMedia.linksFor(a).length ? 0 : 1, vb = GoExMedia.linksFor(b).length ? 0 : 1;
       return va - vb || a.localeCompare(b, "de");
     });
@@ -180,14 +189,46 @@
     el.querySelectorAll("[data-gxl-label]").forEach(function (c) {
       c.classList.toggle("is-on", c.getAttribute("data-gxl-label") === label);
     });
+    /* Übung gewählt (Name in „Übungsname“) und gültiger Link: Pille „Sichern“ im Linkfeld */
+    var chosen = chosenName(el);
+    var saveBtn = el.querySelector("[data-gxl-save]");
+    if (saveBtn) saveBtn.hidden = !(picking && chosen);
     var hint = el.querySelector("[data-gxl-newhint]");
     if (hint) {
       var raw = (el.querySelector("[data-gxl-new]") || {}).value || "";
-      hint.textContent = picking ? "Jetzt die passende Übung wählen: „Hierhin“ tippen." : raw.trim() ? "Bitte einen Instagram- oder YouTube-Link einfügen." : "";
+      hint.textContent = picking && chosen ? "" : picking ? "Jetzt die passende Übung wählen: „Hierhin“ tippen." : raw.trim() ? "Bitte einen Instagram- oder YouTube-Link einfügen." : "";
     }
   }
 
   function refreshOne(el) { paint(el); }
+  /* genau eine Übung im Feld „Übungsname“ */
+  function chosenName(el) {
+    var q = String(((el.querySelector("[data-gxl-q]") || {}).value) || "").trim().toLowerCase();
+    if (!q) return "";
+    return (names || []).filter(function (n) { return n.toLowerCase() === q; })[0] || "";
+  }
+  function saveLink(el, exName, btn) {
+    var url = pendingUrl(el);
+    if (!url || !exName) return;
+    if (btn) btn.disabled = true;
+    host.rest("go_exercise_links", { method: "POST", prefer: "return=minimal",
+      body: { name_key: GoExMedia.key(exName), name: exName, url: url, added_by: host.me() } })
+      .then(function () { return GoExMedia.reload(); })
+      .then(function () {
+        el.querySelector("[data-gxl-new]").value = "";
+        el.querySelector("[data-gxl-q]").value = "";
+        query = "";
+        savedFirst = GoExMedia.key(exName);
+        if (btn) btn.disabled = false;
+        paint(el);
+        if (host.toast) host.toast("Gesichert");
+      })
+      .catch(function (err) {
+        if (btn) btn.disabled = false;
+        var m = String((err && err.message) || "");
+        if (host.toast) host.toast(/duplicate|23505/.test(m) ? "Diesen Link gibt es bei der Übung schon" : /go_exercise_links|relation/.test(m) ? "Tabelle fehlt: go-exercise-links.sql ausführen" : "Speichern fehlgeschlagen");
+      });
+  }
 
   function mount(el) {
     if (!el || !host || !global.GoExMedia) return;
@@ -197,7 +238,8 @@
       el.className = "gxl";
       label = PLAN;
       el.innerHTML =
-        '<input type="url" inputmode="url" class="gxl__new" placeholder="Link aus Instagram oder YouTube" data-gxl-new />' +
+        '<div class="gxl__newwrap"><input type="url" inputmode="url" class="gxl__new" placeholder="Link aus Instagram oder YouTube" data-gxl-new />' +
+        '<button type="button" class="gxl__save" data-gxl-save hidden>Sichern</button></div>' +
         '<p class="gxl__newhint" data-gxl-newhint></p>' +
         '<div class="gxl__chips">' + [PLAN, "Alle"].concat(LABELS).map(function (l) {
           return '<button type="button" class="gxl__chip" data-gxl-label="' + esc(l) + '">' + esc(l) + "</button>";
@@ -239,9 +281,24 @@
         });
       return;
     }
+    var sv = e.target.closest("[data-gxl-save]");
+    if (sv) { saveLink(el, chosenName(el), sv); return; }
     var pin = e.target.closest("[data-gxl-open]");
     if (pin && !e.target.closest("[data-gxl-pick]")) {
       GoExMedia.open(pin.getAttribute("data-gxl-ex"));
+      return;
+    }
+    /* Kachel ohne Video: nach oben, Name ins Feld „Übungsname“, dann Link einfügen und sichern */
+    var emptyPin = e.target.closest(".gxl__pin.is-empty");
+    if (emptyPin && !e.target.closest("[data-gxl-pick]")) {
+      var nmSel = emptyPin.getAttribute("data-gxl-ex");
+      var qIn = el.querySelector("[data-gxl-q]");
+      qIn.value = nmSel;
+      query = nmSel;
+      paint(el);
+      try { el.scrollIntoView({ block: "start", behavior: "smooth" }); } catch (eS) { el.scrollIntoView(); }
+      var sc = el.closest(".go-slide__body");
+      if (sc) { try { sc.scrollTo({ top: 0, behavior: "smooth" }); } catch (eT) { sc.scrollTop = 0; } }
       return;
     }
     var play = e.target.closest("[data-gxl-play]");
@@ -275,23 +332,7 @@
     var pick = e.target.closest("[data-gxl-pick]");
     if (pick) {
       e.preventDefault();
-      var exName = pick.closest("[data-gxl-ex]").getAttribute("data-gxl-ex");
-      var url = pendingUrl(el);
-      if (!url) return;
-      pick.disabled = true;
-      host.rest("go_exercise_links", { method: "POST", prefer: "return=minimal",
-        body: { name_key: GoExMedia.key(exName), name: exName, url: url, added_by: host.me() } })
-        .then(function () { return GoExMedia.reload(); })
-        .then(function () {
-          el.querySelector("[data-gxl-new]").value = "";
-          paint(el);
-          if (host.toast) host.toast("Gespeichert bei " + exName);
-        })
-        .catch(function (err) {
-          pick.disabled = false;
-          var m = String((err && err.message) || "");
-          if (host.toast) host.toast(/duplicate|23505/.test(m) ? "Diesen Link gibt es bei der Übung schon" : /go_exercise_links|relation/.test(m) ? "Tabelle fehlt: go-exercise-links.sql ausführen" : "Speichern fehlgeschlagen");
-        });
+      saveLink(el, pick.closest("[data-gxl-ex]").getAttribute("data-gxl-ex"), pick);
     }
   }
 
