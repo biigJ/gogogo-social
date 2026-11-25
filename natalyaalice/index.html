@@ -8979,10 +8979,10 @@
   <script src="/natalyaalice/exercise-links.js?v=gxl-9"></script>
   <script src="/natalyaalice/coach-portal.js?v=cp-12"></script>
   <script src="/natalyaalice/admin-inbox.js?v=ga-47"></script>
-  <script src="/natalyaalice/coach-reviews.js?v=gcr-5"></script>
-  <script src="/natalyaalice/coach-browse.js?v=gcb-3"></script>
+  <script src="/natalyaalice/coach-reviews.js?v=gcr-6"></script>
+  <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-31"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-17"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-18"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
@@ -19657,8 +19657,14 @@
           reviewCta.type = "button";
           reviewCta.className = "team-slide__cta is-review";
           reviewCta.textContent = "Bewertung schreiben";
-          reviewCta.addEventListener("click", function () { coachReviewsReady(); GoCoachReviews.openWrite(trainer); });
+          /* schon bewertet: „Bewertung anpassen“ (Sterne und Text änderbar) */
+          var reviewLabel = function () {
+            coachReviewsReady();
+            if (GoCoachReviews.mine) GoCoachReviews.mine(trainer.id).then(function (r) { reviewCta.textContent = r ? "Bewertung anpassen" : "Bewertung schreiben"; });
+          };
+          reviewCta.addEventListener("click", function () { coachReviewsReady(); GoCoachReviews.openWrite(trainer, reviewLabel); });
           coachSlide.appendChild(reviewCta);
+          reviewLabel();
         }
         var nameRow = document.createElement("div");
         nameRow.className = "team-slide__coach-name";

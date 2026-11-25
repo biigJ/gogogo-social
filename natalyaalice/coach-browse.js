@@ -107,7 +107,8 @@
   }
 
   function paintReviews(el, c) {
-    host.rest("go_coach_reviews?coach_id=eq." + encodeURIComponent(c.id) + "&select=stars,body,updated_at&order=updated_at.desc&limit=50")
+    host.rest("go_coach_reviews?coach_id=eq." + encodeURIComponent(c.id) + "&select=stars,body,created_at,updated_at&order=updated_at.desc&limit=50")
+      .catch(function () { return host.rest("go_coach_reviews?coach_id=eq." + encodeURIComponent(c.id) + "&select=stars,body,updated_at&order=updated_at.desc&limit=50"); })
       .catch(function () { return []; })
       .then(function (rows) {
         rows = rows || [];
@@ -118,7 +119,8 @@
         el.innerHTML = '<div class="gcb-rate" role="img" aria-label="' + String(Math.round(avg * 10) / 10).replace(".", ",") + ' von 5 Sternen">' +
           starsHtml(avg) + '<span class="gcb-avg">' + (Math.round(avg * 10) / 10).toFixed(1).replace(".", ",") + "</span></div>" +
           '<div class="gcb-revs">' + texts.slice(0, 3).map(function (r) {
-            return '<p class="gcb-rev">„' + esc(String(r.body).trim()) + '“<small>' + "★".repeat(Math.max(1, Math.min(5, r.stars || 0))) + "</small></p>";
+            var stp = global.GoCoachReviews && GoCoachReviews.stampText ? GoCoachReviews.stampText(r) : "";
+            return '<p class="gcb-rev">„' + esc(String(r.body).trim()) + '“<small>' + "★".repeat(Math.max(1, Math.min(5, r.stars || 0))) + (stp ? " · " + esc(stp) : "") + "</small></p>";
           }).join("") +
           (texts.length > 3 ? '<button type="button" class="gcb-more" data-gcb-more="' + esc(c.id) + '">mehr</button>' : "") + "</div>";
       });

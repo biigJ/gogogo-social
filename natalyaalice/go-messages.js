@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-review-edit",
+      at: "2026-11-25T15:30:00Z",
+      text: "Deine Coach-Bewertung kannst Du jetzt anpassen: Community → Mein Coach → „Bewertung anpassen“. Sterne und Text sind änderbar."
+    },
+    {
       key: "news:2026-11-25-messages-heart",
       at: "2026-11-25T15:00:00Z",
       text: "Kommentare zu Deinen Events und @Nachrichten an Dich stehen jetzt im Herz oben rechts. Beim Öffnen der App siehst Du neue Nachrichten direkt."
