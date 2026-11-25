@@ -4704,11 +4704,6 @@
       animation: training-ring-pulse-dark 1.6s ease-in-out infinite;
     }
     .crew-story.is-training.is-training-done .crew-story__name { color: #2A2118; }
-    /* Status-Pille am Profilkreis: gleiche Logik und Farben wie auf der Karte in Aktuell */
-    .crew-story { position: relative; }
-    .crew-story__stat { position: absolute; left: 50%; top: calc(var(--story-d, 64px) - 15px); transform: translateX(-50%); z-index: 3; display: inline-flex; align-items: center; gap: 3px;
-      height: 16px; padding: 0 6px; border-radius: 999px; background: #2A2118; color: #F6F1E8; font: 700 9.5px/1 Inter, system-ui, sans-serif; letter-spacing: .02em; white-space: nowrap; pointer-events: none; box-shadow: 0 0 0 1.5px #F3EEE4; }
-    .crew-story__stat.is-late::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #E5383B; }
     .crew-story.is-today .crew-story__name { font-weight: 700; }
     #heute-stories.is-filter-hidden { display: none !important; }
     .team-group-ffc { margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(42,33,24,.2); }
@@ -7140,7 +7135,7 @@
       padding: 0 12px;
     }
   </style>
-  <script src="/natalyaalice/themes.js?v=thm-25"></script>
+  <script src="/natalyaalice/themes.js?v=thm-26"></script>
 </head>
 <body class="is-home">
   <div class="go-boot" id="go-boot" role="status" aria-live="polite">
@@ -9010,7 +9005,7 @@
   <script src="/natalyaalice/log.js?v=log-2"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-4"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-8"></script>
-  <script src="/natalyaalice/go-story.js?v=gst-9"></script>
+  <script src="/natalyaalice/go-story.js?v=gst-10"></script>
   <script src="/natalyaalice/bubbles.js?v=bub-17"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-5"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-8"></script>
@@ -9024,12 +9019,12 @@
   <script src="/natalyaalice/coach-reviews.js?v=gcr-6"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-31"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-24"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-25"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-183"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-184"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-119"></script>
   <script src="/natalyaalice/support.js?v=support-36"></script>
@@ -26880,6 +26875,8 @@
               (ev.location ? " · " + ev.location : ""),
             note: note,
             done: ev.status === "erledigt",
+            /* Status-Pille wie auf der Karte in Aktuell; gestern Erledigtes zeigt „erledigt“ */
+            status: ev.status === "erledigt" ? "erledigt" : (HeuteAccountability.statusFor ? HeuteAccountability.statusFor(ev) : ""),
             loadList: ev.status === "erledigt" && HeuteAccountability.storyExercisesHtml ? function () { return HeuteAccountability.storyExercisesHtml(ev); } : null
           };
         }), {
@@ -27040,13 +27037,6 @@
           if (active && !done) el.classList.add("is-training-active");
           if (done) el.classList.add("is-training-done");
           el.title = active && !done ? "Trainiert gerade" : done ? "Heute trainiert" : "Trainiert heute";
-          /* Status-Pille wie unten links auf der Karte in Aktuell (heute-v3 statusOf) */
-          if (st) {
-            var pill = document.createElement("span");
-            pill.className = "crew-story__stat is-" + (st === "verspätet" ? "late" : st === "erledigt" ? "done" : "open");
-            pill.textContent = st;
-            el.appendChild(pill);
-          }
         }
         var meActEarly = {};
         try {

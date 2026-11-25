@@ -1,6 +1,6 @@
 /* go-story.js — Story-Ansicht für Kreise in Aktuell (Bubble-Orte, Freunde-Posts, eigener Post, heutiges Event)
  *   GoStory.open(items, opts)
- *     items: [{ bg, who, title, sub, note, done, id }]
+ *     items: [{ bg, who, title, sub, note, done, status, id }]   status: Pille wie auf der Karte in Aktuell
  *     opts:  { title, color, onItem(item) }   onItem: Tipp auf den Titel öffnet das Event
  *   Je Eintrag 5 s, Zeitstrahl unten. Finger halten = anhalten. Tipp links = zurück, rechts = weiter.
  */
@@ -42,6 +42,9 @@
       ".gstory .gstory__list li span+span{flex:none;opacity:.85;font-variant-numeric:tabular-nums}" +
       ".gstory__note{margin-top:8px !important;font-weight:500 !important}" +
       ".gstory__done{margin-top:8px !important}" +
+      /* Status-Pille wie unten links auf der Karte in Aktuell (Farben aus dem Schema, themes.js tag) */
+      ".gstory__stat{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:999px;background:#F6F1E8;color:#2A2118;font:700 12px/1 Inter,system-ui,sans-serif;letter-spacing:.02em;white-space:nowrap}" +
+      ".gstory__stat.is-late::before{content:'';width:6px;height:6px;border-radius:50%;background:#E5383B}" +
       ".gstory__bars{position:absolute;z-index:3;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);display:flex;gap:4px}" +
       ".gstory__bars span{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.35);overflow:hidden}" +
       ".gstory__bars i{display:block;height:100%;width:0;background:#fff}" +
@@ -93,12 +96,13 @@
         (it.bg ? '<img class="gstory__bg" src="' + esc(it.bg) + '" alt="" />' : "") +
         '<div class="gstory__top"><span>' + esc(opts.title || "") + '</span><button type="button" data-gstory-close aria-label="Schließen"><svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg></button></div>' +
         '<div class="gstory__txt">' +
+        (it.status ? '<span class="gstory__stat is-' + (it.status === "verspätet" ? "late" : it.status === "erledigt" ? "done" : "open") + '">' + esc(it.status) + "</span>" : "") +
         (it.who ? '<p class="gstory__who">' + esc(it.who) + "</p>" : "") +
         '<h3 data-gstory-open="1">' + esc(it.title || "Training") + "</h3>" +
         (it.sub ? "<p>" + esc(it.sub) + "</p>" : "") +
         (it.loadList ? '<ul class="gstory__list" hidden></ul>' : "") +
         (it.note ? '<p class="gstory__note">' + esc(it.note) + "</p>" : "") +
-        (it.done ? '<p class="gstory__done">Erledigt ✓</p>' : "") +
+        (it.done && !it.status ? '<p class="gstory__done">Erledigt ✓</p>' : "") +
         "</div>" +
         '<div class="gstory__bars">' + items.map(function (_, k) {
           return '<span class="' + (k < i ? "is-done" : k === i ? "is-now" : "") + '"><i></i></span>';

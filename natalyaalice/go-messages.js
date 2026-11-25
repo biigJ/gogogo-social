@@ -16,7 +16,7 @@
     {
       key: "news:2026-11-25-endless-status",
       at: "2026-11-25T17:35:00Z",
-      text: "Wiederkehrende Events laufen jetzt ohne Ende weiter. Die Profilkreise oben zeigen denselben Status wie die Karten in Aktuell: dabei, gleich, bald, heute, verspätet, erledigt."
+      text: "Wiederkehrende Events laufen jetzt ohne Ende weiter. Stories zeigen denselben Status wie die Karten in Aktuell: dabei, gleich, bald, heute, verspätet, erledigt."
     },
     {
       key: "news:2026-11-25-who-coach-cal",
