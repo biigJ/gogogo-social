@@ -6537,6 +6537,8 @@
     afterKindChosen: afterKindChosen,
     createUnplanned: createUnplannedEvent,
     todayActivity: todayActivity,
+    /* Status wie die Pille auf der Karte (für die Story-Ansicht) */
+    statusFor: function (ev) { return ev ? statusOf({ done: ev.status === "erledigt", ts: ev.starts_at, started: isStarted(ev) }) : ""; },
     focusEvent: focusEvent,
     todayCardFor: todayCardFor,
     todayEventsFor: todayEventsFor,

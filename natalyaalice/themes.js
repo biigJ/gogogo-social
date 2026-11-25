@@ -376,7 +376,7 @@
     var t = THEMES[current] || {};
     var css = "";
     /* Etikett oben auf den Karten (Kreise, Bubbles: „Meine Gruppe“, „Coach-Gruppe“ …) */
-    if (t.tag) css += ".gbub-card__me:not(.is-leave):not(#_),.acc-card__status:not(#_):not(#__),.crew-story__stat:not(#_):not(#__){background:" + t.tag.bg + " !important;color:" + t.tag.ink + " !important;box-shadow:" + (t.tag.ring ? "0 0 0 1px " + t.tag.ring : "none") + " !important}";
+    if (t.tag) css += ".gbub-card__me:not(.is-leave):not(#_),.acc-card__status:not(#_):not(#__),.gstory__stat:not(#_):not(#__){background:" + t.tag.bg + " !important;color:" + t.tag.ink + " !important;box-shadow:" + (t.tag.ring ? "0 0 0 1px " + t.tag.ring : "none") + " !important}";
     if (t.cta) css += CTA_SEL + "{background:" + t.cta.bg + " !important;color:" + t.cta.ink + " !important;border-color:" + t.cta.bg + " !important}";
     if (t.dark) {
       css +=
