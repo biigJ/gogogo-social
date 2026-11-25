@@ -231,11 +231,12 @@
   var thumbAsked = {};
   function makeThumb(id) {
     var st = host && host.storage;
-    if (!st || !id || thumbAsked[id]) return Promise.resolve(null);
+    if (!st || !id || thumbAsked[id] || !meId()) return Promise.resolve(null);
     thumbAsked[id] = true;
     return fetch(st.url + "/functions/v1/go-ig-thumb", {
       method: "POST",
-      headers: { apikey: st.key, Authorization: "Bearer " + st.key, "Content-Type": "application/json" },
+      /* nur eingeloggt: die Function prüft das Konto */
+      headers: { apikey: st.key, Authorization: "Bearer " + st.key, "Content-Type": "application/json", "x-go-account-id": meId() },
       body: JSON.stringify({ id: id })
     }).then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {

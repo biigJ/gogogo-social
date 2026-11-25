@@ -3687,6 +3687,8 @@
     if (b) { b.textContent = "Speichern"; b.disabled = false; b.classList.remove("is-saved"); }
   }
 
+  var EYE_SVG = '<svg class="wr-dl-eye" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
+
   function paintDaysEditor() {
     var de = state.daysEdit;
     if (!de) return;
@@ -3703,18 +3705,20 @@
       var opts = timeOptsFor(de.times[ev.id]);
       var ti = Math.max(0, opts.indexOf(de.times[ev.id]));
       var vis = de.vis[ev.id];
-      /* Zeile 1: Wochentag + Name. Zeile 2: Uhrzeit, zeigen/privat (feste Breite), Bubble, Media. Griff über die volle Höhe */
+      /* Zeile 1: Wochentag, Name, Uhrzeit. Zeile 2: Auge + wer sieht es, Ort im Rahmen. Griff über die volle Höhe */
       return '<div class="wr-dayrow" data-wr-dayslot="' + i + '">' +
-        '<div class="wr-dayrow__mid"><span class="wr-dayrow__title wr-dayrow__title--place"><b>' + label + "</b>" +
+        '<div class="wr-dayrow__mid">' +
+        '<div class="wr-dl wr-dl--1"><b>' + label + "</b>" +
         '<span class="wr-dt-name">' + esc(ev.title || "Training") + "</span>" +
-        '<button type="button" class="wr-dt-place' + (dayPlace(ev) ? "" : " is-empty") + '" data-wr-dayplace="' + esc(ev.id) + '">' + esc(dayPlace(ev) || "Ort") + "</button></span>" +
-        '<div class="wr-dayrow__ctl"><span class="wr-mini-wrap"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
-        opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div></span>" +
+        '<span class="wr-mini-wrap"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
+        opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div></span></div>" +
+        '<div class="wr-dl wr-dl--2">' + EYE_SVG +
         /* Sichtbarkeit und Bubble in einem Dropdown wie der Filter in Aktuell */
         '<label class="wr-dayrow__pick"><select data-wr-dayvissel="' + esc(ev.id) + '" aria-label="Wer sieht es">' +
           visCycle().map(function (v) {
             return '<option value="' + v + '"' + ((state.daysEdit.bub[ev.id] ? v === "bubble" : v === vis) ? " selected" : "") + ">" + esc(visPickLabel(v)) + "</option>";
           }).join("") + "</select></label>" +
+        '<button type="button" class="wr-dt-box' + (dayPlace(ev) ? "" : " is-empty") + '" data-wr-dayplace="' + esc(ev.id) + '">' + esc(dayPlace(ev) || "Ort") + "</button>" +
         "</div></div>" +
         '<span class="wr-dayrow__grip" data-wr-grip="' + i + '" aria-label="Ziehen"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span></div>';
     }).join("");

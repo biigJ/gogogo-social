@@ -123,6 +123,7 @@
     /* Bild fest 4 Schriftreihen hoch, Rechteck 4:5 */
     ".ga-cimg,.ga-rect{width:61px;height:76px;flex:none;align-self:flex-start;border-radius:10px;object-fit:cover;background:#E6DED0;display:grid;place-items:center;font-weight:700}" +
     ".ga-rectbtn{flex:none;align-self:flex-start;padding:0;border:0;background:none;cursor:pointer;border-radius:10px}" +
+    ".ga-rectbtn.is-drop{outline:3px dashed #2A2118;outline-offset:2px}" +
     ".ga-photo{position:relative;width:160px;height:200px;margin:0 auto 12px}" +
     ".ga-photo img,.ga-photo span{width:100%;height:100%;border-radius:14px;object-fit:cover;background:#E6DED0;display:grid;place-items:center;font:700 48px/1 Inter,system-ui,sans-serif}" +
     ".ga-pen{position:absolute;right:-8px;bottom:-8px;width:40px;height:40px;border-radius:50%;border:0;background:#111;color:#fff;display:grid;place-items:center;cursor:pointer}" +
@@ -1436,7 +1437,7 @@
       return (ob ? 1 : 0) - (oa ? 1 : 0) || (b.events || 0) - (a.events || 0) || String(a.name).localeCompare(String(b.name), "de");
     });
     function btn(act, id, html, extra) { return '<button type="button" class="ga-link" data-gpl="' + act + '" data-pid="' + esc(id) + '"' + (extra || "") + ">" + html + "</button>"; }
-    return '<p class="cp-hint">Foto antippen: ändern. Name antippen: umbenennen (gilt dann auch in Events und bei „Meine Orte“).</p>' + list.map(function (p) {
+    return '<p class="cp-hint">Foto antippen oder ein Bild darauf ziehen: ändern. Name antippen: umbenennen (gilt dann auch in Events und bei „Meine Orte“).</p>' + list.map(function (p) {
       var img = p.photo_url || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Crect width='10' height='10' fill='%23E6DED0'/%3E%3C/svg%3E";
       var ppl = (p.people || []).map(function (m) {
         return '<button type="button" class="ga-link" data-gpl="person" data-pid="' + esc(m.id) + '">' + esc(String(m.name || "?").split(" ")[0]) + "</button>";
@@ -1489,11 +1490,41 @@
       return;
     }
     if (act === "photo") {
-      pickPhoto(function (url) {
-        host.rest("rpc/go_admin_place_photo", { method: "POST", body: { p_place: id, p_url: url, p_credit: "" } })
-          .then(function () { return done("Foto gespeichert"); }).catch(fail);
+      var inp = document.createElement("input");
+      inp.type = "file";
+      inp.accept = "image/*";
+      inp.hidden = true;
+      document.body.appendChild(inp);
+      inp.addEventListener("change", function () {
+        var f = inp.files && inp.files[0];
+        inp.remove();
+        if (f) placeFile(id, f);
       });
+      inp.click();
     }
+  }
+  /* Foto eines Orts: in den Bildspeicher laden (keine data-URL in der Datenbank), dann als Titelbild setzen */
+  function placeFile(id, file) {
+    if (!file || !/^image\//.test(file.type || "")) { if (host.toast) host.toast("Bitte ein Bild"); return; }
+    if (!global.GoExMedia || !GoExMedia.uploadImage) { GoDialog.alert("Upload gerade nicht verfügbar."); return; }
+    if (host.toast) host.toast("Foto wird hochgeladen …");
+    GoExMedia.uploadImage(file, "places").then(function (url) {
+      return host.rest("rpc/go_admin_place_photo", { method: "POST", body: { p_place: id, p_url: url, p_credit: "" } });
+    }).then(function () {
+      if (host.toast) host.toast("Foto gespeichert");
+      return loadPlaces();
+    }).catch(function () { GoDialog.alert("Ging nicht. Ist go-orte-plus.sql in Supabase ausgeführt?"); });
+  }
+  /* Drag & Drop (Desktop): Bild auf das Foto eines Orts ziehen */
+  function onPlaceDrag(e) {
+    var t = e.target && e.target.closest ? e.target.closest('[data-gpl="photo"]') : null;
+    if (!t) return;
+    e.preventDefault();
+    if (e.type === "dragover") { t.classList.add("is-drop"); if (e.dataTransfer) e.dataTransfer.dropEffect = "copy"; return; }
+    t.classList.remove("is-drop");
+    if (e.type !== "drop") return;
+    var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) placeFile(t.getAttribute("data-pid"), f);
   }
   function orgPhoto(kind, gid) {
     var c = orgById(kind, gid);
@@ -2764,6 +2795,7 @@
       tab: tab || "news", seenBefore: lastSeen(), data: null, accounts: [] };
     root.addEventListener("click", onClick);
     root.addEventListener("change", onChange);
+    ["dragover", "dragleave", "drop"].forEach(function (ev) { root.addEventListener(ev, onPlaceDrag); });
     paintMenu();
     load().then(function (data) {
       if (!st) return;
