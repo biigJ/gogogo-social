@@ -167,6 +167,11 @@
     return info && info.embed ? url : "";
   }
 
+  function rankOf(name) {
+    var links = GoExMedia.linksFor(name);
+    if (links.some(function (l) { var x = GoExMedia.parse(l.url); return x && x.kind !== "img"; })) return 0;
+    return links.length ? 1 : 2;
+  }
   function paint(el) {
     var box = el.querySelector("[data-gxl-list]");
     var picking = !!pendingUrl(el);
@@ -179,15 +184,14 @@
       if (label && label !== "Alle" && label !== PLAN && (labelsOf[GoExMedia.key(n)] || []).indexOf(label) === -1) return false;
       return true;
     });
-    /* Mein Wochenplan: alphabetisch; sonst Videos zuerst. Gerade gesicherte Übung steht ganz oben */
+    /* Gerade gesicherte Übung steht ganz oben, dann Videos zuerst */
     list.sort(function (a, b) {
       if (savedFirst) {
         var fa = GoExMedia.key(a) === savedFirst ? 0 : 1, fb = GoExMedia.key(b) === savedFirst ? 0 : 1;
         if (fa !== fb) return fa - fb;
       }
-      if (label === PLAN && !q) return a.localeCompare(b, "de");
-      var va = GoExMedia.linksFor(a).length ? 0 : 1, vb = GoExMedia.linksFor(b).length ? 0 : 1;
-      return va - vb || a.localeCompare(b, "de");
+      /* überall: Übungen mit Video oben, darunter mit Foto, dann ohne; jeweils alphabetisch */
+      return rankOf(a) - rankOf(b) || a.localeCompare(b, "de");
     });
     var exact = q && (names || []).some(function (n) { return n.toLowerCase() === q.toLowerCase(); });
     box.innerHTML = (list.length
