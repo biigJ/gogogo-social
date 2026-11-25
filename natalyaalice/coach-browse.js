@@ -46,7 +46,9 @@
     ".gcb-dots{display:flex;justify-content:center;gap:6px;margin:10px 0 0}" +
     ".gcb-dots i{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.25}" +
     ".gcb-dots i.is-on{opacity:.9}" +
-    ".gcb-hidden{display:none !important}";
+    ".gcb-hidden{display:none !important}" +
+    ".kreis-page__body.gcb-on > :not(.team-slide){display:none !important}" +
+    ".team-slide.gcb-on > :not(.gcb-track){display:none !important}";
 
   var HAND_SVG =
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7.4 11.6V5.3a1.35 1.35 0 0 1 2.7 0v5.2h.5V3.6a1.35 1.35 0 0 1 2.7 0v6.9h.5V4.5a1.35 1.35 0 0 1 2.7 0v7.1h.5V7.3a1.35 1.35 0 0 1 2.7 0v7.6c0 4.4-3 7.6-7.2 7.6-2.6 0-4.6-1.2-6-3.3l-3.1-4.7a1.4 1.4 0 0 1 2.2-1.7l1.9 2.2z"/></svg>';
@@ -103,7 +105,8 @@
       .catch(function () { return []; })
       .then(function (rows) {
         rows = rows || [];
-        if (!rows.length) { el.innerHTML = '<p class="gcb-none">Noch keine Bewertungen.</p>'; return; }
+        /* Sterne immer zeigen, auch ohne Bewertung (leer) */
+        if (!rows.length) { el.innerHTML = '<div class="gcb-rate">' + starsHtml(0) + '</div><p class="gcb-none">Noch keine Bewertungen.</p>'; return; }
         var avg = rows.reduce(function (s, r) { return s + (Number(r.stars) || 0); }, 0) / rows.length;
         var texts = rows.filter(function (r) { return String(r.body || "").trim(); });
         el.innerHTML = '<div class="gcb-rate" role="img" aria-label="' + String(Math.round(avg * 10) / 10).replace(".", ",") + ' von 5 Sternen">' +
@@ -142,9 +145,6 @@
         track.innerHTML = list.map(function (c, i) { return pageHtml(c, String(c.id) === mineId, i === 0); }).join("");
         var hand = track.querySelector("[data-gcb-hand]");
         if (hand) hand.style.color = bg;
-        var dots = document.createElement("div");
-        dots.className = "gcb-dots";
-        dots.innerHTML = list.length > 1 ? list.map(function (_, i) { return '<i class="' + (i ? "" : "is-on") + '"></i>'; }).join("") : "";
         /* blaues c hinter den Namen */
         track.querySelectorAll("[data-gcb-name]").forEach(function (h) {
           var pg = h.closest("[data-gcb-id]");
@@ -153,22 +153,35 @@
         o.art.classList.add("gcb-hidden");
         if (o.nameRow) o.nameRow.classList.add("gcb-hidden");
         slide.insertBefore(track, o.art);
-        slide.insertBefore(dots, o.art);
+        /* Detailansicht: nur die Reihe der Coaches. Buttons, Stempelkarte und Gruppentrainings sind hier nicht nutzbar */
+        var page = slide.closest(".kreis-page");
+        var pageBody = slide.closest(".kreis-page__body");
+        slide.classList.add("gcb-on");
+        if (pageBody) pageBody.classList.add("gcb-on");
+        /* Pfeil oben links: erst zurück zur normalen Ansicht, beim zweiten Tippen zu den Kreisen */
+        var back = page && page.querySelector(".kreis-page__back");
+        function close(e) {
+          if (e) { e.preventDefault(); e.stopImmediatePropagation(); }
+          if (back) back.removeEventListener("click", close, true);
+          track.remove();
+          o.art.classList.remove("gcb-hidden");
+          if (o.nameRow) o.nameRow.classList.remove("gcb-hidden");
+          (o.hide || []).forEach(function (el) { if (el) el.classList.remove("gcb-hidden"); });
+          slide.classList.remove("gcb-on");
+          if (pageBody) { pageBody.classList.remove("gcb-on"); pageBody.scrollTop = 0; }
+        }
+        if (back) back.addEventListener("click", close, true);
         list.forEach(function (c) {
           var pg = track.querySelector('[data-gcb-id="' + String(c.id).replace(/"/g, "") + '"] [data-gcb-rev]');
           if (pg) paintReviews(pg, c);
         });
         var idx = 0;
-        var buttons = o.buttons || [];
         track.addEventListener("scroll", function () {
           if (hand && track.scrollLeft > 8) hand.classList.add("is-gone");
           var w = track.clientWidth || 1;
           var i = Math.round(track.scrollLeft / w);
           if (i === idx) return;
           idx = i;
-          dots.querySelectorAll("i").forEach(function (d, k) { d.classList.toggle("is-on", k === i); });
-          /* Termin buchen, Nachricht und Bewertung gelten dem eigenen Coach: nur auf seiner Seite */
-          buttons.forEach(function (b) { if (b) b.classList.toggle("gcb-hidden", i !== 0); });
         }, { passive: true });
         track.addEventListener("click", function (e) {
           var t = e.target.closest && e.target.closest("[data-gcb-hand],[data-gcb-pick],[data-gcb-more]");
