@@ -25,12 +25,13 @@
       /* deckender Streifen unter der Statusleiste: iOS übernimmt dessen Farbe statt eines langen Verlaufs über dem Foto */
       ".gstory__sb{position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);background:var(--gstory,#2A2118);z-index:4;pointer-events:none}" +
       ".gstory__bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}" +
-      ".gstory::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,0) 28%,rgba(0,0,0,0) 45%,rgba(0,0,0,.75))}" +
+      ".gstory::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,0) 22%,rgba(0,0,0,.35) 38%,rgba(0,0,0,.7) 60%,rgba(0,0,0,.75))}" +
       ".gstory__top{position:absolute;z-index:2;top:calc(env(safe-area-inset-top,0px) + 12px);left:16px;right:8px;display:flex;justify-content:space-between;align-items:center;font:700 15px Inter,sans-serif}" +
       /* X groß, Trefferfläche ringsum 18px größer (Pseudo-Element zählt zum Button) */
       ".gstory__top button{position:relative;border:0;background:transparent;color:#fff;display:grid;place-items:center;width:60px;height:60px;margin:-6px -4px 0 0;padding:0;cursor:pointer;filter:drop-shadow(0 1px 3px rgba(0,0,0,.5))}" +
       ".gstory__top button::before{content:'';position:absolute;inset:-18px -8px -18px -18px}" +
-      ".gstory__txt{position:absolute;z-index:2;left:22px;right:22px;bottom:calc(env(safe-area-inset-bottom,0px) + 40px)}" +
+      /* Text beginnt bei 2/5 der Höhe und läuft nach unten (vorher unten verankert: lange Listen schoben alles hoch) */
+      ".gstory__txt{position:absolute;z-index:2;left:22px;right:22px;top:40%;bottom:calc(env(safe-area-inset-bottom,0px) + 40px);overflow:hidden}" +
       ".gstory .gstory__txt h3{margin:4px 0 8px !important;font-family:'Playfair Display',Georgia,serif !important;font-size:32px !important;font-weight:600 !important;line-height:1.1 !important;color:#fff !important;cursor:pointer}" +
       ".gstory__txt p{margin:0;font:600 16px/1.4 Inter,sans-serif}" +
       ".gstory__who{opacity:.85}" +
