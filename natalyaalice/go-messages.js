@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-who-coach-cal",
+      at: "2026-11-25T17:20:00Z",
+      text: "Events der Gruppe und des Circles zeigen jetzt, wer zugesagt hat. Unter Mein Coach siehst Du auch die Termine aus dem Kalender Deines Coaches und kannst zusagen."
+    },
+    {
       key: "news:2026-11-25-orte-fotos",
       at: "2026-11-25T17:10:00Z",
       text: "Plus → Orte: Mit der Kamera links oben an einer Kachel lädst Du Fotos hoch. Nach der Freigabe sehen sie alle. Mehrere Fotos wischst Du seitlich durch."

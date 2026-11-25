@@ -97,6 +97,9 @@
         "&workout_date=gte." + days[0] + "&workout_date=lte." + days[6] + "&select=id,status,event_id,workout_label,workout_date,events(id,title,starts_at,location,status)&limit=60")
         .catch(function () { return []; }));
       jobs.push(host.rest("go_coach_group_open?account_id=eq." + encodeURIComponent(me()) + "&select=is_open,coach_id").catch(function () { return []; }));
+      /* Termine aus dem Kalender des Coaches (nicht privat; was ich sehen darf, entscheidet RLS) */
+      jobs.push(host.rest("events?user_id=eq." + coach + "&status=eq.geplant&visibility=neq.privat&coach_group=not.is.true&starts_at=gte." + encodeURIComponent(from) +
+        "&starts_at=lt." + encodeURIComponent(to) + "&select=id,title,starts_at,location,item_type&order=starts_at.asc&limit=60").catch(function () { return []; }));
     }
     /* Kalender des Coaches (PT-Kalender): gesperrte Tage, Feiertage, verfügbare Zeiten, belegte Stunden */
     var cal = Promise.all([
@@ -129,6 +132,16 @@
       s.invites = (r[1] || []).filter(function (x) { return x.events && x.events.status !== "ausgefallen"; });
       var o = (r[2] || [])[0];
       s.open = !!(o && o.is_open && String(o.coach_id || "") === String(s.coach.id));
+      var invited = {};
+      s.invites.forEach(function (x) { invited[String(x.event_id)] = 1; });
+      s.cal = (r[3] || []).filter(function (e) {
+        return e && !invited[String(e.id)] && e.item_type !== "support_session" && e.item_type !== "nutrition_log";
+      });
+      s.calOn = {};
+      if (!s.cal.length) return;
+      return host.rest("event_rsvps?user_id=eq." + encodeURIComponent(me()) + "&status=eq.zugesagt&event_id=in.(" + s.cal.map(function (e) { return e.id; }).join(",") + ")&select=event_id")
+        .catch(function () { return []; })
+        .then(function (rows) { (rows || []).forEach(function (x) { s.calOn[String(x.event_id)] = true; }); });
     });
   }
 
@@ -218,7 +231,7 @@
         : '<p class="gcg__empty">Noch keine Coachees. Coachees wählen Dich unter Kreise → Hinzufügen → Coach.</p>';
     }
     var d0 = new Date(s.days[0] + "T12:00:00Z"), d6 = new Date(s.days[6] + "T12:00:00Z");
-    html += '<p class="gcg__h">Gruppentraining</p>' +
+    html += '<p class="gcg__h">' + (s.mode === "client" ? "Termine von " + esc(first(s.coach.name) || "Deinem Coach") : "Gruppentraining") + "</p>" +
       '<div class="gcg__wk"><button type="button" data-gcg-wk="-1"' + (s.week <= 0 ? " disabled" : "") + ' aria-label="Vorherige Woche">‹</button><b>' +
       d0.getUTCDate() + "." + (d0.getUTCMonth() + 1) + ". – " + d6.getUTCDate() + "." + (d6.getUTCMonth() + 1) + ".</b>" +
       '<button type="button" data-gcg-wk="1" aria-label="Nächste Woche">›</button></div>';
@@ -243,6 +256,14 @@
             (past ? "<span></span>" : on && iso === t ? '<button type="button" class="wr-pill-btn wr-pill-btn--dark wr-ga-rsvp" data-gcg-qr="' + esc(x.event_id) + '">QR</button>'
               : '<button type="button" class="wr-pill-btn' + (on ? "" : " wr-pill-btn--dark") + ' wr-ga-rsvp" data-gcg-' + (on ? "no" : "yes") + '="' + esc(x.id) + '">' + (on ? "Absagen" : "Zusagen") + "</button>") + "</div>";
         });
+        /* Termine aus dem Kalender des Coaches: Zusage direkt am Event */
+        (s.cal || []).filter(function (e) { return berlinDay(e.starts_at) === iso; }).forEach(function (e) {
+          var on = !!(s.calOn || {})[String(e.id)];
+          out += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-zirkel is-group' + (past ? " is-past" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
+            esc(e.title || "Training") + " · " + esc(berlinTime(e.starts_at)) + '</span><span class="wr-dayrow__tag">' +
+            esc([e.location, "Kalender von " + (first(s.coach.name) || "Coach"), on ? "Du bist dabei" : ""].filter(Boolean).join(" · ")) + "</span></div>" +
+            (past ? "<span></span>" : '<button type="button" class="wr-pill-btn' + (on ? "" : " wr-pill-btn--dark") + ' wr-ga-rsvp" data-gcg-c' + (on ? "no" : "yes") + '="' + esc(e.id) + '">' + (on ? "Absagen" : "Zusagen") + "</button>") + "</div>";
+        });
       }
       /* Zustand aus dem PT-Kalender des Coaches: gesperrt, Feiertag, ausgebucht oder freie Stunden */
       var ds = dayState(s, iso);
@@ -260,7 +281,7 @@
       return out;
     }).join("");
     html += '<div class="wr-days wr-days--all">' + rows + "</div>";
-    if (s.mode === "client" && !s.invites.length) html += '<p class="gcg__empty">Diese Woche keine Einladung von ' + esc(first(s.coach.name) || "Deinem Coach") + ".</p>";
+    if (s.mode === "client" && !s.invites.length && !(s.cal || []).length) html += '<p class="gcg__empty">Diese Woche keine Termine von ' + esc(first(s.coach.name) || "Deinem Coach") + ".</p>";
     el.innerHTML = html;
   }
   function refresh(s) {
@@ -378,6 +399,18 @@
       return refresh(s);
     }).catch(function () { host.toast("Ging gerade nicht"); });
   }
+  /* Zusage zu einem Termin aus dem Kalender des Coaches */
+  function calAnswer(s, eventId, yes) {
+    var job = yes
+      ? host.rest("event_rsvps?on_conflict=event_id,user_id", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+          body: { event_id: eventId, user_id: me(), status: "zugesagt" } })
+      : host.rest("event_rsvps?event_id=eq." + encodeURIComponent(eventId) + "&user_id=eq." + encodeURIComponent(me()), { method: "DELETE", prefer: "return=minimal" });
+    job.then(function () {
+      if (host.toast) host.toast(yes ? "Du bist dabei" : "Abgesagt");
+      if (host.onChange) host.onChange();
+      return refresh(s);
+    }).catch(function () { host.toast("Ging gerade nicht"); });
+  }
   function setOpen(s, on) {
     host.rest("go_coach_group_open", { method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
       body: { account_id: me(), coach_id: s.coach.id, is_open: !!on, updated_at: new Date().toISOString() } })
@@ -395,6 +428,13 @@
     if (add) { addEvent(s, add.getAttribute("data-gcg-add")); return; }
     var y = t.closest("[data-gcg-yes]");
     if (y) { answer(s, y.getAttribute("data-gcg-yes"), true); return; }
+    var cy = t.closest("[data-gcg-cyes]");
+    if (cy) { calAnswer(s, cy.getAttribute("data-gcg-cyes"), true); return; }
+    var cn = t.closest("[data-gcg-cno]");
+    if (cn) {
+      GoDialog.confirm("Absagen?", { ok: "Absagen", cancel: "Zurück" }).then(function (ok) { if (ok) calAnswer(s, cn.getAttribute("data-gcg-cno"), false); });
+      return;
+    }
     var n = t.closest("[data-gcg-no]");
     if (n) {
       GoDialog.confirm("Absagen?", { ok: "Absagen", cancel: "Abbrechen" }).then(function (ok) { if (ok) answer(s, n.getAttribute("data-gcg-no"), false); });
