@@ -157,7 +157,14 @@
       if (e.target.closest("[data-gtm-finish]")) { done(cur); return; }
       if (e.target.closest("[data-gtm-stop]")) {
         var ask = global.GoDialog ? GoDialog.confirm("Uhr abbrechen? Nichts wird gespeichert.", { ok: "Abbrechen" }) : Promise.resolve(true);
-        ask.then(function (ok) { if (ok) { write(null); closeUi(); } });
+        ask.then(function (ok) {
+          if (!ok) return;
+          var cid = cur && cur.id;
+          write(null);
+          closeUi();
+          /* Aktuell: Status „dabei“ zurücknehmen */
+          try { document.dispatchEvent(new CustomEvent("go:start-cancel", { detail: { id: cid } })); } catch (eC) {}
+        });
       }
     };
   }
