@@ -6436,19 +6436,17 @@
       if (ev.status === "erledigt") a.done = true;
       if (ev.photo_url && !a.photoEventId) a.photoEventId = String(ev.id);
     });
-    /* Gruppentraining heute: alle Mitglieder trainieren mit (Gründer gehört dazu) */
-    var groupToday = (state.events || []).some(function (ev) {
-      return ev && ev.group_id && dayKey(ev.starts_at) === today && ev.status !== "ausgefallen" &&
-        (String(ev.user_id) === me() || isMyGroupEvent(ev));
-    });
-    if (groupToday && host.groupMemberIds) {
-      (host.groupMemberIds() || []).forEach(function (uid) {
+    /* Wer bei einem heutigen Event zugesagt hat (Gruppe, Winken/Herz, Circle): pulsiert auch.
+       Gruppenmitglieder ohne Zusage nicht mehr. */
+    (state.events || []).forEach(function (ev) {
+      if (!ev || dayKey(ev.starts_at) !== today || ev.status === "ausgefallen") return;
+      (state.rsvps[String(ev.id)] || []).forEach(function (uid) {
         uid = String(uid || "");
         if (!uid || out[uid]) return;
         var p = personOf(uid);
-        out[uid] = { id: uid, name: p.name, photo: p.photo, training: true, done: false, photoEventId: "", group: true };
+        out[uid] = { id: uid, name: p.name, photo: p.photo, training: true, done: false, photoEventId: "", group: !!ev.group_id };
       });
-    }
+    });
     return out;
   }
 
