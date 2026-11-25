@@ -8994,7 +8994,7 @@
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
   <script src="/natalyaalice/heute-v3.js?v=feed-178"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-113"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-114"></script>
   <script src="/natalyaalice/support.js?v=support-35"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
   <script src="/natalyaalice/coach-group.js?v=gcg-4"></script>
@@ -14354,7 +14354,8 @@
           },
           toast: function (msg) { gogogoToast(msg); },
           openTravelPlanModal: openTravelPlanModal,
-          openCalendar: function () { openGoCalendar(); }
+          openCalendar: function () { openGoCalendar(); },
+          addMyPlace: function (n) { return addMyPlace(n); }
         };
         WocheReels.install(host);
         if (noShow) return;
@@ -22471,6 +22472,7 @@
           return v === "__other" ? pickPlace("Ort") : v;
         }).then(function (name) {
           if (!name) return;
+          addMyPlace(name);
           rest("events?id=eq." + encodeURIComponent(ev.id) + "&user_id=eq." + encodeURIComponent(sessionAccount.id), { method: "PATCH", prefer: "return=minimal", body: { location: String(name).slice(0, 80) } })
             .then(function () {
               if (window.HeuteAccountability && HeuteAccountability.notifyChange)
@@ -28179,6 +28181,23 @@
         });
       }
       /* Ort über den Ortswähler mit Karte wählen → Promise<Name|null> (auch für Circle-Orte und Admin) */
+      /* Ort, den ich bei einem Event wähle, gehört zu meinen Orten (Profil, höchstens 12) */
+      function addMyPlace(name) {
+        name = String(name || "").trim().slice(0, 80);
+        if (!name || !sessionAccount || !sessionAccount.id) return Promise.resolve();
+        var raw = sessionAccount.workout_places;
+        if (typeof raw === "string") { try { raw = JSON.parse(raw); } catch (eR) { raw = []; } }
+        var list = (Array.isArray(raw) ? raw : []).map(function (x) { return x && typeof x === "object" ? x.name : x; }).filter(Boolean).map(String);
+        var low = name.toLowerCase();
+        if (list.some(function (x) { return x.toLowerCase() === low; })) return Promise.resolve();
+        list.push(name);
+        list = list.slice(0, 12);
+        sessionAccount.workout_places = list;
+        return rest("go_accounts?id=eq." + encodeURIComponent(sessionAccount.id), {
+          method: "PATCH", prefer: "return=minimal", body: { workout_places: list, workout_place: list[0] || "" }
+        }).catch(function () {});
+      }
+      window.GoAddMyPlace = addMyPlace;
       function pickPlace(title) {
         return new Promise(function (resolve) {
           if (!window.GoPlacePicker) { resolve(null); return; }
@@ -28202,6 +28221,7 @@
             var p = picker.value();
             if (!p || !p.name) return;
             picker.remember();
+            addMyPlace(p.name);
             close(p.name);
           });
         });
