@@ -122,7 +122,9 @@
         "#gbub-compose button[type=submit]{background:#fff !important;color:#000 !important}" +
         "#gbub-compose .gbub-compose__att{color:#fff !important}" +
         "#gbub-compose .gbub-compose__reply{background:#1A1A1A !important;color:#fff !important;border-left-color:#fff !important}" +
-        /* Neutral-Sans-Look: Text fein, Titel Regular, eng */
+        /* Leiste unten: schwarz, weiße Schrift, feine weiße Kante gegen den schwarzen Grund */
+        "html[data-go-theme=bw] .app-pill nav:not(#_){background:#000 !important;color:#fff !important;box-shadow:0 0 0 1px rgba(255,255,255,.28) !important}html[data-go-theme=bw] .app-pill .pill-dot:not(#_){background:#fff !important}" +
+                /* Neutral-Sans-Look: Text fein, Titel Regular, eng */
         "html[data-go-theme=bw] body p:not(#_):not(#__),html[data-go-theme=bw] body li:not(#_):not(#__),html[data-go-theme=bw] body li span:not(#_):not(#__),html[data-go-theme=bw] body .acc-card__when:not(#_):not(#__),html[data-go-theme=bw] body .acc-card__place:not(#_):not(#__),html[data-go-theme=bw] body .acc-msg__txt:not(#_):not(#__),html[data-go-theme=bw] body .gbub-row__name:not(#_):not(#__),html[data-go-theme=bw] body .friend-list__name:not(#_):not(#__),html[data-go-theme=bw] body .friend-list__meta:not(#_):not(#__),html[data-go-theme=bw] body .gcg__ce b:not(#_):not(#__),html[data-go-theme=bw] body .fw-tag:not(#_):not(#__),html[data-go-theme=bw] body .fw-card__text:not(#_):not(#__),html[data-go-theme=bw] body .team-slide__about:not(#_):not(#__),html[data-go-theme=bw] body .fw-card__about:not(#_):not(#__){font-weight:200 !important}" +
         /* Kreise ohne Foto (z. B. Meine Coachees): schwarz gefüllt, weißer Rand, weißes Symbol mittig */
         ".kreis-row .gbub-row__img:not(#_){background:#000 !important;box-shadow:inset 0 0 0 1.5px #fff}.kreis-row .gbub-row__ico.is-plain:not(#_){color:#fff !important;filter:none}" +
