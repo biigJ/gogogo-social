@@ -187,19 +187,25 @@
     return (keys || []).map(function (k) { return map[k] || k; });
   }
   /* Coach wählt die Stationen in der Reihenfolge an der Tafel; Antwort = Schlüssel oder null */
-  function pickStations(title, have) {
+  /* opts.need: genau so viele Stationen wie Runden; opts.step: Weiter/Zurück nebeneinander.
+     Zurück in der Reihenfolge führt wieder zur Auswahl; Zurück in der Auswahl liefert null */
+  function pickStations(title, have, opts) {
     if (!global.GoDialog) return Promise.resolve(null);
     have = have || [];
-    return global.GoDialog.pick(title || "Stationen", stationList().map(function (x) { return { label: x[1], value: x[0], checked: have.indexOf(x[0]) >= 0 }; }), { ok: "Weiter", cancel: "Abbrechen" })
+    opts = opts || {};
+    return global.GoDialog.pick(title || "Stationen", stationList().map(function (x) { return { label: x[1], value: x[0], checked: have.indexOf(x[0]) >= 0 }; }),
+      { ok: "Weiter", cancel: opts.cancel || "Abbrechen", need: opts.need || 0, needLabel: "Stationen auswählen", step: !!opts.step })
       .then(function (v) {
         if (!v || !v.length) return null;
         /* Reihenfolge an der Tafel: Stationen am Griff hoch und runter schieben */
-        return v.length > 1 ? orderStations(v) : v;
+        if (v.length < 2) return v;
+        return orderStations(v, opts).then(function (o) { return o || (opts.step ? pickStations(title, v, opts) : null); });
       });
   }
 
   /* Reihenfolge festlegen: Zeilen am Griff ziehen (Maus und Finger). Ergebnis: Schlüssel in neuer Reihenfolge, null = Abbrechen */
-  function orderStations(keys) {
+  function orderStations(keys, opts) {
+    opts = opts || {};
     var names = {};
     stationList().forEach(function (x) { names[x[0]] = x[1]; });
     var order = keys.slice();
@@ -263,9 +269,19 @@
         b.textContent = label;
         b.addEventListener("click", function () { wrap.remove(); resolve(val()); });
         card.appendChild(b);
+        return b;
       }
-      btn("Übernehmen", "", function () { return order.slice(); });
-      btn("Abbrechen", "god__btn--quiet", function () { return null; });
+      var okO = btn("Übernehmen", "", function () { return order.slice(); });
+      var noO = btn(opts.step ? "Zurück" : "Abbrechen", "god__btn--quiet", function () { return null; });
+      if (opts.step) {
+        var row2 = document.createElement("div");
+        row2.className = "god__row2";
+        row2.appendChild(okO);
+        row2.appendChild(noO);
+        card.appendChild(row2);
+        var tO = card.querySelector(".god__text");
+        if (tO) tO.style.textAlign = "center";
+      }
       document.body.appendChild(wrap);
     });
   }

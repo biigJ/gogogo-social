@@ -1,0 +1,27 @@
+-- go-circle-events-past.sql — Circle-Seite: auch Events, deren Start schon vorbei ist (ab gestern), zum Ansehen und Löschen.
+-- p_past = true liefert zusätzlich geplante Events ab gestern 0:00 (Berlin). Ohne p_past wie bisher (ab jetzt minus 2 Stunden).
+-- Idempotent. Ersetzt go_circle_events(text, integer) aus go-circle-events-rsvps.sql.
+drop function if exists public.go_circle_events(text, integer);
+drop function if exists public.go_circle_events(text, integer, boolean);
+create function public.go_circle_events(p_group text, p_days integer default 14, p_past boolean default false)
+returns table(id uuid, user_id uuid, title text, starts_at timestamptz, note text, location text,
+              circle_id text, created_at timestamptz, joined boolean, rsvp_count integer)
+language sql stable security definer set search_path to 'public'
+as $function$
+  select e.id, e.user_id, e.title, e.starts_at, e.note, e.location, e.circle_id, e.created_at,
+         exists (select 1 from event_rsvps r where r.event_id = e.id and r.user_id = go_current_account_id() and r.status = 'zugesagt'),
+         (select count(*)::int from event_rsvps r where r.event_id = e.id and r.user_id <> e.user_id and r.status = 'zugesagt')
+  from events e
+  left join go_circles c on c.group_id = trim(p_group)
+  where e.status = 'geplant'
+    and e.starts_at >= case when coalesce(p_past, false)
+          then ((now() at time zone 'Europe/Berlin')::date - 1)::timestamp at time zone 'Europe/Berlin'
+          else now() - interval '2 hours' end
+    and e.starts_at < now() + make_interval(days => greatest(1, least(coalesce(p_days, 14), 60)))
+    and (
+      e.circle_id = trim(p_group)
+      or (e.circle_id is null and e.category = 'zirkel' and c.owner_id is not null and e.user_id = c.owner_id)
+    )
+  order by e.starts_at;
+$function$;
+grant execute on function public.go_circle_events(text, integer, boolean) to anon, authenticated;

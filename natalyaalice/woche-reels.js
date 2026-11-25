@@ -3238,7 +3238,7 @@
       }
       return gevs.map(function (e, k) {
         var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
-        return '<div class="wr-dayrow wr-zrec-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k ? "" : label) + "</b> " +
+        return '<div class="wr-dayrow wr-zrec-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " +
           "👥 " + esc(e.title || "Training") + esc(tm) + (plan && !k ? ' <s class="wr-dayrow__free">' + esc(plan.title || "") + "</s>" : "") +
           '</span></div><button type="button" class="wr-dayrow__minus" data-wr-gev-rm="' + esc(e.id) + '" aria-label="Entfernen">−</button></div>';
       }).join("");
@@ -3317,13 +3317,13 @@
       var html = mine.map(function (e, k) {
         var isSh = shared.indexOf(e) >= 0;
         var tm = displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
-        return '<div class="wr-dayrow wr-zrec-row' + (isSh ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k ? "" : label) + "</b> " +
+        return '<div class="wr-dayrow wr-zrec-row' + (isSh ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " +
           (isSh ? "👥 " : "") + esc(e.title || "Training") + esc(tm) + "</span>" +
           (isSh ? '<span class="wr-dayrow__tag">in der Gruppe</span>' : "") + "</div><span></span></div>";
       }).join("");
       if (!shared.length) {
         html += '<button type="button" class="wr-dayrow wr-zrec-row wr-dayrow--add" data-wr-gextra-add="' + iso + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' +
-          (mine.length ? "" : label) + '</b> <span class="wr-dayrow__free">+ Gruppen-Event</span></span></div><span></span></button>';
+          label + '</b> <span class="wr-dayrow__free">+ Gruppen-Event</span></span></div><span></span></button>';
       }
       return html;
     }).join("");
@@ -3437,7 +3437,7 @@
         /* in der Gruppe = group_id gesetzt (Sichtbarkeit kann beim Abhaken auf Community stehen) */
         var inGroup = String(e.group_id || "") === gid && e.visibility !== "privat";
         var tm = gaTime(e);
-        html += '<div class="wr-dayrow wr-zrec-row wr-ga-row' + (inGroup ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
+        html += '<div class="wr-dayrow wr-zrec-row wr-ga-row' + (inGroup ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++, label) + "</b> " +
           esc(e.title || "Training") + esc(tm) + "</span>" +
           /* zweite Zeile: Ort (zugeordnet heißt nicht „nur in der Gruppe sichtbar“) */
           (e.location ? '<span class="wr-dayrow__tag">' + esc(e.location) + "</span>" : "") + "</div>" +
@@ -3450,7 +3450,7 @@
         var on = !!st.going[String(e.id)];
         var tm = gaTime(e);
         var who = String(personOf(e.user_id).name || "").split(" ")[0];
-        html += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
+        html += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-zirkel is-group"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++, label) + "</b> " +
           esc(e.title || "Training") + esc(tm) + "</span>" +
           '<span class="wr-dayrow__tag">' + esc([e.location, "von " + (who || "Gruppe"), on ? "Du bist dabei" : ""].filter(Boolean).join(" · ")) + "</span></div>" +
           (on
