@@ -2359,6 +2359,10 @@
     .wr-exlist__more { opacity: .75; }
     .woche-reels .wr-bottom__main { cursor: default; }
     .acc-zrow { justify-content: center; margin: 6px 0 4px; position: relative; z-index: 2; }
+    /* Aktuell-Karte: Pillen mittig unter Name/Ort, schwarz auf weiß in jedem Schema */
+    .acc-card .acc-card__overlay > .acc-zrow:not(#_):not(#__) { margin: 64px 0 0 !important; align-self: stretch; justify-content: center; }
+    .acc-card .acc-card__overlay > .acc-zrow > *:not(#_):not(#__) { background: #fff !important; color: #111 !important; text-shadow: none !important; }
+    .acc-card .acc-card__overlay:has(> .acc-zrow) > .acc-card__title:not(#_):not(#__) { margin-top: 14px !important; }
     .wr-zrow .wr-zirkel-cd, .wr-zrow .go-online-cta, .wr-zrow .go-online-cta--ghost {
       display: inline-flex; align-items: center; justify-content: center; min-height: 36px; margin: 0 !important; padding: 0 14px;
       border-radius: 999px; border: 0 !important; background: #fff !important; color: #111 !important;
@@ -8978,14 +8982,14 @@
   <script src="/natalyaalice/coach-reviews.js?v=gcr-5"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-3"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-30"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-16"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-17"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-1"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-170"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-171"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-111"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-112"></script>
   <script src="/natalyaalice/support.js?v=support-35"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
   <script src="/natalyaalice/coach-group.js?v=gcg-3"></script>
@@ -14049,6 +14053,11 @@
         return rest("events?id=eq." + encodeURIComponent(eventId) + "&select=note,starts_at").then(function (rows) {
           var note = rows && rows[0] ? rows[0].note : "";
           var startMs = rows && rows[0] ? new Date(rows[0].starts_at).getTime() : 0;
+          /* Anhalten nur vor dem Start: läuft der Countdown schon ab, bleibt er */
+          if (action === "hold") {
+            var zz = GoZirkelSetup.parse(note) || {};
+            if (!(zz.hold && !zz.goAt) && (zz.goAt || startMs) <= Date.now()) return Promise.reject(new Error("running"));
+          }
           if (action === "hold") note = GoZirkelSetup.withFlag(GoZirkelSetup.withFlag(note, "go", null), "hold", 1);
           else if (action === "now") {
             note = GoZirkelSetup.withFlag(note, "hold", null);
@@ -18788,7 +18797,9 @@
               var on = mine || !!e.joined;
               var tm = new Date(e.starts_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
               var meta = [circleMode(e), circleRounds(e) ? circleRounds(e) + " Runden" : ""].filter(Boolean).join(" · ");
-              var can = owner && mine;
+              /* Uhrzeit, Ort, Entfernen nur, solange niemand sonst zugesagt hat (go-circle-events-rsvps.sql) */
+              var taken = Number(e.rsvp_count || 0);
+              var can = owner && mine && !taken;
               var side = can
                 ? '<button type="button" class="wr-dayrow__pen" data-cev-pen="' + escapeHtml(e.id) + '" aria-label="Bearbeiten">' + KREIS_PEN + "</button>"
                 : mine ? '<span class="wr-dayrow__pen"></span>'
@@ -18803,6 +18814,7 @@
                   : '<span class="wr-mini-wheel wr-cev-time">' + escapeHtml(tm) + "</span>") +
                 (meta ? '<span class="wr-dayrow__vis wr-cev-meta">' + escapeHtml(meta) + "</span>" : "") +
                 (on && !mine ? '<span class="wr-cev-in">dabei</span>' : "") +
+                (mine && taken ? '<span class="wr-cev-in">' + taken + " dabei</span>" : "") +
                 "</div></div>" + side + "</div>";
             });
             if (!list.length) {
@@ -27340,6 +27352,7 @@
             clearInvitesForDay: clearInvitesForDay,
             groupMemberIds: groupMemberIds,
             myCoachGroupIds: myCoachGroupIds,
+            pickPlace: pickPlace,
             /* meine Circles (Zirkel-App) für Circle-Events in Aktuell */
             circleIds: function () {
               var c = window.__goCircleState;
