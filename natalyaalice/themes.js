@@ -142,11 +142,11 @@
     },
     postmodern: {
       label: "Postmodern",
-      /* 80er-Magazin: Headlines in Abril Fatface (fette Didone wie Magazin-Cover), Text in Poppins (geometrisch wie ITC Avant Garde) */
-      fonts: "family=Abril+Fatface&family=Poppins:wght@400;500;600;700",
-      display: "Poppins",
-      body: "Poppins",
-      serif: "Abril Fatface",
+      /* Schrift wie Raptor Text (kommerziell, nicht als Webfont frei): Inter Tight, Headlines Black eng gesetzt */
+      fonts: "family=Inter+Tight:wght@400;500;600;700;900",
+      display: "Inter Tight",
+      body: "Inter Tight",
+      serif: "Inter Tight",
       /* Pop Clash: Pink #FF1493 (Akzent), Koralle #FF6F61 (Leiste), Gelb #FFD700 (Buttons),
          Türkis #40E0D0 / #00CED1 (Signal, Flächen), Schrift #2A2A2A.
          Kontraste: #2A2A2A auf Weiß 14:1, Weiß auf #D10F79 5,2:1, #2A2A2A auf Gelb 11:1, #2A2A2A auf Koralle 5,8:1 */
@@ -165,7 +165,7 @@
       extra: ".app-pill nav{background:#FF6F61 !important;color:#2A2A2A}.app-pill .pill-dot{background:#2A2A2A !important}" +
         "html[data-go-theme=postmodern] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=postmodern] body .profile-name:not(#_):not(#__)," +
         "html[data-go-theme=postmodern] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=postmodern] body #heute-filter-select:not(#_)" +
-        "{font-family:'Abril Fatface',Georgia,serif !important;font-weight:400 !important;letter-spacing:.01em}"
+        "{font-family:'Inter Tight',system-ui,sans-serif !important;font-weight:900 !important;letter-spacing:-.04em}"
     }
   };
   /* Postpunk: dunkel wie B/W, Pink #FF4F9A / #FF78B4, Grün #00D68F / #00B894, Grund #121214.
