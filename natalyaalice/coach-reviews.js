@@ -20,6 +20,9 @@
     ".gcr-stars{display:flex;justify-content:center;gap:6px;margin:6px 0 14px}" +
     ".gcr-star{width:46px;height:46px;border:0;background:transparent;padding:0;cursor:pointer;color:rgba(42,33,24,.25)}" +
     ".gcr-star.is-on{color:#2A2118}" +
+    /* Bewertung schreiben: Sterne wie in Details & Auswahl (30px, Abstand 6px, mittig) */
+    ".gcr-card .gcr-stars.gcr-stars--pick{display:flex;justify-content:center;gap:6px;margin:6px 0 14px}" +
+    ".gcr-stars--pick .gcr-star{width:30px;height:30px}.gcr-card .gcr-stars--pick svg{width:30px;height:30px}" +
     ".gcr-star svg{width:100%;height:100%}" +
     ".gcr-card textarea{display:block;width:100%;min-height:110px;box-sizing:border-box;padding:12px;border:1px solid rgba(42,33,24,.22);border-radius:14px;background:#fff;font:inherit;font-size:16px;color:#2A2118;resize:vertical}" +
     ".gcr-btn{display:block;width:100%;min-height:50px;margin:10px 0 0;border:0;border-radius:999px;background:#111;color:#fff;font:inherit;font-weight:700;font-size:16px;cursor:pointer}" +
@@ -143,7 +146,7 @@
     var sh = sheet(
       "<h2>Bewertung für " + esc(coach.name || "Deinen Coach") + "</h2>" +
         '<p class="gcr-sub">Wie ist das Training mit ' + esc(coach.name || "ihm") + "?</p>" +
-        '<div class="gcr-stars">' + [1, 2, 3, 4, 5].map(function (n) {
+        '<div class="gcr-stars gcr-stars--pick">' + [1, 2, 3, 4, 5].map(function (n) {
           return '<button type="button" class="gcr-star" data-gcr-star="' + n + '" aria-label="' + n + ' Sterne">' + STAR + "</button>";
         }).join("") + "</div>" +
         '<textarea data-gcr-text placeholder="Was macht ' + esc(coach.name || "Deinen Coach") + ' besonders?" maxlength="600"></textarea>' +
