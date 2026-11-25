@@ -139,8 +139,28 @@
       : starsSvg(0, false);
   }
 
-  /* ---------- Bewertung schreiben ---------- */
-  function openWrite(coach) {
+  /* „Erstellt am …“ bzw. nach einer Änderung „Ergänzt am …“ */
+  function dateDe(ts) {
+    var d = new Date(ts);
+    return isNaN(d.getTime()) ? "" : d.toLocaleDateString("de-DE", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Europe/Berlin" });
+  }
+  function stampText(r) {
+    if (!r) return "";
+    var c = r.created_at ? new Date(r.created_at).getTime() : 0, u = r.updated_at ? new Date(r.updated_at).getTime() : 0;
+    if (u && c && u - c > 60000) return "Ergänzt am " + dateDe(r.updated_at);
+    return (c || u) ? "Erstellt am " + dateDe(r.created_at || r.updated_at) : "";
+  }
+  /* Eigene Bewertung für den Coach (oder null) */
+  function mine(coachId) {
+    var me = host && host.me();
+    if (!me || !coachId) return Promise.resolve(null);
+    return host.rest("go_coach_reviews?coach_id=eq." + encodeURIComponent(coachId) + "&author_id=eq." + encodeURIComponent(me) + "&select=stars,body,created_at,updated_at&limit=1")
+      .then(function (rows) { return (rows && rows[0]) || null; })
+      .catch(function () { return null; });
+  }
+
+  /* ---------- Bewertung schreiben (oder anpassen: Sterne und Text änderbar) ---------- */
+  function openWrite(coach, onSaved) {
     if (!host || !coach || !coach.id) return;
     var me = host.me();
     var sh = sheet(
@@ -150,8 +170,9 @@
           return '<button type="button" class="gcr-star" data-gcr-star="' + n + '" aria-label="' + n + ' Sterne">' + STAR + "</button>";
         }).join("") + "</div>" +
         '<textarea data-gcr-text placeholder="Was macht ' + esc(coach.name || "Deinen Coach") + ' besonders?" maxlength="600"></textarea>' +
+        '<p class="gcr-sub" data-gcr-stamp hidden></p>' +
         '<button type="button" class="gcr-btn" data-gcr-save>Speichern</button>' +
-        '<button type="button" class="gcr-btn gcr-btn--ghost" data-gcr-close>Abbrechen</button>'
+        '<button type="button" class="gcr-btn gcr-btn--ghost" data-gcr-close>Zurück</button>'
     );
     var stars = 0;
     function paint() {
@@ -159,15 +180,16 @@
         b.classList.toggle("is-on", +b.getAttribute("data-gcr-star") <= stars);
       });
     }
-    host.rest("go_coach_reviews?coach_id=eq." + encodeURIComponent(coach.id) + "&author_id=eq." + encodeURIComponent(me) + "&select=stars,body&limit=1")
-      .then(function (rows) {
-        if (rows && rows[0]) {
-          stars = rows[0].stars;
-          sh.el.querySelector("[data-gcr-text]").value = rows[0].body || "";
-          paint();
-        }
-      })
-      .catch(function () {});
+    mine(coach.id).then(function (r) {
+      if (!r) return;
+      stars = r.stars;
+      sh.el.querySelector("[data-gcr-text]").value = r.body || "";
+      var h = sh.el.querySelector("h2");
+      if (h) h.textContent = "Bewertung anpassen";
+      var stp = sh.el.querySelector("[data-gcr-stamp]");
+      if (stp && stampText(r)) { stp.textContent = stampText(r); stp.hidden = false; }
+      paint();
+    });
     sh.el.addEventListener("click", function (e) {
       var st = e.target.closest("[data-gcr-star]");
       if (st) {
@@ -186,6 +208,7 @@
           prefer: "resolution=merge-duplicates,return=minimal",
           body: { coach_id: coach.id, author_id: me, stars: stars, body: text || null, updated_at: new Date().toISOString() }
         }).then(function () {
+          if (typeof onSaved === "function") { try { onSaved(); } catch (eS) {} }
           showShare(sh, coach, stars, text);
         }).catch(function (err) {
           if (host.toast) host.toast(/go_coach_reviews|relation/.test(String(err && err.message)) ? "Tabelle fehlt: go-coach-reviews.sql ausführen" : "Speichern fehlgeschlagen");
@@ -414,9 +437,9 @@
       '<p class="gcr-own">' + esc(aboutText(coach) || "Noch kein eigener Text.") + "</p>" +
       '<p class="gcr-h">Coachees über ' + esc(coach.name || "den Coach") + '</p><div data-gcr-reviews><p class="gcr-sub">Lädt …</p></div>' +
       '<button type="button" class="gcr-btn gcr-btn--ghost" data-gcr-close>Zurück</button>');
-    host.rest("go_coach_reviews?coach_id=eq." + encodeURIComponent(coach.id) + "&select=stars,body,updated_at,author:go_accounts!go_coach_reviews_author_id_fkey(name)&order=updated_at.desc&limit=50")
+    host.rest("go_coach_reviews?coach_id=eq." + encodeURIComponent(coach.id) + "&select=stars,body,created_at,updated_at,author:go_accounts!go_coach_reviews_author_id_fkey(name)&order=updated_at.desc&limit=50")
       .catch(function () {
-        return host.rest("go_coach_reviews?coach_id=eq." + encodeURIComponent(coach.id) + "&select=stars,body,updated_at&order=updated_at.desc&limit=50");
+        return host.rest("go_coach_reviews?coach_id=eq." + encodeURIComponent(coach.id) + "&select=stars,body,created_at,updated_at&order=updated_at.desc&limit=50");
       })
       .then(function (rows) {
         rows = rows || [];
@@ -425,7 +448,8 @@
         sh.el.querySelector("[data-gcr-reviews]").innerHTML = rows.length
           ? rows.map(function (r) {
               return '<div class="gcr-review"><div class="gcr-mini"><b>' + starsText(r.stars) + "</b> " + esc((r.author && r.author.name) || "") + "</div>" +
-                (r.body ? "<p>" + esc(r.body) + "</p>" : "") + "</div>";
+                (r.body ? "<p>" + esc(r.body) + "</p>" : "") +
+                (stampText(r) ? '<div class="gcr-mini gcr-stamp">' + esc(stampText(r)) + "</div>" : "") + "</div>";
             }).join("")
           : '<p class="gcr-sub">Noch keine Bewertungen.</p>';
       })
@@ -437,6 +461,8 @@
   global.GoCoachReviews = {
     init: function (h) { host = h; ensureCss(); },
     openWrite: openWrite,
+    mine: mine,
+    stampText: stampText,
     openCoachList: openCoachList,
     openAbout: openAbout,
     summaries: summaries
