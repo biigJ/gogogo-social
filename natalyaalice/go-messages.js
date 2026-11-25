@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-workout-video",
+      at: "2026-11-25T19:00:00Z",
+      text: "Im Workout hat jede Übung ein Video-Icon. Fehlt ein Video, kannst Du dort direkt einen Link von YouTube oder Instagram einfügen."
+    },
+    {
       key: "news:2026-11-25-plus-orte",
       at: "2026-11-25T17:40:00Z",
       text: "Neu unter Plus: Orte. Alle Trainingsorte mit Foto, Deine Orte mit ☆ merken, neue über „Neu“ anlegen, auf der Karte suchen."

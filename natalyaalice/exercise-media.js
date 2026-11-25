@@ -47,7 +47,16 @@
     ".gxm-ext{display:flex;align-items:center;justify-content:center;min-height:200px;border-radius:14px;background:#111;color:#fff;font-weight:700;text-decoration:none}" +
     ".gxm-dots{display:flex;justify-content:center;gap:6px;margin-top:10px}" +
     ".gxm-dots i{width:7px;height:7px;border-radius:50%;background:rgba(42,33,24,.25)}" +
-    ".gxm-dots i.is-on{background:#2A2118}";
+    ".gxm-dots i.is-on{background:#2A2118}" +
+    ".gxm-btn.is-empty{opacity:.4}" +
+    ".gxm-frame--empty{aspect-ratio:16/9;background:rgba(42,33,24,.08);border:1.5px dashed rgba(42,33,24,.3);display:flex;align-items:center;justify-content:center;color:rgba(42,33,24,.35)}" +
+    ".gxm-frame--empty svg{width:44px;height:44px}" +
+    ".gxm-add-hint{margin:12px 0 8px;font-size:14px;color:#2A2118}" +
+    ".gxm-add{display:flex;gap:8px;align-items:center}" +
+    ".gxm-add input{flex:1;min-width:0;min-height:46px;box-sizing:border-box;border:1.5px solid rgba(42,33,24,.25);border-radius:12px;padding:0 12px;font:inherit;font-size:16px;background:#fff;color:#2A2118}" +
+    ".gxm-add button{flex:none;min-height:46px;padding:0 18px;border:0;border-radius:999px;background:#111;color:#fff;font:inherit;font-weight:700;font-size:15px;cursor:pointer}" +
+    ".gxm-add button:disabled{opacity:.45}" +
+    ".gxm-row button.gxm-back{background:transparent;color:#111;border:1.5px solid #111}";
 
   function ensureCss() {
     if (document.getElementById("gxm-css")) return;
@@ -321,17 +330,68 @@
     document.body.appendChild(wrap);
   }
 
+  /* Kein Video zur Übung: gleicher Dialog mit leerem Rahmen, darunter Link einfügen und speichern */
+  function openAdd(name, onSaved) {
+    ensureCss();
+    var wrap = document.createElement("div");
+    wrap.className = "gxm-sheet";
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    wrap.innerHTML = '<div class="gxm-card"><h2>' + esc(name || "Übung") + "</h2>" +
+      '<div class="gxm-frame gxm-frame--empty">' + PLAY_SVG + "</div>" +
+      '<p class="gxm-add-hint">Füge ein Link aus YouTube oder Instagram ein.</p>' +
+      '<div class="gxm-add"><input type="url" inputmode="url" autocomplete="off" placeholder="https://" data-gxm-url />' +
+      '<button type="button" data-gxm-save>Speichern</button></div>' +
+      '<div class="gxm-row"><button type="button" class="gxm-back" data-gxm-close>Zurück</button></div></div>';
+    var input = wrap.querySelector("[data-gxm-url]");
+    var save = wrap.querySelector("[data-gxm-save]");
+    function close() { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }
+    function toast(t) { try { if (host && host.toast) host.toast(t); else if (global.goToast) global.goToast(t); } catch (e) {} }
+    save.addEventListener("click", function () {
+      var url = String(input.value || "").trim();
+      var info = parse(url);
+      if (!info || info.kind === "img" || info.kind === "link") { toast("Bitte ein Link von YouTube oder Instagram"); input.focus(); return; }
+      if (!host || !host.rest || !meId()) { toast("Zum Speichern bitte anmelden"); return; }
+      save.disabled = true;
+      var newId = "";
+      host.rest("go_exercise_links", { method: "POST", prefer: "return=representation",
+        body: { name_key: key(name), name: name, url: url, added_by: meId() } })
+        .then(function (rows) { newId = rows && rows[0] && rows[0].id ? String(rows[0].id) : ""; loading = null; return load(); })
+        .then(function () {
+          close();
+          toast("Gesichert");
+          if (newId && info.kind === "ig") makeThumb(newId);
+          if (onSaved) { try { onSaved(url); } catch (e) {} }
+          open(name, url);
+        })
+        .catch(function (err) {
+          save.disabled = false;
+          var m = String((err && err.message) || "");
+          toast(/duplicate|23505/.test(m) ? "Diesen Link gibt es bei der Übung schon" : "Speichern fehlgeschlagen");
+        });
+    });
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); save.click(); } });
+    wrap.addEventListener("click", function (e) {
+      if (e.target === wrap || (e.target.closest && e.target.closest("[data-gxm-close]"))) close();
+    });
+    document.body.appendChild(wrap);
+  }
+
+  /* Video-Icon: mit Video abspielen, ohne Video den Dialog zum Einfügen öffnen */
   function button(name) {
     ensureCss();
     var b = document.createElement("button");
     b.type = "button";
     b.className = "gxm-btn";
-    b.setAttribute("aria-label", "Video " + name);
+    var has = !!urlFor(name);
+    if (!has) b.classList.add("is-empty");
+    b.setAttribute("aria-label", (has ? "Video " : "Video hinzufügen ") + name);
     b.innerHTML = PLAY_SVG;
     b.addEventListener("click", function (e) {
       e.preventDefault();
       e.stopPropagation();
-      open(name);
+      if (urlFor(name)) { open(name); return; }
+      openAdd(name, function () { b.classList.remove("is-empty"); b.setAttribute("aria-label", "Video " + name); });
     });
     return b;
   }
@@ -342,6 +402,7 @@
     reload: function () { loading = null; return load(); },
     set: function (name, url) { if (url) map[key(name)] = url; else delete map[key(name)]; },
     urlFor: urlFor,
+    openAdd: openAdd,
     makeThumb: makeThumb,
     fillThumbs: fillThumbs,
     itemsFor: itemsFor,

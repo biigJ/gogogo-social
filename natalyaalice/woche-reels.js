@@ -1165,29 +1165,35 @@
       "events?user_id=eq." + encodeURIComponent(id) + "&status=neq.ausgefallen" +
         "&starts_at=gte." + encodeURIComponent(start + "T00:00:00+01:00") +
         "&starts_at=lt." + encodeURIComponent(end + "T00:00:00+01:00") +
-        "&select=title,starts_at&order=starts_at.asc&limit=1000"
+        "&select=title,starts_at,location&order=starts_at.asc&limit=1000"
     ).then(function (rows) {
       var weeks = {};
       var times = {};
+      var locs = {};
       (rows || []).forEach(function (r) {
         var k = seriesKey(r.title, r.starts_at);
         if (!k) return;
         (weeks[k] = weeks[k] || {})[dayKey(r.starts_at)] = true;
         var t = displayTime(r.starts_at);
         if (t) { var tk = times[k] = times[k] || {}; tk[t] = (tk[t] || 0) + 1; }
+        var lk = locs[k] = locs[k] || {}; var l0 = String(r.location || ""); lk[l0] = (lk[l0] || 0) + 1;
       });
       var out = {};
       var mode = {};
+      var place = {};
+      function top(m) { var best = null, n = 0; Object.keys(m || {}).forEach(function (x) { if (m[x] > n) { n = m[x]; best = x; } }); return best; }
       Object.keys(weeks).forEach(function (k) {
         if (Object.keys(weeks[k]).length < 2) return;
         out[k] = true;
-        /* übliche Uhrzeit der Serie (häufigste), damit ein einzeln verschobener Start hier nicht erscheint */
-        var best = "", n = 0;
-        Object.keys(times[k] || {}).forEach(function (t) { if (times[k][t] > n) { n = times[k][t]; best = t; } });
+        /* übliche Uhrzeit und üblicher Ort der Serie (häufigste): einzelne Änderungen aus Aktuell erscheinen hier nicht */
+        var best = top(times[k]);
         if (best) mode[k] = best;
+        var pl = top(locs[k]);
+        if (pl !== null) place[k] = pl;
       });
       state.seriesKeys = out;
       state.seriesTime = mode;
+      state.seriesPlace = place;
     }).catch(function () { state.seriesKeys = null; });
   }
   function isRecurringItem(it) {
@@ -2585,7 +2591,7 @@
         "</div>";
     }).join("");
     openSheet(
-      '<p class="wr-sheet-hint">Schieb das Zirkeltraining auf Deinen Tag. Es ersetzt dort die Einheit aus Deinem Wochenplan.</p>' +
+      '<p class="wr-sheet-hint">Schieb das Zirkeltraining auf Deinen Tag. Es ersetzt dort das Event aus Deinem Wochenplan.</p>' +
       '<div class="wr-days wr-days--all">' + rows + "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Verlassen</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zrec-next="1">Weiter</button></div>'
@@ -2688,7 +2694,7 @@
       '<p class="wr-zrec-lab">Uhrzeit setzen</p><div class="gz-time"><div class="gz-time__col" data-wr-zrec-time>' +
       times.map(function (t) { return '<span class="gz-time__opt">' + t + "</span>"; }).join("") + "</div></div>" +
       '<button type="button" class="wr-dayrow__vis' + (z.vis === "privat" ? "" : " is-on") + '" data-wr-zrec="vis">' + (z.vis === "privat" ? "privat" : "sichtbar") + "</button>" +
-      '<p class="wr-sheet-hint">Ersetzt die Einheit aus Deinem Wochenplan an diesem Tag.</p>' +
+      '<p class="wr-sheet-hint">Ersetzt das Event aus Deinem Wochenplan an diesem Tag.</p>' +
       "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-zrec="back">Zurück</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zrec="save">Speichern</button></div>'
@@ -2967,8 +2973,8 @@
         var opts = timeOptsFor(ze.times[x.ev.id]);
         var ti = Math.max(0, opts.indexOf(ze.times[x.ev.id]));
         var vis = ze.vis[x.ev.id];
-        ctl = '<div class="wr-mini-wheel" data-wr-zmini="' + esc(x.ev.id) + '" data-idx="' + ti + '">' +
-          opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
+        ctl = '<span class="wr-mini-wrap"><div class="wr-mini-wheel" data-wr-zmini="' + esc(x.ev.id) + '" data-idx="' + ti + '">' +
+          opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div></span>" +
           '<button type="button" class="wr-dayrow__vis' + (vis === "privat" ? "" : " is-on") + '" data-wr-zvis="' + esc(x.ev.id) + '">' + (vis === "privat" ? "privat" : "zeigen") + "</button>";
       } else {
         ctl = '<span class="wr-dayrow__time">' + esc(displayTime(x.at) ? formatTime(x.at) : "–:–") + "</span>" +
@@ -3001,8 +3007,10 @@
       place();
       requestAnimationFrame(function () { place(); requestAnimationFrame(function () { place(); settling = false; }); });
       var tm = null;
+      bindMiniOpen(card, w);
       w.addEventListener("scroll", function () {
         if (settling) return;
+        if (w._wrMiniTouch) w._wrMiniTouch();
         clearTimeout(tm);
         tm = setTimeout(function () {
           if (!state.zEdit) return;
@@ -3563,7 +3571,7 @@
   function groupAssignClick(e) {
     if (e.target.closest && e.target.closest("[data-ga-info]")) {
       e.stopPropagation();
-      var msg = "Hier stehen Deine Einheiten aus dem Wochenplan. Mit + teilst Du eine mit der Gruppe, mit − nimmst Du sie heraus. Events anderer Mitglieder siehst Du, sobald sie sie geteilt haben. Mit + nimmst Du teil: Das Event steht dann jede Woche an dem Tag in Deinem Kalender, neben Deinem Wochenplan.";
+      var msg = "Hier stehen Deine Events aus dem Wochenplan. Mit + teilst Du eins mit der Gruppe, mit − nimmst Du sie heraus. Events anderer Mitglieder siehst Du, sobald sie sie geteilt haben. Mit + nimmst Du teil: Das Event steht dann jede Woche an dem Tag in Deinem Kalender, neben Deinem Wochenplan.";
       if (global.GoDialog) GoDialog.alert(msg); else if (host.toast) host.toast(msg);
       return true;
     }
@@ -3599,6 +3607,23 @@
     });
   }
 
+  /* Mini-Uhrzeitrad: Antippen klappt es auf (eine Zeit drüber und drunter), damit klar ist, dass man dreht.
+     Nach dem Drehen klappt es wieder zu. scrollTop bleibt gleich, weil oben genau eine Zeile Abstand dazukommt. */
+  function bindMiniOpen(card, w) {
+    var wrap = w.parentNode;
+    if (!wrap || !wrap.classList || !wrap.classList.contains("wr-mini-wrap")) return;
+    var closeT = null;
+    var later = function (ms) { clearTimeout(closeT); closeT = setTimeout(function () { wrap.classList.remove("is-open"); }, ms); };
+    var openIt = function () {
+      card.querySelectorAll(".wr-mini-wrap.is-open").forEach(function (x) { if (x !== wrap) x.classList.remove("is-open"); });
+      wrap.classList.add("is-open");
+      later(2600);
+    };
+    w.addEventListener("pointerdown", openIt);
+    w.addEventListener("touchstart", openIt, { passive: true });
+    w._wrMiniTouch = function () { if (wrap.classList.contains("is-open")) later(1400); };
+  }
+
   function openDaysEditor() {
     var days = [];
     for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
@@ -3611,10 +3636,15 @@
       if (slots[i]) return null;
       return normalDayEvents(iso).filter(function (e) { return e.status === "erledigt"; })[0] || null;
     });
-    state.daysEdit = { days: days, slots: slots, done: done, times: {}, vis: {}, orig: {}, bub: {} };
+    state.daysEdit = { days: days, slots: slots, done: done, times: {}, vis: {}, orig: {}, bub: {}, placeBase: {} };
     slots.forEach(function (ev) {
       if (!ev) return;
-      state.daysEdit.times[ev.id] = displayTime(ev.starts_at) ? formatTime(ev.starts_at) : NO_TIME;
+      /* Tage bearbeiten ist die globale Woche: Uhrzeit und Ort der Serie, nicht die Änderung an einem einzelnen Termin */
+      var sk = seriesKey(ev.title, ev.starts_at);
+      var serT = (state.seriesTime || {})[sk];
+      var serP = (state.seriesPlace || {})[sk];
+      state.daysEdit.times[ev.id] = serT || (displayTime(ev.starts_at) ? formatTime(ev.starts_at) : NO_TIME);
+      state.daysEdit.placeBase[ev.id] = serP != null ? serP : (ev.location || "");
       state.daysEdit.vis[ev.id] = VIS_LABEL[ev.visibility] ? ev.visibility : "team";
       state.daysEdit.bub[ev.id] = !!ev.bubble_id;
       state.daysEdit.orig[ev.id] = state.daysEdit.times[ev.id];
@@ -3625,6 +3655,7 @@
   function dayPlace(ev) {
     var de = state.daysEdit;
     if (de && de.place && Object.prototype.hasOwnProperty.call(de.place, ev.id)) return de.place[ev.id];
+    if (de && de.placeBase && Object.prototype.hasOwnProperty.call(de.placeBase, ev.id)) return de.placeBase[ev.id];
     return ev.location || "";
   }
   function editDayPlace(id) {
@@ -3677,20 +3708,18 @@
         '<div class="wr-dayrow__mid"><span class="wr-dayrow__title wr-dayrow__title--place"><b>' + label + "</b>" +
         '<span class="wr-dt-name">' + esc(ev.title || "Training") + "</span>" +
         '<button type="button" class="wr-dt-place' + (dayPlace(ev) ? "" : " is-empty") + '" data-wr-dayplace="' + esc(ev.id) + '">' + esc(dayPlace(ev) || "Ort") + "</button></span>" +
-        '<div class="wr-dayrow__ctl"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
-        opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div>" +
+        '<div class="wr-dayrow__ctl"><span class="wr-mini-wrap"><div class="wr-mini-wheel" data-wr-mini="' + esc(ev.id) + '" data-idx="' + ti + '">' +
+        opts.map(function (t) { return '<span class="wr-mini-opt">' + t + "</span>"; }).join("") + "</div></span>" +
         /* Sichtbarkeit und Bubble in einem Dropdown wie der Filter in Aktuell */
         '<label class="wr-dayrow__pick"><select data-wr-dayvissel="' + esc(ev.id) + '" aria-label="Wer sieht es">' +
           visCycle().map(function (v) {
             return '<option value="' + v + '"' + ((state.daysEdit.bub[ev.id] ? v === "bubble" : v === vis) ? " selected" : "") + ">" + esc(visPickLabel(v)) + "</option>";
           }).join("") + "</select></label>" +
-        '<button type="button" class="wr-dayrow__vis" data-wr-daymedia="' + esc(ev.id) + '">Media</button>' +
         "</div></div>" +
         '<span class="wr-dayrow__grip" data-wr-grip="' + i + '" aria-label="Ziehen"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span></div>';
     }).join("");
     openSheet(
-      '<p class="wr-sheet-title">Tage bearbeiten</p>' +
-      '<p class="wr-sheet-hint">Einheiten verschieben, Uhrzeit anpassen und wählen, wer sie sieht.</p>' +
+      '<p class="wr-sheet-title">Deine Woche aus wiederholenden Events</p>' +
       '<div class="wr-days wr-days--all">' + rows + "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Verlassen</button>' +
       (state.daysSaved
@@ -3711,8 +3740,10 @@
       place();
       requestAnimationFrame(function () { place(); requestAnimationFrame(function () { place(); settling = false; }); });
       var tm = null;
+      bindMiniOpen(card, w);
       w.addEventListener("scroll", function () {
         if (settling) return;
+        if (w._wrMiniTouch) w._wrMiniTouch();
         clearTimeout(tm);
         tm = setTimeout(function () {
           var id = w.getAttribute("data-wr-mini");
@@ -3861,7 +3892,7 @@
     else if (!names.length) {
       exHtml = '<p class="wr-sheet-hint">' + (ev.category === "zirkel"
         ? "Beim Zirkel wählst Du die Stationen im Workout."
-        : "Für diese Einheit sind keine Übungen hinterlegt.") + "</p>";
+        : "Für dieses Event sind keine Übungen hinterlegt.") + "</p>";
     } else {
       /* Je Übung: Name, rechts Foto-Vorschau und Video-Vorschau, dann Stift (Bearbeiten) */
       exHtml = names.map(function (n) {
@@ -4204,15 +4235,17 @@
       var hhmm = untimed ? "" : (pick || formatTime(ev.starts_at) || "18:00");
       var starts = untimed ? iso + "T12:00:00Z" : timedStarts(iso, hhmm);
       var vis = de.vis[ev.id] || "team";
-      var sameDay = dayKey(ev.starts_at) === iso &&
-        (untimed ? !displayTime(ev.starts_at) : (displayTime(ev.starts_at) && formatTime(ev.starts_at) === hhmm));
+      /* nur echte Änderungen hier schreiben: Uhrzeit wie beim Öffnen (Serie) lässt einen einzeln verschobenen Termin in Ruhe */
+      var timeChanged = pick !== de.orig[ev.id];
+      var sameDay = dayKey(ev.starts_at) === iso && !timeChanged;
       var wantBub = !!(de.bub && de.bub[ev.id]) || vis === "bubble";
       var bubId = host.bubbleId ? host.bubbleId() : "";
       var bubChanged = wantBub !== !!ev.bubble_id && (!!bubId || !wantBub);
       var grp = vis === "gruppe" && host.myGroups ? (host.myGroups() || [])[0] : null;
       /* auch wenn diese Woche schon passt: kommende Wochen angleichen (Tag, Uhrzeit, Sichtbarkeit, Bubble).
          Circle teilt einzelne Termine in der Zirkel-App, deshalb nicht für die Serie. */
-      var placeChanged = !!(de.place && Object.prototype.hasOwnProperty.call(de.place, ev.id) && (de.place[ev.id] || "") !== (ev.location || ""));
+      var placeBase = de.placeBase && Object.prototype.hasOwnProperty.call(de.placeBase, ev.id) ? de.placeBase[ev.id] : (ev.location || "");
+      var placeChanged = !!(de.place && Object.prototype.hasOwnProperty.call(de.place, ev.id) && (de.place[ev.id] || "") !== (placeBase || ""));
       if (vis !== "circle") {
         var serBody = { visibility: vis, bubble_id: wantBub && bubId ? bubId : wantBub ? ev.bubble_id || null : null };
         if (placeChanged) serBody.location = de.place[ev.id] || null;
@@ -4220,10 +4253,11 @@
         jobs = jobs.concat(seriesJobs(future, ev, iso, untimed, hhmm, serBody));
       }
       if (sameDay && !placeChanged && (ev.visibility || "team") === vis && !bubChanged && !(grp && String(ev.group_id || "") !== String(grp.id))) return;
-      var body = { starts_at: starts, visibility: vis };
+      var body = { visibility: vis };
+      if (!sameDay) body.starts_at = starts;
       if (placeChanged) body.location = de.place[ev.id] || null;
       /* neue Uhrzeit → Herz-Meldung für Freunde (go-events-time-set.sql) */
-      if (!untimed && !(displayTime(ev.starts_at) && formatTime(ev.starts_at) === hhmm)) body.time_set_at = new Date().toISOString();
+      if (body.starts_at && !untimed && !(displayTime(ev.starts_at) && formatTime(ev.starts_at) === hhmm)) body.time_set_at = new Date().toISOString();
       /* Durch eine Alternative ersetzte Einheit auf einen anderen Tag gelegt: dort wieder geplant */
       if (ev.status === "ausgefallen" && dayKey(ev.starts_at) !== iso) body.status = "geplant";
       if (bubChanged) body.bubble_id = wantBub ? bubId : null;

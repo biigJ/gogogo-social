@@ -4508,7 +4508,7 @@
   function askForPlan() {
     if (!global.GoDialog) return;
     GoDialog.choose("Erst einen Wochenplan wählen", [{ label: "Wochenplan wählen", value: "plan" }], {
-      center: true, sub: "Bei gogogo trainierst Du nach Wochenplan. Die Einheiten daraus kannst Du dann auch spontan machen.", cancel: "Später"
+      center: true, sub: "Bei gogogo trainierst Du nach Wochenplan. Die Events daraus kannst Du dann auch spontan machen.", cancel: "Später"
     }).then(function (v) {
       if (v === "plan") setTimeout(function () { if (global.WocheReels && WocheReels.openPlanPicker) WocheReels.openPlanPicker(); }, 0);
     });
@@ -4799,7 +4799,7 @@
     if ((kind === "kraft" || kind === "ausdauer") && host.openEventWorkout) {
       kinds.hidden = true;
       title.hidden = false;
-      title.textContent = "Welche Einheit?";
+      title.textContent = "Welches Event?";
       pick.hidden = false;
       pick.innerHTML = visPickerHtml() + '<p class="acc-spontan-loading">Lädt …</p>';
       loadSingleUnits(kind).then(function (units) {
@@ -4812,7 +4812,7 @@
           return;
         }
         if (!units.length) {
-          pick.insertAdjacentHTML("beforeend", "<p>Dein Wochenplan hat keine Einheit in dieser Kategorie.</p>");
+          pick.insertAdjacentHTML("beforeend", "<p>Dein Wochenplan hat kein Event in dieser Kategorie.</p>");
           return;
         }
         units.forEach(function (u) {
@@ -5121,8 +5121,8 @@
       }
       return loadSingleUnits(kind).then(function (units) {
         if (units.noPlan) { askForPlan(); return; }
-        if (!units.length) { GoDialog.alert("Dein Wochenplan hat keine Einheit in dieser Kategorie."); return; }
-        return GoDialog.choose("Welche Einheit?", units.map(function (u) {
+        if (!units.length) { GoDialog.alert("Dein Wochenplan hat kein Event in dieser Kategorie."); return; }
+        return GoDialog.choose("Welches Event?", units.map(function (u) {
           return { label: (emojiFor(kind, u.title) + " " + u.title).trim(), value: String(u.id) };
         })).then(function (uid) {
           if (!uid) return;
