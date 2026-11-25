@@ -3374,8 +3374,10 @@
   function sameSlot(a, b) {
     return new Date(a).getDay() === new Date(b).getDay() && formatTime(a) === formatTime(b);
   }
-  function renderGroupAssign(el) {
-    var g = groupOfMine();
+  function renderGroupAssign(el, gid) {
+    /* mehrere eigene Gruppen (go-group-limit.sql): die Gruppe dieser Seite, sonst die erste */
+    var all = host && host.myGroups ? host.myGroups() || [] : [];
+    var g = (gid && all.filter(function (x) { return x && String(x.id) === String(gid); })[0]) || groupOfMine();
     if (!el || !g) return;
     state.gaTarget = el;
     var days = gaWeekDays();
@@ -7177,7 +7179,7 @@
 
   global.WocheReels = {
     /* Gruppe → „Events zuordnen“; onBack: nach „Fertig“ zurück zur Gruppe */
-    renderGroupAssign: function (el) { renderGroupAssign(el); },
+    renderGroupAssign: function (el, gid) { renderGroupAssign(el, gid); },
     openGroupAssign: function (onBack) {
       state.gaBack = onBack || null;
       openGroupAssign();
