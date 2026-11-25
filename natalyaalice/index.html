@@ -1504,6 +1504,8 @@
     .kreis-wico svg { width: 34px; height: 34px; }
     .kreis-page { position: fixed; inset: 0; z-index: 70; background: #F3EEE4; display: flex; flex-direction: column; }
     .kreis-page__bar { display: grid; grid-template-columns: 31px 1fr 31px; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 8px; }
+    .kreis-page__edit { display: grid; place-items: center; padding: 0; }
+    .kreis-page__edit svg { width: 16px; height: 16px; display: block; }
     .kreis-page__bar h2 { margin: 0; text-align: center; font: 600 22px/1.2 "Playfair Display", Georgia, serif; color: #2A2118; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .kreis-page__body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 20px calc(110px + env(safe-area-inset-bottom)); }
     .kreis-page .go-circle-name { display: none !important; }
@@ -18577,7 +18579,7 @@
           '<span class="gbub-row__img" style="--gbub:#E9E1D2">' + (photo ? '<img src="' + escapeHtml(photo) + '" alt="" decoding="sync" />' : "") +
           '<span class="gbub-row__ico' + (photo ? "" : " is-plain") + '">' + KREIS_ICON[kind] + "</span></span>" +
           '<span class="gbub-row__txt"><span class="gbub-row__name">' + escapeHtml(name) + "</span></span>" +
-          (pen ? '<button type="button" class="team-pencil kreis-row__pen" data-kreis-pen="' + kind + '" aria-label="Bearbeiten">' + KREIS_PEN + "</button>" : "") +
+          /* kein Stift mehr in der Zeile: Bearbeiten liegt oben rechts auf der Seite des Kreises (openKreisPage onEdit) */
           "</div>";
       }
       function paintKreiseRows(el) {
@@ -18662,7 +18664,7 @@
         myStampCount(kind, ref).then(function (n) { paintKreisStamps(el, n); });
       }
 
-      function openKreisPage(slide, title, restoreTo) {
+      function openKreisPage(slide, title, restoreTo, onEdit) {
         if (!slide) return;
         closeKreisPage();
         var page = document.createElement("div");
@@ -18671,8 +18673,10 @@
         page._slide = slide;
         page.innerHTML = '<div class="kreis-page__bar"><button type="button" class="profile-back kreis-page__back" aria-label="Zurück">' +
           '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.2 6.5 8.2 12l6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-          '</button><h2></h2><span></span></div><div class="kreis-page__body"></div>';
+          '</button><h2></h2>' + (onEdit ? '<button type="button" class="profile-back kreis-page__edit" aria-label="Bearbeiten">' + KREIS_PEN + "</button>" : "<span></span>") +
+          '</div><div class="kreis-page__body"></div>';
         page.querySelector("h2").textContent = title || "";
+        if (onEdit) page.querySelector(".kreis-page__edit").addEventListener("click", function () { onEdit(); });
         page.querySelector(".kreis-page__body").appendChild(slide);
         page.querySelector(".kreis-page__back").addEventListener("click", closeKreisPage);
         document.body.appendChild(page);
@@ -18747,7 +18751,12 @@
         if (gNew && window.FFC && FFC.user && FFC.user()) {
           var openNew = function () {
             var slide = circleSlide(gNew);
-            openKreisPage(slide, String(gNew.name || "Circle"));
+            /* Verwalten (vorher Stift der Zeile): oben rechts, nur wer den Circle verwalten darf */
+            var cEdit = typeof circleCanManage === "function" && circleCanManage(gNew) ? function () {
+              var go = function () { openCircleJoin({ coach: true }); };
+              if (typeof selectCircle === "function") Promise.resolve(selectCircle(gid)).then(go, go); else go();
+            } : null;
+            openKreisPage(slide, String(gNew.name || "Circle"), null, cEdit);
             var body = document.querySelector(".kreis-page .kreis-page__body");
             var evBox = slide.querySelector(".circle-evs-box");
             appendKreisStampBox(slide, "circle", gid);
@@ -19110,7 +19119,9 @@
         if (kind === "group") {
           var kg = kreisGroup(id);
           var gs = kg.slide || st.groupSlide;
-          openKreisPage(gs, (kg.group && kg.group.name) || (st.group && st.group.name) || "Meine Gruppe");
+          var gOwn = kg.group && String(kg.group.owner || "") === String((sessionAccount && sessionAccount.id) || "");
+          openKreisPage(gs, (kg.group && kg.group.name) || (st.group && st.group.name) || "Meine Gruppe", null,
+            gOwn ? function () { openGroupEditModal(kg.group); } : null);
           if (gs && gs._gaBox && window.WocheReels && WocheReels.renderGroupAssign) WocheReels.renderGroupAssign(gs._gaBox, gs._gaGid);
         }
         else if (kind === "coach") {
