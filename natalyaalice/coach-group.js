@@ -23,6 +23,7 @@
     ".gcg__face{flex:none;display:flex;flex-direction:column;align-items:center;gap:4px;width:58px;padding:0;border:0;background:none;color:#2A2118;font:500 12px Inter,sans-serif;cursor:pointer}" +
     ".gcg__face span.gcg__img{position:relative;width:52px;height:52px;border-radius:50%;background:#E6DED0 center/cover no-repeat;display:grid;place-items:center;font-weight:700;font-size:18px}" +
     ".gcg__face.is-open span.gcg__img::after{content:'';position:absolute;right:0;bottom:2px;width:12px;height:12px;border-radius:50%;background:#2E9E5B;border:2px solid #F3EEE4}" +
+    ".gcg__face.is-none{cursor:default;width:auto}.gcg__face.is-none em{max-width:none}.gcg__face.is-none span.gcg__img{background:transparent;border:1.5px dashed currentColor;box-sizing:border-box;opacity:.55}" +
     ".gcg__face em{font-style:normal;max-width:58px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
     ".gcg__empty{margin:4px 0;font-size:14px;color:rgba(42,33,24,.65)}" +
     ".gcg__open{display:flex;align-items:center;gap:12px;min-height:52px;padding:0 14px;border-radius:12px;background:#fff;border:1px solid rgba(42,33,24,.12);font-size:15px;cursor:pointer}" +
@@ -202,12 +203,13 @@
     if (s.mode === "client") {
       html += '<label class="gcg__open"><input type="checkbox" data-gcg-open' + (s.open ? " checked" : "") + ">Offen für Gruppentraining</label>";
       html += '<p class="gcg__empty" style="margin-top:6px">' + (s.open
-        ? "Die anderen Coachees von " + esc(first(s.coach.name) || "Deinem Coach") + " mit Haken sehen Dich, Du siehst sie."
+        ? "Coachees von " + esc(first(s.coach.name) || "Deinem Coach") + " mit Haken:"
         : "Mit Haken sehen Dich die anderen Coachees mit Haken, und Du siehst sie.") + "</p>";
       if (s.open) {
-        html += '<p class="gcg__h">Offen für Gruppentraining</p>';
-        html += s.members.length ? '<div class="gcg__faces">' + s.members.map(function (p) { return faceHtml(p, true); }).join("") + "</div>"
-          : '<p class="gcg__empty">Noch niemand außer Dir.</p>';
+        /* Profilkreise direkt darunter; noch keiner: leerer, gestrichelter Kreis */
+        html += '<div class="gcg__faces">' + (s.members.length
+          ? s.members.map(function (p) { return faceHtml(p, true); }).join("")
+          : '<span class="gcg__face is-none" aria-label="Noch keiner"><span class="gcg__img"></span><em>Noch keiner</em></span>') + "</div>";
       }
     } else {
       html += !s.membersOk ? '<p class="gcg__empty">Braucht go-coach-gruppe.sql in Supabase.</p>'
