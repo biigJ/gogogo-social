@@ -1040,7 +1040,10 @@
     var c = document.createElement("style");
     c.id = "ga-wk-css";
     c.textContent =
-      ".ga-wk{position:fixed;inset:0;z-index:10040;display:flex;flex-direction:column;overflow-y:auto;box-sizing:border-box;padding:calc(env(safe-area-inset-top,0px) + 12px) 16px calc(env(safe-area-inset-bottom,0px) + 20px);font-family:Inter,system-ui,sans-serif}" +
+      ".ga-wk{position:fixed;inset:0;z-index:10040;display:flex;flex-direction:column;overflow-y:auto;box-sizing:border-box;padding:calc(env(safe-area-inset-top,0px) + 12px) 20px calc(env(safe-area-inset-bottom,0px) + 40px);font-family:Inter,system-ui,sans-serif}" +
+      /* so breit wie die anderen Admin-Listen (.cp-body: 20 px Rand, ab 900 px höchstens 1280 px mittig) */
+      ".ga-wk > *{width:100%;box-sizing:border-box;flex:none}" +
+      "@media (min-width:900px){.ga-wk > *{max-width:1280px;margin-left:auto;margin-right:auto}}" +
       ".ga-wk__bar{display:grid;grid-template-columns:40px minmax(0,1fr) 40px;align-items:center;gap:8px;margin:0 0 4px}" +
       ".ga-wk__bar h2{margin:0;text-align:center;font-size:20px;line-height:1.2;overflow-wrap:anywhere}" +
       ".ga-wk__sub{margin:0 0 14px;text-align:center;font-size:14px;opacity:.65}" +
