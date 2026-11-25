@@ -1432,7 +1432,8 @@
     if (!l.length) return '<p class="cp-hint">Noch keine Orte.</p>';
     /* offene Namensänderungen zuerst */
     var list = l.slice().sort(function (a, b) {
-      return ((b.renames || []).length ? 1 : 0) - ((a.renames || []).length ? 1 : 0) || (b.events || 0) - (a.events || 0) || String(a.name).localeCompare(String(b.name), "de");
+      var oa = (a.renames || []).length + (a.photos || []).length, ob = (b.renames || []).length + (b.photos || []).length;
+      return (ob ? 1 : 0) - (oa ? 1 : 0) || (b.events || 0) - (a.events || 0) || String(a.name).localeCompare(String(b.name), "de");
     });
     function btn(act, id, html, extra) { return '<button type="button" class="ga-link" data-gpl="' + act + '" data-pid="' + esc(id) + '"' + (extra || "") + ">" + html + "</button>"; }
     return '<p class="cp-hint">Foto antippen: ändern. Name antippen: umbenennen (gilt dann auch in Events und bei „Meine Orte“).</p>' + list.map(function (p) {
@@ -1444,10 +1445,16 @@
         return '<div class="ga-r1"><b>Neuer Name: „' + esc(r.new_name) + "“</b> von " + esc(String(r.by || "?").split(" ")[0]) + " · " + esc(shortDay(r.at)) + " " +
           btn("ok", p.id, "Freigeben", ' data-rid="' + esc(r.id) + '"') + " · " + btn("no", p.id, "Ablehnen", ' data-rid="' + esc(r.id) + '"') + "</div>";
       }).join("");
+      /* Nutzerfotos (go-place-photos.sql): bis zur Freigabe sieht sie nur der Hochlader */
+      var pho = (p.photos || []).map(function (f) {
+        return '<div class="ga-r1" style="display:flex;align-items:center;gap:8px"><a href="' + esc(f.url) + '" target="_blank" rel="noopener"><img src="' + esc(f.url) + '" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px;display:block" /></a>' +
+          "<span><b>Neues Foto</b> von " + esc(String(f.by || "?").split(" ")[0]) + " · " + esc(shortDay(f.at)) + "<br>" +
+          btn("pok", p.id, "Freigeben", ' data-rid="' + esc(f.id) + '"') + " · " + btn("pno", p.id, "Ablehnen", ' data-rid="' + esc(f.id) + '"') + "</span></div>";
+      }).join("");
       var map = p.lat != null && p.lng != null
         ? '<a class="ga-link" href="https://www.openstreetmap.org/?mlat=' + esc(p.lat) + "&mlon=" + esc(p.lng) + '#map=17/' + esc(p.lat) + "/" + esc(p.lng) + '" target="_blank" rel="noopener">Karte</a>' : "ohne Koordinaten";
       return '<div class="ga-item is-top ga-circ"><button type="button" class="ga-rectbtn" data-gpl="photo" data-pid="' + esc(p.id) + '" aria-label="Foto"><img class="ga-cimg" src="' + esc(img) + '" alt="" /></button>' +
-        '<div class="ga-copy ga-rows"><div class="ga-r1">' + btn("rename", p.id, "<b>" + esc(p.name) + "</b>") + "</div>" + ren +
+        '<div class="ga-copy ga-rows"><div class="ga-r1">' + btn("rename", p.id, "<b>" + esc(p.name) + "</b>") + "</div>" + ren + pho +
         "<div>Events: " + esc(String(p.events || 0)) + (p.last ? " · zuletzt " + esc(shortDay(p.last)) : "") + "</div>" +
         "<div>Meine Orte bei: " + (ppl || "–") + "</div>" +
         "<div>" + map + (p.creator ? " · angelegt von " + esc(String(p.creator).split(" ")[0]) : "") + "</div>" +
@@ -1464,6 +1471,12 @@
     if (act === "ok" || act === "no") {
       host.rest("rpc/go_admin_rename_place", { method: "POST", body: { p_place: id, p_name: "", p_rename: rid, p_ok: act === "ok" } })
         .then(function () { return done(act === "ok" ? "Name übernommen" : "Abgelehnt"); }).catch(fail);
+      return;
+    }
+    if (act === "pok" || act === "pno") {
+      host.rest("rpc/go_admin_place_photo_review", { method: "POST", body: { p_photo: rid, p_ok: act === "pok" } })
+        .then(function () { return done(act === "pok" ? "Foto freigegeben" : "Foto abgelehnt"); })
+        .catch(function () { GoDialog.alert("Ging nicht. Ist go-place-photos.sql in Supabase ausgeführt?"); });
       return;
     }
     if (act === "rename") {

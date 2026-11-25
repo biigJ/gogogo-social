@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-orte-fotos",
+      at: "2026-11-25T17:10:00Z",
+      text: "Plus → Orte: Mit der Kamera links oben an einer Kachel lädst Du Fotos hoch. Nach der Freigabe sehen sie alle. Mehrere Fotos wischst Du seitlich durch."
+    },
+    {
       key: "news:2026-11-25-workout-video",
       at: "2026-11-25T19:00:00Z",
       text: "Im Workout hat jede Übung ein Video-Icon. Fehlt ein Video, kannst Du dort direkt einen Link von YouTube oder Instagram einfügen."

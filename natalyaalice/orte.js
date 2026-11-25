@@ -3,7 +3,7 @@
  *   GoOrte.init({ rest, me, toast, myPlaces() → [Name], weekEvents() → [Event], pickPlace(title) → Promise<Name>, addMyPlace(name), removeMyPlace(name) })
  *   GoOrte.mount(el)
  *
- * Daten: go_workout_places (Name, Koordinaten, Foto), rpc go_place_usage (Kategorien je Ort),
+ * Daten: go_workout_places (Name, Koordinaten, Foto), go_place_photos (Nutzerfotos, go-place-photos.sql), rpc go_place_usage (Kategorien je Ort),
  *        go_place_renames (Namensänderung → Admin gibt frei). go-orte-plus.sql
  * Oben: „Mein Wochenplan“ | „Meine Orte“, darunter Alle / Kraft / Ausdauer / Zirkeltraining,
  * Name (Suche, Kachel tippen füllt ihn, x leert), „Neu“ und „Auf Karte suchen“.
@@ -15,6 +15,7 @@
   var places = null;       /* [{ id, name, lat, lng, photo_url }] */
   var usage = {};          /* name_key → { cats: [], n } */
   var pending = {};        /* place_id → neuer Name (eigene offene Änderung) */
+  var photosBy = {};       /* place_id → [{ id, url, status, added_by }] (go-place-photos.sql; RLS: freigegebene + eigene) */
   var label = "";
   var query = "";
   var selected = null;     /* gewählter Ort (Kachel getippt) */
@@ -50,9 +51,19 @@
     ".gor .gxl__pinname{position:absolute;z-index:1;left:8px;right:8px;bottom:7px;color:#2A2118;font:600 12.5px/1.25 Inter,system-ui,sans-serif;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}" +
     ".gor .gxl__pin.has-photo .gxl__pinname{color:#fff}" +
     ".gor .gxl__pin.is-sel{box-shadow:0 0 0 3px #2A2118 inset}" +
-    ".gor__star{position:absolute;z-index:2;top:4px;right:4px;width:34px;height:34px;display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.85);color:#2A2118;font-size:17px;line-height:1;cursor:pointer}" +
+    ".gor__star,.gor__up{position:absolute;z-index:2;top:4px;right:4px;width:34px;height:34px;display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.85);color:#2A2118;cursor:pointer}" +
+    ".gor__up{right:auto;left:4px}" +
+    ".gor__star svg,.gor__up svg{display:block;width:18px;height:18px}" +
     ".gor__star.is-on{background:#2A2118;color:#F6F1E8}" +
-    ".gor__tag{position:absolute;z-index:1;top:8px;left:8px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.9);color:#2A2118;font:700 11px/1.4 Inter,sans-serif}" +
+    /* mehrere Fotos: innerhalb der Kachel seitlich wischen (die Plus-Leiste selbst wischt nicht) */
+    ".gor__track{position:absolute;inset:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;touch-action:pan-x pan-y;overscroll-behavior-x:contain}" +
+    ".gor__track::-webkit-scrollbar{display:none}" +
+    ".gor__slide{position:relative;flex:0 0 100%;height:100%;scroll-snap-align:center}" +
+    ".gor .gor__slide img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}" +
+    ".gor__wait{position:absolute;z-index:1;left:50%;top:48px;transform:translateX(-50%);white-space:nowrap;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.9);color:#2A2118;font:700 10.5px/1.4 Inter,sans-serif}" +
+    ".gor__dots{position:absolute;z-index:2;left:0;right:0;bottom:42px;display:flex;justify-content:center;gap:4px;pointer-events:none}" +
+    ".gor__dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.5)}.gor__dots i.is-on{background:#fff}" +
+    ".gor__tag{position:absolute;z-index:1;top:44px;left:8px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.9);color:#2A2118;font:700 11px/1.4 Inter,sans-serif}" +
     ".gor .gxl__empty{margin:8px 0;font-size:14px;color:rgba(42,33,24,.65)}" +
     /* Karte */
     ".gor-map{position:fixed;inset:0;z-index:10060;display:flex;flex-direction:column;background:#F3EEE4}" +
@@ -100,8 +111,14 @@
         .catch(function () { return host.rest("go_workout_places?select=id,name,lat,lng&order=name.asc&limit=1000"); })
         .catch(function () { return []; }),
       host.rest("rpc/go_place_usage", { method: "POST", body: {} }).catch(function () { return []; }),
-      me ? host.rest("go_place_renames?requested_by=eq." + encodeURIComponent(me) + "&status=eq.pending&select=place_id,new_name").catch(function () { return []; }) : []
+      me ? host.rest("go_place_renames?requested_by=eq." + encodeURIComponent(me) + "&status=eq.pending&select=place_id,new_name").catch(function () { return []; }) : [],
+      host.rest("go_place_photos?status=neq.rejected&select=id,place_id,url,status,added_by,created_at&order=created_at.asc&limit=3000").catch(function () { return []; })
     ]).then(function (r) {
+      photosBy = {};
+      (r[3] || []).forEach(function (f) {
+        if (!f || !f.url) return;
+        (photosBy[String(f.place_id)] = photosBy[String(f.place_id)] || []).push(f);
+      });
       places = (r[0] || []).filter(function (p) { return p && p.name; });
       usage = {};
       (r[1] || []).forEach(function (u) { if (u && u.name_key) usage[u.name_key] = { cats: u.categories || [], n: u.n || 0 }; });
@@ -109,6 +126,25 @@
       (r[2] || []).forEach(function (x) { pending[String(x.place_id)] = x.new_name; });
     });
   }
+
+  /* Fotos eines Orts: Titelbild, dann freigegebene, dann eigene noch nicht freigegebene */
+  function photosOf(p) {
+    var out = [];
+    var seen = {};
+    if (p.photo_url) { out.push({ url: p.photo_url, wait: false }); seen[p.photo_url] = 1; }
+    (photosBy[String(p.id)] || []).forEach(function (f) {
+      if (f.status === "approved" && !seen[f.url]) { out.push({ url: f.url, wait: false }); seen[f.url] = 1; }
+    });
+    (photosBy[String(p.id)] || []).forEach(function (f) {
+      if (f.status === "pending" && !seen[f.url]) { out.push({ url: f.url, wait: true }); seen[f.url] = 1; }
+    });
+    return out;
+  }
+
+  var STAR_PATH = "M12 3.2l2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3.1-5.4 3.1 1.2-6-4.5-4.2 6.1-.7z";
+  var STAR_ON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + STAR_PATH + '" fill="currentColor"/></svg>';
+  var STAR_OFF = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + STAR_PATH + '" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+  var CAM_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.6-2.2h6.8L17 8h3v11H4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="13.3" r="3.3" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
 
   /* ---------- Filter ---------- */
   function filtered() {
@@ -125,7 +161,7 @@
     });
     /* mit Foto zuerst, dann häufig genutzt, dann alphabetisch */
     return list.sort(function (a, b) {
-      var fa = a.photo_url ? 0 : 1, fb = b.photo_url ? 0 : 1;
+      var fa = photosOf(a).length ? 0 : 1, fb = photosOf(b).length ? 0 : 1;
       var na = (usage[key(a.name)] || {}).n || 0, nb = (usage[key(b.name)] || {}).n || 0;
       return fa - fb || nb - na || a.name.localeCompare(b.name, "de");
     });
@@ -134,10 +170,17 @@
   function pinHtml(p) {
     var mine = isMine(p.name);
     var sel = selected && String(selected.id) === String(p.id);
-    return '<div class="gxl__pin' + (p.photo_url ? " has-photo" : "") + (sel ? " is-sel" : "") + '" data-gor-place="' + esc(p.id) + '">' +
-      (p.photo_url ? '<img src="' + esc(p.photo_url) + '" alt="" loading="lazy" />' : "") +
+    var ph = photosOf(p);
+    var slides = ph.map(function (f) {
+      return '<div class="gor__slide"><img src="' + esc(f.url) + '" alt="" loading="lazy" />' +
+        (f.wait ? '<span class="gor__wait">Nur Du, bis zur Freigabe</span>' : "") + "</div>";
+    }).join("");
+    return '<div class="gxl__pin' + (ph.length ? " has-photo" : "") + (sel ? " is-sel" : "") + '" data-gor-place="' + esc(p.id) + '">' +
+      (ph.length ? '<div class="gor__track" data-gor-track>' + slides + "</div>" : "") +
+      (ph.length > 1 ? '<div class="gor__dots">' + ph.map(function (_, i) { return '<i class="' + (i ? "" : "is-on") + '"></i>'; }).join("") + "</div>" : "") +
       (pending[String(p.id)] ? '<span class="gor__tag">Änderung angefragt</span>' : "") +
-      '<button type="button" class="gor__star' + (mine ? " is-on" : "") + '" data-gor-star="' + esc(p.id) + '" aria-label="' + (mine ? "Aus meinen Orten entfernen" : "Zu meinen Orten") + '">' + (mine ? "★" : "☆") + "</button>" +
+      '<button type="button" class="gor__up" data-gor-up="' + esc(p.id) + '" aria-label="Foto hochladen">' + CAM_SVG + "</button>" +
+      '<button type="button" class="gor__star' + (mine ? " is-on" : "") + '" data-gor-star="' + esc(p.id) + '" aria-label="' + (mine ? "Aus meinen Orten entfernen" : "Zu meinen Orten") + '">' + (mine ? STAR_ON : STAR_OFF) + "</button>" +
       '<span class="gxl__pinname">' + esc(p.name) + "</span></div>";
   }
 
@@ -207,11 +250,50 @@
     var p = (places || []).filter(function (x) { return String(x.id) === String(id); })[0];
     if (!p) return;
     var on = isMine(p.name);
-    var job = on ? (host.removeMyPlace ? host.removeMyPlace(p.name) : null) : (host.addMyPlace ? host.addMyPlace(p.name) : null);
-    Promise.resolve(job).then(function () {
-      paint(el);
-      toast(on ? "Aus meinen Orten entfernt" : "Zu meinen Orten hinzugefügt");
+    /* Entfernen erst nach Bestätigung */
+    var ask = on && global.GoDialog && GoDialog.confirm
+      ? GoDialog.confirm("„" + p.name + "“ aus Deinen Orten entfernen?", { ok: "Entfernen", cancel: "Zurück" })
+      : Promise.resolve(true);
+    Promise.resolve(ask).then(function (yes) {
+      if (!yes) return;
+      var job = on ? (host.removeMyPlace ? host.removeMyPlace(p.name) : null) : (host.addMyPlace ? host.addMyPlace(p.name) : null);
+      return Promise.resolve(job).then(function () {
+        paint(el);
+        toast(on ? "Aus meinen Orten entfernt" : "Zu meinen Orten hinzugefügt");
+      });
     });
+  }
+  /* Foto hochladen: sieht nur der Nutzer selbst, nach Freigabe im Admin alle */
+  function uploadPhoto(el, id) {
+    var me = host.me();
+    if (!me) { toast("Zum Hochladen bitte anmelden"); return; }
+    if (!global.GoExMedia || !GoExMedia.uploadImage) { toast("Upload gerade nicht verfügbar"); return; }
+    var inp = document.createElement("input");
+    inp.type = "file";
+    inp.accept = "image/*";
+    inp.hidden = true;
+    document.body.appendChild(inp);
+    inp.addEventListener("change", function () {
+      var f = inp.files && inp.files[0];
+      inp.remove();
+      if (!f) return;
+      toast("Foto wird hochgeladen …");
+      GoExMedia.uploadImage(f, "places").then(function (url) {
+        return host.rest("go_place_photos", { method: "POST", prefer: "return=representation",
+          body: { place_id: id, url: url, added_by: me } });
+      }).then(function (rows) {
+        var row = (rows && rows[0]) || null;
+        if (row) (photosBy[String(id)] = photosBy[String(id)] || []).push(row);
+        paint(el);
+        /* zum neuen Foto wischen */
+        var tr = el.querySelector('[data-gor-place="' + String(id).replace(/"/g, "") + '"] [data-gor-track]');
+        if (tr) tr.scrollLeft = tr.scrollWidth;
+        toast("Foto gespeichert. Alle sehen es nach der Freigabe.");
+      }).catch(function (err) {
+        toast(/go_place_photos|relation/.test(String((err && err.message) || "")) ? "Braucht go-place-photos.sql in Supabase" : "Hochladen ging nicht");
+      });
+    });
+    inp.click();
   }
   function addNew(el) {
     if (!host.pickPlace) return;
@@ -295,10 +377,20 @@
         if (!selected) query = this.value;
         paint(el);
       });
+      /* Punkte unter den Fotos mitführen (scroll bubbelt nicht, daher capture) */
+      el.addEventListener("scroll", function (e) {
+        var tr = e.target;
+        if (!tr || !tr.hasAttribute || !tr.hasAttribute("data-gor-track")) return;
+        var i = Math.round(tr.scrollLeft / Math.max(1, tr.clientWidth));
+        var dots = tr.parentNode.querySelectorAll(".gor__dots i");
+        Array.prototype.forEach.call(dots, function (d, k) { d.classList.toggle("is-on", k === i); });
+      }, true);
       el.addEventListener("click", function (e) {
         var t = e.target;
         var star = t.closest("[data-gor-star]");
         if (star) { e.stopPropagation(); toggleMine(el, star.getAttribute("data-gor-star")); return; }
+        var up = t.closest("[data-gor-up]");
+        if (up) { e.stopPropagation(); uploadPhoto(el, up.getAttribute("data-gor-up")); return; }
         if (t.closest("[data-gor-qclear]")) { clearQuery(el); return; }
         var rn = t.closest("[data-gor-rename]");
         if (rn) { rename(el, rn); return; }
