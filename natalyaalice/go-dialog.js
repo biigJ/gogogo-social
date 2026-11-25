@@ -441,7 +441,8 @@
   function visDlg(msg, opts) {
     opts = opts || {};
     /* Kompakt (wie Instagram): Zeile 1 Pille + Speichern, Zeile 2 Aktion (z. B. Löschen). Antippen außerhalb schließt. */
-    if (opts.extra) return visSheet(opts);
+    /* auch ohne „Löschen“ (extra): mit Aktionen (Verkleinern, Foto, wieder aufnehmen) die kompakte Ansicht */
+    if (opts.extra || (opts.actions && opts.actions.length)) return visSheet(opts);
     return open(function (card, close) {
       text(card, msg);
       var tEl = card.querySelector(".god__text");
@@ -536,12 +537,14 @@
         r3.addEventListener("click", function () { close(a.value); });
         card.appendChild(r3);
       });
-      var r2 = document.createElement("button");
-      r2.type = "button";
-      r2.className = "god__sheet-row god__sheet-danger";
-      r2.textContent = opts.extra;
-      r2.addEventListener("click", function () { close("__extra"); });
-      card.appendChild(r2);
+      if (opts.extra) {
+        var r2 = document.createElement("button");
+        r2.type = "button";
+        r2.className = "god__sheet-row god__sheet-danger";
+        r2.textContent = opts.extra;
+        r2.addEventListener("click", function () { close("__extra"); });
+        card.appendChild(r2);
+      }
       return null;
     });
   }
