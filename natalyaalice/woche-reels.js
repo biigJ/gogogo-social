@@ -3381,13 +3381,20 @@
     if (!el || !g) return;
     state.gaTarget = el;
     var days = gaWeekDays();
-    state.ga = { group: g, days: days, mine: [], others: [], going: {} };
+    /* je Gruppen-Seite eigener Zustand (mehrere eigene Gruppen): sonst überschrieb die erste Gruppe die offene Seite */
+    var st = { group: g, days: days, mine: [], others: [], going: {} };
+    el._ga = st;
+    state.ga = st;
     if (!el.innerHTML) el.innerHTML = '<p class="wr-sheet-hint">Lädt …</p>';
     if (!el._gaBound) {
       el._gaBound = true;
-      el.addEventListener("click", groupAssignClick);
+      el.addEventListener("click", function (e) {
+        /* Klick auf dieser Seite: ihren Zustand aktiv setzen */
+        if (el._ga) { state.ga = el._ga; state.gaTarget = el; }
+        groupAssignClick(e);
+      });
     }
-    loadGroupAssign().then(paintGroupAssign, function () { el.innerHTML = '<p class="wr-sheet-hint">Laden ging gerade nicht.</p>'; });
+    loadGroupAssign(st).then(function () { paintGroupAssign(st, el); }, function () { el.innerHTML = '<p class="wr-sheet-hint">Laden ging gerade nicht.</p>'; });
   }
   function openGroupAssign() {
     state.gaTarget = null;
@@ -3396,7 +3403,7 @@
     var days = gaWeekDays();
     state.ga = { group: g, days: days, mine: [], others: [], going: {} };
     openSheet('<p class="wr-sheet-title">Events zuordnen</p><p class="wr-sheet-hint">Lädt …</p>');
-    loadGroupAssign().then(paintGroupAssign, function () {
+    loadGroupAssign().then(function () { paintGroupAssign(); }, function () {
       openSheet('<p class="wr-sheet-title">Events zuordnen</p><p class="wr-sheet-hint">Laden ging gerade nicht.</p>' +
         '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Schließen</button></div>');
     });
@@ -3416,8 +3423,8 @@
     if (usual) return " · " + usual;
     return displayTime(e.starts_at) ? " · " + formatTime(e.starts_at) : "";
   }
-  function loadGroupAssign() {
-    var st = state.ga;
+  function loadGroupAssign(stArg) {
+    var st = stArg || state.ga;
     var sorted = st.days.slice().sort();
     var from = sorted[0] + "T00:00:00" + berlinOffsetSuffix(sorted[0]);
     var to = addDays(sorted[6], 1) + "T00:00:00" + berlinOffsetSuffix(sorted[6]);
@@ -3472,8 +3479,9 @@
       return '<span class="wr-zface" title="' + esc(p.name || "") + '">' + (p.photo ? '<img src="' + esc(p.photo) + '" alt="" />' : esc(String(p.name || "?").slice(0, 1))) + "</span>";
     }).join("") + '<span class="wr-cev-whon">' + esc(ids.map(function (id) { return String(personOf(id).name || "").split(" ")[0]; }).filter(Boolean).join(", ")) + "</span></div>";
   }
-  function paintGroupAssign() {
-    var st = state.ga;
+  function paintGroupAssign(stArg, elArg) {
+    var st = stArg || state.ga;
+    var target = elArg || (stArg ? null : state.gaTarget);
     if (!st) return;
     var gid = String(st.group.id);
     var rows = st.days.map(function (iso) {
@@ -3488,7 +3496,7 @@
         html += '<div class="wr-dayrow wr-zrec-row wr-ga-row' + (inGroup ? " is-zirkel is-group" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++, label) + "</b> " +
           esc(e.title || "Training") + esc(tm) + "</span>" +
           /* zweite Zeile: Ort (zugeordnet heißt nicht „nur in der Gruppe sichtbar“) */
-          (e.location ? '<span class="wr-dayrow__tag">' + esc(e.location) + "</span>" : "") + (inGroup ? gaWho(st, e) : "") + "</div>" +
+          ((e.location || (!inGroup && e.group_id)) ? '<span class="wr-dayrow__tag">' + esc([e.location, !inGroup && e.group_id ? "in " + groupNameOf(e.group_id) : ""].filter(Boolean).join(" · ")) + "</span>" : "") + (inGroup ? gaWho(st, e) : "") + "</div>" +
           (inGroup
             ? '<button type="button" class="wr-dayrow__minus" data-ga-rm="' + esc(e.id) + '" aria-label="Aus der Gruppe nehmen">−</button>'
             : '<button type="button" class="wr-dayrow__minus wr-dayrow__plus" data-ga-add="' + esc(e.id) + '" aria-label="Zur Gruppe hinzufügen">+</button>') +
@@ -3509,8 +3517,8 @@
       return html;
     }).join("");
     var hint = '<button type="button" class="wr-ga-info" data-ga-info="1">Info</button>';
-    if (state.gaTarget) {
-      state.gaTarget.innerHTML = '<h3 class="wr-ga-head">Events der Gruppe</h3>' + hint + '<div class="wr-days wr-days--all">' + rows + "</div>";
+    if (target) {
+      target.innerHTML = '<h3 class="wr-ga-head">Events der Gruppe</h3>' + hint + '<div class="wr-days wr-days--all">' + rows + "</div>";
       return;
     }
     openSheet(
@@ -3521,6 +3529,11 @@
     bindGroupSheet();
   }
   /* Vor + / −: Einheit aus dem Wochenplan zeigen (Tag, Uhrzeit, Übungen), dann bestätigen */
+  /* Name einer meiner Gruppen (für „steckt in …“) */
+  function groupNameOf(gid) {
+    var g = (host && host.myGroups ? host.myGroups() || [] : []).filter(function (x) { return x && String(x.id) === String(gid); })[0];
+    return g ? g.name || "einer anderen Gruppe" : "einer anderen Gruppe";
+  }
   function confirmGroupAssign(kind, id, btn) {
     var st = state.ga;
     var ev = st && st.mine.filter(function (e) { return String(e.id) === id; })[0];
@@ -3530,7 +3543,9 @@
     var head = (ev.title || "Training");
     var job = host && host.exercisesForEvent && ev.category !== "zirkel" ? Promise.resolve(host.exercisesForEvent(ev)).catch(function () { return []; }) : Promise.resolve([]);
     job.then(function (names) {
-      var body = "Jeden " + wd + tm + (kind === "add" ? " mit " + (st.group.name || "Deiner Gruppe") + " teilen." : " nicht mehr mit " + (st.group.name || "Deiner Gruppe") + " teilen.") +
+      /* ein Event gehört zu genau einer Gruppe: Hinzufügen nimmt es aus der bisherigen heraus */
+      var other = kind === "add" && ev.group_id && String(ev.group_id) !== String(st.group.id) ? " Es wechselt aus „" + groupNameOf(ev.group_id) + "“." : "";
+      var body = "Jeden " + wd + tm + (kind === "add" ? " mit " + (st.group.name || "Deiner Gruppe") + " teilen." + other : " nicht mehr mit " + (st.group.name || "Deiner Gruppe") + " teilen.") +
         ((names || []).length ? "\n\n" + names.slice(0, 10).map(function (n) { return "· " + n; }).join("\n") + (names.length > 10 ? "\n· + " + (names.length - 10) + " weitere" : "") : "");
       return GoDialog.confirm(head, { body: body, ok: kind === "add" ? "Zuordnen" : "Herausnehmen", cancel: "Abbrechen", row: true });
     }).then(function (yes) { if (yes) groupAssignDo(kind, id, btn); });
@@ -3538,6 +3553,7 @@
 
   function groupAssignDo(kind, id, btn) {
     var st = state.ga;
+    var tgt = state.gaTarget;
     if (!st) return;
     if (btn) btn.disabled = true;
     var gid = String(st.group.id);
@@ -3583,7 +3599,7 @@
     }
     job.then(function () {
       if (host.toast) host.toast(kind === "add" ? "Mit der Gruppe geteilt" : kind === "rm" ? "Aus der Gruppe genommen" : kind === "yes" ? "Zugesagt" : "Abgesagt");
-      return loadGroupAssign().then(paintGroupAssign);
+      return loadGroupAssign(st).then(function () { paintGroupAssign(st, tgt); });
     }).then(function () {
       /* auf der Gruppen-Seite: Kalender nicht neu zeichnen (er ist nicht sichtbar), nur Aktuell benachrichtigen */
       if (state.gaTarget) return notifyAktuell();
