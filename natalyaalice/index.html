@@ -9012,7 +9012,7 @@
   <script src="/natalyaalice/kraft-tracking.js?v=kt-4"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-8"></script>
   <script src="/natalyaalice/go-story.js?v=gst-11"></script>
-  <script src="/natalyaalice/bubbles.js?v=bub-18"></script>
+  <script src="/natalyaalice/bubbles.js?v=bub-19"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-6"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-8"></script>
   <script src="/natalyaalice/plan-rules.js?v=gpr-1"></script>
@@ -9030,9 +9030,9 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-188"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-189"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
-  <script src="/natalyaalice/woche-reels.js?v=woche-127"></script>
+  <script src="/natalyaalice/woche-reels.js?v=woche-128"></script>
   <script src="/natalyaalice/support.js?v=support-36"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
   <script src="/natalyaalice/coach-group.js?v=gcg-5"></script>
@@ -19058,9 +19058,8 @@
         GoDialog.choose("Hinzufügen:", [
           { label: "Gruppe", value: "group" },
           { label: "Circle", value: "circle" },
-          { label: "Coach", value: "coach" },
-          { label: "Bubble", value: "bubble" }
-        ], { center: true }).then(function (v) {
+          { label: "Coach", value: "coach" }
+        ].concat(window.GoBubbles && !GoBubbles.off ? [{ label: "Bubble", value: "bubble" }] : []), { center: true }).then(function (v) {
           if (!v) return;
           /* erst nach dem Dialog öffnen, sonst schließt derselbe Tipp die neue Seite */
           setTimeout(function () {
@@ -19419,7 +19418,7 @@
           bubList.className = "gbub-rows";
           var bubHint = document.createElement("p");
           bubHint.className = "friend-list__hint";
-          bubHint.textContent = "Deine Gruppe, Deine Circles, Dein Coach und Deine Bubble an einem Ort.";
+          bubHint.textContent = GoBubbles.off ? "Deine Gruppe, Deine Circles und Dein Coach an einem Ort." : "Deine Gruppe, Deine Circles, Dein Coach und Deine Bubble an einem Ort.";
           /* Zeilen für Gruppe und Coach (paintKreiseRows), darunter die Bubbles */
           kreiseRows = document.createElement("div");
           kreiseRows.className = "gbub-rows kreise-rows";
@@ -25492,7 +25491,7 @@
         if (value === "mine") value = "ich";
         if (String(value).indexOf("group:") === 0) value = "gruppe";
         if (value === "tagebuch") value = "alles";
-        var allowed = value === "team" || value === "gruppe" || /^circle(:|$)/.test(String(value)) || value === "bubble" || value === "coach" || value === "alles" ? value : "ich";
+        var allowed = value === "team" || value === "gruppe" || /^circle(:|$)/.test(String(value)) || (value === "bubble" && !(window.GoBubbles && GoBubbles.off)) || value === "coach" || value === "alles" ? value : "ich";
         if (window.HeuteAccountability) {
           HeuteAccountability.setFilter(allowed);
           heuteFilter = allowed;
@@ -30012,7 +30011,7 @@
         else if (storedHeute === "gruppe" || String(storedHeute).indexOf("group:") === 0) heuteFilter = "gruppe";
         else if (storedHeute === "tagebuch") heuteFilter = "alles";
         else if (storedHeute === "circle") heuteFilter = "team";
-        else if (/^circle:/.test(String(storedHeute)) || storedHeute === "coach" || storedHeute === "bubble") heuteFilter = storedHeute;
+        else if (/^circle:/.test(String(storedHeute)) || storedHeute === "coach" || (storedHeute === "bubble" && !(window.GoBubbles && GoBubbles.off))) heuteFilter = storedHeute;
       } catch (eSH) {}
       paintVisibility();
       paintHeuteFilter();

@@ -16,6 +16,8 @@
 (function (global) {
   "use strict";
 
+  /* Geparkt: Bubble-Oberfläche aus, Code und Daten bleiben. Wieder an: window.GO_BUBBLES_OFF = false vor bubbles.js */
+  var OFF = global.GO_BUBBLES_OFF !== false;
   var host = null;
   var bubbles = [];
   var members = [];
@@ -54,6 +56,7 @@
     return members.filter(function (m) { return String(m.account_id) === id; })[0] || null;
   }
   function mine() {
+    if (OFF) return null;
     if (!loaded) return readCache();
     var r = myRow();
     if (!r) return null;
@@ -628,6 +631,7 @@
   /* ---------- Bubble anlegen: Name, Foto, Beschreibung, Orte ---------- */
   /* edit: bestehende Bubble (nur Ersteller, RLS go_bubbles_update) → Formular vorbelegt, Speichern statt Anlegen */
   function openCreate(onDone, edit) {
+    if (OFF) return;
     ensureCss();
     var file = null;
     var wrap = document.createElement("div");
@@ -806,6 +810,7 @@
 
   function renderInto(el) {
     if (!el) return;
+    if (OFF) { el.innerHTML = ""; el.hidden = true; return; }
     ensureCss();
     paint(el);
     if (!el._gbubBound) {
@@ -844,6 +849,7 @@
 
   /* Wallet-Ansicht (Team → Bubbles, Quadrat): paint(items, fill(card, b), open(b)) aus index.html */
   function wallet(paint) {
+    if (OFF) { paint([], function () {}, function () {}); return; }
     function run() {
       var cur = mine();
       var items = bubbles.slice();
@@ -998,7 +1004,9 @@
     load: load,
     mine: mine,
     /* Mitglieder (Konto-IDs) einer Bubble */
+    off: OFF,
     memberIds: function (bid) {
+      if (OFF) return [];
       return members.filter(function (m) { return String(m.bubble_id) === String(bid); }).map(function (m) { return String(m.account_id); });
     },
     renderInto: renderInto,

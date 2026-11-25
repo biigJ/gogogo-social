@@ -112,6 +112,8 @@
     if (/^circle:[^,()\s]+$/.test(String(v || ""))) return String(v);
     /* Tagebuch gibt es im Dropdown nicht mehr → Alles */
     if (v === "tagebuch") return "alles";
+    /* Bubble geparkt (bubbles.js): gespeicherte Bubble-Ansicht → Ich */
+    if (v === "bubble" && global.GoBubbles && GoBubbles.off) return "";
     if (["ich", "team", "gruppe", "circle", "alles", "bubble", "coach", "mycoach"].indexOf(v) >= 0) return v;
     return "";
   }

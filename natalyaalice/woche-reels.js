@@ -1675,7 +1675,7 @@
       goingAvatarsHtml(ev) +
       inviteAvatarsHtml(iso) +
       "</div>" +
-      '<p class="wr-when">' + (ev.bubble_id && global.GoBubbles ? '<span class="wr-when__bub" title="Bubble">' + GoBubbles.SOAP_SVG + "</span>" : "") +
+      '<p class="wr-when">' + (ev.bubble_id && global.GoBubbles && !GoBubbles.off ? '<span class="wr-when__bub" title="Bubble">' + GoBubbles.SOAP_SVG + "</span>" : "") +
         esc([dayWord(iso, item._once), when, place].filter(Boolean).join(" · ")) + "</p>" +
       /* Countdown und „Start anhalten“ nebeneinander als gleiche Pillen */
       (cd || zirkelAdminHtml(ev, zSet, iso) ? '<div class="wr-zrow">' + cd + zirkelAdminHtml(ev, zSet, iso) + "</div>" : "") +
