@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-25-coach-details",
+      at: "2026-11-25T13:00:00Z",
+      text: "Unter Community → Mein Coach zeigt „Details & Auswahl“ Über mich, Sterne und Bewertungen. Wisch zur Seite, um andere Coaches mit blauem c anzusehen."
+    },
+    {
       key: "news:2026-11-25-circle-seite",
       at: "2026-11-25T12:00:00Z",
       text: "Circles unter Community → Kreise sind neu aufgebaut: Beschreibung, Mitglieder, Stempelkarte und die Zirkeltrainings der nächsten 7 Tage. Mit + übernimmst Du einen Termin in Deine Woche."
