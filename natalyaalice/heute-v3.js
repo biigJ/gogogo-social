@@ -2213,6 +2213,27 @@
     );
   }
 
+  /* Status unten links (symmetrisch zu den drei Punkten): erledigt, verspätet, dabei, bald, heute, morgen */
+  function statusOf(o) {
+    if (!o) return "";
+    if (o.done) return "erledigt";
+    if (!o.ts) return "";
+    var t = new Date(o.ts).getTime();
+    if (isNaN(t)) return "";
+    var day = dayKey(o.ts), today = todayIso();
+    if (day < today) return "";
+    var timed = hasTime({ starts_at: o.ts });
+    if (day === today && timed && t <= Date.now()) return "verspätet";
+    if (o.going) return "dabei";
+    if (day === today) return timed && t - Date.now() <= 60 * 60000 ? "bald" : "heute";
+    var tm = new Date(today + "T12:00:00Z"); tm.setUTCDate(tm.getUTCDate() + 1);
+    if (day === tm.toISOString().slice(0, 10)) return "morgen";
+    return "";
+  }
+  function statusHtml(st) {
+    return st ? '<span class="acc-card__status is-' + (st === "verspätet" ? "late" : st === "erledigt" ? "done" : "open") + '">' + esc(st) + "</span>" : "";
+  }
+
   function mediaHtml(opts) {
     var tone = toneClass(opts.category);
     return (
@@ -2224,6 +2245,7 @@
       mediaInnerHtml(opts) +
       overlayHtml(opts) +
       /* eigene Events: drei weiße Punkte unten rechts → Sichtbarkeit (nur an aufgeklappten Karten sichtbar) */
+      statusHtml(opts.status) +
       (opts.visDots ? '<button type="button" class="acc-card__visdots" data-vis-ev="' + esc(opts.visDots) + '" aria-label="Sichtbarkeit ändern"><i></i><i></i><i></i></button>' : "") +
       "</div>"
     );
@@ -2498,6 +2520,8 @@
       eventId: String(ev.id),
       /* ••• : eigene Events immer, Freunde bei erledigten (Verkleinern) */
       visDots: (mine || ev.status === "erledigt") && /^[0-9a-f-]{36}$/i.test(String(ev.id)) ? String(ev.id) : "",
+      /* laufender Zirkel hat eigene Pillen (Countdown/läuft) */
+      status: zirkelPillsHtml(ev) && ev.status !== "erledigt" ? "" : statusOf({ done: ev.status === "erledigt", ts: ev.starts_at, going: !mine && (acceptedInv || iAmGoing(ev.id)) }),
       inviteIso: day,
       ownerId: String(ev.user_id || ""),
       canInvite: !mine
@@ -2538,6 +2562,7 @@
       title: "🔥 " + (ev.title || "Zirkeltraining"),
       place: ev.location || "",
       desc: "",
+      status: statusOf({ ts: ev.starts_at, going: !mine && going }),
       postId: postId,
       inviteIso: dayKey(ev.starts_at),
       canInvite: mine ? canInviteOnDay(dayKey(ev.starts_at)) : false
@@ -2573,6 +2598,7 @@
       actions: "",
       author: authorHtml(authorPerson, !post.is_me),
       when: when,
+      status: "erledigt",
       title: "🔥 " + (post.caption || "Zirkeltraining"),
       place: "",
       desc: "",
@@ -2604,6 +2630,7 @@
       actions: "",
       author: authorHtml(p, !mine),
       when: whenLine(item.starts_at),
+      status: "erledigt",
       whenTs: item.starts_at,
       title: title,
       place: item.location || "",
@@ -2649,6 +2676,7 @@
       actions: tools,
       author: "",
       when: item.when || whenLine(item.starts_at),
+      status: statusOf({ ts: item.starts_at || (item.iso ? item.iso + "T12:00:00Z" : "") }),
       whenTs: item.when ? "" : item.starts_at,
       title: title,
       place: item.location || "",
@@ -3188,6 +3216,7 @@
       emoji: emojiFor(cat, label),
       author: authorHtml(personOf(me()), true),
       when: whenLine(at),
+      status: statusOf({ ts: at, going: true }),
       title: (emojiFor(cat, label) + " " + label).trim(),
       place: (inv.place ? inv.place + " · " : "") + "mit " + String(owner.name || "Freund").split(" ")[0],
       actions:
@@ -3255,6 +3284,7 @@
       author: authorHtml(personOf(me()), false),
       when: whenLine(item.starts_at) + " · privat",
       whenTs: item.starts_at,
+      status: statusOf({ ts: item.starts_at }),
       title: item.title || "Support",
       place: item.location || "",
       desc: descHtml(item.note),
