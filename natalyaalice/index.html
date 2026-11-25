@@ -22451,6 +22451,11 @@
           var at = berlinAt(day, String(t).padStart(5, "0"));
           rest("events?id=eq." + encodeURIComponent(ev.id) + "&user_id=eq." + encodeURIComponent(sessionAccount.id), { method: "PATCH", prefer: "return=minimal", body: { starts_at: at } })
             .then(function () { return circleFfcDelete(ev.starts_at).then(function () { return circleFfcCopy(g, at, ev.location); }); })
+            .then(function () {
+              /* Kommentar unter dem Event und Nachricht an Zusagen und Kommentierende */
+              if (window.HeuteAccountability && HeuteAccountability.notifyChange)
+                HeuteAccountability.notifyChange(ev, "Startzeit geändert: " + (ev.title || "Zirkeltraining") + " " + circleDayLabel(at) + " jetzt um " + t + " statt " + cur + " Uhr.");
+            })
             .then(function () { gogogoToast("Uhrzeit gespeichert"); done(); })
             .catch(function () { gogogoToast("Ging gerade nicht"); });
         });
@@ -22467,6 +22472,10 @@
         }).then(function (name) {
           if (!name) return;
           rest("events?id=eq." + encodeURIComponent(ev.id) + "&user_id=eq." + encodeURIComponent(sessionAccount.id), { method: "PATCH", prefer: "return=minimal", body: { location: String(name).slice(0, 80) } })
+            .then(function () {
+              if (window.HeuteAccountability && HeuteAccountability.notifyChange)
+                HeuteAccountability.notifyChange(ev, "Ort geändert: " + (ev.title || "Zirkeltraining") + " " + circleDayLabel(ev.starts_at, true) + " jetzt " + String(name).slice(0, 80) + (ev.location ? " statt " + ev.location : "") + ".");
+            })
             .then(function () { gogogoToast("Ort gespeichert"); done(); })
             .catch(function () { gogogoToast("Ging gerade nicht"); });
         });

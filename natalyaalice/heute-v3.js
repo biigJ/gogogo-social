@@ -5400,24 +5400,10 @@
       var iso = berlinIsoAt(evDayIso(ev), t);
       if (!iso) return;
       var eid = String(ev.id);
-      var who = (state.rsvps[eid] || []).map(String);
-      var inv = rest("go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&event_id=eq." + encodeURIComponent(eid) +
-        "&status=in.(pending,accepted)&select=to_id").catch(function () { return []; });
       return rest("events?id=eq." + encodeURIComponent(eid), { method: "PATCH", prefer: "return=minimal", body: { starts_at: iso } })
         .then(function () {
           ev.starts_at = iso;
-          return inv;
-        })
-        .then(function (rows) {
-          (rows || []).forEach(function (r) { if (r && r.to_id) who.push(String(r.to_id)); });
-          var seen = {};
-          who = who.filter(function (id) { if (!id || id === me() || seen[id]) return false; seen[id] = true; return true; });
-          if (!who.length) return 0;
-          return rest("go_aktuell_posts", {
-            method: "POST", prefer: "return=minimal",
-            body: { author_id: me(), audience: "team", audience_id: eid, recipients: who,
-              body: "Neue Startzeit: " + (ev.title || "Training") + " um " + t + " statt " + old + " Uhr." }
-          }).then(function () { return who.length; }, function () { return -1; });
+          return notifyChange(ev, "Startzeit geändert: " + (ev.title || "Training") + " jetzt um " + t + " statt " + old + " Uhr.");
         })
         .then(function (n) {
           try { if (global.WocheReels && WocheReels.refresh) WocheReels.refresh(); } catch (e2) {}
@@ -5430,7 +5416,30 @@
     });
   }
 
-  /* Ort ändern: nur dieser Termin; Eingeladene bekommen eine Nachricht */
+  /* Startzeit/Ort geändert: Kommentar unter dem Event (sehen alle, die die Karte sehen) und Nachricht an
+     Zusagen, Eingeladene und alle, die unter dem Event kommentiert haben (Herz + „Neue Nachricht“). Liefert die Anzahl. */
+  function notifyChange(ev, text) {
+    var eid = String(ev.id);
+    var who = (state.rsvps[eid] || []).map(String);
+    var cmt = rest("event_comments", { method: "POST", prefer: "return=minimal", body: { event_id: eid, account_id: me(), text: text } }).catch(function () {});
+    var inv = rest("go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&event_id=eq." + encodeURIComponent(eid) +
+      "&status=in.(pending,accepted)&select=to_id").catch(function () { return []; });
+    var cm = rest("event_comments?event_id=eq." + encodeURIComponent(eid) + "&account_id=neq." + encodeURIComponent(me()) + "&select=account_id&limit=200")
+      .catch(function () { return []; });
+    return Promise.all([inv, cm, cmt]).then(function (r) {
+      (r[0] || []).forEach(function (x) { if (x && x.to_id) who.push(String(x.to_id)); });
+      (r[1] || []).forEach(function (x) { if (x && x.account_id) who.push(String(x.account_id)); });
+      var seen = {};
+      who = who.filter(function (id) { if (!id || id === me() || seen[id]) return false; seen[id] = true; return true; });
+      if (!who.length) return 0;
+      return rest("go_aktuell_posts", {
+        method: "POST", prefer: "return=minimal",
+        body: { author_id: me(), audience: "team", audience_id: eid, recipients: who, body: text }
+      }).then(function () { return who.length; }, function () { return -1; });
+    });
+  }
+
+  /* Ort ändern: nur dieser Termin; Kommentar und Nachricht über notifyChange */
   function changePlace(ev) {
     return host.pickPlace("Ort ändern").then(function (place) {
       if (!place || place === ev.location) return;
@@ -5438,18 +5447,7 @@
       return rest("events?id=eq." + encodeURIComponent(eid), { method: "PATCH", prefer: "return=minimal", body: { location: place } })
         .then(function () {
           ev.location = place;
-          return rest("go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&event_id=eq." + encodeURIComponent(eid) +
-            "&status=in.(pending,accepted)&select=to_id").catch(function () { return []; });
-        })
-        .then(function (rows) {
-          var seen = {}, who = [];
-          (rows || []).forEach(function (r) { var id = r && String(r.to_id); if (id && id !== me() && !seen[id]) { seen[id] = true; who.push(id); } });
-          if (!who.length) return 0;
-          return rest("go_aktuell_posts", {
-            method: "POST", prefer: "return=minimal",
-            body: { author_id: me(), audience: "team", audience_id: eid, recipients: who,
-              body: "Neuer Ort: " + (ev.title || "Training") + " jetzt " + place + (old ? " statt " + old : "") + "." }
-          }).then(function () { return who.length; }, function () { return -1; });
+          return notifyChange(ev, "Ort geändert: " + (ev.title || "Training") + " jetzt " + place + (old ? " statt " + old : "") + ".");
         })
         .then(function (n) {
           try { if (global.WocheReels && WocheReels.refresh) WocheReels.refresh(); } catch (e2) {}
@@ -6508,6 +6506,7 @@
   }
 
   global.HeuteAccountability = {
+    notifyChange: function (ev, text) { return ev && ev.id ? notifyChange(ev, text).catch(function () { return 0; }) : Promise.resolve(0); },
     install: install,
     refresh: refresh,
     openDone: openDoneModal,
