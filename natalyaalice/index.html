@@ -10115,11 +10115,31 @@
         var b = document.getElementById("log-vis");
         if (b) { b.textContent = logVis === "privat" ? "privat" : "zeigen"; b.classList.toggle("is-on", logVis !== "privat"); }
       }
+      var lastDoneEventId = "";
+      /* Foto aus dem Abschluss-Dialog ans erledigte Event: erstes wird Titelbild, weitere in photos (bis 5) */
+      function attachDonePhoto(url) {
+        var id = lastDoneEventId;
+        if (!sessionMode || !id || !url || !/^https?:/.test(url)) return Promise.resolve(false);
+        return rest("events?id=eq." + encodeURIComponent(id) + "&select=photo_url,photos").then(function (rows) {
+          var ev = (rows || [])[0];
+          if (!ev) return false;
+          var photos = ev.photos || [];
+          if ((ev.photo_url ? 1 : 0) + photos.length >= 5) return false;
+          var body = ev.photo_url ? { photos: photos.concat([url]) } : { photo_url: url };
+          return rest("events?id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(sessionAccount.id), { method: "PATCH", prefer: "return=minimal", body: body });
+        }).then(function (ok) {
+          if (ok === false) return false;
+          try { if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh(); } catch (eH) {}
+          gogogoToast("Foto am Event gespeichert");
+          return true;
+        }).catch(function () { gogogoToast("Foto ans Event ging nicht"); return false; });
+      }
       /* Trainingsplan: Workout machen, dann "Fertig" → Tag im Tagebuch + geplantes Event erledigt */
       function finishWorkoutNow() {
         var btn = document.getElementById("finish-workout");
         var label = String((document.getElementById("workout-title") || {}).textContent || "Training").trim();
         btn.disabled = true;
+        lastDoneEventId = "";
         celebratedDate = date;
         finishWheel();
         markDiaryMove(date, label);
@@ -10156,6 +10176,8 @@
             rows = rows || [];
             var hit = rows.filter(function (r) { return String(r.title || "").trim() === label; })[0] || rows[0];
             if (!hit) return;
+            /* „Foto machen“ im Abschluss-Dialog hängt das Foto an dieses Event (Kachel und Aktuell) */
+            lastDoneEventId = String(hit.id);
             return rest("events?id=eq." + encodeURIComponent(hit.id), {
               method: "PATCH",
               prefer: "return=minimal",
@@ -11823,9 +11845,10 @@
         return map;
       }
 
-      function storeWorkoutPhoto(file, iso) {
+      function storeWorkoutPhoto(file, iso, onUrl) {
         var when = iso || date;
         compressPhoto(file, function (url) {
+          if (onUrl) { try { onUrl(url); } catch (eU) {} }
           var map = workoutPhotoMap();
           map[when] = url;
           writeStore(HOME_PHOTOS, map);
@@ -25005,7 +25028,7 @@
         var file = event.target.files && event.target.files[0];
         event.target.value = "";
         if (!file) return;
-        storeWorkoutPhoto(file, date);
+        storeWorkoutPhoto(file, date, attachDonePhoto);
         closeDone(true);
       });
       document.getElementById("diary-photo-file").addEventListener("change", function (event) {
