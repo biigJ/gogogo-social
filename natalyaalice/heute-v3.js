@@ -4178,6 +4178,9 @@
       if (iAmGoing(eventId)) toggleRsvp(eventId);
       return;
     }
+    /* Sicherung: Termine aus dem Wochenplan (Serie) werden nie gelöscht */
+    var evDel = (state.events || []).filter(function (e) { return String(e.id) === String(eventId); })[0];
+    if (!evDel || evDel.enrollment_id || String(evDel.user_id) !== me()) { if (host.toast) host.toast("Events werden nicht gelöscht."); return; }
     rest("events?id=eq." + encodeURIComponent(eventId), { method: "DELETE", prefer: "return=minimal" })
       .then(function () {
         state.events = (state.events || []).filter(function (e) {
@@ -5245,8 +5248,8 @@
     if (past && eventPhotoCount(ev) < MAX_EVENT_PHOTOS) acts.push({ label: "Foto hinzufügen", value: "__photo" });
     if (past && evDayIso(ev) === todayIso()) acts.push({ label: "Training wieder aufnehmen", value: "__reopen" });
     if (past) acts.push({ label: compactPast() ? "Vergrößern" : "Verkleinern", value: "__compact" });
-    GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, select: true, extra: "Löschen", actions: acts }).then(function (v) {
-      if (v === "__extra") { removeEvent(id, "delete"); return; }
+    /* kein „Löschen“ mehr: Events werden nicht gelöscht (Serie aus dem Wochenplan, Kommentare, Zusagen hängen daran) */
+    GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, select: true, actions: acts }).then(function (v) {
       if (v === "__compact") { setCompact(!compactPast()); return; }
       if (v === "__photo") { addEventPhoto(ev); return; }
       if (v === "__reopen") { reopenEvent(ev); return; }
