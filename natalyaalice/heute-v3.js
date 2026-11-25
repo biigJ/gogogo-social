@@ -3155,7 +3155,16 @@
       else history.push(it);
     });
     /* Heute wie der ganze Feed: oben später, unten früher (Events nach Startzeit, Nachrichten nach Sendezeit) */
+    /* Heute: offene Events zuerst (Mitte des Feeds, direkt unter „kommend“), Erledigtes und Nachrichten darunter.
+       Vorher nach Startzeit: ein Event ohne Uhrzeit (12:00 UTC) rutschte unter die erledigten von heute */
+    /* 0 = eigenes offenes Event (wird zentriert, currentEventCard), 1 = andere offene, 2 = Rest */
+    var openToday = function (it) {
+      var open = it && ((it.ev && it.ev.status === "geplant" && it.kind !== "bubble_msg") || it.kind === "inv");
+      return !open ? 2 : it._mine ? 0 : 1;
+    };
     myToday.sort(function (a, b) {
+      var o = openToday(a) - openToday(b);
+      if (o) return o;
       var c = String(b.starts_at).localeCompare(String(a.starts_at));
       if (c) return c;
       return sortOwnFirst(a, b);
