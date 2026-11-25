@@ -2972,14 +2972,21 @@
     if (!card) return;
     card.classList.add("wr-sheet__card--days");
     card.querySelectorAll("[data-wr-zmini]").forEach(function (w) {
-      w.scrollTop = (Number(w.getAttribute("data-idx")) || 0) * 36;
+      var id = w.getAttribute("data-wr-zmini");
+      /* dieselbe Liste wie beim Zeichnen (vorher: Liste der Originalzeit → Versatz) */
+      var o = timeOptsFor(ze.times[id]);
+      var want = (Number(w.getAttribute("data-idx")) || 0) * 36;
+      /* Position erst nach dem Layout setzen: nach „Format anpassen → Zurück“ blieb das Rad sonst auf 0 (–:–) stehen */
+      var settling = true;
+      var place = function () { w.scrollTop = want; };
+      place();
+      requestAnimationFrame(function () { place(); requestAnimationFrame(function () { place(); settling = false; }); });
       var tm = null;
       w.addEventListener("scroll", function () {
+        if (settling) return;
         clearTimeout(tm);
         tm = setTimeout(function () {
           if (!state.zEdit) return;
-          var id = w.getAttribute("data-wr-zmini");
-          var o = timeOptsFor(state.zEdit.orig[id]);
           state.zEdit.times[id] = o[Math.max(0, Math.min(o.length - 1, Math.round(w.scrollTop / 36)))];
         }, 80);
       }, { passive: true });
@@ -3656,14 +3663,19 @@
     /* Räder auf den Wert stellen und Scroll lesen */
     card.querySelectorAll("[data-wr-mini]").forEach(function (w) {
       var idx = Number(w.getAttribute("data-idx")) || 0;
-      w.scrollTop = idx * 36;
+      var o = timeOptsFor(state.daysEdit && state.daysEdit.times[w.getAttribute("data-wr-mini")]);
+      /* wie im Zirkel-Editor: Position nach dem Layout setzen, solange nicht als Eingabe werten */
+      var settling = true;
+      var place = function () { w.scrollTop = idx * 36; };
+      place();
+      requestAnimationFrame(function () { place(); requestAnimationFrame(function () { place(); settling = false; }); });
       var tm = null;
       w.addEventListener("scroll", function () {
+        if (settling) return;
         clearTimeout(tm);
         tm = setTimeout(function () {
           var id = w.getAttribute("data-wr-mini");
           if (!state.daysEdit) return;
-          var o = timeOptsFor(state.daysEdit.orig[id]);
           var n = Math.max(0, Math.min(o.length - 1, Math.round(w.scrollTop / 36)));
           if (state.daysEdit.times[id] !== o[n]) { state.daysEdit.times[id] = o[n]; markDaysDirty(); }
         }, 80);
@@ -4493,12 +4505,20 @@
        und body.wr-sheet-open blendet die Pill weiter aus */
     var oldSheet = $("wr-sheet");
     var keepSheet = oldSheet && !oldSheet.hidden ? oldSheet : null;
-    if (keepSheet) keepSheet.remove();
+    /* Umhängen setzt alle Scroll-Positionen im Sheet auf 0 (Uhrzeit-Räder sprangen auf –:–): merken und zurücksetzen */
+    var keepScroll = [];
+    if (keepSheet) {
+      [keepSheet].concat(Array.prototype.slice.call(keepSheet.querySelectorAll("*"))).forEach(function (el) {
+        if (el.scrollTop || el.scrollLeft) keepScroll.push([el, el.scrollTop, el.scrollLeft]);
+      });
+      keepSheet.remove();
+    }
     root.innerHTML = nextHtml;
     root.__wrHtml = nextHtml;
     if (keepSheet) {
       var freshSheet = $("wr-sheet");
       if (freshSheet) freshSheet.replaceWith(keepSheet);
+      keepScroll.forEach(function (k) { k[0].scrollTop = k[1]; k[0].scrollLeft = k[2]; });
     } else {
       document.body.classList.remove("wr-sheet-open");
     }
@@ -4527,7 +4547,52 @@
     document.body.classList.add("wr-sheet-open");
   }
 
+  /* Stift in Woche: Auswahl „Deine Woche“. Sheets daraus kehren mit „Verlassen“ hierher zurück (state.menuBack) */
+  function openDeineWoche() {
+      var activeEn = (state.enrollments || []).filter(function (en) { return en && en.status === "aktiv"; });
+      var hasPlan = activeEn.length > 0;
+      {
+        var planNames = activeEn.map(function (en) { return en.courses && en.courses.title; })
+          .filter(function (tt) { return tt && !/^zirkeltraining$/i.test(tt); });
+        var zDays = zirkelWeekdaysAhead();
+        var items = hasPlan
+          ? [{ label: "Wochenplan ändern", value: "plan" }, { label: "Tage bearbeiten", value: "days" }]
+          : [{ label: "Wochenplan wählen", value: "plan" }];
+        items.push({ info: "Zirkeltraining am: " + (zDays.length ? zDays.join(", ") : "–") });
+        items.push({ label: "Zirkeltrainings eintragen", value: "zrec" });
+        items.push({ label: "Zirkeltrainings bearbeiten", value: "zedit" });
+        /* Gruppen-Events ordnet man unter Community → Gruppe → „Events zuordnen“ zu */
+        /* früher rechts am Bild: Einladen, Extern teilen, ics */
+        var curIt = currentItem();
+        var curEv = curIt && curIt.ev && !curIt.ev._pt && curIt.kind !== "ffc" ? curIt.ev : null;
+        if (curEv) {
+          items.push({ label: "Einladen", value: "share" });
+          items.push({ label: "Extern teilen", value: "plane" });
+        }
+        items.push({ label: "Kalender exportieren (ics)", value: "ics" });
+        GoDialog.choose("Deine Woche", items, {
+          center: true,
+          sub: planNames.length ? planNames.join(" · ") : "Kein Wochenplan"
+        }).then(function (v) {
+          /* erst nach dem Dialog-Klick öffnen, sonst schließt derselbe Klick das neue Sheet wieder */
+          setTimeout(function () {
+            if (v === "plan") openPlanPicker();
+            if (v === "days") { state.daysSaved = false; openDaysEditor(); state.menuBack = true; }
+            /* Mitglieder: vorher fragen, ob sie lieber das nächste Zirkeltraining ihres Circles übernehmen */
+            if (v === "zrec") { if (global.GoCircle && GoCircle.askBeforeOwn) GoCircle.askBeforeOwn(function () { openZirkelRecurring(); state.menuBack = true; }); else { openZirkelRecurring(); state.menuBack = true; } }
+            if (v === "zedit") { openZirkelEditor(); state.menuBack = true; }
+            if (v === "gev") openGroupEventsPick();
+            if (v === "gextra") openGroupExtras();
+            if (v === "share" && curEv) openShareSheet(dayKey(curEv.starts_at), String(curEv.id));
+            if (v === "plane" && curEv) shareExternal(dayKey(curEv.starts_at), String(curEv.id));
+            if (v === "ics") exportWeekIcs();
+          }, 0);
+        });
+      }
+  }
+
   function closeSheet() {
+    state.menuBack = false;
     var sheet = $("wr-sheet");
     /* abgebrochenes „+ Gruppen-Event“: nächstes normales Anlegen ist wieder privat/Team */
     state.groupExtraNext = null;
@@ -6135,7 +6200,10 @@
       return;
     }
     if (t.getAttribute("data-wr-sheet-close")) {
+      /* aus „Deine Woche“ geöffnet: eine Ebene zurück in die Auswahl */
+      var backToMenu = !!state.menuBack;
       closeSheet();
+      if (backToMenu && global.GoDialog) setTimeout(openDeineWoche, 0);
       return;
     }
     if (t.getAttribute("data-wr-zmode")) {
@@ -6294,47 +6362,7 @@
         render();
         return;
       }
-      var activeEn = (state.enrollments || []).filter(function (en) { return en && en.status === "aktiv"; });
-      var hasPlan = activeEn.length > 0;
-      if (global.GoDialog) {
-        var planNames = activeEn.map(function (en) { return en.courses && en.courses.title; })
-          .filter(function (tt) { return tt && !/^zirkeltraining$/i.test(tt); });
-        var zDays = zirkelWeekdaysAhead();
-        var items = hasPlan
-          ? [{ label: "Wochenplan ändern", value: "plan" }, { label: "Tage bearbeiten", value: "days" }]
-          : [{ label: "Wochenplan wählen", value: "plan" }];
-        items.push({ info: "Zirkeltraining am: " + (zDays.length ? zDays.join(", ") : "–") });
-        items.push({ label: "Zirkeltrainings eintragen", value: "zrec" });
-        items.push({ label: "Zirkeltrainings bearbeiten", value: "zedit" });
-        /* Gruppen-Events ordnet man unter Community → Gruppe → „Events zuordnen“ zu */
-        /* früher rechts am Bild: Einladen, Extern teilen, ics */
-        var curIt = currentItem();
-        var curEv = curIt && curIt.ev && !curIt.ev._pt && curIt.kind !== "ffc" ? curIt.ev : null;
-        if (curEv) {
-          items.push({ label: "Einladen", value: "share" });
-          items.push({ label: "Extern teilen", value: "plane" });
-        }
-        items.push({ label: "Kalender exportieren (ics)", value: "ics" });
-        GoDialog.choose("Deine Woche", items, {
-          center: true,
-          sub: planNames.length ? planNames.join(" · ") : "Kein Wochenplan"
-        }).then(function (v) {
-          /* erst nach dem Dialog-Klick öffnen, sonst schließt derselbe Klick das neue Sheet wieder */
-          setTimeout(function () {
-            if (v === "plan") openPlanPicker();
-            if (v === "days") { state.daysSaved = false; openDaysEditor(); }
-            /* Mitglieder: vorher fragen, ob sie lieber das nächste Zirkeltraining ihres Circles übernehmen */
-            if (v === "zrec") { if (global.GoCircle && GoCircle.askBeforeOwn) GoCircle.askBeforeOwn(openZirkelRecurring); else openZirkelRecurring(); }
-            if (v === "zedit") openZirkelEditor();
-            if (v === "gev") openGroupEventsPick();
-            if (v === "gextra") openGroupExtras();
-            if (v === "share" && curEv) openShareSheet(dayKey(curEv.starts_at), String(curEv.id));
-            if (v === "plane" && curEv) shareExternal(dayKey(curEv.starts_at), String(curEv.id));
-            if (v === "ics") exportWeekIcs();
-          }, 0);
-        });
-        return;
-      }
+      if (global.GoDialog) { openDeineWoche(); return; }
       openPlanPicker();
       return;
     }
