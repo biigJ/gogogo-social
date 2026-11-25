@@ -30,6 +30,7 @@
         E8E2D6: "F6D7E8", D8D0C4: "E7BCD6", ECECEB: "F6E4EE",
         "2A2118": "2B0B3F", "1A1510": "1A0628", "6B6358": "7A4E8C", D93A3A: "E0187A"
       },
+      tag: { bg: "#E0187A", ink: "#FFFFFF" },
       rgb: {
         "199,65,59": "224,24,122", "165,51,46": "176,16,94", "247,245,240": "255,246,251",
         "246,241,232": "255,240,245", "243,238,228": "253,232,241",
@@ -58,6 +59,7 @@
         "42,33,24": "55,58,54", "20,16,12": "35,37,31", "52,34,32": "55,58,54"
       },
       cta: { bg: "#FBD872", ink: "#373A36" },
+      tag: { bg: "#236192", ink: "#FFFFFF" },
       /* Leiste unten: Outer Reef mit weißer Schrift */
       extra: ".app-pill nav{background:#236192 !important;color:#fff}.app-pill .pill-dot{background:#E1523E !important}"
     },
@@ -84,6 +86,7 @@
         "42,33,24": "242,242,242", "52,34,32": "242,242,242", "20,16,12": "0,0,0"
       },
       cta: { bg: "#FFFFFF", ink: "#000000" },
+      tag: { bg: "#000000", ink: "#FFFFFF", ring: "#FFFFFF" },
       /* Harte Kontraste: Weiß auf Schwarz, Schwarz auf Weiß (feste #fff/#111-Flächen der Module) */
       extra:
         "input:not([type=checkbox]):not([type=radio]):not([type=range]),select:not(#heute-filter-select),textarea,.gpl__select,.god__input{background-color:#000 !important;color:#fff !important;border-color:rgba(255,255,255,.7) !important}" +
@@ -154,7 +157,8 @@
         "246,241,232": "245,237,232", "243,238,228": "243,236,231",
         "42,33,24": "52,54,43", "52,34,32": "52,54,43", "20,16,12": "35,36,28"
       },
-      cta: { bg: "#B04A2F", ink: "#FFFFFF" }
+      cta: { bg: "#B04A2F", ink: "#FFFFFF" },
+      tag: { bg: "#B04A2F", ink: "#FFFFFF" }
     },
     postmodern: {
       label: "Postmodern",
@@ -179,6 +183,7 @@
         "42,33,24": "42,42,42", "52,34,32": "42,42,42", "20,16,12": "26,26,26"
       },
       cta: { bg: "#FFD700", ink: "#2A2A2A" },
+      tag: { bg: "#00CED1", ink: "#FFD700" },
       /* Leiste Pink mit gelber Schrift, Tag-Leiste Woche hell Türkis, Kreise ohne Foto Pink, Rahmen der Event-Karten Koralle */
       extra: ".app-pill nav{background:#FF1493 !important;color:#FFD700 !important}.app-pill nav *{color:#FFD700 !important}.app-pill .pill-dot{background:#FFD700 !important}" +
         ".wr-dsq:not(#_){background:#D5F7F3 !important;color:#2A2A2A !important;border-color:#40E0D0 !important;text-shadow:none !important}" +
@@ -214,6 +219,7 @@
       "42,33,24": "244,244,245", "52,34,32": "244,244,245", "20,16,12": "0,0,0"
     },
     cta: { bg: "#00D68F", ink: "#121214" },
+    tag: { bg: "#FF4F9A", ink: "#121214" },
     /* Dunkle Flächen und Kontraste wie B/W, gefüllte Knöpfe in Pink statt Weiß */
     extra: THEMES.bw.extra
       .replace(/background:#fff !important;color:#000 !important/g, "background:#FF4F9A !important;color:#121214 !important")
@@ -247,6 +253,7 @@
       "42,33,24": "17,17,17", "52,34,32": "17,17,17", "20,16,12": "0,0,0"
     },
     cta: { bg: "#111111", ink: "#FFFFFF" },
+    tag: { bg: "#111111", ink: "#FFFFFF" },
     extra: ".app-pill nav{background:#fff !important;color:#111 !important;box-shadow:0 0 0 1px #111 !important}.app-pill .pill-dot{background:#111 !important}" +
       ".app-pill nav,.app-pill nav *,.wr-dsq:not(#_),.go-tile__pill,.cp-pill,.gcr-pill{font-family:Inter,system-ui,sans-serif !important;letter-spacing:.03em}" +
       ".acc-card__media,.acc-card.is-wallet,.acc-card.is-wallet .acc-card__media,.gxl__pin,.go-slide__art{border-radius:0 !important}" +
@@ -364,6 +371,8 @@
   function paintExtra() {
     var t = THEMES[current] || {};
     var css = "";
+    /* Etikett oben auf den Karten (Kreise, Bubbles: „Meine Gruppe“, „Coach-Gruppe“ …) */
+    if (t.tag) css += ".gbub-card__me:not(.is-leave):not(#_){background:" + t.tag.bg + " !important;color:" + t.tag.ink + " !important;box-shadow:" + (t.tag.ring ? "0 0 0 1px " + t.tag.ring : "none") + " !important}";
     if (t.cta) css += CTA_SEL + "{background:" + t.cta.bg + " !important;color:" + t.cta.ink + " !important;border-color:" + t.cta.bg + " !important}";
     if (t.dark) {
       css +=
