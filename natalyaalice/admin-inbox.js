@@ -2123,8 +2123,8 @@
       }).join("") +
       '<p class="ga-h3">Lesen</p>' +
       '<p class="ga-logrow"><span><b>Zeitraum</b></span><span>gilt für Sitzungen, Zeit, Aktionen und Feedback. Labels und die Spalten mit „30 T“ immer letzte 30 Tage.</span></p>' +
-      '<p class="ga-logrow"><span><b>Zeit</b></span><span>nur aktive Zeit, solange die App sichtbar ist. Nach 30 min im Hintergrund neue Sitzung.</span></p>' +
-      '<p class="ga-logrow"><span><b>Aktionen</b></span><span>angetippte Funktionen ohne Pille und Start.</span></p>' +
+      '<p class="ga-logrow"><span><b>Zeit</b></span><span>nur aktive Zeit, solange die App sichtbar ist, ohne Admin. Nach 30 min im Hintergrund neue Sitzung.</span></p>' +
+      '<p class="ga-logrow"><span><b>Aktionen</b></span><span>angetippte Funktionen ohne Pille, Start und Admin. Top-Sektion: meiste Tipps außerhalb von Admin.</span></p>' +
       '<p class="ga-logrow"><span><b>Feedback</b></span><span>Dialog jede 20. Sitzung.</span></p>' +
       '<p class="ga-logrow"><span><b>Zeile</b></span><span>antippen: Logs der Person.</span></p>' +
       '<div class="ga-info__btns"><button type="button" class="is-quiet" data-gi-close="1">Schließen</button></div></div>';
