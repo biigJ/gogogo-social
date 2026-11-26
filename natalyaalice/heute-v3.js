@@ -2286,6 +2286,7 @@
       overlayHtml(opts) +
       /* eigene Events: drei weiße Punkte unten rechts → Sichtbarkeit (nur an aufgeklappten Karten sichtbar) */
       statusHtml(opts.status) +
+      (opts.mediaExtra || "") +
       (opts.visDots ? '<button type="button" class="acc-card__visdots" data-vis-ev="' + esc(opts.visDots) + '" aria-label="Sichtbarkeit ändern"><i></i><i></i><i></i></button>' : "") +
       "</div>"
     );
@@ -2489,12 +2490,11 @@
     var actions = "";
     var invite = !mine ? inviteFor(ev.id) : null;
     var acceptedInv = upcoming && !mine && invite && invite.status === "accepted";
+    /* offene Einladung: „Teilnehmen“ mittig unten auf dem Bild, Brief unten rechts (statt Zeile unter der Karte) */
+    var inviteCta = "";
     if (upcoming && !mine && invite && !acceptedInv) {
-      actions = actionRowHtml({
-        inviteId: invite.id,
-        inviteEventId: ev.id,
-        accepted: invite.status === "accepted"
-      });
+      inviteCta = '<button type="button" class="acc-rsvp acc-card__join" data-accept-invite="' + esc(invite.id) + '">Teilnehmen</button>' +
+        '<span class="acc-card__invbadge" aria-label="Einladung">' + badgeSvg("invite") + "</span>";
     }
     var groupMember = !mine && upcoming && day === todayIso() && isMyGroupEvent(ev);
     var ptR = ptRole(ev);
@@ -2554,6 +2554,7 @@
         esc(ev.id) +
         '"' + (ptR ? ' data-pt="' + ptR + '"' : ""),
       category: ev.category,
+      mediaExtra: inviteCta,
       photo: ev.photo_url || "",
       extraPhotos: eventExtraPhotos(ev),
       courseId: ev.course_id || "",
@@ -6039,6 +6040,45 @@
     while (tmp.firstChild) root.appendChild(tmp.firstChild);
   }
 
+  /* Neue Einladung: Dialog „X lädt Dich ein“ mit Annehmen / Kann nicht. Je Einladung einmal; daneben tippen = beim nächsten Start nochmal */
+  function invAskedKey() { return "gogogo_inv_asked_" + me(); }
+  function invitePopup() {
+    if (state.invPopBusy || !global.GoDialog || document.hidden || document.body.dataset.shell !== "heute") return;
+    var asked = {};
+    try { asked = JSON.parse(localStorage.getItem(invAskedKey()) || "{}") || {}; } catch (e) {}
+    state.invPopSkip = state.invPopSkip || {};
+    var next = null;
+    Object.keys(state.invites || {}).some(function (k) {
+      var inv = state.invites[k];
+      var ev = evById(k);
+      if (!inv || inv.status !== "pending" || asked[String(inv.id)] || state.invPopSkip[String(inv.id)] || !ev || ev.status !== "geplant") return false;
+      if (hasTime(ev) && new Date(ev.starts_at).getTime() < Date.now()) return false;
+      next = { inv: inv, ev: ev };
+      return true;
+    });
+    if (!next) return;
+    if (document.querySelector(".god, .hl-wrap, .cp")) { setTimeout(invitePopup, 3000); return; }
+    state.invPopBusy = true;
+    var from = personOf(next.inv.from_id);
+    var first = String(from.name || "Jemand").split(" ")[0];
+    var line = first + " lädt Dich ein: " + (next.ev.title || "Training") + ", " + whenLine(next.ev.starts_at);
+    GoDialog.confirm(line, { ok: "Annehmen", cancel: "Kann nicht", row: true, dismiss: null, photo: from.photo || "", initial: from.photo ? "" : first })
+      .then(function (yes) {
+        state.invPopBusy = false;
+        var id = String(next.inv.id);
+        if (yes === null) { state.invPopSkip[id] = true; setTimeout(invitePopup, 400); return; }
+        asked[id] = Date.now();
+        try { localStorage.setItem(invAskedKey(), JSON.stringify(asked)); } catch (e2) {}
+        var job = yes
+          ? rest("rpc/go_accept_invite", { method: "POST", body: { p_invite_id: id } })
+          : rest("rpc/go_decline_invite", { method: "POST", body: { p_invite_id: id } });
+        job.then(function () {
+          if (host.toast) host.toast(yes ? "Zugesagt" : first + " weiß Bescheid");
+          return refresh();
+        }).catch(function () { if (host.toast) host.toast("Ging gerade nicht"); });
+      });
+  }
+
   function refresh() {
     if (!host || !me()) return Promise.resolve();
     var seq = ++state.refreshSeq;
@@ -6091,6 +6131,7 @@
         render();
         saveTodayHint();
         checkReplies();
+        setTimeout(invitePopup, 1500);
         if (!state.readySent) {
           state.readySent = true;
           try { document.dispatchEvent(new CustomEvent("go:aktuell-ready")); } catch (eR) {}

@@ -182,7 +182,8 @@
         row.appendChild(noB);
         card.appendChild(row);
       }
-      return false;
+      /* opts.dismiss: Wert beim Tippen daneben (Standard false wie „Abbrechen“) */
+      return opts.dismiss !== undefined ? opts.dismiss : false;
     });
   }
 
