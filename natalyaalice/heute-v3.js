@@ -5208,6 +5208,49 @@
     if (host.trainingCancel) { try { host.trainingCancel(); } catch (e2) {} }
     try { render(); } catch (e3) {}
   }
+  /* Nach 90 Minuten ohne Abschluss: Training gilt als beendet („dabei“ und „trainiert gerade“ aus).
+     Beim nächsten Öffnen kommt die gewohnte Abfrage zum Beenden (Schreib, wie es war). */
+  var OVERDUE_MS = 90 * 60000;
+  function overdueKey() { return "gogogo_overdue_" + me(); }
+  function overdueList() { try { return JSON.parse(localStorage.getItem(overdueKey()) || "[]") || []; } catch (e) { return []; } }
+  function overdueSave(l) { try { localStorage.setItem(overdueKey(), JSON.stringify(l.slice(-10))); } catch (e) {} }
+  function checkOverdueStarts() {
+    if (!me()) return;
+    var y = new Date(Date.now() - 86400000).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" });
+    var keys = [startedKey(), "gogogo_started_" + me() + "_" + y];
+    var list = overdueList(), changed = false;
+    keys.forEach(function (k) {
+      var m;
+      try { m = JSON.parse(localStorage.getItem(k) || "{}") || {}; } catch (e) { m = {}; }
+      var dirty = false;
+      Object.keys(m).forEach(function (id) {
+        if (Date.now() - Number(m[id] || 0) < OVERDUE_MS) return;
+        delete m[id];
+        dirty = true;
+        if (list.indexOf(id) < 0) { list.push(id); changed = true; }
+      });
+      if (dirty) {
+        try { localStorage.setItem(k, JSON.stringify(m)); } catch (e2) {}
+        if (host.trainingStop) { try { host.trainingStop(); } catch (e3) {} }
+      }
+    });
+    if (changed) overdueSave(list);
+    showOverdueEnd();
+  }
+  function showOverdueEnd() {
+    var list = overdueList();
+    if (!list.length || document.hidden || !global.GoDialog || document.body.dataset.shell !== "heute") return;
+    if (document.querySelector(".god, .cp, .sand-modal:not([hidden]), #acc-done-modal:not([hidden])")) return;
+    var id = list[0];
+    var ev = evById(id);
+    if (!ev && state.events && state.events.length) { overdueSave(list.slice(1)); return; }
+    if (!ev) return;
+    overdueSave(list.slice(1));
+    if (ev.status !== "geplant") return;
+    openDoneModal(ev.id, { title: "Schreib, wie es war", placeholder: "Wie war es? (Training nach 90 Minuten beendet)" });
+  }
+  setInterval(function () { try { checkOverdueStarts(); } catch (e) {} }, 60000);
+
   /* Eieruhr abgebrochen (ausdauer-timer.js) */
   document.addEventListener("go:start-cancel", function (e) { unmarkStarted(e && e.detail && e.detail.id); });
   function isStarted(ev) {
@@ -6199,6 +6242,7 @@
         checkReplies();
         /* Einladungs-Dialog kommt aus index.html (promptPendingInvites), hier kein zweiter */
         setTimeout(startSoonPopup, 2500);
+        setTimeout(checkOverdueStarts, 1800);
         if (!state.readySent) {
           state.readySent = true;
           try { document.dispatchEvent(new CustomEvent("go:aktuell-ready")); } catch (eR) {}
