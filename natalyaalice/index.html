@@ -18846,17 +18846,17 @@
             });
           });
           slide.appendChild(aboutBtn);
-          /* Circle verwalten (vorher Stift der Zeile in Kreise) */
-          var manageBtn = document.createElement("button");
-          manageBtn.type = "button";
-          manageBtn.className = "wr-ga-info circle-about-edit";
-          manageBtn.textContent = "Circle verwalten";
-          manageBtn.addEventListener("click", function () {
-            var go = function () { openCircleJoin({ coach: true }); };
-            if (typeof selectCircle === "function") Promise.resolve(selectCircle(gid)).then(go, go); else go();
-          });
-          slide.appendChild(manageBtn);
         }
+        /* Circle verwalten (Gründer) bzw. ansehen (Mitglied: Orte, Termine, Stempelkarte, verlassen) */
+        var manageBtn = document.createElement("button");
+        manageBtn.type = "button";
+        manageBtn.className = "wr-ga-info circle-about-edit";
+        manageBtn.textContent = owner ? "Circle verwalten" : "Circle ansehen";
+        manageBtn.addEventListener("click", function () {
+          var go = function () { openCircleJoin({ coach: true }); };
+          if (typeof selectCircle === "function") Promise.resolve(selectCircle(gid)).then(go, go); else go();
+        });
+        slide.appendChild(manageBtn);
         /* Mitglieder: Profilkreise aus dem Circle (ohne Kreis mit +) */
         var members = document.createElement("div");
         members.className = "team-slide__members";
@@ -22499,8 +22499,9 @@
         if (g.is_owner) return true;
         var st0 = circleSettings(g);
         if (st0 && st0.owner_id && String(st0.owner_id) === String(sessionAccount.id)) return true;
+        /* Nur Gründer und Joscha (beide Konten). Andere Admins sind im Circle einfache Mitglieder */
         var adminIds = ["5f86ab1e-2043-4944-8196-1bec0c6b0130", "2d3ab029-0a5f-4388-8da7-52501a87dc8c"];
-        return !!(sessionAccount.is_admin || adminIds.indexOf(String(sessionAccount.id)) !== -1);
+        return adminIds.indexOf(String(sessionAccount.id)) !== -1;
       }
       window.__goCircleGid = function () { var g = circleCurrent(); return g ? String(g.group_id) : null; };
       window.__goCircleReady = function () { return cst().loaded ? Promise.resolve() : loadCircleState(); };
