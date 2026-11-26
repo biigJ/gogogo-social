@@ -710,6 +710,38 @@
     ].join("|");
   }
 
+  /* Personal Training (go-pt-events.sql): wer ist Coach, wer Coachee je Termin */
+  function loadPtInfo() {
+    state.pt = state.pt || {};
+    var ids = {};
+    (state.events || []).forEach(function (e) { if (e && e.pt_session_id && !state.pt[String(e.pt_session_id)]) ids[String(e.pt_session_id)] = 1; });
+    var list = Object.keys(ids);
+    if (!list.length) return Promise.resolve();
+    return rest("go_pt_sessions?id=in.(" + list.map(encodeURIComponent).join(",") + ")&select=id,status,session_at,go_pt_bookings(client_id,coach_id)")
+      .then(function (rows) {
+        (rows || []).forEach(function (r) {
+          var b = r.go_pt_bookings || {};
+          state.pt[String(r.id)] = { id: String(r.id), coach: String(b.coach_id || ""), client: String(b.client_id || ""), status: r.status };
+        });
+      }).catch(function () {});
+  }
+  function ptOf(ev) { return ev && ev.pt_session_id && state.pt ? state.pt[String(ev.pt_session_id)] || null : null; }
+  /* „coach“ | „client“ | "" */
+  function ptRole(ev) {
+    var p = ptOf(ev);
+    if (!p) return "";
+    return p.coach === me() ? "coach" : p.client === me() ? "client" : "";
+  }
+  /* gemeinsames PT: die Kopie des anderen nicht zeigen, wenn ich meine eigene habe (wie angenommene Einladungen) */
+  function ptCopyOfMine(ev) {
+    if (!ev || String(ev.user_id) === me()) return false;
+    return (state.events || []).some(function (m) {
+      if (!m || String(m.user_id) !== me() || m.status === "ausgefallen") return false;
+      if (ev.pt_session_id) return String(m.pt_session_id || "") === String(ev.pt_session_id);
+      return ev.item_type === "support_session" && m.item_type === "support_session" && String(m.starts_at) === String(ev.starts_at);
+    });
+  }
+
   function dedupeEvents(rows) {
     var byId = {};
     var byFp = {};
@@ -847,7 +879,9 @@
     var range = "&starts_at=gte." + encodeURIComponent(fromIso) + "&starts_at=lte." + encodeURIComponent(toIso) + "&order=starts_at.desc&limit=500";
     /* bubble_id erst nach go-bubbles.sql vorhanden; group_id für Gruppen-Events (Gruppenname statt Vorname) */
     /* feed_hidden: „Speichern ohne Posting“ (go-events-feed-hidden.sql) */
-    return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact,photos" + range)
+    /* pt_session_id: Personal Training von Coach und Coachee (go-pt-events.sql) */
+    return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact,photos,pt_session_id" + range)
+      .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact,photos" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden" + range); })
@@ -887,7 +921,7 @@
           var ids = state.events.map(function (e) {
             return String(e.user_id);
           });
-          return Promise.all([ensurePeople(ids), loadShareConsent(ids)]);
+          return Promise.all([ensurePeople(ids), loadShareConsent(ids), loadPtInfo()]);
         });
       })
       .catch(function () {
@@ -1410,6 +1444,8 @@
     if (ev.status === "geplant" && dayKey(ev.starts_at) < dayKey(new Date(now).toISOString())) return false;
     /* Freund hat meine Einladung angenommen: sein eigenes gleiches Event nicht doppelt zeigen */
     if (!mine && ev.status === "geplant" && duplicateOfMine(ev)) return false;
+    /* Personal Training: nur die eigene Kopie (Coach und Coachee haben je eine) */
+    if (!mine && ptCopyOfMine(ev)) return false;
     if (inv && ev.status === "geplant") {
       /* angenommen: überall wie eigene Zusage; offen: ab Team */
       if (inv.status === "accepted") return true;
@@ -1742,6 +1778,8 @@
 
   function isBookedSupportEvent(ev) {
     if (!ev) return false;
+    /* Personal Training mit Coach: normale Event-Karte (Übungen, Kreis des Coachs) */
+    if (ev.pt_session_id) return false;
     var t = String(ev.item_type || "");
     if (t === "nutrition_log" || t === "support_session") return true;
     var title = String(ev.title || "").toLowerCase();
@@ -2459,7 +2497,22 @@
       });
     }
     var groupMember = !mine && upcoming && day === todayIso() && isMyGroupEvent(ev);
-    var tools = mine || groupMember
+    var ptR = ptRole(ev);
+    var tools = mine && ptR
+      ? eventToolRowHtml({
+          eventId: ev.id,
+          postId: String(ev.id),
+          isDone: ev.status === "erledigt",
+          /* PT: nur der Coach hat den Kreis (Inhalt, Start, Verschieben, Absagen) */
+          noCheck: ptR !== "coach" ? ev.status !== "erledigt" : ev.status !== "erledigt" && day < todayIso(),
+          menu: ptR === "coach" && upcoming && day >= todayIso(),
+          badge: eventBadgeKind(ev),
+          shareId: "",
+          shareDay: day,
+          removeId: "",
+          removeMode: "delete"
+        })
+      : mine || groupMember
       ? eventToolRowHtml({
           eventId: ev.id,
           postId: String(ev.id),
@@ -2499,7 +2552,7 @@
         esc(ev.id) +
         '" data-event-id="' +
         esc(ev.id) +
-        '"',
+        '"' + (ptR ? ' data-pt="' + ptR + '"' : ""),
       category: ev.category,
       photo: ev.photo_url || "",
       extraPhotos: eventExtraPhotos(ev),
@@ -4987,6 +5040,7 @@
   function openEventMenu(id) {
     var ev = evById(id);
     if (!ev || !global.GoDialog) return;
+    if (ev.pt_session_id && ptRole(ev) === "coach") { openPtMenu(ev); return; }
     var today = evDayIso(ev) === todayIso();
     if (!today) return;
     if (isMyGroupEvent(ev)) {
@@ -5018,6 +5072,86 @@
       if (v === "alt") return alternativeFor(ev);
       if (v === "move") return moveToTomorrow(ev);
     });
+  }
+
+  /* Personal Training: Kreis des Coachs. Jede Aktion meldet sich beim Coachee (Herz + Dialog, go-pt-events.sql) */
+  function ptRpc(fn, body, ok) {
+    return rest("rpc/" + fn, { method: "POST", body: body })
+      .then(function () {
+        if (ok && host.toast) host.toast(ok);
+        try { if (global.WocheReels && WocheReels.refresh) WocheReels.refresh(); } catch (e) {}
+        return refresh();
+      })
+      .catch(function () { if (host.toast) host.toast("Ging nicht (go-pt-events.sql?)"); });
+  }
+  function openPtMenu(ev) {
+    var sid = String(ev.pt_session_id);
+    var who = String(personOf(ptOf(ev).client).name || "Coachee").split(" ")[0];
+    var today = evDayIso(ev) === todayIso();
+    var choices = [{ label: ev.course_id ? "Übungen ändern" : "Übungen oder Initialgespräch", value: "content" }];
+    if (today) choices.push({ label: "PT starten", value: "start" });
+    choices.push({ label: "Start verschieben", value: "move" });
+    choices.push({ label: "Absagen", value: "cancel" });
+    choices.push({ label: "Absagen mit Stempel", value: "cancel_stamp" });
+    GoDialog.choose(String(ev.title || "Personal Training"), choices, { sub: who + " bekommt bei jeder Änderung eine Nachricht." }).then(function (v) {
+      if (!v) return;
+      if (v === "content") return setTimeout(function () { pickPtContent(ev); }, 0);
+      if (v === "start") {
+        return rest("rpc/go_pt_action", { method: "POST", body: { p_session: sid, p_action: "start" } })
+          .catch(function () {})
+          .then(function () { startEvent(ev); });
+      }
+      if (v === "move") return setTimeout(function () { movePt(ev); }, 0);
+      var stamp = v === "cancel_stamp";
+      setTimeout(function () {
+        GoDialog.confirm(stamp ? "Absagen, der Termin zählt als Stempel auf " + who + "s Karte?" : "Personal Training mit " + who + " absagen?",
+          { ok: "Absagen", cancel: "Zurück" }).then(function (yes) {
+          if (yes) ptRpc("go_pt_action", { p_session: sid, p_action: v }, stamp ? "Abgesagt, Stempel gesetzt" : "Abgesagt");
+        });
+      }, 0);
+    });
+  }
+  function movePt(ev) {
+    var old = hasTime(ev) ? timeLabel(ev.starts_at) : "";
+    var times = [];
+    var nowD = new Date(), from = 5 * 60;
+    if (evDayIso(ev) === todayIso()) from = Math.max(from, Math.ceil((nowD.getHours() * 60 + nowD.getMinutes()) / 15) * 15);
+    for (var mm = from; mm <= 23 * 60 + 45; mm += 15) times.push(Math.floor(mm / 60) + ":" + ("0" + (mm % 60)).slice(-2));
+    if (!times.length) return GoDialog.alert("Heute geht keine andere Zeit mehr.");
+    GoDialog.time("Start verschieben", { times: times, ok: "Verschieben", cancel: "Abbrechen", sub: old ? "Bisher " + old + " Uhr" : "" }).then(function (t) {
+      if (!t) return;
+      var iso = berlinIsoAt(evDayIso(ev), t);
+      if (iso) ptRpc("go_pt_action", { p_session: String(ev.pt_session_id), p_action: "move", p_at: iso }, "Neuer Start " + t);
+    });
+  }
+  /* Inhalt: Initialgespräch oder eine Einheit aus allen Events (Filter Kraft, Ausdauer, Bewegung) */
+  var ptUnits = null;
+  function loadPtUnits() {
+    if (ptUnits) return Promise.resolve(ptUnits);
+    return rest("courses?is_active=eq.true&deleted_at=is.null&private_for=is.null&select=id,title,category_default,sessions_per_week,is_system,course_sessions(block_no,is_travel)&order=title.asc&limit=500")
+      .then(function (rows) {
+        ptUnits = (rows || []).filter(function (c) {
+          if (c.is_system || c.category_default === "zirkel") return false;
+          var n = (c.course_sessions || []).filter(function (x) { return x.block_no === 1 && !x.is_travel; }).length;
+          return n <= 1 && (c.sessions_per_week || 1) <= 1;
+        });
+        return ptUnits;
+      });
+  }
+  function pickPtContent(ev) {
+    var CAT = { kraft: "Kraft", ausdauer: "Ausdauer", alternative: "Bewegung" };
+    loadPtUnits().then(function (units) {
+      return GoDialog.list("Was macht Ihr im PT?", units.map(function (u) {
+        return { label: (emojiFor(u.category_default, u.title) + " " + u.title).trim(), value: String(u.id), tag: u.category_default || "alternative", sub: CAT[u.category_default] || "" };
+      }), {
+        top: [{ label: "Initialgespräch", value: "__initial" }],
+        filters: [{ label: "Kraft", value: "kraft" }, { label: "Ausdauer", value: "ausdauer" }, { label: "Bewegung", value: "alternative" }],
+        placeholder: "Event suchen"
+      });
+    }).then(function (v) {
+      if (!v) return;
+      ptRpc("go_pt_content", { p_session: String(ev.pt_session_id), p_course: v === "__initial" ? null : v }, "Gespeichert");
+    }).catch(function () { if (host.toast) host.toast("Events laden ging nicht"); });
   }
 
   /* „dabei“: Start getippt und nicht abgebrochen, bis das Event erledigt ist.
@@ -5759,6 +5893,8 @@
     if (mediaHit && !t.closest("button, a, input")) {
       var cardW = mediaHit.closest(".acc-card[data-event-id]");
       var evA = cardW ? (state.events || []).filter(function (x) { return String(x.id) === cardW.getAttribute("data-event-id"); })[0] : null;
+      /* Personal Training: Stempelkarte von Coach und Coachee (Mein Coach) */
+      if (evA && evA.pt_session_id && ptOf(evA) && host.openPtStamp) { host.openPtStamp(ptOf(evA), ptRole(evA)); return; }
       /* Heutiges Event, bei dem ich dabei bin → meine Stempelkarte (Freund scannt, Pünktlichkeit gegenseitig) */
       if (evA && host.openStampCard &&
           new Date(evA.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }) === todayIso() &&

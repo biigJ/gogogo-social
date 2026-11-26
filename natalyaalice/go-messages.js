@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-26-pt",
+      at: "2026-11-26T09:30:00Z",
+      text: "Personal Training steht jetzt einmal als gemeinsames Event bei Dir und Deinem Coach. Dein Coach legt die Übungen fest, startet, verschiebt oder sagt ab, Du bekommst jedes Mal eine Nachricht. Bild antippen zeigt Eure Stempelkarte."
+    },
+    {
       key: "news:2026-11-25-endless-status",
       at: "2026-11-25T17:35:00Z",
       text: "Wiederkehrende Events laufen jetzt ohne Ende weiter. Stories zeigen denselben Status wie die Karten in Aktuell: dabei, gleich, bald, heute, verspätet, erledigt."
