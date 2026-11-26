@@ -19442,16 +19442,18 @@
           bubWallet.className = "friend-wallet bubble-wallet";
           bubWallet.hidden = true;
           function paintBubView() {
+            /* ohne Gruppe, Circle, Coach (und Bubble geparkt): Karten wären leer → Liste mit Hinweis und „Hinzufügen“ */
+            var walletNow = bubWalletOn && !(GoBubbles.off && !kreiseWalletItems().length);
             [].forEach.call(bubView.querySelectorAll("[data-bview]"), function (b) {
-              var on = (b.getAttribute("data-bview") === "wallet") === bubWalletOn;
+              var on = (b.getAttribute("data-bview") === "wallet") === walletNow;
               b.classList.toggle("is-on", on);
               b.setAttribute("aria-checked", on ? "true" : "false");
             });
-            bubList.hidden = bubWalletOn;
-            bubHint.hidden = bubWalletOn;
-            if (kreiseRows) kreiseRows.hidden = bubWalletOn;
-            bubWallet.hidden = !bubWalletOn;
-            if (bubWalletOn) {
+            bubList.hidden = walletNow;
+            bubHint.hidden = walletNow;
+            if (kreiseRows) kreiseRows.hidden = walletNow;
+            bubWallet.hidden = !walletNow;
+            if (walletNow) {
               /* Karten: erst Gruppe, Circles, Coach (wie die Liste), dann die Bubbles */
               GoBubbles.wallet(function (items, fill, open) {
                 var all = kreiseWalletItems().concat(items);
