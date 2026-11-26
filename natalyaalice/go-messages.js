@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-26-invite",
+      at: "2026-11-26T10:55:00Z",
+      text: "Einladungen kommen jetzt als kurze Frage beim Öffnen: Annehmen oder Kann nicht. Auf der Karte steht „Teilnehmen“ direkt auf dem Bild."
+    },
+    {
       key: "news:2026-11-26-pt",
       at: "2026-11-26T09:30:00Z",
       text: "Personal Training steht jetzt einmal als gemeinsames Event bei Dir und Deinem Coach. Dein Coach legt die Übungen fest, startet, verschiebt oder sagt ab, Du bekommst jedes Mal eine Nachricht. Bild antippen zeigt Eure Stempelkarte."
