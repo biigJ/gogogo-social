@@ -880,7 +880,9 @@
     /* bubble_id erst nach go-bubbles.sql vorhanden; group_id für Gruppen-Events (Gruppenname statt Vorname) */
     /* feed_hidden: „Speichern ohne Posting“ (go-events-feed-hidden.sql) */
     /* pt_session_id: Personal Training von Coach und Coachee (go-pt-events.sql) */
-    return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact,photos,pt_session_id" + range)
+    /* copy_of: eigene Einheit beim Gruppentraining, nie als eigene Karte (go-group-copy.sql) */
+    return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact,photos,pt_session_id,copy_of" + range)
+      .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact,photos,pt_session_id" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact,photos" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id,feed_compact" + range); })
       .catch(function () { return rest("events?select=" + fullSel + ",bubble_id,group_id,feed_hidden,circle_id" + range); })
@@ -1399,10 +1401,11 @@
   function myCopyOfGroupEvent(ev) {
     if (!ev || !ev.group_id) return null;
     var d = dayKey(ev.starts_at);
-    return (state.events || []).filter(function (e) {
-      return e && String(e.user_id) === me() && String(e.group_id || "") === String(ev.group_id) &&
-        dayKey(e.starts_at) === d && e.status !== "ausgefallen";
-    })[0] || null;
+    var mine = (state.events || []).filter(function (e) { return e && String(e.user_id) === me() && e.status !== "ausgefallen"; });
+    return mine.filter(function (e) { return String(e.copy_of || "") === String(ev.id); })[0] ||
+      mine.filter(function (e) {
+        return !e.enrollment_id && String(e.group_id || "") === String(ev.group_id) && dayKey(e.starts_at) === d;
+      })[0] || null;
   }
   /* Mitglied startet das Gruppentraining: eigene Einheit (Sichtbarkeit Gruppe) + Zusage, dann wie eigenes Event */
   function startGroupEvent(ev) {
@@ -1412,7 +1415,7 @@
       category: ev.category || "kraft", course_id: ev.course_id || null,
       title: ev.title || "Gruppentraining", starts_at: ev.starts_at,
       /* Sichtbarkeit wie gewohnt (Community), die Gruppe hängt über group_id dran */
-      location: ev.location || null, visibility: "team", group_id: ev.group_id
+      location: ev.location || null, visibility: "team", group_id: ev.group_id, copy_of: ev.id
     }).then(function (copy) {
       return rest("event_rsvps?on_conflict=event_id,user_id", {
         method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
@@ -1427,6 +1430,8 @@
     if (!ev) return false;
     var uid = me();
     var mine = String(ev.user_id) === uid;
+    /* Teilnahme-Einheit am Gruppentraining: nur in der Datenbank, im Feed steht das Event der Gruppe */
+    if (ev.copy_of) return false;
     var vis = normalizeVisibility(ev.visibility);
     /* Coach sieht die Events seiner Coachees immer, auch privat und „Nur Coach“ (RLS: go_is_coach_of) */
     var coachSees = !mine && isMyCoachee(ev.user_id);
@@ -1457,7 +1462,6 @@
       /* Eigene Events von heute bleiben bis Mitternacht sichtbar, damit man sie nachträglich abschließen kann */
       if (mine && t <= week && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString())) return true;
       /* Gruppentraining meiner Gruppe: heute bis Mitternacht und kommende Tage, auch unter „Nur ich“ */
-      if (isMyGroupEvent(ev) && myCopyOfGroupEvent(ev)) return false;
       if (isMyGroupEvent(ev) && vis !== "privat" && t <= week &&
           (dayKey(ev.starts_at) === dayKey(new Date(now).toISOString()) || t >= now - 3600000)) return true;
       /* Kreise oben (todayAll): heutige Trainings der Freunde bis Mitternacht, auch wenn die Uhrzeit vorbei ist
@@ -2501,6 +2505,9 @@
     if (upcoming && !mine && invite && !acceptedInv) {
       inviteCta = '<button type="button" class="acc-rsvp acc-card__join" data-accept-invite="' + esc(invite.id) + '">Teilnehmen</button>';
     }
+    /* Gruppentraining: mein Stand (gestartet, erledigt) steckt in meiner unsichtbaren Teilnahme-Einheit */
+    var gCopy = !mine && isMyGroupEvent(ev) ? myCopyOfGroupEvent(ev) : null;
+    var gDone = !!(gCopy && gCopy.status === "erledigt");
     var groupMember = !mine && upcoming && day === todayIso() && isMyGroupEvent(ev);
     var ptR = ptRole(ev);
     var tools = mine && ptR
@@ -2521,12 +2528,12 @@
       ? eventToolRowHtml({
           eventId: ev.id,
           postId: String(ev.id),
-          canDone: upcoming && day === todayIso(),
-          isDone: ev.status === "erledigt",
+          canDone: upcoming && day === todayIso() && !gDone,
+          isDone: ev.status === "erledigt" || gDone,
           /* vergangene Tage: kein Kreis, die Einheit lässt sich nicht mehr nachholen */
-          noCheck: ev.status !== "erledigt" && day < todayIso(),
+          noCheck: ev.status !== "erledigt" && !gDone && day < todayIso(),
           /* nur das heutige Event ist im Kreis antippbar; kommende Tage: Kreis ohne Aktion */
-          menu: ev.status !== "erledigt" && day === todayIso(),
+          menu: ev.status !== "erledigt" && !gDone && day === todayIso(),
           badge: eventBadgeKind(ev),
           /* Papierflieger nur für heute und kommende Events, nicht für vergangene */
           shareId: !groupMember && day >= todayIso() ? String(ev.id) : "",
@@ -2585,7 +2592,7 @@
       /* ••• : eigene Events immer, Freunde bei erledigten (Verkleinern) */
       visDots: (mine || ev.status === "erledigt") && /^[0-9a-f-]{36}$/i.test(String(ev.id)) ? String(ev.id) : "",
       /* laufender Zirkel hat eigene Pillen (Countdown/läuft) */
-      status: zirkelPillsHtml(ev) && ev.status !== "erledigt" ? "" : statusOf({ done: ev.status === "erledigt", ts: ev.starts_at, started: isStarted(ev) }),
+      status: zirkelPillsHtml(ev) && ev.status !== "erledigt" ? "" : statusOf({ done: ev.status === "erledigt" || gDone, ts: ev.starts_at, started: isStarted(gCopy || ev) }),
       inviteIso: day,
       ownerId: String(ev.user_id || ""),
       canInvite: !mine
@@ -4607,6 +4614,7 @@
     };
     if (payload.photo_url) body.photo_url = payload.photo_url;
     if (payload.group_id) body.group_id = payload.group_id;
+    if (payload.copy_of) body.copy_of = payload.copy_of;
     if (payload.bubble_id) body.bubble_id = payload.bubble_id;
     var err = host.validateOwnEvent ? host.validateOwnEvent(body) : null;
     if (err) {

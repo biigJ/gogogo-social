@@ -515,7 +515,9 @@
     /* bubble_id erst nach go-bubbles.sql vorhanden */
     /* circle_id: Bild des richtigen Circles (go-covers.js) */
     /* moved_days: einzeln verschobener Wochenplan-Termin steht im Kalender an seinem Serientag (go_events_track_move) */
-    return query(richSelect + ",bubble_id,circle_id,moved_days")
+    /* copy_of: Teilnahme-Einheit am Gruppentraining, im Kalender nicht als eigenes Event (go-group-copy.sql) */
+    return query(richSelect + ",bubble_id,circle_id,moved_days,copy_of")
+      .catch(function () { return query(richSelect + ",bubble_id,circle_id,moved_days"); })
       .catch(function () { return query(richSelect + ",bubble_id,circle_id"); })
       .catch(function () { return query(richSelect + ",bubble_id"); })
       .catch(function () { return query(richSelect); })
@@ -525,7 +527,7 @@
         });
       })
       .then(function (rows) {
-        state.events = rows || [];
+        state.events = (rows || []).filter(function (e) { return !e.copy_of; });
         return loadJoinedEvents(start, end, richSelect).then(function () {
           return loadInvitedEvents(start, end, richSelect);
         });
@@ -3451,7 +3453,7 @@
     var from = sorted[0] + "T00:00:00" + berlinOffsetSuffix(sorted[0]);
     var to = addDays(sorted[6], 1) + "T00:00:00" + berlinOffsetSuffix(sorted[6]);
     var range = "&starts_at=gte." + encodeURIComponent(from) + "&starts_at=lt." + encodeURIComponent(to);
-    var sel = "&select=id,user_id,title,category,starts_at,visibility,group_id,status,item_type,enrollment_id,course_id,location&order=starts_at.asc&limit=80";
+    var sel = "&select=id,user_id,title,category,starts_at,visibility,group_id,status,item_type,enrollment_id,course_id,location&copy_of=is.null&order=starts_at.asc&limit=80";
     return Promise.all([
       rest("events?user_id=eq." + encodeURIComponent(me()) + "&status=in.(geplant,erledigt)" + range + sel),
       rest("events?group_id=eq." + encodeURIComponent(st.group.id) + "&user_id=neq." + encodeURIComponent(me()) + "&status=eq.geplant" + range + sel),
