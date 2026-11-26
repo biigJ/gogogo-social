@@ -527,7 +527,7 @@
         });
       })
       .then(function (rows) {
-        state.events = (rows || []).filter(function (e) { return !e.copy_of; });
+        state.events = (rows || []).filter(function (e) { return !e.copy_of || e.status === "erledigt"; });
         return loadJoinedEvents(start, end, richSelect).then(function () {
           return loadInvitedEvents(start, end, richSelect);
         });
