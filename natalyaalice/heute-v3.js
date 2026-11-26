@@ -2493,8 +2493,7 @@
     /* offene Einladung: „Teilnehmen“ mittig unten auf dem Bild, Brief unten rechts (statt Zeile unter der Karte) */
     var inviteCta = "";
     if (upcoming && !mine && invite && !acceptedInv) {
-      inviteCta = '<button type="button" class="acc-rsvp acc-card__join" data-accept-invite="' + esc(invite.id) + '">Teilnehmen</button>' +
-        '<span class="acc-card__invbadge" aria-label="Einladung">' + badgeSvg("invite") + "</span>";
+      inviteCta = '<button type="button" class="acc-rsvp acc-card__join" data-accept-invite="' + esc(invite.id) + '">Teilnehmen</button>';
     }
     var groupMember = !mine && upcoming && day === todayIso() && isMyGroupEvent(ev);
     var ptR = ptRole(ev);
@@ -2539,7 +2538,9 @@
           wave: !invite && !iAmGoing(ev.id) && ev.status === "geplant" &&
             (hasTime(ev) ? new Date(ev.starts_at).getTime() > Date.now() : dayKey(ev.starts_at) >= todayIso()),
           waved: !!state.waved[String(ev.id)],
-          heart: acceptedInv || (upcoming && !invite && iAmGoing(ev.id))
+          heart: acceptedInv || (upcoming && !invite && iAmGoing(ev.id)),
+          /* Einladung: Brief rechts unter dem Bild wie die anderen Rubrik-Icons */
+          badge: invite && upcoming ? "invite" : ""
         });
     return renderCardShell({
       /* zugesagt (Einladung angenommen oder Herz) → dicker Rahmen */
