@@ -1766,6 +1766,9 @@
     }
     if (eventId && state.rsvps[String(eventId)]) {
       state.rsvps[String(eventId)].forEach(function (rid) {
+        /* Zusage am Event (z. B. über die Gruppe) zählt, auch wenn die Einladung noch anders steht */
+        var had = out.filter(function (f) { return f.id === String(rid); })[0];
+        if (had) { had.status = "accepted"; return; }
         var p = personOf(rid);
         pushFace(rid, p.name, p.photo, "accepted");
       });
@@ -6048,6 +6051,48 @@
     while (tmp.firstChild) root.appendChild(tmp.firstChild);
   }
 
+  /* Eine Stunde vorher: wer nimmt teil. Start bleibt automatisch, außer ich verschiebe ihn (Startzeit ändern) */
+  function soonKey() { return "gogogo_soon_" + me(); }
+  function startSoonPopup() {
+    if (state.soonBusy || !global.GoDialog || document.hidden || document.body.dataset.shell !== "heute") return;
+    if (document.querySelector(".god, .hl-wrap, .cp, .sand-modal:not([hidden])")) { setTimeout(startSoonPopup, 4000); return; }
+    var seen = {};
+    try { seen = JSON.parse(localStorage.getItem(soonKey()) || "{}") || {}; } catch (e) {}
+    var now = Date.now();
+    var hit = null;
+    (state.events || []).some(function (ev) {
+      if (!ev || ev.status !== "geplant" || !hasTime(ev)) return false;
+      var t = new Date(ev.starts_at).getTime();
+      if (t - now > 3600000 || t < now) return false;
+      var key = String(ev.id) + "@" + ev.starts_at;
+      if (seen[key]) return false;
+      var mine = String(ev.user_id) === me();
+      var going = (state.rsvps[String(ev.id)] || []).filter(function (u) { return String(u) !== me() && String(u) !== String(ev.user_id); });
+      if (mine && going.length) { hit = { ev: ev, key: key, mine: true, going: going }; return true; }
+      if (!mine && iAmGoing(ev.id)) { hit = { ev: ev, key: key, mine: false, going: going }; return true; }
+      return false;
+    });
+    if (!hit) return;
+    seen[hit.key] = now;
+    try { localStorage.setItem(soonKey(), JSON.stringify(seen)); } catch (e2) {}
+    state.soonBusy = true;
+    var names = hit.going.map(function (u) { return String(personOf(u).name || "Jemand").split(" ")[0]; });
+    var list = names.length > 1 ? names.slice(0, -1).join(", ") + " und " + names[names.length - 1] : names[0] || "";
+    var at = timeLabel(hit.ev.starts_at);
+    var title = hit.ev.title || "Training";
+    var done = function () { state.soonBusy = false; };
+    if (hit.mine) {
+      GoDialog.confirm(list + (names.length > 1 ? " nehmen teil" : " nimmt teil") + ": " + title + " um " + at + " Uhr", {
+        body: "Der Start bleibt, wenn Du nichts änderst.", ok: "Passt", cancel: "Start verzögert sich", row: true, dismiss: true
+      }).then(function (ok) { done(); if (ok === false) delayStart(hit.ev); });
+    } else {
+      var owner = String(personOf(hit.ev.user_id).name || "").split(" ")[0];
+      GoDialog.alert(title + " mit " + owner + " startet um " + at + " Uhr" + (names.length ? ". Dabei: " + list + "." : "."))
+        .then(done, done);
+    }
+  }
+  setInterval(function () { try { startSoonPopup(); } catch (e) {} }, 300000);
+
   /* Neue Einladung: Dialog „X lädt Dich ein“ mit Annehmen / Kann nicht. Je Einladung einmal; daneben tippen = beim nächsten Start nochmal */
   function invAskedKey() { return "gogogo_inv_asked_" + me(); }
   function invitePopup() {
@@ -6140,6 +6185,7 @@
         saveTodayHint();
         checkReplies();
         /* Einladungs-Dialog kommt aus index.html (promptPendingInvites), hier kein zweiter */
+        setTimeout(startSoonPopup, 2500);
         if (!state.readySent) {
           state.readySent = true;
           try { document.dispatchEvent(new CustomEvent("go:aktuell-ready")); } catch (eR) {}
