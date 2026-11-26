@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-26-coach-invite",
+      at: "2026-11-26T11:40:00Z",
+      text: "Du kannst jetzt auch Deinen Coach zu Deinem Event einladen. Der Termin steht dann bei Euch beiden unter Kreise → Mein Coach. Bild antippen zeigt beide Stempelkarten."
+    },
+    {
       key: "news:2026-11-26-invite",
       at: "2026-11-26T10:55:00Z",
       text: "Einladungen kommen jetzt als kurze Frage beim Öffnen: Annehmen oder Kann nicht. Auf der Karte steht „Teilnehmen“ direkt auf dem Bild."
