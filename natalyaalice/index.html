@@ -15643,11 +15643,12 @@
          Scannender sagt, ob der Inhaber pünktlich war, der Inhaber bestätigt umgekehrt.
          Pünktlich = 2 Stempel, sonst 1 (go-stamp-punctual.sql). */
       function handleStampScan() {
-        var host = "", ev = "";
+        var host = "", ev = "", card = "";
         try {
           var qs = new URLSearchParams(location.search);
           host = qs.get("stamp") || "";
           ev = qs.get("ev") || "";
+          card = qs.get("card") || "";
         } catch (eU) {}
         if (!host || !sessionAccount || !sessionAccount.id) return;
         try {
@@ -15656,7 +15657,7 @@
         } catch (eH) {}
         rest("rpc/go_stamp_check_start", {
           method: "POST",
-          body: { p_owner: host, p_event: /^[0-9a-f-]{36}$/i.test(ev) ? ev : null }
+          body: { p_owner: host, p_event: /^[0-9a-f-]{36}$/i.test(ev) ? ev : null, p_card: /^(main|group|circle|coach)$/.test(card) ? card : null }
         })
           .then(function (res) {
             var r = res || {};
@@ -15904,6 +15905,8 @@
           /* Scan mit der Kamera öffnet die App; wer bei mir eingeladen ist, bekommt einen Stempel */
           var payload = location.origin + "/workout/?stamp=" + encodeURIComponent(String((sessionAccount && sessionAccount.id) || sid));
           if (opts.eventId) payload += "&ev=" + encodeURIComponent(String(opts.eventId));
+          /* welche Karte gezeigt wird (&card=), setzt paintStampFace beim Wechseln: Coach-Karte nur, wenn sie vorgezeigt wird */
+          modal._qrBase = payload;
           qr.src =
             "https://api.qrserver.com/v1/create-qr-code/?size=336x336&margin=8&data=" +
             encodeURIComponent(payload);
@@ -15944,6 +15947,12 @@
             slot.className = "stamp-pass__slot" + (i < n ? " is-filled" : "");
             grid.appendChild(slot);
           }
+        }
+        var qrImg = document.querySelector("#stamp-card-modal .stamp-pass__qr img") || document.getElementById("stamp-card-qr");
+        var modalQ = document.getElementById("stamp-card-modal");
+        if (qrImg && modalQ && modalQ._qrBase) {
+          qrImg.src = "https://api.qrserver.com/v1/create-qr-code/?size=336x336&margin=8&data=" +
+            encodeURIComponent(modalQ._qrBase + "&card=" + encodeURIComponent(card.kind || "main"));
         }
         if (pass) {
           var bgc = STAMP_COLORS[card.kind] || STAMP_COLORS.main;
