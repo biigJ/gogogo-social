@@ -233,8 +233,11 @@
       return;
     }
     var m = list.shift();
-    (m.keys || [m.key]).forEach(markRead);
+    var shownAt = Date.now();
     (GoDialog.note || GoDialog.alert)(m.text).then(function () {
+      /* gelesen erst nach dem Schließen; ein Tipp in der ersten Sekunde (z. B. Refresh im selben Moment) zeigt sie nochmal */
+      if (Date.now() - shownAt < 1000 && !m._again) { m._again = true; list.unshift(m); }
+      else (m.keys || [m.key]).forEach(markRead);
       setTimeout(function () { showQueue(list); }, 350);
     });
   }
