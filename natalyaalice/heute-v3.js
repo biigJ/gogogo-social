@@ -2503,9 +2503,9 @@
           eventId: ev.id,
           postId: String(ev.id),
           isDone: ev.status === "erledigt",
-          /* PT: nur der Coach hat den Kreis (Inhalt, Start, Verschieben, Absagen) */
-          noCheck: ptR !== "coach" ? ev.status !== "erledigt" : ev.status !== "erledigt" && day < todayIso(),
-          menu: ptR === "coach" && upcoming && day >= todayIso(),
+          /* PT: Coach = Inhalt, Start, Verschieben, Absagen; Coachee = Absagen mit Stempel */
+          noCheck: ev.status !== "erledigt" && day < todayIso(),
+          menu: upcoming && day >= todayIso(),
           badge: eventBadgeKind(ev),
           shareId: "",
           shareDay: day,
@@ -5041,6 +5041,7 @@
     var ev = evById(id);
     if (!ev || !global.GoDialog) return;
     if (ev.pt_session_id && ptRole(ev) === "coach") { openPtMenu(ev); return; }
+    if (ev.pt_session_id && ptRole(ev) === "client") { openPtClientMenu(ev); return; }
     var today = evDayIso(ev) === todayIso();
     if (!today) return;
     if (isMyGroupEvent(ev)) {
@@ -5107,6 +5108,18 @@
         GoDialog.confirm(stamp ? "Absagen, der Termin zählt als Stempel auf " + who + "s Karte?" : "Personal Training mit " + who + " absagen?",
           { ok: "Absagen", cancel: "Zurück" }).then(function (yes) {
           if (yes) ptRpc("go_pt_action", { p_session: sid, p_action: v }, stamp ? "Abgesagt, Stempel gesetzt" : "Abgesagt");
+        });
+      }, 0);
+    });
+  }
+  function openPtClientMenu(ev) {
+    var coach = String(personOf(ptOf(ev).coach).name || "Dein Coach").split(" ")[0];
+    GoDialog.choose(String(ev.title || "Personal Training"), [{ label: "Absagen mit Stempel", value: "cancel_stamp" }],
+      { sub: "Der Termin zählt als Stempel auf Deiner Karte. " + coach + " bekommt eine Nachricht." }).then(function (v) {
+      if (!v) return;
+      setTimeout(function () {
+        GoDialog.confirm("Personal Training mit " + coach + " absagen?", { ok: "Absagen", cancel: "Zurück" }).then(function (yes) {
+          if (yes) ptRpc("go_pt_action", { p_session: String(ev.pt_session_id), p_action: "cancel_stamp" }, "Abgesagt");
         });
       }, 0);
     });
