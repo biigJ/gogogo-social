@@ -32,7 +32,7 @@
   }
 
   var TRAINER_MAIL =
-    "mailto:mail@bjgrope.de?subject=" + encodeURIComponent("Trainer werden") +
+    "mailto:mail@bjgrope.de?subject=" + encodeURIComponent("Coach werden") +
     "&body=" + encodeURIComponent(
       "Hallo Joscha, ich bin xxx und wohne in Berlin. Gerne möchte ich zu Deinem Netzwerk gehören. Ich bin Personal Trainer mit dem Schwerpunkt xxx. Du erreichst mich am besten unter dieser Email oder ruf mich an unter xxx.\n\nGruß,\nxxx"
     );
@@ -319,7 +319,7 @@
     /* Trainer-Mailto Übersetzung für den Button-Text */
     var trainerBtns = document.querySelectorAll("[data-trainer-mail]");
     trainerBtns.forEach(function (el) {
-      el.textContent = lang === "de" ? "Trainer werden" : "Become a trainer";
+      el.textContent = lang === "de" ? "Coach werden" : "Become a coach";
     });
   }
 
