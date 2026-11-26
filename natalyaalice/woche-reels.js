@@ -4345,10 +4345,21 @@
         if (grp) serBody.group_id = grp.id;
         jobs = jobs.concat(seriesJobs(future, ev, iso, untimed && timeChanged, timeChanged ? hhmm : "", serBody));
       }
-      if (sameDay && !placeChanged && (ev.visibility || "team") === vis && !bubChanged && !(grp && String(ev.group_id || "") !== String(grp.id))) return;
+      /* heutiger Serientermin (nicht einzeln verschoben): was hier geändert wird, gilt sofort auch für heute.
+         Uhrzeit nur, wenn sie im Rad geändert wurde; Ort, wenn geändert oder heute noch keiner steht. */
+      var todaySeries = dayKey(ev.starts_at) === berlinToday() && seriesDayOf(ev) === dayKey(ev.starts_at);
+      var todayStarts = todaySeries && timeChanged ? (untimed ? dayKey(ev.starts_at) + "T12:00:00Z" : timedStarts(dayKey(ev.starts_at), hhmm)) : "";
+      var todayPlace;
+      if (todaySeries) {
+        var wantPlace = placeChanged ? (de.place[ev.id] || null) : (!ev.location && placeBase ? placeBase : undefined);
+        if (wantPlace !== undefined && (wantPlace || "") !== (ev.location || "")) todayPlace = wantPlace;
+      }
+      if (sameDay && !placeChanged && !todayStarts && todayPlace === undefined && (ev.visibility || "team") === vis && !bubChanged && !(grp && String(ev.group_id || "") !== String(grp.id))) return;
       var body = { visibility: vis };
       if (!sameDay) body.starts_at = starts;
+      if (todayStarts) body.starts_at = todayStarts;
       if (placeChanged && !isToday) body.location = de.place[ev.id] || null;
+      if (todayPlace !== undefined) body.location = todayPlace;
       /* neue Uhrzeit → Herz-Meldung für Freunde (go-events-time-set.sql) */
       if (body.starts_at && !untimed && !(displayTime(ev.starts_at) && formatTime(ev.starts_at) === hhmm)) body.time_set_at = new Date().toISOString();
       /* Durch eine Alternative ersetzte Einheit auf einen anderen Tag gelegt: dort wieder geplant */
