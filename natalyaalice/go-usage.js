@@ -14,7 +14,6 @@
   var sid = null;
   var n = 0;
   var seconds = 0;
-  var visibleSince = 0;
   var hiddenAt = 0;
   var queue = [];
   var starting = null;
@@ -24,13 +23,19 @@
 
   var SECTION = { heute: "Aktuell", woche: "Kalender", team: "Community", kurse: "Plus", profil: "Profil" };
 
+  /* Admin offen: zählt nicht als Nutzung (keine Zeit, Sektion „Admin“ wird in der Analyse ausgelassen) */
+  function inAdmin() { return !!document.querySelector(".ga-root"); }
   function section() {
+    if (inAdmin()) return "Admin";
     var s = document.body && document.body.dataset ? document.body.dataset.shell : "";
     return SECTION[s] || s || "";
   }
-  function activeSeconds() {
-    return seconds + (visibleSince ? Math.round((Date.now() - visibleSince) / 1000) : 0);
-  }
+  function activeSeconds() { return seconds; }
+  /* aktive Zeit in 5-Sekunden-Schritten: nur sichtbar und nicht im Admin */
+  var TICK = 5;
+  setInterval(function () {
+    if (host && sid && document.visibilityState === "visible" && !inAdmin()) seconds += TICK;
+  }, TICK * 1000);
   function device() {
     var standalone = (global.matchMedia && global.matchMedia("(display-mode: standalone)").matches) || global.navigator.standalone;
     var ua = String(global.navigator.userAgent || "");
@@ -41,7 +46,6 @@
   function start() {
     if (!host) return Promise.resolve();
     seconds = 0;
-    visibleSince = document.visibilityState === "visible" ? Date.now() : 0;
     sid = null;
     starting = host.send("go_usage_start", { p_device: device() }).then(function (r) {
       if (!r || !r.id) return;
@@ -106,14 +110,12 @@
 
   function onVisibility() {
     if (document.visibilityState === "hidden") {
-      if (visibleSince) { seconds += Math.round((Date.now() - visibleSince) / 1000); visibleSince = 0; }
       hiddenAt = Date.now();
       flush(true);
       return;
     }
     if (hiddenAt && Date.now() - hiddenAt > NEW_AFTER) { hiddenAt = 0; start(); return; }
     hiddenAt = 0;
-    visibleSince = Date.now();
   }
 
   /* Jede 20. Sitzung: kurz nachfragen */

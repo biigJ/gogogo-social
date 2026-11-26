@@ -33,9 +33,10 @@ begin
     from go_usage_sessions s where s.started_at >= v_from group by s.account_id
   ),
   evs as (
+    -- Admin zählt nicht als Nutzung; Top-Sektion = meiste Tipps (Pille und Funktionen) außerhalb von Admin
     select e.account_id, count(*) filter (where e.action not in ('Start', 'Pille'))::int n,
-           mode() within group (order by e.section) filter (where e.action = 'Pille') top
-    from go_usage_events e where e.at >= v_from group by e.account_id
+           mode() within group (order by e.section) filter (where e.action <> 'Start') top
+    from go_usage_events e where e.at >= v_from and coalesce(e.section, '') <> 'Admin' group by e.account_id
   ),
   fb as (
     select f.account_id,
