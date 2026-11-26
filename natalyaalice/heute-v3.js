@@ -6132,7 +6132,7 @@
         render();
         saveTodayHint();
         checkReplies();
-        setTimeout(invitePopup, 1500);
+        /* Einladungs-Dialog kommt aus index.html (promptPendingInvites), hier kein zweiter */
         if (!state.readySent) {
           state.readySent = true;
           try { document.dispatchEvent(new CustomEvent("go:aktuell-ready")); } catch (eR) {}
