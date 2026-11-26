@@ -23902,15 +23902,23 @@
       }
 
       /* Foto des Einladenden für den Dialog */
+      var inviteFacePhotos = {};
       function inviteFromFace(invite) {
         var p = (teamPeople || []).filter(function (x) { return x && String(x.id) === String(invite.from_id); })[0] || {};
-        return { photo: p.photo_url || p.photo || "", name: String(p.name || invite.from_name || "Jemand").split(" ")[0] };
+        return { photo: p.photo_url || p.photo || inviteFacePhotos[String(invite.from_id)] || "", name: String(p.name || invite.from_name || "Jemand").split(" ")[0] };
       }
       function openIncoming(invite) {
         pendingIncoming = invite;
         /* gleicher Dialog wie überall: Foto, ein Satz, Annehmen | Kann nicht; daneben tippen = später */
         if (window.GoDialog && GoDialog.confirm) {
-          var face = inviteFromFace(invite);
+          var face0 = inviteFromFace(invite);
+          /* Team noch nicht geladen (Dialog direkt beim Start): Foto aus dem Konto holen */
+          var faceJob = face0.photo || !invite.from_id ? Promise.resolve(face0)
+            : rest("go_accounts?id=eq." + encodeURIComponent(invite.from_id) + "&select=photo_url,name").then(function (r) {
+                var a = (r && r[0]) || {};
+                return { photo: a.photo_url || "", name: face0.name !== "Jemand" ? face0.name : String(a.name || "Jemand").split(" ")[0] };
+              }).catch(function () { return face0; });
+          faceJob.then(function (face) {
           var dIso0 = String(invite.workout_date || "").slice(0, 10);
           var today0 = Log.berlinToday();
           var dTxt0 = !dIso0 ? "" : dIso0 === today0 ? "heute" : new Date(dIso0 + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "numeric" });
@@ -23922,6 +23930,7 @@
               if (yes === null) laterIncoming();
               else decideIncoming(yes ? "accepted" : "declined");
             });
+          });
           return;
         }
         var fromEl = document.getElementById("invite-in-from");
@@ -23968,6 +23977,22 @@
           var sDay = new Date(sIso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long" });
           var sWho = String(next.from_name || "Dein Freund").split(" ")[0];
           var sFace = inviteFromFace(next);
+          if (!sFace.photo && next.from_id) {
+            /* Foto nachladen, Dialog danach (Team beim Start oft noch leer) */
+            invitePromptOn = false;
+            if (!invitePromptSkip["face:" + next.from_id]) {
+              invitePromptSkip["face:" + next.from_id] = true;
+              invitePromptOn = true;
+              rest("go_accounts?id=eq." + encodeURIComponent(next.from_id) + "&select=photo_url").then(function (r) {
+                var ph = r && r[0] && r[0].photo_url;
+                if (ph && !(teamPeople || []).some(function (x) { return x && String(x.id) === String(next.from_id); })) {
+                  inviteFacePhotos[String(next.from_id)] = ph;
+                }
+              }).catch(function () {}).then(function () { invitePromptOn = false; promptPendingInvites(); });
+              return;
+            }
+            invitePromptOn = true;
+          }
           GoDialog.confirm(sWho + " lädt Dich jeden " + sDay + " ein: " + (next.workout_label || "Training") +
             (next.meet_time ? ", " + next.meet_time : ""), { body: "Es steht dann jede Woche in Deinem Kalender.",
               ok: "Annehmen", cancel: "Kann nicht", row: true, dismiss: null, photo: sFace.photo, initial: sFace.photo ? "" : sWho }).then(function (yes) {
