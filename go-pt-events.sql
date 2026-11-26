@@ -91,9 +91,20 @@ declare
 begin
   select ps.*, b.client_id, b.coach_id into s
   from go_pt_sessions ps join go_pt_bookings b on b.id = ps.booking_id where ps.id = p_session;
-  if s.id is null or s.coach_id <> v_me then raise exception 'not_coach'; end if;
+  if s.id is null then raise exception 'not_found'; end if;
   v_who := go_first_name(v_me);
   v_when := to_char(s.session_at at time zone 'Europe/Berlin', 'DD.MM. "um" HH24:MI');
+  -- Coachee darf nur „Absagen mit Stempel“, die Nachricht geht an den Coach
+  if s.client_id = v_me and p_action = 'cancel_stamp' then
+    update go_pt_sessions set status = 'declined', updated_at = now() where id = p_session;
+    update events set status = 'ausgefallen' where pt_session_id = p_session and status = 'geplant';
+    update go_stamp_links set stamps = least(12, stamps + 1)
+    where account_id = s.client_id and kind = 'coach' and ref = s.coach_id::text and status = 'linked';
+    insert into go_messages (to_id, from_id, kind, body) values (s.coach_id, v_me, 'pt',
+      v_who || ' hat Euer Personal Training am ' || v_when || ' abgesagt. Der Termin zählt als Stempel.');
+    return;
+  end if;
+  if s.coach_id <> v_me then raise exception 'not_coach'; end if;
   if p_action = 'start' then
     insert into go_messages (to_id, from_id, kind, body) values (s.client_id, v_me, 'pt', v_who || ' hat Euer Personal Training gestartet.');
   elsif p_action = 'move' then
