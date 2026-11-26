@@ -170,7 +170,20 @@
         ".stamp-mini:not(#_){background:#000 !important;color:#fff !important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.5)}" +
         ".stamp-mini__slot:not(#_),.kreis-stamps__slot:not(#_),.stamp-pass__slot:not(#_){border-color:rgba(255,255,255,.6) !important}" +
         ".stamp-mini__slot.is-filled:not(#_),.kreis-stamps__slot.is-filled:not(#_),.stamp-pass__slot.is-filled:not(#_){background:#fff !important;border-color:#fff !important}" +
-        ".gcg__face span.gcg__img{background-color:#000 !important;color:#fff;box-shadow:inset 0 0 0 1.5px #fff}"
+        ".gcg__face span.gcg__img{background-color:#000 !important;color:#fff;box-shadow:inset 0 0 0 1.5px #fff}" +
+        /* Feste Dunkelfarben, die die Farbtabelle nicht kennt (#111, #1D1630): auf Schwarz hell */
+        ".friend-list__reqbtn.is-dark:not(#_){background:#fff !important;color:#000 !important;border-color:#fff !important}" +
+        ".gbub-strip__ring svg:not(#_){stroke:#fff !important}" +
+        ".wr-time-wheel:not(#_){background:#000 !important;border-color:rgba(255,255,255,.35) !important}" +
+        ".wr-time-opt.is-on:not(#_),.wr-time-sep:not(#_){color:#fff !important}.wr-time-center:not(#_){border-color:rgba(255,255,255,.35) !important}" +
+        ".wr-time-fade--top:not(#_){background:linear-gradient(#000,rgba(0,0,0,0)) !important}.wr-time-fade--bot:not(#_){background:linear-gradient(rgba(0,0,0,0),#000) !important}" +
+        ".time-card h2:not(#_){color:#fff !important}" +
+        ".gz-seg button.is-on:not(#_),.gz-pf.is-on:not(#_){background:#fff !important;color:#000 !important;border-color:#fff !important}" +
+        ".gz-online input{accent-color:#fff}" +
+        ".cp-days button:not(.is-on),.gcr-btn--ghost,.gxm-row a,.gxm-row button.gxm-back,.hxe__chips button:not(.is-on),.hxe__btns button:not(.is-dark):not(.is-quiet),.ga-root .ga-aninfo,.ga-root .ga-info__btns button:not(.is-dark):not(.is-quiet){color:#fff !important;border-color:#fff !important;background:transparent !important}" +
+        ".cp-days button.is-on:not(#_),.hxe__chips button.is-on:not(#_),.hxe__btns button.is-dark:not(#_),.ga-root .ga-info__btns button.is-dark{background:#fff !important;color:#000 !important;border-color:#fff !important}" +
+        ".ga-root .ga-tkv__bar button{color:#fff !important}" +
+        ".wr-zjoin__own:not(#_),.go-online-cta--ghost:not(#_){color:#fff !important;border-color:#fff !important;background:transparent !important}"
     },
     /* Terrakotta: Olivgrau, Rost, Terrakotta, Blush, Taubenblau, Schiefer. Kontraste geprüft:
        Text #34362B auf Hell ≥ 10:1, Nebentext #5D646D ≥ 5:1, Weiß auf Rost 5,4:1 (Terrakotta nie als Texthintergrund) */
@@ -260,7 +273,9 @@
       .replace(/background:#fff !important;color:#000 !important/g, "background:#FF4F9A !important;color:#121214 !important")
       .replace(/background-color:#000/g, "background-color:#121214")
       .replace(/background:#000/g, "background:#121214")
-      .replace(/#0A0A0A/g, "#1C1C20") +
+      .replace(/#0A0A0A/g, "#1C1C20")
+      .replace(/linear-gradient\(#000,rgba\(0,0,0,0\)\)/g, "linear-gradient(#121214,rgba(18,18,20,0))")
+      .replace(/linear-gradient\(rgba\(0,0,0,0\),#000\)/g, "linear-gradient(rgba(18,18,20,0),#121214)") +
       "html,body{background:#121214 !important}" +
       ".app-pill .pill-dot{background:#FF4F9A !important}" +
       /* Monoton (Streifenschrift) nur für kurze große Titel; alles andere Syne, gut lesbar */
