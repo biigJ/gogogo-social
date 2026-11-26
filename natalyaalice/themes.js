@@ -153,6 +153,10 @@
         ".gcg__open:not(#_){background:#000 !important;color:#fff !important;border-color:rgba(255,255,255,.35) !important}.gcg__open input{accent-color:#fff}" +
         /* Meine Coachees: Stempel weiß umrandet, innen schwarz (gestempelt weiß) */
         ".gcg__stamps i:not(#_){border-color:#fff !important;background:#000 !important}.gcg__stamps i.is-on:not(#_){background:#fff !important}" +
+        /* Stempelkarten im Dunkeln: dunkle Karte, Stempel weiß gefüllt (Plus-Kachel, Kreise, Karte) */
+        ".stamp-mini:not(#_){background:#000 !important;color:#fff !important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.5)}" +
+        ".stamp-mini__slot:not(#_),.kreis-stamps__slot:not(#_),.stamp-pass__slot:not(#_){border-color:rgba(255,255,255,.6) !important}" +
+        ".stamp-mini__slot.is-filled:not(#_),.kreis-stamps__slot.is-filled:not(#_),.stamp-pass__slot.is-filled:not(#_){background:#fff !important;border-color:#fff !important}" +
         ".gcg__face span.gcg__img{background-color:#000 !important;color:#fff;box-shadow:inset 0 0 0 1.5px #fff}"
     },
     /* Terrakotta: Olivgrau, Rost, Terrakotta, Blush, Taubenblau, Schiefer. Kontraste geprüft:
