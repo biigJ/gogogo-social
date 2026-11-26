@@ -157,6 +157,8 @@
     ".ga-usno{font-size:12px;color:rgba(0,0,0,.45);text-align:center}" +
     ".ga-usrow select{min-height:34px;min-width:0;padding:0 8px;border-radius:10px;border:1px solid rgba(0,0,0,.2);background:#F3EEE4;font:inherit;font-size:13px;color:#111}" +
     ".ga-antools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 4px}.ga-antools .ga-filters{margin:0}" +
+    ".ga-aninfo{flex:none;width:34px;height:34px;padding:0;border-radius:50%;border:1.5px solid #111;background:transparent;color:#111;font:italic 700 16px Georgia,serif;cursor:pointer}" +
+    ".ga-info .ga-logrow{grid-template-columns:96px 1fr}" +
     ".ga-anpanel{max-width:620px}.ga-anrow{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) 24px}" +
     ".ga-anrow input{min-height:34px;min-width:0;padding:0 8px;border-radius:10px;border:1px solid rgba(0,0,0,.2);background:#F3EEE4;font:inherit;font-size:13px;color:#111;box-sizing:border-box;width:100%}" +
     ".ga-anempty{margin:0 0 8px;font-size:13px;color:rgba(42,33,24,.6)}" +
@@ -2081,7 +2083,7 @@
     var funnel = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4-2v-4.5z"/></svg>';
     var sortIco = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/></svg>';
     var days = [[7, "7 Tage"], [30, "30 Tage"], [90, "90 Tage"], [0, "Alles"]];
-    var tools = '<div class="ga-antools"><span class="ga-filters"><select data-ga-andays aria-label="Zeitraum" class="is-on">' + days.map(function (d) {
+    var tools = '<div class="ga-antools"><button type="button" class="ga-aninfo" data-ga-an="info" aria-label="Info zur Analyse">i</button><span class="ga-filters"><select data-ga-andays aria-label="Zeitraum" class="is-on">' + days.map(function (d) {
         return '<option value="' + d[0] + '"' + (Number(an.days) === d[0] ? " selected" : "") + ">" + d[1] + "</option>"; }).join("") + "</select></span>" +
       '<button type="button" class="ga-usbtn' + (an.fOpen ? " is-open" : "") + '" data-ga-an="ftoggle">' + funnel + "Filter" + (an.f.length ? " · " + an.f.length : "") + "</button>" +
       '<button type="button" class="ga-usbtn' + (an.sOpen ? " is-open" : "") + '" data-ga-an="stoggle">' + sortIco + "Sortieren nach" + (an.s.length ? " · " + an.s.length : "") + "</button></div>" +
@@ -2109,12 +2111,29 @@
     }).join("");
     return tools + chips + sum +
       '<div class="ga-tblwrap"><table class="ga-tbl"><thead>' + head + "</thead><tbody>" +
-      (body || '<tr><td colspan="' + AN_COLS.length + '" class="ga-anempty">Keine Nutzer für diesen Filter.</td></tr>') + "</tbody></table></div>" +
-      '<p class="cp-hint">Zeile antippen: Logs der Person. Zeitraum gilt für Sitzungen, Zeit, Aktionen und Feedback. Labels: ' +
-      AN_LABELS.map(function (l) { return esc(l) + " = " + esc(AN_LABEL_INFO[l]); }).join("; ") + ".</p>";
+      (body || '<tr><td colspan="' + AN_COLS.length + '" class="ga-anempty">Keine Nutzer für diesen Filter.</td></tr>') + "</tbody></table></div>";
+  }
+  /* Info (links in der Kopfzeile): Labels und Lesehilfe */
+  function anInfo() {
+    var box = document.createElement("div");
+    box.className = "ga-info";
+    box.innerHTML = '<div class="ga-info__card" role="dialog" aria-modal="true"><p class="ga-info__name" style="text-align:center">Analyse</p>' +
+      '<p class="ga-h3">Labels</p>' + AN_LABELS.map(function (l) {
+        return '<p class="ga-logrow"><span><b>' + esc(l.replace("-User", "")) + "</b></span><span>" + esc(AN_LABEL_INFO[l]) + "</span></p>";
+      }).join("") +
+      '<p class="ga-h3">Lesen</p>' +
+      '<p class="ga-logrow"><span><b>Zeitraum</b></span><span>gilt für Sitzungen, Zeit, Aktionen und Feedback. Labels und die Spalten mit „30 T“ immer letzte 30 Tage.</span></p>' +
+      '<p class="ga-logrow"><span><b>Zeit</b></span><span>nur aktive Zeit, solange die App sichtbar ist. Nach 30 min im Hintergrund neue Sitzung.</span></p>' +
+      '<p class="ga-logrow"><span><b>Aktionen</b></span><span>angetippte Funktionen ohne Pille und Start.</span></p>' +
+      '<p class="ga-logrow"><span><b>Feedback</b></span><span>Dialog jede 20. Sitzung.</span></p>' +
+      '<p class="ga-logrow"><span><b>Zeile</b></span><span>antippen: Logs der Person.</span></p>' +
+      '<div class="ga-info__btns"><button type="button" class="is-quiet" data-gi-close="1">Schließen</button></div></div>';
+    document.body.appendChild(box);
+    box.addEventListener("click", function (e) { if (e.target === box || e.target.closest("[data-gi-close]")) box.remove(); });
   }
   function onAnalyse(t) {
     var an = anState(), act = t.getAttribute("data-ga-an"), i = parseInt(t.getAttribute("data-i"), 10);
+    if (act === "info") { anInfo(); return; }
     if (act === "ftoggle") an.fOpen = !an.fOpen;
     else if (act === "stoggle") an.sOpen = !an.sOpen;
     else if (act === "fadd") an.f.push({ k: "labels", op: "has", v: "" });
