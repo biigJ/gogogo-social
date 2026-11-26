@@ -61,6 +61,7 @@
     ".god__area{min-height:88px;padding:10px 12px;resize:none;font-family:inherit}" +
     ".god__file{display:flex;align-items:center;justify-content:center;cursor:pointer}" +
     ".god__row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}" +
+    ".god__row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 0 12px}.god__row3 .god__btn{margin:0;padding:0 6px}" +
     ".god__check{margin:12px 0 16px;line-height:1.3;padding:10px 12px}" +
     ".god__row2 .god__btn{margin:0}" +
     ".god__btn.is-off{opacity:.55}" +
@@ -671,5 +672,50 @@
     });
   }
 
-  global.GoDialog = { place: placeDlg, alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg, plan: planDlg, done: doneDlg, vis: visDlg, form: formDlg };
+  /* Kurzes Feedback: Überschrift, Untertitel, drei Antworten (eine wählbar), Textfeld, Absenden → { answer, text } | null */
+  function feedbackDlg(msg, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      var tEl = card.querySelector(".god__text");
+      if (tEl) tEl.classList.add("is-center");
+      if (opts.sub) {
+        var sub = document.createElement("p");
+        sub.className = "god__sub";
+        sub.textContent = opts.sub;
+        card.appendChild(sub);
+      }
+      var answer = "";
+      var row = document.createElement("div");
+      row.className = "god__row3";
+      (opts.options || []).forEach(function (o) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "god__btn god__btn--choice";
+        b.textContent = o.label;
+        b.setAttribute("aria-pressed", "false");
+        b.addEventListener("click", function () {
+          answer = answer === o.value ? "" : o.value;
+          [].forEach.call(row.children, function (x) {
+            var on = answer && x === b;
+            x.classList.toggle("god__btn--choice", !on);
+            x.setAttribute("aria-pressed", on ? "true" : "false");
+          });
+        });
+        row.appendChild(b);
+      });
+      card.appendChild(row);
+      var area = document.createElement("textarea");
+      area.className = "god__input god__area";
+      area.rows = 3;
+      area.maxLength = opts.maxLength || 2000;
+      area.placeholder = opts.placeholder || "";
+      card.appendChild(area);
+      button(card, opts.ok || "Absenden", "", function () { close({ answer: answer, text: String(area.value || "").trim() }); });
+      button(card, opts.cancel || "Später", "god__btn--quiet", function () { close(null); });
+      return null;
+    });
+  }
+
+  global.GoDialog = { feedback: feedbackDlg, place: placeDlg, alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg, plan: planDlg, done: doneDlg, vis: visDlg, form: formDlg };
 })(window);
