@@ -7234,6 +7234,7 @@
         if (!el) return;
         var box = el; el = null;
         box.classList.add("is-done");
+        if (window.__goStatusFade) window.__goStatusFade();
         setTimeout(function () { if (box.parentNode) box.parentNode.removeChild(box); }, 320);
       }
       var has = false;
@@ -7264,6 +7265,7 @@
             ? '<p class="go-boot__txt go-boot__txt--top">' + esc(text) + "</p>" + (window.__goWheel || "")
             : (window.__goWheel || "") + '<p class="go-boot__txt">Lädt</p>';
           document.body.appendChild(box);
+          if (window.__goStatusFade) window.__goStatusFade();
         }, text ? 0 : 120);
         var safety = setTimeout(hideNow, 6000);
         function hide() {
@@ -7278,6 +7280,7 @@
           if (!box) return;
           var b = box;
           b.classList.add("is-done");
+          if (window.__goStatusFade) window.__goStatusFade();
           setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 320);
         }
         return { hide: hide };
@@ -13856,6 +13859,13 @@
             }
           }
         }
+        /* Ladebildschirm offen: Statusleiste in dessen Farbe, sonst färbt iOS das Band
+           unter der Uhr in der Farbe der Seite dahinter (z. B. Ocker vom Kalenderbild) */
+        var bootOn = document.querySelector(".go-boot:not(.is-done)");
+        if (bootOn) {
+          var bootBg = window.getComputedStyle(bootOn).backgroundColor;
+          if (bootBg && bootBg !== "transparent" && bootBg !== "rgba(0, 0, 0, 0)") surface = bootBg;
+        }
         var bar = document.getElementById("gogogo-status-bg");
         if (!bar && document.body) {
           bar = document.createElement("div");
@@ -13864,19 +13874,21 @@
           bar.style.cssText = "position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top,0px);z-index:35;pointer-events:none;";
           document.body.appendChild(bar);
         }
-        var active = !!(sessionMode && shell && shell !== "workout");
+        var active = !!((sessionMode && shell && shell !== "workout") || bootOn);
         if (bar) {
           bar.style.background = surface;
           bar.style.display = active ? "block" : "none";
           /* Unter Reels-Header (z-index 5–6), nicht darüber — sonst Icons „hinter Verlauf“ */
           /* über Vollseiten wie Kreise (z-index 70), damit der iOS-Verlauf dort nicht in die Headline läuft; unter Dialogen */
-          bar.style.zIndex = reelsOn ? "28" : "75";
+          bar.style.zIndex = bootOn ? "10070" : reelsOn ? "28" : "75";
         }
         document.documentElement.style.background = active ? surface : "";
         if (document.body) document.body.style.background = active ? surface : "";
         var theme = document.querySelector('meta[name="theme-color"]');
         if (theme) theme.setAttribute("content", active ? surface : themeColor("#F3EEE4"));
       }
+
+      window.__goStatusFade = function () { syncStatusFade(); };
 
       function paintPill() {
         beatTrainingPresence();

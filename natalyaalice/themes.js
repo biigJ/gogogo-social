@@ -121,6 +121,7 @@
         ".ga-root .ga-tk__meta b{color:#fff !important}" +
         ".ga-root .ga-face,.ga-root .ga-rect{color:#111 !important}" +
         /* alte Dialoge (Workout fertig, Neustart, …): dunkle Karte, also helle Schrift */
+        ".modal-card:not(#_){background:#0A0A0A !important;border:1px solid rgba(255,255,255,.3) !important}" +
         ".modal-card,.modal-card h2,.modal-card p{color:#fff !important}" +
         ".modal-card .quiet{color:#fff !important;border-color:rgba(255,255,255,.6) !important;background:transparent !important}" +
         ".modal-card .primary{background:#fff !important;color:#000 !important}" +
@@ -145,6 +146,11 @@
         "#gbub-compose .gbub-compose__inp:not(#_){background:transparent !important;border:0 !important;color:#fff !important}" +
         "#gbub-compose button[type=submit]{background:#fff !important;color:#000 !important}" +
         "#gbub-compose .gbub-compose__att{color:#fff !important}" +
+        /* @-Erwähnung: Namensliste und getippter Text (Dunkelblau auf Schwarz war unlesbar) */
+        ".gbub-compose__mention button:not(#_){background:#000 !important;color:#fff !important}" +
+        ".gbub-compose__mention small:not(#_){color:rgba(255,255,255,.6) !important;opacity:1}" +
+        ".gbub-compose__mention i:not(#_){background:#1A1A1A !important;color:#fff !important}" +
+        ".gbub-compose__mirror:not(#_){color:#fff !important}.gbub-compose .gbub-compose__field .gbub-compose__inp:not(#_){caret-color:#fff !important}" +
         "#gbub-compose .gbub-compose__reply{background:#1A1A1A !important;color:#fff !important;border-left-color:#fff !important}" +
         /* Leiste unten: schwarz, weiße Schrift, feine weiße Kante gegen den schwarzen Grund */
         "html[data-go-theme=bw] .app-pill nav:not(#_){background:#000 !important;color:#fff !important;box-shadow:0 0 0 1px rgba(255,255,255,.28) !important}html[data-go-theme=bw] .app-pill .pill-dot:not(#_){background:#fff !important}" +
