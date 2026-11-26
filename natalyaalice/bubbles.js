@@ -325,7 +325,7 @@
       var q = normM(m[2]);
       var job = mList ? Promise.resolve(mList) : Promise.resolve(host.mentionCandidates()).then(function (l) { mList = l || []; return mList; });
       job.then(function (list) {
-        var hits = list.filter(function (p) { return !q || normM(firstName(p)).indexOf(q) === 0 || normM(p.nickname).indexOf(q) === 0; }).slice(0, 5);
+        var hits = list.filter(function (p) { return !q || normM(firstName(p)).indexOf(q) === 0 || normM(p.nickname).indexOf(q) === 0; }).slice(0, 30);
         if (!hits.length || mAt < 0) return hideMention();
         mBox.innerHTML = hits.map(function (p) {
           return '<button type="button" data-gbub-mention="' + escM(p.id) + '">' + (p.photo_url ? '<img src="' + escM(p.photo_url) + '" alt="" />' : "<i>" + escM(firstName(p).slice(0, 1)) + "</i>") +
