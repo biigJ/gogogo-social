@@ -9035,7 +9035,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-193"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-194"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-129"></script>
   <script src="/natalyaalice/support.js?v=support-36"></script>
@@ -23901,8 +23901,29 @@
         });
       }
 
+      /* Foto des Einladenden für den Dialog */
+      function inviteFromFace(invite) {
+        var p = (teamPeople || []).filter(function (x) { return x && String(x.id) === String(invite.from_id); })[0] || {};
+        return { photo: p.photo_url || p.photo || "", name: String(p.name || invite.from_name || "Jemand").split(" ")[0] };
+      }
       function openIncoming(invite) {
         pendingIncoming = invite;
+        /* gleicher Dialog wie überall: Foto, ein Satz, Annehmen | Kann nicht; daneben tippen = später */
+        if (window.GoDialog && GoDialog.confirm) {
+          var face = inviteFromFace(invite);
+          var dIso0 = String(invite.workout_date || "").slice(0, 10);
+          var today0 = Log.berlinToday();
+          var dTxt0 = !dIso0 ? "" : dIso0 === today0 ? "heute" : new Date(dIso0 + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "numeric" });
+          var line = face.name + " lädt Dich ein: " + (invite.workout_label || "Training") +
+            [dTxt0, invite.meet_time ? invite.meet_time + " Uhr" : ""].filter(Boolean).map(function (x, i) { return (i ? " " : ", ") + x; }).join("") +
+            (invite.place ? " · " + invite.place : "");
+          GoDialog.confirm(line, { ok: "Annehmen", cancel: "Kann nicht", row: true, dismiss: null, photo: face.photo, initial: face.photo ? "" : face.name })
+            .then(function (yes) {
+              if (yes === null) laterIncoming();
+              else decideIncoming(yes ? "accepted" : "declined");
+            });
+          return;
+        }
         var fromEl = document.getElementById("invite-in-from");
         if (fromEl) {
           var dIso = String(invite.workout_date || "").slice(0, 10);
@@ -23946,12 +23967,11 @@
           var sIso = String(next.workout_date || "").slice(0, 10);
           var sDay = new Date(sIso + "T12:00:00").toLocaleDateString("de-DE", { weekday: "long" });
           var sWho = String(next.from_name || "Dein Freund").split(" ")[0];
-          GoDialog.choose(sWho + " lädt Dich jeden " + sDay + " ein: " + (next.workout_label || "Training") +
-            (next.meet_time ? ", " + next.meet_time : "") + ".", [
-              { label: "Annehmen", value: "woche" },
-              { label: "Klappt nicht", value: "declined" },
-              { label: "Vielleicht", value: "maybe" }
-            ], { sub: "Annehmen: Es steht dann jede Woche in Deiner Woche." }).then(function (v) {
+          var sFace = inviteFromFace(next);
+          GoDialog.confirm(sWho + " lädt Dich jeden " + sDay + " ein: " + (next.workout_label || "Training") +
+            (next.meet_time ? ", " + next.meet_time : ""), { body: "Es steht dann jede Woche in Deinem Kalender.",
+              ok: "Annehmen", cancel: "Kann nicht", row: true, dismiss: null, photo: sFace.photo, initial: sFace.photo ? "" : sWho }).then(function (yes) {
+            var v = yes === null ? null : yes ? "woche" : "declined";
             invitePromptSkip[sKey] = true;
             invitePromptOn = false;
             if (v === "declined" || v === "maybe") {
