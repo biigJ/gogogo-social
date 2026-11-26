@@ -588,7 +588,14 @@
         : [{ label: "Absagen", value: "declined" }];
       GoDialog.choose("PT mit " + name + ", " + shortDay(iso) + " " + pad(h) + ":00", opts).then(function (v) {
         if (!v) return;
-        host.rest("go_pt_sessions?id=eq." + encodeURIComponent(s.id), { method: "PATCH", prefer: "return=minimal", body: { status: v, updated_at: new Date().toISOString() } })
+        /* Bestätigen legt das gemeinsame Event bei Coach und Coachee an, Absagen setzt es auf ausgefallen;
+           beides meldet sich beim Coachee (go-pt-events.sql) */
+        var job = v === "confirmed"
+          ? host.rest("rpc/go_pt_confirm", { method: "POST", body: { p_session: s.id } })
+          : host.rest("rpc/go_pt_action", { method: "POST", body: { p_session: s.id, p_action: "cancel" } });
+        job.catch(function () {
+          return host.rest("go_pt_sessions?id=eq." + encodeURIComponent(s.id), { method: "PATCH", prefer: "return=minimal", body: { status: v, updated_at: new Date().toISOString() } });
+        })
           .then(function () { if (host.onChange) host.onChange(); return refresh("day"); })
           .catch(function () { host.toast("Ging gerade nicht"); });
       });

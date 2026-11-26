@@ -9026,18 +9026,18 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-56"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-6"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-33"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-34"></script>
   <script src="/natalyaalice/go-usage.js?v=gus-1"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-25"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-26"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-189"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-190"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-129"></script>
   <script src="/natalyaalice/support.js?v=support-36"></script>
-  <script src="/natalyaalice/pt-calendar.js?v=gpt-3"></script>
+  <script src="/natalyaalice/pt-calendar.js?v=gpt-4"></script>
   <script src="/natalyaalice/coach-group.js?v=gcg-5"></script>
   <script>
     (function () {
@@ -27595,6 +27595,20 @@
             travelRange: function () { return absenceOf(sessionAccount); },
             openEventWorkout: function (ev) { openEventWorkout(ev); },
             /* Heutiges Event antippen → eigene Stempelkarte mit Event im QR */
+            /* Personal Training (go-pt-events.sql): Coachee sieht seine Karte bei diesem Coach, Coach die Karte des Coachees */
+            openPtStamp: function (pt, role) {
+              if (!pt) return;
+              if (role === "client") {
+                var ord0 = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
+                openStampCardModal(ord0 || { meta: { stamps: 0 } }, { only: { kind: "coach", ref: String(pt.coach) } });
+                return;
+              }
+              rest("rpc/go_coach_cards", { method: "POST", body: { p_coach: String(pt.coach) } }).catch(function () { return []; }).then(function (rows) {
+                var c = (rows || []).filter(function (r) { return String(r.account_id) === String(pt.client); })[0] || { stamps: 0 };
+                var person = (teamPeople || []).filter(function (x) { return x && String(x.id) === String(pt.client); })[0] || { id: pt.client, name: "" };
+                openStampPreview({ kind: "coach", name: "Coach " + String((sessionAccount && (sessionAccount.name || sessionAccount.nickname)) || "").split(" ")[0], stamps: c.stamps || 0 }, person);
+              });
+            },
             openStampCard: function (ev) {
               var ord = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
               if (!ord || !ev) return false;

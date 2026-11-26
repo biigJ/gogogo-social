@@ -61,6 +61,8 @@
     ".god__area{min-height:88px;padding:10px 12px;resize:none;font-family:inherit}" +
     ".god__file{display:flex;align-items:center;justify-content:center;cursor:pointer}" +
     ".god__row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}" +
+    ".god__chips{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px}.god__chip{min-height:32px;padding:0 12px;border-radius:999px;border:1.5px solid #2A2118;background:transparent;color:#2A2118;font:inherit;font-size:13px;font-weight:600;cursor:pointer}.god__chip.is-on{background:#2A2118;color:#fff}" +
+    ".god__lrow{width:100%;border:0;text-align:left;font:inherit;font-size:15px;color:#2A2118;justify-content:space-between}.god__lrow small{font-size:12px;opacity:.6;margin-left:8px;flex:none}" +
     ".god__row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:0 0 12px}.god__row3 .god__btn{margin:0;padding:0 6px}" +
     ".god__check{margin:12px 0 16px;line-height:1.3;padding:10px 12px}" +
     ".god__row2 .god__btn{margin:0}" +
@@ -672,6 +674,74 @@
     });
   }
 
+  /* Liste mit Suche und Filter-Pillen: items [{label, value, tag, sub}], opts.filters [{label, value}], opts.top [{label, value}] → value | null */
+  function listDlg(msg, items, opts) {
+    opts = opts || {};
+    return open(function (card, close) {
+      text(card, msg);
+      var tEl = card.querySelector(".god__text");
+      if (tEl) tEl.classList.add("is-center");
+      (opts.top || []).forEach(function (o) { button(card, o.label, "", function () { close(o.value); }); });
+      var q = document.createElement("input");
+      q.className = "god__input";
+      q.type = "search";
+      q.placeholder = opts.placeholder || "Suchen";
+      card.appendChild(q);
+      var tag = "";
+      var chips = null;
+      if ((opts.filters || []).length) {
+        chips = document.createElement("div");
+        chips.className = "god__chips";
+        [{ label: "Alle", value: "" }].concat(opts.filters).forEach(function (f) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "god__chip" + (f.value === "" ? " is-on" : "");
+          b.textContent = f.label;
+          b.addEventListener("click", function () {
+            tag = f.value;
+            [].forEach.call(chips.children, function (x) { x.classList.toggle("is-on", x === b); });
+            paintList();
+          });
+          chips.appendChild(b);
+        });
+        card.appendChild(chips);
+      }
+      var list = document.createElement("div");
+      list.className = "god__list";
+      card.appendChild(list);
+      function paintList() {
+        var needle = String(q.value || "").trim().toLowerCase();
+        list.innerHTML = "";
+        var hits = (items || []).filter(function (it) {
+          return (!tag || it.tag === tag) && (!needle || String(it.label).toLowerCase().indexOf(needle) >= 0);
+        });
+        hits.forEach(function (it) {
+          var row = document.createElement("button");
+          row.type = "button";
+          row.className = "god__pick god__lrow";
+          row.textContent = it.label;
+          if (it.sub) {
+            var sm = document.createElement("small");
+            sm.textContent = it.sub;
+            row.appendChild(sm);
+          }
+          row.addEventListener("click", function () { close(it.value); });
+          list.appendChild(row);
+        });
+        if (!hits.length) {
+          var none = document.createElement("p");
+          none.className = "god__sub";
+          none.textContent = "Nichts gefunden.";
+          list.appendChild(none);
+        }
+      }
+      q.addEventListener("input", paintList);
+      paintList();
+      button(card, opts.cancel || "Abbrechen", "god__btn--quiet", function () { close(null); });
+      return null;
+    });
+  }
+
   /* Kurzes Feedback: Überschrift, Untertitel, drei Antworten (eine wählbar), Textfeld, Absenden → { answer, text } | null */
   function feedbackDlg(msg, opts) {
     opts = opts || {};
@@ -717,5 +787,5 @@
     });
   }
 
-  global.GoDialog = { feedback: feedbackDlg, place: placeDlg, alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg, plan: planDlg, done: doneDlg, vis: visDlg, form: formDlg };
+  global.GoDialog = { list: listDlg, feedback: feedbackDlg, place: placeDlg, alert: alertDlg, confirm: confirmDlg, prompt: promptDlg, choose: chooseDlg, pick: pickDlg, note: noteDlg, time: timeDlg, plan: planDlg, done: doneDlg, vis: visDlg, form: formDlg };
 })(window);
