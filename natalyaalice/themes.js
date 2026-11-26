@@ -103,6 +103,13 @@
         ".friend-list__feed{border-color:#fff !important}.friend-list__feed.is-on{background:#fff !important;color:#000 !important;border-color:#fff !important}" +
         ".wr-mini-wheel,.cp-wheel,.gtm__wheel{background:#000 !important;border-color:#fff !important}" +
         ".wr-mini-opt,.cp-wheel__opt,.gtm__opt{color:#fff !important}" +
+        /* Workout: Rad für Wiederholungen unten (vorher hellgrau mit weißer Schrift) */
+        "#wheel.wheel:not(#_){background:#000 !important;border-top:1px solid rgba(255,255,255,.35) !important;color:#fff !important}" +
+        "#wheel .wheel-frame::before{background:linear-gradient(#000,rgba(0,0,0,0)) !important}#wheel .wheel-frame::after{background:linear-gradient(rgba(0,0,0,0),#000) !important}" +
+        "#wheel .wheel-head span{color:#fff !important}#wheel .wheel-head button:not(#_){background:#fff !important;color:#000 !important}" +
+        "#wheel .wheel-item:not(#_){color:rgba(255,255,255,.45) !important}#wheel .wheel-item.is-on:not(#_){color:#fff !important}" +
+        "#wheel .wheel-mark{border-color:rgba(255,255,255,.35) !important}" +
+        ".reps input:not(#_),.kg input:not(#_){color:#fff !important}" +
         /* Ort-Feld in Tage bearbeiten wie das Uhrzeitrad (weißes Feld mit heller Schrift war unlesbar) */
         ".wr-dt-box{background:#000 !important;border-color:#fff !important;color:#fff !important}.wr-dt-box.is-empty{color:rgba(255,255,255,.55) !important}" +
         /* Admin: Konturknöpfe und Pillen mit fester #111-Schrift waren auf Schwarz unsichtbar → hell; gefüllte invertiert */
