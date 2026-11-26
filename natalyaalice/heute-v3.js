@@ -1430,8 +1430,13 @@
     if (!ev) return false;
     var uid = me();
     var mine = String(ev.user_id) === uid;
-    /* Teilnahme-Einheit am Gruppentraining: nur in der Datenbank, im Feed steht das Event der Gruppe */
-    if (ev.copy_of) return false;
+    /* Teilnahme-Einheit am Gruppentraining: bis zum Speichern nur in der Datenbank (im Feed steht das Event der Gruppe),
+       abgeschlossen ist sie das eigene Event */
+    if (ev.copy_of && ev.status !== "erledigt") return false;
+    /* eigene Einheit gespeichert: das Event der Gruppe nicht zusätzlich zeigen */
+    if (!mine && isMyGroupEvent(ev) && (state.events || []).some(function (e) {
+      return e && String(e.user_id) === uid && String(e.copy_of || "") === String(ev.id) && e.status === "erledigt";
+    })) return false;
     var vis = normalizeVisibility(ev.visibility);
     /* Coach sieht die Events seiner Coachees immer, auch privat und „Nur Coach“ (RLS: go_is_coach_of) */
     var coachSees = !mine && isMyCoachee(ev.user_id);
