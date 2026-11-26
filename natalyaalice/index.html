@@ -9024,7 +9024,8 @@
   <script src="/natalyaalice/admin-inbox.js?v=ga-54"></script>
   <script src="/natalyaalice/coach-reviews.js?v=gcr-6"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
-  <script src="/natalyaalice/go-dialog.js?v=dlg-32"></script>
+  <script src="/natalyaalice/go-dialog.js?v=dlg-33"></script>
+  <script src="/natalyaalice/go-usage.js?v=gus-1"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-25"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
@@ -24684,6 +24685,20 @@
           if (window.GoDialog) GoDialog.alert("Dein Konto ist gesperrt.", { body: "Es gab Meldungen zu Deinen Beiträgen.", ok: "OK" }).then(leave);
           else leave();
         }).catch(function () {});
+      }
+      /* Nutzungsmessung (go-usage.js, go-usage.sql): Sitzungen, Sektion und Funktion, jede 20. Sitzung Feedback */
+      if (window.GoUsage && sessionMode && sessionAccount) {
+        GoUsage.init({
+          send: function (fn, body, keep) {
+            return fetch(apiBase + "/rest/v1/rpc/" + fn, {
+              method: "POST",
+              keepalive: !!keep,
+              headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "x-go-account-id": String(sessionAccount.id) },
+              body: JSON.stringify(body || {})
+            }).then(function (res) { return res.text().then(function (t) { if (!res.ok) throw new Error(t || res.statusText); return t ? JSON.parse(t) : null; }); });
+          },
+          toast: function (m) { gogogoToast(m); }
+        });
       }
       /* Bubbles (bubbles.js, go-bubbles.sql): Team → Bubbles, Aktuell-Filter „Bubble“, Woche → Tage bearbeiten → Bubble */
       if (window.GoBubbles && sessionMode && sessionAccount) {
