@@ -14367,7 +14367,8 @@
               if (b && b.id && b.status !== "cancelled" && (String(b.coach_id) === me || String(b.client_id) === me)) bk[String(b.id)] = b;
             });
             return (remotePtSessions || []).filter(function (x) {
-              return x && x.status !== "declined" && bk[String(x.booking_id)] && x.session_at &&
+              /* bestätigte PTs sind echte Events (go-pt-events.sql, abgesagt = ausgefallen); hier nur noch offene Anfragen */
+              return x && x.status === "proposed" && bk[String(x.booking_id)] && x.session_at &&
                 new Date(x.session_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }) === iso;
             }).map(function (x) {
               var b = bk[String(x.booking_id)];
