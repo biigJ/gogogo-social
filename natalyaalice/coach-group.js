@@ -92,6 +92,9 @@
       jobs.push(host.rest("rpc/go_coach_cards", { method: "POST", body: { p_coach: s.coach.id } }).catch(function () { return []; }));
       jobs.push(host.rest("events?user_id=eq." + encodeURIComponent(me()) + "&coach_group=eq.true&status=neq.ausgefallen&starts_at=gte." + encodeURIComponent(from) +
         "&starts_at=lt." + encodeURIComponent(to) + "&select=id,title,starts_at,location,status&order=starts_at.asc&limit=60").catch(function () { return []; }));
+      /* Events meiner Coachees, zu denen sie mich eingeladen haben (stehen auch bei ihnen unter Mein Coach) */
+      jobs.push(host.rest("go_workout_invites?to_id=eq." + encodeURIComponent(me()) + "&event_id=not.is.null&status=in.(pending,accepted,maybe)" +
+        "&workout_date=gte." + days[0] + "&workout_date=lte." + days[6] + "&select=id,status,from_id,to_id,event_id,events(id,title,starts_at,location,status)&limit=60").catch(function () { return []; }));
     } else {
       jobs.push(host.rest("go_workout_invites?to_id=eq." + encodeURIComponent(me()) + "&from_id=eq." + coach + "&event_id=not.is.null&status=in.(pending,accepted,maybe)" +
         "&workout_date=gte." + days[0] + "&workout_date=lte." + days[6] + "&select=id,status,event_id,workout_label,workout_date,events(id,title,starts_at,location,status)&limit=60")
@@ -100,6 +103,9 @@
       /* Termine aus dem Kalender des Coaches (nicht privat; was ich sehen darf, entscheidet RLS) */
       jobs.push(host.rest("events?user_id=eq." + coach + "&status=eq.geplant&visibility=neq.privat&coach_group=not.is.true&starts_at=gte." + encodeURIComponent(from) +
         "&starts_at=lt." + encodeURIComponent(to) + "&select=id,title,starts_at,location,item_type&order=starts_at.asc&limit=60").catch(function () { return []; }));
+      /* meine Events, zu denen ich meinen Coach eingeladen habe */
+      jobs.push(host.rest("go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&to_id=eq." + coach + "&event_id=not.is.null&status=in.(pending,accepted,maybe)" +
+        "&workout_date=gte." + days[0] + "&workout_date=lte." + days[6] + "&select=id,status,from_id,to_id,event_id,events(id,title,starts_at,location,status)&limit=60").catch(function () { return []; }));
     }
     /* Kalender des Coaches (PT-Kalender): gesperrte Tage, Feiertage, verfügbare Zeiten, belegte Stunden */
     var cal = Promise.all([
@@ -125,11 +131,15 @@
         s.cards = {};
         (r[1] || []).forEach(function (c) { s.cards[String(c.account_id)] = c; });
         s.events = r[2] || [];
+        var memIds = {};
+        s.members.forEach(function (p) { memIds[String(p.id)] = 1; });
+        s.joint = (r[3] || []).filter(function (x) { return x.events && x.events.status !== "ausgefallen" && memIds[String(x.from_id)]; });
         if (!s.events.length) { s.inv = []; return; }
         return host.rest("go_workout_invites?from_id=eq." + encodeURIComponent(me()) + "&event_id=in.(" + s.events.map(function (e) { return e.id; }).join(",") + ")&select=event_id,to_id,status")
           .catch(function () { return []; }).then(function (inv) { s.inv = inv || []; });
       }
       s.invites = (r[1] || []).filter(function (x) { return x.events && x.events.status !== "ausgefallen"; });
+      s.mine = (r[4] || []).filter(function (x) { return x.events && x.events.status !== "ausgefallen"; });
       var o = (r[2] || [])[0];
       s.open = !!(o && o.is_open && String(o.coach_id || "") === String(s.coach.id));
       var invited = {};
@@ -247,6 +257,15 @@
           out += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-zirkel is-group' + (past ? " is-past" : "") + '" data-gcg-ev="' + esc(e.id) + '" role="button"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
             esc(e.title || "Gruppentraining") + " · " + esc(berlinTime(e.starts_at)) + '</span><span class="wr-dayrow__tag">' + esc(tag) + "</span></div><span></span></div>";
         });
+        /* Einladungen meiner Coachees zu ihren Events: zusagen oder absagen wie bei Freunden */
+        (s.joint || []).filter(function (x) { return berlinDay(x.events.starts_at) === iso; }).forEach(function (x) {
+          var on = x.status === "accepted";
+          var who = (s.members.filter(function (p) { return String(p.id) === String(x.from_id); })[0] || {}).name;
+          out += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-group' + (past ? " is-past" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
+            esc(x.events.title || "Training") + " · " + esc(berlinTime(x.events.starts_at)) + '</span><span class="wr-dayrow__tag">' +
+            esc([x.events.location, "von " + (first(who) || "Coachee"), on ? "Du bist dabei" : "Einladung"].filter(Boolean).join(" · ")) + "</span></div>" +
+            (past ? "<span></span>" : '<button type="button" class="wr-pill-btn' + (on ? "" : " wr-pill-btn--dark") + ' wr-ga-rsvp" data-gcg-' + (on ? "no" : "yes") + '="' + esc(x.id) + '">' + (on ? "Absagen" : "Zusagen") + "</button>") + "</div>";
+        });
       } else {
         s.invites.filter(function (x) { return berlinDay(x.events.starts_at) === iso; }).forEach(function (x) {
           var on = x.status === "accepted";
@@ -255,6 +274,13 @@
             esc([x.events.location, "von " + (first(s.coach.name) || "Coach"), on ? "Du bist dabei" : ""].filter(Boolean).join(" · ")) + "</span></div>" +
             (past ? "<span></span>" : on && iso === t ? '<button type="button" class="wr-pill-btn wr-pill-btn--dark wr-ga-rsvp" data-gcg-qr="' + esc(x.event_id) + '">QR</button>'
               : '<button type="button" class="wr-pill-btn' + (on ? "" : " wr-pill-btn--dark") + ' wr-ga-rsvp" data-gcg-' + (on ? "no" : "yes") + '="' + esc(x.id) + '">' + (on ? "Absagen" : "Zusagen") + "</button>") + "</div>";
+        });
+        /* meine Events mit meinem Coach (ich habe eingeladen) */
+        (s.mine || []).filter(function (x) { return berlinDay(x.events.starts_at) === iso; }).forEach(function (x) {
+          var on = x.status === "accepted";
+          out += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-group' + (past ? " is-past" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
+            esc(x.events.title || "Training") + " · " + esc(berlinTime(x.events.starts_at)) + '</span><span class="wr-dayrow__tag">' +
+            esc([x.events.location, "Dein Event", (first(s.coach.name) || "Coach") + (on ? " ist dabei" : x.status === "maybe" ? " vielleicht" : " eingeladen")].filter(Boolean).join(" · ")) + "</span></div><span></span></div>";
         });
         /* Termine aus dem Kalender des Coaches: Zusage direkt am Event */
         (s.cal || []).filter(function (e) { return berlinDay(e.starts_at) === iso; }).forEach(function (e) {
@@ -281,7 +307,7 @@
       return out;
     }).join("");
     html += '<div class="wr-days wr-days--all">' + rows + "</div>";
-    if (s.mode === "client" && !s.invites.length && !(s.cal || []).length) html += '<p class="gcg__empty">Diese Woche keine Termine von ' + esc(first(s.coach.name) || "Deinem Coach") + ".</p>";
+    if (s.mode === "client" && !s.invites.length && !(s.cal || []).length && !(s.mine || []).length) html += '<p class="gcg__empty">Diese Woche keine Termine von ' + esc(first(s.coach.name) || "Deinem Coach") + ".</p>";
     el.innerHTML = html;
   }
   function refresh(s) {

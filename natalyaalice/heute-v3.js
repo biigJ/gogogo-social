@@ -5914,10 +5914,14 @@
       /* Personal Training: Stempelkarte von Coach und Coachee (Mein Coach) */
       if (evA && evA.pt_session_id && ptOf(evA) && host.openPtStamp) { host.openPtStamp(ptOf(evA), ptRole(evA)); return; }
       /* Heutiges Event, bei dem ich dabei bin → meine Stempelkarte (Freund scannt, Pünktlichkeit gegenseitig) */
+      /* mein Coach trainiert mit (sein Event oder er hat zugesagt): beide Karten zum Wischen */
+      var myCoachA = host.sessionAccount && host.sessionAccount.trainer_id ? String(host.sessionAccount.trainer_id) : "";
+      var coachIn = !!(evA && myCoachA && (String(evA.user_id) === myCoachA ||
+        (state.rsvps[String(evA.id)] || []).some(function (u) { return String(u) === myCoachA; })));
       if (evA && host.openStampCard &&
           new Date(evA.starts_at).toLocaleDateString("en-CA", { timeZone: "Europe/Berlin" }) === todayIso() &&
           (String(evA.user_id) === me() || iAmGoing(evA.id) || !!inviteFor(evA.id)) &&
-          host.openStampCard(evA)) {
+          host.openStampCard(evA, { withCoach: coachIn })) {
         return;
       }
       /* Sonst ist das Bild nicht aktiv: Start nur über den Kreis unten links oder „Start“ */

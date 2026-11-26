@@ -9035,12 +9035,12 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-195"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-196"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-129"></script>
   <script src="/natalyaalice/support.js?v=support-36"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-4"></script>
-  <script src="/natalyaalice/coach-group.js?v=gcg-5"></script>
+  <script src="/natalyaalice/coach-group.js?v=gcg-6"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -15997,19 +15997,23 @@
         if (dots) dots.hidden = true;
         if (!sessionAccount) return;
         modal._only = only || null;
-        if (only && only.kind === "main") return;
+        if (only && only.kind === "main" && !only.also) return;
         if (only) pass.style.visibility = "hidden";
         rest("go_stamp_links?account_id=eq." + encodeURIComponent(sessionAccount.id) + "&status=eq.linked&select=id,kind,ref,name,stamps&order=created_at.asc")
           .then(function (rows) {
             if (only) {
               pass.style.visibility = "";
-              var hit = (rows || []).filter(function (r) { return r.kind === only.kind && (!only.ref || String(r.ref) === only.ref); })[0] ||
+              var hit = only.kind === "main" ? null : (rows || []).filter(function (r) { return r.kind === only.kind && (!only.ref || String(r.ref) === only.ref); })[0] ||
                 (rows || []).filter(function (r) { return r.kind === only.kind; })[0];
+              /* zweite Karte (z. B. Coach-Karte, wenn der Coach mittrainiert) */
+              var also = only.also ? (rows || []).filter(function (r) { return r.kind === only.also.kind && (!only.also.ref || String(r.ref) === String(only.also.ref)); })[0] : null;
+              if (modal.hidden) return;
               /* keine passende verknüpfte Karte: gogogo-Karte bleibt */
-              if (!hit || modal.hidden) return;
-              modal._stack = [{ kind: hit.kind, name: hit.name, stamps: hit.stamps }];
+              var first0 = hit ? { kind: hit.kind, name: hit.name, stamps: hit.stamps } : modal._stack[0];
+              modal._stack = [first0].concat(also ? [{ kind: also.kind, name: also.name, stamps: also.stamps }] : []);
               modal._stackAt = 0;
               paintStampFace(modal._stack[0]);
+              if (modal._stack.length > 1) { pass.classList.add("has-stack"); paintStackDots(); }
               return;
             }
             if (!rows || !rows.length || modal.hidden) return;
@@ -23575,8 +23579,8 @@
         document.getElementById("invite-title").textContent = "Einladung an:";
         var box = document.getElementById("invite-people");
         box.textContent = "";
-        /* mein gebuchter Coach sieht meine Events ohnehin: nicht einladbar, ohne Kreis zum Abhaken */
-        var myCoachId = sessionAccount && sessionAccount.trainer_id ? String(sessionAccount.trainer_id) : "";
+        /* auch der eigene Coach ist einladbar (steht dann bei beiden unter Mein Coach) */
+        var myCoachId = "";
         function fill(list) {
           box.textContent = "";
           var groups = myGroups();
@@ -23706,7 +23710,6 @@
               });
             });
             row.appendChild(name);
-            if (String(person.id) === myCoachId) { box.appendChild(row); return; }
             row.appendChild(check);
             /* ganze Zeile antippbar */
             row.addEventListener("click", function (eRow) { if (eRow.target.closest && eRow.target.closest(".invite-check")) return; check.click(); });
@@ -24389,9 +24392,8 @@
         var ready = teamPeople.length ? Promise.resolve() : loadTeam();
         Promise.resolve(ready).then(function () {
           if (!goFlow) return;
-          var myCoach = sessionAccount && sessionAccount.trainer_id ? String(sessionAccount.trainer_id) : "";
           var others = teamPeople.filter(function (person) {
-            return person && person.id && String(person.id) !== me && String(person.id) !== myCoach && !personAway(person, today);
+            return person && person.id && String(person.id) !== me && !personAway(person, today);
           });
           if (!others.length) {
             askGoPlan();
@@ -27662,10 +27664,17 @@
                 openStampPreview({ kind: "coach", name: "Coach " + String((sessionAccount && (sessionAccount.name || sessionAccount.nickname)) || "").split(" ")[0], stamps: c.stamps || 0 }, person);
               });
             },
-            openStampCard: function (ev) {
+            /* opts.withCoach: mein Coach ist dabei → Karte des Events und meine Coach-Karte (wischen) */
+            openStampCard: function (ev, opts) {
               var ord = window.GoSupport && GoSupport.activeOrderFor ? GoSupport.activeOrderFor("stempelkarte") : null;
-              if (!ord || !ev) return false;
-              openStampCardModal(ord, { eventId: ev.id, only: stampKindForEvent(ev) });
+              var myCoach = sessionAccount && sessionAccount.trainer_id ? String(sessionAccount.trainer_id) : "";
+              var withCoach = !!(opts && opts.withCoach && myCoach);
+              if ((!ord && !withCoach) || !ev) return false;
+              var only = stampKindForEvent(ev);
+              /* ohne gogogo-Stempelkarte: nur die Coach-Karte */
+              if (!ord && only.kind === "main") { only = { kind: "coach", ref: myCoach }; withCoach = false; }
+              if (withCoach && !(only.kind === "coach" && String(only.ref) === myCoach)) only = Object.assign({}, only, { also: { kind: "coach", ref: myCoach } });
+              openStampCardModal(ord || { meta: { stamps: 0 } }, { eventId: ev.id, only: only });
               return true;
             },
           eventMinutes: function (ev) { return eventMinutes(ev); },
