@@ -156,6 +156,22 @@
     ".ga-usrow{display:grid;grid-template-columns:18px minmax(0,1.3fr) minmax(0,1fr) 24px 24px;gap:6px;align-items:center;margin-bottom:8px}" +
     ".ga-usno{font-size:12px;color:rgba(0,0,0,.45);text-align:center}" +
     ".ga-usrow select{min-height:34px;min-width:0;padding:0 8px;border-radius:10px;border:1px solid rgba(0,0,0,.2);background:#F3EEE4;font:inherit;font-size:13px;color:#111}" +
+    ".ga-antools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:6px 0 4px}.ga-antools .ga-filters{margin:0}" +
+    ".ga-anpanel{max-width:620px}.ga-anrow{grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) 24px}" +
+    ".ga-anrow input{min-height:34px;min-width:0;padding:0 8px;border-radius:10px;border:1px solid rgba(0,0,0,.2);background:#F3EEE4;font:inherit;font-size:13px;color:#111;box-sizing:border-box;width:100%}" +
+    ".ga-anempty{margin:0 0 8px;font-size:13px;color:rgba(42,33,24,.6)}" +
+    ".ga-anchips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px}.ga-anchip{min-height:30px;padding:0 12px;border-radius:999px;border:1px solid rgba(42,33,24,.3);background:transparent;color:#2A2118;font:inherit;font-size:13px;cursor:pointer}.ga-anchip b{font-weight:700}" +
+    ".ga-tblwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0 10px;border:1px solid rgba(42,33,24,.14);border-radius:14px;background:#F3EEE4}" +
+    ".ga-tbl{width:max-content;min-width:100%;border-collapse:collapse;font-size:13px;color:#2A2118}" +
+    ".ga-tbl th{font:600 11px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;color:rgba(42,33,24,.62);text-align:left;padding:10px 10px 6px;white-space:nowrap}" +
+    ".ga-tbl td{padding:10px;border-top:1px solid rgba(42,33,24,.14);vertical-align:top;max-width:220px;overflow-wrap:anywhere}" +
+    ".ga-tbl th.num,.ga-tbl td.num{text-align:right;white-space:nowrap}.ga-tbl td.is-zero{color:rgba(42,33,24,.35)}" +
+    ".ga-tbl td.name{font-weight:600;white-space:nowrap}.ga-tbl th:first-child,.ga-tbl td:first-child{position:sticky;left:0;background:#F3EEE4;z-index:1}" +
+    ".ga-tbl tbody tr{cursor:pointer}.ga-tbl tbody tr:active td{background:#E9E1D2}" +
+    ".ga-anlabels{white-space:nowrap}.ga-anlabel{display:inline-block;margin:0 4px 2px 0;padding:1px 8px;border-radius:999px;border:1px solid rgba(42,33,24,.3);font-size:11px}" +
+    ".ga-log{text-align:left;margin:8px 0}.ga-logses{margin:0 0 14px}.ga-loghead{margin:0 0 4px;font-weight:700;font-size:13px}" +
+    ".ga-logrow{display:grid;grid-template-columns:64px 1fr;gap:8px;margin:0;padding:4px 0;border-top:1px solid rgba(42,33,24,.1);font-size:13px}.ga-logrow span:first-child{color:rgba(42,33,24,.55);font-variant-numeric:tabular-nums}" +
+    ".ga-logrow.is-fb{background:#E9E1D2;border-radius:8px;padding:6px}" +
     ".ga-usx{width:28px;height:28px;border:0;background:transparent;font-size:18px;line-height:1;color:rgba(0,0,0,.5);cursor:pointer;padding:0}" +
     ".ga-trash{margin-top:22px;padding-top:12px;border-top:1px solid rgba(42,33,24,.15)}.ga-trash .ga-item{opacity:.75}" +
     ".ga-ucount{font-size:13px;color:rgba(42,33,24,.65);margin:4px 0 0}" +
@@ -928,7 +944,9 @@
               '<button type="button" class="ga-pill" data-ga-qr="' + esc(id) + '">QR-Code</button>' +
               /* wie viele Gruppen die Person gründen darf (go-group-limit.sql), Tipp wechselt 1 ↔ 5 */
               '<button type="button" class="ga-pill' + (Number(ci.max_groups) >= 5 ? " is-fill" : "") + '" data-ga-mg="' + esc(id) + '">' + (Number(ci.max_groups) >= 5 ? "5 Gruppen" : "1 Gruppe") + "</button>" +
-              (rp.adm || "<span></span>") + "<span></span></span>";
+              (rp.adm || "<span></span>") +
+              /* Nutzungs-Logs (go-usage.sql) */
+              '<button type="button" class="ga-pill" data-ga-log="' + esc(id) + '">Logs</button></span>';
           })() + "</div>";
       }).join("") + paintTrash();
   }
@@ -1899,10 +1917,289 @@
     }
   }
 
+  /* ---------- Analyse: Nutzungsverhalten je Nutzer (go-usage.sql, go-usage-admin.sql) ----------
+     Tabelle wie im Editor, darüber Zeitraum, Labels, Filter und Sortierung wie in Notion (gemerkt pro Gerät). */
+  var AN_LABELS = ["Circle-User", "Coaching-User", "Plan-User", "Chat-User", "PT-User"];
+  var AN_LABEL_INFO = {
+    "Circle-User": "Circle in der App, Circle-Stempelkarte oder Zusage zu Circle-Termin (60 T)",
+    "Coaching-User": "Coach-Status und setzt Termine im Kalender (30 T)",
+    "Plan-User": "aktiver Wochenplan und mind. 3 abgehakte Plan-Events (30 T)",
+    "Chat-User": "mind. 5 Nachrichten: Posts, Kommentare, Community (30 T)",
+    "PT-User": "hat einen Coach gewählt und einen Termin gebucht"
+  };
+  /* [Schlüssel, Spalte, Typ] Typ: text | num | date | list */
+  var AN_COLS = [
+    ["name", "Nutzer", "text"], ["labels", "Labels", "list"], ["sessions", "Sitzungen", "num"], ["minutes", "Zeit (min)", "num"],
+    ["avg", "Ø Sitzung (min)", "num"], ["last", "Letzte Sitzung", "date"], ["top", "Top-Sektion", "text"], ["actions", "Aktionen", "num"],
+    ["done", "Abgehakt 30 T", "num"], ["chat", "Nachrichten 30 T", "num"], ["coachev", "Termine gesetzt 30 T", "num"],
+    ["plan", "Wochenplan", "text"], ["fb", "Feedback", "text"], ["fbtext", "Letztes Feedback", "text"], ["device", "Gerät", "text"]
+  ];
+  var AN_OPS = {
+    text: [["has", "enthält"], ["not", "enthält nicht"], ["empty", "ist leer"], ["full", "ist nicht leer"]],
+    list: [["has", "enthält"], ["not", "enthält nicht"], ["empty", "ist leer"], ["full", "ist nicht leer"]],
+    num: [["gte", "≥"], ["lte", "≤"], ["eq", "="]],
+    date: [["within", "in den letzten … Tagen"], ["older", "älter als … Tage"], ["empty", "ist leer"], ["full", "ist nicht leer"]]
+  };
+  function anCol(k) { return AN_COLS.filter(function (c) { return c[0] === k; })[0] || AN_COLS[0]; }
+  function anState() {
+    if (st.an) return st.an;
+    var an = { days: 30, rows: null, f: [], s: [{ k: "minutes", d: "desc" }], fOpen: false, sOpen: false };
+    try {
+      var x = JSON.parse(localStorage.getItem(prefKey("analyse")) || "null");
+      if (x && typeof x === "object") { if (x.days != null) an.days = x.days; if (Array.isArray(x.f)) an.f = x.f; if (Array.isArray(x.s)) an.s = x.s; }
+    } catch (e) {}
+    return (st.an = an);
+  }
+  function anSave() {
+    var an = anState();
+    try { localStorage.setItem(prefKey("analyse"), JSON.stringify({ days: an.days, f: an.f, s: an.s })); } catch (e) {}
+  }
+  function anLoad() {
+    var an = anState();
+    an.rows = "loading";
+    return host.rest("rpc/go_admin_usage", { method: "POST", body: { p_days: an.days || 0 } })
+      .then(function (r) { an.rows = r || []; if (st.tab === "analyse") paint(); })
+      .catch(function () { an.rows = "error"; if (st.tab === "analyse") paint(); });
+  }
+  function anMin(sec) { return Math.round((Number(sec) || 0) / 6) / 10; }
+  function anVal(r, k) {
+    if (k === "name") return String(r.name || "");
+    if (k === "labels") return r.labels || [];
+    if (k === "sessions") return Number(r.sessions) || 0;
+    if (k === "minutes") return anMin(r.seconds);
+    if (k === "avg") return r.sessions ? anMin((Number(r.seconds) || 0) / r.sessions) : 0;
+    if (k === "last") return r.last_at || "";
+    if (k === "top") return String(r.top_section || "");
+    if (k === "actions") return Number(r.actions) || 0;
+    if (k === "done") return Number(r.done_30) || 0;
+    if (k === "chat") return Number(r.chat_30) || 0;
+    if (k === "coachev") return Number(r.coach_events_30) || 0;
+    if (k === "plan") return String(r.plan || "");
+    if (k === "fb") {
+      return [[r.fb_ja, "ja"], [r.fb_nein, "nein"], [r.fb_vielleicht, "vielleicht"]].filter(function (x) { return x[0]; })
+        .map(function (x) { return x[0] + "× " + x[1]; }).join(" · ");
+    }
+    if (k === "fbtext") return String(r.fb_last || "");
+    if (k === "device") return String(r.device || "");
+    return "";
+  }
+  function anMatch(r) {
+    return anState().f.every(function (f) {
+      var c = anCol(f.k), v = anVal(r, f.k), want = String(f.v == null ? "" : f.v).trim();
+      if (f.op === "empty") return c[2] === "list" ? !v.length : c[2] === "num" ? !v : !v;
+      if (f.op === "full") return c[2] === "list" ? !!v.length : !!v;
+      if (c[2] === "list") {
+        if (!want) return true;
+        var hit = v.indexOf(want) >= 0;
+        return f.op === "not" ? !hit : hit;
+      }
+      if (c[2] === "num") {
+        if (want === "") return true;
+        var n = Number(want.replace(",", "."));
+        if (isNaN(n)) return true;
+        return f.op === "lte" ? v <= n : f.op === "eq" ? v === n : v >= n;
+      }
+      if (c[2] === "date") {
+        var d = Number(want);
+        if (!want || isNaN(d)) return true;
+        if (!v) return false;
+        var age = (Date.now() - Date.parse(v)) / 864e5;
+        return f.op === "older" ? age > d : age <= d;
+      }
+      if (!want) return true;
+      var has = String(v).toLowerCase().indexOf(want.toLowerCase()) >= 0;
+      return f.op === "not" ? !has : has;
+    });
+  }
+  function anCompare(x, y) {
+    var list = anState().s;
+    for (var i = 0; i < list.length; i++) {
+      var k = list[i].k, dir = list[i].d === "desc" ? -1 : 1, t = anCol(k)[2];
+      var a = anVal(x, k), b = anVal(y, k);
+      if (t === "list") { a = a.length; b = b.length; }
+      var ea = a === "" || a == null, eb = b === "" || b == null;
+      if (ea || eb) { if (ea !== eb) return ea ? 1 : -1; continue; }
+      var c = typeof a === "number" ? a - b : String(a).localeCompare(String(b), "de", { numeric: true });
+      if (c) return c * dir;
+    }
+    return String(x.name || "").localeCompare(String(y.name || ""), "de");
+  }
+  function anDirs(k) {
+    var t = anCol(k)[2];
+    if (t === "date") return [["asc", "alt → neu"], ["desc", "neu → alt"]];
+    if (t === "num" || t === "list") return [["asc", "aufsteigend"], ["desc", "absteigend"]];
+    return [["asc", "A → Z"], ["desc", "Z → A"]];
+  }
+  function anWhen(iso) {
+    if (!iso) return "";
+    var d = new Date(iso);
+    return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", timeZone: "Europe/Berlin" }) + " " +
+      d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+  }
+  function anFilterPanel() {
+    var an = anState();
+    return '<div class="ga-uspanel ga-anpanel">' + (an.f.length ? "" : '<p class="ga-anempty">Noch kein Filter.</p>') +
+      an.f.map(function (f, i) {
+        var c = anCol(f.k), t = c[2], ops = AN_OPS[t];
+        var needs = f.op !== "empty" && f.op !== "full";
+        var val = !needs ? '<span></span>' : t === "list"
+          ? '<select data-ga-anfv="' + i + '" aria-label="Wert"><option value="">–</option>' + AN_LABELS.map(function (l) {
+              return '<option' + (f.v === l ? " selected" : "") + ">" + esc(l) + "</option>"; }).join("") + "</select>"
+          : t === "text" && f.k === "top"
+          ? '<select data-ga-anfv="' + i + '" aria-label="Wert"><option value="">–</option>' + ["Aktuell", "Kalender", "Community", "Plus", "Profil"].map(function (l) {
+              return '<option' + (f.v === l ? " selected" : "") + ">" + l + "</option>"; }).join("") + "</select>"
+          : '<input data-ga-anfv="' + i + '" aria-label="Wert" inputmode="' + (t === "text" ? "text" : "decimal") + '" placeholder="' + (t === "date" ? "Tage" : "Wert") + '" value="' + esc(f.v || "") + '" />';
+        return '<div class="ga-usrow ga-anrow"><select data-ga-anfk="' + i + '" aria-label="Feld">' + AN_COLS.map(function (x) {
+            return '<option value="' + x[0] + '"' + (x[0] === f.k ? " selected" : "") + ">" + esc(x[1]) + "</option>"; }).join("") + "</select>" +
+          '<select data-ga-anfo="' + i + '" aria-label="Bedingung">' + ops.map(function (o) {
+            return '<option value="' + o[0] + '"' + (o[0] === f.op ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
+          val + '<button type="button" class="ga-usx" data-ga-an="fdel" data-i="' + i + '" aria-label="Filter entfernen">×</button></div>';
+      }).join("") +
+      '<button type="button" class="ga-link" data-ga-an="fadd">+ Filter hinzufügen</button>' +
+      (an.f.length ? ' · <button type="button" class="ga-link" data-ga-an="fclear">Filter löschen</button>' : "") + "</div>";
+  }
+  function anSortPanel() {
+    var list = anState().s;
+    return '<div class="ga-uspanel">' + list.map(function (r, i) {
+      return '<div class="ga-usrow"><span class="ga-usno">' + (i + 1) + "</span>" +
+        '<select data-ga-ansk="' + i + '" aria-label="Feld">' + AN_COLS.map(function (u) {
+          return '<option value="' + u[0] + '"' + (u[0] === r.k ? " selected" : "") + ">" + esc(u[1]) + "</option>"; }).join("") + "</select>" +
+        '<select data-ga-ansd="' + i + '" aria-label="Richtung">' + anDirs(r.k).map(function (d) {
+          return '<option value="' + d[0] + '"' + (d[0] === r.d ? " selected" : "") + ">" + d[1] + "</option>"; }).join("") + "</select>" +
+        (i ? '<button type="button" class="ga-usx" data-ga-an="sup" data-i="' + i + '" aria-label="nach oben">↑</button>' : '<span class="ga-usx"></span>') +
+        '<button type="button" class="ga-usx" data-ga-an="sdel" data-i="' + i + '" aria-label="Sortierung entfernen">×</button></div>';
+    }).join("") +
+      '<button type="button" class="ga-link" data-ga-an="sadd">+ Sortierung hinzufügen</button>' +
+      (list.length ? ' · <button type="button" class="ga-link" data-ga-an="sclear">Sortierung löschen</button>' : "") + "</div>";
+  }
+  function paintAnalyse() {
+    var an = anState();
+    if (an.rows === "error") return '<p class="cp-hint">Analyse nicht geladen. Sind go-usage.sql und go-usage-admin.sql in Supabase ausgeführt?</p>';
+    if (!an.rows) { anLoad(); return '<p class="cp-hint">Lade…</p>'; }
+    if (an.rows === "loading") return '<p class="cp-hint">Lade…</p>';
+    var all = an.rows, rows = all.filter(anMatch).sort(anCompare);
+    var funnel = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6 7.5V19l-4-2v-4.5z"/></svg>';
+    var sortIco = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3.5 16.5 7 20l3.5-3.5M17 20V4M13.5 7.5 17 4l3.5 3.5"/></svg>';
+    var days = [[7, "7 Tage"], [30, "30 Tage"], [90, "90 Tage"], [0, "Alles"]];
+    var tools = '<div class="ga-antools"><span class="ga-filters"><select data-ga-andays aria-label="Zeitraum" class="is-on">' + days.map(function (d) {
+        return '<option value="' + d[0] + '"' + (Number(an.days) === d[0] ? " selected" : "") + ">" + d[1] + "</option>"; }).join("") + "</select></span>" +
+      '<button type="button" class="ga-usbtn' + (an.fOpen ? " is-open" : "") + '" data-ga-an="ftoggle">' + funnel + "Filter" + (an.f.length ? " · " + an.f.length : "") + "</button>" +
+      '<button type="button" class="ga-usbtn' + (an.sOpen ? " is-open" : "") + '" data-ga-an="stoggle">' + sortIco + "Sortieren nach" + (an.s.length ? " · " + an.s.length : "") + "</button></div>" +
+      (an.fOpen ? anFilterPanel() : "") + (an.sOpen ? anSortPanel() : "");
+    /* Labels: Anzahl in der gefilterten Liste, Tipp = Filter auf dieses Label */
+    var chips = '<div class="ga-anchips">' + AN_LABELS.map(function (l) {
+      var n = rows.filter(function (r) { return (r.labels || []).indexOf(l) >= 0; }).length;
+      return '<button type="button" class="ga-anchip" data-ga-an="label" data-v="' + esc(l) + '" title="' + esc(AN_LABEL_INFO[l]) + '"><b>' + n + "</b> " + esc(l) + "</button>";
+    }).join("") + "</div>";
+    var active = rows.filter(function (r) { return r.sessions; });
+    var secs = active.reduce(function (s, r) { return s + (Number(r.seconds) || 0); }, 0);
+    var sess = active.reduce(function (s, r) { return s + (Number(r.sessions) || 0); }, 0);
+    var sum = '<p class="ga-ucount">' + rows.length + " von " + all.length + " Nutzern · " + active.length + " mit Sitzung · " + sess + " Sitzungen · " +
+      String(anMin(secs)).replace(".", ",") + " min gesamt" + (sess ? " · Ø " + String(anMin(secs / sess)).replace(".", ",") + " min je Sitzung" : "") + "</p>";
+    var head = "<tr>" + AN_COLS.map(function (c) {
+      return '<th class="' + (c[2] === "num" ? "num" : "") + '">' + esc(c[1]) + "</th>"; }).join("") + "</tr>";
+    var body = rows.map(function (r) {
+      return '<tr data-ga-log="' + esc(r.account_id) + '">' + AN_COLS.map(function (c) {
+        var v = anVal(r, c[0]);
+        if (c[0] === "labels") return '<td class="ga-anlabels">' + v.map(function (l) { return '<span class="ga-anlabel">' + esc(l.replace("-User", "")) + "</span>"; }).join("") + "</td>";
+        if (c[0] === "last") return "<td>" + esc(anWhen(v)) + "</td>";
+        if (c[2] === "num") return '<td class="num' + (v ? "" : " is-zero") + '">' + esc(String(v).replace(".", ",")) + "</td>";
+        return '<td class="' + (c[0] === "name" ? "name" : "") + '">' + esc(v) + "</td>";
+      }).join("") + "</tr>";
+    }).join("");
+    return tools + chips + sum +
+      '<div class="ga-tblwrap"><table class="ga-tbl"><thead>' + head + "</thead><tbody>" +
+      (body || '<tr><td colspan="' + AN_COLS.length + '" class="ga-anempty">Keine Nutzer für diesen Filter.</td></tr>') + "</tbody></table></div>" +
+      '<p class="cp-hint">Zeile antippen: Logs der Person. Zeitraum gilt für Sitzungen, Zeit, Aktionen und Feedback. Labels: ' +
+      AN_LABELS.map(function (l) { return esc(l) + " = " + esc(AN_LABEL_INFO[l]); }).join("; ") + ".</p>";
+  }
+  function onAnalyse(t) {
+    var an = anState(), act = t.getAttribute("data-ga-an"), i = parseInt(t.getAttribute("data-i"), 10);
+    if (act === "ftoggle") an.fOpen = !an.fOpen;
+    else if (act === "stoggle") an.sOpen = !an.sOpen;
+    else if (act === "fadd") an.f.push({ k: "labels", op: "has", v: "" });
+    else if (act === "fdel") an.f.splice(i, 1);
+    else if (act === "fclear") an.f = [];
+    else if (act === "label") {
+      var l = t.getAttribute("data-v");
+      var hit = an.f.filter(function (f) { return f.k === "labels" && f.op === "has" && f.v === l; })[0];
+      if (hit) an.f.splice(an.f.indexOf(hit), 1); else an.f.push({ k: "labels", op: "has", v: l });
+    }
+    else if (act === "sadd") {
+      var used = an.s.map(function (r) { return r.k; });
+      var nx = AN_COLS.filter(function (c) { return used.indexOf(c[0]) < 0; })[0];
+      if (nx) an.s.push({ k: nx[0], d: nx[2] === "text" ? "asc" : "desc" });
+    }
+    else if (act === "sdel") an.s.splice(i, 1);
+    else if (act === "sup" && i > 0) { var tmp = an.s[i - 1]; an.s[i - 1] = an.s[i]; an.s[i] = tmp; }
+    else if (act === "sclear") an.s = [];
+    anSave();
+    paint();
+  }
+  function onAnalyseChange(el) {
+    var an = anState();
+    if (el.hasAttribute("data-ga-andays")) { an.days = Number(el.value) || 0; anSave(); anLoad(); paint(); return true; }
+    var i;
+    if (el.hasAttribute("data-ga-anfk")) {
+      i = Number(el.getAttribute("data-ga-anfk"));
+      if (an.f[i]) { an.f[i].k = el.value; an.f[i].op = AN_OPS[anCol(el.value)[2]][0][0]; an.f[i].v = ""; }
+    } else if (el.hasAttribute("data-ga-anfo")) {
+      i = Number(el.getAttribute("data-ga-anfo"));
+      if (an.f[i]) an.f[i].op = el.value;
+    } else if (el.hasAttribute("data-ga-anfv")) {
+      i = Number(el.getAttribute("data-ga-anfv"));
+      if (an.f[i]) an.f[i].v = el.value;
+    } else if (el.hasAttribute("data-ga-ansk")) {
+      i = Number(el.getAttribute("data-ga-ansk"));
+      if (an.s[i]) { an.s[i].k = el.value; an.s[i].d = anCol(el.value)[2] === "text" ? "asc" : "desc"; }
+    } else if (el.hasAttribute("data-ga-ansd")) {
+      i = Number(el.getAttribute("data-ga-ansd"));
+      if (an.s[i]) an.s[i].d = el.value;
+    } else return false;
+    anSave();
+    paint();
+    return true;
+  }
+  /* Logs einer Person (Pille „Logs“ unter Nutzer, Zeile in Analyse): Sitzungen mit Ereignissen und Feedback */
+  function openUsageLog(id) {
+    var a = (st.accounts || []).filter(function (x) { return String(x.account_id) === String(id); })[0] ||
+      (Array.isArray((st.an || {}).rows) ? st.an.rows.filter(function (x) { return String(x.account_id) === String(id); })[0] : null) || {};
+    var box = document.createElement("div");
+    box.className = "ga-info ga-rec";
+    box.innerHTML = '<div class="ga-info__card" role="dialog" aria-modal="true"><p class="ga-info__name" style="text-align:center">Logs · ' + esc(a.name || "") + '</p><div class="ga-log"><p class="cp-hint">Lade…</p></div>' +
+      '<div class="ga-info__btns"><button type="button" class="is-quiet" data-gi-close="1">Schließen</button></div></div>';
+    document.body.appendChild(box);
+    box.addEventListener("click", function (e) { if (e.target === box || e.target.closest("[data-gi-close]")) box.remove(); });
+    var list = box.querySelector(".ga-log");
+    function hms(iso) { return new Date(iso).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Europe/Berlin" }); }
+    function dur(s) { s = Number(s) || 0; return Math.floor(s / 60) + " min " + (s % 60) + " s"; }
+    host.rest("rpc/go_admin_usage_log", { method: "POST", body: { p_account: id, p_limit: 1500 } }).then(function (rows) {
+      rows = rows || [];
+      if (!rows.length) { list.innerHTML = '<p class="cp-hint" style="text-align:center">Noch keine Logs.</p>'; return; }
+      var bySes = {}, order = [];
+      rows.forEach(function (r) {
+        var k = r.session_id || "x";
+        if (!bySes[k]) { bySes[k] = { head: null, items: [] }; order.push(k); }
+        if (r.kind === "session") bySes[k].head = r; else bySes[k].items.push(r);
+      });
+      list.innerHTML = order.map(function (k) {
+        var g = bySes[k], h = g.head;
+        var items = g.items.slice().sort(function (x, y) { return String(x.at).localeCompare(String(y.at)); });
+        var day = h ? new Date(h.at).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Europe/Berlin" }) : "";
+        return '<div class="ga-logses"><p class="ga-loghead">' + (h ? esc(day + " · " + hms(h.at) + " · " + dur(h.seconds) + (h.device ? " · " + h.device : "")) : "Ohne Sitzung") + "</p>" +
+          items.map(function (r) {
+            if (r.kind === "feedback") return '<p class="ga-logrow is-fb"><span>' + esc(hms(r.at)) + "</span><span>Feedback: <b>" + esc(r.section || "ohne Antwort") + "</b>" + (r.action ? " · „" + esc(r.action) + "“" : "") + "</span></p>";
+            return '<p class="ga-logrow"><span>' + esc(hms(r.at)) + "</span><span>" + esc(r.section || "") + " · " + esc(r.action || "") + "</span></p>";
+          }).join("") + "</div>";
+      }).join("");
+    }).catch(function () { list.innerHTML = '<p class="cp-hint">Logs laden ging nicht (go-usage-admin.sql ausgeführt?).</p>'; });
+  }
+
   var TABS = [
     { id: "news", label: "Nachrichten" },
     { id: "wa", label: "Erinnerungen" },
     { id: "coaches", label: "Nutzer" },
+    { id: "analyse", label: "Analyse" },
     { id: "editor", label: "Editor" },
     { id: "ex", label: "Social Media Links" },
     { id: "circles", label: "Circles" },
@@ -1934,7 +2231,7 @@
       return;
     }
     var fa = document.activeElement, fq = fa && fa.getAttribute ? fa.getAttribute("data-ga-q") : null, fpos = fq ? fa.selectionStart : 0;
-    st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : st.tab === "circles" ? paintOrgs("circle") : st.tab === "places" ? paintPlaces() : st.tab === "groups" ? paintOrgs("group") : st.tab === "tickets" ? paintTickets() : paintCoaches();
+    st.body.innerHTML = st.tab === "news" ? paintNews() : st.tab === "wa" ? paintWa() : st.tab === "ex" ? paintEx() : st.tab === "circles" ? paintOrgs("circle") : st.tab === "places" ? paintPlaces() : st.tab === "groups" ? paintOrgs("group") : st.tab === "tickets" ? paintTickets() : st.tab === "analyse" ? paintAnalyse() : paintCoaches();
     if (fq) {
       var back = st.body.querySelector('[data-ga-q="' + fq + '"]');
       if (back) { back.focus(); try { back.setSelectionRange(fpos, fpos); } catch (e) {} }
@@ -2640,7 +2937,7 @@
   }
 
   function onClick(e) {
-    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-gpl],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall],[data-ga-us],[data-ga-ts],[data-ga-trash],[data-ga-mg]") : null;
+    var t = e.target && e.target.closest ? e.target.closest("[data-ga-broadcast],[data-ga-close],[data-ga-burger],[data-ga-tab],[data-ga-coach],[data-ga-wa],[data-ga-sub],[data-ga-block],[data-ga-rdone],[data-ga-media],[data-ga-del],[data-ga-goal],[data-ga-info],[data-ga-req],[data-ga-vc],[data-ga-role],[data-ga-user],[data-gx],[data-gpl],[data-ga-places],[data-ga-plan],[data-ga-rec],[data-ga-uf],[data-ga-nfreset],[data-gt],[data-ga-admin],[data-ga-new],[data-ga-qr],[data-ga-pdfall],[data-ga-us],[data-ga-ts],[data-ga-trash],[data-ga-mg],[data-ga-log],[data-ga-an]") : null;
     if (st && st.menu && !st.menu.hidden && (!t || !t.hasAttribute("data-ga-burger"))) st.menu.hidden = true;
     if (!t) return;
     if (t.hasAttribute("data-ga-burger")) { st.menu.hidden = !st.menu.hidden; return; }
@@ -2656,6 +2953,8 @@
       return;
     }
     if (t.hasAttribute("data-ga-qr")) { openQr(t.getAttribute("data-ga-qr")); return; }
+    if (t.hasAttribute("data-ga-log")) { openUsageLog(t.getAttribute("data-ga-log")); return; }
+    if (t.hasAttribute("data-ga-an")) { onAnalyse(t); return; }
     if (t.hasAttribute("data-ga-mg")) { setMaxGroups(t); return; }
     if (t.hasAttribute("data-ga-user")) { userMenu(t.getAttribute("data-ga-user")); return; }
     if (t.hasAttribute("data-ga-places")) { userPlaces(t.getAttribute("data-ga-places")); return; }
@@ -2751,6 +3050,7 @@
   }
 
   function onChange(e) {
+    if (st && e.target && e.target.closest && e.target.closest("[data-ga-andays],[data-ga-anfk],[data-ga-anfo],[data-ga-anfv],[data-ga-ansk],[data-ga-ansd]") && onAnalyseChange(e.target)) return;
     var tsk = e.target && e.target.closest ? e.target.closest("select[data-ga-tsk],select[data-ga-tsd]") : null;
     if (tsk && st) {
       var ti = parseInt(tsk.getAttribute("data-ga-tsk") || tsk.getAttribute("data-ga-tsd"), 10), tl = tsGet();
