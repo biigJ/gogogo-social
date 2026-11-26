@@ -1789,8 +1789,11 @@
   function inviteFaceRowHtml(postId, inviteIso, canInvite, eventId, ownerId) {
     /* Fremdes Event: Ersteller vorne, dahinter Zusagen; kein Einladen */
     if (ownerId && String(ownerId) !== String(me())) {
+      /* ich selbst stehe schon neben dem Herz (Zusage), nicht ein zweites Mal in der Reihe */
+      var evF = evById(eventId || postId);
+      var meAtHeart = evF && evF.status === "geplant";
       var going = (state.rsvps[String(eventId || postId)] || []).filter(function (id) {
-        return String(id) !== String(ownerId);
+        return String(id) !== String(ownerId) && !(meAtHeart && String(id) === String(me()));
       });
       return (
         '<div class="acc-card__faces">' +
