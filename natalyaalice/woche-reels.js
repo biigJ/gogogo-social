@@ -3736,16 +3736,23 @@
   function openDaysEditor() {
     var days = [];
     for (var i = 0; i < 7; i++) days.push(addDays(berlinToday(), i));
+    /* je Tag die Einheit aus dem Wochenplan (Normalfall); Termine wie Initialgespräch verdrängen sie nicht.
+       Zirkeltrainings belegen den Tag nicht, sie stehen als eigene Zeile darunter (z. B. Fr: Zirkel 13:30 und 10.000 Schritte) */
     var slots = days.map(function (iso) {
-      /* je Tag die Einheit aus dem Wochenplan (Normalfall); Termine wie Initialgespräch verdrängen sie nicht */
-      return normalDayEvents(iso).filter(function (e) { return e.status !== "erledigt"; })[0] || null;
+      var list = normalDayEvents(iso).filter(function (e) { return e.status !== "erledigt" && e.category !== "zirkel"; });
+      return list.filter(function (e) { return e.enrollment_id; })[0] || list[0] || null;
+    });
+    var zirkels = days.map(function (iso) {
+      return (state.events || []).filter(function (e) {
+        return e && String(e.user_id) === me() && e.category === "zirkel" && e.status === "geplant" && dayKey(e.starts_at) === iso;
+      }).sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
     });
     /* Tag schon trainiert: erledigtes Event anzeigen statt „frei“ (nur Anzeige, nicht verschiebbar) */
     var done = days.map(function (iso, i) {
       if (slots[i]) return null;
       return normalDayEvents(iso).filter(function (e) { return e.status === "erledigt"; })[0] || null;
     });
-    state.daysEdit = { days: days, slots: slots, done: done, times: {}, vis: {}, orig: {}, bub: {}, placeBase: {} };
+    state.daysEdit = { days: days, slots: slots, done: done, zirkels: zirkels, times: {}, vis: {}, orig: {}, bub: {}, placeBase: {} };
     slots.forEach(function (ev) {
       if (!ev) return;
       /* Tage bearbeiten ist die globale Woche: Uhrzeit und Ort der Serie, nicht die Änderung an einem einzelnen Termin */
@@ -3806,6 +3813,13 @@
       /* nur der Wochentag: Tage bearbeiten gilt für die Serie, nicht für ein Datum */
       var label = DAYS_DE[d.getDay()];
       var ev = de.slots[i];
+      /* Zirkel des Tages: eigene Zeile, Änderungen im Zirkel-Editor (Tipp öffnet ihn) */
+      var zRows = ((de.zirkels && de.zirkels[i]) || []).map(function (z) {
+        return '<button type="button" class="wr-dayrow wr-dayrow--zirkel" data-wr-dayzirkel="1"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> 🔥 " +
+          esc(z.title || "Zirkeltraining") + (displayTime(z.starts_at) ? " · " + formatTime(z.starts_at) : "") + "</span></div><span></span></button>";
+      }).join("");
+      return dayRowHtml() + zRows;
+      function dayRowHtml() {
       if (!ev) {
         var doneEv = de.done && de.done[i];
         return '<div class="wr-dayrow is-empty' + (doneEv ? " is-done" : "") + '" data-wr-dayslot="' + i + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " +
@@ -3831,6 +3845,7 @@
         '<button type="button" class="wr-dt-box' + (dayPlace(ev) ? "" : " is-empty") + '" data-wr-dayplace="' + esc(ev.id) + '">' + esc(dayPlace(ev) || "Ort") + "</button>" +
         "</div></div>" +
         '<span class="wr-dayrow__grip" data-wr-grip="' + i + '" aria-label="Ziehen"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span></div>';
+      }
     }).join("");
     openSheet(
       '<p class="wr-sheet-title">Deine Woche aus wiederkehrenden Events</p>' +
@@ -3880,6 +3895,7 @@
     });
     card.addEventListener("click", function (e) {
       if (!state.daysEdit) return;
+      if (e.target.closest && e.target.closest("[data-wr-dayzirkel]")) { openZirkelEditor(); state.menuBack = true; return; }
       var vb = e.target.closest && e.target.closest("[data-wr-dayvis]");
       if (vb) {
         var id = vb.getAttribute("data-wr-dayvis");
