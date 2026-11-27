@@ -1672,7 +1672,8 @@
       /* oben links (statt „Plane Deine Woche“): Tag · Uhrzeit · Ort, darunter der Name */
       '<div class="wr-head">' +
       '<p class="wr-when">' + (ev.bubble_id && global.GoBubbles && !GoBubbles.off ? '<span class="wr-when__bub" title="Bubble">' + GoBubbles.SOAP_SVG + "</span>" : "") +
-        esc([dayWord(iso, item._once), when, place].filter(Boolean).join(" · ")) + "</p>" +
+        /* Wochentag, Uhrzeit, Ort mit Abstand statt Punkten */
+        [dayWord(iso, item._once), when, place].filter(Boolean).map(esc).join('<span class="wr-when__gap"></span>') + "</p>" +
       '<h2 class="wr-title">' +
       esc(title) +
       "</h2>" +
