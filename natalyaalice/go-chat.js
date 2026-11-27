@@ -57,7 +57,7 @@
 
   function rows() {
     var out = [];
-    (host.kreise() || []).forEach(function (k) { out.push({ key: k.key, name: k.name, photo: k.photo || "", icon: k.icon || "" }); });
+    (host.kreise() || []).forEach(function (k) { out.push({ key: k.key, name: k.name, photo: k.photo || "", icon: k.icon || "", coach: !!k.coach }); });
     (host.friends() || []).forEach(function (p) {
       out.push({ key: "dm:" + p.id, name: first(p.name) || p.nickname || "Freund", photo: p.photo_url || "", letter: String(p.name || "?").slice(0, 1) });
     });
@@ -85,6 +85,9 @@
         var face = r.photo
           ? '<span class="team-avatar"><img src="' + esc(r.photo) + '" alt="" /></span>'
           : '<span class="team-avatar go-chat__ico">' + (r.icon || esc(r.letter || first(r.name).slice(0, 1))) + "</span>";
+        /* Coaching-Gruppe: blaues c am Bild, damit sie sich von der Direktnachricht an dieselbe Person unterscheidet */
+        if (r.coach) face = '<span class="go-chat__face">' + face + '<span class="go-chat__c" aria-label="Coaching">' +
+          '<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M13.1 6.6A4.6 4.6 0 1 0 13.1 13.4" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg></span></span>';
         return '<button type="button" class="go-chat__row" data-chat-open="' + esc(r.key) + '">' + face +
           '<span class="friend-list__text"><span class="friend-list__name">' + esc(r.name) + "</span>" +
           (r.last ? '<span class="friend-list__meta">' + esc(preview(r.last)) + " · " + esc(whenShort(r.last.created_at)) + "</span>" : "") +
