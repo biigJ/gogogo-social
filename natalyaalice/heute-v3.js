@@ -3583,6 +3583,32 @@
     var feed = buildFeedItems(flags);
     root.hidden = false;
     var html = "";
+    var dash = dashMode();
+    function shrinkCard(h) { return h.indexOf("is-shrunk") < 0 ? h.replace('<article class="acc-card', '<article class="acc-card is-wallet is-shrunk') : h; }
+    if (dash) {
+      /* Dashboard: oben meine heutigen Events als Wallet (aktuellstes oben), darunter Stories,
+         darunter alles Anstehende (Freunde und ich) chronologisch in die Zukunft, alles verkleinert, keine Historie */
+      var nowD = Date.now();
+      var mineD = feed.myToday.slice().sort(function (a, b) {
+        var ea = a.ev || a, eb = b.ev || b;
+        var da = (ea.status === "erledigt" ? 1 : 0), db = (eb.status === "erledigt" ? 1 : 0);
+        if (da !== db) return da - db;
+        return String(a.starts_at || "").localeCompare(String(b.starts_at || ""));
+      });
+      void nowD;
+      html += '<div class="acc-feed-today acc-dash-mine" data-acc-zone="today" id="acc-feed-today">';
+      mineD.forEach(function (item) {
+        var hM = renderFeedItem(item);
+        if (hM.indexOf("is-wallet") < 0) hM = hM.replace('<article class="acc-card', '<article class="acc-card is-wallet');
+        html += hM;
+      });
+      html += "</div>";
+      html += '<div class="acc-dash-stories" data-acc-zone="dstories"></div>';
+      html += '<div class="acc-feed-future acc-dash-next" data-acc-zone="future">';
+      feed.upcoming.forEach(function (item) { html += shrinkCard(renderFeedItem(item)); });
+      if (!feed.upcoming.length) html += '<p class="acc-bubble-empty">Noch nichts Anstehendes bei Dir und Deinen Freunden.</p>';
+      html += "</div>";
+    } else {
     /* Oben = Zukunft: weiter weg oben, nah an heute unten (umgekehrt zur Zeit) */
     html += '<div class="acc-feed-future" data-acc-zone="future">';
     /* Ab morgen wie im Wallet: Karten zusammengeschoben, Tipp schiebt eine frei. Heute bleibt offen. */
@@ -3590,7 +3616,9 @@
     for (var ui = feed.upcoming.length - 1; ui >= 0; ui--) {
       var itU = feed.upcoming[ui];
       var hU = renderFeedItem(itU);
-      if (dayKey(itU.starts_at) > todayK && !tilesMode()) hU = hU.replace('<article class="acc-card', '<article class="acc-card is-wallet');
+      if (dayKey(itU.starts_at) > todayK) hU = hU.replace('<article class="acc-card', '<article class="acc-card is-wallet');
+      /* Chronologie: heutige Events von Freunden verkleinert, eigene bleiben aufgeklappt */
+      else if (!itU._mine) hU = shrinkCard(hU);
       html += hU;
     }
     html += "</div>";
@@ -3603,12 +3631,13 @@
     html += '<div class="acc-feed-past" data-acc-zone="past">';
     /* „Verkleinern“ gilt für alles Vergangene (auch Circle-Posts, Circle-Events), nicht nur erledigte Events */
     var shrinkAll = compactPast();
-    (feedPrefs().history ? feed.history : []).forEach(function (item) {
+    feed.history.forEach(function (item) {
       var hH = renderFeedItem(item);
       if (shrinkAll && hH.indexOf("is-shrunk") < 0) hH = hH.replace('<article class="acc-card', '<article class="acc-card is-wallet is-shrunk');
       html += hH;
     });
     html += "</div>";
+    }
     if (chatMode() && !feed.myToday.length && !feed.history.length) {
       html += '<p class="acc-bubble-empty">Noch keine Nachrichten in dieser Ansicht. Schreib unten an Deinen Kreis.</p>';
     }
@@ -3648,7 +3677,11 @@
       !firstPaint && !state.bootNeedsCenter && !bootPhase ? scroller.scrollTop || 0 : null;
     /* Feed sichtbar lassen — kein opacity-Flash bei Refresh */
     root.classList.remove("is-centering");
+    /* Dashboard: Stories-Zeile wandert zwischen meine Events und das Anstehende; sonst an ihren Platz zurück */
+    var storiesEl = $("heute-stories");
+    if (storiesEl && root.contains(storiesEl) && root.parentNode) root.parentNode.insertBefore(storiesEl, $("bubble-strip") || root);
     patchFeed(root, placeSpontan(html));
+    if (dash && storiesEl) { var slotS = root.querySelector(".acc-dash-stories"); if (slotS) slotS.appendChild(storiesEl); }
     state.paintedAktuell = true;
     if (state.walletOpen) {
       var wOpen = root.querySelector('.acc-card.is-wallet[data-post-id="' + state.walletOpen + '"]');
@@ -3665,6 +3698,7 @@
         if (Math.abs((scroller.scrollTop || 0) - keepScroll) > 1) scroller.scrollTop = keepScroll;
         return;
       }
+      if (dashMode() && !focusedCard()) { if (firstPaint) scroller.scrollTop = 0; return; }
       scrollCurrentToCenter({ soft: false, force: true });
       /* Nochmals nach Layout — Heute-Karte erst nach Event-Load da */
       requestAnimationFrame(function () {
@@ -3799,6 +3833,8 @@
   function currentEventCard() {
     var fc = focusedCard();
     if (fc) return fc;
+    /* Dashboard: kein Magnet aufs aktuelle Event, man liest von oben in die Zukunft */
+    if (dashMode()) return null;
     var today = $("acc-feed-today");
     if (!today) return null;
     var cards = today.querySelectorAll(".acc-card:not(.acc-card--spontan)");
@@ -5493,7 +5529,7 @@
     if (!state.feedPrefs) {
       var p0 = {};
       try { p0 = JSON.parse(localStorage.getItem(FEED_PREFS_KEY) || "{}") || {}; } catch (e) {}
-      state.feedPrefs = { history: p0.history !== false, stories: p0.stories !== false, layout: p0.layout === "tiles" ? "tiles" : "wallet" };
+      state.feedPrefs = { stories: p0.stories !== false, layout: p0.layout === "dash" ? "dash" : "chrono" };
     }
     return state.feedPrefs;
   }
@@ -5503,24 +5539,24 @@
     state.walletOpen = "";
     render();
   }
-  function tilesMode() { return feedPrefs().layout === "tiles"; }
+  /* Kacheln-Modus entfällt (27.11.): Chronologie oder Dashboard */
+  function tilesMode() { return false; }
+  function dashMode() { return feedPrefs().layout === "dash"; }
   function applyFeedPrefs() {
     var p = feedPrefs();
     document.body.classList.toggle("go-no-stories", !p.stories);
-    document.body.classList.toggle("go-feed-tiles", p.layout === "tiles");
+    document.body.classList.toggle("go-feed-dash", p.layout === "dash");
   }
   function openFeedSettings() {
     if (!global.GoDialog) return Promise.resolve();
     var p = feedPrefs();
-    return GoDialog.choose("Feed Darstellung", [
-      { label: (p.history ? "✓ " : "") + "Historie", value: "history" },
+    return GoDialog.choose("Darstellung Aktuell", [
       { label: (p.stories ? "✓ " : "") + "Stories", value: "stories" },
-      { label: (p.layout === "wallet" ? "✓ " : "") + "Event Wallet", value: "wallet" },
-      { label: (p.layout === "tiles" ? "✓ " : "") + "Event Kacheln", value: "tiles" }
+      { label: (p.layout === "chrono" ? "✓ " : "") + "Events als Chronologie", value: "chrono" },
+      { label: (p.layout === "dash" ? "✓ " : "") + "Events als Dashboard", value: "dash" }
     ], { sub: "Gilt auf diesem Gerät." }).then(function (v) {
       if (!v) return;
-      if (v === "history") p.history = !p.history;
-      else if (v === "stories") p.stories = !p.stories;
+      if (v === "stories") p.stories = !p.stories;
       else p.layout = v;
       saveFeedPrefs();
       /* Dialog bleibt, bis man ihn schließt */
@@ -5539,6 +5575,7 @@
     if (!ev || !global.GoDialog || !GoDialog.vis) return;
     /* Event eines Freundes: nur die Ansicht (Verkleinern gilt für alle) */
     if (String(ev.user_id) !== me()) {
+      if (dashMode()) return;
       GoDialog.choose(String(ev.title || "Training"), [{ label: compactPast() ? "Vergrößerte Ansicht" : "Verkleinerte Ansicht", value: "c" }]).then(function (v) {
         if (v === "c") setCompact(!compactPast());
       });
@@ -5572,7 +5609,7 @@
     var acts = [];
     if (past && eventPhotoCount(ev) < MAX_EVENT_PHOTOS) acts.push({ label: "Foto hinzufügen", value: "__photo" });
     if (past && evDayIso(ev) === todayIso()) acts.push({ label: "Training wieder aufnehmen", value: "__reopen" });
-    if (past && !tilesMode()) acts.push({ label: compactPast() ? "Vergrößerte Ansicht" : "Verkleinerte Ansicht", value: "__compact" });
+    if (past && !dashMode()) acts.push({ label: compactPast() ? "Vergrößerte Ansicht" : "Verkleinerte Ansicht", value: "__compact" });
     /* kein „Löschen“ mehr: Events werden nicht gelöscht (Serie aus dem Wochenplan, Kommentare, Zusagen hängen daran) */
     GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, select: true, actions: acts }).then(function (v) {
       if (v === "__compact") { setCompact(!compactPast()); return; }
