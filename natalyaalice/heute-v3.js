@@ -4247,12 +4247,15 @@
     if (!list) return "";
     var box = $("acc-done-metrics");
     var parts = [], missing = false;
+    state.doneValues = {};
     list.forEach(function (f) {
       var inp = box && box.querySelector('[data-metric="' + f.key + '"]');
       var raw = String(inp && inp.value || "").trim().replace(/\s/g, "");
       if (!raw) { if (f.required) missing = true; return; }
       var n = f.key === "km" ? Number(raw.replace(",", ".")) : Number(raw.replace(/[.,]/g, ""));
       if (!isFinite(n) || n <= 0) { if (f.required) missing = true; return; }
+      /* Zahlen auch in Spalten (go-activity-metrics.sql): steps, distance_km, duration_min */
+      state.doneValues[f.key === "km" ? "distance_km" : f.key === "min" ? "duration_min" : "steps"] = f.key === "km" ? Math.round(n * 100) / 100 : Math.round(n);
       var txt = f.key === "km" ? n.toLocaleString("de-DE", { maximumFractionDigits: 2 }) : Math.round(n).toLocaleString("de-DE");
       parts.push(txt + " " + f.unit);
     });
@@ -4375,6 +4378,10 @@
         var msg = errMsg(err);
         var next = Object.assign({}, body);
         var stripped = false;
+        /* Messwerte erst nach go-activity-metrics.sql: ohne die Spalten trotzdem speichern */
+        ["steps", "distance_km", "duration_min"].forEach(function (k) {
+          if (Object.prototype.hasOwnProperty.call(next, k) && (new RegExp(k)).test(msg)) { delete next[k]; stripped = true; }
+        });
         if (/note/i.test(msg) && Object.prototype.hasOwnProperty.call(next, "note")) {
           delete next.note;
           stripped = true;
@@ -4506,6 +4513,7 @@
           visibility: vis
         };
         if (note) body.note = note;
+        if (metricTxt && state.doneValues) Object.keys(state.doneValues).forEach(function (k) { body[k] = state.doneValues[k]; });
         if (photo) body.photo_url = photo;
         if (noPost) body.feed_hidden = true;
         /* Heute beendet: Uhrzeit des Beendens wird Zeitstempel des Posts (Reihenfolge in Aktuell) */
