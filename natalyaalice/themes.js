@@ -513,7 +513,7 @@
       return { label: (id === current ? "✓ " : "") + THEMES[id].label, value: id, font: String(THEMES[id].head || "").replace(/^(\d+) /, "$1 19px/1.2 ") };
     });
     if (!global.GoDialog || !global.GoDialog.choose) return Promise.resolve(null);
-    return global.GoDialog.choose("Darstellung", opts).then(function (v) {
+    return global.GoDialog.choose("Farbschema", opts).then(function (v) {
       if (v) apply(v);
       return v;
     });
