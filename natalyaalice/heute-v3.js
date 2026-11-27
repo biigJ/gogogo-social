@@ -2657,7 +2657,7 @@
           : canInviteOnDay(day)
     });
     if (stressNote) cardHtml = cardHtml.replace(/(<article class="acc-card[^>]*>)/, stressDone
-      ? '$1<button type="button" class="acc-postit-peek is-ready" data-postit-read="' + esc(ev.id) + '">Mental Upload: zum Lesen tippen</button>'
+      ? '$1<button type="button" class="acc-postit-peek is-ready" data-postit-read="' + esc(ev.id) + '">Dein Mental Upload vorm Workout.</button>'
       : '$1<div class="acc-postit-peek" aria-hidden="true">Öffnet sich nach fertigem Workout</div>');
     return cardHtml;
   }
