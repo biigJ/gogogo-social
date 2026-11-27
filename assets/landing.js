@@ -316,7 +316,7 @@
         el.textContent = text;
       }
     });
-    /* Trainer-Mailto Übersetzung für den Button-Text */
+    /* Coach Mailto Übersetzung für den Button-Text */
     var trainerBtns = document.querySelectorAll("[data-trainer-mail]");
     trainerBtns.forEach(function (el) {
       el.textContent = lang === "de" ? "Coach werden" : "Become a coach";

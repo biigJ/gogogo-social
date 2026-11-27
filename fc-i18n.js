@@ -141,7 +141,7 @@
       {
         s: 'meta[name="description"]',
         attr: "content",
-        de: "Joscha als Trainer — Sport als Bewegungstherapie bei Friday Circle gogogo.",
+        de: "Joscha als Coach — Sport als Bewegungstherapie bei Friday Circle gogogo.",
         en: "Joscha as a trainer — movement as therapy with Friday Circle gogogo.",
       },
       { s: "header.nav", attr: "aria-label", de: "Hauptnavigation", en: "Main navigation" },
@@ -155,7 +155,7 @@
       },
       {
         s: ".tj-hero--intro .tj-prose p:nth-of-type(2)",
-        de: "Als ich anfing als Fitnesstrainer zu arbeiten, habe ich jeden Tag mehr begriffen, wie viel Potenzial an Zufriedenheit in einem gesunden Maß an Bewegung liegt. Das Naheliegende ist uns oft doch fern. Als Trainer darf ich wunderbare Gespräche mit so vielen unterschiedlichen Menschen führen und was ich aktuell erlebe, ist beeindruckend.",
+        de: "Als ich anfing als Fitnesstrainer zu arbeiten, habe ich jeden Tag mehr begriffen, wie viel Potenzial an Zufriedenheit in einem gesunden Maß an Bewegung liegt. Das Naheliegende ist uns oft doch fern. Als Coach darf ich wunderbare Gespräche mit so vielen unterschiedlichen Menschen führen und was ich aktuell erlebe, ist beeindruckend.",
         en: "When I started working as a fitness trainer, I understood more every day how much satisfaction lies in a healthy amount of movement. What seems obvious is often far from us. As a trainer I get to have wonderful conversations with so many different people — and what I am experiencing right now is impressive.",
       },
       {
@@ -321,7 +321,7 @@
     var labelsDe = [
       "Sportsfreunde versammeln",
       "Mitglied werden",
-      "Den passenden Trainer",
+      "Den passenden Coach",
       "ZIRKELTRAINING",
       "Factfulness",
       "Upper Body",
@@ -555,7 +555,7 @@
     }
     if (PAGE === "joschaalstrainer.html") {
       document.title =
-        lang === "en" ? "Joscha as trainer — Friday Circle" : "Joscha als Trainer — Friday Circle";
+        lang === "en" ? "Joscha as coach — Friday Circle" : "Joscha als Coach — Friday Circle";
     }
     if (PAGE === "loesungen.html") {
       document.title =

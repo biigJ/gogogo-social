@@ -363,7 +363,7 @@
       (opts.onSearch ? '<button type="button" class="gcr-link" data-gcr-search>Per ID oder Nickname suchen</button>' : "") +
       '<button type="button" class="gcr-btn gcr-btn--ghost" data-gcr-close>Schließen</button>');
     var coaches = [];
-    /* Auch Coaches ohne Zertifikat (selbst angemeldet, go-coach-self.sql): nicht als Trainer wählbar,
+    /* Auch Coaches ohne Zertifikat (selbst angemeldet, go-coach-self.sql): nicht als Coach wählbar,
        aber man kann ihrer Gruppe beitreten. Man hat immer höchstens einen Coach (trainer_id). */
     host.rest("go_accounts?or=(is_trainer.eq.true,coach_self_at.not.is.null)&select=id,name,nickname,photo_url,about_me,is_trainer,coach_verified_at&order=name.asc")
       .catch(function () { return host.rest("go_accounts?is_trainer=eq.true&select=id,name,nickname,photo_url,about_me,is_trainer&order=name.asc"); })

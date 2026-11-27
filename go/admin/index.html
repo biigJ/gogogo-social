@@ -1952,7 +1952,7 @@
 
     <div class="challenge-modal" id="kraft-note-modal" hidden aria-hidden="true">
       <div class="challenge-modal__sheet" role="dialog" aria-modal="true" aria-labelledby="kraft-note-title">
-        <p class="challenge-modal__title" id="kraft-note-title">Trainernotiz</p>
+        <p class="challenge-modal__title" id="kraft-note-title">Coach Notiz</p>
         <textarea class="kraft-rename-input" id="kraft-note-input" maxlength="400" rows="5" placeholder="Hinweis unter der Übung"></textarea>
         <div class="challenge-modal__actions">
           <button type="button" class="challenge-modal__btn is-ghost" id="kraft-note-cancel">Abbrechen</button>
@@ -2038,7 +2038,7 @@
         <section class="admin-role" id="admin-role" aria-label="Funktion">
           <h2 class="admin-plan__title">Funktion</h2>
           <p class="admin-role__status" id="trainer-status">Funktion: Freund</p>
-          <button class="btn admin-plan__save" type="button" id="trainer-toggle">Als Trainer markieren</button>
+          <button class="btn admin-plan__save" type="button" id="trainer-toggle">Als Coach markieren</button>
           <p class="msg" id="trainer-msg" role="status"></p>
         </section>
         <hr class="admin-rule" />
@@ -2276,7 +2276,7 @@
       var AUTH_KEY = "gogogo_go_admin";
       var ADMIN_RETURN_KEY = "gogogo_admin_return";
       var ADMIN_RETURN_ACC_KEY = "gogogo_admin_return_acc";
-      /* Getrennt vom Admin-Return: Trainer-Session beim Verlassen des Trainerbereichs. */
+      /* Getrennt vom Admin-Return: Coach Session beim Verlassen des Coach Bereichs. */
       var TRAINER_SESSION_STASH_KEY = "gogogo_trainer_session_stash";
       var trainerSessionAccount = null;
       var trainerAdminMode = false;
@@ -2535,8 +2535,8 @@
           noteBtn.className = "kraft-note" + (kraftTrainerNotes[ex.id] ? " is-on" : "");
           noteBtn.textContent = "i";
           noteBtn.dataset.ex = ex.id;
-          noteBtn.title = "Trainernotiz";
-          noteBtn.setAttribute("aria-label", "Trainernotiz");
+          noteBtn.title = "Coach Notiz";
+          noteBtn.setAttribute("aria-label", "Coach Notiz");
           actions.appendChild(noteBtn);
           var del = document.createElement("button");
           del.type = "button";
@@ -3107,7 +3107,7 @@
           try { text = await res.text(); } catch (eText) {}
           if (/trainer_note|plan_meta|PGRST204|schema cache/i.test(text)) {
             kraftNoteColumnOk = false;
-            setKraftAdminMsg("Trainernotiz braucht go-trainer-note.sql im Supabase SQL Editor.", true);
+            setKraftAdminMsg("Coach Notiz braucht go-trainer-note.sql im Supabase SQL Editor.", true);
             return;
           }
           var updated = [];
@@ -3133,7 +3133,7 @@
             var createdText = "";
             try { createdText = await created.text(); } catch (eCreated) {}
             if (/trainer_note|plan_meta|PGRST204/i.test(createdText)) {
-              setKraftAdminMsg("Trainernotiz braucht go-trainer-note.sql im Supabase SQL Editor.", true);
+              setKraftAdminMsg("Coach Notiz braucht go-trainer-note.sql im Supabase SQL Editor.", true);
               return;
             }
             if (!created.ok) {
@@ -3144,7 +3144,7 @@
           kraftTrainerNotes[id] = note;
           kraftNoteColumnOk = true;
           refreshKraftAdminUi();
-          setKraftAdminMsg("Trainernotiz gespeichert.");
+          setKraftAdminMsg("Coach Notiz gespeichert.");
         } catch (e) {
           setKraftAdminMsg("Notiz speichern fehlgeschlagen.", true);
         }
@@ -4120,7 +4120,7 @@
         try {
           var payload = {
             mode: opts.mode || "full",
-            /* Immer Voll-Admin, nie ?trainer=1 — sonst landet Return im Trainerbereich. */
+            /* Immer Voll-Admin, nie ?trainer=1 — sonst landet Return im Coach Bereich. */
             href: "/go/admin/"
           };
           sessionStorage.setItem(ADMIN_RETURN_KEY, JSON.stringify(payload));
@@ -4168,7 +4168,7 @@
       }
 
       function exitTrainerAdminToAccount() {
-        /* Admin hat einen Trainer-Nutzer geöffnet und den Trainerbereich betreten:
+        /* Admin hat einen Coach Nutzer geöffnet und den Coach Bereich betreten:
            Logout führt zurück in den Voll-Admin, nicht in dessen Nutzerprofil. */
         var adminRet = readAdminReturnPayload();
         if (adminRet) {
@@ -4198,7 +4198,7 @@
       function initTrainerAdminMode() {
         var params = new URLSearchParams(location.search || "");
         if (params.get("trainer") !== "1") return false;
-        /* Admin-Impersonation aktiv + Admin noch eingeloggt: kein Trainerbereich. */
+        /* Admin-Impersonation aktiv + Admin noch eingeloggt: kein Coach Bereich. */
         if (readAdminReturnPayload()) {
           var adminStillAuthed = false;
           try {
@@ -4210,7 +4210,7 @@
             window.location.replace("/go/admin/");
             return false;
           }
-          /* Verwaistes Return-Flag ohne Admin-Login — für echte Trainer freigeben. */
+          /* Verwaistes Return-Flag ohne Admin-Login — für echte Coach freigeben. */
           try {
             sessionStorage.removeItem(ADMIN_RETURN_KEY);
             sessionStorage.removeItem(ADMIN_RETURN_ACC_KEY);
@@ -4235,10 +4235,10 @@
           }
         }
         var brand = document.querySelector(".site-header__brand");
-        if (brand) brand.textContent = "Trainer";
+        if (brand) brand.textContent = "Coach";
         var listBtn = document.querySelector(".menu-list-label");
         if (listBtn) listBtn.textContent = "Meine Nutzer";
-        /* Kein setAuthed — Trainer dürfen AUTH_KEY nicht bekommen (kein Voll-Admin). */
+        /* Kein setAuthed — Coach dürfen AUTH_KEY nicht bekommen (kein Voll-Admin). */
         return true;
       }
 
@@ -4761,7 +4761,7 @@
         if (!el) return;
         var label = {
           private: "Tagebuch: Nur für mich",
-          trainer: "Tagebuch: Offen für Trainer",
+          trainer: "Tagebuch: Offen für Coach",
           friends: "Tagebuch: Offen für Freunde"
         }[value];
         if (!label) {
@@ -4805,7 +4805,7 @@
         } catch (e) {}
       }
 
-      /* Kalender im Plan-Panel: Trainer bewertet nur Vergangenheit ohne Eintrag. */
+      /* Kalender im Plan-Panel: Coach bewertet nur Vergangenheit ohne Eintrag. */
       var adminCalEntries = {};
       var adminCalWeekOffset = 0;
       var adminCalSelectedKey = null;
@@ -5624,7 +5624,7 @@
             timeZone: "Europe/Berlin"
           });
         } catch (eTime) {}
-        who.textContent = (mine ? "Du (Trainer)" : adminFeedAuthorFirstName(post.author_id)) +
+        who.textContent = (mine ? "Du (Coach)" : adminFeedAuthorFirstName(post.author_id)) +
           (timeStr ? " · " + timeStr : "");
         if (post.reply_to_id) {
           who.textContent += " → " + (String(post.reply_to_id) === String(primary)
@@ -5801,7 +5801,7 @@
           });
           var nameById = {};
           if (account && account.id) nameById[String(account.id)] = account.name;
-          if (coachId) nameById[coachId] = (coach && coach.name) || "Trainer";
+          if (coachId) nameById[coachId] = (coach && coach.name) || "Coach";
           try {
             var peopleRes = await fetch(
               SUPABASE_URL + "/rest/v1/go_accounts?id=in.(" + nameIds.join(",") + ")&select=id,name&limit=40",
@@ -5843,7 +5843,7 @@
         }
         var coach = await resolveCoachAccount();
         if (!coach || !coach.id) {
-          window.alert("Trainer-Account nicht gefunden.");
+          window.alert("Coach Account nicht gefunden.");
           return;
         }
         if (replySend) replySend.disabled = true;
@@ -5896,7 +5896,7 @@
         };
         panelResult.hidden = false;
         setResultExtrasVisible(!trainerAdminMode || !!(inviteRow || activeAccount));
-        /* Trainer: nach Generator nur QR + Meta, Plan wenn Nutzer gewählt */
+        /* Coach: nach Generator nur QR + Meta, Plan wenn Nutzer gewählt */
         if (trainerAdminMode && !inviteRow && !activeAccount) {
           setResultExtrasVisible(false);
         }
@@ -6008,10 +6008,10 @@
           }
         }
         var isTrainer = !!(activeAccount && activeAccount.is_trainer);
-        if (status) status.textContent = "Funktion: " + (isTrainer ? "Trainer" : "Freund");
+        if (status) status.textContent = "Funktion: " + (isTrainer ? "Coach" : "Freund");
         if (btn) {
           btn.disabled = !activeAccount || !activeAccount.id || trainerSchemaOk === false;
-          btn.textContent = isTrainer ? "Trainer-Status entfernen" : "Als Trainer markieren";
+          btn.textContent = isTrainer ? "Coach Status entfernen" : "Als Coach markieren";
         }
       }
 
@@ -6039,7 +6039,7 @@
         var msg = document.getElementById("trainer-msg");
         if (!activeAccount || !activeAccount.id) {
           if (msg) {
-            msg.textContent = "Kein Account — Trainer-Status nicht speicherbar.";
+            msg.textContent = "Kein Account — Coach Status nicht speicherbar.";
             msg.classList.add("is-error");
           }
           return;
@@ -6090,7 +6090,7 @@
             activeAccount.is_trainer = !!on;
           }
           refreshTrainerUi();
-          if (msg) msg.textContent = activeAccount.is_trainer ? "Als Trainer markiert." : "Trainer-Status entfernt.";
+          if (msg) msg.textContent = activeAccount.is_trainer ? "Als Coach markiert." : "Coach Status entfernt.";
         } catch (e) {
           if (msg) {
             msg.textContent = "Speichern fehlgeschlagen.";
@@ -6652,7 +6652,7 @@
         return ids;
       }
 
-      /* Map author_id -> latest post timestamp (ms), ohne Trainer-Posts */
+      /* Map author_id -> latest post timestamp (ms), ohne Coach Posts */
       async function loadLatestPostMsByAuthor() {
         var latest = {};
         try {
@@ -6760,7 +6760,7 @@
         if (trainerLabel) {
           var trainerLine = document.createElement("span");
           trainerLine.className = "list-item__trainer";
-          trainerLine.textContent = "Trainer: " + trainerLabel;
+          trainerLine.textContent = "Coach: " + trainerLabel;
           openBtn.appendChild(trainerLine);
         }
         openBtn.setAttribute("aria-label", "Profil von " + (row.first_name || "Nutzer") + " öffnen");
@@ -7122,7 +7122,7 @@
               (accMapRows || []).forEach(function (acc) {
                 if (!acc || !acc.id) return;
                 if (acc.is_trainer) {
-                  trainerNameById[String(acc.id)] = adminFirstName(acc.name) || "Trainer";
+                  trainerNameById[String(acc.id)] = adminFirstName(acc.name) || "Coach";
                 }
                 if (acc.trainer_id) {
                   if (acc.serial_number) trainerIdBySerial[String(acc.serial_number)] = String(acc.trainer_id);
@@ -7205,7 +7205,7 @@
               if (label) row.trainerName = label;
             });
           }
-          listMsg.textContent = rows.length ? "" : (trainerAdminMode ? "Noch keine Nutzer mit Dir als Trainer." : "Noch keine Codes.");
+          listMsg.textContent = rows.length ? "" : (trainerAdminMode ? "Noch keine Nutzer mit Dir als Coach." : "Noch keine Codes.");
           var accountIndex = await loadAccountIndex();
           var latestByAuthor = trainerAdminMode ? {} : await loadLatestPostMsByAuthor();
           rows.forEach(function (row) {
@@ -7305,7 +7305,7 @@
         }
         if (!trainerSessionAccount || !trainerSessionAccount.id) {
           if (msg) {
-            msg.textContent = "Kein Trainer-Account.";
+            msg.textContent = "Kein Coach Account.";
             msg.classList.add("is-error");
           }
           return;
