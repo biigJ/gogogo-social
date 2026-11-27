@@ -2646,7 +2646,7 @@
         "</div>";
     }).join("");
     openSheet(
-      '<p class="wr-sheet-hint">Schieb das Zirkeltraining auf Deinen Tag. Es ersetzt dort das Event aus Deinem Wochenplan.</p>' +
+      '<p class="wr-sheet-hint">Schieb das Zirkeltraining auf Deinen Tag. Dein Wochenplan bleibt, beide Events stehen an dem Tag.</p>' +
       '<div class="wr-days wr-days--all">' + rows + "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Verlassen</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zrec-next="1">Weiter</button></div>'
@@ -2733,7 +2733,8 @@
     card.addEventListener("pointercancel", endZ);
   }
   function openZrecDay(wd) {
-    state.zrec = { wd: wd, time: "18:00", vis: "team", friends: [], circle: null, mode: "alt" };
+    /* Die App ersetzt nichts von selbst: Standard „zusätzlich“, „statt“ nur, wenn der Nutzer es wählt */
+    state.zrec = { wd: wd, time: "18:00", vis: "team", friends: [], circle: null, mode: "extra" };
     paintZrecDay();
   }
   function paintZrecDay() {
@@ -2749,7 +2750,7 @@
       '<p class="wr-zrec-lab">Uhrzeit setzen</p><div class="gz-time"><div class="gz-time__col" data-wr-zrec-time>' +
       times.map(function (t) { return '<span class="gz-time__opt">' + t + "</span>"; }).join("") + "</div></div>" +
       '<button type="button" class="wr-dayrow__vis' + (z.vis === "privat" ? "" : " is-on") + '" data-wr-zrec="vis">' + (z.vis === "privat" ? "privat" : "sichtbar") + "</button>" +
-      '<p class="wr-sheet-hint">Ersetzt das Event aus Deinem Wochenplan an diesem Tag.</p>' +
+      '<p class="wr-sheet-hint">Kommt an diesem Tag zu Deinem Wochenplan dazu.</p>' +
       "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-zrec="back">Zurück</button>' +
       '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-zrec="save">Speichern</button></div>'
@@ -3315,7 +3316,7 @@
     var any = st.evs.length;
     openSheet(
       '<p class="wr-sheet-title">Gruppen-Events</p>' +
-      '<p class="wr-sheet-hint">' + (any ? "Die Events Deiner Gruppe " + esc(st.group.name || "") + " ersetzen an diesen Tagen Deinen Wochenplan. Mit − nimmst Du eins heraus." : "Diese Woche gibt es keine Gruppen-Events.") + "</p>" +
+      '<p class="wr-sheet-hint">' + (any ? "Die Events Deiner Gruppe " + esc(st.group.name || "") + " kommen an diesen Tagen zu Deinem Wochenplan dazu. Mit − nimmst Du eins heraus." : "Diese Woche gibt es keine Gruppen-Events.") + "</p>" +
       '<div class="wr-days wr-days--all">' + rows + "</div>" +
       '<div class="wr-btnrow"><button type="button" class="wr-sheet-cancel" data-wr-sheet-close="1">Verlassen</button>' +
       (any ? '<button type="button" class="wr-pill-btn wr-pill-btn--dark" data-wr-gev-save="1">Weiter</button>' : "") + "</div>"
@@ -3335,14 +3336,9 @@
         jobs.push(rest("event_rsvps?on_conflict=event_id,user_id", {
           method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
           body: { event_id: id, user_id: me(), status: "zugesagt" }
-        }).then(function () {
-          /* Ersatz für den Wochenplan an diesem Tag */
-          if (plan && plan.status === "geplant" && /^[0-9a-f-]{36}$/i.test(String(plan.id))) {
-            return rest("events?id=eq." + encodeURIComponent(plan.id) + "&user_id=eq." + encodeURIComponent(me()), {
-              method: "PATCH", prefer: "return=minimal", body: { status: "ausgefallen" }
-            });
-          }
         }));
+        /* kein Ersatz: der Wochenplan an diesem Tag bleibt, der Nutzer entscheidet selbst (starten, verschieben, absagen) */
+        void plan;
       } else if (!st.keep[id] && st.going[id]) {
         jobs.push(rest("event_rsvps?event_id=eq." + encodeURIComponent(id) + "&user_id=eq." + encodeURIComponent(me()), {
           method: "DELETE", prefer: "return=minimal"
@@ -3861,11 +3857,12 @@
       var label = DAYS_DE[d.getDay()];
       var ev = de.slots[i];
       /* Zirkel des Tages: eigene Zeile, Änderungen im Zirkel-Editor (Tipp öffnet ihn) */
-      var zRows = ((de.zirkels && de.zirkels[i]) || []).map(function (z) {
+      var zList = ((de.zirkels && de.zirkels[i]) || []).map(function (z) {
         return '<button type="button" class="wr-dayrow wr-dayrow--zirkel" data-wr-dayzirkel="1"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> 🔥 " +
           esc(z.title || "Zirkeltraining") + (displayTime(z.starts_at) ? " · " + formatTime(z.starts_at) : "") + "</span></div><span></span></button>";
-      }).join("");
-      var jRows = ((de.joined && de.joined[i]) || []).map(function (j) {
+      });
+      var zRows = zList.join("");
+      var jList = ((de.joined && de.joined[i]) || []).map(function (j) {
         var off = !!de.joinOff[String(j.id)];
         var ico = j.category === "zirkel" ? "🔥" : j.group_id ? "👥" : (emojiFor(j.category, j.title) || "");
         var who = String((personOf(j.user_id) || {}).name || "").split(" ")[0];
@@ -3873,8 +3870,17 @@
           esc(j.title || "Training") + (displayTime(j.starts_at) ? " · " + formatTime(j.starts_at) : "") + (who ? ' <span class="wr-dayrow__who">· ' + esc(who) + "</span>" : "") +
           (j.location ? '<span class="wr-dayrow__place">' + esc(j.location) + "</span>" : "") + "</span></div>" +
           '<button type="button" class="wr-dayrow__join" data-wr-dayjoin="' + esc(j.id) + '" aria-label="' + (off ? "Wieder zusagen" : "Absagen") + '">' + (off ? "+" : "−") + "</button></div>";
-      }).join("");
-      return dayRowHtml() + zRows + jRows;
+      });
+      var jRows = jList.join("");
+      /* alle wiederkehrenden Events des Tages chronologisch (Plan, eigener Zirkel, Gruppe/Circle), nichts ersetzt etwas */
+      var parts = [];
+      var planT = ev ? (de.times[ev.id] && de.times[ev.id] !== NO_TIME ? de.times[ev.id] : "00:00") : "00:00";
+      parts.push({ t: planT, h: dayRowHtml() });
+      ((de.zirkels && de.zirkels[i]) || []).forEach(function (z, k) { parts.push({ t: displayTime(z.starts_at) ? formatTime(z.starts_at) : "00:00", h: zList[k] }); });
+      ((de.joined && de.joined[i]) || []).forEach(function (j, k) { parts.push({ t: displayTime(j.starts_at) ? formatTime(j.starts_at) : "00:00", h: jList[k] }); });
+      parts.sort(function (a, b) { return a.t.localeCompare(b.t); });
+      void zRows; void jRows;
+      return parts.map(function (x) { return x.h; }).join("");
       function dayRowHtml() {
       if (!ev) {
         var doneEv = de.done && de.done[i];
