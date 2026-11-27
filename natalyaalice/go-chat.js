@@ -128,8 +128,30 @@
     paint();
   }
 
+  /* iOS: nach dem Schließen der Tastatur bleibt die Seite manchmal hochgeschoben, dann liegt der Chat
+     zu hoch und darunter scheint der Feed durch. Seite zurück auf 0, sobald die Tastatur weg ist. */
+  var vvBound = false;
+  function resetShift() {
+    if (!root || !root.isConnected) return;
+    var vv = global.visualViewport;
+    if (vv && vv.height < global.innerHeight * 0.8) return; /* Tastatur noch offen */
+    if (global.scrollY || document.documentElement.scrollTop || document.body.scrollTop) {
+      global.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    }
+  }
+  function bindShift() {
+    if (vvBound) return;
+    vvBound = true;
+    document.addEventListener("focusout", function () { setTimeout(resetShift, 60); setTimeout(resetShift, 400); });
+    if (global.visualViewport) global.visualViewport.addEventListener("resize", function () { setTimeout(resetShift, 60); });
+    global.addEventListener("scroll", function () { if (root && root.isConnected && !document.activeElement.matches("input,textarea,[contenteditable]")) resetShift(); }, { passive: true });
+  }
+
   function open() {
     if (!host) return;
+    bindShift();
     if (!root) {
       root = document.createElement("div");
       root.className = "go-chat";
