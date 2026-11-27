@@ -1460,7 +1460,8 @@
        abgeschlossen ist sie das eigene Event */
     if (ev.copy_of && ev.status !== "erledigt") return false;
     /* eigene Einheit gespeichert: das Event der Gruppe nicht zusätzlich zeigen */
-    if (!mine && isMyGroupEvent(ev) && (state.events || []).some(function (e) {
+    /* auch Zirkel eines anderen, bei dem ich mitgemacht und meine Einheit abgeschlossen habe */
+    if (!mine && (isMyGroupEvent(ev) || iAmGoing(ev.id)) && (state.events || []).some(function (e) {
       return e && String(e.user_id) === uid && String(e.copy_of || "") === String(ev.id) && e.status === "erledigt";
     })) return false;
     var vis = normalizeVisibility(ev.visibility);
