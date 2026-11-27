@@ -85,7 +85,7 @@ window.REGISTER_I18N = {
     ],
   },
   training: {
-    title: { de: "Mein Trainer. — go Training | gogogo", en: "My trainer. — go Training | gogogo" },
+    title: { de: "Mein Coach. — go Training | gogogo", en: "My coach. — go Training | gogogo" },
     meta: {
       de: "Beantworte ein paar Fragen — wir melden uns persönlich bei dir.",
       en: "Answer a few questions — we will get in touch personally.",
@@ -111,7 +111,7 @@ window.REGISTER_I18N = {
       ["Ich brauche einen individuell passenden Wochenplan", "I need a weekly plan that fits me"],
       ["Ich möchte regelmäßig professionelles Feedback", "I want regular professional feedback"],
       [
-        "Ich suche einen spezifischen Trainer. Das Thema schreibe ich in den Freitext unten. Schlag mir einen passenden Trainer in Berlin vor.",
+        "Ich suche einen spezifischen Coach. Das Thema schreibe ich in den Freitext unten. Schlag mir einen passenden Coach in Berlin vor.",
         "I am looking for a specific trainer. I will write the topic below. Suggest a suitable trainer in Berlin.",
       ],
       ["Ich will online trainieren und flexibel bleiben", "I want to train online and stay flexible"],
