@@ -2601,10 +2601,10 @@
           /* Einladung: Brief rechts unter dem Bild wie die anderen Rubrik-Icons */
           badge: invite && upcoming ? "invite" : ""
         });
-    /* Plus → Stressabbau: „Entstressen“ an jedem Event, bei dem ich dabei bin; gemerkter Zettel lugt oben hervor */
-    var stressOn = ev.status === "geplant" && day >= todayIso() && (mine || iAmGoing(ev.id)) && stressActive();
-    var stressNote = stressOn && postitOf(ev.id);
-    var stressBtn = stressOn ? '<button type="button" class="acc-destress" data-destress="' + esc(ev.id) + '">Entstressen</button>' : "";
+    /* Plus → Stressabbau: Zettel vom Start lugt oben hinter dem Bild hervor; nach dem Workout antippbar */
+    var stressNote = postitOf(ev.id);
+    var stressDone = !!stressNote && (ev.status === "erledigt" || !!gDone);
+    var stressBtn = "";
     var cardHtml = renderCardShell({
       /* zugesagt (Einladung angenommen oder Herz) → dicker Rahmen */
       extraClass: (stressNote ? "has-postit " : "") + (!mine && (acceptedInv || iAmGoing(ev.id)) ? "is-going"
@@ -2656,7 +2656,9 @@
           ? false
           : canInviteOnDay(day)
     });
-    if (stressNote) cardHtml = cardHtml.replace(/(<article class="acc-card[^>]*>)/, '$1<div class="acc-postit-peek" aria-hidden="true">Öffnet sich nach fertigem Workout</div>');
+    if (stressNote) cardHtml = cardHtml.replace(/(<article class="acc-card[^>]*>)/, stressDone
+      ? '$1<button type="button" class="acc-postit-peek is-ready" data-postit-read="' + esc(ev.id) + '">Mental Upload: zum Lesen tippen</button>'
+      : '$1<div class="acc-postit-peek" aria-hidden="true">Öffnet sich nach fertigem Workout</div>');
     return cardHtml;
   }
 
@@ -2681,7 +2683,8 @@
       ".pi-note button{align-self:stretch;min-height:46px;border:0;border-radius:999px;background:#3B2F00;color:#FFE680;font:700 16px Inter,system-ui,sans-serif;cursor:pointer}";
     document.head.appendChild(st);
   }
-  function openPostit(id) {
+  /* vor dem Start: Zettel mittig, „Merken für später“ speichert und startet das Workout; daneben tippen startet ohne Notiz */
+  function openPostit(id, then) {
     postitCss();
     var cur = postitOf(id);
     var wrap = document.createElement("div");
@@ -2693,7 +2696,7 @@
     ta.value = cur ? cur.text : "";
     setTimeout(function () { try { ta.focus(); } catch (e) {} }, 60);
     wrap.addEventListener("click", function (e) {
-      if (e.target === wrap) { wrap.remove(); return; }
+      if (e.target === wrap) { wrap.remove(); if (then) then(); return; }
       if (!e.target.closest("[data-pi-save]")) return;
       var o = postits();
       var t = String(ta.value || "").trim();
@@ -2702,24 +2705,13 @@
       savePostits(o);
       wrap.remove();
       render();
+      if (then) then();
     });
   }
   /* Event abgeschlossen (auch die eigene Einheit beim Gruppentraining): Zettel mittig öffnen, „Alles klar“ schließt und löscht */
-  function checkPostitUploads() {
-    if (document.querySelector(".pi-wrap, .god, #acc-done-modal:not([hidden])")) return;
-    var o = postits();
-    var ids = Object.keys(o);
-    if (!ids.length) return;
-    var hit = null;
-    ids.some(function (id) {
-      var done = (state.events || []).some(function (e) {
-        return e && e.status === "erledigt" && String(e.user_id) === me() && (String(e.id) === id || String(e.copy_of || "") === id);
-      });
-      if (done) hit = id;
-      return done;
-    });
-    if (!hit) return;
-    var note = o[hit];
+  function readPostit(hit) {
+    var note = postits()[String(hit)];
+    if (!note) return;
     postitCss();
     var wrap = document.createElement("div");
     wrap.className = "pi-wrap";
@@ -3806,7 +3798,6 @@
     }
     bindObserver(root);
     bindPhotoPinch(root);
-    setTimeout(checkPostitUploads, 600);
     markSnapCard();
     bindHeuteScrollFilter();
     requestAnimationFrame(function () {
@@ -5480,6 +5471,14 @@
   }
 
   function startEvent(ev) {
+    /* Stressabbau aktiv: vor dem Workout erst der Zettel „Mental Deload hier:“ */
+    if (ev && stressActive() && !postitOf(ev.id) && !document.querySelector(".pi-wrap")) {
+      openPostit(ev.id, function () { startEventNow(ev); });
+      return;
+    }
+    startEventNow(ev);
+  }
+  function startEventNow(ev) {
     markStarted(ev);
     if (ev.category === "zirkel") {
       var z = global.GoZirkelSetup && GoZirkelSetup.parse ? GoZirkelSetup.parse(ev.note) : {};
@@ -6001,8 +6000,8 @@
 
   function onRootClick(e) {
     var t = e.target;
-    var dz = t.closest("[data-destress]");
-    if (dz) { e.preventDefault(); e.stopPropagation(); openPostit(dz.getAttribute("data-destress")); return; }
+    var pr = t.closest("[data-postit-read]");
+    if (pr) { e.preventDefault(); e.stopPropagation(); readPostit(pr.getAttribute("data-postit-read")); return; }
     var moreDesc = t.closest("[data-more-desc]");
     if (moreDesc) {
       var card = moreDesc.closest(".acc-card");
