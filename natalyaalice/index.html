@@ -5591,7 +5591,8 @@
     .team-challenge__end { margin-left: auto; padding: 0; border: 0; background: transparent; color: #C7413B; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
     /* Stempelkarten-Stapel: Karten dahinter angedeutet, Punkte zeigen, welche oben liegt */
     /* mehrere Karten: hintere Karten deutlich abgesetzt, Wischen oder Tippen wechselt */
-    .stamp-pass.has-stack { box-shadow: 0 -16px 0 -6px rgba(246,241,232,.6), 0 -32px 0 -12px rgba(246,241,232,.32); margin-top: 32px; cursor: pointer; touch-action: pan-y; }
+    /* mehrere Karten: hintere Karten gleich groß und gleich hell, je 30 px versetzt (Schatten per JS in Kartenfarbe), vertikal wischen */
+    .stamp-pass.has-stack { cursor: pointer; touch-action: none; }
     .stamp-pass.is-swiping { transition: none !important; }
     .stamp-pass.is-swapped { transition: transform .22s ease, opacity .22s ease; }
     .stamp-pass__stackdots { display: flex; justify-content: center; gap: 6px; margin: 6px 0 0; }
@@ -16055,6 +16056,7 @@
         modal._stack = [{ kind: "main", name: "gogogo", stamps: mainStamps }];
         modal._stackAt = 0;
         pass.classList.remove("has-stack", "is-darkface");
+        pass.style.boxShadow = ""; pass.style.marginTop = "";
         pass.style.background = "";
         if (dots) dots.hidden = true;
         if (!sessionAccount) return;
@@ -16108,7 +16110,7 @@
             if (e.target.closest("#stamp-card-wallet, #stamp-card-pen, .stamp-pass__qr")) return;
             stackGo(1);
           });
-          /* Wischen links/rechts wechselt die Karte (vertikal bleibt Scrollen) */
+          /* Wischen hoch/runter wechselt die Karte */
           var sx = 0, sy = 0, dx = 0, track = false;
           pass.addEventListener("touchstart", function (e) {
             if ((modal._stack || []).length < 2 || !e.touches[0]) return;
@@ -16118,10 +16120,10 @@
           }, { passive: true });
           pass.addEventListener("touchmove", function (e) {
             if (!track || !e.touches[0]) return;
-            dx = e.touches[0].clientX - sx;
-            var dy = e.touches[0].clientY - sy;
-            if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 12) { track = false; pass.style.transform = ""; pass.classList.remove("is-swiping"); return; }
-            pass.style.transform = "translateX(" + dx * 0.6 + "px) rotate(" + dx * 0.02 + "deg)";
+            var dxh = e.touches[0].clientX - sx;
+            dx = e.touches[0].clientY - sy;
+            if (Math.abs(dxh) > Math.abs(dx) && Math.abs(dxh) > 12) { track = false; pass.style.transform = ""; pass.classList.remove("is-swiping"); return; }
+            pass.style.transform = "translateY(" + dx * 0.5 + "px)";
           }, { passive: true });
           function swipeEnd() {
             if (!track) return;
@@ -16135,12 +16137,31 @@
           pass.addEventListener("touchcancel", swipeEnd);
         }
         function paintStackDots() {
+          paintStackBack();
           var d = document.getElementById("stamp-card-stackdots");
           if (!d) return;
           var st = modal._stack || [];
           d.hidden = st.length < 2;
           d.innerHTML = st.map(function (_, i) { return '<i class="' + (i === modal._stackAt ? "is-on" : "") + '"></i>'; }).join("");
         }
+      }
+
+      /* Hintere Karten: volle Breite in ihrer eigenen Farbe, Oberkanten je 30 px versetzt, feine Kante zur Trennung */
+      function paintStackBack() {
+        var modal = document.getElementById("stamp-card-modal");
+        var pass = modal && modal.querySelector(".stamp-pass");
+        if (!pass) return;
+        var st = (modal._stack || []);
+        var n = Math.min(2, Math.max(0, st.length - 1));
+        if (!n) { pass.style.boxShadow = ""; pass.style.marginTop = ""; return; }
+        var at = modal._stackAt || 0, sh = [];
+        for (var k = 1; k <= n; k++) {
+          var c = st[(at + k) % st.length] || {};
+          var col = STAMP_COLORS[c.kind] || STAMP_COLORS.main;
+          sh.push("0 " + (-30 * k) + "px 0 0 " + col, "0 " + (-30 * k - 1) + "px 0 0 rgba(0,0,0,.28)");
+        }
+        pass.style.boxShadow = sh.join(",");
+        pass.style.marginTop = 30 * n + "px";
       }
 
       function paypalDonateUrl() {
