@@ -1668,22 +1668,25 @@
         : cover
           ? '<img class="wr-photo wr-cover" src="' + esc(cover) + '" alt="" loading="lazy" />'
           : "") +
+      /* oben links (statt „Plane Deine Woche“): Tag · Uhrzeit · Ort, darunter der Name */
+      '<div class="wr-head">' +
+      '<p class="wr-when">' + (ev.bubble_id && global.GoBubbles && !GoBubbles.off ? '<span class="wr-when__bub" title="Bubble">' + GoBubbles.SOAP_SVG + "</span>" : "") +
+        esc([dayWord(iso, item._once), when, place].filter(Boolean).join(" · ")) + "</p>" +
+      '<h2 class="wr-title">' +
+      esc(title) +
+      "</h2>" +
+      "</div>" +
+      /* Übungen: Oberkante bündig mit dem obersten Wochentag-Kästchen rechts */
+      '<div class="wr-exwrap">' + exListHtml(ev) + "</div>" +
       '<div class="wr-bottom">' +
       '<div class="wr-bottom__main">' +
-      /* Übungen oben, eine Zeile Abstand, darunter Profilfotos, Tag · Uhrzeit, Titel */
-      exListHtml(ev) +
       '<div class="wr-author">' +
       avatarHtml(p) +
       goingAvatarsHtml(ev) +
       inviteAvatarsHtml(iso) +
       "</div>" +
-      '<p class="wr-when">' + (ev.bubble_id && global.GoBubbles && !GoBubbles.off ? '<span class="wr-when__bub" title="Bubble">' + GoBubbles.SOAP_SVG + "</span>" : "") +
-        esc([dayWord(iso, item._once), when, place].filter(Boolean).join(" · ")) + "</p>" +
       /* Countdown und „Start anhalten“ nebeneinander als gleiche Pillen */
       (cd || zirkelAdminHtml(ev, zSet, iso) ? '<div class="wr-zrow">' + cd + zirkelAdminHtml(ev, zSet, iso) + "</div>" : "") +
-      '<h2 class="wr-title">' +
-      esc(title) +
-      "</h2>" +
       desc +
       (zSet && zSet.online
         ? '<button type="button" class="go-online-cta" data-wr-zirkel-go="1">Online mitmachen</button>'
@@ -1935,7 +1938,7 @@
       "</div>" +
       /* rechts: Kalender (Monat mit Reise, Coaching, Zirkel, Gruppe) und Stift */
       '<div class="wr-top__right">' +
-      '<button type="button" class="wr-icon-btn wr-cal-btn" data-wr-cal="1" aria-label="Kalender">' +
+      '<button type="button" class="wr-icon-btn wr-cal-btn" data-wr-cal="1" aria-label="Kalender" hidden>' +
       '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>' +
       "</button>" +
       '<button type="button" class="wr-icon-btn' +
@@ -1945,7 +1948,7 @@
       "</button>" +
       "</div>" +
       "</div>" +
-      '<p class="wr-day-label wr-plan-label">Plane Deine Woche</p>' +
+      '<p class="wr-day-label wr-plan-label" hidden>Plane Deine Woche</p>' +
       '<p class="wr-day-label" hidden>' +
       esc(dayLabel) +
       "</p>" +
