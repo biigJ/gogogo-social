@@ -1539,6 +1539,9 @@
       /* Kreise oben (todayAll): heutige Trainings der Freunde bis Mitternacht, auch wenn die Uhrzeit vorbei ist
          (Plan-Events ohne Uhrzeit stehen auf 12:00 UTC und fielen sonst ab 14 Uhr raus) */
       var todayKeep = flags.todayAll && dayKey(ev.starts_at) === dayKey(new Date(now).toISOString());
+      /* Freund trainiert gerade (go_training_presence): Karte bleibt in Aktuell, auch wenn die geplante Zeit vorbei ist,
+         damit man ihn vor Ort findet (Status „dabei“ + Ort) */
+      if (!mine && !todayKeep && isStarted(ev)) todayKeep = true;
       if ((t < now - 3600000 && !todayKeep) || t > week) return false;
       if (mine) return true;
       if (flags.showRsvpdUpcoming && iAmGoing(ev.id)) {
@@ -2343,6 +2346,17 @@
     );
   }
 
+  /* Ort auf der Karte; trainiert ein Freund gerade: „Ort · seit 16:49“ */
+  function livePlace(ev, mine) {
+    var place = ev.location || "";
+    if (mine || ev.status !== "geplant" || !isStarted(ev)) return place;
+    var pr = host.presenceOf ? host.presenceOf(String(ev.user_id)) : null;
+    var t = pr && pr.started_at ? new Date(pr.started_at) : null;
+    if (!t || isNaN(t.getTime())) return place;
+    var since = "seit " + t.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Berlin" });
+    return place ? place + " · " + since : since;
+  }
+
   /* Status unten links (symmetrisch zu den drei Punkten): erledigt, dabei (gestartet, nicht abgeschlossen), verspätet, gleich (unter 30 min), bald (unter 1 h), heute, morgen */
   function statusOf(o) {
     if (!o) return "";
@@ -2680,7 +2694,7 @@
       whenTs: zirkelPillsHtml(ev) ? "" : ev.starts_at,
       zpills: inviteCta ? zirkelPillsHtml(ev) : "",
       title: title,
-      place: ev.location || "",
+      place: livePlace(ev, mine),
       desc:
         descHtml(parseZirkelNote(ev.note) ? zirkelLabel(parseZirkelNote(ev.note)) : ev.note) +
         zirkelPairsHtml(ev) +

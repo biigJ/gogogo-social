@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-27-live",
+      at: "2026-11-27T16:00:00Z",
+      text: "Trainiert ein Freund gerade, steht sein Training in Aktuell mit „dabei“, Ort und Startzeit. So findest Du ihn vor Ort."
+    },
+    {
       key: "news:2026-11-27-stress",
       at: "2026-11-27T11:30:00Z",
       text: "Neu unter Plus: Stressabbau. Notier vor dem Training, was Dich beschäftigt, nach dem Workout kommt es zurück."
