@@ -3602,6 +3602,7 @@
     root.hidden = false;
     var html = "";
     var dash = dashMode();
+    var todayK = todayIso();
     function shrinkCard(h) { return h.indexOf("is-shrunk") < 0 ? h.replace('<article class="acc-card', '<article class="acc-card is-wallet is-shrunk') : h; }
     if (dash) {
       /* Dashboard: oben meine heutigen Events als Wallet (aktuellstes oben), darunter Stories,
@@ -3615,22 +3616,26 @@
       });
       void nowD;
       html += '<div class="acc-feed-today acc-dash-mine" data-acc-zone="today" id="acc-feed-today">';
+      if (mineD.length) html += '<h3 class="acc-dash-h">Heute Ich:</h3>';
       mineD.forEach(function (item) {
         var hM = renderFeedItem(item);
         if (hM.indexOf("is-wallet") < 0) hM = hM.replace('<article class="acc-card', '<article class="acc-card is-wallet');
         html += hM;
       });
       html += "</div>";
-      html += '<div class="acc-dash-stories" data-acc-zone="dstories"></div>';
+      html += '<div class="acc-dash-stories" data-acc-zone="dstories">' + (feedPrefs().stories ? '<h3 class="acc-dash-h">Meine Community heute aktiv:</h3>' : "") + "</div>";
       html += '<div class="acc-feed-future acc-dash-next" data-acc-zone="future">';
-      feed.upcoming.forEach(function (item) { html += shrinkCard(renderFeedItem(item)); });
+      var tomorrowSaid = false;
+      feed.upcoming.forEach(function (item) {
+        if (!tomorrowSaid && dayKey(item.starts_at) > todayK) { tomorrowSaid = true; html += '<h3 class="acc-dash-h">ab morgen folgende Events:</h3>'; }
+        html += shrinkCard(renderFeedItem(item));
+      });
       if (!feed.upcoming.length) html += '<p class="acc-bubble-empty">Noch nichts Anstehendes bei Dir und Deinen Freunden.</p>';
       html += "</div>";
     } else {
     /* Oben = Zukunft: weiter weg oben, nah an heute unten (umgekehrt zur Zeit) */
     html += '<div class="acc-feed-future" data-acc-zone="future">';
     /* Ab morgen wie im Wallet: Karten zusammengeschoben, Tipp schiebt eine frei. Heute bleibt offen. */
-    var todayK = todayIso();
     for (var ui = feed.upcoming.length - 1; ui >= 0; ui--) {
       var itU = feed.upcoming[ui];
       var hU = renderFeedItem(itU);
