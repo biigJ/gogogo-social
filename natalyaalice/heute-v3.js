@@ -2622,7 +2622,11 @@
         '"' + (ptR ? ' data-pt="' + ptR + '"' : ""),
       category: ev.category,
       /* Zirkel heute: Countdown, Anhalten, Sofortstart an der Stelle des Buttons (kein Start-Button) */
-      mediaExtra: inviteCta || (zirkelPillsHtml(ev) ? zirkelPillsHtml(ev).replace('class="wr-zrow acc-zrow"', 'class="wr-zrow acc-zrow acc-zrow--media"') : actCta),
+      /* darunter „Dashboard öffnen“: ins Zirkel-Workout (Timer, Stationen), für Ersteller und Zusagende */
+      mediaExtra: inviteCta || (zirkelPillsHtml(ev)
+        ? '<div class="acc-zmedia">' + zirkelPillsHtml(ev).replace('class="wr-zrow acc-zrow"', 'class="wr-zrow acc-zrow acc-zrow--media"') +
+          ((mine || iAmGoing(ev.id)) ? '<button type="button" class="acc-rsvp acc-zopen" data-zirkel-open="' + esc(ev.id) + '">Dashboard öffnen</button>' : "") + "</div>"
+        : actCta),
       photo: ev.photo_url || "",
       extraPhotos: eventExtraPhotos(ev),
       courseId: ev.course_id || "",
@@ -6015,6 +6019,8 @@
 
   function onRootClick(e) {
     var t = e.target;
+    var zo = t.closest("[data-zirkel-open]");
+    if (zo) { e.preventDefault(); e.stopPropagation(); var zev = evById(zo.getAttribute("data-zirkel-open")); if (zev) startEvent(zev); return; }
     var pr = t.closest("[data-postit-read]");
     if (pr) { e.preventDefault(); e.stopPropagation(); readPostit(pr.getAttribute("data-postit-read")); return; }
     var moreDesc = t.closest("[data-more-desc]");
