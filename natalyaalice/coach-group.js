@@ -42,6 +42,7 @@
     ".gcg__stamps i.is-on{background:#2F5D50}" +
     ".gcg__cefoot{display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;margin-top:6px;font-size:13px;color:rgba(42,33,24,.7)}" +
     ".gcg__link{border:0;background:none;padding:0;font:inherit;font-size:14px;font-weight:600;color:#2A2118;text-decoration:underline;text-underline-offset:3px;cursor:pointer}" +
+    ".gcg .wr-dayrow.is-hidden-cc .wr-dayrow__title{opacity:.5}" +
     ".gcg__plus{width:32px;height:32px;border-radius:50%;border:1.5px solid rgba(42,33,24,.35);background:transparent;color:#2A2118;font:400 20px/1 Inter,sans-serif;cursor:pointer;align-self:center}";
 
   function ensureCss() {
@@ -88,7 +89,11 @@
     var to = addDays(days[6], 1) + "T00:00:00" + offset(days[6]);
     var coach = encodeURIComponent(s.coach.id);
     var jobs = [host.rest("rpc/go_coach_group_members", { method: "POST", body: { p_coach: s.coach.id } }).catch(function () { return null; })];
-    if (s.mode === "coach") {
+    if (s.mode === "coachcal") {
+      /* Ich als Coach (Plus): meine Termine so, wie Coachees sie unter „Mein Coach“ sehen, plus private */
+      jobs.push(host.rest("events?user_id=eq." + encodeURIComponent(me()) + "&status=eq.geplant&coach_group=not.is.true&starts_at=gte." + encodeURIComponent(from) +
+        "&starts_at=lt." + encodeURIComponent(to) + "&select=id,title,starts_at,location,item_type,visibility&order=starts_at.asc&limit=80").catch(function () { return []; }));
+    } else if (s.mode === "coach") {
       jobs.push(host.rest("rpc/go_coach_cards", { method: "POST", body: { p_coach: s.coach.id } }).catch(function () { return []; }));
       jobs.push(host.rest("events?user_id=eq." + encodeURIComponent(me()) + "&coach_group=eq.true&status=neq.ausgefallen&starts_at=gte." + encodeURIComponent(from) +
         "&starts_at=lt." + encodeURIComponent(to) + "&select=id,title,starts_at,location,status&order=starts_at.asc&limit=60").catch(function () { return []; }));
@@ -127,6 +132,10 @@
       s.days = days;
       s.membersOk = r[0] !== null;
       s.members = r[0] || [];
+      if (s.mode === "coachcal") {
+        s.own = (r[1] || []).filter(function (e) { return e && e.item_type !== "support_session" && e.item_type !== "nutrition_log"; });
+        return;
+      }
       if (s.mode === "coach") {
         s.cards = {};
         (r[1] || []).forEach(function (c) { s.cards[String(c.account_id)] = c; });
@@ -241,7 +250,8 @@
         : '<p class="gcg__empty">Noch keine Coachees. Coachees wählen Dich unter Kreise → Hinzufügen → Coach.</p>';
     }
     var d0 = new Date(s.days[0] + "T12:00:00Z"), d6 = new Date(s.days[6] + "T12:00:00Z");
-    html += '<p class="gcg__h">' + (s.mode === "client" ? "Termine von " + esc(first(s.coach.name) || "Deinem Coach") : "Gruppentraining") + "</p>" +
+    if (s.mode === "coachcal") html = "";
+    html += '<p class="gcg__h">' + (s.mode === "client" ? "Termine von " + esc(first(s.coach.name) || "Deinem Coach") : s.mode === "coachcal" ? "So sehen Deine Coachees Deine Woche" : "Gruppentraining") + "</p>" +
       '<div class="gcg__wk"><button type="button" data-gcg-wk="-1"' + (s.week <= 0 ? " disabled" : "") + ' aria-label="Vorherige Woche">‹</button><b>' +
       d0.getUTCDate() + "." + (d0.getUTCMonth() + 1) + ". – " + d6.getUTCDate() + "." + (d6.getUTCMonth() + 1) + ".</b>" +
       '<button type="button" data-gcg-wk="1" aria-label="Nächste Woche">›</button></div>';
@@ -249,7 +259,16 @@
       var label = DAYS[dow(iso)];
       var past = iso < t;
       var out = "", k = 0;
-      if (s.mode === "coach") {
+      if (s.mode === "coachcal") {
+        /* − nimmt das Event aus der Sicht der Coachees (privat), + gibt es wieder frei (Freunde und Coachees) */
+        (s.own || []).filter(function (e) { return berlinDay(e.starts_at) === iso; }).forEach(function (e) {
+          var open = e.visibility !== "privat";
+          out += '<div class="wr-dayrow wr-zrec-row wr-ga-row is-group' + (open ? " is-zirkel" : " is-hidden-cc") + (past ? " is-past" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + (k++ ? "" : label) + "</b> " +
+            esc(e.title || "Training") + " · " + esc(berlinTime(e.starts_at)) + '</span><span class="wr-dayrow__tag">' +
+            esc([e.location, open ? "für Coachees sichtbar" : "privat, Coachees sehen es nicht"].filter(Boolean).join(" · ")) + "</span></div>" +
+            (past ? "<span></span>" : '<button type="button" class="gcg__plus" data-gcg-vis="' + esc(e.id) + '" data-on="' + (open ? 1 : 0) + '" aria-label="' + (open ? "Für Coachees ausblenden" : "Für Coachees freigeben") + '">' + (open ? "−" : "+") + "</button>") + "</div>";
+        });
+      } else if (s.mode === "coach") {
         s.events.filter(function (e) { return berlinDay(e.starts_at) === iso; }).forEach(function (e) {
           var inv = (s.inv || []).filter(function (x) { return String(x.event_id) === String(e.id); });
           var yes = inv.filter(function (x) { return x.status === "accepted"; }).length;
@@ -293,12 +312,13 @@
       }
       /* Zustand aus dem PT-Kalender des Coaches: gesperrt, Feiertag, ausgebucht oder freie Stunden */
       var ds = dayState(s, iso);
-      var stateTxt = s.mode === "coach" || ds.closed ? ds.label : "";
-      var canAdd = s.mode === "coach" && !past && !ds.closed;
+      var mgr = s.mode === "coach" || s.mode === "coachcal";
+      var stateTxt = mgr || ds.closed ? ds.label : "";
+      var canAdd = mgr && !past && !ds.closed;
       if (!k) {
         out = '<div class="wr-dayrow wr-zrec-row is-empty' + (past ? " is-past" : "") + (ds.closed ? " is-closed" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + '</b> <span class="wr-dayrow__free">' + esc(stateTxt || "frei") + "</span></span></div>" +
           (canAdd ? '<button type="button" class="gcg__plus" data-gcg-add="' + iso + '" aria-label="Event am ' + DAYS_LONG[dow(iso)] + ' anlegen">+</button>' : "<span></span>") + "</div>";
-      } else if (s.mode === "coach" && !past) {
+      } else if (mgr && !past) {
         out += '<div class="wr-dayrow wr-zrec-row is-empty' + (ds.closed ? " is-closed" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b></b> <span class="wr-dayrow__free">' + esc(ds.closed ? ds.label : "weiteres Event · " + ds.label) + "</span></span></div>" +
           (canAdd ? '<button type="button" class="gcg__plus" data-gcg-add="' + iso + '" aria-label="Weiteres Event anlegen">+</button>' : "<span></span>") + "</div>";
       } else if (ds.closed) {
@@ -451,7 +471,38 @@
     var wk = t.closest("[data-gcg-wk]");
     if (wk && !wk.disabled) { s.week = Math.max(0, s.week + Number(wk.getAttribute("data-gcg-wk"))); refresh(s); return; }
     var add = t.closest("[data-gcg-add]");
-    if (add) { addEvent(s, add.getAttribute("data-gcg-add")); return; }
+    if (add) {
+      var isoA = add.getAttribute("data-gcg-add");
+      if (s.mode !== "coachcal") { addEvent(s, isoA); return; }
+      /* Ich als Coach: Gruppentraining (Coachees einladen) oder Einzeltraining im PT-Kalender */
+      GoDialog.choose(shortDay(isoA), [
+        { label: "Gruppentraining mit Coachees", value: "group" },
+        { label: "Einzeltraining planen", value: "pt" }
+      ]).then(function (v) {
+        if (v === "group") addEvent(s, isoA);
+        else if (v === "pt" && host.openPtCal) host.openPtCal(isoA);
+      });
+      return;
+    }
+    var vb = t.closest("[data-gcg-vis]");
+    if (vb) {
+      var on = vb.getAttribute("data-on") === "1";
+      var idV = vb.getAttribute("data-gcg-vis");
+      (on ? GoDialog.confirm("Für Coachees ausblenden?", { body: "Das Event wird privat: auch Freunde sehen es dann nicht mehr.", ok: "Ausblenden", cancel: "Abbrechen" }) : Promise.resolve(true))
+        .then(function (ok) {
+          if (!ok) return;
+          vb.disabled = true;
+          return host.rest("events?id=eq." + encodeURIComponent(idV) + "&user_id=eq." + encodeURIComponent(me()), {
+            method: "PATCH", prefer: "return=minimal", body: { visibility: on ? "privat" : "team" }
+          }).then(function () {
+            host.toast(on ? "Für Coachees ausgeblendet" : "Für Coachees sichtbar");
+            if (host.onChange) host.onChange();
+            return refresh(s);
+          });
+        })
+        .catch(function () { vb.disabled = false; host.toast("Speichern ging nicht"); });
+      return;
+    }
     var y = t.closest("[data-gcg-yes]");
     if (y) { answer(s, y.getAttribute("data-gcg-yes"), true); return; }
     var cy = t.closest("[data-gcg-cyes]");
