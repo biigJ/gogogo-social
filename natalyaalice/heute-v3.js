@@ -3710,7 +3710,10 @@
       var tomorrowSaid = false;
       feed.upcoming.forEach(function (item) {
         if (!tomorrowSaid && dayKey(item.starts_at) > todayK) { tomorrowSaid = true; html += '<h3 class="acc-dash-h">ab morgen folgende Events:</h3>'; }
-        html += shrinkCard(renderFeedItem(item));
+        var hD = shrinkCard(renderFeedItem(item));
+        /* heutige Events von Freunden: Farbschicht nur 20 % */
+        if (dayKey(item.starts_at) === todayK) hD = hD.replace('<article class="acc-card', '<article class="acc-card is-day-today');
+        html += hD;
       });
       if (!feed.upcoming.length) html += '<p class="acc-bubble-empty">Noch nichts Anstehendes bei Dir und Deinen Freunden.</p>';
       html += "</div>";
