@@ -6469,6 +6469,8 @@
   function refresh() {
     if (!host || !me()) return Promise.resolve();
     var seq = ++state.refreshSeq;
+    /* „Neue Nachricht“ beim Öffnen: Meldungen gleich mitladen, nicht erst nach dem ganzen Feed */
+    if (!state.msgPopDone && !state.msgEarly) { state.msgEarly = true; try { checkReplies(); } catch (eMe) {} }
     function stillCurrent() {
       return seq === state.refreshSeq;
     }
@@ -6634,6 +6636,7 @@
     try { localStorage.setItem(msgPopSeenKey(), String(fresh[0].created_at)); } catch (e2) {}
     var x = fresh[0];
     var body = heartLabel(x) + (fresh.length > 1 ? "\n\n+ " + (fresh.length - 1) + " weitere" : "");
+    /* kurz nach dem Öffnen, nicht erst nach Sekunden */
     setTimeout(function () {
       if (document.querySelector(".god, .hl-wrap")) { try { localStorage.setItem(msgPopSeenKey(), seen); } catch (e3) {} state.msgPopDone = false; return; }
       GoDialog.confirm("Neue Nachricht", { body: body, ok: "Ansehen", cancel: "Später" }).then(function (yes) {
@@ -6644,7 +6647,7 @@
         if (typeof x.open === "function") x.open();
         else if (x.event_id) openReplyEvent(x.event_id);
       });
-    }, 1200);
+    }, 350);
   }
   function heartLabel(x) {
     if (x.label) return x.label;
