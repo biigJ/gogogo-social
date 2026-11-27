@@ -4559,6 +4559,8 @@
     .friend-list__row img, .friend-list__row .team-face, .friend-list__row > :first-child { flex: 0 0 auto; }
     .friend-list__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .friend-list__name { font-size: 18px; font-weight: 600; }
+    /* Kreise: zweite Zeile, abgesetzt */
+    .gbub-row__sub { margin-top: -3px; font: 400 13px/1.3 Inter, system-ui, sans-serif; letter-spacing: .01em; opacity: .62; }
     .friend-list__meta { font-size: 14px; opacity: 0.7; }
     .friend-list__plus { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; border: 1.5px dashed rgba(42,33,24,.45); font-size: 26px; font-weight: 500; line-height: 1; }
     /* Meine Coachees: gleiche Textgröße/-stil wie team-slide__about */
@@ -18607,11 +18609,34 @@
         coach: '<svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M15.2 9.2a4 4 0 1 0 0 5.6"/></svg>'
       };
       var KREIS_PEN = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20l3.2-.7L19.2 7.3 16.7 4.8 4.7 16.8 4 20z"/><path d="M14.6 6.9l2.5 2.5"/></svg>';
-      function kreisRowHtml(kind, photo, name, pen, id) {
+      /* zweite Zeile unter dem Namen: was ist dieser Kreis (Ersteller aus Team oder nachgeladen) */
+      var kreisNames = {};
+      var kreisNamesWant = {};
+      function kreisPersonName(id) {
+        id = String(id || "");
+        if (!id) return "";
+        if (sessionAccount && String(sessionAccount.id) === id) return "Dir";
+        var p = (teamPeople || []).filter(function (x) { return x && String(x.id) === id; })[0];
+        var n = (p && p.name) || kreisNames[id] || "";
+        if (!n) kreisNamesWant[id] = 1;
+        return String(n).split(" ")[0];
+      }
+      function loadKreisNames(el) {
+        var ids = Object.keys(kreisNamesWant).filter(function (k) { return !(k in kreisNames); });
+        kreisNamesWant = {};
+        if (!ids.length) return;
+        ids.forEach(function (k) { kreisNames[k] = kreisNames[k] || ""; });
+        rest("go_accounts?id=in.(" + ids.map(encodeURIComponent).join(",") + ")&select=id,name").then(function (rows) {
+          (rows || []).forEach(function (a) { kreisNames[String(a.id)] = a.name || ""; });
+          if (el) { el._kreiseHtml = ""; paintKreiseRows(el); }
+        }).catch(function () {});
+      }
+      function kreisRowHtml(kind, photo, name, pen, id, sub) {
         return '<div class="gbub-row kreis-row" data-kreis="' + kind + '"' + (id ? ' data-kreis-id="' + escapeHtml(id) + '"' : "") + ' role="button" tabindex="0">' +
           '<span class="gbub-row__img" style="--gbub:#E9E1D2">' + (photo ? '<img src="' + escapeHtml(photo) + '" alt="" decoding="sync" />' : "") +
           '<span class="gbub-row__ico' + (photo ? "" : " is-plain") + '">' + KREIS_ICON[kind] + "</span></span>" +
-          '<span class="gbub-row__txt"><span class="gbub-row__name">' + escapeHtml(name) + "</span></span>" +
+          '<span class="gbub-row__txt"><span class="gbub-row__name">' + escapeHtml(name) + "</span>" +
+          (sub ? '<span class="gbub-row__sub">' + escapeHtml(sub) + "</span>" : "") + "</span>" +
           /* kein Stift mehr in der Zeile: Bearbeiten liegt oben rechts auf der Seite des Kreises (openKreisPage onEdit) */
           "</div>";
       }
@@ -18619,21 +18644,23 @@
         var st = kreiseState || {};
         var me = String((sessionAccount && sessionAccount.id) || "");
         /* Kreis mit +: Gruppe, Circle, Coach oder Bubble hinzufügen (Dialog, dann der bekannte Ablauf) */
-        var html = '<button type="button" class="friend-list__row friend-list__add" data-kreis-add>' +
+        /* Coach: Meine Coachees ganz oben */
+        var html = sessionIsTrainer ? kreisRowHtml("coachgroup", "", "Meine Coachees", false, "", "Einzel- und Gruppentraining") : "";
+        html += '<button type="button" class="friend-list__row friend-list__add" data-kreis-add>' +
           '<span class="friend-list__plus" aria-hidden="true">+</span>' +
           '<span class="friend-list__text"><span class="friend-list__name">Hinzufügen</span></span></button>';
         /* jede eigene Gruppe eine Zeile (bis zu 5 mit Admin-Recht, go-group-limit.sql) */
         (st.groups || (st.group ? [{ group: st.group }] : [])).forEach(function (x) {
           var g = x.group;
+          var gBy = kreisPersonName(g.owner || g.created_by);
           html += kreisRowHtml("group", g.photo_url || "/assets/gogogo/gogogo-Gruppe-small.jpg", g.name || "Meine Gruppe",
-            String(g.owner || "") === me, g.id ? String(g.id) : "");
+            String(g.owner || "") === me, g.id ? String(g.id) : "", gBy ? "Gruppe erstellt von " + gBy : "Gruppe");
         });
         html += circleRowsHtml();
         if (st.coach) {
-          html += kreisRowHtml("coach", st.coach.photo_url || "", "Coach " + String(st.coach.name || "").split(" ")[0], true);
+          html += kreisRowHtml("coach", st.coach.photo_url || "", "Coach " + String(st.coach.name || "").split(" ")[0], true, "", "Einzel- und Gruppentraining");
         }
-        /* Coach: Gruppe mit seinen Coachees (coach-group.js) */
-        if (sessionIsTrainer) html += kreisRowHtml("coachgroup", "", "Meine Coachees", false);
+        loadKreisNames(el);
         if (el._kreiseHtml === html) return;
         el._kreiseHtml = html;
         el.innerHTML = html;
@@ -18773,7 +18800,10 @@
         var gs = (cst().groups || []);
         var def = "/assets/gogogo/gogogo-Zirkeltraining.jpg";
         return gs.map(function (g) {
-          return kreisRowHtml("circle", circlePhoto(g) || def, String(g.name || "Circle"), typeof circleCanManage === "function" && circleCanManage(g))
+          var cs0 = typeof circleSettings === "function" ? circleSettings(g) : null;
+          var cBy = cs0 && cs0.owner_id ? kreisPersonName(cs0.owner_id) : "";
+          return kreisRowHtml("circle", circlePhoto(g) || def, String(g.name || "Circle"), typeof circleCanManage === "function" && circleCanManage(g), "",
+            cBy ? "Zirkeltraining mit " + cBy : "Zirkeltraining")
             .replace('data-kreis="circle"', 'data-kreis="circle" data-kreis-id="' + escapeHtml(String(g.group_id)) + '"');
         }).join("");
       }
