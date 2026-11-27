@@ -4182,7 +4182,14 @@
     });
   }
 
+  /* Abschließen nur für eigene Events. Zusagende (Zirkel, Einladung) und Coaches dürfen das Event eines anderen
+     nie auf „erledigt“ setzen (RLS erlaubt Coaches das Ändern der Coachee-Events). */
+  function ownEventId(id) {
+    var ev = evById(id);
+    return !ev || String(ev.user_id) === me();
+  }
   function patchEventDone(eventId, body) {
+    if (!ownEventId(eventId)) return Promise.reject(new Error("Nur eigene Events lassen sich abschließen"));
     var wantedNote = body.note;
     var wantedPhoto = body.photo_url;
     function attempt(payload) {
@@ -4974,8 +4981,8 @@
           if (host.openZirkel) host.openZirkel(Object.assign({}, z, {
             autostart: true,
             onSaved: function () {
-              if (forEv && forEv.id) {
-                return rest("events?id=eq." + encodeURIComponent(forEv.id), {
+              if (forEv && forEv.id && String(forEv.user_id || me()) === me()) {
+                return rest("events?id=eq." + encodeURIComponent(forEv.id) + "&user_id=eq." + encodeURIComponent(me()), {
                   method: "PATCH", prefer: "return=minimal", body: { status: "erledigt", starts_at: new Date().toISOString() }
                 }).then(refresh).catch(function () {});
               }
@@ -5448,6 +5455,8 @@
     if (!ev) return;
     overdueSave(list.slice(1));
     if (ev.status !== "geplant") return;
+    /* fremdes Event (z. B. Zirkel mit Zusage): nichts abschließen, nur Start-Markierung weg */
+    if (String(ev.user_id) !== me()) { unmarkStarted(ev.id); return; }
     /* Titel nennt Einheit und Tag, sonst wirkt die Abfrage wie eine Folge der letzten Aktion (z. B. einer Zusage) */
     var dOv = dayKey(ev.starts_at), tOv = todayIso();
     var whenOv = dOv === tOv ? "heute" : dOv < tOv ? "gestern" : "";
@@ -5487,6 +5496,7 @@
       if (host.openZirkel) host.openZirkel(Object.assign({}, z || {}, {
         eventId: ev.id,
         onSaved: function () {
+          if (String(ev.user_id) !== me()) return refresh();
           return rest("events?id=eq." + encodeURIComponent(ev.id), {
             method: "PATCH", prefer: "return=minimal", body: { status: "erledigt", starts_at: new Date().toISOString() }
           }).then(function () {
