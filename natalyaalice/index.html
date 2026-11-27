@@ -2454,6 +2454,8 @@
     .acc-card__media > .acc-zmedia { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 12px; }
     .acc-card__media > .acc-zmedia > .acc-zrow--media:not(#_) { position: static; transform: none; }
     .acc-card__media > .acc-zmedia > .acc-zopen { position: static; white-space: nowrap; }
+    /* individueller Start: eigener Countdown in Blau unter dem offiziellen */
+    .acc-card__media .acc-zrow--own > .wr-zirkel-cd--own:not(#_):not(#__):not(#___) { background: #1D9BF0 !important; color: #fff !important; border-color: #1D9BF0 !important; }
     .acc-card.is-wallet:not(.is-open) .acc-zopen { display: none; }
     .acc-card__media .acc-zrow--media > *:not(#_):not(#__) { background: #F6F1E8 !important; color: #2A2118 !important; border: 1px solid #F6F1E8 !important; text-shadow: none !important; }
     .wr-zrow .wr-zirkel-cd, .wr-zrow .go-online-cta, .wr-zrow .go-online-cta--ghost {
@@ -9134,7 +9136,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-229"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-230"></script>
   <script src="/natalyaalice/go-chat.js?v=gch-6"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-137"></script>
@@ -14169,6 +14171,8 @@
               refreshZirkel();
               if (window.FFC && FFC.openSetup) {
                 zirkelSyncPreset(preset && preset.eventId, preset).then(function (pr) {
+                  /* individueller Start: kein gemeinsamer Countdown, man startet im Dashboard selbst */
+                  if (pr && preset && preset.indiv) delete pr.sync;
                   return FFC.openSetup(pr && Object.keys(pr).length ? pr : null);
                 }).catch(function () {
                   document.body.classList.remove("ffc-open");
@@ -14178,7 +14182,8 @@
             },
             {
               title: "FFC Login",
-              tagline: "Mit Deiner Friday-Fitness-Circle E-Mail und Passwort anmelden (nicht der gogogo-Code)."
+              tagline: "Mit Deiner Friday-Fitness-Circle E-Mail und Passwort anmelden (nicht der gogogo-Code).",
+              guestOk: !!(preset && preset.eventId)
             }
           );
         } else {
@@ -30152,6 +30157,19 @@
               "Mit Deiner Friday-Fitness-Circle E-Mail und Passwort anmelden (nicht der gogogo-Code).",
             email: email
           });
+        }
+        /* Zirkel von außen (ohne FFC-Konto): Gast oder registrieren, nicht erst ins Login */
+        if (opts.guestOk && window.GoDialog && GoDialog.choose) {
+          GoDialog.choose("Beim Zirkeltraining mitmachen", [
+            { label: "Als Gast mitmachen", value: "guest" },
+            { label: "Registrieren und Circle beitreten", value: "reg" },
+            { label: "Ich habe ein FFC Konto", value: "login" }
+          ], { sub: "Als Gast läuft das Workout mit, Deine Ergebnisse werden nicht gespeichert." }).then(function (v) {
+            if (v === "guest") { window.__ffcGuest = true; action(); return; }
+            if (v === "reg") { try { openZirkelRegister(); } catch (eR) { askLogin(); } return; }
+            if (v === "login") askLogin();
+          });
+          return;
         }
         /* Immer sichtbares Login — kein stilles Invite-Code-als-Passwort */
         askLogin();
