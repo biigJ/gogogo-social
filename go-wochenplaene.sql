@@ -188,7 +188,7 @@ $$;
 do $$
 declare
   v_kraft jsonb;
-  v_steps jsonb := '{"title": "> 5.000 Schritte", "category": "alternative", "focus": "", "blocks": [{"type": "ausdauer", "items": [{"name": "Gehen", "note": "mindestens 5.000 Schritte über den Tag"}]}]}';
+  v_steps jsonb := '{"title": "> 7.500 Schritte", "category": "alternative", "focus": "", "blocks": [{"type": "ausdauer", "items": [{"name": "Gehen", "note": "mindestens 7.500 Schritte über den Tag"}]}]}';
 begin
   select blocks into v_kraft from course_sessions s
   join courses c on c.id = s.course_id
@@ -197,7 +197,7 @@ begin
   v_kraft := coalesce(v_kraft, '[]'::jsonb);
   perform go_tmp_upsert_plan(
     'superwoman-l1', 'Superwoman', 1,
-    'Einstieg: zwei einfache Ganzkörper-Einheiten, ein lockerer 5-km-Lauf und an den übrigen Tagen mehr als 5.000 Schritte.',
+    'Einstieg: zwei einfache Ganzkörper-Einheiten, ein lockerer 5-km-Lauf und an den übrigen Tagen mehr als 7.500 Schritte.',
     jsonb_build_array(
       jsonb_build_object('title', 'Einfache Basics A', 'category', 'kraft', 'focus', 'ganzkoerper', 'min', 45, 'blocks', v_kraft),
       v_steps,
@@ -301,7 +301,7 @@ select go_tmp_upsert_plan('fit-for-run-l1', 'Fit for Run', 1,
   ]
  },
  {
-  "title": "> 5.000 Schritte",
+  "title": "> 7.500 Schritte",
   "category": "alternative",
   "focus": "",
   "blocks": [
@@ -310,7 +310,7 @@ select go_tmp_upsert_plan('fit-for-run-l1', 'Fit for Run', 1,
     "items": [
      {
       "name": "Gehen",
-      "note": "mindestens 5.000 Schritte über den Tag"
+      "note": "mindestens 7.500 Schritte über den Tag"
      }
     ]
    }
@@ -380,7 +380,7 @@ select go_tmp_upsert_plan('fit-for-run-l1', 'Fit for Run', 1,
   ]
  },
  {
-  "title": "> 5.000 Schritte",
+  "title": "> 7.500 Schritte",
   "category": "alternative",
   "focus": "",
   "blocks": [
@@ -389,7 +389,7 @@ select go_tmp_upsert_plan('fit-for-run-l1', 'Fit for Run', 1,
     "items": [
      {
       "name": "Gehen",
-      "note": "mindestens 5.000 Schritte über den Tag"
+      "note": "mindestens 7.500 Schritte über den Tag"
      }
     ]
    }
@@ -419,7 +419,7 @@ select go_tmp_upsert_plan('fit-for-run-l1', 'Fit for Run', 1,
   ]
  },
  {
-  "title": "> 5.000 Schritte",
+  "title": "> 7.500 Schritte",
   "category": "alternative",
   "focus": "",
   "blocks": [
@@ -428,7 +428,7 @@ select go_tmp_upsert_plan('fit-for-run-l1', 'Fit for Run', 1,
     "items": [
      {
       "name": "Gehen",
-      "note": "mindestens 5.000 Schritte über den Tag"
+      "note": "mindestens 7.500 Schritte über den Tag"
      }
     ]
    }
@@ -629,7 +629,7 @@ select go_tmp_upsert_plan('fit-for-run-l2', 'Fit for Run', 2,
   ]
  },
  {
-  "title": "> 5.000 Schritte",
+  "title": "> 7.500 Schritte",
   "category": "alternative",
   "focus": "",
   "blocks": [
@@ -638,7 +638,7 @@ select go_tmp_upsert_plan('fit-for-run-l2', 'Fit for Run', 2,
     "items": [
      {
       "name": "Gehen",
-      "note": "mindestens 5.000 Schritte über den Tag"
+      "note": "mindestens 7.500 Schritte über den Tag"
      }
     ]
    }
@@ -836,7 +836,7 @@ select go_tmp_upsert_plan('fit-for-run-l3', 'Fit for Run', 3,
   ]
  },
  {
-  "title": "> 5.000 Schritte",
+  "title": "> 7.500 Schritte",
   "category": "alternative",
   "focus": "",
   "blocks": [
@@ -845,7 +845,7 @@ select go_tmp_upsert_plan('fit-for-run-l3', 'Fit for Run', 3,
     "items": [
      {
       "name": "Gehen",
-      "note": "mindestens 5.000 Schritte über den Tag"
+      "note": "mindestens 7.500 Schritte über den Tag"
      }
     ]
    }
@@ -941,7 +941,7 @@ select go_tmp_upsert_plan('bulletproof-knee', 'Bulletproof Knees', 1,
   ]
  },
  {
-  "title": "> 5.000 Schritte",
+  "title": "> 7.500 Schritte",
   "category": "alternative",
   "focus": "",
   "blocks": [
@@ -950,7 +950,7 @@ select go_tmp_upsert_plan('bulletproof-knee', 'Bulletproof Knees', 1,
     "items": [
      {
       "name": "Gehen",
-      "note": "mindestens 5.000 Schritte über den Tag"
+      "note": "mindestens 7.500 Schritte über den Tag"
      }
     ]
    }
@@ -1051,7 +1051,7 @@ select go_tmp_upsert_plan('bulletproof-knee', 'Bulletproof Knees', 1,
   ]
  },
  {
-  "title": "> 5.000 Schritte",
+  "title": "> 7.500 Schritte",
   "category": "alternative",
   "focus": "",
   "blocks": [
@@ -1060,7 +1060,7 @@ select go_tmp_upsert_plan('bulletproof-knee', 'Bulletproof Knees', 1,
     "items": [
      {
       "name": "Gehen",
-      "note": "mindestens 5.000 Schritte über den Tag"
+      "note": "mindestens 7.500 Schritte über den Tag"
      }
     ]
    }
@@ -1107,7 +1107,7 @@ select go_tmp_upsert_plan('bulletproof-knee', 'Bulletproof Knees', 1,
   ]
  },
  {
-  "title": "> 5.000 Schritte",
+  "title": "> 7.500 Schritte",
   "category": "alternative",
   "focus": "",
   "blocks": [
@@ -1116,7 +1116,7 @@ select go_tmp_upsert_plan('bulletproof-knee', 'Bulletproof Knees', 1,
     "items": [
      {
       "name": "Gehen",
-      "note": "mindestens 5.000 Schritte über den Tag"
+      "note": "mindestens 7.500 Schritte über den Tag"
      }
     ]
    }
@@ -1170,7 +1170,7 @@ end $$;
 -- Hybrid Kraft 2× / 3×: auf 7 Tage auffüllen (Kraft an festen Tagen, sonst Schritte)
 do $$
 declare
-  v_steps jsonb := '{"title": "> 5.000 Schritte", "category": "alternative", "focus": "", "blocks": [{"type": "ausdauer", "items": [{"name": "Gehen", "note": "mindestens 5.000 Schritte über den Tag"}]}]}';
+  v_steps jsonb := '{"title": "> 7.500 Schritte", "category": "alternative", "focus": "", "blocks": [{"type": "ausdauer", "items": [{"name": "Gehen", "note": "mindestens 7.500 Schritte über den Tag"}]}]}';
   v_c uuid;
 begin
   select id into v_c from courses where slug = 'hybrid-kraft-2x';
