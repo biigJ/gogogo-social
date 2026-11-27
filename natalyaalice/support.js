@@ -419,7 +419,7 @@
       title: "Stressabbau",
       price: "gratis",
       description:
-        "Kopf voll vor dem Training? Ist Stressabbau aktiv, erscheint vor jedem Start ein gelber Zettel: „Mental Deload hier:“. Schreib auf, was Dich gerade beschäftigt, und tipp „Merken für später“. Dann geht es direkt ins Workout. Der Zettel steckt solange oben hinter Deinem Event. Nach dem Workout schaut er dort mit „Mental Upload“ hervor: antippen, nachlesen, „Alles klar“. Deine Notizen bleiben nur auf Deinem Gerät."
+        "Kopf voll vor dem Training? Ist Stressabbau aktiv, erscheint vor jedem Start ein gelber Zettel: „Mental Deload hier:“. Schreib auf, was Dich gerade beschäftigt, und tipp „Merken für später“. Dann geht es direkt ins Workout. Der Zettel steckt solange oben hinter Deinem Event. Nach dem Workout schaut er dort mit „Dein Mental Upload vorm Workout.“ hervor: antippen, nachlesen, „Alles klar“. Deine Notizen bleiben nur auf Deinem Gerät."
     },
     {
       key: "orte",
