@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-27-stress",
+      at: "2026-11-27T11:30:00Z",
+      text: "Neu unter Plus: Stressabbau. Notier vor dem Training, was Dich beschäftigt, nach dem Workout kommt es zurück."
+    },
+    {
       key: "news:2026-11-27-dash",
       at: "2026-11-27T09:10:00Z",
       text: "Neu unter Profil → Einstellungen → Darstellung Aktuell: Stories an oder aus, Events als Chronologie oder als Dashboard."

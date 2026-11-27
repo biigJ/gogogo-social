@@ -4662,6 +4662,13 @@
     body.go-no-stories #heute-stories { display: none !important; }
     /* Dashboard: Stories zwischen meinen Events und dem Anstehenden */
     .acc-dash-stories { margin: 4px 0 18px; }
+    /* Plus → Stressabbau: Knopf „Entstressen“ und gelber Zettel, der hinter der oberen Kante hervorlugt */
+    .acc-destress { display: inline-flex; align-items: center; margin: 0 0 10px; min-height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: #FFE680; color: #3B2F00; font: 700 14px/1 Inter, system-ui, sans-serif; cursor: pointer; }
+    .acc-card.has-postit { position: relative; margin-top: 30px; }
+    .acc-card.has-postit > .acc-card__media { position: relative; z-index: 1; }
+    .acc-postit-peek { position: absolute; z-index: 0; top: -26px; left: 18px; right: 18px; height: 60px; padding: 6px 12px 0; box-sizing: border-box;
+      background: #FFE680; color: #9A7A00; border-radius: 4px 4px 0 0; transform: rotate(-1deg); box-shadow: 0 -2px 8px rgba(0,0,0,.12);
+      font: 700 13px/1.2 Inter, system-ui, sans-serif; text-align: center; pointer-events: none; }
     /* Überschriften im Dashboard */
     .acc-dash-h { margin: 6px 0 12px; font: 600 17px/1.25 Inter, system-ui, sans-serif; color: #2A2118; text-align: left; }
     .acc-dash-stories .heute-stories { position: static !important; }
@@ -9099,16 +9106,16 @@
   <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-35"></script>
   <script src="/natalyaalice/go-usage.js?v=gus-4"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-33"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-34"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-216"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-217"></script>
   <script src="/natalyaalice/go-chat.js?v=gch-4"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-133"></script>
-  <script src="/natalyaalice/support.js?v=support-36"></script>
+  <script src="/natalyaalice/support.js?v=support-37"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-4"></script>
   <script src="/natalyaalice/coach-group.js?v=gcg-6"></script>
   <script>
@@ -20813,6 +20820,12 @@
             var arr = JSON.parse(raw);
             if (Array.isArray(arr)) {
               /* neue Kachel „Orte“ (25.11.): einmal in die gespeicherte Auswahl aufnehmen */
+              /* neue Kachel „Stressabbau“ (27.11.): ebenso einmal aufnehmen */
+              if (arr.indexOf("stress") < 0 && !localStorage.getItem(plusPickKey() + "_stress")) {
+                arr.push("stress");
+                localStorage.setItem(plusPickKey(), JSON.stringify(arr));
+                localStorage.setItem(plusPickKey() + "_stress", "1");
+              }
               if (arr.indexOf("orte") < 0 && !localStorage.getItem(plusPickKey() + "_orte")) {
                 arr.push("orte");
                 localStorage.setItem(plusPickKey(), JSON.stringify(arr));
@@ -20951,7 +20964,7 @@
       }
       function sortPlusOffers(list) {
         /* Voreinstellung beim ersten Öffnen (Joscha 24.11.) */
-        var order = plusStore("order") || ["stempelkarte", "web_call", "uebungen", "orte", "coach_offer", "ernaehrung", "kraft_tracking", "routine"];
+        var order = plusStore("order") || ["stempelkarte", "web_call", "uebungen", "orte", "stress", "coach_offer", "ernaehrung", "kraft_tracking", "routine"];
         var seen = plusStore("active_seen");
         var active = list.filter(plusOfferOwned).map(function (o) { return o.key; });
         /* frisch aktiviert (nicht im letzten Stand): nach ganz oben */
@@ -21160,7 +21173,8 @@
           stempelkarte: "/assets/gogogo/gogogo-Stempelkarte-Freunde.webp",
           kraft_tracking: "/assets/gogogo/Jelena-Pullups-1600.webp",
           uebungen: "/assets/gogogo/gogogo-upperbody-Video-Poster-1600.webp",
-          orte: "/assets/gogogo/gogogo-Orte-1600.webp"
+          orte: "/assets/gogogo/gogogo-Orte-1600.webp",
+          stress: "/assets/gogogo/gogogo-mobility-Video-Poster-1600.webp"
         };
         var offers =
           window.GoSupport && GoSupport.getOffers
@@ -21254,9 +21268,9 @@
                 var btn = existing[ei].querySelector(".go-slide__cta:not(.go-slide__cta--signup)");
                 if (!btn) continue;
                 if (ownedNow) {
-                  btn.textContent = coachSelf ? "Registriert" : isZ ? "Ich bin dabei" : "Gebucht";
+                  btn.textContent = coachSelf ? "Registriert" : isZ ? "Ich bin dabei" : of.key === "stress" ? "Aktiv" : "Gebucht";
                 } else {
-                  btn.textContent = of.key === "coach_offer" ? "Registrierung" : isZ ? "Beitreten" : of.key === "uebungen" ? "Aktivieren" : "Buchen";
+                  btn.textContent = of.key === "coach_offer" ? "Registrierung" : isZ ? "Beitreten" : of.key === "uebungen" || of.key === "stress" ? "Aktivieren" : "Buchen";
                 }
                 btn.disabled = !!ownedNow;
                 btn.classList.toggle("is-owned", !!ownedNow);
@@ -21606,6 +21620,7 @@
             card.classList.add("go-slide--pins");
             mountOrte(card);
           }
+          if (offer.key === "stress") cta.textContent = owned ? "Aktiv" : "Aktivieren";
           if (offer.key === "uebungen") {
             /* Videos: nicht aktiv = Bild, Text, „Aktivieren“; aktiv = nur das Raster (ohne Bild und Text oben) */
             if (owned) {

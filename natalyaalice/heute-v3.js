@@ -2601,9 +2601,13 @@
           /* Einladung: Brief rechts unter dem Bild wie die anderen Rubrik-Icons */
           badge: invite && upcoming ? "invite" : ""
         });
-    return renderCardShell({
+    /* Plus → Stressabbau: „Entstressen“ an jedem Event, bei dem ich dabei bin; gemerkter Zettel lugt oben hervor */
+    var stressOn = ev.status === "geplant" && day >= todayIso() && (mine || iAmGoing(ev.id)) && stressActive();
+    var stressNote = stressOn && postitOf(ev.id);
+    var stressBtn = stressOn ? '<button type="button" class="acc-destress" data-destress="' + esc(ev.id) + '">Entstressen</button>' : "";
+    var cardHtml = renderCardShell({
       /* zugesagt (Einladung angenommen oder Herz) → dicker Rahmen */
-      extraClass: (!mine && (acceptedInv || iAmGoing(ev.id)) ? "is-going"
+      extraClass: (stressNote ? "has-postit " : "") + (!mine && (acceptedInv || iAmGoing(ev.id)) ? "is-going"
         : mine && upcoming && day >= todayIso() ? "is-mine-next" : "")
         /* verkleinert (Besitzer über •••, gilt für alle): Höhe wie Wallet-Karte, Tipp klappt auf */
         + (ev.status === "erledigt" && compactPast() ? " is-wallet is-shrunk" : "")
@@ -2624,7 +2628,7 @@
       enrollmentId: ev.enrollment_id || "",
       circleId: ev.circle_id || "",
       emoji: emoji,
-      actions: (tools || "") + (actions || ""),
+      actions: (tools || "") + (actions || "") + stressBtn,
       author: authorHtml(groupAuthor(ev, p) || p, true),
       exlist: accExListHtml(ev),
       when: zirkelPillsHtml(ev) ? "Heute · " + timeLabel(ev.starts_at) : whenLine(ev.starts_at),
@@ -2651,6 +2655,84 @@
         : ev.status === "erledigt"
           ? false
           : canInviteOnDay(day)
+    });
+    if (stressNote) cardHtml = cardHtml.replace(/(<article class="acc-card[^>]*>)/, '$1<div class="acc-postit-peek" aria-hidden="true">Öffnet sich nach fertigem Workout</div>');
+    return cardHtml;
+  }
+
+  /* ---- Stressabbau (Plus): Post-it je Event, nur auf diesem Gerät ---- */
+  function stressActive() { return !!(global.GoSupport && GoSupport.offerOwned && GoSupport.offerOwned("stress")); }
+  function postitKey() { return "gogogo_postits_" + me(); }
+  function postits() { try { return JSON.parse(localStorage.getItem(postitKey()) || "{}") || {}; } catch (e) { return {}; } }
+  function savePostits(o) { try { localStorage.setItem(postitKey(), JSON.stringify(o)); } catch (e) {} }
+  function postitOf(id) { var o = postits()[String(id)]; return o && o.text ? o : null; }
+  function postitCss() {
+    if (document.getElementById("postit-css")) return;
+    var st = document.createElement("style");
+    st.id = "postit-css";
+    st.textContent =
+      ".pi-wrap{position:fixed;inset:0;z-index:10060;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(20,16,12,.42)}" +
+      ".pi-note{width:100%;max-width:360px;min-height:340px;box-sizing:border-box;padding:22px 20px 18px;background:#FFE680;color:#3B2F00;border-radius:4px;transform:rotate(-1.2deg);" +
+      "box-shadow:0 18px 40px rgba(0,0,0,.28),inset 0 -14px 24px rgba(160,120,0,.10);display:flex;flex-direction:column;gap:12px;font-family:Inter,system-ui,sans-serif}" +
+      ".pi-note h3{margin:0;font:700 22px/1.2 Inter,system-ui,sans-serif;color:#3B2F00}" +
+      ".pi-note textarea{flex:1;min-height:180px;border:0;background:transparent;resize:none;outline:none;font:500 17px/1.45 Inter,system-ui,sans-serif;color:#3B2F00;" +
+      "background-image:repeating-linear-gradient(transparent 0 24px,rgba(140,105,0,.22) 24px 25px);padding:0}" +
+      ".pi-note p{margin:0;white-space:pre-wrap;font:500 17px/1.45 Inter,system-ui,sans-serif;max-height:50vh;overflow:auto}" +
+      ".pi-note button{align-self:stretch;min-height:46px;border:0;border-radius:999px;background:#3B2F00;color:#FFE680;font:700 16px Inter,system-ui,sans-serif;cursor:pointer}";
+    document.head.appendChild(st);
+  }
+  function openPostit(id) {
+    postitCss();
+    var cur = postitOf(id);
+    var wrap = document.createElement("div");
+    wrap.className = "pi-wrap";
+    wrap.innerHTML = '<div class="pi-note" role="dialog" aria-label="Mental Deload"><h3>Mental Deload hier:</h3>' +
+      '<textarea maxlength="1000" aria-label="Notiz"></textarea><button type="button" data-pi-save>Merken für später</button></div>';
+    document.body.appendChild(wrap);
+    var ta = wrap.querySelector("textarea");
+    ta.value = cur ? cur.text : "";
+    setTimeout(function () { try { ta.focus(); } catch (e) {} }, 60);
+    wrap.addEventListener("click", function (e) {
+      if (e.target === wrap) { wrap.remove(); return; }
+      if (!e.target.closest("[data-pi-save]")) return;
+      var o = postits();
+      var t = String(ta.value || "").trim();
+      if (t) o[String(id)] = { text: t, at: new Date().toISOString() };
+      else delete o[String(id)];
+      savePostits(o);
+      wrap.remove();
+      render();
+    });
+  }
+  /* Event abgeschlossen (auch die eigene Einheit beim Gruppentraining): Zettel mittig öffnen, „Alles klar“ schließt und löscht */
+  function checkPostitUploads() {
+    if (document.querySelector(".pi-wrap, .god, #acc-done-modal:not([hidden])")) return;
+    var o = postits();
+    var ids = Object.keys(o);
+    if (!ids.length) return;
+    var hit = null;
+    ids.some(function (id) {
+      var done = (state.events || []).some(function (e) {
+        return e && e.status === "erledigt" && String(e.user_id) === me() && (String(e.id) === id || String(e.copy_of || "") === id);
+      });
+      if (done) hit = id;
+      return done;
+    });
+    if (!hit) return;
+    var note = o[hit];
+    postitCss();
+    var wrap = document.createElement("div");
+    wrap.className = "pi-wrap";
+    wrap.innerHTML = '<div class="pi-note" role="dialog" aria-label="Mental Upload"><h3>Mental Upload</h3><p></p><button type="button" data-pi-ok>Alles klar</button></div>';
+    wrap.querySelector("p").textContent = note.text;
+    document.body.appendChild(wrap);
+    wrap.addEventListener("click", function (e) {
+      if (!e.target.closest("[data-pi-ok]")) return;
+      var o2 = postits();
+      delete o2[hit];
+      savePostits(o2);
+      wrap.remove();
+      render();
     });
   }
 
@@ -3712,6 +3794,7 @@
     }
     bindObserver(root);
     bindPhotoPinch(root);
+    setTimeout(checkPostitUploads, 600);
     markSnapCard();
     bindHeuteScrollFilter();
     requestAnimationFrame(function () {
@@ -5902,6 +5985,8 @@
 
   function onRootClick(e) {
     var t = e.target;
+    var dz = t.closest("[data-destress]");
+    if (dz) { e.preventDefault(); e.stopPropagation(); openPostit(dz.getAttribute("data-destress")); return; }
     var moreDesc = t.closest("[data-more-desc]");
     if (moreDesc) {
       var card = moreDesc.closest(".acc-card");
