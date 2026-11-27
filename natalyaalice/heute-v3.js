@@ -2671,7 +2671,7 @@
           badge: invite && upcoming ? "invite" : ""
         });
     /* Plus → Stressabbau: Zettel vom Start lugt oben hinter dem Bild hervor; nach dem Workout antippbar */
-    var stressNote = postitOf(ev.id);
+    var stressNote = isStepsEvent(ev) ? null : postitOf(ev.id);
     var stressDone = !!stressNote && (ev.status === "erledigt" || !!gDone);
     var stressBtn = "";
     var cardHtml = renderCardShell({
@@ -2732,6 +2732,9 @@
     if (stressNote) cardHtml = cardHtml.replace(/(<article class="acc-card[^>]*>)/, stressDone
       ? '$1<button type="button" class="acc-postit-peek is-ready" data-postit-read="' + esc(ev.id) + '">Dein Mental Upload vorm Workout.</button>'
       : '$1<div class="acc-postit-peek" aria-hidden="true">Öffnet sich nach fertigem Workout</div>');
+    /* Stressabbau: ab 1 h vor dem Start klebt ein kleiner Zettel schräg auf dem Bild (nicht bei Schritten) */
+    if (!stressNote && mine && stressWindow(ev) && !gDone)
+      cardHtml = cardHtml.replace(/(<div class="acc-card__media[^>]*>)/, '$1<button type="button" class="acc-postit-stick" data-postit-write="' + esc(ev.id) + '">Mental Deload hier vorm Training.</button>');
     return cardHtml;
   }
 
@@ -2740,6 +2743,13 @@
   function postitKey() { return "gogogo_postits_" + me(); }
   function postits() { try { return JSON.parse(localStorage.getItem(postitKey()) || "{}") || {}; } catch (e) { return {}; } }
   function savePostits(o) { try { localStorage.setItem(postitKey(), JSON.stringify(o)); } catch (e) {} }
+  /* Zettel auf dem Bild: Stressabbau an, eigenes geplantes Event heute, ab 1 h vor Start; Schritte nie */
+  function stressWindow(ev) {
+    if (!ev || ev.status !== "geplant" || isStepsEvent(ev) || !stressActive()) return false;
+    if (dayKey(ev.starts_at) !== todayIso()) return false;
+    if (!hasTime(ev)) return true;
+    return Date.now() >= new Date(ev.starts_at).getTime() - 3600000;
+  }
   function postitOf(id) { var o = postits()[String(id)]; return o && o.text ? o : null; }
   function postitCss() {
     if (document.getElementById("postit-css")) return;
@@ -2752,6 +2762,7 @@
       ".pi-note h3{margin:0;font:700 22px/1.2 Inter,system-ui,sans-serif;color:#3B2F00}" +
       ".pi-note textarea{flex:1;min-height:180px;border:0;background:transparent;resize:none;outline:none;font:500 17px/1.45 Inter,system-ui,sans-serif;color:#3B2F00;" +
       "background-image:repeating-linear-gradient(transparent 0 24px,rgba(140,105,0,.22) 24px 25px);padding:0}" +
+      ".pi-note .pi-hint{font:500 14px/1.4 Inter,system-ui,sans-serif;color:#6B5600;max-height:none}" +
       ".pi-note p{margin:0;white-space:pre-wrap;font:500 17px/1.45 Inter,system-ui,sans-serif;max-height:50vh;overflow:auto}" +
       ".pi-note button{align-self:stretch;min-height:46px;border:0;border-radius:999px;background:#3B2F00;color:#FFE680;font:700 16px Inter,system-ui,sans-serif;cursor:pointer}";
     document.head.appendChild(st);
@@ -2763,6 +2774,7 @@
     var wrap = document.createElement("div");
     wrap.className = "pi-wrap";
     wrap.innerHTML = '<div class="pi-note" role="dialog" aria-label="Mental Deload"><h3>Mental Deload hier:</h3>' +
+      '<p class="pi-hint">Was hast Du noch zu erledigen? Schreib es auf, dann ist der Kopf frei fürs Training. Nach dem Workout liegt es wieder hier.</p>' +
       '<textarea maxlength="1000" aria-label="Notiz"></textarea><button type="button" data-pi-save>Merken für später</button></div>';
     document.body.appendChild(wrap);
     var ta = wrap.querySelector("textarea");
@@ -5559,7 +5571,7 @@
 
   function startEvent(ev) {
     /* Stressabbau aktiv: vor dem Workout erst der Zettel „Mental Deload hier:“ */
-    if (ev && stressActive() && !postitOf(ev.id) && !document.querySelector(".pi-wrap")) {
+    if (ev && stressActive() && !isStepsEvent(ev) && !postitOf(ev.id) && !document.querySelector(".pi-wrap")) {
       openPostit(ev.id, function () { startEventNow(ev); });
       return;
     }
@@ -6093,6 +6105,8 @@
     if (zi) { e.preventDefault(); e.stopPropagation(); pickIndivStart(zi.getAttribute("data-zirkel-indiv")); return; }
     var zo = t.closest("[data-zirkel-open]");
     if (zo) { e.preventDefault(); e.stopPropagation(); var zev = evById(zo.getAttribute("data-zirkel-open")); if (zev) startEvent(zev); return; }
+    var pw = t.closest("[data-postit-write]");
+    if (pw) { e.preventDefault(); e.stopPropagation(); openPostit(pw.getAttribute("data-postit-write")); return; }
     var pr = t.closest("[data-postit-read]");
     if (pr) { e.preventDefault(); e.stopPropagation(); readPostit(pr.getAttribute("data-postit-read")); return; }
     var moreDesc = t.closest("[data-more-desc]");
