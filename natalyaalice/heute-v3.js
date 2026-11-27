@@ -3760,6 +3760,18 @@
     var today = $("acc-feed-today");
     if (!today) return null;
     var cards = today.querySelectorAll(".acc-card:not(.acc-card--spontan)");
+    /* das nächste Event (nicht das letzte des Tages): offen, eigenes oder zugesagt, frühester Start, der noch läuft oder kommt */
+    var now = Date.now(), best = null, bestT = Infinity;
+    [].forEach.call(cards, function (c) {
+      var ev = evById(c.getAttribute("data-event-id") || "");
+      if (!ev || ev.status !== "geplant") return;
+      if (String(ev.user_id) !== me() && !iAmGoing(ev.id)) return;
+      /* ohne Uhrzeit hinter die Termine mit Uhrzeit */
+      var t = hasTime(ev) ? new Date(ev.starts_at).getTime() : 8e15;
+      if (hasTime(ev) && t < now - OVERDUE_MS) return;
+      if (t < bestT) { bestT = t; best = c; }
+    });
+    if (best) return best;
     if (cards && cards.length) return cards[0];
     var any = today.querySelector(".acc-card");
     if (any) return any;
