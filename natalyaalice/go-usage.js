@@ -21,12 +21,13 @@
   var NEW_AFTER = 30 * 60 * 1000;
   var ASK_EVERY = 20;
 
-  var SECTION = { heute: "Aktuell", woche: "Kalender", team: "Community", kurse: "Plus", profil: "Profil" };
+  var SECTION = { heute: "Aktuell", chat: "Chat", woche: "Kalender", team: "Community", kurse: "Plus", profil: "Profil" };
 
   /* Admin offen: zählt nicht als Nutzung (keine Zeit, Sektion „Admin“ wird in der Analyse ausgelassen) */
   function inAdmin() { return !!document.querySelector(".ga-root"); }
   function section() {
     if (inAdmin()) return "Admin";
+    if (document.body.classList.contains("is-chat-feed")) return "Chat";
     var s = document.body && document.body.dataset ? document.body.dataset.shell : "";
     return SECTION[s] || s || "";
   }

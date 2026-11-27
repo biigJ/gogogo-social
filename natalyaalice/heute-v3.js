@@ -2950,9 +2950,24 @@
     return d.toISOString().slice(0, 10);
   }
 
+  /* Pille „Chat“: eigener Feed nur aus Nachrichten der Sprechblase; in Aktuell stehen sie nicht mehr */
+  function chatMode() { return document.body.classList.contains("is-chat-feed"); }
+  function chatFeedItems(flags) {
+    var today = todayIso();
+    var out = { myToday: [], upcoming: [], history: [] };
+    kreisMsgsFor((flags && flags.view) || "alles").forEach(function (m) {
+      var it = { kind: "bubble_msg", starts_at: m.created_at, _mine: String(m.author_id) === me(), msg: m };
+      if (dayKey(m.created_at) === today) out.myToday.push(it);
+      else out.history.push(it);
+    });
+    out.myToday.sort(function (a, b) { return String(b.starts_at).localeCompare(String(a.starts_at)); });
+    out.history.sort(function (a, b) { return String(b.starts_at).localeCompare(String(a.starts_at)); });
+    return out;
+  }
   function buildFeedItems(flags) {
     state.extraPhotos = {};
     if (flags && flags.bubbleOnly) return bubbleFeedItems();
+    if (chatMode()) return chatFeedItems(flags);
     var today = todayIso();
     var pack = filterOwnEvents(flags);
     var ffc = filterFfcEvents(flags);
@@ -3235,11 +3250,7 @@
       upcoming = upcoming.filter(inKreis);
       history = history.filter(inKreis);
     }
-    kreisMsgsFor(flags.view).forEach(function (m) {
-      var it = { kind: "bubble_msg", starts_at: m.created_at, _mine: String(m.author_id) === me(), msg: m };
-      if (dayKey(m.created_at) === today) myToday.push(it);
-      else history.push(it);
-    });
+    /* Nachrichten stehen im eigenen Chat-Feed (Pille „Chat“), nicht mehr zwischen den Events */
     /* Heute wie der ganze Feed: oben später, unten früher (Events nach Startzeit, Nachrichten nach Sendezeit) */
     /* Heute: offene Events zuerst (Mitte des Feeds, direkt unter „kommend“), Erledigtes und Nachrichten darunter.
        Vorher nach Startzeit: ein Event ohne Uhrzeit (12:00 UTC) rutschte unter die erledigten von heute */
@@ -3585,6 +3596,9 @@
       html += hH;
     });
     html += "</div>";
+    if (chatMode() && !feed.myToday.length && !feed.history.length) {
+      html += '<p class="acc-bubble-empty">Noch keine Nachrichten in dieser Ansicht. Schreib unten an Deinen Kreis.</p>';
+    }
     if (flags.bubbleOnly && global.GoBubbles && GoBubbles.paintStrip) {
       var bid = host.bubbleId ? String(host.bubbleId() || "") : "";
       GoBubbles.paintStrip($("bubble-strip"), (state.events || []).filter(function (ev) {
@@ -3599,8 +3613,7 @@
             : Promise.resolve(global.confirm("Zu Deiner Woche wechseln, um Events der Bubble hinzuzufügen?"));
           ask.then(function (yes) {
             if (!yes) return;
-            var pb = document.querySelector('.app-pill [data-shell="woche"]');
-            if (pb) pb.click();
+            if (global.__goTab) global.__goTab("woche");
           });
         }
       });
