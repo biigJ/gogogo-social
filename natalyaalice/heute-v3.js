@@ -3790,7 +3790,13 @@
     root.classList.remove("is-centering");
     /* Dashboard: Stories-Zeile wandert zwischen meine Events und das Anstehende; sonst an ihren Platz zurück */
     var storiesEl = $("heute-stories");
-    if (storiesEl && root.contains(storiesEl) && root.parentNode) root.parentNode.insertBefore(storiesEl, $("bubble-strip") || root);
+    /* Ursprünglichen Platz merken (Stories liegen in einem anderen Container als der Feed) */
+    if (storiesEl && !state.storiesHome && !root.contains(storiesEl)) state.storiesHome = { parent: storiesEl.parentNode, next: storiesEl.nextSibling };
+    if (storiesEl && root.contains(storiesEl) && state.storiesHome && state.storiesHome.parent) {
+      var nx = state.storiesHome.next;
+      if (nx && nx.parentNode === state.storiesHome.parent) state.storiesHome.parent.insertBefore(storiesEl, nx);
+      else state.storiesHome.parent.appendChild(storiesEl);
+    }
     patchFeed(root, placeSpontan(html));
     if (dash && storiesEl) { var slotS = root.querySelector(".acc-dash-stories"); if (slotS) slotS.appendChild(storiesEl); }
     state.paintedAktuell = true;
