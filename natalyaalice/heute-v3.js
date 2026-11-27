@@ -273,8 +273,15 @@
       (r[7] || []).forEach(function (m) {
         out.push({ kind: "kreismsg", created_at: m.created_at, author_id: m.author_id, past: String(m.created_at) <= kSeen,
           labelFn: function () { return first(m.author_id) + (String(m.to_id || "") === me() ? " an Dich: " : ": ") + String(m.body || "Foto").slice(0, 100); },
+          /* öffnet das Gespräch im Chat (Absender direkt oder der Kreis) */
           open: function () {
             markKreisSeen();
+            var key = chatKeyOf(m);
+            if (global.GoChat && key) {
+              if (global.__goTab) global.__goTab("chat");
+              setTimeout(function () { GoChat.openKey(key); }, 30);
+              return;
+            }
             saveFilter("alles");
             refresh();
           } });
@@ -285,6 +292,17 @@
       });
       return out;
     });
+  }
+  /* Nachricht → Gespräch in go-chat.js */
+  function chatKeyOf(m) {
+    if (!m) return "";
+    var aud = String(m.audience || "");
+    var author = String(m.author_id || "");
+    if (aud === "circle" && m.audience_id) return "circle:" + m.audience_id;
+    if (aud === "gruppe") return "gruppe";
+    if (aud === "coach") return host.sessionAccount && String(host.sessionAccount.trainer_id || "") === author ? "mycoach" : "coach";
+    if (String(m.to_id || "") === me()) return "dm:" + author;
+    return "team";
   }
   /* heute / morgen / Wochentag */
   function trainDayLabel(ts) {
