@@ -3786,6 +3786,8 @@
   }
 
   function currentEventCard() {
+    var fc = focusedCard();
+    if (fc) return fc;
     var today = $("acc-feed-today");
     if (!today) return null;
     var cards = today.querySelectorAll(".acc-card:not(.acc-card--spontan)");
@@ -6830,7 +6832,14 @@
     return (STATUS_RANK[b] || 9) < (STATUS_RANK[a] || 9) ? b : a;
   }
 
+  /* Anker aus der Story („Anzeigen“): genau dieses Event statt des aktuellen; gilt 2 Minuten */
+  function focusedCard() {
+    if (!state.focusId || Date.now() > (state.focusUntil || 0)) { state.focusId = ""; return null; }
+    return document.querySelector('.acc-card[data-event-id="' + String(state.focusId).replace(/"/g, "") + '"]');
+  }
   function focusEvent(id) {
+    state.focusId = String(id || "");
+    state.focusUntil = Date.now() + 120000;
     var card = document.querySelector('.acc-card[data-event-id="' + String(id).replace(/"/g, "") + '"]');
     if (!card) return false;
     /* zusammengeschobene Karte aufklappen (wie Tipp im Stapel) */
@@ -6839,7 +6848,9 @@
       card.classList.add("is-open");
       state.walletOpen = card.getAttribute("data-post-id") || "";
     }
-    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    /* Magnet und Parkplatz zielen jetzt auf diese Karte */
+    markSnapCard();
+    scrollCurrentToCenter({ soft: true, force: true });
     return true;
   }
 
