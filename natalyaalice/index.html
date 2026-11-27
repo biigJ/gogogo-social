@@ -9122,7 +9122,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-224"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-225"></script>
   <script src="/natalyaalice/go-chat.js?v=gch-6"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-134"></script>
@@ -14280,8 +14280,31 @@
             "&user_id=eq." +
             encodeURIComponent(sessionAccount.id) +
             "&status=neq.erledigt",
-          { method: "PATCH", prefer: "return=minimal", body: { status: "erledigt", starts_at: new Date().toISOString() } }
+          { method: "PATCH", prefer: "return=representation", body: { status: "erledigt", starts_at: new Date().toISOString() } }
         )
+          .then(function (rows) {
+            if (rows && rows.length) return;
+            /* Zirkel eines anderen (Zusage): eigene erledigte Einheit mit copy_of, wie beim Gruppentraining.
+               Das Event des Erstellers bleibt unberührt. */
+            var me0 = encodeURIComponent(sessionAccount.id);
+            return Promise.all([
+              rest("events?id=eq." + encodeURIComponent(eventId) + "&select=id,user_id,course_id,title,location,status,category"),
+              rest("events?user_id=eq." + me0 + "&copy_of=eq." + encodeURIComponent(eventId) + "&select=id,status").catch(function () { return []; })
+            ]).then(function (r) {
+              var orig = (r[0] || [])[0];
+              var have = (r[1] || [])[0];
+              if (!orig || String(orig.user_id) === String(sessionAccount.id) || orig.status === "ausgefallen") return;
+              var now = new Date().toISOString();
+              if (have) {
+                if (have.status === "erledigt") return;
+                return rest("events?id=eq." + encodeURIComponent(have.id) + "&user_id=eq." + me0, { method: "PATCH", prefer: "return=minimal", body: { status: "erledigt", starts_at: now } });
+              }
+              return rest("events", { method: "POST", prefer: "return=minimal", body: {
+                user_id: sessionAccount.id, category: "zirkel", course_id: orig.course_id || null, title: orig.title || "Zirkeltraining",
+                location: orig.location || null, starts_at: now, status: "erledigt", visibility: "team", is_unplanned: true, copy_of: orig.id
+              } });
+            });
+          })
           .then(function () {
             if (window.WocheReels && WocheReels.refresh) WocheReels.refresh();
             if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
