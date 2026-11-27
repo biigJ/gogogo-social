@@ -18,6 +18,7 @@
     zirkel: "/assets/gogogo/gogogo-Zirkeltraining.jpg",
     kraft_tracking: "/assets/gogogo/Jelena-Pullups-1600.webp",
     uebungen: "/assets/gogogo/gogogo-upperbody-Video-Poster-1600.webp",
+    stress: "/assets/gogogo/gogogo-mobility-Video-Poster-1600.webp",
     orte: "https://agpysewcsakdpmpftndp.supabase.co/storage/v1/object/public/go-covers/places/69f5f314-c03e-4e90-aa18-64b65303bcb9.jpg"
   };
 
@@ -354,6 +355,7 @@
     ernaehrung: "Ernährung",
     kraft_tracking: "Kraft-Tracking",
     uebungen: "Videos",
+    stress: "Stressabbau",
     orte: "Orte",
     web_call: "Initialgespräch",
     coach_offer: "Ich als Coach",
@@ -410,6 +412,14 @@
       price: "gratis",
       description:
         "Kopier Links aus Instagram oder YouTube und verbinde sie mit den Übungen aus Deinem Wochenplan. So hast Du jederzeit Beispiele von Deinen Lieblingssportlern in der Tasche und musst keine Tracking App oder gespeicherte Links von YouTube nebenher aufhaben."
+    },
+    {
+      key: "stress",
+      type: "stress",
+      title: "Stressabbau",
+      price: "gratis",
+      description:
+        "Kopf voll vor dem Training? Aktiviere Stressabbau, dann steht an jedem Event, bei dem Du dabei bist, der Knopf „Entstressen“. Tippen, auf den Zettel schreiben, was Dich gerade beschäftigt, und „Merken für später“. Der gelbe Zettel steckt dann oben an Deinem Event und wartet. Sobald Du das Workout abschließt, öffnet er sich wieder: Dein Mental Upload. Mit „Alles klar“ ist er erledigt. Deine Notizen bleiben nur auf Deinem Gerät."
     },
     {
       key: "orte",
@@ -564,6 +574,7 @@
 
   /* v2 (24.11. abends): Aktivierungen von Videos zurückgesetzt */
   function videosKey() { return "gogogo_uebungen_on2_" + (me() || ""); }
+  function stressKey() { return "gogogo_stress_on_" + (me() || ""); }
   function trackingKey() {
     /* v2 (24.11.): alle wieder auf „Aktivieren“, es gibt noch keine Auswertung. Gespeichert werden Sätze trotzdem. */
     return "gogogo_kraft_tracking_v3_" + (me() || "");
@@ -574,6 +585,9 @@
     /* Videos: gratis, aber erst nach „Aktivieren“ (je Konto auf diesem Gerät) */
     if (type === "uebungen") {
       try { return !!me() && localStorage.getItem(videosKey()) === "1"; } catch (eU) { return false; }
+    }
+    if (type === "stress") {
+      try { return !!me() && localStorage.getItem(stressKey()) === "1"; } catch (eS) { return false; }
     }
     if (type === "kraft_tracking") {
       try {
@@ -657,6 +671,10 @@
     key = String(key || "");
     if (key === "uebungen") {
       try { localStorage.setItem(videosKey(), "1"); } catch (eU) {}
+      return Promise.resolve(null);
+    }
+    if (key === "stress") {
+      try { localStorage.setItem(stressKey(), "1"); } catch (eS) {}
       return Promise.resolve(null);
     }
     if (key === "routine") {
@@ -955,6 +973,10 @@
     cancelOffer: function (type) {
       if (type === "uebungen") {
         try { localStorage.removeItem(videosKey()); } catch (eU) {}
+        return Promise.resolve();
+      }
+      if (type === "stress") {
+        try { localStorage.removeItem(stressKey()); } catch (eS) {}
         return Promise.resolve();
       }
       if (type === "kraft_tracking") {
