@@ -25,4 +25,9 @@ update events
    and status = 'geplant'
    and starts_at >= (date_trunc('day', now() at time zone 'Europe/Berlin') at time zone 'Europe/Berlin');
 
+-- Einheit „> 20.000 Schritte“ hatte die Notiz „mindestens 5.000“: auf 20.000 korrigiert
+update course_sessions
+   set blocks = replace(blocks::text, 'mindestens 5.000 Schritte', 'mindestens 20.000 Schritte')::jsonb
+ where title = '> 20.000 Schritte' and blocks::text like '%mindestens 5.000 Schritte%';
+
 commit;
