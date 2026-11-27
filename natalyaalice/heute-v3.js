@@ -5431,7 +5431,8 @@
       });
       if (dirty) {
         try { localStorage.setItem(k, JSON.stringify(m)); } catch (e2) {}
-        if (host.trainingStop) { try { host.trainingStop(); } catch (e3) {} }
+        /* „fertig“ in der Anwesenheit nur für heute gestartete Einheiten, nicht für die von gestern */
+        if (k === startedKey() && host.trainingStop) { try { host.trainingStop(); } catch (e3) {} }
       }
     });
     if (changed) overdueSave(list);

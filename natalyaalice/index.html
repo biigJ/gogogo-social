@@ -9122,7 +9122,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-222"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-223"></script>
   <script src="/natalyaalice/go-chat.js?v=gch-6"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-134"></script>
@@ -27657,7 +27657,9 @@
         friends = friends.filter(function (entry) {
           var pid = String(entry.person.id);
           var pr = entry.presence;
-          var done = (entry.today && entry.today.done) || (pr && pr.status === "done");
+          /* heutiges Event (eigenes oder Zusage) entscheidet; „fertig“ aus der Anwesenheit zählt nur ohne solches Event
+             (Stefan: Abbruch des gestrigen Trainings schrieb heute „done“ und warf ihn trotz Zusage aus der Reihe) */
+          var done = entry.today ? !!entry.today.done : !!(pr && pr.status === "done");
           var open = !done && ((entry.today && entry.today.training) || (pr && pr.status === "active"));
           /* oder heute eine Story gepostet (Event gemacht, Foto) */
           var story = !!(entry.story || (entry.today && entry.today.photoEventId) || recentStory(pid));
