@@ -149,5 +149,21 @@
     start();
   }
 
-  global.GoUsage = { init: init, track: function (action) { push(section(), action); }, ask: ask };
+  /* Fehler im Browser mitschreiben (Analyse), damit Abbrüche auf dem iPhone sichtbar werden */
+  var errSeen = {};
+  function reportErr(msg, src, line) {
+    var file = String(src || "").split("/").pop().split("?")[0];
+    var txt = "Fehler: " + String(msg || "").slice(0, 50) + (file ? " " + file + ":" + (line || "") : "");
+    if (errSeen[txt]) return;
+    errSeen[txt] = 1;
+    try { push("Fehler", txt); } catch (e) {}
+  }
+  global.addEventListener("error", function (e) { reportErr(e.message, e.filename, e.lineno); });
+  global.addEventListener("unhandledrejection", function (e) {
+    var r = e.reason || {};
+    var m = String(r.stack || r.message || r).split("\n");
+    var at = (m[1] || "").match(/([\w.-]+\.js)[^:]*:(\d+)/);
+    reportErr(m[0], at ? at[1] : "", at ? at[2] : "");
+  });
+  global.GoUsage = { init: init, track: function (action) { push(section(), action); }, error: reportErr, ask: ask };
 })(window);

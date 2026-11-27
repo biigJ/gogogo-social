@@ -3656,6 +3656,12 @@
   }
 
   function render() {
+    try { renderFeed(); } catch (eR) {
+      if (global.GoUsage && GoUsage.error) GoUsage.error("render " + (eR && eR.message), "heute-v3.js", String((eR && eR.stack || "").match(/heute-v3\.js[^:]*:(\d+)/) ? RegExp.$1 : ""));
+      throw eR;
+    }
+  }
+  function renderFeed() {
     var root = $("heute-acc");
     if (!root) return;
     startWhenTicker();
@@ -5742,14 +5748,18 @@
         .then(function () {
           Object.keys(body).forEach(function (k) { ev[k] = body[k]; });
           if (host.toast) host.toast("Sichtbar: " + (pick.label || v));
+          /* gespeichert ist gespeichert: Fehler beim Neuzeichnen nicht als „Ging nicht“ melden */
+          try { afterVisSaved(); } catch (eUi) { if (global.GoUsage && GoUsage.error) GoUsage.error("vis-ui " + (eUi && eUi.message), "heute-v3.js", ""); }
+        }, function (err) { throw err; })
+        .catch(function () {
+          if (host.toast) host.toast(v === "bubble" || v === "alles" ? "Ging nicht (go-bubbles.sql?)" : circleGid ? "Ging nicht (go-circle-events.sql?)" : v === "coach" ? "Ging nicht (go-visibility-coach.sql?)" : "Ändern ging gerade nicht");
+        });
+      function afterVisSaved() {
           /* Circle: wie in „Tage bearbeiten“ den Termin im Circle der Zirkel-App teilen */
           if (circleGid && global.WocheReels && WocheReels.shareToCircle) { try { WocheReels.shareToCircle(id, circleGid); } catch (eC) {} }
           if (global.WocheReels && WocheReels.refresh) { try { WocheReels.refresh(); } catch (eW) {} }
           render();
-        })
-        .catch(function () {
-          if (host.toast) host.toast(v === "bubble" || v === "alles" ? "Ging nicht (go-bubbles.sql?)" : circleGid ? "Ging nicht (go-circle-events.sql?)" : v === "coach" ? "Ging nicht (go-visibility-coach.sql?)" : "Ändern ging gerade nicht");
-        });
+      }
     });
   }
 
