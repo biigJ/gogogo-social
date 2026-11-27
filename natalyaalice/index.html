@@ -9145,7 +9145,7 @@
   <script src="/natalyaalice/woche-reels.js?v=woche-137"></script>
   <script src="/natalyaalice/support.js?v=support-39"></script>
   <script src="/natalyaalice/pt-calendar.js?v=gpt-4"></script>
-  <script src="/natalyaalice/coach-group.js?v=gcg-6"></script>
+  <script src="/natalyaalice/coach-group.js?v=gcg-7"></script>
   <script>
     (function () {
       var Log = window.NatalyaLog;
@@ -19403,6 +19403,8 @@
             myName: function () { return personName(); },
             toast: function (msg) { gogogoToast(msg); },
             openProfile: function (p) { openProfile(p); },
+            /* Ich als Coach: Einzeltraining am Tag im PT-Kalender planen */
+            openPtCal: function (iso) { if (sessionAccount) openPtCal({ mode: "coach", coachId: sessionAccount.id, coachName: "", day: iso }); },
             openStampPreview: function (card, person) { openStampPreview(card, person); },
             openOwnStampCard: function (kind, ref) { openOwnStampCard(kind, ref); },
             openStampForEvent: function (evId, only) {
@@ -21607,6 +21609,14 @@
               card.appendChild(ptCalBtn);
             }
             /* Für alle Coaches gleich: Coachees wählen → Coach-Portal (Reihenfolge + Dauer). Voller Kurs-Editor nur unter Profil → Admin */
+            /* Ich als Coach: meine Woche so, wie Coachees sie unter „Mein Coach“ sehen; − / + steuert, was sie sehen,
+               + am freien Tag: Gruppentraining oder Einzeltraining */
+            if (isCoachSelf && typeof coachGroupReady === "function" && coachGroupReady() && window.GoCoachGroup) {
+              var ccBox = document.createElement("div");
+              ccBox.className = "go-coach-cal";
+              card.appendChild(ccBox);
+              GoCoachGroup.render(ccBox, { mode: "coachcal", coach: { id: sessionAccount.id, name: personName(), photo_url: sessionAccount.photo_url || "" } });
+            }
             if (isCoachSelf) {
               var cmLink = document.createElement("button");
               cmLink.type = "button";
