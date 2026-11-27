@@ -3774,7 +3774,15 @@
       /* Dashboard: oben meine heutigen Events als Wallet (aktuellstes oben), darunter Stories,
          darunter alles Anstehende (Freunde und ich) chronologisch in die Zukunft, alles verkleinert, keine Historie */
       var nowD = Date.now();
-      var mineD = feed.myToday.slice().sort(function (a, b) {
+      /* „Heute Ich“: nur eigene Items (oder Gruppen-Event, zu dem ich gehöre). Heute erledigte Events von Freunden
+         kommen über pack.past in myToday, gehören im Dashboard nur in die Stories */
+      var isMineD = function (it) { return !!it && (it._mine || (it.kind === "event" && isMyGroupEvent(it.ev))); };
+      var friendDoneD = function (it) {
+        if (!it || isMineD(it)) return false;
+        if (it.kind === "ffc_post") return true;
+        return it.kind === "event" && it.ev && it.ev.status === "erledigt";
+      };
+      var mineD = feed.myToday.filter(isMineD).sort(function (a, b) {
         var ea = a.ev || a, eb = b.ev || b;
         var da = (ea.status === "erledigt" ? 1 : 0), db = (eb.status === "erledigt" ? 1 : 0);
         if (da !== db) return da - db;
@@ -3792,14 +3800,15 @@
       html += '<div class="acc-dash-stories" data-acc-zone="dstories">' + (feedPrefs().stories ? '<h3 class="acc-dash-h">Meine Community heute aktiv:</h3>' : "") + "</div>";
       html += '<div class="acc-feed-future acc-dash-next" data-acc-zone="future">';
       var tomorrowSaid = false;
-      feed.upcoming.forEach(function (item) {
+      var nextD = feed.upcoming.filter(function (it) { return !friendDoneD(it); });
+      nextD.forEach(function (item) {
         if (!tomorrowSaid && dayKey(item.starts_at) > todayK) { tomorrowSaid = true; html += '<h3 class="acc-dash-h">ab morgen folgende Events:</h3>'; }
         var hD = shrinkCard(renderFeedItem(item));
         /* heutige Events von Freunden: Farbschicht nur 20 % */
         if (dayKey(item.starts_at) === todayK) hD = hD.replace('<article class="acc-card', '<article class="acc-card is-day-today');
         html += hD;
       });
-      if (!feed.upcoming.length) html += '<p class="acc-bubble-empty">Noch nichts Anstehendes bei Dir und Deinen Freunden.</p>';
+      if (!nextD.length) html += '<p class="acc-bubble-empty">Noch nichts Anstehendes bei Dir und Deinen Freunden.</p>';
       html += "</div>";
     } else {
     /* Oben = Zukunft: weiter weg oben, nah an heute unten (umgekehrt zur Zeit) */
