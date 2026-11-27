@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-27-chat",
+      at: "2026-11-27T08:00:00Z",
+      text: "Nachrichten haben jetzt ihren eigenen Feed: Chat unten in der Leiste. Den Kalender findest Du oben links in Aktuell."
+    },
+    {
       key: "news:2026-11-27-cta",
       at: "2026-11-27T07:30:00Z",
       text: "Starten, Alternative und Schieben gehen jetzt über den Button mitten auf Deinem Event. Bei Schritten heißt er „Festhalten“. Der Kreis unter dem Bild ist weg."

@@ -1586,7 +1586,9 @@
       background: transparent; color: #2A2118; cursor: pointer;
     }
     .heute-say svg { width: 24px; height: 24px; }
-    body.go-say-open .heute-say svg { fill: currentColor; }
+    body.go-say-open .heute-say:not(.heute-cal) svg { fill: currentColor; }
+    /* Chat-Feed (Pille „Chat“): nur Nachrichten, Eingabe immer offen, keine Profilkreise */
+    body.is-chat-feed #heute-stories, body.is-chat-feed #heute-joins { display: none !important; }
     body.go-say-open #heute-acc { padding-bottom: 90px; }
     .heute-refresh.is-busy svg { animation: heute-spin .8s linear infinite; }
     @keyframes heute-spin { to { transform: rotate(360deg); } }
@@ -7745,7 +7747,7 @@
     </div>
     <div class="heute-filter-row shell-heute">
       <button type="button" class="heute-info" id="heute-info" aria-label="Tamagotchi"><svg class="tama-ico" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8c4.3 0 7.2 3.6 7.2 8.6 0 5.6-3.1 9.8-7.2 9.8s-7.2-4.2-7.2-9.8c0-5 2.9-8.6 7.2-8.6z"/><rect x="8.2" y="7.4" width="7.6" height="6" rx="1.4"/><circle cx="9.3" cy="16.9" r=".9"/><circle cx="12" cy="17.6" r=".9"/><circle cx="14.7" cy="16.9" r=".9"/><path class="tama-ico__off" d="M3.5 21.5 20.5 2.5" stroke-width="2"/></svg><span class="tama-ico__txt">Info</span></button>
-      <button type="button" class="heute-say" id="heute-say" aria-label="Nachricht schreiben"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M12 4c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-1.9-.1-2.8-.4L5 19.5l1.2-3.6C4.5 14.7 3.5 12.9 3.5 11c0-3.9 3.8-7 8.5-7z"/></svg></button>
+      <button type="button" class="heute-say heute-cal" id="heute-cal" aria-label="Kalender" onclick="window.__goTab &amp;&amp; window.__goTab('woche')"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><rect x="3.5" y="4.5" width="17" height="15.5" rx="2.5"/><path d="M3.5 15.5h17"/></svg></button>
       <label class="heute-filter-pick">
         <select id="heute-filter-select" aria-label="Heute filtern">
           <option value="ich">Nur Ich</option>
@@ -8405,12 +8407,13 @@
         </span>
         <small>Aktuell</small>
       </button>
-      <button type="button" data-shell="woche" aria-label="Kalender">
+      <!-- Chat: Nachrichten aus der Sprechblase als eigener Feed (Kalender liegt oben links in Aktuell) -->
+      <button type="button" data-shell="chat" aria-label="Chat">
         <span class="pill-ico">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15.5" rx="2.5"/><path d="M3.5 15.5h17"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-1.9-.1-2.8-.4L5 19.5l1.2-3.6C4.5 14.7 3.5 12.9 3.5 11c0-3.9 3.8-7 8.5-7z"/></svg>
           <span class="pill-dot" hidden></span>
         </span>
-        <small>Kalender</small>
+        <small>Chat</small>
       </button>
       <button type="button" data-shell="team" aria-label="Community">
         <span class="pill-ico">
@@ -9039,13 +9042,13 @@
   <script src="/natalyaalice/coach-reviews.js?v=gcr-6"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-35"></script>
-  <script src="/natalyaalice/go-usage.js?v=gus-2"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-30"></script>
+  <script src="/natalyaalice/go-usage.js?v=gus-3"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-31"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-203"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-204"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-131"></script>
   <script src="/natalyaalice/support.js?v=support-36"></script>
@@ -13901,8 +13904,9 @@
         beatTrainingPresence();
         window.setTimeout(syncHScrollDock, 20);
         syncStatusFade();
+        var chatOn = shellTab === "heute" && document.body.classList.contains("is-chat-feed");
         document.querySelectorAll(".app-pill button").forEach(function (btn) {
-          var on = btn.getAttribute("data-shell") === shellTab;
+          var on = chatOn ? btn.getAttribute("data-shell") === "chat" : btn.getAttribute("data-shell") === shellTab;
           btn.classList.toggle("is-on", on);
           if (on) btn.setAttribute("aria-current", "page");
           else btn.removeAttribute("aria-current");
@@ -24981,6 +24985,12 @@
           var now = Date.now();
           if (now - lastAt < 280) return;
           lastAt = now;
+          /* Chat = Aktuell nur mit Nachrichten (heute-v3 chatMode), Eingabe unten offen */
+          var chatWas = document.body.classList.contains("is-chat-feed");
+          var chatNow = tab === "chat";
+          document.body.classList.toggle("is-chat-feed", chatNow);
+          if (chatNow) { document.body.classList.add("go-say-open"); tab = "heute"; }
+          else if (chatWas) document.body.classList.remove("go-say-open");
           closeKreisPage();
           var sheetOpen = document.getElementById("profile-sheet");
           if (sheetOpen && !sheetOpen.hidden && sheetOpen.classList.contains("is-open")) {
@@ -25035,6 +25045,7 @@
           if (!btn || !pill.contains(btn)) return;
           goTab(btn.getAttribute("data-shell"));
         }
+        window.__goTab = function (t) { lastAt = 0; goTab(t); };
         /* Zurück aus Admin/Kurs-Editor (bfcache): Zustand neu anwenden statt eingefrorenem Layout */
         window.addEventListener("pageshow", function (ev) {
           if (!ev.persisted) return;
@@ -28899,7 +28910,7 @@
         var open = false;
         /* Platz zwischen Sprechblase und Herz: Select steht mittig, also zählt die engere Seite doppelt */
         function room(cs) {
-          var say = document.getElementById("heute-say");
+          var say = document.getElementById("heute-cal");
           var heart = document.getElementById("heute-replies");
           var mid = window.innerWidth / 2;
           var left = say && say.offsetParent ? say.getBoundingClientRect().right : 90;
