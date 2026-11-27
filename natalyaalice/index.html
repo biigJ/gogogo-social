@@ -9122,8 +9122,8 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-221"></script>
-  <script src="/natalyaalice/go-chat.js?v=gch-5"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-222"></script>
+  <script src="/natalyaalice/go-chat.js?v=gch-6"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-134"></script>
   <script src="/natalyaalice/support.js?v=support-39"></script>
@@ -18454,12 +18454,13 @@
           var o = String(key).slice(3);
           return H.chatMsgs().filter(function (m) {
             var a = String(m.author_id), t = String(m.to_id || "");
-            return t && ((a === mine && t === o) || (a === o && t === mine));
+            /* Direktnachricht: ohne Coaching (audience coach steht im Coaching-Gespräch) */
+            return t && m.audience !== "coach" && ((a === mine && t === o) || (a === o && t === mine));
           });
         }
         var l = H.kreisMsgsFor ? H.kreisMsgsFor(key) : [];
         /* Freunde gesamt: Nachrichten an einzelne stehen im Gespräch mit der Person */
-        return key === "team" ? l.filter(function (m) { return !m.to_id; }) : l;
+        return key === "team" ? l.filter(function (m) { return !m.to_id && m.audience !== "coach"; }) : l;
       }
       function initGoChat() {
         if (!window.GoChat || initGoChat.done) return;

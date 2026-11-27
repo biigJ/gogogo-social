@@ -126,6 +126,7 @@
   }
   function backToList() {
     key = null;
+    setTimeout(fitKeyboard, 0);
     document.body.classList.remove("go-chat-thread");
     if (host.onThread) host.onThread(null);
     paint();
@@ -144,9 +145,37 @@
       document.body.scrollTop = 0;
     }
   }
+  /* Tastatur offen (iOS): Eingabe und Verlauf über die Tastatur heben, feste Elemente wandern dort nicht mit */
+  function fitKeyboard() {
+    var comp = document.getElementById("gbub-compose");
+    var vv = global.visualViewport;
+    if (!root || !root.isConnected || !key || !vv) {
+      if (comp) comp.style.removeProperty("bottom");
+      if (root) { root.style.removeProperty("height"); root.style.removeProperty("bottom"); }
+      return;
+    }
+    var kb = Math.max(0, Math.round(global.innerHeight - vv.height - vv.offsetTop));
+    if (kb > 60) {
+      if (comp) comp.style.setProperty("bottom", (kb + 8) + "px", "important");
+      root.style.bottom = "auto";
+      root.style.height = Math.round(vv.height + vv.offsetTop) + "px";
+      var box = root.querySelector(".go-chat__msgs");
+      if (box) box.scrollTop = box.scrollHeight;
+    } else {
+      if (comp) comp.style.removeProperty("bottom");
+      root.style.removeProperty("height");
+      root.style.removeProperty("bottom");
+    }
+  }
   function bindShift() {
     if (vvBound) return;
     vvBound = true;
+    if (global.visualViewport) {
+      global.visualViewport.addEventListener("resize", fitKeyboard);
+      global.visualViewport.addEventListener("scroll", fitKeyboard);
+    }
+    document.addEventListener("focusin", function () { setTimeout(fitKeyboard, 50); setTimeout(fitKeyboard, 350); });
+    document.addEventListener("focusout", function () { setTimeout(fitKeyboard, 50); });
     document.addEventListener("focusout", function () { setTimeout(resetShift, 60); setTimeout(resetShift, 400); });
     if (global.visualViewport) global.visualViewport.addEventListener("resize", function () { setTimeout(resetShift, 60); });
     global.addEventListener("scroll", function () { if (root && root.isConnected && !document.activeElement.matches("input,textarea,[contenteditable]")) resetShift(); }, { passive: true });
@@ -177,6 +206,7 @@
   }
   function close() {
     key = null;
+    setTimeout(fitKeyboard, 0);
     if (root) root.remove();
     document.body.classList.remove("go-chat-open", "go-chat-thread");
     if (host.onThread) host.onThread(null);
