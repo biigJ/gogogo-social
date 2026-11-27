@@ -313,6 +313,8 @@
     cta: { bg: "#111111", ink: "#FFFFFF" },
     tag: { bg: "#111111", ink: "#FFFFFF" },
     extra: ".app-pill nav{background:#fff !important;color:#111 !important;box-shadow:0 0 0 1px #111 !important}.app-pill .pill-dot{background:#111 !important}" +
+      /* CTA auf der Event-Kachel: weiß mit schwarzer Schrift */
+      ".acc-card__media > .acc-card__join:not(#_):not(#__){background:#fff !important;color:#000 !important;border-color:#fff !important}" +
       ".app-pill nav,.app-pill nav *,.wr-dsq:not(#_),.go-tile__pill,.cp-pill,.gcr-pill{font-family:Inter,system-ui,sans-serif !important;letter-spacing:.03em}" +
       ".acc-card__media,.acc-card.is-wallet,.acc-card.is-wallet .acc-card__media,.gxl__pin,.go-slide__art{border-radius:0 !important}" +
       "html[data-go-theme=art] body .rail-nav__title:not(#_):not(#__),html[data-go-theme=art] body .profile-name:not(#_):not(#__),html[data-go-theme=art] body .kreis-page__bar h2:not(#_):not(#__),html[data-go-theme=art] body .team-slide__head:not(#_):not(#__),html[data-go-theme=art] body .acc-card__title:not(#_):not(#__),html[data-go-theme=art] body .wr-day-label:not(#_):not(#__),html[data-go-theme=art] body .wr-title:not(#_):not(#__)" +
