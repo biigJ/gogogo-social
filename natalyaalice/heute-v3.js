@@ -1295,15 +1295,55 @@
 
   /* Zirkel heute mit Uhrzeit: Countdown-Pille (läuft sekündlich über den Woche-Ticker) und für den
      Ersteller „Countdown anhalten/starten“ – dieselben Pillen wie in Woche */
+  /* Individueller Start (Zusagende, die nicht pünktlich sind): eigene Startzeit, nur auf diesem Gerät */
+  function zIndivKey(id) { return "gogogo_zindiv_" + me() + "_" + id; }
+  function zIndivOf(id) { try { var v = Number(localStorage.getItem(zIndivKey(id)) || 0); return v > 0 ? v : 0; } catch (e) { return 0; } }
+  function cdText(ms) {
+    var sec = Math.max(0, Math.floor(ms / 1000));
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
+    return (h ? h + ":" : "") + (m < 10 ? "0" : "") + m + ":" + (x < 10 ? "0" : "") + x;
+  }
+  function zirkelOwnRowHtml(ev, total) {
+    if (String(ev.user_id) === me()) return "";
+    var own = zIndivOf(ev.id);
+    if (own && total && Date.now() > own + total) own = 0;
+    if (!own) {
+      return '<div class="wr-zrow acc-zrow acc-zrow--media acc-zrow--own"><button type="button" class="go-online-cta go-online-cta--ghost" data-zirkel-indiv="' + esc(ev.id) + '">Individueller Start</button></div>';
+    }
+    var cdOwn = own > Date.now()
+      ? '<span class="wr-zirkel-cd wr-zirkel-cd--own" data-wr-cd-start="' + own + '">' + cdText(own - Date.now()) + "</span>"
+      : '<span class="wr-zirkel-cd wr-zirkel-cd--own">Dein Start: jetzt</span>';
+    return '<div class="wr-zrow acc-zrow acc-zrow--media acc-zrow--own">' + cdOwn +
+      '<button type="button" class="go-online-cta go-online-cta--ghost" data-zirkel-indiv="' + esc(ev.id) + '">Ändern</button></div>';
+  }
+  function pickIndivStart(id) {
+    var ev = evById(id);
+    if (!ev || !global.GoDialog) return;
+    var base = Math.max(Date.now(), new Date(ev.starts_at).getTime());
+    var opts = [];
+    var t0 = Math.ceil(base / (5 * 60000)) * 5 * 60000;
+    for (var k = 0; k < 16; k++) {
+      var t = t0 + k * 5 * 60000;
+      opts.push({ label: new Date(t).toLocaleTimeString("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" }) + " Uhr", value: String(t) });
+    }
+    if (zIndivOf(id)) opts.push({ label: "Mit der Gruppe starten", value: "0" });
+    GoDialog.choose("Wann startest Du?", opts, { sub: "Dein Countdown läuft unter dem offiziellen. Im Dashboard startest Du dann selbst." }).then(function (v) {
+      if (v == null) return;
+      try { if (v === "0") localStorage.removeItem(zIndivKey(id)); else localStorage.setItem(zIndivKey(id), v); } catch (e) {}
+      render();
+    });
+  }
   function zirkelPillsHtml(ev) {
     if (!ev || ev.category !== "zirkel" || ev.status === "erledigt" || !hasTime(ev)) return "";
     if (dayKey(ev.starts_at) !== todayIso()) return "";
+    if (state.events && (state.events || []).some(function (e) { return e && String(e.copy_of || "") === String(ev.id) && e.status === "erledigt" && String(e.user_id) === me(); })) return "";
     var z = global.GoZirkelSetup ? GoZirkelSetup.parse(ev.note) : null;
     var start = new Date(ev.starts_at).getTime();
     var target = z && z.goAt ? z.goAt : start;
     var held = !!(z && z.hold && !z.goAt);
     var total = z ? GoZirkelSetup.totalSec(z) * 1000 : 0;
-    if (!held && total && Date.now() > target + total) return "";
+    var ownRow = zirkelOwnRowHtml(ev, total);
+    if (!held && total && Date.now() > target + total) return zIndivOf(ev.id) ? ownRow.replace('acc-zrow--own">', 'acc-zrow--own">').replace(/<button[^>]*data-zirkel-indiv[^>]*>Individueller Start<\/button>/, "") : "";
     var cd;
     if (held) cd = '<span class="wr-zirkel-cd">Angehalten</span>';
     else if (target > Date.now()) {
@@ -1320,7 +1360,7 @@
           ? '<button type="button" class="go-online-cta go-online-cta--ghost" data-acc-zadmin="now" data-id="' + esc(ev.id) + '">Sofortstart</button>'
           : "")
       : "";
-    return '<div class="wr-zrow acc-zrow">' + cd + admin + "</div>";
+    return '<div class="wr-zrow acc-zrow">' + cd + admin + "</div>" + ownRow;
   }
 
   /* Zirkel vom Ersteller angehalten bzw. neu gestartet (events.note hold/go): für alle Teilnehmer sichtbar */
@@ -5503,6 +5543,7 @@
       var z = global.GoZirkelSetup && GoZirkelSetup.parse ? GoZirkelSetup.parse(ev.note) : {};
       if (host.openZirkel) host.openZirkel(Object.assign({}, z || {}, {
         eventId: ev.id,
+        indiv: !!zIndivOf(ev.id),
         onSaved: function () {
           if (String(ev.user_id) !== me()) return refresh();
           return rest("events?id=eq." + encodeURIComponent(ev.id), {
@@ -5745,7 +5786,8 @@
     var past = ev.status === "erledigt";
     var acts = [];
     if (past && eventPhotoCount(ev) < MAX_EVENT_PHOTOS) acts.push({ label: "Foto hinzufügen", value: "__photo" });
-    if (past && evDayIso(ev) === todayIso()) acts.push({ label: "Training wieder aufnehmen", value: "__reopen" });
+    /* Zirkel ist mit dem Abschluss vorbei: kein Wiederaufnehmen */
+    if (past && evDayIso(ev) === todayIso() && ev.category !== "zirkel") acts.push({ label: "Training wieder aufnehmen", value: "__reopen" });
     if (past && !dashMode()) acts.push({ label: compactPast() ? "Vergrößerte Ansicht" : "Verkleinerte Ansicht", value: "__compact" });
     /* kein „Löschen“ mehr: Events werden nicht gelöscht (Serie aus dem Wochenplan, Kommentare, Zusagen hängen daran) */
     GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, select: true, actions: acts }).then(function (v) {
@@ -6019,6 +6061,8 @@
 
   function onRootClick(e) {
     var t = e.target;
+    var zi = t.closest("[data-zirkel-indiv]");
+    if (zi) { e.preventDefault(); e.stopPropagation(); pickIndivStart(zi.getAttribute("data-zirkel-indiv")); return; }
     var zo = t.closest("[data-zirkel-open]");
     if (zo) { e.preventDefault(); e.stopPropagation(); var zev = evById(zo.getAttribute("data-zirkel-open")); if (zev) startEvent(zev); return; }
     var pr = t.closest("[data-postit-read]");
