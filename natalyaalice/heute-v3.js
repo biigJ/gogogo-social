@@ -5286,7 +5286,13 @@
     if (!ev) return;
     overdueSave(list.slice(1));
     if (ev.status !== "geplant") return;
-    openDoneModal(ev.id, { title: "Schreib, wie es war", placeholder: "Wie war es? (Training nach 90 Minuten beendet)" });
+    /* Titel nennt Einheit und Tag, sonst wirkt die Abfrage wie eine Folge der letzten Aktion (z. B. einer Zusage) */
+    var dOv = dayKey(ev.starts_at), tOv = todayIso();
+    var whenOv = dOv === tOv ? "heute" : dOv < tOv ? "gestern" : "";
+    openDoneModal(ev.id, {
+      title: (ev.title || "Training") + (whenOv ? " " + whenOv : "") + ": wie war es?",
+      placeholder: "Gestartet und nach 90 Minuten automatisch beendet. Kurz notieren oder Abbrechen."
+    });
   }
   setInterval(function () { try { checkOverdueStarts(); } catch (e) {} }, 60000);
 
