@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-27-cta",
+      at: "2026-11-27T07:30:00Z",
+      text: "Starten, Alternative und Schieben gehen jetzt über den Button mitten auf Deinem Event. Bei Schritten heißt er „Festhalten“. Der Kreis unter dem Bild ist weg."
+    },
+    {
       key: "news:2026-11-26-coach-invite",
       at: "2026-11-26T11:40:00Z",
       text: "Du kannst jetzt auch Deinen Coach zu Deinem Event einladen. Der Termin steht dann bei Euch beiden unter Kreise → Mein Coach. Bild antippen zeigt beide Stempelkarten."
