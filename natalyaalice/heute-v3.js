@@ -2003,6 +2003,33 @@
   function isStepsEvent(ev) {
     return !!ev && /schritte/i.test(String(ev.title || "")) && (!ev.category || ev.category === "alternative");
   }
+  /* Wie ein Event erfasst wird:
+     zirkel  → Zirkel-App
+     kraft   → Workout tracken (Sätze)
+     cardio  → Eieruhr oder nachträglich Strecke + Dauer eintragen
+     steps   → nur abfragen: wie viele Schritte
+     ask     → nur abfragen: wie lange, wie war es (Mannschaftssport, Yoga, Mobility, Sonstiges) */
+  var CARDIO_RE = /lauf|laufen|jogg|running|\brun\b|radfahr|fahrrad|\brad\b|rennrad|bike|cycling|spinning|schwimm|rudern|\brow|skierg|ergometer|crosstrainer|stepper|wander|walking|nordic|inline|skaten|langlauf|intervall|hiit|cardio|ausdauer|triathlon|zone ?2/i;
+  function trackMode(ev) {
+    if (!ev) return "ask";
+    if (ev.category === "zirkel") return "zirkel";
+    if (isStepsEvent(ev)) return "steps";
+    if (ev.category === "kraft") return "kraft";
+    if (ev.category === "ausdauer" || CARDIO_RE.test(String(ev.title || ""))) return "cardio";
+    return "ask";
+  }
+  /* Felder im Erledigt-Dialog je Art; Werte stehen danach als erste Zeile der Notiz („8.500 Schritte“, „5,2 km · 32 min“) */
+  function trackOpts(ev, title) {
+    var m = trackMode(ev);
+    if (m === "steps") return { title: "Wie viele Schritte hast Du heute gemacht?", placeholder: "Notiz (optional)",
+      metrics: [{ key: "steps", label: "Schritte", ph: "z. B. 8500", unit: "Schritte", required: true }] };
+    if (m === "cardio") return { title: title || "Wie weit, wie lange?", placeholder: "Wie war es? (optional)",
+      metrics: [{ key: "km", label: "Strecke", ph: "km", unit: "km" }, { key: "min", label: "Dauer", ph: "Minuten", unit: "min" }] };
+    if (m === "ask") return { title: title || "Wie lange warst Du dabei?", placeholder: "Wie war es? (optional)",
+      metrics: [{ key: "min", label: "Dauer", ph: "Minuten", unit: "min" }] };
+    return { title: title || "Schreib, wie es war", placeholder: "Wie war es?" };
+  }
+  function logEvent(ev, title) { openDoneModal(ev.id, trackOpts(ev, title)); }
 
   var SPONTAN_BTN =
     '<button type="button" class="acc-tool acc-tool--spontan" data-spontan="1" aria-label="Spontan trainieren">' +
@@ -2623,7 +2650,7 @@
     if (mine && ptR) {
       if (upcoming && day >= todayIso()) actCta = eventCtaHtml(ev, ptR === "coach" ? (day === todayIso() ? "Start" : "Planen") : "Ändern");
     } else if ((mine || groupMember) && upcoming && !gDone && day === todayIso()) {
-      actCta = eventCtaHtml(ev, /schritte/i.test(ev.title || "") ? "Festhalten" : isStarted(gCopy || ev) ? "Weiter" : "Start");
+      actCta = eventCtaHtml(ev, (trackMode(ev) === "steps" || trackMode(ev) === "ask") && !isMyGroupEvent(ev) ? "Eintragen" : isStarted(gCopy || ev) ? "Weiter" : "Start");
     }
     var tools = mine && ptR
       ? eventToolRowHtml({
@@ -4186,6 +4213,7 @@
     modal.dataset.initVis = modal.dataset.vis || "";
     var note = $("acc-done-note");
     if (note) note.value = (ev && ev.note) || "";
+    paintDoneMetrics(opts.metrics || null);
     var photo = $("acc-done-photo");
     if (photo) photo.value = "";
     var fileLabel = $("acc-done-file-label");
@@ -4195,6 +4223,42 @@
     }
   }
 
+  function paintDoneMetrics(list) {
+    var noteEl = $("acc-done-note");
+    if (!noteEl) return;
+    var box = $("acc-done-metrics");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "acc-done-metrics";
+      box.className = "acc-done-metrics";
+      noteEl.parentNode.insertBefore(box, noteEl);
+    }
+    state.doneMetrics = list && list.length ? list : null;
+    box.hidden = !state.doneMetrics;
+    box.innerHTML = (list || []).map(function (f) {
+      return '<label class="acc-done-metric"><span>' + esc(f.label) + '</span><input type="text" inputmode="decimal" autocomplete="off" data-metric="' + esc(f.key) +
+        '" placeholder="' + esc(f.ph || "") + '" /></label>';
+    }).join("");
+    if (state.doneMetrics) setTimeout(function () { var i = box.querySelector("input"); if (i) try { i.focus(); } catch (e) {} }, 80);
+  }
+  /* Werte aus den Feldern → „8.500 Schritte“ / „5,2 km · 32 min“; null = Pflichtfeld leer */
+  function readDoneMetrics() {
+    var list = state.doneMetrics;
+    if (!list) return "";
+    var box = $("acc-done-metrics");
+    var parts = [], missing = false;
+    list.forEach(function (f) {
+      var inp = box && box.querySelector('[data-metric="' + f.key + '"]');
+      var raw = String(inp && inp.value || "").trim().replace(/\s/g, "");
+      if (!raw) { if (f.required) missing = true; return; }
+      var n = f.key === "km" ? Number(raw.replace(",", ".")) : Number(raw.replace(/[.,]/g, ""));
+      if (!isFinite(n) || n <= 0) { if (f.required) missing = true; return; }
+      var txt = f.key === "km" ? n.toLocaleString("de-DE", { maximumFractionDigits: 2 }) : Math.round(n).toLocaleString("de-DE");
+      parts.push(txt + " " + f.unit);
+    });
+    return missing ? null : parts.join(" · ");
+  }
+
   function closeDoneModal(e) {
     var modal = $("acc-done-modal");
     /* Abbrechen im „Schreib, wie es war“ nach Start: nicht mehr „dabei“ */
@@ -4202,6 +4266,7 @@
     if (modal) modal.hidden = true;
     state.doneDraft = null;
     state.altReplace = null;
+    state.doneMetrics = null;
   }
 
   /* Original nur behalten, wenn es ohnehin klein ist (sonst lieber ohne Foto als Upload-Fehler) */
@@ -4414,6 +4479,14 @@
     /* „Speichern ohne Posting“: erledigt, aber nur für mich, ohne Foto */
     if (noPost) vis = "privat";
     var note = (($("acc-done-note") && $("acc-done-note").value) || "").trim().slice(0, 500);
+    var metricTxt = readDoneMetrics();
+    if (metricTxt === null) {
+      if (host.toast) host.toast("Trag kurz die Zahl ein");
+      var miss = document.querySelector("#acc-done-metrics input");
+      if (miss) try { miss.focus(); } catch (eF) {}
+      return;
+    }
+    if (metricTxt) note = (metricTxt + (note ? "\n" + note : "")).slice(0, 500);
     var draft = eventId === "draft" ? state.doneDraft : null;
     if (eventId === "draft" && !draft) return;
     var ready = draft
@@ -5376,10 +5449,16 @@
       return;
     }
     var choices = [];
-    if (today) choices.push({ label: ev.category === "zirkel" ? "Start: Zirkeltraining" : "Start", value: "start" });
+    var tm = trackMode(ev);
+    if (tm === "steps") choices.push({ label: "Schritte eintragen", value: "log" });
+    else if (tm === "ask") choices.push({ label: "Eintragen", value: "log" });
+    else if (tm === "cardio") {
+      choices.push({ label: "Start mit Timer", value: "start" });
+      choices.push({ label: "Eintragen: Strecke und Dauer", value: "log" });
+    } else choices.push({ label: ev.category === "zirkel" ? "Start: Zirkeltraining" : "Start", value: "start" });
     /* eingetragene Alternative: nur noch starten, kein zweites Ausweichen.
        Circle-Event: kein Ausweichen/Schieben hier, „Statt“ würde es für alle absagen (verwaltet auf der Circle-Seite) */
-    if (ev.item_type !== "alternative" && !ev.circle_id) {
+    if (ev.item_type !== "alternative" && !ev.circle_id && tm !== "steps") {
       choices.push({ label: "Alternative", value: "alt" });
       choices.push({ label: "Schieben auf morgen", value: "move" });
     }
@@ -5395,6 +5474,7 @@
       if (v === "late") return delayStart(ev);
       if (v === "place") return changePlace(ev);
       if (v === "start") return startEvent(ev);
+      if (v === "log") return logEvent(ev);
       if (v === "alt") return alternativeFor(ev);
       if (v === "move") return moveToTomorrow(ev);
     });
@@ -5557,10 +5637,10 @@
     /* Titel nennt Einheit und Tag, sonst wirkt die Abfrage wie eine Folge der letzten Aktion (z. B. einer Zusage) */
     var dOv = dayKey(ev.starts_at), tOv = todayIso();
     var whenOv = dOv === tOv ? "heute" : dOv < tOv ? "gestern" : "";
-    openDoneModal(ev.id, {
+    openDoneModal(ev.id, Object.assign(trackOpts(ev), {
       title: (ev.title || "Training") + (whenOv ? " " + whenOv : "") + ": wie war es?",
       placeholder: "Gestartet und nach 90 Minuten automatisch beendet. Kurz notieren oder Abbrechen."
-    });
+    }));
   }
   setInterval(function () { try { checkOverdueStarts(); } catch (e) {} }, 60000);
 
@@ -5579,6 +5659,9 @@
   }
 
   function startEvent(ev) {
+    /* Nur abfragen (Schritte, Sonstiges): nichts starten, kein Zettel */
+    var tmE = trackMode(ev);
+    if (ev && (tmE === "steps" || tmE === "ask") && !isMyGroupEvent(ev)) { logEvent(ev); return; }
     /* Stressabbau aktiv: vor dem Workout erst der Zettel „Mental Deload hier:“ */
     if (ev && stressActive() && !isStepsEvent(ev) && !postitOf(ev.id) && !document.querySelector(".pi-wrap")) {
       openPostit(ev.id, function () { startEventNow(ev); });
@@ -5610,7 +5693,9 @@
       host.openEventWorkout(ev);
       return;
     }
-    if (ev.category === "ausdauer" && global.GoTimer) {
+    var tmS = trackMode(ev);
+    if (tmS === "steps" || tmS === "ask") { unmarkStarted(ev.id); logEvent(ev); return; }
+    if (tmS === "cardio" && global.GoTimer) {
       Promise.resolve(host.eventMinutes ? host.eventMinutes(ev) : 30)
         .catch(function () { return 30; })
         .then(function (min) {
@@ -5618,7 +5703,7 @@
         });
       return;
     }
-    openDoneModal(ev.id, { title: "Schreib, wie es war", placeholder: "Wie war es?" });
+    logEvent(ev);
   }
 
   /* „Du hast für diesen Tag eine Reise vom 24.11. bis 28.11. eingestellt.“ oder "" */
@@ -5915,12 +6000,24 @@
         return createUnplannedEvent(p).then(function (nev) {
           return markReplaced(replace, nev).then(function () { return refresh(); }).then(function () {
             if (kind === "kraft" && host.openEventWorkout) { host.openEventWorkout(nev); return; }
-            if (kind === "ausdauer" && global.GoTimer) { GoTimer.start({ id: nev.id, title: nev.title || "Ausdauer", minutes: 30 }); return; }
-            openDoneModal(nev.id, { title: "Schreib, wie es war", placeholder: "Wie war es?" });
+            if (kind === "ausdauer") {
+              return GoDialog.choose(nev.title || "Ausdauer", [{ label: "Start mit Timer", value: "timer" }, { label: "Eintragen: Strecke und Dauer", value: "log" }]).then(function (v) {
+                if (v === "timer" && global.GoTimer) GoTimer.start({ id: nev.id, title: nev.title || "Ausdauer", minutes: 30 });
+                else if (v === "log") logEvent(Object.assign({}, nev, { category: "ausdauer" }));
+              });
+            }
+            logEvent(nev);
           });
         });
       }
-      /* Bewegung / Sonstiges: gleich erledigt eintragen */
+      /* Bewegung / Sonstiges: gleich erledigt eintragen. Schritte, Ausdauer, Sonstiges mit Feldern (Event erst beim Speichern) */
+      var probe = Object.assign({}, p, { title: unit.title || p.title, category: kind });
+      if (trackMode(probe) !== "kraft" && trackMode(probe) !== "zirkel") {
+        state.doneDraft = { payload: p, replace: replace || null };
+        openDoneModal("draft", trackOpts(probe));
+        setDoneVis(normalizeVisibility(p.visibility || "team"));
+        return;
+      }
       return GoDialog.done(unit.title || "Erledigt").then(function (d) {
         if (!d) return;
         var up = d.file && global.GoExMedia && GoExMedia.uploadImage ? GoExMedia.uploadImage(d.file, "events").catch(function () { return ""; }) : Promise.resolve("");
@@ -7022,7 +7119,7 @@
       GoTimer.init({
         onFinish: function (eventId) {
           if (!eventId) return;
-          var go = function () { openDoneModal(eventId, { title: "Geschafft", placeholder: "Wie war es?" }); };
+          var go = function () { var evT = evById(eventId); if (evT) logEvent(evT, "Geschafft: wie weit, wie lange?"); else openDoneModal(eventId, { title: "Geschafft", placeholder: "Wie war es?" }); };
           if ((state.events || []).some(function (e) { return String(e.id) === String(eventId); })) go();
           else refresh().then(go, go);
         }

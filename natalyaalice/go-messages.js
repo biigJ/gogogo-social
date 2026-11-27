@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-27-track",
+      at: "2026-11-27T21:50:00Z",
+      text: "Schritte und Sonstiges trägst Du jetzt direkt ein, ohne Start. Ausdauer: Timer oder nachträglich Strecke und Dauer."
+    },
+    {
       key: "news:2026-11-27-steps",
       at: "2026-11-27T16:30:00Z",
       text: "Schritte haben in Aktuell jetzt ein eigenes Icon unten rechts. Tipp drauf für den Hinweis. Die Vorgabe im Plan ist auf 7.500 gestiegen."
