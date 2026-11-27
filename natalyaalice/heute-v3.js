@@ -6892,8 +6892,14 @@
     var flags = viewFlags("alles");
     flags.todayAll = true;
     flags.storyFrom = from;
+    var pid = String(personId);
     var list = (state.events || []).filter(function (e) {
-      if (!e || String(e.user_id) !== String(personId) || e.status === "ausgefallen") return false;
+      if (!e || e.status === "ausgefallen") return false;
+      /* Zusage bei einem heutigen Event eines anderen (Zirkel, Gruppe, Einladung): steht als anstehend in der Story */
+      if (String(e.user_id) !== pid) {
+        return e.status === "geplant" && evDayIso(e) === t && (state.rsvps[String(e.id)] || []).some(function (u) { return String(u) === pid; }) &&
+          eventVisibleToMe(e, flags);
+      }
       var d = evDayIso(e);
       /* Erledigtes bleibt 24 Stunden Story (wie Instagram) */
       if (e.status === "erledigt") return d >= from && d <= t && new Date(e.starts_at).getTime() >= Date.now() - 86400000 && eventVisibleToMe(e, flags);
