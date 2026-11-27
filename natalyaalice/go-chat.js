@@ -71,14 +71,15 @@
     return out;
   }
 
+  /* Liste: ohne Zurück (Pille bleibt sichtbar); Verlauf: Zurück zur Liste */
   function bar(title, backAttr) {
-    return '<div class="go-chat__bar"><button type="button" class="profile-back go-chat__back" ' + backAttr + ' aria-label="Zurück">' + BACK + "</button>" +
+    return '<div class="go-chat__bar">' + (backAttr ? '<button type="button" class="profile-back go-chat__back" ' + backAttr + ' aria-label="Zurück">' + BACK + "</button>" : "<span></span>") +
       "<h2>" + esc(title) + '</h2><button type="button" class="go-chat__refresh" data-chat-refresh aria-label="Aktualisieren">' + REFRESH + "</button></div>";
   }
 
   function paintList() {
     var list = rows();
-    root.innerHTML = bar("Chat", "data-chat-close") +
+    root.innerHTML = bar("Chat", "") +
       '<div class="go-chat__list">' +
       (list.length ? list.map(function (r) {
         var face = r.photo
