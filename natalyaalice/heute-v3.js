@@ -2072,14 +2072,19 @@
     });
   }
 
+  /* Handlungs-Button mitten auf dem Bild (Stil wie „Teilnehmen“): öffnet das bisherige Kreis-Menü */
+  function eventCtaHtml(ev, label) {
+    return '<button type="button" class="acc-rsvp acc-card__join" data-ev-menu="' + esc(ev.id) + '">' + esc(label) + "</button>";
+  }
   function eventToolRowHtml(opts) {
     opts = opts || {};
     var eventId = opts.eventId || "";
     var postId = opts.postId || eventId;
     var done = !!opts.canDone;
     var isDone = !!opts.isDone;
-    /* Kreis: offen = Menü (Start, Alternative, Schieben), erledigt = Haken */
-    var check = opts.noCheck ? "" :
+    /* Kreis entfällt: Start, Alternative, Schieben laufen über den Button mitten auf der Kachel (eventCtaHtml),
+       erledigt zeigt die Pille im Bild; die anderen Icons rücken nach links */
+    var check = true ? "" :
       '<button type="button" class="acc-tool acc-tool--check' +
       (isDone ? " is-done" : "") +
       '"' +
@@ -2515,6 +2520,13 @@
     var gDone = !!(gCopy && gCopy.status === "erledigt");
     var groupMember = !mine && upcoming && day === todayIso() && isMyGroupEvent(ev);
     var ptR = ptRole(ev);
+    /* Button auf der Kachel statt Kreis darunter */
+    var actCta = "";
+    if (mine && ptR) {
+      if (upcoming && day >= todayIso()) actCta = eventCtaHtml(ev, ptR === "coach" ? (day === todayIso() ? "Start" : "Planen") : "Ändern");
+    } else if ((mine || groupMember) && upcoming && !gDone && day === todayIso()) {
+      actCta = eventCtaHtml(ev, /schritte/i.test(ev.title || "") ? "Festhalten" : isStarted(gCopy || ev) ? "Weiter" : "Start");
+    }
     var tools = mine && ptR
       ? eventToolRowHtml({
           eventId: ev.id,
@@ -2575,7 +2587,7 @@
         esc(ev.id) +
         '"' + (ptR ? ' data-pt="' + ptR + '"' : ""),
       category: ev.category,
-      mediaExtra: inviteCta,
+      mediaExtra: inviteCta || actCta,
       photo: ev.photo_url || "",
       extraPhotos: eventExtraPhotos(ev),
       courseId: ev.course_id || "",
