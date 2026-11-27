@@ -9036,7 +9036,7 @@
   <script src="/natalyaalice/log.js?v=log-2"></script>
   <script src="/natalyaalice/kraft-tracking.js?v=kt-4"></script>
   <script src="/natalyaalice/exercise-media.js?v=gxm-8"></script>
-  <script src="/natalyaalice/go-story.js?v=gst-11"></script>
+  <script src="/natalyaalice/go-story.js?v=gst-12"></script>
   <script src="/natalyaalice/bubbles.js?v=bub-19"></script>
   <script src="/natalyaalice/go-covers.js?v=cov-6"></script>
   <script src="/natalyaalice/tamagotchi.js?v=tama-8"></script>
@@ -9056,7 +9056,7 @@
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-206"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-207"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-131"></script>
   <script src="/natalyaalice/support.js?v=support-36"></script>
@@ -26864,6 +26864,18 @@
       }
       var storyPeople = {};
       /* Story zu Ende: weiter mit der nächsten Person in der Profilkreis-Reihe, die eine Story hat; sonst zurück zu Aktuell */
+      function openPrevPersonStory(fromId) {
+        var els = [].slice.call(document.querySelectorAll("[data-story-person]")).filter(function (el) { return el.offsetParent; });
+        var ids = els.map(function (el) { return el.getAttribute("data-story-person"); });
+        var at = ids.indexOf(String(fromId));
+        for (var k = at - 1; k >= 0; k--) {
+          var p = storyPeople[ids[k]];
+          if (p && openPersonStory(p)) return true;
+        }
+        /* kein vorheriges Profil: eigene Story wieder von vorn */
+        var me0 = storyPeople[String(fromId)];
+        return me0 ? openPersonStory(me0) : false;
+      }
       function openNextPersonStory(fromId) {
         var els = [].slice.call(document.querySelectorAll("[data-story-person]")).filter(function (el) { return el.offsetParent; });
         var ids = els.map(function (el) { return el.getAttribute("data-story-person"); });
@@ -27162,11 +27174,14 @@
             done: ev.status === "erledigt",
             /* Status-Pille wie auf der Karte in Aktuell; gestern Erledigtes zeigt „erledigt“ */
             status: ev.status === "erledigt" ? "erledigt" : (HeuteAccountability.statusFor ? HeuteAccountability.statusFor(ev) : ""),
-            loadList: ev.status === "erledigt" && HeuteAccountability.storyExercisesHtml ? function () { return HeuteAccountability.storyExercisesHtml(ev); } : null
+            loadList: ev.status === "erledigt" && HeuteAccountability.storyExercisesHtml ? function () { return HeuteAccountability.storyExercisesHtml(ev); }
+              : HeuteAccountability.storyPlanHtml ? function () { return HeuteAccountability.storyPlanHtml(ev); } : null,
+            cta: "Anzeigen"
           };
         }), {
           title: first,
           onEnd: function () { openNextPersonStory(person.id); },
+          onPrev: function () { return openPrevPersonStory(person.id); },
           onItem: function (it) {
             if (HeuteAccountability.focusEvent(it.id)) return;
             HeuteAccountability.setFilter("alles");
