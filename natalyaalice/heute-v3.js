@@ -3579,7 +3579,7 @@
     for (var ui = feed.upcoming.length - 1; ui >= 0; ui--) {
       var itU = feed.upcoming[ui];
       var hU = renderFeedItem(itU);
-      if (dayKey(itU.starts_at) > todayK) hU = hU.replace('<article class="acc-card', '<article class="acc-card is-wallet');
+      if (dayKey(itU.starts_at) > todayK && !tilesMode()) hU = hU.replace('<article class="acc-card', '<article class="acc-card is-wallet');
       html += hU;
     }
     html += "</div>";
@@ -3592,7 +3592,7 @@
     html += '<div class="acc-feed-past" data-acc-zone="past">';
     /* „Verkleinern“ gilt für alles Vergangene (auch Circle-Posts, Circle-Events), nicht nur erledigte Events */
     var shrinkAll = compactPast();
-    feed.history.forEach(function (item) {
+    (feedPrefs().history ? feed.history : []).forEach(function (item) {
       var hH = renderFeedItem(item);
       if (shrinkAll && hH.indexOf("is-shrunk") < 0) hH = hH.replace('<article class="acc-card', '<article class="acc-card is-wallet is-shrunk');
       html += hH;
@@ -5469,10 +5469,52 @@
   }
 
   /* Verkleinern gilt für alle erledigten Events in meinem Feed (eigene und von Freunden), pro Gerät gemerkt */
-  var COMPACT_KEY = "gogogo_feed_compact_past";
+  /* ab 27.11.: Standard verkleinert für alle (neuer Schlüssel, alte Wahl zählt nicht mehr) */
+  var COMPACT_KEY = "gogogo_feed_compact_past_v2";
   function compactPast() {
-    if (state.compactPast == null) { try { state.compactPast = localStorage.getItem(COMPACT_KEY) === "1"; } catch (e) { state.compactPast = false; } }
+    if (tilesMode()) return false;
+    if (state.compactPast == null) { try { state.compactPast = localStorage.getItem(COMPACT_KEY) !== "0"; } catch (e) { state.compactPast = true; } }
     return state.compactPast;
+  }
+  /* Einstellungen → Feed Darstellung (je Gerät): Historie an/aus, Stories an/aus, Event Wallet oder Event Kacheln */
+  var FEED_PREFS_KEY = "gogogo_feed_prefs";
+  function feedPrefs() {
+    if (!state.feedPrefs) {
+      var p0 = {};
+      try { p0 = JSON.parse(localStorage.getItem(FEED_PREFS_KEY) || "{}") || {}; } catch (e) {}
+      state.feedPrefs = { history: p0.history !== false, stories: p0.stories !== false, layout: p0.layout === "tiles" ? "tiles" : "wallet" };
+    }
+    return state.feedPrefs;
+  }
+  function saveFeedPrefs() {
+    try { localStorage.setItem(FEED_PREFS_KEY, JSON.stringify(feedPrefs())); } catch (e) {}
+    applyFeedPrefs();
+    state.walletOpen = "";
+    render();
+  }
+  function tilesMode() { return feedPrefs().layout === "tiles"; }
+  function applyFeedPrefs() {
+    var p = feedPrefs();
+    document.body.classList.toggle("go-no-stories", !p.stories);
+    document.body.classList.toggle("go-feed-tiles", p.layout === "tiles");
+  }
+  function openFeedSettings() {
+    if (!global.GoDialog) return Promise.resolve();
+    var p = feedPrefs();
+    return GoDialog.choose("Feed Darstellung", [
+      { label: (p.history ? "✓ " : "") + "Historie", value: "history" },
+      { label: (p.stories ? "✓ " : "") + "Stories", value: "stories" },
+      { label: (p.layout === "wallet" ? "✓ " : "") + "Event Wallet", value: "wallet" },
+      { label: (p.layout === "tiles" ? "✓ " : "") + "Event Kacheln", value: "tiles" }
+    ], { sub: "Gilt auf diesem Gerät." }).then(function (v) {
+      if (!v) return;
+      if (v === "history") p.history = !p.history;
+      else if (v === "stories") p.stories = !p.stories;
+      else p.layout = v;
+      saveFeedPrefs();
+      /* Dialog bleibt, bis man ihn schließt */
+      setTimeout(openFeedSettings, 250);
+    });
   }
   function setCompact(on) {
     state.compactPast = !!on;
@@ -5486,7 +5528,7 @@
     if (!ev || !global.GoDialog || !GoDialog.vis) return;
     /* Event eines Freundes: nur die Ansicht (Verkleinern gilt für alle) */
     if (String(ev.user_id) !== me()) {
-      GoDialog.choose(String(ev.title || "Training"), [{ label: compactPast() ? "Vergrößern" : "Verkleinern", value: "c" }]).then(function (v) {
+      GoDialog.choose(String(ev.title || "Training"), [{ label: compactPast() ? "Vergrößerte Ansicht" : "Verkleinerte Ansicht", value: "c" }]).then(function (v) {
         if (v === "c") setCompact(!compactPast());
       });
       return;
@@ -5519,7 +5561,7 @@
     var acts = [];
     if (past && eventPhotoCount(ev) < MAX_EVENT_PHOTOS) acts.push({ label: "Foto hinzufügen", value: "__photo" });
     if (past && evDayIso(ev) === todayIso()) acts.push({ label: "Training wieder aufnehmen", value: "__reopen" });
-    if (past) acts.push({ label: compactPast() ? "Vergrößern" : "Verkleinern", value: "__compact" });
+    if (past && !tilesMode()) acts.push({ label: compactPast() ? "Vergrößerte Ansicht" : "Verkleinerte Ansicht", value: "__compact" });
     /* kein „Löschen“ mehr: Events werden nicht gelöscht (Serie aus dem Wochenplan, Kommentare, Zusagen hängen daran) */
     GoDialog.vis("Sichtbarkeit", { vis: cur, visList: list, select: true, actions: acts }).then(function (v) {
       if (v === "__compact") { setCompact(!compactPast()); return; }
@@ -6679,6 +6721,7 @@
 
   function install(h) {
     host = h || host || {};
+    try { applyFeedPrefs(); } catch (eFp) {}
     bindTrainTimeAsk();
     scheduleMidnight();
     if (global.GoTimer) {
@@ -6963,7 +7006,8 @@
       return Promise.resolve(host.exercisesForEvent(ev)).then(function (l) { return l && l.length ? accExItems(l) : ""; }).catch(function () { return ""; });
     },
     /* Herz neu prüfen (z. B. nach Bestätigen einer Anfrage) */
-    refreshHeart: function () { state.repliesAt = 0; return checkReplies(); }
+    refreshHeart: function () { state.repliesAt = 0; return checkReplies(); },
+    openFeedSettings: openFeedSettings
   };
   /* Wallet: Tipp auf eine zusammengeschobene Karte schiebt sie frei (andere bleiben zu);
      Tipp aufs Bild einer offenen Karte schiebt sie zurück. Werkzeuge unter der offenen Karte bleiben bedienbar. */
