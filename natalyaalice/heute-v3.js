@@ -370,6 +370,14 @@
     return { id: String(uid), name: "?", photo: "" };
   }
 
+  function faceLetter(img) {
+    if (!img || !img.parentNode) return;
+    var sp = document.createElement("span");
+    sp.className = img.className + " " + (img.className.split(" ")[0] || "acc-face") + "--ph";
+    sp.textContent = img.getAttribute("data-face-letter") || "?";
+    img.parentNode.replaceChild(sp, img);
+  }
+
   function ensurePeople(ids) {
     var missing = ids.filter(function (id) {
       return id && !state.people[id] && String(id) !== me();
@@ -1553,7 +1561,9 @@
   function avatarHtml(person, cls) {
     var c = cls || "acc-avatar";
     if (person.photo) {
-      return '<img class="' + c + '" src="' + esc(person.photo) + '" alt="">';
+      /* Bild lädt nicht (veraltete Adresse): frisches Profilbild nachladen, sonst Anfangsbuchstabe statt kaputtem Bild */
+      return '<img class="' + c + '" src="' + esc(person.photo) + '" alt="" data-face-id="' + esc(person.id || "") +
+        '" data-face-letter="' + esc(String(person.name || "?").slice(0, 1)) + '" onerror="window.HeuteAccountability&&HeuteAccountability.faceError(this)">';
     }
     return '<span class="' + c + " " + c + '--ph">' + esc((person.name || "?").slice(0, 1)) + "</span>";
   }
@@ -6989,6 +6999,18 @@
     storyExercisesHtml: function (ev) {
       if (!ev || ev.status !== "erledigt" || ev.category === "zirkel" || !global.GoKraftTracking || !GoKraftTracking.dayExercises) return Promise.resolve("");
       return GoKraftTracking.dayExercises(String(ev.user_id), dayKey(ev.starts_at)).then(accExItems).catch(function () { return ""; });
+    },
+    faceError: function (img) {
+      if (!img || img.getAttribute("data-face-retry")) return faceLetter(img);
+      img.setAttribute("data-face-retry", "1");
+      var id = img.getAttribute("data-face-id");
+      if (!id) return faceLetter(img);
+      rest("go_accounts?id=eq." + encodeURIComponent(id) + "&select=id,name,photo_url").then(function (rows) {
+        var r = rows && rows[0];
+        if (!r || !r.photo_url || r.photo_url === img.getAttribute("src")) return faceLetter(img);
+        if (state.people[String(id)]) state.people[String(id)].photo = r.photo_url;
+        img.src = r.photo_url;
+      }).catch(function () { faceLetter(img); });
     },
     /* Chat (go-chat.js): Nachrichten, Darstellung wie in Aktuell, Neuladen */
     chatMsgs: function () { return state.kreisMsgs || []; },
