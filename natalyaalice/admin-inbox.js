@@ -1931,8 +1931,8 @@
   };
   /* [Schlüssel, Spalte, Typ] Typ: text | num | date | list */
   var AN_COLS = [
-    ["name", "Nutzer", "text"], ["labels", "Labels", "list"], ["sessions", "Sitzungen", "num"], ["minutes", "Zeit (min)", "num"],
-    ["avg", "Ø Sitzung (min)", "num"], ["last", "Letzte Sitzung", "date"], ["top", "Top-Sektion", "text"], ["actions", "Aktionen", "num"],
+    ["name", "Nutzer", "text"], ["labels", "Labels", "list"], ["sessions", "Sitzungen", "num"], ["minutes", "Zeit", "num"],
+    ["avg", "Ø Sitzung", "num"], ["last", "Letzte Sitzung", "date"], ["top", "Top-Sektion", "text"], ["actions", "Aktionen", "num"],
     ["done", "Abgehakt 30 T", "num"], ["chat", "Nachrichten 30 T", "num"], ["coachev", "Termine gesetzt 30 T", "num"],
     ["plan", "Wochenplan", "text"], ["fb", "Feedback", "text"], ["fbtext", "Letztes Feedback", "text"], ["device", "Gerät", "text"]
   ];
@@ -1964,6 +1964,10 @@
       .catch(function () { an.rows = "error"; if (st.tab === "analyse") paint(); });
   }
   function anMin(sec) { return Math.round((Number(sec) || 0) / 6) / 10; }
+  /* Anzeige: Zeit 00:00:00 Std, Ø Sitzung 00:00 min (Filter rechnen weiter in Minuten) */
+  function an2(n) { return (n < 10 ? "0" : "") + n; }
+  function anHms(sec) { sec = Math.round(Number(sec) || 0); return an2(Math.floor(sec / 3600)) + ":" + an2(Math.floor(sec % 3600 / 60)) + ":" + an2(sec % 60) + " Std"; }
+  function anMs(sec) { sec = Math.round(Number(sec) || 0); return an2(Math.floor(sec / 60)) + ":" + an2(sec % 60) + " min"; }
   function anVal(r, k) {
     if (k === "name") return String(r.name || "");
     if (k === "labels") return r.labels || [];
@@ -2097,7 +2101,7 @@
     var secs = active.reduce(function (s, r) { return s + (Number(r.seconds) || 0); }, 0);
     var sess = active.reduce(function (s, r) { return s + (Number(r.sessions) || 0); }, 0);
     var sum = '<p class="ga-ucount">' + rows.length + " von " + all.length + " Nutzern · " + active.length + " mit Sitzung · " + sess + " Sitzungen · " +
-      String(anMin(secs)).replace(".", ",") + " min gesamt" + (sess ? " · Ø " + String(anMin(secs / sess)).replace(".", ",") + " min je Sitzung" : "") + "</p>";
+      anHms(secs) + " gesamt" + (sess ? " · Ø " + anMs(secs / sess) + " je Sitzung" : "") + "</p>";
     var head = "<tr>" + AN_COLS.map(function (c) {
       return '<th class="' + (c[2] === "num" ? "num" : "") + '">' + esc(c[1]) + "</th>"; }).join("") + "</tr>";
     var body = rows.map(function (r) {
@@ -2105,6 +2109,8 @@
         var v = anVal(r, c[0]);
         if (c[0] === "labels") return '<td class="ga-anlabels">' + v.map(function (l) { return '<span class="ga-anlabel">' + esc(l.replace("-User", "")) + "</span>"; }).join("") + "</td>";
         if (c[0] === "last") return "<td>" + esc(anWhen(v)) + "</td>";
+        if (c[0] === "minutes") return '<td class="num' + (v ? "" : " is-zero") + '">' + anHms(r.seconds) + "</td>";
+        if (c[0] === "avg") return '<td class="num' + (v ? "" : " is-zero") + '">' + anMs(r.sessions ? (Number(r.seconds) || 0) / r.sessions : 0) + "</td>";
         if (c[2] === "num") return '<td class="num' + (v ? "" : " is-zero") + '">' + esc(String(v).replace(".", ",")) + "</td>";
         return '<td class="' + (c[0] === "name" ? "name" : "") + '">' + esc(v) + "</td>";
       }).join("") + "</tr>";
