@@ -30382,6 +30382,30 @@
         onSaved: function (workout, syncEventId) {
           if (sessionMode) markDiaryMove(Log.berlinToday(), "Zirkeltraining");
           if (sessionMode && syncEventId && window.GoZirkelSync) GoZirkelSync.finished(syncEventId);
+        },
+        /* Gast fertig: Ergebnis liegt lokal, speichern nur mit Konto (Registrierung oder Login) */
+        onGuestFinished: function () {
+          window.__ffcGuest = false;
+          if (!window.GoDialog || !GoDialog.choose) return;
+          setTimeout(function () {
+            GoDialog.choose("Ergebnis speichern?", [
+              { label: "Konto anlegen und speichern", value: "reg" },
+              { label: "Ich habe ein FFC Konto", value: "login" },
+              { label: "Nicht speichern", value: "no" }
+            ], { sub: "Dein Workout ist auf diesem Gerät gemerkt. Mit Konto landet es in Deinen Aufzeichnungen und zählt in gogogo als erledigt." }).then(function (v) {
+              if (v === "reg") { try { openZirkelRegister(); } catch (eR) {} return; }
+              if (v === "login" && window.FFC && FFC.showAuth) {
+                document.body.classList.add("ffc-open");
+                FFC.showAuth("login", { title: "FFC Login", tagline: "Anmelden, dann wird Dein Workout gespeichert.", email: accountEmail() });
+                return;
+              }
+              if (v === "no") { try { localStorage.removeItem("ffc_guest_pending"); } catch (eN) {} }
+            });
+          }, 600);
+        },
+        onGuestSaved: function () {
+          if (typeof gogogoToast === "function") gogogoToast("Workout gespeichert");
+          if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh();
         }
       };
 
@@ -30489,6 +30513,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="/natalyaalice/hyrox-doubles.js?v=hxd-3"></script>
   <script src="/natalyaalice/circle-sheet.js?v=cs-5"></script>
-  <script src="/natalyaalice/ffc.js?v=ffc-dlg-21"></script>
+  <script src="/natalyaalice/ffc.js?v=ffc-dlg-22"></script>
 </body>
 </html>

@@ -382,6 +382,7 @@
       loadMyGender();
       handleEventDeepLink();
       host('onAuth', currentUser);
+      flushGuestPending();
     } else {
       currentUser = null;
       cachedHistory = [];
@@ -419,6 +420,7 @@
       loadMyGender();
       handleEventDeepLink();
       host('onAuth', currentUser);
+      flushGuestPending();
     } else {
       showScreen('auth');
       host('onAuth', null);
@@ -2524,9 +2526,29 @@
   }
 
   let onSavedCb = null;
+  /* gogogo: Gast (ohne Konto) – Ergebnis lokal merken; nach Anmeldung/Registrierung wird es nachgetragen */
+  const GUEST_KEY = 'ffc_guest_pending';
+  async function flushGuestPending(){
+    if(!currentUser) return;
+    let pend = null;
+    try{ pend = JSON.parse(localStorage.getItem(GUEST_KEY) || 'null'); }catch(e){}
+    if(!pend || !pend.payload) return;
+    try{ localStorage.removeItem(GUEST_KEY); }catch(e){}
+    const payload = Object.assign({}, pend.payload, { user_id: currentUser.id });
+    const { data, error } = await sb.from('training_sessions').insert(payload).select().single();
+    if(error){ try{ localStorage.setItem(GUEST_KEY, JSON.stringify(pend)); }catch(e){} console.error(error); return; }
+    host('onSaved', { id: data.id, rounds: data.rounds, workSec: data.work_sec, restSec: data.rest_sec, totalSec: data.total_sec }, pend.eventId || null);
+    host('onGuestSaved');
+  }
   async function saveHistory(){
     if(!currentUser){
-      return { ok:false, message:'Nicht angemeldet – Workout kann nicht gespeichert werden.' };
+      try{
+        localStorage.setItem(GUEST_KEY, JSON.stringify({
+          at: Date.now(), eventId: finishedSyncEventId || null,
+          payload: { date: new Date().toISOString(), rounds: rounds, work_sec: workSec, rest_sec: restSec, total_sec: elapsedTotal, log: log }
+        }));
+      }catch(e){}
+      return { ok:false, guest:true, message:'Als Gast trainiert.' };
     }
     const payload = {
       user_id: currentUser.id,
@@ -2751,6 +2773,10 @@
       statusEl.style.color = 'var(--chalk)';
       statusEl.textContent = 'In deinen Trainingsaufzeichnungen gespeichert.';
       host('onSaved', lastWorkout, finishedSyncEventId);
+    } else if(result.guest){
+      statusEl.style.color = 'var(--text-dim)';
+      statusEl.textContent = 'Als Gast trainiert. Zum Speichern brauchst Du ein Konto.';
+      host('onGuestFinished', lastWorkout, finishedSyncEventId);
     } else {
       statusEl.style.color = 'var(--danger)';
       statusEl.textContent = 'Nicht gespeichert: ' + result.message;
