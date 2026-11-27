@@ -27,7 +27,7 @@
   function inAdmin() { return !!document.querySelector(".ga-root"); }
   function section() {
     if (inAdmin()) return "Admin";
-    if (document.body.classList.contains("is-chat-feed")) return "Chat";
+    if (document.body.classList.contains("go-chat-open")) return "Chat";
     var s = document.body && document.body.dataset ? document.body.dataset.shell : "";
     return SECTION[s] || s || "";
   }

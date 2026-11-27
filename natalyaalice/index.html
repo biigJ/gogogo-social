@@ -1589,6 +1589,26 @@
     body.go-say-open .heute-say:not(.heute-cal) svg { fill: currentColor; }
     /* Chat-Feed (Pille „Chat“): nur Nachrichten, Eingabe immer offen, keine Profilkreise */
     body.is-chat-feed #heute-stories, body.is-chat-feed #heute-joins { display: none !important; }
+    /* Chat (go-chat.js): eigene Ebene ohne Pille und ohne Aktuell-Kopfzeile, nur Zurück und Aktualisieren */
+    .go-chat { position: fixed; inset: 0; z-index: 58; background: #F3EEE4; color: #2A2118; display: flex; flex-direction: column; }
+    body.go-chat-open .app-pill { display: none !important; }
+    body.go-chat-open:not(.go-chat-thread) .gbub-compose { display: none !important; }
+    body.go-chat-open.go-chat-thread .gbub-compose { display: flex !important; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px) !important; }
+    .go-chat__bar { display: grid; grid-template-columns: 36px 1fr 36px; align-items: center; gap: 8px; padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 8px; }
+    .go-chat__bar h2 { margin: 0; text-align: center; font: 600 22px/1.2 "Playfair Display", Georgia, serif; color: #2A2118; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .go-chat__refresh { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; background: transparent; color: #2A2118; cursor: pointer; }
+    .go-chat__refresh svg { width: 22px; height: 22px; }
+    .go-chat__refresh.is-spin svg { animation: goChatSpin .8s linear infinite; }
+    @keyframes goChatSpin { to { transform: rotate(360deg); } }
+    .go-chat__list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 14px; padding: 8px 20px calc(env(safe-area-inset-bottom, 0px) + 24px); }
+    .go-chat__row { display: flex; align-items: center; gap: 14px; width: 100%; background: none; border: 0; padding: 0; text-align: left; color: inherit; font: inherit; cursor: pointer; }
+    .go-chat__row .friend-list__text { flex: 1 1 auto; }
+    .go-chat__row .friend-list__meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .go-chat__ico svg { width: 26px; height: 26px; }
+    .go-chat__say { flex: none; display: grid; place-items: center; width: 40px; height: 40px; color: #2A2118; }
+    .go-chat__say svg { width: 26px; height: 26px; }
+    .go-chat__msgs { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 0 calc(env(safe-area-inset-bottom, 0px) + 110px); }
+    .go-chat__empty { margin: 40px 20px; text-align: center; opacity: .6; }
     body.go-say-open #heute-acc { padding-bottom: 90px; }
     .heute-refresh.is-busy svg { animation: heute-spin .8s linear infinite; }
     @keyframes heute-spin { to { transform: rotate(360deg); } }
@@ -9050,13 +9070,14 @@
   <script src="/natalyaalice/coach-reviews.js?v=gcr-6"></script>
   <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-35"></script>
-  <script src="/natalyaalice/go-usage.js?v=gus-3"></script>
+  <script src="/natalyaalice/go-usage.js?v=gus-4"></script>
   <script src="/natalyaalice/go-messages.js?v=msg-31"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-207"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-208"></script>
+  <script src="/natalyaalice/go-chat.js?v=gch-1"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-131"></script>
   <script src="/natalyaalice/support.js?v=support-36"></script>
@@ -13912,7 +13933,7 @@
         beatTrainingPresence();
         window.setTimeout(syncHScrollDock, 20);
         syncStatusFade();
-        var chatOn = shellTab === "heute" && document.body.classList.contains("is-chat-feed");
+        var chatOn = shellTab === "heute" && document.body.classList.contains("go-chat-open");
         document.querySelectorAll(".app-pill button").forEach(function (btn) {
           var on = chatOn ? btn.getAttribute("data-shell") === "chat" : btn.getAttribute("data-shell") === shellTab;
           btn.classList.toggle("is-on", on);
@@ -18322,6 +18343,73 @@
           if (ex.reply_to) row.reply_to = ex.reply_to;
           return rest("go_aktuell_posts", { method: "POST", prefer: "return=minimal", body: row });
         }).then(function () { return true; });
+      }
+
+      /* Chat: Direktnachricht an einen Freund (audience team, nur an ihn) oder an einen Kreis */
+      function sendChat(key, text, ex) {
+        ex = ex || {};
+        if (String(key).indexOf("dm:") !== 0) return sendKreisPost(key, text, ex);
+        var to = String(key).slice(3);
+        var body = String(text || "").trim();
+        if (!sessionAccount || !to || (!body && !ex.media_url)) return Promise.resolve(false);
+        var row = { author_id: sessionAccount.id, audience: "team", recipients: [to], to_id: to, body: body.slice(0, 2000) };
+        if (ex.media_url) { row.media_url = ex.media_url; row.media_kind = ex.media_kind || "img"; }
+        if (ex.reply_to) row.reply_to = ex.reply_to;
+        return rest("go_aktuell_posts", { method: "POST", prefer: "return=minimal", body: row }).then(function () { return true; });
+      }
+      function chatKreise() {
+        var out = [];
+        var mine = String((sessionAccount && sessionAccount.id) || "");
+        if ((teamPeople || []).some(function (p) { return p && !p.isSelf; })) out.push({ key: "team", name: "Alle Freunde", icon: KREIS_ICON.group || "" });
+        var grp = (myGroups() || [])[0];
+        if (grp) out.push({ key: "gruppe", name: grp.name || "Meine Gruppe", photo: grp.photo_url || "/assets/gogogo/gogogo-Gruppe-small.jpg" });
+        (cst().groups || []).filter(function (g) { return g && g.group_id; }).forEach(function (g) {
+          out.push({ key: "circle:" + g.group_id, name: String(g.name || "Circle"), photo: circlePhoto(g) || "/assets/gogogo/gogogo-Zirkeltraining.jpg" });
+        });
+        var bub = window.GoBubbles ? GoBubbles.mine() : null;
+        if (bub) out.push({ key: "bubble", name: bub.name || "Bubble", photo: bub.photo_url || "", icon: (window.GoBubbles && GoBubbles.SOAP_SVG) || "" });
+        var hasCoachees = sessionIsTrainer && (teamPeople || []).some(function (p) { return p && !p.isSelf && String(p.trainer_id || "") === mine; });
+        if (hasCoachees) out.push({ key: "coach", name: "Meine Coachees", icon: KREIS_ICON.group || "" });
+        var st = kreiseState || {};
+        if (sessionAccount && sessionAccount.trainer_id) {
+          out.push({ key: "mycoach", name: "Coach " + String((st.coach && st.coach.name) || "").split(" ")[0], photo: (st.coach && st.coach.photo_url) || "" });
+        }
+        return out;
+      }
+      function chatMsgs(key) {
+        var H = window.HeuteAccountability;
+        if (!H || !H.chatMsgs) return [];
+        var mine = String((sessionAccount && sessionAccount.id) || "");
+        if (String(key).indexOf("dm:") === 0) {
+          var o = String(key).slice(3);
+          return H.chatMsgs().filter(function (m) {
+            var a = String(m.author_id), t = String(m.to_id || "");
+            return t && ((a === mine && t === o) || (a === o && t === mine));
+          });
+        }
+        var l = H.kreisMsgsFor ? H.kreisMsgsFor(key) : [];
+        /* Freunde gesamt: Nachrichten an einzelne stehen im Gespräch mit der Person */
+        return key === "team" ? l.filter(function (m) { return !m.to_id; }) : l;
+      }
+      function initGoChat() {
+        if (!window.GoChat || initGoChat.done) return;
+        initGoChat.done = true;
+        GoChat.init({
+          me: function () { return String((sessionAccount && sessionAccount.id) || ""); },
+          friends: function () { return (teamPeople || []).filter(function (p) { return p && !p.isSelf && isUuid(p.id); }); },
+          kreise: chatKreise,
+          msgs: chatMsgs,
+          bubbleMsgs: function () { return window.GoBubbles && GoBubbles.mine() && GoBubbles.messages ? GoBubbles.messages() : Promise.resolve([]); },
+          reload: function () { return window.HeuteAccountability && HeuteAccountability.reloadChat ? HeuteAccountability.reloadChat() : Promise.resolve(); },
+          msgHtml: function (m) { return window.HeuteAccountability && HeuteAccountability.chatMsgHtml ? HeuteAccountability.chatMsgHtml(m) : ""; },
+          onThread: function (k) {
+            document.body.classList.toggle("go-say-open", !!k);
+            var inp = document.querySelector("#gbub-compose .gbub-compose__inp");
+            if (k) { if (inp) inp.placeholder = ""; }
+            else { if (inp) inp.blur(); syncHeuteSay(); }
+          },
+          onClose: function () { try { paintPill(); } catch (e) {} }
+        });
       }
 
       function syncHeuteFilterOptions() {
@@ -24881,16 +24969,21 @@
             try { if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh(); } catch (eB) {}
           },
           onMessage: function () {
+            if (window.GoChat && GoChat.isOpen()) { GoChat.refresh(); return; }
             try { if (window.HeuteAccountability && HeuteAccountability.refresh) HeuteAccountability.refresh(); } catch (eM) {}
           },
-          /* Sprechblase: in der Bubble-Ansicht in den Bubble-Chat, sonst an den gewählten Kreis */
+          /* Sprechblase: in der Bubble-Ansicht in den Bubble-Chat, sonst an den gewählten Kreis; im Chat an das offene Gespräch */
           composeTarget: function () {
+            var ck = window.GoChat ? GoChat.key() : null;
+            if (ck) return ck === "bubble" ? null : { send: function (text, ex) { return sendChat(ck, text, ex); } };
             var view = heuteView();
             if (view === "bubble") return null;
             return { send: function (text, ex) { return sendKreisPost(view, text, ex); } };
           },
           /* @ im Eingabefeld: Personen der aktuellen Ansicht */
           mentionCandidates: function () {
+            var ck = window.GoChat ? GoChat.key() : null;
+            if (ck) return ck.indexOf("dm:") === 0 || ck === "bubble" ? Promise.resolve([]) : mentionPeople(ck);
             var view = heuteView();
             if (view === "bubble" || view === "ich") return Promise.resolve([]);
             return mentionPeople(view);
@@ -24898,6 +24991,7 @@
         }).then(function () { syncHeuteFilterOptions(); });
         GoBubbles.mountComposer();
         bindHeuteSay();
+        initGoChat();
       }
 
       /* Kraft-Tracking: Historie + Verlauf (kraft-tracking.js) */
@@ -25024,11 +25118,12 @@
           if (now - lastAt < 280) return;
           lastAt = now;
           /* Chat = Aktuell nur mit Nachrichten (heute-v3 chatMode), Eingabe unten offen */
-          var chatWas = document.body.classList.contains("is-chat-feed");
-          var chatNow = tab === "chat";
-          document.body.classList.toggle("is-chat-feed", chatNow);
-          if (chatNow) { document.body.classList.add("go-say-open"); tab = "heute"; }
-          else if (chatWas) document.body.classList.remove("go-say-open");
+          /* Chat: eigene Ebene über Aktuell (go-chat.js), Zurück führt nach Aktuell */
+          if (tab === "chat") {
+            document.body.classList.remove("go-say-open");
+            if (window.GoChat) GoChat.open();
+            tab = "heute";
+          } else if (window.GoChat && GoChat.isOpen()) GoChat.close();
           closeKreisPage();
           var sheetOpen = document.getElementById("profile-sheet");
           if (sheetOpen && !sheetOpen.hidden && sheetOpen.classList.contains("is-open")) {

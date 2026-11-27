@@ -2952,7 +2952,8 @@
   }
 
   /* Pille „Chat“: eigener Feed nur aus Nachrichten der Sprechblase; in Aktuell stehen sie nicht mehr */
-  function chatMode() { return document.body.classList.contains("is-chat-feed"); }
+  /* Chat hat seine eigene Ebene (go-chat.js); der Feed-Modus bleibt aus */
+  function chatMode() { return false; }
   function chatFeedItems(flags) {
     var today = todayIso();
     var out = { myToday: [], upcoming: [], history: [] };
@@ -6928,6 +6929,11 @@
       if (!ev || ev.status !== "erledigt" || ev.category === "zirkel" || !global.GoKraftTracking || !GoKraftTracking.dayExercises) return Promise.resolve("");
       return GoKraftTracking.dayExercises(String(ev.user_id), dayKey(ev.starts_at)).then(accExItems).catch(function () { return ""; });
     },
+    /* Chat (go-chat.js): Nachrichten, Darstellung wie in Aktuell, Neuladen */
+    chatMsgs: function () { return state.kreisMsgs || []; },
+    kreisMsgsFor: function (v) { return kreisMsgsFor(v); },
+    chatMsgHtml: function (m) { return renderBubbleMsg(m); },
+    reloadChat: function () { return loadKreisMsgs(); },
     /* Story kommender Events: geplante Übungen, Zirkel sein Format */
     storyPlanHtml: function (ev) {
       if (!ev || ev.status === "erledigt") return Promise.resolve("");
