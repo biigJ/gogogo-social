@@ -52,7 +52,10 @@
       ".gstory__bars .is-done i{width:100%}" +
       ".gstory__bars .is-now i{animation:gstorybar " + DUR + "ms linear forwards}" +
       ".gstory.is-held .gstory__bars .is-now i{animation-play-state:paused}" +
-      "@keyframes gstorybar{from{width:0}to{width:100%}}";
+      "@keyframes gstorybar{from{width:0}to{width:100%}}" +
+      /* „Anzeigen“: springt zur aufgeklappten Kachel in Aktuell (Stil wie der CTA auf der Kachel) */
+      ".gstory__cta{position:absolute;z-index:3;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 40px);min-height:40px;padding:0 22px;border-radius:999px;border:1px solid #F6F1E8;background:#F6F1E8;color:#2A2118;font:700 15px/1 Inter,system-ui,sans-serif;cursor:pointer}" +
+      ".gstory.has-cta .gstory__txt{bottom:calc(env(safe-area-inset-bottom,0px) + 96px)}";
     document.head.appendChild(st);
   }
 
@@ -90,7 +93,12 @@
       clearTimeout(timer);
       /* Ende: nächste Person (opts.onEnd), sonst zurück */
       if (i >= items.length) { close(); if (opts.onEnd) opts.onEnd(); return; }
-      if (i < 0) i = 0;
+      /* links tippen auf der ersten Story: zurück zum vorherigen Profil */
+      if (i < 0) {
+        if (opts.onPrev) { close(); if (opts.onPrev()) return; }
+        else i = 0;
+        if (i < 0) return;
+      }
       var it = items[i];
       wrap.innerHTML =
         '<div class="gstory__sb" aria-hidden="true"></div>' +
@@ -105,11 +113,13 @@
         (it.note ? '<p class="gstory__note">' + esc(it.note) + "</p>" : "") +
         (it.done && !it.status ? '<p class="gstory__done">Erledigt ✓</p>' : "") +
         "</div>" +
+        (it.cta ? '<button type="button" class="gstory__cta" data-gstory-open="1">' + esc(it.cta) + "</button>" : "") +
         '<div class="gstory__bars">' + items.map(function (_, k) {
           return '<span class="' + (k < i ? "is-done" : k === i ? "is-now" : "") + '"><i></i></span>';
         }).join("") + "</div>";
       held = false;
       wrap.classList.remove("is-held");
+      wrap.classList.toggle("has-cta", !!it.cta);
       /* Übungsliste kommt asynchron; nur einsetzen, wenn die Story noch dieselbe ist */
       if (it.loadList) {
         var at = i;

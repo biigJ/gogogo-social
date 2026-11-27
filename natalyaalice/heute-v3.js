@@ -6832,6 +6832,12 @@
   function focusEvent(id) {
     var card = document.querySelector('.acc-card[data-event-id="' + String(id).replace(/"/g, "") + '"]');
     if (!card) return false;
+    /* zusammengeschobene Karte aufklappen (wie Tipp im Stapel) */
+    if (card.classList.contains("is-wallet") && !card.classList.contains("is-open")) {
+      [].forEach.call(document.querySelectorAll(".acc-card.is-wallet.is-open"), function (c) { c.classList.remove("is-open"); });
+      card.classList.add("is-open");
+      state.walletOpen = card.getAttribute("data-post-id") || "";
+    }
     card.scrollIntoView({ behavior: "smooth", block: "center" });
     return true;
   }
@@ -6921,6 +6927,17 @@
     storyExercisesHtml: function (ev) {
       if (!ev || ev.status !== "erledigt" || ev.category === "zirkel" || !global.GoKraftTracking || !GoKraftTracking.dayExercises) return Promise.resolve("");
       return GoKraftTracking.dayExercises(String(ev.user_id), dayKey(ev.starts_at)).then(accExItems).catch(function () { return ""; });
+    },
+    /* Story kommender Events: geplante Übungen, Zirkel sein Format */
+    storyPlanHtml: function (ev) {
+      if (!ev || ev.status === "erledigt") return Promise.resolve("");
+      if (ev.category === "zirkel") {
+        var z = parseZirkelNote(ev.note);
+        var lab = z ? zirkelLabel(z) : "";
+        return Promise.resolve(lab ? "<li><span>" + esc(lab) + "</span></li>" : "");
+      }
+      if (!host.exercisesForEvent) return Promise.resolve("");
+      return Promise.resolve(host.exercisesForEvent(ev)).then(function (l) { return l && l.length ? accExItems(l) : ""; }).catch(function () { return ""; });
     },
     /* Herz neu prüfen (z. B. nach Bestätigen einer Anfrage) */
     refreshHeart: function () { state.repliesAt = 0; return checkReplies(); }
