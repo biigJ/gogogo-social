@@ -187,6 +187,13 @@
     isOpen: function () { return !!(root && root.isConnected); },
     key: function () { return root && root.isConnected ? key : null; },
     refresh: function () { return root && root.isConnected ? reload() : Promise.resolve(); },
-    repaint: paint
+    repaint: paint,
+    /* direkt ein Gespräch öffnen (Herz → neue Nachricht) */
+    openKey: function (k) {
+      if (!host || !k) return;
+      if (!root || !root.isConnected) open();
+      openThread(k);
+      reload();
+    }
   };
 })(window);
