@@ -2565,7 +2565,9 @@
       extraClass: (!mine && (acceptedInv || iAmGoing(ev.id)) ? "is-going"
         : mine && upcoming && day >= todayIso() ? "is-mine-next" : "")
         /* verkleinert (Besitzer über •••, gilt für alle): Höhe wie Wallet-Karte, Tipp klappt auf */
-        + (ev.status === "erledigt" && compactPast() ? " is-wallet is-shrunk" : ""),
+        + (ev.status === "erledigt" && compactPast() ? " is-wallet is-shrunk" : "")
+        /* kommende Events von Freunden und Coachees: Foto 70 % eingefärbt (Farbe je Darstellung) */
+        + (!mine && ev.status === "geplant" && (hasTime(ev) ? new Date(ev.starts_at).getTime() > Date.now() : day > todayIso()) ? " is-tint" : ""),
       attrs:
         ' data-post-id="' +
         esc(ev.id) +
