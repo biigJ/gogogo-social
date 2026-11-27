@@ -2587,7 +2587,8 @@
         esc(ev.id) +
         '"' + (ptR ? ' data-pt="' + ptR + '"' : ""),
       category: ev.category,
-      mediaExtra: inviteCta || actCta,
+      /* Zirkel heute: Countdown, Anhalten, Sofortstart an der Stelle des Buttons (kein Start-Button) */
+      mediaExtra: inviteCta || (zirkelPillsHtml(ev) ? zirkelPillsHtml(ev).replace('class="wr-zrow acc-zrow"', 'class="wr-zrow acc-zrow acc-zrow--media"') : actCta),
       photo: ev.photo_url || "",
       extraPhotos: eventExtraPhotos(ev),
       courseId: ev.course_id || "",
@@ -2599,7 +2600,7 @@
       exlist: accExListHtml(ev),
       when: zirkelPillsHtml(ev) ? "Heute · " + timeLabel(ev.starts_at) : whenLine(ev.starts_at),
       whenTs: zirkelPillsHtml(ev) ? "" : ev.starts_at,
-      zpills: zirkelPillsHtml(ev),
+      zpills: inviteCta ? zirkelPillsHtml(ev) : "",
       title: title,
       place: ev.location || "",
       desc:
