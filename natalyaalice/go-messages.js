@@ -14,6 +14,11 @@
 
   var NEWS = [
     {
+      key: "news:2026-11-27-feed",
+      at: "2026-11-27T09:10:00Z",
+      text: "Vergangene Events sind jetzt verkleinert. Unter Profil → Einstellungen → Feed Darstellung stellst Du Historie, Stories und Wallet oder Kacheln ein."
+    },
+    {
       key: "news:2026-11-27-chat",
       at: "2026-11-27T08:00:00Z",
       text: "Nachrichten haben jetzt ihren eigenen Feed: Chat unten in der Leiste. Den Kalender findest Du oben links in Aktuell."
