@@ -5757,8 +5757,7 @@
         : v === "gruppe" ? { visibility: "gruppe", group_id: grp ? grp.id : ev.group_id, bubble_id: null }
         : circleGid ? { visibility: "circle", circle_id: circleGid, bubble_id: null }
         : { visibility: v === "coach" ? "coach" : "team", bubble_id: null };
-      /* Circle verlassen: Zuordnung lösen */
-      if (!circleGid && ev.circle_id) body.circle_id = null;
+      /* Sichtbarkeit ändert nur, wer es sieht: der Zirkel bleibt seinem Circle zugeordnet (Bild, Circle-Seite, Teilnehmer) */
       function save(b) { return rest("events?id=eq." + encodeURIComponent(id), { method: "PATCH", prefer: "return=minimal", body: b }); }
       save(body)
         .catch(function (err) {
