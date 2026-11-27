@@ -1250,8 +1250,24 @@
   function globalPlanFor(iso) {
     try { return host && host.planItemForDay ? host.planItemForDay(iso) : null; } catch (e) { return null; }
   }
+  /* Serienbild: „Eigenes Foto“ aus Tage bearbeiten liegt auf den geplanten Events gleichen Titels */
+  function seriesPhotoOf(ev) {
+    var hit = (state.events || []).filter(function (e) {
+      return e && e.status === "geplant" && e.photo_url && String(e.user_id) === String(ev.user_id) && e.title === ev.title;
+    })[0];
+    return hit ? hit.photo_url : null;
+  }
   function globalize(it, plan) {
-    if (!it || !it.ev || it._fromPlan || isTravelAlt(it) || !it.ev.enrollment_id) return it;
+    if (!it || !it.ev || it._fromPlan || isTravelAlt(it)) return it;
+    /* Erledigt (z. B. Zirkel mit Foto vom Training): Kalender zeigt die Serie, nicht das Ergebnis.
+       Foto = Serienbild oder Standard, Uhrzeit = übliche Serienzeit statt Startzeit beim Beenden */
+    if (!it.ev.enrollment_id) {
+      if (it.ev.status !== "erledigt" || String(it.ev.user_id) !== me()) return it;
+      var evD = Object.assign({}, it.ev, { photo_url: seriesPhotoOf(it.ev) });
+      var usualD = (state.seriesTime || {})[seriesKey(evD.title, dayKey(evD.starts_at) + "T12:00:00Z")];
+      if (usualD) evD.starts_at = timedStarts(dayKey(evD.starts_at), ("0" + usualD).slice(-5)) || evD.starts_at;
+      return Object.assign({}, it, { ev: evD, starts_at: evD.starts_at });
+    }
     var ev = Object.assign({}, it.ev, { photo_url: null });
     if (plan) {
       /* Titel nicht mehr aus dem lokalen Wochenplan des Geräts: der Termin aus der Einschreibung ist maßgeblich
