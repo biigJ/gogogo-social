@@ -5570,7 +5570,10 @@
     .team-challenge__show { border: 0; background: transparent; color: #2A2118; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; padding: 0; }
     .team-challenge__end { margin-left: auto; padding: 0; border: 0; background: transparent; color: #C7413B; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
     /* Stempelkarten-Stapel: Karten dahinter angedeutet, Punkte zeigen, welche oben liegt */
-    .stamp-pass.has-stack { box-shadow: 0 -9px 0 -4px rgba(246,241,232,.55), 0 -18px 0 -8px rgba(246,241,232,.3); cursor: pointer; }
+    /* mehrere Karten: hintere Karten deutlich abgesetzt, Wischen oder Tippen wechselt */
+    .stamp-pass.has-stack { box-shadow: 0 -16px 0 -6px rgba(246,241,232,.6), 0 -32px 0 -12px rgba(246,241,232,.32); margin-top: 32px; cursor: pointer; touch-action: pan-y; }
+    .stamp-pass.is-swiping { transition: none !important; }
+    .stamp-pass.is-swapped { transition: transform .22s ease, opacity .22s ease; }
     .stamp-pass__stackdots { display: flex; justify-content: center; gap: 6px; margin: 6px 0 0; }
     .stamp-pass__stackdots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(246,241,232,.4); }
     .stamp-pass__stackdots i.is-on { background: #F6F1E8; }
@@ -16072,14 +16075,43 @@
           .catch(function () { pass.style.visibility = ""; });
         if (!pass._stackBound) {
           pass._stackBound = true;
-          pass.addEventListener("click", function (e) {
+          function stackGo(dir) {
             var st = modal._stack || [];
             if (st.length < 2) return;
-            if (e.target.closest("#stamp-card-wallet, #stamp-card-pen, .stamp-pass__qr")) return;
-            modal._stackAt = (modal._stackAt + 1) % st.length;
+            modal._stackAt = (modal._stackAt + dir + st.length) % st.length;
             paintStampFace(st[modal._stackAt]);
             paintStackDots();
+          }
+          pass.addEventListener("click", function (e) {
+            if (pass._swiped) { pass._swiped = false; return; }
+            if (e.target.closest("#stamp-card-wallet, #stamp-card-pen, .stamp-pass__qr")) return;
+            stackGo(1);
           });
+          /* Wischen links/rechts wechselt die Karte (vertikal bleibt Scrollen) */
+          var sx = 0, sy = 0, dx = 0, track = false;
+          pass.addEventListener("touchstart", function (e) {
+            if ((modal._stack || []).length < 2 || !e.touches[0]) return;
+            sx = e.touches[0].clientX; sy = e.touches[0].clientY; dx = 0; track = true;
+            pass.classList.remove("is-swapped");
+            pass.classList.add("is-swiping");
+          }, { passive: true });
+          pass.addEventListener("touchmove", function (e) {
+            if (!track || !e.touches[0]) return;
+            dx = e.touches[0].clientX - sx;
+            var dy = e.touches[0].clientY - sy;
+            if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 12) { track = false; pass.style.transform = ""; pass.classList.remove("is-swiping"); return; }
+            pass.style.transform = "translateX(" + dx * 0.6 + "px) rotate(" + dx * 0.02 + "deg)";
+          }, { passive: true });
+          function swipeEnd() {
+            if (!track) return;
+            track = false;
+            pass.classList.remove("is-swiping");
+            pass.classList.add("is-swapped");
+            pass.style.transform = "";
+            if (Math.abs(dx) > 45) { pass._swiped = true; stackGo(dx < 0 ? 1 : -1); setTimeout(function () { pass._swiped = false; }, 400); }
+          }
+          pass.addEventListener("touchend", swipeEnd);
+          pass.addEventListener("touchcancel", swipeEnd);
         }
         function paintStackDots() {
           var d = document.getElementById("stamp-card-stackdots");
