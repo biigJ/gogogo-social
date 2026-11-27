@@ -1481,7 +1481,8 @@
       /* Kommende Events: „zeigen“ am Event reicht (Historie teilen gilt nur für Vergangenes) */
       if (coachSees) return !flags.groupOnly || inGroupFilter(ev.user_id, flags);
       if (!inTeamFilter(ev.user_id, flags)) return false;
-      if (!(vis === "team" || vis === "gruppe")) return false;
+      /* Circle-Event (Zirkel) eines Freundes: sichtbar wie „team“ (go-circle-events-friends.sql), er pulsiert, Story, Winken = Zusage */
+      if (!(vis === "team" || vis === "gruppe" || vis === "circle")) return false;
       return inGroupFilter(ev.user_id, flags);
     }
     if (ev.status === "erledigt") {
