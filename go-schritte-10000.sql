@@ -10,9 +10,9 @@ begin
     raise notice '> 10.000 Schritte gibt es schon';
     return;
   end if;
-  select id into v_src from courses where title = '> 5.000 Schritte' order by created_at limit 1;
+  select id into v_src from courses where title in ('> 7.500 Schritte', '> 5.000 Schritte') order by created_at limit 1;
   if v_src is null then
-    raise exception 'Vorlage „> 5.000 Schritte“ fehlt';
+    raise exception 'Vorlage „> 7.500 Schritte“ fehlt';
   end if;
   v_new := gen_random_uuid();
 

@@ -1431,7 +1431,7 @@
       localStorage.setItem("go_today_hint", JSON.stringify({
         d: todayIso(),
         done: list.some(function (e) { return e.status === "erledigt"; }),
-        next: next ? { title: String(next.title || "Training").replace(/^[^A-Za-zÄÖÜäöü0-9]+\s*/, ""), time: timeLabel(next.starts_at) } : null
+        next: next ? { title: String(next.title || "Training").replace(/^[^A-Za-zÄÖÜäöü0-9]+\s*/, ""), time: timeLabel(next.starts_at), steps: isStepsEvent(next) } : null
       }));
     } catch (e) {}
   }
@@ -1757,6 +1757,14 @@
         '<path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19l8-8"/></svg>'
       );
     }
+    if (kind === "steps") {
+      /* Schritte: zwei Fußabdrücke */
+      return (
+        '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M7.5 3.5c-1.8 0-2.7 2-2.7 4.3 0 1.8.7 3.2 1 4.6h3.6c.3-1.4.8-2.8.8-4.6 0-2.3-.9-4.3-2.7-4.3z"/><path d="M5.9 14.8h3.4v1.5a1.7 1.7 0 0 1-3.4 0z"/>' +
+        '<path d="M16.5 7.5c1.8 0 2.7 2 2.7 4.3 0 1.8-.7 3.2-1 4.6h-3.6c-.3-1.4-.8-2.8-.8-4.6 0-2.3.9-4.3 2.7-4.3z"/><path d="M14.7 18.8h3.4v1.5a1.7 1.7 0 0 1-3.4 0z"/></svg>'
+      );
+    }
     if (kind === "spontan") {
       return (
         '<svg class="acc-badge-ico" viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' +
@@ -1988,8 +1996,13 @@
     zirkel: "FRIDAY CIRCLE: Zirkeltraining der Gruppe.",
     spontan: "Spontanes Event: einfach so trainiert.",
     alternative: "Alternative: Bewegung statt Training, z. B. Schritte oder Mobility.",
-    invite: "Einladung: Jemand will mit Dir trainieren."
+    invite: "Einladung: Jemand will mit Dir trainieren.",
+    steps: "Mach ausreichend Schritte. Sei aktiv, ob bei der Arbeit, in Pausen oder als Teil Deiner Freizeitgestaltung. An einem Tag ohne Workout oder Sport zählen besonders die Schritte."
   };
+  /* Schritte-Event (Sonstiges/Bewegung mit „Schritte“ im Titel): eigenes Icon, eigene Texte */
+  function isStepsEvent(ev) {
+    return !!ev && /schritte/i.test(String(ev.title || "")) && (!ev.category || ev.category === "alternative");
+  }
 
   var SPONTAN_BTN =
     '<button type="button" class="acc-tool acc-tool--spontan" data-spontan="1" aria-label="Spontan trainieren">' +
@@ -2534,6 +2547,7 @@
   function eventBadgeKind(ev) {
     if (!ev) return "";
     if (ev.category === "zirkel") return "zirkel";
+    if (isStepsEvent(ev)) return "steps";
     if (ev.is_unplanned) return "spontan";
     if (ev.category === "alternative" && !ev.enrollment_id && !ev.assigned_by) return "alternative";
     if (ev.assigned_by) return "coach";
@@ -2912,7 +2926,7 @@
       postId: postId,
       canDone: false,
       isDone: false,
-      badge: item.category === "zirkel" ? "zirkel" : "plan",
+      badge: item.category === "zirkel" ? "zirkel" : isStepsEvent(item) ? "steps" : "plan",
       removeId: "",
       removeMode: "skip"
     });
@@ -6182,8 +6196,11 @@
     }
     var badgeInfo = t.closest("[data-badge-info]");
     if (badgeInfo) {
-      var info = BADGE_INFO[badgeInfo.getAttribute("data-badge-info")] || "";
-      if (info && host.toast) host.toast(info);
+      var bKind = badgeInfo.getAttribute("data-badge-info");
+      var info = BADGE_INFO[bKind] || "";
+      /* Schritte: längerer Text, bleibt stehen bis OK */
+      if (info && bKind === "steps" && global.GoDialog && GoDialog.alert) GoDialog.alert(info);
+      else if (info && host.toast) host.toast(info);
       return;
     }
     var spontan = t.closest("[data-spontan]");

@@ -7309,7 +7309,15 @@
       var DONE = ["Heute schon trainiert. Stark.", "Training erledigt. Gönn Dir die Pause.", "Bewegt hast Du Dich heute schon. Gut so."];
       function pick(arr) { return arr[(now.getDate() + h) % arr.length]; }
       var sub;
-      if (hint && hint.next && slot !== "nacht" && slot !== "spaet") {
+      if (hint && hint.next && (hint.next.steps || /schritte/i.test(String(hint.next.title || ""))) && slot !== "nacht") {
+        /* Schritte: keine Ankündigung wie ein Termin, Erinnerung an Bewegung + wann notieren */
+        var ts = hint.next.time;
+        sub = pick([
+          "Hast Du Dich schon ausreichend bewegt?" + (ts ? " Notiere um " + ts + " die gemachten Schritte." : " Notiere heute Abend die gemachten Schritte."),
+          "Jeder Weg zählt heute." + (ts ? " Um " + ts + " trägst Du Deine Schritte ein." : " Abends trägst Du Deine Schritte ein."),
+          "Treppe statt Aufzug, zu Fuß statt Bahn." + (ts ? " Um " + ts + " zählst Du nach." : " Abends zählst Du nach.")
+        ]);
+      } else if (hint && hint.next && slot !== "nacht" && slot !== "spaet") {
         var t = hint.next.time;
         sub = pick([
           (t ? "Um " + t + " wartet " : "Heute wartet ") + hint.next.title + " auf Dich.",
@@ -9134,12 +9142,12 @@
   <script src="/natalyaalice/coach-browse.js?v=gcb-4"></script>
   <script src="/natalyaalice/go-dialog.js?v=dlg-35"></script>
   <script src="/natalyaalice/go-usage.js?v=gus-5"></script>
-  <script src="/natalyaalice/go-messages.js?v=msg-35"></script>
+  <script src="/natalyaalice/go-messages.js?v=msg-36"></script>
   <script src="/natalyaalice/go-onboarding.js?v=gob-5"></script>
   <script src="/natalyaalice/go-zirkel-setup.js?v=gz-5"></script>
   <script src="/natalyaalice/ausdauer-timer.js?v=gtm-2"></script>
   <script src="/natalyaalice/share-card.js?v=sc-1"></script>
-  <script src="/natalyaalice/heute-v3.js?v=feed-231"></script>
+  <script src="/natalyaalice/heute-v3.js?v=feed-232"></script>
   <script src="/natalyaalice/go-chat.js?v=gch-6"></script>
   <script src="/natalyaalice/place-picker.js?v=pp-4"></script>
   <script src="/natalyaalice/woche-reels.js?v=woche-137"></script>
