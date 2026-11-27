@@ -3752,7 +3752,13 @@
       if (slots[i]) return null;
       return normalDayEvents(iso).filter(function (e) { return e.status === "erledigt"; })[0] || null;
     });
-    state.daysEdit = { days: days, slots: slots, done: done, zirkels: zirkels, times: {}, vis: {}, orig: {}, bub: {}, placeBase: {} };
+    /* Gruppentrainings und Zirkel anderer (Gruppe, Circle), denen ich zugesagt habe: eigene Zeile, nur Zusage/Absage */
+    var joinedByDay = days.map(function (iso) {
+      return (state.joined || []).filter(function (e) {
+        return e && String(e.user_id) !== me() && e.status === "geplant" && dayKey(e.starts_at) === iso;
+      }).sort(function (a, b) { return String(a.starts_at).localeCompare(String(b.starts_at)); });
+    });
+    state.daysEdit = { days: days, slots: slots, done: done, zirkels: zirkels, joined: joinedByDay, joinOff: {}, times: {}, vis: {}, orig: {}, bub: {}, placeBase: {} };
     slots.forEach(function (ev) {
       if (!ev) return;
       /* Tage bearbeiten ist die globale Woche: Uhrzeit und Ort der Serie, nicht die Änderung an einem einzelnen Termin */
@@ -3766,6 +3772,47 @@
       state.daysEdit.orig[ev.id] = state.daysEdit.times[ev.id];
     });
     paintDaysEditor();
+  }
+
+  /* Zusage/Absage für die Serie (gleicher Ersteller, Titel, Wochentag, Uhrzeit ab diesem Termin).
+     event_rsvps ist die eine Quelle: Aktuell, Kalender, Gruppe/Circle und Einladungen (go-rsvp-sync.sql) folgen ihr. */
+  function toggleJoinedSeries(id, btn) {
+    var de = state.daysEdit;
+    if (!de) return;
+    var ev = null;
+    (de.joined || []).forEach(function (l) { l.forEach(function (j) { if (String(j.id) === String(id)) ev = j; }); });
+    if (!ev) return;
+    var yes = !!de.joinOff[String(id)];
+    var ask = !yes && global.GoDialog ? GoDialog.confirm((ev.title || "Training") + " absagen?", { body: "Gilt für diesen und alle folgenden Termine dieser Serie.", ok: "Absagen", cancel: "Abbrechen" }) : Promise.resolve(true);
+    ask.then(function (ok) {
+      if (!ok) return;
+      if (btn) btn.disabled = true;
+      rest("events?user_id=eq." + encodeURIComponent(ev.user_id) + "&title=eq." + encodeURIComponent(ev.title || "") +
+        "&status=eq.geplant&starts_at=gte." + encodeURIComponent(ev.starts_at) + "&select=id,starts_at&order=starts_at.asc&limit=400")
+        .catch(function () { return []; })
+        .then(function (rows) {
+          var ids = (rows || []).filter(function (r) { return sameSlot(r.starts_at, ev.starts_at); }).map(function (r) { return String(r.id); });
+          if (ids.indexOf(String(id)) < 0) ids.unshift(String(id));
+          if (yes) {
+            /* Zirkel im Circle: über die Circle-Funktion (prüft die Berechtigung), sonst direkt */
+            return rest("event_rsvps?on_conflict=event_id,user_id", {
+              method: "POST", prefer: "resolution=merge-duplicates,return=minimal",
+              body: ids.map(function (x) { return { event_id: x, user_id: me(), status: "zugesagt" }; })
+            });
+          }
+          return rest("event_rsvps?user_id=eq." + encodeURIComponent(me()) + "&event_id=in.(" + ids.join(",") + ")", { method: "DELETE", prefer: "return=minimal" });
+        })
+        .then(function () {
+          de.joinOff[String(id)] = !yes;
+          if (host.toast) host.toast(yes ? "Zugesagt" : "Abgesagt");
+          paintDaysEditor();
+          notifyAktuell();
+        })
+        .catch(function () {
+          if (btn) btn.disabled = false;
+          if (host.toast) host.toast("Hat nicht geklappt");
+        });
+    });
   }
 
   function dayPlace(ev) {
@@ -3818,7 +3865,16 @@
         return '<button type="button" class="wr-dayrow wr-dayrow--zirkel" data-wr-dayzirkel="1"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> 🔥 " +
           esc(z.title || "Zirkeltraining") + (displayTime(z.starts_at) ? " · " + formatTime(z.starts_at) : "") + "</span></div><span></span></button>";
       }).join("");
-      return dayRowHtml() + zRows;
+      var jRows = ((de.joined && de.joined[i]) || []).map(function (j) {
+        var off = !!de.joinOff[String(j.id)];
+        var ico = j.category === "zirkel" ? "🔥" : j.group_id ? "👥" : (emojiFor(j.category, j.title) || "");
+        var who = String((personOf(j.user_id) || {}).name || "").split(" ")[0];
+        return '<div class="wr-dayrow wr-dayrow--joined' + (off ? " is-off" : "") + '"><div class="wr-dayrow__mid"><span class="wr-dayrow__title"><b>' + label + "</b> " + ico + " " +
+          esc(j.title || "Training") + (displayTime(j.starts_at) ? " · " + formatTime(j.starts_at) : "") + (who ? ' <span class="wr-dayrow__who">· ' + esc(who) + "</span>" : "") +
+          (j.location ? '<span class="wr-dayrow__place">' + esc(j.location) + "</span>" : "") + "</span></div>" +
+          '<button type="button" class="wr-dayrow__join" data-wr-dayjoin="' + esc(j.id) + '" aria-label="' + (off ? "Wieder zusagen" : "Absagen") + '">' + (off ? "+" : "−") + "</button></div>";
+      }).join("");
+      return dayRowHtml() + zRows + jRows;
       function dayRowHtml() {
       if (!ev) {
         var doneEv = de.done && de.done[i];
@@ -3896,6 +3952,8 @@
     card.addEventListener("click", function (e) {
       if (!state.daysEdit) return;
       if (e.target.closest && e.target.closest("[data-wr-dayzirkel]")) { openZirkelEditor(); state.menuBack = true; return; }
+      var dj = e.target.closest && e.target.closest("[data-wr-dayjoin]");
+      if (dj) { toggleJoinedSeries(dj.getAttribute("data-wr-dayjoin"), dj); return; }
       var vb = e.target.closest && e.target.closest("[data-wr-dayvis]");
       if (vb) {
         var id = vb.getAttribute("data-wr-dayvis");
