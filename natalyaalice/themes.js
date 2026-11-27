@@ -103,6 +103,12 @@
         ".friend-list__feed{border-color:#fff !important}.friend-list__feed.is-on{background:#fff !important;color:#000 !important;border-color:#fff !important}" +
         ".wr-mini-wheel,.cp-wheel,.gtm__wheel{background:#000 !important;border-color:#fff !important}" +
         ".wr-mini-opt,.cp-wheel__opt,.gtm__opt{color:#fff !important}" +
+        /* Coach-Kalender und Verfügbare Zeiten (pt-calendar.js): frei = weiß mit schwarzer Zahl, Zeilen dunkel mit weißer Schrift */
+        ".gpt__day:not(#_){background:#fff !important;color:#000 !important}.gpt__day.is-empty:not(#_),.gpt__day.is-past:not(#_){background:transparent !important;color:#fff !important}" +
+        ".gpt__day.is-blocked:not(#_){background:#2A2A2A !important;color:#fff !important}.gpt__day i:not(#_){background:#000 !important}" +
+        ".gpt__row:not(#_),.gpt__opt:not(#_),.gpt__hrow:not(#_){background:#111 !important;border-color:rgba(255,255,255,.25) !important;color:#fff !important}" +
+        ".gpt__row.is-busy:not(#_){background:#2A2A2A !important;color:rgba(255,255,255,.75) !important}.gpt__row.is-mine:not(#_){background:#fff !important;color:#000 !important}" +
+        ".gpt__hrow b:not(#_),.gpt__opt:not(#_),.gpt__hrow i:not(#_){color:#fff !important}.gpt__opt input,.gpt__hrow input{accent-color:#fff !important}" +
         /* Workout: Rad für Wiederholungen unten (vorher hellgrau mit weißer Schrift) */
         "#wheel.wheel:not(#_){background:#000 !important;border-top:1px solid rgba(255,255,255,.35) !important;color:#fff !important}" +
         "#wheel .wheel-frame::before{background:linear-gradient(#000,rgba(0,0,0,0)) !important}#wheel .wheel-frame::after{background:linear-gradient(rgba(0,0,0,0),#000) !important}" +
