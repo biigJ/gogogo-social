@@ -2909,7 +2909,8 @@
       /* Mein Coach: meine Nachrichten an ihn, seine an mich und an alle Coachees */
       if (view === "mycoach") {
         var au = String(m.author_id), to = String(m.to_id || "");
-        return !!coachId && ((au === me() && to === coachId) || (au === coachId && (to === me() || (!to && m.audience === "coach"))));
+        /* nur Coaching-Nachrichten (audience coach); Direktnachrichten mit dem Coach stehen im Gespräch mit der Person */
+        return !!coachId && m.audience === "coach" && ((au === me() && to === coachId) || (au === coachId && (to === me() || !to)));
       }
       /* „Nur ich“: auch Nachrichten an mich und meine Nachrichten an eine einzelne Person (@Name) */
       if (view === "ich" && m.to_id && (String(m.to_id) === me() || String(m.author_id) === me())) return true;
