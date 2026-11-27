@@ -1579,6 +1579,7 @@
       if (!names || !names.length || !ul.hidden) return;
       ul.innerHTML = exItems(names);
       ul.hidden = false;
+      requestAnimationFrame(alignExWraps);
     });
     /* gleiches HTML beim nächsten render(): Cache steckt schon drin */
     root.__wrHtml = "";
@@ -1675,18 +1676,18 @@
       '<h2 class="wr-title">' +
       esc(title) +
       "</h2>" +
-      "</div>" +
-      /* Übungen: Oberkante bündig mit dem obersten Wochentag-Kästchen rechts */
-      '<div class="wr-exwrap">' + exListHtml(ev) + "</div>" +
-      '<div class="wr-bottom">' +
-      '<div class="wr-bottom__main">' +
+      /* Profilkreise (Nutzer und Teilnehmer) unter dem Namen */
       '<div class="wr-author">' +
       avatarHtml(p) +
       goingAvatarsHtml(ev) +
       inviteAvatarsHtml(iso) +
       "</div>" +
-      /* Countdown und „Start anhalten“ nebeneinander als gleiche Pillen */
-      (cd || zirkelAdminHtml(ev, zSet, iso) ? '<div class="wr-zrow">' + cd + zirkelAdminHtml(ev, zSet, iso) + "</div>" : "") +
+      "</div>" +
+      /* Übungen: Oberkante bündig mit dem obersten Wochentag-Kästchen rechts (alignExWraps) */
+      '<div class="wr-exwrap">' + exListHtml(ev) + "</div>" +
+      '<div class="wr-bottom">' +
+      '<div class="wr-bottom__main">' +
+      /* Zirkel-Pillen (Countdown, Anhalten, Sofortstart) gehören nach Aktuell, nicht in den Kalender */
       desc +
       (zSet && zSet.online
         ? '<button type="button" class="go-online-cta" data-wr-zirkel-go="1">Online mitmachen</button>'
@@ -2257,7 +2258,28 @@
     el.textContent = formatWeekday(currentDayIso());
   }
 
+  /* Übungsliste: Oberkante der Buchstaben auf Höhe des obersten Wochentag-Kästchens (gemessen statt geschätzt) */
+  function alignExWraps() {
+    var root = $(ROOT_ID);
+    if (!root) return;
+    var dq = root.querySelector(".wr-dsqs .wr-dsq");
+    if (!dq) return;
+    var top = dq.getBoundingClientRect().top - root.getBoundingClientRect().top;
+    if (!(top > 0)) return;
+    [].forEach.call(root.querySelectorAll(".wr-exwrap"), function (w) {
+      var li = w.querySelector("li");
+      /* Abstand Zeilenoberkante → Buchstabenoberkante (Inter 14px / 1.3): rund 4 px */
+      var lead = li ? Math.max(0, (parseFloat(getComputedStyle(li).lineHeight) - parseFloat(getComputedStyle(li).fontSize)) / 2 + 1) : 4;
+      w.style.top = Math.round(top - lead) + "px";
+    });
+  }
+  if (!global.__wrAlignBound) {
+    global.__wrAlignBound = true;
+    global.addEventListener("resize", function () { setTimeout(alignExWraps, 50); });
+  }
+
   function syncSurface() {
+    alignExWraps();
     applyDayContrast();
     patchDayLabel();
     if (host && typeof host.syncStatusFade === "function") {
@@ -4699,6 +4721,7 @@
     }
     root.innerHTML = nextHtml;
     root.__wrHtml = nextHtml;
+    requestAnimationFrame(alignExWraps);
     if (keepSheet) {
       var freshSheet = $("wr-sheet");
       if (freshSheet) freshSheet.replaceWith(keepSheet);
